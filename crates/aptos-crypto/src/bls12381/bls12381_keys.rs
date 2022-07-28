@@ -30,7 +30,7 @@ use aptos_crypto_derive::{DeserializeKey, SerializeKey, SilentDebug, SilentDispl
 use serde::Serialize;
 use std::{convert::TryFrom, fmt};
 
-#[derive(Clone, Debug, Eq, SerializeKey, DeserializeKey)]
+#[derive(Clone, Eq, SerializeKey, DeserializeKey)]
 /// A BLS12381 public key
 pub struct PublicKey {
     pub(crate) pubkey: blst::min_pk::PublicKey,
@@ -244,6 +244,12 @@ impl std::hash::Hash for PublicKey {
 impl PartialEq for PublicKey {
     fn eq(&self, other: &Self) -> bool {
         self.to_bytes()[..] == other.to_bytes()[..]
+    }
+}
+
+impl fmt::Debug for PublicKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.to_bytes()))
     }
 }
 

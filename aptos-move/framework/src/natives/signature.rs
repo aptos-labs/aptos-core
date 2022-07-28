@@ -65,7 +65,7 @@ macro_rules! pop_vec_arg {
     }};
 }
 
-pub fn native_bls12381_aggregate_unvalidated_pubkeys(
+pub fn native_bls12381_aggregate_pop_verified_pubkeys(
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -81,7 +81,7 @@ pub fn native_bls12381_aggregate_unvalidated_pubkeys(
     let mut pks = vec![];
 
     for pk_bytes in pks_serialized {
-        // NOTE(Gas): O(|pk_bytes|) deserialization cost
+        // NOTE(Gas): O(1) deserialization cost
         let pk = match bls12381::PublicKey::try_from(&pk_bytes[..]) {
             Ok(key) => key,
             // If PK does not deserialize correctly, return None.
@@ -123,7 +123,7 @@ pub fn native_bls12381_validate_pubkey(
 
     let pk_bytes = pop_arg!(arguments, Vec<u8>);
 
-    // NOTE(Gas): O(|pk_bytes|) deserialization cost
+    // NOTE(Gas): O(1) deserialization cost
     let public_key = match bls12381::PublicKey::try_from(&pk_bytes[..]) {
         Ok(key) => key,
         Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
@@ -149,13 +149,13 @@ pub fn native_bls12381_verify_proof_of_possession(
     let pop_bytes = pop_arg!(arguments, Vec<u8>);
     let key_bytes = pop_arg!(arguments, Vec<u8>);
 
-    // NOTE(Gas): O(|pop_bytes|) deserialization cost
+    // NOTE(Gas): O(1) deserialization cost
     let pop = match bls12381::ProofOfPossession::try_from(&pop_bytes[..]) {
         Ok(pop) => pop,
         Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
     };
 
-    // NOTE(Gas): O(|key_bytes|) deserialization cost
+    // NOTE(Gas): O(1) deserialization cost
     let public_key = match bls12381::PublicKey::try_from(&key_bytes[..]) {
         Ok(key) => key,
         Err(_) => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
@@ -182,7 +182,7 @@ pub fn native_bls12381_verify_signature(
     let pk_bytes = pop_arg!(arguments, Vec<u8>);
     let sig_bytes = pop_arg!(arguments, Vec<u8>);
 
-    // NOTE(Gas): O(|pk_bytes|) deserialization cost
+    // NOTE(Gas): O(1) deserialization cost
     let pk = match bls12381::PublicKey::try_from(&pk_bytes[..]) {
         Ok(pk) => pk,
         Err(_) => {
@@ -190,7 +190,7 @@ pub fn native_bls12381_verify_signature(
         }
     };
 
-    // NOTE(Gas): O(|sig_bytes|) deserialization cost
+    // NOTE(Gas): O(1) deserialization cost
     let sig = match bls12381::Signature::try_from(&sig_bytes[..]) {
         Ok(sig) => sig,
         Err(_) => {
@@ -223,7 +223,7 @@ pub fn native_ed25519_validate_pubkey(
         key_bytes.len(),
     );
 
-    // NOTE(Gas): O(|key_bytes|) deserialization cost
+    // NOTE(Gas): O(1) deserialization cost
     let key_bytes_slice = match <[u8; 32]>::try_from(key_bytes) {
         Ok(slice) => slice,
         Err(_) => {
@@ -266,7 +266,7 @@ pub fn native_ed25519_verify_signature(
         msg.len(),
     );
 
-    // NOTE(Gas): O(|signature|) deserialization cost
+    // NOTE(Gas): O(1) deserialization cost
     let sig = match ed25519::Ed25519Signature::try_from(signature.as_slice()) {
         Ok(sig) => sig,
         Err(_) => {
@@ -274,7 +274,7 @@ pub fn native_ed25519_verify_signature(
         }
     };
 
-    // NOTE(Gas): O(|pubkey|) deserialization cost
+    // NOTE(Gas): O(1) deserialization cost
     let pk = match ed25519::Ed25519PublicKey::try_from(pubkey.as_slice()) {
         Ok(pk) => pk,
         Err(_) => {
@@ -290,7 +290,7 @@ pub fn native_ed25519_verify_signature(
     ))
 }
 
-pub fn native_secp256k1_recover(
+pub fn native_secp256k1_ecdsa_recover(
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -304,7 +304,9 @@ pub fn native_secp256k1_recover(
 
     let cost = GasCost::new(super::cost::APTOS_SECP256K1_RECOVER, 1).total();
 
-    // NOTE(Gas): O(|msg|) deserialization cost, with |msg| < libsecp256k1_core::util::MESSAGE_SIZE
+    // NOTE(Gas): O(1) cost
+    // (In reality, O(|msg|) deserialization cost, with |msg| < libsecp256k1_core::util::MESSAGE_SIZE
+    // which seems to be 32 bytes, so O(1) cost for all intents and purposes.)
     let msg = match libsecp256k1::Message::parse_slice(&msg) {
         Ok(msg) => msg,
         Err(_) => {
@@ -326,7 +328,8 @@ pub fn native_secp256k1_recover(
         }
     };
 
-    // NOTE(Gas): O(|signature|) deserialization cost, with |signature| < libsecp256k1_core::util::SIGNATURE_SIZE
+    // NOTE(Gas): O(1) deserialization cost
+    // which seems to be 64 bytes, so O(1) cost for all intents and purposes.
     let sig = match libsecp256k1::Signature::parse_standard_slice(&signature) {
         Ok(sig) => sig,
         Err(_) => {

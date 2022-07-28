@@ -310,11 +310,13 @@ fn bls12381_random_multisig_dont_verify_with_random_pk() {
         .is_err());
 }
 
-/// Test that generates an example signature. We used this to create a test case for the BLS12-381
-/// Move submodule. For simplicity, we use `sign_arbitrary_message` to generate a signature directly on a
+#[test]
+#[ignore]
+/// Not an actual test: only used to generate test cases for testing the BLS Move module in
+/// aptos-move/framework/move-stdlib/sources/signer.move
+/// For simplicity, we use `sign_arbitrary_message` to generate a signature directly on a
 /// message `m` rather than on its hash derived using the `CryptoHasher` trait. This makes it easier
 /// to verify the signature in our Move code, which uses `verify_arbitrary_message`.
-#[test]
 fn bls12381_sample_signature() {
     let mut rng = OsRng;
 
@@ -332,6 +334,8 @@ fn bls12381_sample_signature() {
 }
 
 #[test]
+/// Tests deserialization and verification of a signature generated for the Move submodule via
+/// `bls12381_sample_signature` above.
 fn bls12381_sample_signature_verifies() {
     let pk = PublicKey::try_from(
         hex::decode(
@@ -349,6 +353,9 @@ fn bls12381_sample_signature_verifies() {
 }
 
 #[test]
+#[ignore]
+/// Not an actual test: only used to generate test cases for testing the BLS Move module in
+/// aptos-move/framework/move-stdlib/sources/signer.move
 fn bls12381_sample_aggregate_pk_and_multisig() {
     let mut rng = OsRng;
 

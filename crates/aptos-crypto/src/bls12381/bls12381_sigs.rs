@@ -32,7 +32,7 @@ use serde::Serialize;
 use std::convert::TryFrom;
 use std::fmt;
 
-#[derive(Debug, Clone, Eq, SerializeKey, DeserializeKey)]
+#[derive(Clone, Eq, SerializeKey, DeserializeKey)]
 /// Either (1) a BLS signature share from an individual signer, (2) a BLS multisignature or (3) a
 /// BLS aggregate signature
 pub struct Signature {
@@ -175,6 +175,12 @@ impl ValidCryptoMaterial for Signature {
 impl Length for Signature {
     fn length(&self) -> usize {
         Self::LENGTH
+    }
+}
+
+impl fmt::Debug for Signature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.to_bytes()))
     }
 }
 
