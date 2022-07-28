@@ -29,7 +29,7 @@ struct Args {
     wait_millis: u64,
     #[structopt(long)]
     burst: bool,
-    #[structopt(long, default_value = "3600")]
+    #[structopt(long, default_value = "1800")]
     duration_secs: usize,
     #[structopt(flatten)]
     options: Options,

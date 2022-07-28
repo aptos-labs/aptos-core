@@ -207,15 +207,19 @@ impl StateComputer for ExecutionProxy {
 
     /// Synchronize to a commit that not present locally.
     async fn sync_to(&self, target: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        warn!("Start sync_to!");
         let _guard = self.write_mutex.lock().await;
 
+        warn!("1 sync_to!");
         // Before the state synchronization, we have to call finish() to free the in-memory SMT
         // held by BlockExecutor to prevent memory leak.
         self.executor.finish();
+        warn!("2 sync_to!");
 
         fail_point!("consensus::sync_to", |_| {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });
+        warn!("3 sync_to!");
         // Here to start to do state synchronization where ChunkExecutor inside will
         // process chunks and commit to Storage. However, after block execution and
         // commitments, the the sync state of ChunkExecutor may be not up to date so
@@ -225,11 +229,14 @@ impl StateComputer for ExecutionProxy {
             "sync_to",
             self.state_sync_notifier.sync_to_target(target).await
         );
+        warn!("4 sync_to!");
 
         // Similarly, after the state synchronization, we have to reset the cache
         // of BlockExecutor to guarantee the latest committed state is up to date.
         self.executor.reset();
+        warn!("5 sync_to!");
 
+        warn!("End sync_to!");
         res.map_err(|error| {
             let anyhow_error: anyhow::Error = error.into();
             anyhow_error.into()

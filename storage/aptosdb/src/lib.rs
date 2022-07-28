@@ -1439,10 +1439,12 @@ impl DbWriter for AptosDB {
         latest_in_memory_state: StateDelta,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
+            warn!("1 save_transactions");
             // Executing and committing from more than one threads not allowed -- consensus and
             // state sync must hand over to each other after all pending execution and committing
             // complete.
             let _lock = self.ledger_commit_lock.lock();
+            warn!("2 save_transactions");
 
             let num_txns = txns_to_commit.len() as u64;
             // ledger_info_with_sigs could be None if we are doing state synchronization. In this case
@@ -1451,6 +1453,7 @@ impl DbWriter for AptosDB {
                 ledger_info_with_sigs.is_some() || num_txns > 0,
                 "txns_to_commit is empty while ledger_info_with_sigs is None.",
             );
+            warn!("3 save_transactions");
 
             let last_version = first_version + num_txns - 1;
 
@@ -1464,12 +1467,14 @@ impl DbWriter for AptosDB {
                     claimed_last_version,
                 );
             }
+            warn!("4 save_transactions");
 
             // Gather db mutations to `batch`.
             let mut cs = ChangeSet::new();
 
             let new_root_hash =
                 self.save_transactions_impl(txns_to_commit, first_version, &mut cs)?;
+            warn!("5 save_transactions");
 
             // If expected ledger info is provided, verify result root hash and save the ledger info.
             if let Some(x) = ledger_info_with_sigs {
@@ -1483,12 +1488,14 @@ impl DbWriter for AptosDB {
 
                 self.ledger_store.put_ledger_info(x, &mut cs)?;
             }
+            warn!("6 save_transactions");
 
             ensure!(Some(last_version) == latest_in_memory_state.current_version,
                 "the last_version {:?} to commit doesn't match the current_version {:?} in latest_in_memory_state",
                 last_version,
                latest_in_memory_state.current_version.expect("Must exist")
             );
+            warn!("7 save_transactions");
 
             // Persist.
             let (sealed_cs, counters) = self.seal_change_set(first_version, num_txns, cs)?;
@@ -1541,6 +1548,7 @@ impl DbWriter for AptosDB {
                     end_with_reconfig || sync_commit,
                 )?;
             }
+            warn!("8 save_transactions");
 
             // Only increment counter if commit succeeds and there are at least one transaction written
             // to the storage. That's also when we'd inform the pruner thread to work.
@@ -1560,6 +1568,7 @@ impl DbWriter for AptosDB {
 
                 self.wake_pruner(last_version);
             }
+            warn!("9 save_transactions");
 
             // Once everything is successfully persisted, update the latest in-memory ledger info.
             if let Some(x) = ledger_info_with_sigs {
@@ -1568,6 +1577,7 @@ impl DbWriter for AptosDB {
                 LEDGER_VERSION.set(x.ledger_info().version() as i64);
                 NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
             }
+            warn!("10 save_transactions");
 
             // Note: this must happen after txns have been saved to db because types can be newly
             // created in this same chunk of transactions.
@@ -1575,6 +1585,7 @@ impl DbWriter for AptosDB {
                 let write_sets: Vec<_> = txns_to_commit.iter().map(|txn| txn.write_set()).collect();
                 indexer.index(self.state_store.clone(), first_version, &write_sets)?;
             }
+            warn!("11 save_transactions");
 
             Ok(())
         })

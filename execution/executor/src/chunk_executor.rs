@@ -38,7 +38,7 @@ use storage_interface::{
 
 pub struct ChunkExecutor<V> {
     db: DbReaderWriter,
-    inner: RwLock<Option<ChunkExecutorInner<V>>>,
+    inner: RwLock<Option<Arc<ChunkExecutorInner<V>>>>,
 }
 
 impl<V: VMExecutor> ChunkExecutor<V> {
@@ -49,8 +49,16 @@ impl<V: VMExecutor> ChunkExecutor<V> {
         }
     }
 
+    fn get_inner(&self) -> Arc<ChunkExecutorInner<V>> {
+        self.inner
+            .read()
+            .clone()
+            .expect("ChunkExecutor is not reset!")
+    }
+
     fn maybe_initialize(&self) -> Result<()> {
-        if self.inner.read().is_none() {
+        let empty_inner = self.inner.read().is_none();
+        if empty_inner {
             self.reset()?;
         }
         Ok(())
@@ -65,10 +73,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
         self.maybe_initialize()?;
-        self.inner
-            .read()
-            .as_ref()
-            .expect("not reset")
+        self.get_inner()
             .execute_chunk(txn_list_with_proof, verified_target_li, epoch_change_li)
     }
 
@@ -78,7 +83,8 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
         verified_target_li: &LedgerInfoWithSignatures,
         epoch_change_li: Option<&LedgerInfoWithSignatures>,
     ) -> Result<()> {
-        self.inner.read().as_ref().expect("not reset").apply_chunk(
+        self.maybe_initialize()?;
+        self.get_inner().apply_chunk(
             txn_output_list_with_proof,
             verified_target_li,
             epoch_change_li,
@@ -86,11 +92,7 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
     }
 
     fn commit_chunk(&self) -> Result<ChunkCommitNotification> {
-        self.inner
-            .read()
-            .as_ref()
-            .expect("not reset")
-            .commit_chunk()
+        self.get_inner().commit_chunk()
     }
 
     fn execute_and_commit_chunk(
@@ -101,11 +103,11 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
     ) -> Result<ChunkCommitNotification> {
         // Re-sync with DB, make sure the queue is empty.
         self.reset()?;
-        self.inner
-            .read()
-            .as_ref()
-            .expect("not reset")
-            .execute_and_commit_chunk(txn_list_with_proof, verified_target_li, epoch_change_li)
+        self.get_inner().execute_and_commit_chunk(
+            txn_list_with_proof,
+            verified_target_li,
+            epoch_change_li,
+        )
     }
 
     fn apply_and_commit_chunk(
@@ -116,19 +118,16 @@ impl<V: VMExecutor> ChunkExecutorTrait for ChunkExecutor<V> {
     ) -> Result<ChunkCommitNotification> {
         // Re-sync with DB, make sure the queue is empty.
         self.reset()?;
-        self.inner
-            .read()
-            .as_ref()
-            .expect("not reset")
-            .apply_and_commit_chunk(
-                txn_output_list_with_proof,
-                verified_target_li,
-                epoch_change_li,
-            )
+        self.get_inner().apply_and_commit_chunk(
+            txn_output_list_with_proof,
+            verified_target_li,
+            epoch_change_li,
+        )
     }
 
     fn reset(&self) -> Result<()> {
-        *self.inner.write() = Some(ChunkExecutorInner::new(self.db.clone())?);
+        let chunk_executor_inner = ChunkExecutorInner::new(self.db.clone())?;
+        *self.inner.write() = Some(Arc::new(chunk_executor_inner));
         Ok(())
     }
 
