@@ -990,10 +990,6 @@ impl TransactionOutputExt {
     pub fn into(self) -> (DeltaChangeSet, TransactionOutput) {
         (self.delta_change_set, self.output)
     }
-
-    pub fn into_transaction_output(self) -> TransactionOutput {
-        self.output
-    }
 }
 
 impl From<TransactionOutput> for TransactionOutputExt {
