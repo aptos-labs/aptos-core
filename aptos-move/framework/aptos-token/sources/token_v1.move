@@ -607,6 +607,16 @@ module aptos_token::token_v1 {
         );
     }
 
+    public fun check_collection_exists(creator: address, name: String): bool acquires Collections {
+        assert!(
+            exists<Collections>(creator),
+            error::not_found(ECOLLECTIONS_NOT_PUBLISHED),
+        );
+
+        let collections = &borrow_global<Collections>(creator).collections;
+        table::contains(collections, name)
+    }
+
     public fun create_tokendata(
         account: &signer,
         collection: String,
