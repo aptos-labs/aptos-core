@@ -32,7 +32,6 @@ pub struct GenesisInfo {
     validators: Vec<Validator>,
     /// Compiled bytecode of framework modules
     modules: Vec<Vec<u8>>,
-    min_price_per_gas_unit: u64,
     /// Whether to allow new validators to join the set after genesis
     pub allow_new_validators: bool,
     /// Minimum stake to be in the validator set
@@ -53,7 +52,6 @@ impl GenesisInfo {
         root_key: Ed25519PublicKey,
         configs: Vec<ValidatorConfiguration>,
         modules: Vec<Vec<u8>>,
-        min_price_per_gas_unit: u64,
         allow_new_validators: bool,
         min_stake: u64,
         max_stake: u64,
@@ -71,7 +69,6 @@ impl GenesisInfo {
             root_key,
             validators,
             modules,
-            min_price_per_gas_unit,
             allow_new_validators,
             min_stake,
             max_stake,
@@ -97,7 +94,6 @@ impl GenesisInfo {
             &self.modules,
             self.chain_id,
             vm_genesis::GenesisConfigurations {
-                min_price_per_gas_unit: self.min_price_per_gas_unit,
                 epoch_duration_secs: self.epoch_duration_secs,
                 min_stake: self.min_stake,
                 max_stake: self.max_stake,

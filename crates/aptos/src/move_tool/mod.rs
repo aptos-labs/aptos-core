@@ -16,13 +16,13 @@ use crate::{
     },
     CliCommand, CliResult,
 };
+use aptos_gas::NativeGasParameters;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
-use aptos_vm;
-use aptos_vm::move_vm_ext::UpgradePolicy;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
+use framework::natives::code::UpgradePolicy;
 use move_deps::move_cli::base::test::UnitTestResult;
 use move_deps::{
     move_cli,
@@ -213,7 +213,8 @@ impl CliCommand<&'static str> for TestPackage {
                 filter: self.filter,
                 ..UnitTestingConfig::default_with_bound(Some(100_000))
             },
-            aptos_debug_natives::aptos_debug_natives(),
+            // TODO(Gas): we may want to switch to non-zero costs in the future
+            aptos_debug_natives::aptos_debug_natives(NativeGasParameters::zeros()),
             false,
             &mut std::io::stdout(),
         )

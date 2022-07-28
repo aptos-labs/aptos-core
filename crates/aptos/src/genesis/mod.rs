@@ -134,7 +134,6 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         layout.root_key,
         validators,
         modules,
-        layout.min_price_per_gas_unit,
         layout.allow_new_validators,
         layout.min_stake,
         layout.max_stake,
