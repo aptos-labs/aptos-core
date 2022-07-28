@@ -66,7 +66,7 @@ cargo install --git https://github.com/aptos-labs/aptos-core.git aptos
 
 In this terminal, change directories to `aptos-move/move-examples/moon_coin`. Keep this terminal window for the rest of this tutorial- we will refer to it later as the "Move Window". The rest of this section will review the file `sources/MoonCoinType.move`.
 
-This module enables users to create a new MoonCoinType::MoonCoin::MoonCoin that can be used to register with the framework Coin module (0x1::coin) to create a standard Coin. Developers can write their own functionalities in the MoonCoin module if they want to do more than what's provided by the standard 0x1::coin or 0x1::ManagedCoin (adds mint/burn functionalities).  
+This module enables users to create a new MoonCoinType::MoonCoin::MoonCoin that can be used to register with the framework Coin module (0x1::coin) to create a standard Coin. Developers can write their own functionalities in the MoonCoin module if they want to do more than what's provided by the standard 0x1::coin or 0x1::managed_coin (adds mint/burn functionalities).  
 
 ```rust
 module MoonCoinType::MoonCoin {
