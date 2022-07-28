@@ -78,10 +78,7 @@ impl StateComputer for MockStateComputer {
                 .lock()
                 .remove(&block.id())
                 .ok_or_else(|| format_err!("Cannot find block"))?;
-            let mut payload_txns = self
-                .data_manager
-                .get_data(block.block())
-                .await?;
+            let mut payload_txns = self.data_manager.get_data(block.block()).await?;
             txns.append(&mut payload_txns);
         }
         // they may fail during shutdown

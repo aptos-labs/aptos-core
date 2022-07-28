@@ -116,14 +116,13 @@ impl DataManager for QuorumStoreDataManager {
             .map(|proof| proof.digest().clone())
             .collect();
 
-        self.quorum_store_wrapper_tx
+        let _ = self.quorum_store_wrapper_tx
             .load()
             .as_ref()
             .unwrap()
             .as_ref()
             .clone()
-            .try_send(WrapperCommand::CleanRequest(logical_time, digests))
-            .expect("could not send to wrapper");
+            .try_send(WrapperCommand::CleanRequest(logical_time, digests));
         let expired_set = self.expiration_status.lock().expire(logical_time.round());
         for expired in expired_set {
             self.digest_status.remove(&expired);
@@ -167,9 +166,7 @@ impl DataManager for QuorumStoreDataManager {
             Payload::DirectMempool(_) => unreachable!("Direct mempool should not be used."),
             Payload::InQuorumStore(proofs) => {
                 match self.digest_status.get(&block.id()) {
-                    None => {
-                        unreachable!()
-                    }
+                    None => unreachable!("No status in Data Manager for digest {}", block.id()),
                     Some(data_status) => {
                         if let DataStatus::Cached(data) = data_status.deref() {
                             return Ok(data.clone());
