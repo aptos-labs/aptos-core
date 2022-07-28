@@ -214,26 +214,25 @@ module aptos_framework::account {
             error::invalid_argument(EMALFORMED_PROOF_OF_KNOWLEDGE)
         );
 
-        // TODO assert proof of knowledge here
+        // TODO verify proof of knowledge here
         let new_auth_key = hash::sha3_256(new_public_key);
-        let new_address = create_address(new_auth_key);
-        let new_signer = create_signer(new_address);
+        let account_resource = borrow_global_mut<Account>(addr);
+        let current_authentication_key = account_resource.authentication_key as address;
 
-        if(exists<OriginatingAddress>(addr)) {
-            let address_redirect = borrow_global<OriginatingAddress>(addr);
-            addr = table::remove(&mut address_redirect.address_map, addr);
+        if(exists<OriginatingAddress>(current_authentication_key)) {
+            let address_redirect = borrow_global<OriginatingAddress>(current_authentication_key);
+            addr = table::remove(&mut address_redirect.address_map, current_authentication_key);
             table::destroy_empty(address_redirect.address_map);
         };
 
         let new_address_map = table::new();
-        table::add(new_address_map, new_address, addr);
+        let new_signer = create_signer(new_auth_key as address);
+        table::add(new_address_map, new_auth_key as address, addr);
         move_to(&new_signer, OriginatingAddress{
             address_map: new_address_map
         });
 
-        let account_resource = borrow_global_mut<Account>(addr);
         account_resource.authentication_key = new_auth_key;
-        account_resource.self_address = new_address;
     }
 
     fun prologue_common(
