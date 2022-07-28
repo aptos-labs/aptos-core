@@ -176,7 +176,7 @@ async fn test_file_discovery() {
 
     // Now when we clear the file, we shouldn't be able to connect
     write_peerset_to_file((*discovery_file).as_ref(), HashMap::new());
-    std::thread::sleep(Duration::from_millis(300));
+    tokio::time::sleep(Duration::from_millis(300)).await;
 
     assert_eq!(
         false,
