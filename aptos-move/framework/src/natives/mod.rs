@@ -33,8 +33,8 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
         ("account", "create_signer", account::native_create_signer),
         (
             "signature",
-            "bls12381_aggregate_unvalidated_pubkeys",
-            signature::native_bls12381_aggregate_unvalidated_pubkeys,
+            "bls12381_aggregate_pop_verified_pubkeys",
+            signature::native_bls12381_aggregate_pop_verified_pubkeys,
         ),
         (
             "signature",
@@ -63,8 +63,8 @@ pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
         ),
         (
             "signature",
-            "secp256k1_recover",
-            signature::native_secp256k1_recover,
+            "secp256k1_ecdsa_recover",
+            signature::native_secp256k1_ecdsa_recover,
         ),
         ("type_info", "type_of", type_info::type_of),
         ("type_info", "type_name", type_info::type_name),

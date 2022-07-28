@@ -1,14 +1,22 @@
-/// Contains functions for [ed25519](https://en.wikipedia.org/wiki/EdDSA) digital signatures and for
-/// [Boneh-Lynn-Shacham (BLS) signatures](https://en.wikipedia.org/wiki/BLS_digital_signature)
+/// Contains functions for:
+///
+///  1. [Ed25519](https://en.wikipedia.org/wiki/EdDSA#Ed25519) digital signatures
+///
+///  2. ECDSA digital signatures over secp256k1 elliptic curves
+///
+///  3. The minimum-pubkey-size variant of [Boneh-Lynn-Shacham (BLS) signatures](https://en.wikipedia.org/wiki/BLS_digital_signature),
+///     where public keys are BLS12-381 elliptic-curve points in $\mathbb{G}_1$ and signatures are in $\mathbb{G}_2$,
+///     as per the [IETF BLS draft standard](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature#section-2.1)
 module aptos_std::signature {
     use std::option::Option;
 
     /// Given a vector of serialized public keys, combines them into an aggregated public key which can be used to verify
     /// multisignatures using `bls12381_verify_signature`.
-    /// Returns 'None' if no public keys are given as input. This function assumes that the caller validated all input
-    /// public keys using `bls12381_validate_pubkey`.
+    /// Returns 'None' if no public keys are given as input.
+    /// This function assumes that the caller verified all public keys have a valid proof-of-possesion (PoP) using
+    /// `bls12381_verify_proof_of_possession`.
     /// Does not abort.
-    native public fun bls12381_aggregate_unvalidated_pubkeys(
+    native public fun bls12381_aggregate_pop_verified_pubkeys(
         public_keys: vector<vector<u8>>,
     ): Option<vector<u8>>;
 
@@ -26,8 +34,8 @@ module aptos_std::signature {
     /// Does not abort.
     native public fun bls12381_validate_pubkey(public_key: vector<u8>): bool;
 
-    /// Return `true` if the bytes in `public_key` are a valid bls12381 public key that passes the proof-of-possesion
-    /// (PoP) check.
+    /// Return `true` if the bytes in `public_key` are a valid bls12381 public key (as per `bls12381_validate_pubkey`)
+    /// *and* has a valid proof-of-possesion (PoP).
     /// Return `false` otherwise.
     /// Does not abort.
     native public fun bls12381_verify_proof_of_possession(public_key: vector<u8>, proof_of_possesion: vector<u8>): bool;
@@ -74,10 +82,10 @@ module aptos_std::signature {
         message: vector<u8>
     ): bool;
 
-    /// Recovers the signer's public key from a secp256k1 `signature` provided the `recovery_id` and signed
+    /// Recovers the signer's public key from a secp256k1 ECDSA `signature` provided the `recovery_id` and signed
     /// `message` (32 byte digest).
     /// Returns `(public_key, true)` if inputs are valid and `([], false)` if invalid.
-    native public fun secp256k1_recover(
+    native public fun secp256k1_ecdsa_recover(
         message: vector<u8>,
         recovery_id: u8,
         signature: vector<u8>
@@ -89,11 +97,11 @@ module aptos_std::signature {
     use std::option;
 
     #[test]
-    /// Test on a valid signature created using sk = x"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-    fun test_secp256k1() {
+    /// Test on a valid secp256k1 ECDSA signature created using sk = x"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    fun test_secp256k1_recover() {
         use std::hash;
 
-        let (pk, ok) = secp256k1_recover(
+        let (pk, ok) = secp256k1_ecdsa_recover(
             hash::sha2_256(b"test aptos secp256k1"),
             0,
             x"f7ad936da03f948c14c542020e3c5f4e02aaacd1f20427c11aa6e2fbf8776477646bba0e1a37f9e7c777c423a1d2849baafd7ff6a9930814a43c3f80d59db56f",
@@ -102,7 +110,7 @@ module aptos_std::signature {
         assert!(pk == x"4646ae5047316b4230d0086c8acec687f00b1cd9d1dc634f6cb358ac0a9a8ffffe77b4dd0a4bfb95851f3b7355c781dd60f8418fc8a65d14907aff47c903a559", 2);
 
         // Flipped bits; Signature stays valid
-        let (pk, ok) = secp256k1_recover(
+        let (pk, ok) = secp256k1_ecdsa_recover(
             hash::sha2_256(b"test aptos secp256k1"),
             0,
             x"f7ad936da03f948c14c542020e3c5f4e02aaacd1f20427c11aa6e2fbf8776477646bba0e1a37f9e7c7f7c423a1d2849baafd7ff6a9930814a43c3f80d59db56f",
@@ -111,7 +119,7 @@ module aptos_std::signature {
         assert!(pk != x"4646ae5047316b4230d0086c8acec687f00b1cd9d1dc634f6cb358ac0a9a8ffffe77b4dd0a4bfb95851f3b7355c781dd60f8418fc8a65d14907aff47c903a559", 4);
 
         // Flipped bits; Signature becomes invalid
-        let (_, ok) = secp256k1_recover(
+        let (_, ok) = secp256k1_ecdsa_recover(
             hash::sha2_256(b"test aptos secp256k1"),
             0,
             x"ffad936da03f948c14c542020e3c5f4e02aaacd1f20427c11aa6e2fbf8776477646bba0e1a37f9e7c7f7c423a1d2849baafd7ff6a9930814a43c3f80d59db56f",
@@ -124,12 +132,9 @@ module aptos_std::signature {
     #[test]
     /// Tests verification of a random BLS signature created using sk = x""
     fun test_bls12381_verify_individual_signature() {
-        // Test case generated by running `cargo test -- bls12381_sample_signature --nocapture` in `crates/aptos-crypto`
+        // Test case generated by running `cargo test -- bls12381_sample_signature --nocapture --include-ignored` in `crates/aptos-crypto`
         // =============================================================================================================
         // SK:        077c8a56f26259215a4a245373ab6ddf328ac6e00e5ea38d8700efa361bdc58d
-        // PK:        94209a296b739577cb076d3bfb1ca8ee936f29b69b7dae436118c4dd1cc26fd43dcd16249476a006b8b949bf022a7858
-        // Message:   Hello Aptos!
-        // Signature: b01ce4632e94d8c611736e96aa2ad8e0528a02f927a81a92db8047b002a8c71dc2d6bfb94729d0973790c10b6ece446817e4b7543afd7ca9a17c75de301ae835d66231c26a003f11ae26802b98d90869a9e73788c38739f7ac9d52659e1f7cf7
 
         let ok = bls12381_verify_signature(
             x"b01ce4632e94d8c611736e96aa2ad8e0528a02f927a81a92db8047b002a8c71dc2d6bfb94729d0973790c10b6ece446817e4b7543afd7ca9a17c75de301ae835d66231c26a003f11ae26802b98d90869a9e73788c38739f7ac9d52659e1f7cf7",
@@ -143,12 +148,12 @@ module aptos_std::signature {
     #[test]
     fun test_bls12381_verify_multisig() {
         // First, make sure if no inputs are given, the function returns None
-        // assert!(bls12381_aggregate_unvalidated_pubkeys(vector::empty()) == option::none(), 1);
-        let none_opt = bls12381_aggregate_unvalidated_pubkeys(vector::empty());
+        // assert!(bls12381_aggregate_pop_verified_pubkeys(vector::empty()) == option::none(), 1);
+        let none_opt = bls12381_aggregate_pop_verified_pubkeys(vector::empty());
         assert!(option::is_none(&none_opt), 1);
 
-        // Second, try some test-cases generated via:
-        //  $ cargo test -- bls12381_sample_aggregate_pk --nocapture
+        // Second, try some test-cases generated by running the following command in `crates/aptos-crypto`:
+        //  $ cargo test -- bls12381_sample_aggregate_pk_and_multisig --nocapture --include-ignored
         let pks = vector[
             x"92e201a806af246f805f460fbdc6fc90dd16a18d6accc236e85d3578671d6f6690dde22134d19596c58ce9d63252410a",
             x"ab9df801c6f96ade1c0490c938c87d5bcc2e52ccb8768e1b5d14197c5e8bfa562783b96711b702dda411a1a9f08ebbfa",
@@ -179,7 +184,7 @@ module aptos_std::signature {
         while (i < std::vector::length(&pks)) {
             std::vector::push_back(&mut accum_pk, *std::vector::borrow(&pks, i));
 
-            let apk = bls12381_aggregate_unvalidated_pubkeys(accum_pk);
+            let apk = bls12381_aggregate_pop_verified_pubkeys(accum_pk);
 
             assert!(option::is_some(&apk), 1);
 
