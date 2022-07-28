@@ -18,10 +18,12 @@ use diesel::{
 };
 use futures::future::Either;
 use serde::Serialize;
+use async_graphql::Object;
 
 #[derive(AsChangeset, Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[primary_key(hash)]
 #[diesel(table_name = "transactions")]
+#[Object]
 pub struct Transaction {
     #[diesel(column_name = type)]
     pub type_: String,
@@ -279,6 +281,7 @@ impl Transaction {
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key(hash)]
 #[diesel(table_name = "user_transactions")]
+#[Object]
 pub struct UserTransaction {
     pub hash: String,
     pub signature: serde_json::Value,
@@ -320,6 +323,7 @@ impl UserTransaction {
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key("hash")]
 #[diesel(table_name = "block_metadata_transactions")]
+#[Object]
 pub struct BlockMetadataTransaction {
     pub hash: String,
     pub id: String,

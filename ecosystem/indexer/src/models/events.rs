@@ -4,11 +4,13 @@
 use crate::{models::transactions::Transaction, schema::events};
 use aptos_rest_client::aptos_api_types::Event as APIEvent;
 use serde::Serialize;
+use async_graphql::Object;
 
 #[derive(Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[diesel(table_name = "events")]
 #[belongs_to(Transaction, foreign_key = "transaction_hash")]
 #[primary_key(key, sequence_number)]
+#[Object]
 pub struct Event {
     pub transaction_hash: String,
     pub key: String,

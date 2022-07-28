@@ -8,11 +8,13 @@ use aptos_rest_client::aptos_api_types::{
 };
 use serde::Serialize;
 use serde_json::json;
+use async_graphql::Object;
 
 #[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[diesel(table_name = "write_set_changes")]
 #[belongs_to(Transaction, foreign_key = "transaction_hash")]
 #[primary_key(transaction_hash, hash)]
+#[Object]
 pub struct WriteSetChange {
     pub transaction_hash: String,
     pub hash: String,
