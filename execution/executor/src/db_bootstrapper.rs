@@ -103,6 +103,7 @@ impl GenesisCommitter {
             self.output.result_view.txn_accumulator().version(),
             self.base_state_version,
             self.output.ledger_info.as_ref(),
+            true, /* sync_commit */
             self.output.result_view.state().clone(),
         )?;
         info!("Genesis commited.");

@@ -9,6 +9,8 @@ repos:
       - id: end-of-file-fixer
         files: \.(rs|move)$
       - id: check-added-large-files
+        args:
+          - --maxkb=2000
   - repo: https://github.com/doublify/pre-commit-rust
     rev: v1.0
     hooks:

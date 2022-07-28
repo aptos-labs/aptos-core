@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
+use aptos_config::config::{NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE};
 use aptos_logger::{prelude::*, Level, Logger};
 use aptos_types::transaction::Version;
 use aptosdb::{AptosDB, GetRestoreHandler};
@@ -60,6 +60,7 @@ async fn main_impl() -> Result<()> {
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner config */
         opt.rocksdb_opt.into(),
         false,
+        TARGET_SNAPSHOT_SIZE,
     )?)
     .get_restore_handler();
     ReplayVerifyCoordinator::new(

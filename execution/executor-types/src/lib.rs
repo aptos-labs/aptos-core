@@ -115,13 +115,13 @@ pub trait BlockExecutorTrait: Send + Sync {
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
         save_state_snapshots: bool,
-    ) -> Result<Option<StateSnapshotDelta>, Error>;
+    ) -> Result<(), Error>;
 
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-    ) -> Result<Option<StateSnapshotDelta>, Error> {
+    ) -> Result<(), Error> {
         self.commit_blocks_ext(
             block_ids,
             ledger_info_with_sigs,
@@ -400,5 +400,9 @@ impl TransactionData {
 
     pub fn txn_info_hash(&self) -> HashValue {
         self.txn_info_hash
+    }
+
+    pub fn is_reconfig(&self) -> bool {
+        !self.reconfig_events.is_empty()
     }
 }

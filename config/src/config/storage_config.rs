@@ -8,6 +8,8 @@ use std::{
     path::PathBuf,
 };
 
+pub const TARGET_SNAPSHOT_SIZE: usize = 100_000;
+
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
@@ -75,6 +77,8 @@ pub struct StorageConfig {
     data_dir: PathBuf,
     /// Read, Write, Connect timeout for network operations in milliseconds
     pub timeout_ms: u64,
+    /// The threshold that determine whether a snapshot should be committed to state merkle db.
+    pub target_snapshot_size: usize,
     /// Rocksdb-specific configurations
     pub rocksdb_configs: RocksdbConfigs,
     /// Try to enable the internal indexer. The indexer expects to have seen all transactions
@@ -151,6 +155,7 @@ impl Default for StorageConfig {
             timeout_ms: 30_000,
             rocksdb_configs: RocksdbConfigs::default(),
             enable_indexer: false,
+            target_snapshot_size: TARGET_SNAPSHOT_SIZE,
         }
     }
 }

@@ -8,9 +8,11 @@ use forge::success_criteria::SuccessCriteria;
 use forge::{ForgeConfig, Options, Result, *};
 use std::{env, num::NonZeroUsize, process, time::Duration};
 use structopt::StructOpt;
+use testcases::network_bandwidth_test::NetworkBandwidthTest;
+use testcases::network_latency_test::NetworkLatencyTest;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, generate_traffic,
-    network_chaos_test::NetworkChaosTest, performance_test::PerformanceBenchmark,
+    network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
     reconfiguration_test::ReconfigurationTest, state_sync_performance::StateSyncPerformance,
 };
 use tokio::runtime::Runtime;
@@ -390,7 +392,9 @@ fn single_test_suite(test_name: &str) -> ForgeConfig<'static> {
         "state_sync" => config.with_network_tests(&[&StateSyncPerformance]),
         "compat" => config.with_network_tests(&[&SimpleValidatorUpgrade]),
         "config" => config.with_network_tests(&[&ReconfigurationTest]),
-        "network_chaos" => config.with_network_tests(&[&NetworkChaosTest]),
+        "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
+        "network_latency" => config.with_network_tests(&[&NetworkLatencyTest]),
+        "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
         _ => config.with_network_tests(&[&PerformanceBenchmark]),
     }
 }
@@ -404,7 +408,7 @@ fn land_blocking_test_suite() -> ForgeConfig<'static> {
 fn pre_release_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
-        .with_network_tests(&[&NetworkChaosTest])
+        .with_network_tests(&[&NetworkBandwidthTest])
 }
 
 //TODO Make public test later
