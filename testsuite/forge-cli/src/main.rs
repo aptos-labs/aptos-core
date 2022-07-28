@@ -408,7 +408,7 @@ fn land_blocking_test_suite() -> ForgeConfig<'static> {
 fn pre_release_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
-        .with_network_tests(&[&NetworkPartitionTest])
+        .with_network_tests(&[&NetworkBandwidthTest])
 }
 
 //TODO Make public test later
