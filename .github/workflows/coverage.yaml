@@ -32,7 +32,8 @@ jobs:
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      - run: cargo llvm-cov nextest --workspace --lcov --output-path lcov.info --exclude smoke-test --exclude testcases --no-fail-fast  -- --profile ci
+      # NOTE: due to some bug in llvm-cov the argument order between llvm-cov and nextest needs to flipped around: https://github.com/taiki-e/cargo-llvm-cov/issues/151
+      - run: cargo llvm-cov --profile ci --workspace --exclude smoke-test --exclude testcases --no-fail-fast nextest --workspace --exclude smoke-test --exclude testcases --lcov --output-path lcov.info
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
       - name: Upload coverage to Codecov
@@ -62,7 +63,8 @@ jobs:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
-      - run: cargo llvm-cov nextest --lcov --output-path lcov.info --package smoke-test --no-fail-fast -- --profile ci --test-threads 6 --retries 3
+      # NOTE: due to some bug in llvm-cov the argument order between llvm-cov and nextest needs to flipped around: https://github.com/taiki-e/cargo-llvm-cov/issues/151
+      - run: cargo llvm-cov --package smoke-test --no-fail-fast --lcov --output-path lcov.info
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
       - name: Upload coverage to Codecov
