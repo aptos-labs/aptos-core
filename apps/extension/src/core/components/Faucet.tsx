@@ -13,6 +13,7 @@ import { useMutation, useQueryClient } from 'react-query';
 import { aptosCoinStructTag, LOCAL_FAUCET_URL } from 'core/constants';
 import Analytics from 'core/utils/analytics/analytics';
 import { faucetEvents } from 'core/utils/analytics/events';
+import queryKeys from 'core/queries/queryKeys';
 import { toast } from './Toast';
 
 export default function Faucet() {
@@ -30,7 +31,7 @@ export default function Faucet() {
           title: 'Faucet failure',
         });
       }
-      queryClient.invalidateQueries('getAccountResources');
+      queryClient.invalidateQueries(queryKeys.getAccountCoinBalance);
       Analytics.event({
         eventType: faucetEvents.RECEIVE_FAUCET,
         params: {
