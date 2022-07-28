@@ -1,0 +1,72 @@
+---
+title: "Connecting to Wallet"
+slug: "connect-to-wallet"
+---
+
+# Connecting to Wallet
+
+To use Wallet with your dApp, your user must first install Wallet on their Chrome browser. Wallet injects an `aptos` object into the [window](https://developer.mozilla.org/en-US/docs/Web/API/Window) of any web app the user visits. 
+
+To check if the user has installed Wallet, perform the below check:
+
+```typescript
+const isAptosInstalled = window.aptos
+```
+
+If Wallet is not installed, you can prompt the user to first install the Wallet extension and provide the below installation instructions. For example, see below:
+
+```typescript
+const getAptosWallet = () => {
+    if ('aptos' in window) {
+        return window.aptos;
+    } else {
+        window.open('https://aptos.app/', `_blank`);
+    }
+}
+```
+
+## Installing the Wallet extension 
+
+To install the Wallet extension on your Chrome browser, follow these steps:
+
+1. Download the latest [Aptos Wallet release](https://github.com/aptos-labs/aptos-core/releases?q=wallet&expanded=true) and unzip.
+2. Open a Chrome window and navigate to the Extensions using any of the below methods:
+    - At the top right corner of the browser window, click the three vertical dots and then More tools and then Extensions, or
+    - On a new tab or a window type `chrome://extensions` in the URL field and press return.
+3. Enable **Developer mode** at the top right of the Extensions page.
+4. Click on **Load unpacked** at the top left, and point it to the folder where you just unzipped the downloaded Wallet release.
+
+Now you will see Wallet in your Chrome extensions.
+
+## Connecting to Wallet
+
+After confirming that the web app has the `aptos` object, we can connect to Wallet by calling `wallet.connect()`. 
+
+When you call `wallet.connect()`, it prompts the user to allow your web app to make additional calls to Wallet, and obtains from the user basic information like the `address` and `public key`. 
+
+See an example code below:
+
+```typescript
+const wallet = getAptosWallet();
+try {
+    const response = await wallet.connect();
+    console.log(response); // { address: string, address: string }
+
+    const account = await wallet.account();
+    console.log(account); // { address: string, address: string }
+} catch (error) {
+    // { code: 4001, message: "User rejected the request."}
+}
+```
+
+**NOTE**: After the user has approved the connnection for the first time, the web app's domain will be remembered for the future sessions. 
+
+## Disconnecting Wallet
+
+When you want the web app to forget about the connection status with Wallet, you can do this by calling `wallet.disconnect()` in your web app. See below:
+
+```typescript
+await wallet.disconnect();
+```
+
+**NOTE**: After disconnecting, the web app must reconnect to Wallet to make requests. 
