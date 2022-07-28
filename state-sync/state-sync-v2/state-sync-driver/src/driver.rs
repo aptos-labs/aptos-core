@@ -32,6 +32,7 @@ use futures::StreamExt;
 use mempool_notifications::MempoolNotificationSender;
 use std::{sync::Arc, time::SystemTime};
 use storage_interface::DbReader;
+use tokio::task::yield_now;
 use tokio::time::{interval, Duration};
 use tokio_stream::wrappers::IntervalStream;
 
@@ -457,6 +458,10 @@ impl<
                 SampleRate::Duration(Duration::from_secs(PENDING_DATA_LOG_FREQ_SECS)),
                 info!("Waiting for the storage synchronizer to handle pending data!")
             );
+
+            // We must yield to avoid spin locking so that the storage synchronizer
+            // threads are not starved.
+            yield_now().await;
         }
 
         // Check if we've hit the target
