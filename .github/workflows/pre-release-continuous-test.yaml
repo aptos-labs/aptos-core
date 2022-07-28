@@ -1,4 +1,9 @@
 name: Run continuous pre release testing
+
+permissions:
+  issues: write
+  pull-requests: write
+
 on:
   workflow_dispatch:
   push:
