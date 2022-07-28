@@ -19,9 +19,9 @@ module aptos_framework::type_info {
 
     public native fun type_of<T>(): TypeInfo;
 
-    /// Return `true` if `type_info_1` and `type_info_2` are the same,
-    /// else `false`
-    public fun are_same_type_info(
+    /// Return `true` if `type_info_1` and `type_info_2` are equal, else
+    /// `false`
+    public fun are_equal(
         type_info_1: &TypeInfo,
         type_info_2: &TypeInfo
     ): bool {
@@ -39,24 +39,24 @@ module aptos_framework::type_info {
     }
 
     #[test]
-    fun test_are_same_type_info() {
+    fun test_are_equal() {
         let type_info = type_of<TypeInfo>();
-        // Verify same type infos assesed as such
-        assert!(are_same_type_info(&type_info, &type_info), 0);
+        // Verify same type infos assessed as such
+        assert!(are_equal(&type_info, &type_info), 0);
         let type_info_2 = copy type_info; // Copy reference type info
         // Assign a different struct name to copy
         type_info_2.struct_name = b"DifferentType";
         // Verify different type infos from same module assessed as such
-        assert!(!are_same_type_info(&type_info, &type_info_2), 1);
+        assert!(!are_equal(&type_info, &type_info_2), 1);
         let type_info_3 = copy type_info; // Copy reference type info
         // Assign a different module name to copy
         type_info_3.module_name = b"different_module";
         // Verify false return when only module name different
-        assert!(!are_same_type_info(&type_info, &type_info_3), 2);
+        assert!(!are_equal(&type_info, &type_info_3), 2);
         let type_info_4 = copy type_info; // Copy reference type info
         // Assign a different account address to copy
         type_info_4.account_address = @core_resources;
         // Verify false return when only account address different
-        assert!(!are_same_type_info(&type_info, &type_info_4), 3);
+        assert!(!are_equal(&type_info, &type_info_4), 3);
     }
 }
