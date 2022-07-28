@@ -23,9 +23,9 @@ module aptos_framework::aggregator {
 
     /// Destroys aggregator and removes it from its `AggregatorTable`.
     public fun destroy(aggregator: Aggregator) {
-        let Aggregator { table_handle, key, limit, } = aggregator;
-        remove_aggregator(table_handle, key, limit);
+        let Aggregator { table_handle, key, limit: _, } = aggregator;
+        remove_aggregator(table_handle, key);
     }
 
-    native fun remove_aggregator(table_handle: u128, key: u128, limit: u128);
+    native fun remove_aggregator(table_handle: u128, key: u128);
 }

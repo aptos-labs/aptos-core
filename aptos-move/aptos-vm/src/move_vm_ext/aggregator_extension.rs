@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::{
-    delta_change_set::{addition, deserialize, serialize, subtraction},
+    delta_change_set::{addition, deserialize, serialize, subtraction, DeltaOp},
     vm_status::StatusCode,
 };
 use better_any::{Tid, TidAble};
@@ -24,18 +24,9 @@ use move_deps::{
 use smallvec::smallvec;
 use std::{
     cell::RefCell,
-    collections::{btree_map::Entry, BTreeMap, VecDeque},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
 };
 use tiny_keccak::{Hasher, Sha3};
-
-/// Specifies if aggregator instance is newly created (`New`), marked for
-/// deletion (`Deleted`), or is currently being used (`Used`).
-#[derive(Clone, Copy, PartialEq)]
-enum Mark {
-    New,
-    Used,
-    Deleted,
-}
 
 /// State of an aggregator: `Data` means that aggregator stores an exact value,
 /// `PositiveDelta` means that actual value is not known but must be added later
@@ -55,8 +46,6 @@ struct Aggregator {
     value: u128,
     // Postondition value, exceeding it aggregator overflows.
     limit: u128,
-    // Mark to add/remove aggregators easily.
-    mark: Mark,
 }
 
 /// When `Aggregator` overflows the `limit`.
@@ -173,22 +162,12 @@ impl Aggregator {
 /// Aggregator table - a top-level collection storing aggregators. It holds an
 /// inner table data structure to actually store the aggregators.
 struct AggregatorTable {
+    // All aggregators created with this table.
+    new_aggregators: BTreeSet<u128>,
+    // All aggregators removed from this table.
+    removed_aggregators: BTreeSet<u128>,
     // Table to store all agregators associated with this `AggregatorTable`.
-    inner: BTreeMap<u128, Aggregator>,
-}
-
-impl std::ops::Deref for AggregatorTable {
-    type Target = BTreeMap<u128, Aggregator>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl std::ops::DerefMut for AggregatorTable {
-    fn deref_mut(&mut self) -> &mut BTreeMap<u128, Aggregator> {
-        &mut self.inner
-    }
+    table: BTreeMap<u128, Aggregator>,
 }
 
 impl AggregatorTable {
@@ -196,17 +175,51 @@ impl AggregatorTable {
     /// initialize this aggregator, then the actual value is not known, and the
     /// aggregator state must be a delta, zero-intialized.
     fn get_or_create_aggregator(&mut self, key: u128, limit: u128) -> &mut Aggregator {
-        if !self.contains_key(&key) {
+        if !self.table.contains_key(&key) {
             let aggregator = Aggregator {
                 key,
                 state: AggregatorState::PositiveDelta,
                 value: 0,
                 limit,
-                mark: Mark::Used,
             };
-            self.insert(key, aggregator);
+            self.table.insert(key, aggregator);
         }
-        self.get_mut(&key).unwrap()
+        self.table.get_mut(&key).unwrap()
+    }
+
+    fn num_aggregators(&self) -> u128 {
+        self.table.len() as u128
+    }
+
+    /// Creates and inserts into table a new Aggregator with given `key` and
+    /// `limit`. Since this transaction initializes aggregator, then the actual
+    /// value is known, and the aggregator state must be `Data`. Also,
+    /// aggregators are zero-initialized.
+    fn create_new_aggregator(&mut self, key: u128, limit: u128) {
+        let aggregator = Aggregator {
+            key,
+            state: AggregatorState::Data,
+            value: 0,
+            limit,
+        };
+        self.table.insert(key, aggregator);
+        self.new_aggregators.insert(key);
+    }
+
+    /// Removes an aggregator.
+    fn remove_aggregator(&mut self, key: u128) {
+        // Aggregator no longer in use during this context, so remove it
+        // from the table if it was there.
+        self.table.remove(&key);
+
+        if self.new_aggregators.contains(&key) {
+            // Aggregator has been created by the same transaction. Therefore,
+            // no side-effects.
+            self.new_aggregators.remove(&key);
+        } else {
+            // Otherwise, aggregator has been created somewhere else.
+            self.removed_aggregators.insert(key);
+        }
     }
 }
 
@@ -228,7 +241,9 @@ impl AggregatorTableData {
     ) -> &mut AggregatorTable {
         if let Entry::Vacant(e) = self.aggregator_tables.entry(table_handle) {
             let aggregator_table = AggregatorTable {
-                inner: BTreeMap::new(),
+                new_aggregators: BTreeSet::new(),
+                removed_aggregators: BTreeSet::new(),
+                table: BTreeMap::new(),
             };
             e.insert(aggregator_table);
         }
@@ -236,10 +251,18 @@ impl AggregatorTableData {
     }
 }
 
+/// Enum to wrap a single aggregator change.
+#[derive(Debug)]
+pub enum AggregatorChange {
+    Write(u128),
+    Delta(DeltaOp),
+}
+
 /// Contains all changes during this VM session. The change set must be
 /// traversed by VM and converted to appropriate write ops.
+
 pub struct AggregatorChangeSet {
-    pub changes: BTreeMap<TableHandle, BTreeMap<Vec<u8>, Option<(AggregatorState, Vec<u8>)>>>,
+    pub changes: BTreeMap<TableHandle, BTreeMap<u128, Option<AggregatorChange>>>,
 }
 
 /// Native context that can be attached to VM NativeContextExtensions.
@@ -276,25 +299,36 @@ impl<'a> NativeAggregatorContext<'a> {
         let mut changes = BTreeMap::new();
         for (table_handle, aggregator_table) in aggregator_tables {
             let mut change = BTreeMap::new();
-            let AggregatorTable { inner } = aggregator_table;
+            let AggregatorTable {
+                removed_aggregators,
+                table,
+                ..
+            } = aggregator_table;
 
-            for (key, aggregator) in inner {
-                let key_bytes = serialize(&key);
-
+            // Add changes that update or create aggregators.
+            for (key, aggregator) in table {
                 let Aggregator {
-                    state, value, mark, ..
+                    state,
+                    value,
+                    limit,
+                    ..
                 } = aggregator;
 
-                let content = match mark {
-                    Mark::Deleted => None,
-                    _ => {
-                        let value_bytes = serialize(&value);
-                        Some((state, value_bytes))
+                let op = match state {
+                    AggregatorState::Data => AggregatorChange::Write(value),
+                    AggregatorState::PositiveDelta => {
+                        let delta_op = DeltaOp::Addition { value, limit };
+                        AggregatorChange::Delta(delta_op)
                     }
                 };
-
-                change.insert(key_bytes, content);
+                change.insert(key, Some(op));
             }
+
+            // Add changes that delete aggregators.
+            for key in removed_aggregators {
+                change.insert(key, None);
+            }
+
             changes.insert(table_handle, change);
         }
 
@@ -341,7 +375,7 @@ fn native_new_aggregator(
     // number of aggregator instances created so far and truncating them to
     // 128 bits.
     let txn_hash_buffer = serialize(&aggregator_context.txn_hash);
-    let num_aggregators_buffer = serialize(&(aggregator_table.len() as u128));
+    let num_aggregators_buffer = serialize(&aggregator_table.num_aggregators());
 
     let mut sha3 = Sha3::v256();
     sha3.update(&txn_hash_buffer);
@@ -351,17 +385,7 @@ fn native_new_aggregator(
     sha3.finalize(&mut key_bytes);
     let key = deserialize(&key_bytes.to_vec());
 
-    // If transaction initializes aggregator, then the actual value is known,
-    // and the aggregator state must be `Data`. Also, aggregators are
-    // zero-initialized.
-    let aggregator = Aggregator {
-        key,
-        state: AggregatorState::Data,
-        value: 0,
-        limit,
-        mark: Mark::New,
-    };
-    aggregator_table.insert(key, aggregator);
+    aggregator_table.create_new_aggregator(key, limit);
 
     // TODO: charge gas properly.
     let cost = GasCost::new(0, 0).total();
@@ -475,10 +499,9 @@ fn native_remove_aggregator(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
-    assert!(args.len() == 3);
+    assert!(args.len() == 2);
 
-    // Get table handle, aggregator key and its limit for removal.
-    let limit = pop_arg!(args, IntegerValue).value_as::<u128>()?;
+    // Get table handle and aggregator key for removal.
     let key = pop_arg!(args, IntegerValue).value_as::<u128>()?;
     let table_handle = pop_arg!(args, IntegerValue)
         .value_as::<u128>()
@@ -489,17 +512,7 @@ fn native_remove_aggregator(
     let mut aggregator_table_data = aggregator_context.aggregator_table_data.borrow_mut();
     let aggregator_table = aggregator_table_data.get_or_create_aggregator_table(table_handle);
 
-    if aggregator_table.contains_key(&key) && aggregator_table.get(&key).unwrap().mark == Mark::New
-    {
-        // Aggregator has been created in this context, hence we can simply
-        // remove the entry from the table.
-        aggregator_table.remove(&key);
-    } else {
-        // Aggregator has been created elsewhere. Mark for delition to produce
-        // the right change set.
-        let aggregator = aggregator_table.get_or_create_aggregator(key, limit);
-        aggregator.mark = Mark::Deleted;
-    }
+    aggregator_table.remove_aggregator(key);
 
     // TODO: charge gas properly.
     let cost = GasCost::new(0, 0).total();
@@ -562,4 +575,70 @@ fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
 /// Returns partial VM error on extension failure.
 fn extension_error(message: impl ToString) -> PartialVMError {
     PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(message.to_string())
+}
+
+// ================================= Tests =================================
+
+mod test {
+    use super::*;
+    use claim::{assert_matches, assert_none};
+    use move_deps::move_vm_test_utils::BlankStorage;
+    use once_cell::sync::Lazy;
+
+    static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
+    static DUMMY_HANDLE: Lazy<TableHandle> = Lazy::new(|| TableHandle(0));
+
+    fn set_up(context: &NativeAggregatorContext) {
+        let mut aggregator_table_data = context.aggregator_table_data.borrow_mut();
+        let table = aggregator_table_data.get_or_create_aggregator_table(*DUMMY_HANDLE);
+
+        // Aggregators with data.
+        table.create_new_aggregator(0, 1000);
+        table.create_new_aggregator(1, 1000);
+        table.create_new_aggregator(2, 1000);
+
+        // Aggregators with delta.
+        table.get_or_create_aggregator(3, 1000);
+        table.get_or_create_aggregator(4, 1000);
+        table.get_or_create_aggregator(5, 10);
+
+        // Different cases of agregator removal.
+        table.remove_aggregator(0);
+        table.remove_aggregator(3);
+        table.remove_aggregator(6);
+    }
+
+    #[test]
+    fn test_into_change_set() {
+        let context = NativeAggregatorContext::new(0, &*DUMMY_RESOLVER);
+        set_up(&context);
+
+        let AggregatorChangeSet { changes } = context.into_change_set();
+
+        let change = changes.get(&*DUMMY_HANDLE).unwrap();
+
+        assert!(!change.contains_key(&0));
+
+        assert_matches!(change.get(&1).unwrap(), Some(AggregatorChange::Write(0)));
+        assert_matches!(change.get(&2).unwrap(), Some(AggregatorChange::Write(0)));
+
+        assert_none!(change.get(&3).unwrap());
+
+        assert_matches!(
+            change.get(&4).unwrap(),
+            Some(AggregatorChange::Delta(DeltaOp::Addition {
+                value: 0,
+                limit: 1000
+            }))
+        );
+        assert_matches!(
+            change.get(&5).unwrap(),
+            Some(AggregatorChange::Delta(DeltaOp::Addition {
+                value: 0,
+                limit: 10
+            }))
+        );
+
+        assert_none!(change.get(&6).unwrap());
+    }
 }

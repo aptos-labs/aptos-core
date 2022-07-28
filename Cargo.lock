@@ -1265,6 +1265,7 @@ dependencies = [
  "aptos-types",
  "bcs",
  "better_any",
+ "claim",
  "fail 0.5.0",
  "framework",
  "mirai-annotations",
