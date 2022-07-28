@@ -37,7 +37,7 @@ services:
       - type: bind
         source: ./validator_node_template.yaml
         target: /opt/aptos/var/validator_node_template.yaml
-    command: ["/opt/aptos/bin/aptos-node", "--test", "--config", "/opt/aptos/var/"]
+    command: ["/opt/aptos/bin/aptos-node", "--test", "--test-dir", "/opt/aptos/var/", "--config", "/opt/aptos/var/"]
     ports:
       - "8080:8080"
     expose:
