@@ -1,0 +1,17 @@
+name: Run continuous pre release testing
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - pre-release-continuous-test
+  schedule:
+    # Run hourly
+    - cron: "0 * * * *"
+
+jobs:
+  run-forge:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      GIT_SHA: ${{ github.sha }}
+      FORGE_NAMESPACE: continuous
