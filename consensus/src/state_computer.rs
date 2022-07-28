@@ -116,7 +116,7 @@ impl StateComputer for ExecutionProxy {
             "Executing block",
         );
 
-        debug!("QSE: trying to get data., round {} ", block.round());
+        debug!("QSE: trying to get data., round {}, epoch: {} ", block.round(), block.epoch());
         let txns = self.data_manager.get_data(block).await?;
 
         // TODO: figure out error handling for the prologue txn

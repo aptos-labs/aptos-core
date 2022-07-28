@@ -92,6 +92,7 @@ impl NetworkListener {
     }
 
     pub async fn start(mut self) {
+        debug!("QS: starting networking");
         //batch fragment -> batch_aggregator, persist it, and prapre signedDigests
         //Keep in memory caching in side the DB wrapper.
         //chack id -> self, call PoQSB.

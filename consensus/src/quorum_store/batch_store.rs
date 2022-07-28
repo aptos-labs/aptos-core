@@ -84,6 +84,7 @@ impl BatchStore {
         db_quota: usize,
     ) -> (Self, Arc<BatchReader>) {
         let db_content = db.get_all_batches().expect("failed to read data from db");
+        debug!("QS: db size {}", db_content.len());
 
         let (batch_reader, expired_keys) = BatchReader::new(
             epoch,

@@ -153,22 +153,12 @@ impl BatchReader {
         };
 
         let mut expired_keys = Vec::new();
+        debug!("QS: Batchreader {} {} {}", db_content.len(), epoch, last_committed_round);
         for (digest, value) in db_content {
             let expiration = value.expiration;
+
+            debug!("QS: Batchreader recovery content exp {:?}, digest {}", expiration, digest);
             assert!(epoch >= expiration.epoch());
-            // if epoch < expiration.epoch() {
-            //     debug!(
-            //         "Outdated batch reader in epoch {}, observed expiration epoch {}",
-            //         epoch,
-            //         expiration.epoch()
-            //     );
-            //
-            //     // Outdated batch reader with the system, must ensure to not affect state.
-            //     // Can already shutdown the worker thread as an optimization.
-            //     self_ob.shutdown_flag.store(true, Ordering::Relaxed);
-            //     break;
-            // }
-            // Guaranteed that epoch >= expiration.epoch() below.
 
             if epoch > expiration.epoch()
                 || last_committed_round > expiration.round() + expiry_grace_rounds
@@ -181,6 +171,7 @@ impl BatchReader {
             }
         }
 
+        debug!("QS: Batchreader recovery expired keys len {}", expired_keys.len());
         (self_ob, expired_keys)
     }
 
