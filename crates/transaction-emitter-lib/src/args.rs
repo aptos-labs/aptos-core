@@ -45,7 +45,7 @@ pub struct ClusterArgs {
 
     /// If set, try to use public peers instead of localhost.
     #[clap(long)]
-    pub vasp: bool,
+    pub reuse_accounts: bool,
 
     #[clap(long, default_value = "TESTING")]
     pub chain_id: ChainId,
@@ -69,11 +69,8 @@ impl Default for TransactionType {
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
 pub struct EmitArgs {
-    #[clap(long, default_value = "15")]
-    pub accounts_per_client: usize,
-
     #[clap(long)]
-    pub workers_per_ac: Option<usize>,
+    pub mempool_backlog: u64,
 
     #[clap(long, default_value = "0")]
     pub wait_millis: u64,

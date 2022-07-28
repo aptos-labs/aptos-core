@@ -81,7 +81,7 @@ impl<'t> AccountMinter<'t> {
                 &req.rest_clients,
                 expected_num_seed_accounts,
                 coins_per_seed_account,
-                req.vasp,
+                req.reuse_accounts,
             )
             .await?;
         let actual_num_seed_accounts = seed_accounts.len();
@@ -113,8 +113,8 @@ impl<'t> AccountMinter<'t> {
                     20,
                     cur_client,
                     &txn_factory,
-                    req.vasp,
-                    if req.vasp {
+                    req.reuse_accounts,
+                    if req.reuse_accounts {
                         seed_rngs[i].clone()
                     } else {
                         StdRng::from_rng(self.rng()).unwrap()
