@@ -14,4 +14,5 @@ jobs:
     secrets: inherit
     with:
       GIT_SHA: ${{ github.sha }}
+      merge_or_canary: canary
       FORGE_NAMESPACE: continuous
