@@ -151,7 +151,7 @@ impl Account {
         let resources = self
             .context
             .move_resolver()?
-            .as_converter()
+            .as_converter(self.context.db.clone())
             .try_into_resources(self.account_state()?.get_resources())?;
         Response::new(self.latest_ledger_info, &resources)
     }
@@ -205,7 +205,7 @@ impl Account {
         Ok(self
             .context
             .move_resolver()?
-            .as_converter()
+            .as_converter(self.context.db.clone())
             .move_struct_fields(&typ, data)?)
     }
 

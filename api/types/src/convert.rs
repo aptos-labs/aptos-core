@@ -3,7 +3,7 @@
 
 use crate::{
     transaction::{
-        DeleteModule, DeleteResource, DeleteTableItem, ModuleBundlePayload,
+        DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, ModuleBundlePayload,
         StateCheckpointTransaction, WriteModule, WriteResource, WriteTableItem,
     },
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
@@ -38,20 +38,24 @@ use move_deps::{
     move_resource_viewer::MoveValueAnnotator,
 };
 use serde_json::Value;
+use std::sync::Arc;
 use std::{
     convert::{TryFrom, TryInto},
     iter::IntoIterator,
     rc::Rc,
 };
+use storage_interface::DbReader;
 
 pub struct MoveConverter<'a, R: ?Sized> {
     inner: MoveValueAnnotator<'a, R>,
+    db: Arc<dyn DbReader>,
 }
 
 impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
-    pub fn new(inner: &'a R) -> Self {
+    pub fn new(inner: &'a R, db: Arc<dyn DbReader>) -> Self {
         Self {
             inner: MoveValueAnnotator::new(inner),
+            db,
         }
     }
 
@@ -273,24 +277,51 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         key: Vec<u8>,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let handle = handle.0.to_be_bytes().to_vec().into();
+        let hex_handle = handle.0.to_be_bytes().to_vec().into();
         let key = key.into();
         let ret = match op {
             WriteOp::Deletion => WriteSetChange::DeleteTableItem(DeleteTableItem {
                 state_key_hash,
-                handle,
+                handle: hex_handle,
                 key,
             }),
-            WriteOp::Value(value) => WriteSetChange::WriteTableItem(WriteTableItem {
-                state_key_hash,
-                handle,
-                key,
-                value: value.into(),
-            }),
+            WriteOp::Value(value) => {
+                let data =
+                    self.try_write_table_item_into_decoded_table_data(handle, &key.0, &value)?;
+
+                WriteSetChange::WriteTableItem(WriteTableItem {
+                    state_key_hash,
+                    handle: hex_handle,
+                    key,
+                    value: value.into(),
+                    data,
+                })
+            }
             // Deltas are materialized into WriteOP::Value(..) in executor.
             WriteOp::Delta(..) => unreachable!("unexpected conversion"),
         };
         Ok(ret)
+    }
+
+    pub fn try_write_table_item_into_decoded_table_data(
+        &self,
+        handle: TableHandle,
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<Option<DecodedTableData>> {
+        if !self.db.indexer_enabled() {
+            return Ok(None);
+        }
+        let table_info = self.db.get_table_info(handle).unwrap();
+        let key = self.try_into_move_value(&table_info.key_type, key)?;
+        let value = self.try_into_move_value(&table_info.value_type, value)?;
+
+        Ok(Some(DecodedTableData {
+            key: key.json().unwrap(),
+            key_type: table_info.key_type.to_string(),
+            value: value.json().unwrap(),
+            value_type: table_info.value_type.to_string(),
+        }))
     }
 
     pub fn try_into_events(&self, events: &[ContractEvent]) -> Result<Vec<Event>> {
@@ -636,12 +667,12 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
 }
 
 pub trait AsConverter<R> {
-    fn as_converter(&self) -> MoveConverter<R>;
+    fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R>;
 }
 
 impl<R: MoveResolverExt> AsConverter<R> for R {
-    fn as_converter(&self) -> MoveConverter<R> {
-        MoveConverter::new(self)
+    fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R> {
+        MoveConverter::new(self, db)
     }
 }
 

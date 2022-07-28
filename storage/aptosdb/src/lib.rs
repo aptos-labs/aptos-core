@@ -1377,6 +1377,11 @@ impl DbReader for AptosDB {
                 .ok_or_else(|| AptosDbError::NotFound(format!("TableInfo for {:?}", handle)).into())
         })
     }
+
+    /// Returns whether the indexer DB has been enabled or not
+    fn indexer_enabled(&self) -> bool {
+        self.indexer.is_some()
+    }
 }
 
 impl DbWriter for AptosDB {
