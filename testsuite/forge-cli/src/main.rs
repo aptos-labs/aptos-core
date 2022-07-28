@@ -185,10 +185,10 @@ fn main() -> Result<()> {
         .accounts_per_client(args.accounts_per_client)
         .duration(Duration::from_secs(args.duration_secs as u64))
         .thread_params(EmitThreadParams {
-            wait_millis: args.wait_millis,
-            wait_committed: !args.burst,
-            txn_expiration_time_secs: 30,
-            check_stats_at_end: false,
+            wait_millis: 1000,
+            wait_committed: false,
+            txn_expiration_time_secs: 300,
+            check_stats_at_end: true,
         });
 
     let success_criteria = SuccessCriteria::new(

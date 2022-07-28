@@ -72,8 +72,8 @@ pub struct EmitThreadParams {
 impl Default for EmitThreadParams {
     fn default() -> Self {
         Self {
-            wait_millis: 0,
-            wait_committed: true,
+            wait_millis: 1000,
+            wait_committed: false,
             txn_expiration_time_secs: 30,
             check_stats_at_end: true,
         }
@@ -97,7 +97,7 @@ impl Default for EmitJobRequest {
     fn default() -> Self {
         Self {
             rest_clients: Vec::new(),
-            accounts_per_client: 15,
+            accounts_per_client: 7,
             workers_per_endpoint: None,
             thread_params: EmitThreadParams::default(),
             gas_price: 0,
@@ -417,7 +417,7 @@ async fn wait_for_single_account_sequence(
 ) -> Result<()> {
     let deadline = Instant::now() + wait_timeout;
     while Instant::now() <= deadline {
-        time::sleep(Duration::from_millis(500)).await;
+        time::sleep(Duration::from_millis(1000)).await;
         match query_sequence_numbers(client, &[account.address()]).await {
             Ok(sequence_numbers) => {
                 if sequence_numbers[0] >= account.sequence_number() {
@@ -492,7 +492,7 @@ async fn wait_for_accounts_sequence(
                 );
             }
         }
-        time::sleep(Duration::from_millis(500)).await;
+        time::sleep(Duration::from_millis(1000)).await;
     }
 
     Err(uncommitted)

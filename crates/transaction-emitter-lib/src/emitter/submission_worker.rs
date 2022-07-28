@@ -22,6 +22,7 @@ use core::{
     time::Duration,
 };
 use rand::seq::IteratorRandom;
+use rand::Rng;
 use std::{sync::Arc, time::Instant};
 use tokio::time::sleep;
 
@@ -70,6 +71,11 @@ impl SubmissionWorker {
 
     #[allow(clippy::collapsible_if)]
     pub(crate) async fn run(mut self, gas_price: u64) -> Vec<LocalAccount> {
+        // Introduce a random jitter between 0 to 5 seconds so that we don't hammer the rest APIs
+        // all at once.
+        let random_jitter_ms = self.rng.gen_range(0, 5000);
+        sleep(Duration::from_millis(random_jitter_ms)).await;
+
         let check_stats_at_end = self.params.check_stats_at_end && !self.params.wait_committed;
         let wait_for_accounts_sequence_timeout = Duration::from_secs(min(
             self.params.txn_expiration_time_secs,
