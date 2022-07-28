@@ -16,6 +16,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context};
 
+use crate::data_manager::DataManager;
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
@@ -29,7 +30,6 @@ use futures::executor::block_on;
 #[cfg(test)]
 use std::collections::VecDeque;
 use std::{sync::Arc, time::Duration};
-use crate::data_manager::DataManager;
 
 #[cfg(test)]
 #[path = "block_store_test.rs"]
@@ -380,7 +380,9 @@ impl BlockStore {
             }
             self.time_service.wait_until(block_time).await;
         }
-        self.data_manager.update_payload(executed_block.block()).await;
+        self.data_manager
+            .update_payload(executed_block.block())
+            .await;
         self.storage
             .save_tree(vec![executed_block.block().clone()], vec![])
             .context("Insert block failed when saving block")?;

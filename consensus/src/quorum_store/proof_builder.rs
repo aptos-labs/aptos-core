@@ -1,15 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{
-    quorum_store::{ProofReturnChannel, QuorumStoreError},
-    types::BatchId,
-    utils::DigestTimeouts,
-};
+use crate::quorum_store::{quorum_store::QuorumStoreError, types::BatchId, utils::DigestTimeouts};
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use consensus_types::proof_of_store::{ProofOfStore, SignedDigest, SignedDigestError};
+use futures::channel::oneshot;
 use std::collections::HashMap;
 use tokio::sync::mpsc::Receiver;
 
@@ -18,6 +15,9 @@ pub(crate) enum ProofBuilderCommand {
     InitProof(SignedDigest, BatchId, ProofReturnChannel),
     AppendSignature(SignedDigest),
 }
+
+pub(crate) type ProofReturnChannel =
+    oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
 pub(crate) struct ProofBuilder {
     // peer_id: PeerId,

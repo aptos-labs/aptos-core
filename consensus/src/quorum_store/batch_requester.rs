@@ -99,10 +99,10 @@ impl BatchRequester {
     }
 
     async fn send_requests(&self, digest: HashValue, request_peers: Vec<PeerId>) {
-        debug_assert!(
-            !request_peers.contains(&self.my_peer_id),
-            "Should never request from self over network"
-        );
+        // debug_assert!( // TODO: in case we loose the db it is possibile.
+        //     !request_peers.contains(&self.my_peer_id),
+        //     "Should never request from self over network"
+        // );
         let batch = Batch::new(self.epoch, self.my_peer_id, digest, None);
         self.network_sender.send_batch(batch, request_peers).await;
     }

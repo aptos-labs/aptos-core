@@ -133,7 +133,10 @@ pub struct EpochManager {
     block_store: Option<Arc<BlockStore>>,
     quorum_store_storage: Arc<QuorumStoreDB>,
     quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
-    wrapper_quorum_store_msg_tx: Option<aptos_channel::Sender<AccountAddress, VerifiedEvent>>,
+    wrapper_quorum_store_tx: Option<(
+        aptos_channel::Sender<AccountAddress, VerifiedEvent>,
+        Sender<oneshot::Sender<()>>,
+    )>,
 }
 
 impl EpochManager {
@@ -174,7 +177,7 @@ impl EpochManager {
             block_store: None,
             quorum_store_storage: Arc::new(QuorumStoreDB::new(path)),
             quorum_store_msg_tx: None,
-            wrapper_quorum_store_msg_tx: None,
+            wrapper_quorum_store_tx: None,
         }
     }
 
@@ -410,7 +413,6 @@ impl EpochManager {
         tokio::spawn(quorum_store.start(consensus_to_quorum_store_rx));
     }
 
-    ///this function spawns QuorumStore
     fn spawn_quorum_store(
         &mut self,
         config: QuorumStoreConfig,
@@ -469,12 +471,11 @@ impl EpochManager {
             wrapper_command_rx,
         );
 
-        // TODO: do we need to destroy the async thread with explicit shutdown?
         tokio::spawn(quorum_store.start());
         batch_reader
     }
 
-    fn spawn_quorum_wrapper(
+    fn spawn_quorum_store_wrapper(
         &mut self,
         network_sender: NetworkSender,
         consensus_to_quorum_store_rx: Receiver<WrapperCommand>,
@@ -489,10 +490,9 @@ impl EpochManager {
                 None,
             );
 
-        self.wrapper_quorum_store_msg_tx = Some(wrapper_quorum_store_msg_tx);
+        let (wrapper_shutdown_tx, wrapper_shutdown_rx) = mpsc::channel(0);
 
-        // TODO: need to bring shutdown_tx out of this function and use it in shutdown_current_processor
-        let (_shutdown_tx, shutdown_rx) = mpsc::channel(0);
+        self.wrapper_quorum_store_tx = Some((wrapper_quorum_store_msg_tx, wrapper_shutdown_tx));
 
         let quorum_store_wrapper = QuorumStoreWrapper::new(
             self.epoch(),
@@ -508,7 +508,7 @@ impl EpochManager {
         tokio::spawn(quorum_store_wrapper.start(
             network_sender,
             consensus_to_quorum_store_rx,
-            shutdown_rx,
+            wrapper_shutdown_rx,
             wrapper_quorum_store_msg_rx,
         ));
     }
@@ -571,6 +571,15 @@ impl EpochManager {
                 .expect("[EpochManager] Fail to drop round manager");
         }
         self.round_manager_tx = None;
+
+        if let Some((_, mut wrapper_shutdown_tx)) = self.wrapper_quorum_store_tx.take() {
+            let (ack_tx, ack_rx) = oneshot::channel();
+            wrapper_shutdown_tx
+                .send(ack_tx)
+                .await
+                .expect("Could not send shutdown indicator to QuorumStoreWrapper");
+            ack_rx.await.expect("Failed to stop QuorumStoreWrapper");
+        }
 
         // Shutdown the previous buffer manager, to release the SafetyRule client
         self.buffer_manager_msg_tx = None;
@@ -665,7 +674,7 @@ impl EpochManager {
             self.data_manager
                 .new_epoch(data_reader.clone(), consensus_to_quorum_store_tx.clone());
 
-            self.spawn_quorum_wrapper(
+            self.spawn_quorum_store_wrapper(
                 network_sender.clone(),
                 consensus_to_quorum_store_rx,
                 wrapper_quorum_store_tx,
@@ -863,8 +872,8 @@ impl EpochManager {
     ) -> anyhow::Result<()> {
         match event {
             wrapper_quorum_store_event @ VerifiedEvent::ProofOfStoreBroadcast(_) => {
-                if let Some(sender) = &mut self.wrapper_quorum_store_msg_tx {
-                    sender.push(peer_id, wrapper_quorum_store_event)?;
+                if let Some((wrapper_net_sender, _)) = &mut self.wrapper_quorum_store_tx {
+                    wrapper_net_sender.push(peer_id, wrapper_quorum_store_event)?;
                 } else {
                     bail!("QuorumStore wrapper not started but received QuorumStore Message");
                 }
