@@ -214,9 +214,7 @@ impl StateView for CachedDbStateView {
             // This can return None, which means the value has been deleted from the DB.
             return Ok(contents.clone());
         }
-        let state_value_option = self
-            .db_state_view
-            .get_state_value(state_key)?;
+        let state_value_option = self.db_state_view.get_state_value(state_key)?;
         // Update the cache if still empty
         let mut cache = self.state_cache.write();
         let new_value = cache

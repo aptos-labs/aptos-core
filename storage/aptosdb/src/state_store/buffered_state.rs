@@ -17,6 +17,9 @@ use std::sync::{mpsc, Arc};
 use std::thread::JoinHandle;
 use storage_interface::state_delta::StateDelta;
 
+pub(crate) const ASYNC_COMMIT_CHANNEL_BUFFER_SIZE: u64 = 1;
+pub(crate) const TARGET_SNAPSHOT_INTERVAL_IN_VERSION: u64 = 20_000;
+
 /// The in-memory buffered state that consists of two pieces:
 /// `state_until_checkpoint`: The ready-to-commit data in range (last snapshot, latest checkpoint].
 /// `state_after_checkpoint`: The pending data from the latest checkpoint(exclusive) until the
@@ -40,7 +43,8 @@ impl BufferedState {
         state_after_checkpoint: StateDelta,
         target_snapshot_size: usize,
     ) -> Self {
-        let (state_commit_sender, state_commit_receiver) = mpsc::sync_channel(1 /* bound */);
+        let (state_commit_sender, state_commit_receiver) =
+            mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
         let arc_state_merkle_db = Arc::clone(state_merkle_db);
         let join_handle = std::thread::Builder::new()
             .name("state_snapshot_committer".to_string())
@@ -76,17 +80,19 @@ impl BufferedState {
                 .send((to_commit, Some(commit_sync_sender)))
                 .unwrap();
             commit_sync_receiver.recv().unwrap();
-        } else if self.state_until_checkpoint.is_some()
-            && self
-                .state_until_checkpoint
-                .as_ref()
-                .expect("Must exist")
-                .updates_since_base
-                .len()
-                >= self.target_snapshot_size
-        {
-            let to_commit = self.state_until_checkpoint.take().map(Arc::from);
-            self.state_commit_sender.send((to_commit, None)).unwrap();
+        } else if self.state_until_checkpoint.is_some() {
+            let take_out_to_commit = {
+                let state_until_checkpoint =
+                    self.state_until_checkpoint.as_ref().expect("Must exist");
+                state_until_checkpoint.updates_since_base.len() >= self.target_snapshot_size
+                    || state_until_checkpoint.current_version.map_or(0, |v| v + 1)
+                        - state_until_checkpoint.base_version.map_or(0, |v| v + 1)
+                        >= TARGET_SNAPSHOT_INTERVAL_IN_VERSION
+            };
+            if take_out_to_commit {
+                let to_commit = self.state_until_checkpoint.take().map(Arc::from);
+                self.state_commit_sender.send((to_commit, None)).unwrap();
+            }
         }
     }
 
