@@ -35,6 +35,7 @@ Create chart name and version as used by the chart label.
 Common labels
 */}}
 {{- define "aptos-genesis.labels" -}}
+{{ toYaml .Values.labels }}
 helm.sh/chart: {{ include "aptos-genesis.chart" . }}
 {{ include "aptos-genesis.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
@@ -47,6 +48,7 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 Selector labels
 */}}
 {{- define "aptos-genesis.selectorLabels" -}}
+{{ toYaml .Values.labels }}
 app.kubernetes.io/part-of: {{ include "aptos-genesis.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
