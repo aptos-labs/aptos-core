@@ -26,6 +26,7 @@ use thiserror::Error;
 
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
+use serde::de::DeserializeOwned;
 
 #[cfg(test)]
 mod test;
@@ -52,11 +53,14 @@ pub enum ProtocolId {
     StorageServiceRpc = 8,
     MempoolRpc = 9,
     PeerMonitoringServiceRpc = 10,
+    ConsensusRpcCompressed = 11,
+    ConsensusDirectSendCompressed = 12,
 }
 
 /// The encoding types for Protocols
 enum Encoding {
     Bcs,
+    CompressedBcs,
     Json,
 }
 
@@ -75,6 +79,8 @@ impl ProtocolId {
             StorageServiceRpc => "StorageServiceRpc",
             MempoolRpc => "MempoolRpc",
             PeerMonitoringServiceRpc => "PeerMonitoringServiceRpc",
+            ConsensusRpcCompressed => "ConsensusRpcCompressed",
+            ConsensusDirectSendCompressed => "ConsensusDirectSendCompressed",
         }
     }
 
@@ -91,6 +97,8 @@ impl ProtocolId {
             ProtocolId::StorageServiceRpc,
             ProtocolId::MempoolRpc,
             ProtocolId::PeerMonitoringServiceRpc,
+            ProtocolId::ConsensusRpcCompressed,
+            ProtocolId::ConsensusDirectSendCompressed,
         ]
     }
 
@@ -98,6 +106,9 @@ impl ProtocolId {
     fn encoding(self) -> Encoding {
         match self {
             ProtocolId::ConsensusDirectSendJson | ProtocolId::ConsensusRpcJson => Encoding::Json,
+            ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
+                Encoding::CompressedBcs
+            }
             _ => Encoding::Bcs,
         }
     }
@@ -109,16 +120,33 @@ impl ProtocolId {
 
     pub fn to_bytes<T: Serialize>(&self, value: &T) -> anyhow::Result<Vec<u8>> {
         match self.encoding() {
+            Encoding::Bcs => self.bcs_encode(value),
+            Encoding::CompressedBcs => {
+                let bcs_bytes = self.bcs_encode(value)?;
+                aptos_compression::compress(bcs_bytes).map_err(|e| anyhow! {"{:?}", e})
+            }
             Encoding::Json => serde_json::to_vec(value).map_err(|e| anyhow!("{:?}", e)),
-            Encoding::Bcs => bcs::to_bytes(value).map_err(|e| anyhow! {"{:?}", e}),
         }
     }
 
-    pub fn from_bytes<'a, T: Deserialize<'a>>(&self, bytes: &'a [u8]) -> anyhow::Result<T> {
+    pub fn from_bytes<T: DeserializeOwned>(&self, bytes: &[u8]) -> anyhow::Result<T> {
         match self.encoding() {
+            Encoding::Bcs => self.bcs_decode(bytes),
+            Encoding::CompressedBcs => {
+                let raw_bytes = aptos_compression::decompress(&bytes.to_vec())
+                    .map_err(|e| anyhow! {"{:?}", e})?;
+                self.bcs_decode(&raw_bytes)
+            }
             Encoding::Json => serde_json::from_slice(bytes).map_err(|e| anyhow!("{:?}", e)),
-            Encoding::Bcs => bcs::from_bytes(bytes).map_err(|e| anyhow! {"{:?}", e}),
         }
+    }
+
+    fn bcs_encode<T: Serialize>(&self, value: &T) -> anyhow::Result<Vec<u8>> {
+        bcs::to_bytes(value).map_err(|e| anyhow! {"{:?}", e})
+    }
+
+    fn bcs_decode<T: DeserializeOwned>(&self, bytes: &[u8]) -> anyhow::Result<T> {
+        bcs::from_bytes(bytes).map_err(|e| anyhow! {"{:?}", e})
     }
 }
 
