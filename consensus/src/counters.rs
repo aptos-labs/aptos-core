@@ -333,3 +333,12 @@ pub static BLOCK_RETRIEVAL_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+/// Count of the buffer manager retry requests since last restart.
+pub static BUFFER_MANAGER_RETRY_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_buffer_manager_retry_count",
+        "Count of the buffer manager retry requests since last restart"
+    )
+    .unwrap()
+});
