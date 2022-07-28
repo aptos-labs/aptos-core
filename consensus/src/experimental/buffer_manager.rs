@@ -23,6 +23,7 @@ use aptos_types::{
 use consensus_types::{common::Author, executed_block::ExecutedBlock};
 
 use crate::{
+    counters,
     experimental::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
@@ -150,6 +151,7 @@ impl BufferManager {
         request: T,
         duration: Duration,
     ) {
+        counters::BUFFER_MANAGER_RETRY_COUNT.inc();
         tokio::spawn(async move {
             tokio::time::sleep(duration).await;
             sender
@@ -176,8 +178,12 @@ impl BufferManager {
     /// Set the execution root to the first not executed item (Ordered) and send execution request
     /// Set to None if not exist
     async fn advance_execution_root(&mut self) {
-        let cursor = self.execution_root.or_else(|| *self.buffer.head_cursor());
-        self.execution_root = self.buffer.find_elem_from(cursor, |item| item.is_ordered());
+        let cursor = self.execution_root;
+        self.execution_root = self
+            .buffer
+            .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
+                item.is_ordered()
+            });
         debug!(
             "Advance execution root from {:?} to {:?}",
             cursor, self.execution_root
@@ -200,10 +206,12 @@ impl BufferManager {
     /// Set the signing root to the first not signed item (Executed) and send execution request
     /// Set to None if not exist
     async fn advance_signing_root(&mut self) {
-        let cursor = self.signing_root.or_else(|| *self.buffer.head_cursor());
+        let cursor = self.signing_root;
         self.signing_root = self
             .buffer
-            .find_elem_from(cursor, |item| item.is_executed());
+            .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
+                item.is_executed()
+            });
         debug!(
             "Advance signing root from {:?} to {:?}",
             cursor, self.signing_root
