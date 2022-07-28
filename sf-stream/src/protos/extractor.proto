@@ -18,7 +18,7 @@ message Transaction {
     STATE_CHECKPOINT = 2;
     USER = 3;
   }
-  
+
   TransactionType type = 6;
 
   oneof txn_data {
@@ -86,12 +86,12 @@ message UserTransactionRequest {
 }
 
 message WriteSet {
-  
+
   enum WriteSetType {
     SCRIPT_WRITE_SET = 0;
     DIRECT_WRITE_SET = 1;
   }
-  
+
   WriteSetType write_set_type = 1;
   oneof write_set {
     ScriptWriteSet script_write_set = 2;
@@ -110,7 +110,7 @@ message DirectWriteSet {
 }
 
 message WriteSetChange {
-  
+
   enum WriteSetChangeType {
     DELETE_MODULE = 0;
     DELETE_RESOURCE = 1;
@@ -147,6 +147,12 @@ message DeleteTableItem {
   bytes state_key_hash = 1;
   string handle = 2;
   string key = 3;
+  DeleteTableData data = 4;
+}
+
+message DeleteTableData {
+  string key = 1;
+  string key_type = 2;
 }
 
 message WriteModule {
@@ -206,7 +212,7 @@ message ScriptPayload {
 }
 
 message ModuleBundlePayload {
-  repeated string modules = 1;  
+  repeated string modules = 1;
 }
 
 message WriteSetPayload {
