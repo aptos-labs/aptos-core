@@ -28,7 +28,7 @@ impl DeltaOp {
 }
 
 /// Implements application of `Addition` to `base`.
-fn addition(base: u128, value: u128, limit: u128) -> Option<u128> {
+pub fn addition(base: u128, value: u128, limit: u128) -> Option<u128> {
     if value > (limit - base) {
         None
     } else {
@@ -37,7 +37,7 @@ fn addition(base: u128, value: u128, limit: u128) -> Option<u128> {
 }
 
 /// Implements application of `Subtraction` to `base`.
-fn subtraction(base: u128, value: u128) -> Option<u128> {
+pub fn subtraction(base: u128, value: u128) -> Option<u128> {
     if value > base {
         None
     } else {

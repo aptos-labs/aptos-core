@@ -1,7 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::vm_status::StatusCode;
+use aptos_types::{
+    delta_change_set::{addition, deserialize, serialize, subtraction},
+    vm_status::StatusCode,
+};
 use better_any::{Tid, TidAble};
 use move_deps::{
     move_binary_format::errors::{PartialVMError, PartialVMResult},
@@ -35,14 +38,11 @@ enum Mark {
 }
 
 /// State of an aggregator: `Data` means that aggregator stores an exact value,
-/// `PositiveDelta` means that actual value is not known but must be added later,
-/// `NegativeDelta` means that the value is also not known but the value should
-/// be subtracted instead.
+/// `PositiveDelta` means that actual value is not known but must be added later
 #[derive(Clone, Copy, PartialEq)]
 pub enum AggregatorState {
     Data,
     PositiveDelta,
-    NegativeDelta,
 }
 
 /// Internal aggregator data structure.
@@ -62,47 +62,33 @@ struct Aggregator {
 /// When `Aggregator` overflows the `limit`.
 const EAGGREGATOR_OVERFLOW: u64 = 1600;
 
-/// When `Aggregator`'s value goes below zero.
+/// When `Aggregator`'s underflows.
 const EAGGREGATOR_UNDERFLOW: u64 = 1601;
 
 impl Aggregator {
     /// Implements logic for adding to an aggregator.
-    fn add(
-        &mut self,
-        context: &NativeAggregatorContext,
-        handle: &TableHandle,
-        value: u128,
-    ) -> PartialVMResult<()> {
-        // First, check if the current value is a negative delta. In this case,
-        // we must materialize the value. For example, assume we hold X-10, with
-        // X being the "true" value. When add(5) comes, the result is X-10+5 =
-        // X-5, which is undefined for X < 6!
-        if self.state == AggregatorState::NegativeDelta {
-            if let Err(e) = self.materialize(context, handle) {
-                return Err(e);
-            }
-        }
-
+    fn add(&mut self, value: u128) -> PartialVMResult<()> {
         // At this point, aggregator holds a positive delta or knows the value.
         // Hence, we can add, of course checking overflow condition.
-        checked_add(self.value, value, self.limit).and_then(|result| {
-            self.value = result;
-            Ok(())
-        })
+        match addition(self.value, value, self.limit) {
+            Some(result) => {
+                self.value = result;
+                Ok(())
+            }
+            None => Err(abort_error(
+                format!("aggregator's value overflowed when adding {}", value),
+                EAGGREGATOR_OVERFLOW,
+            )),
+        }
     }
 
     /// Implements logic for subtracting from an aggregator.
-    fn sub(
-        &mut self,
-        context: &NativeAggregatorContext,
-        handle: &TableHandle,
-        value: u128,
-    ) -> PartialVMResult<()> {
+    fn sub(&mut self, value: u128) -> PartialVMResult<()> {
         // First, we check if the value can be subtracted in theory, that is
         // if `value <= limit`. If not, we can immediately abort.
         if value > self.limit {
             return Err(abort_error(
-                "aggregator's value underflowed",
+                format!("aggregator's value underflowed when subtracting more than aggregator can hold ({} > limit)", value),
                 EAGGREGATOR_UNDERFLOW,
             ));
         }
@@ -113,59 +99,25 @@ impl Aggregator {
             AggregatorState::Data => {
                 // Aggregator knows the value, therefore we can subtract
                 // checking we don't drop below zero.
-                checked_sub(self.value, value).and_then(|result| {
-                    self.value = result;
-                    Ok(())
-                })
-            }
-            AggregatorState::NegativeDelta => {
-                // If aggregator holds a negative delta, subtraction is
-                // commutative because of monotonicity. Indeed, if we hold
-                // X-10 and sub(2) comes, the result is X-10-2 = X-12 which
-                // aborts if X-10 should have aborted.
-                // Note that here we reuse `checeked_add`. the reason is that
-                // since we never can have `result > limit`, we also can never
-                // subtract more that `limit`.
-                checked_add(self.value, value, self.limit).and_then(|result| {
-                    self.value = result;
-                    Ok(())
-                })
-            }
-            AggregatorState::PositiveDelta => {
-                // If aggregator holds a positive delta, we need to consider
-                // three cases. First, the delta can be zero itself, and hence
-                // it is allowed to become negative. (again, monotonicty means
-                // commutativity). If this is the case, change to negative delta
-                // of `value`.
-                // Note: we must protect over edge case of X+0-0 keeping it to
-                // be X+0.
-                if self.value == 0 && value != 0 {
-                    self.state = AggregatorState::NegativeDelta;
-                    self.value = value;
-                    return Ok(());
-                }
-
-                // Alternatively, we try to subtract the value from the delta, and
-                // as long as we stay above zero it's ok. (e.g. going from X+10 to
-                // X+2 preserves correctness).
-                match checked_sub(self.value, value) {
-                    Ok(result) => {
+                match subtraction(self.value, value) {
+                    Some(result) => {
                         self.value = result;
                         Ok(())
                     }
-                    Err(_) => {
-                        // Subtraction from delta failed and we dropped below
-                        // zero. Unlucky! We must materialize the value to
-                        // check if the "true" value is large enough for doing
-                        // subtraction. If not - abort.
-                        self.materialize(context, handle).and_then(|_| {
-                            checked_sub(self.value, value).and_then(|result| {
-                                self.value = result;
-                                Ok(())
-                            })
-                        })
-                    }
+                    None => Err(abort_error(
+                        format!(
+                            "aggregator's value underflowed when subtracting {} from {}",
+                            value, self.value
+                        ),
+                        EAGGREGATOR_UNDERFLOW,
+                    )),
                 }
+            }
+            // Since `sub` is a barrier, we never encounter delta during
+            // subtraction. This will change in future.
+            // TODO: implement this properly once `sub` stops being a barrier.
+            AggregatorState::PositiveDelta => {
+                unreachable!("subtraction always materializes the value")
             }
         }
     }
@@ -188,35 +140,28 @@ impl Aggregator {
             Ok(maybe_bytes) => {
                 match maybe_bytes {
                     Some(bytes) => {
-                        let true_value = deserialize(&bytes);
+                        let base = deserialize(&bytes);
 
                         // At this point, we fetched the "true" value of the
                         // aggregator from the previously executed transaction.
-                        let result = match self.state {
+                        match self.state {
                             AggregatorState::PositiveDelta => {
-                                // If we hold a positive delta, apply it to the
-                                // "true" value, aborting on overflow. Also change
-                                // the state since the value is now known.
-                                checked_add(true_value, self.value, self.limit)
-                            }
-                            AggregatorState::NegativeDelta => {
-                                // Otherwise, we must be holding a negative
-                                // delta. Check if applying it to the "true"
-                                // value does not cause underflow.
-                                checked_sub(true_value, self.value)
+                                match addition(base, self.value, self.limit) {
+                                    Some(result) => {
+                                        self.value = result;
+                                        self.state = AggregatorState::Data;
+                                        Ok(())
+                                    }
+                                    None => Err(abort_error(
+                                        "aggregator's value overflowed when materializing the delta",
+                                        EAGGREGATOR_OVERFLOW,
+                                    )),
+                                }
                             }
                             AggregatorState::Data => {
                                 unreachable!("aggregator's value is already materialized")
                             }
-                        };
-
-                        // If no errors occurred after applying deltas, update
-                        // the value and the state.
-                        result.and_then(|result| {
-                            self.value = result;
-                            self.state = AggregatorState::Data;
-                            Ok(())
-                        })
+                        }
                     }
                     None => Err(extension_error("aggregator's value not found")),
                 }
@@ -359,17 +304,17 @@ impl<'a> NativeAggregatorContext<'a> {
 
 // ================================= Natives =================================
 
-/// All aggregator native functions. For more details, refer to cod in
-/// AggregatorTable.move.
+/// All aggregator native functions. For more details, refer to code in
+/// `aggregator_table.move`.
 pub fn aggregator_natives(aggregator_addr: AccountAddress) -> NativeFunctionTable {
     native_functions::make_table(
         aggregator_addr,
         &[
-            ("aggregator_table", "new_aggregator", native_new_aggregator),
             ("aggregator", "add", native_add),
             ("aggregator", "read", native_read),
-            ("aggregator", "sub", native_sub),
             ("aggregator", "remove_aggregator", native_remove_aggregator),
+            ("aggregator", "sub", native_sub),
+            ("aggregator_table", "new_aggregator", native_new_aggregator),
         ],
     )
 }
@@ -392,7 +337,7 @@ fn native_new_aggregator(
     let aggregator_table = aggregator_table_data.get_or_create_aggregator_table(table_handle);
 
     // Every aggregator instance has a unique key. Here we can reuse the
-    // strategy from `Table` implementation: taking hash of transaction and
+    // strategy from `table` implementation: taking hash of transaction and
     // number of aggregator instances created so far and truncating them to
     // 128 bits.
     let txn_hash_buffer = serialize(&aggregator_context.txn_hash);
@@ -421,7 +366,7 @@ fn native_new_aggregator(
     // TODO: charge gas properly.
     let cost = GasCost::new(0, 0).total();
 
-    // Return `Aggregator` Move struct to the user.
+    // Return `Aggregator` Move struct to the user so that we can add/subtract.
     Ok(NativeResult::ok(
         cost,
         smallvec![Value::struct_(Struct::pack(vec![
@@ -452,13 +397,11 @@ fn native_add(
         .get_or_create_aggregator_table(table_handle)
         .get_or_create_aggregator(key, limit);
 
-    aggregator
-        .add(aggregator_context, &table_handle, value)
-        .and_then(|_| {
-            // TODO: charge gas properly.
-            let cost = GasCost::new(0, 0).total();
-            Ok(NativeResult::ok(cost, smallvec![]))
-        })
+    aggregator.add(value).and_then(|_| {
+        // TODO: charge gas properly.
+        let cost = GasCost::new(0, 0).total();
+        Ok(NativeResult::ok(cost, smallvec![]))
+    })
 }
 
 fn native_read(
@@ -514,12 +457,16 @@ fn native_sub(
         .get_or_create_aggregator_table(table_handle)
         .get_or_create_aggregator(key, limit);
 
+    // For V1 Aggregator, subtraction is a barrier, and materializes the value
+    // first.
     aggregator
-        .sub(aggregator_context, &table_handle, value)
+        .materialize(aggregator_context, &table_handle)
         .and_then(|_| {
-            // TODO: charge gas properly.
-            let cost = GasCost::new(0, 0).total();
-            Ok(NativeResult::ok(cost, smallvec![]))
+            aggregator.sub(value).and_then(|_| {
+                // TODO: charge gas properly.
+                let cost = GasCost::new(0, 0).total();
+                Ok(NativeResult::ok(cost, smallvec![]))
+            })
         })
 }
 
@@ -606,51 +553,13 @@ fn get_aggregator_fields(aggregator: &StructRef) -> PartialVMResult<(TableHandle
 }
 
 /// Returns partial VM error on abort.
-fn abort_error(message: &str, code: u64) -> PartialVMError {
+fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
     PartialVMError::new(StatusCode::ABORTED)
         .with_message(message.to_string())
         .with_sub_status(code)
 }
 
 /// Returns partial VM error on extension failure.
-fn extension_error(message: &str) -> PartialVMError {
+fn extension_error(message: impl ToString) -> PartialVMError {
     PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(message.to_string())
-}
-
-/// Serializes aggregator value. The function is public so that it can be used
-/// by the executor.
-pub fn serialize(value: &u128) -> Vec<u8> {
-    bcs::to_bytes(value).expect("unexpected serialization error")
-}
-
-/// Deserializes aggregator value. The function is public so that it can be
-/// used by the executor.
-pub fn deserialize(value_bytes: &Vec<u8>) -> u128 {
-    bcs::from_bytes(value_bytes).expect("unexpected deserialization error")
-}
-
-/// Returns `base` + `value` or error if the result is greater than `limit`.
-/// Function is public so that it can be used by executor.
-pub fn checked_add(base: u128, value: u128, limit: u128) -> PartialVMResult<u128> {
-    if value > limit - base {
-        Err(abort_error(
-            "aggregator's value overflowed",
-            EAGGREGATOR_OVERFLOW,
-        ))
-    } else {
-        Ok(base + value)
-    }
-}
-
-/// Returns `base` - `value` or error if the result is smaller than zero.
-/// Function is public so that it can be used by executor.
-pub fn checked_sub(base: u128, value: u128) -> PartialVMResult<u128> {
-    if value > base {
-        Err(abort_error(
-            "aggregator's value underflowed",
-            EAGGREGATOR_UNDERFLOW,
-        ))
-    } else {
-        Ok(base - value)
-    }
 }
