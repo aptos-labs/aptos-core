@@ -72,9 +72,6 @@ impl SwarmBuilder {
                 self.genesis_modules,
                 self.init_config,
                 Some(Arc::new(move |genesis_config| {
-                    // TODO: migrate to > 0
-                    genesis_config.min_price_per_gas_unit = 0;
-
                     if let Some(init_genesis_config) = &init_genesis_config {
                         (init_genesis_config)(genesis_config);
                     }

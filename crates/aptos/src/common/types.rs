@@ -904,7 +904,8 @@ impl FaucetOptions {
     }
 }
 
-pub const DEFAULT_MAX_GAS: u64 = 1000;
+// TODO(Gas): double check if this is correct
+pub const DEFAULT_MAX_GAS: u64 = 4_000_000;
 pub const DEFAULT_GAS_UNIT_PRICE: u64 = 1;
 
 /// Gas price options for manipulating how to prioritize transactions

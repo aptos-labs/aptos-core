@@ -50,7 +50,8 @@ impl LaunchFullnode {
         chain_info
             .create_user_account(account1.public_key())
             .await?;
-        chain_info.mint(account1.address(), 1000).await?;
+        // TODO(Gas): double check if this is correct
+        chain_info.mint(account1.address(), 4_000_000).await?;
         chain_info
             .create_user_account(account2.public_key())
             .await?;

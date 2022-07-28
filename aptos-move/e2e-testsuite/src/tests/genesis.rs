@@ -15,6 +15,7 @@ fn no_deletion_in_genesis() {
 #[test]
 fn execute_genesis_write_set() {
     let executor = FakeExecutor::no_genesis();
+    println!("{:#?}", *GENESIS_CHANGE_SET);
     let txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(GENESIS_CHANGE_SET.clone()));
     let mut output = executor.execute_transaction_block(vec![txn]).unwrap();
 
