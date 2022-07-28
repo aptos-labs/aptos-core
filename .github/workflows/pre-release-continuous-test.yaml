@@ -21,3 +21,15 @@ jobs:
       GIT_SHA: ${{ github.sha }}
       merge_or_canary: canary
       FORGE_NAMESPACE: continuous
+  debug-forge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+      - name:
+        run: echo ${{ toJSON(github) }}
+      - name: Set kubectl context
+        run: aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
+        env:
+          FORGE_CLUSTER_NAME: ${{ secrets.FORGE_CLUSTER_NAME}}
