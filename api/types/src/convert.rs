@@ -3,8 +3,9 @@
 
 use crate::{
     transaction::{
-        DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, ModuleBundlePayload,
-        StateCheckpointTransaction, WriteModule, WriteResource, WriteTableItem,
+        DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
+        ModuleBundlePayload, StateCheckpointTransaction, WriteModule, WriteResource,
+        WriteTableItem,
     },
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
     MoveResource, MoveScriptBytecode, MoveValue, ScriptFunctionId, ScriptFunctionPayload,
@@ -278,13 +279,18 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         op: WriteOp,
     ) -> Result<WriteSetChange> {
         let hex_handle = handle.0.to_be_bytes().to_vec().into();
-        let key = key.into();
+        let key: HexEncodedBytes = key.into();
         let ret = match op {
-            WriteOp::Deletion => WriteSetChange::DeleteTableItem(DeleteTableItem {
-                state_key_hash,
-                handle: hex_handle,
-                key,
-            }),
+            WriteOp::Deletion => {
+                let data = self.try_delete_table_item_into_deleted_table_data(handle, &key.0)?;
+
+                WriteSetChange::DeleteTableItem(DeleteTableItem {
+                    state_key_hash,
+                    handle: hex_handle,
+                    key,
+                    data,
+                })
+            }
             WriteOp::Value(value) => {
                 let data =
                     self.try_write_table_item_into_decoded_table_data(handle, &key.0, &value)?;
@@ -321,6 +327,23 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             key_type: table_info.key_type.to_string(),
             value: value.json().unwrap(),
             value_type: table_info.value_type.to_string(),
+        }))
+    }
+
+    pub fn try_delete_table_item_into_deleted_table_data(
+        &self,
+        handle: TableHandle,
+        key: &[u8],
+    ) -> Result<Option<DeletedTableData>> {
+        if !self.db.indexer_enabled() {
+            return Ok(None);
+        }
+        let table_info = self.db.get_table_info(handle).unwrap();
+        let key = self.try_into_move_value(&table_info.key_type, key)?;
+
+        Ok(Some(DeletedTableData {
+            key: key.json().unwrap(),
+            key_type: table_info.key_type.to_string(),
         }))
     }
 

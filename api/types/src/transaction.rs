@@ -505,6 +505,10 @@ pub struct DeleteTableItem {
     pub state_key_hash: String,
     pub handle: HexEncodedBytes,
     pub key: HexEncodedBytes,
+    // This is optional, and only possible to populate if the table indexer is enabled for this node
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub data: Option<DeletedTableData>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
@@ -527,6 +531,12 @@ pub struct DecodedTableData {
     pub key_type: String,
     pub value: serde_json::Value,
     pub value_type: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct DeletedTableData {
+    pub key: serde_json::Value,
+    pub key_type: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
