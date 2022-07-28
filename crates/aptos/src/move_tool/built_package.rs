@@ -61,7 +61,7 @@ impl BuiltPackage {
 
         let manifest_file = package_path.join("Move.toml");
         let manifest = std::fs::read_to_string(&manifest_file)
-            .map_err(|err| CliError::IO(manifest_file.to_string_lossy().to_string(), err))?;
+            .map_err(|err| CliError::IO(manifest_file.display().to_string(), err))?;
         let mut modules = vec![];
         for u in &self.package.root_compiled_units {
             let name = u.unit.name().to_string();

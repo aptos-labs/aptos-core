@@ -1,7 +1,7 @@
 module DebugDemo::Message {
     use std::string;
     use std::signer;
-    use std::debug;
+    use aptos_std::debug;
 
     struct MessageHolder has key {
         message: string::String,

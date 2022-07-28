@@ -312,7 +312,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         if !new_flow {
             if upgrade_policy.is_some() {
                 return Err(CliError::CommandArgumentError(
-                    "`--upgrade-policy` can only be used with the `--new-publish` flow".to_owned(),
+                    "`--upgrade-policy` can only be used with the `--new-flow` option".to_owned(),
                 ));
             }
             // Send the compiled module using a module bundle
