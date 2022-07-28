@@ -233,6 +233,7 @@ module aptos_framework::account {
 
         let account_resource = borrow_global_mut<Account>(addr);
         account_resource.authentication_key = new_auth_key;
+        account_resource.self_address = new_address;
     }
 
     fun prologue_common(
