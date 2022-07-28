@@ -586,6 +586,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-infallible",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-types",
  "aptosdb",
