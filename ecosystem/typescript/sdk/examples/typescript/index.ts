@@ -6,20 +6,20 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
 
 (async () => {
   const client = new AptosClient(NODE_URL);
-  const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL, null);
+  const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL, undefined);
 
   const account1 = new AptosAccount();
   await faucetClient.fundAccount(account1.address(), 5000);
   let resources = await client.getAccountResources(account1.address());
-  let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
-  let balance = (accountResource.data as { coin: { value: string } }).coin.value;
+  let accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
+  let balance = (accountResource!.data as { coin: { value: string } }).coin.value;
   console.log(`account1 coins: ${balance}. Should be 5000!`);
 
   const account2 = new AptosAccount();
   await faucetClient.fundAccount(account2.address(), 0);
   resources = await client.getAccountResources(account2.address());
-  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
-  balance = (accountResource.data as { coin: { value: string } }).coin.value;
+  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
+  balance = (accountResource!.data as { coin: { value: string } }).coin.value;
   console.log(`account2 coins: ${balance}. Should be 0!`);
 
   const payload: Types.TransactionPayload = {
@@ -34,7 +34,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
   await client.waitForTransaction(transactionRes.hash);
 
   resources = await client.getAccountResources(account2.address());
-  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
-  balance = (accountResource.data as { coin: { value: string } }).coin.value;
+  accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::test_coin::TestCoin>");
+  balance = (accountResource!.data as { coin: { value: string } }).coin.value;
   console.log(`account2 coins: ${balance}. Should be 717!`);
 })();
