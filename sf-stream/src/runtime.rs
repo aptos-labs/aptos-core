@@ -164,7 +164,7 @@ impl SfStreamer {
                         .unwrap();
                     let txn = self
                         .resolver
-                        .as_converter()
+                        .as_converter(self.context.db.clone())
                         .try_into_onchain_transaction(timestamp, onchain_txn)
                         .unwrap();
 

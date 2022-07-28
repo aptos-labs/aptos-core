@@ -161,11 +161,18 @@ message WriteResource {
   MoveResource data = 3;
 }
 
+message WriteTableData {
+  string key = 1;
+  string key_type = 2;
+  string value = 3;
+  string value_type = 4;
+}
+
 message WriteTableItem {
   bytes state_key_hash = 1;
   string handle = 2;
   string key = 3;
-  string value = 4;
+  WriteTableData data = 4;
 }
 
 message TransactionPayload {
