@@ -17,6 +17,7 @@ module aptos_framework::genesis {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_framework::vm_config;
+    use aptos_std::table::{Self, Table};
 
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;
@@ -89,6 +90,7 @@ module aptos_framework::genesis {
         // TODO: Only do create the core resources account in testnets
         account::create_account_internal(signer::address_of(core_resource_account));
         account::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
+        account::create_address_map(core_resource_account);
 
         // Initialize the aptos framework account. This is the account where system resources and modules will be
         // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
