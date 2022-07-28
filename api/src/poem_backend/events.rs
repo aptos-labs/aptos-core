@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use super::accept_type::{parse_accept, AcceptType};
+use super::accept_type::AcceptType;
 use super::accounts::Account;
 use super::page::Page;
 use super::{
@@ -15,7 +15,6 @@ use crate::failpoint::fail_point_poem;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{Address, EventKey, IdentifierWrapper, MoveStructTagWrapper, U64};
 use aptos_api_types::{AsConverter, Event};
-use poem::web::Accept;
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
 
@@ -37,16 +36,15 @@ impl EventsApi {
     // TODO: https://github.com/aptos-labs/aptos-core/issues/2284
     async fn get_events_by_event_key(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         // TODO: https://github.com/aptos-labs/aptos-core/issues/2278
         event_key: Path<EventKey>,
         start: Query<Option<U64>>,
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<Event>> {
         fail_point_poem("endpoint_get_events_by_event_key")?;
-        let accept_type = parse_accept(&accept)?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
-        self.list(&accept_type, page, event_key.0)
+        self.list(accept_type, page, event_key.0)
     }
 
     /// Get events by event handle
@@ -62,7 +60,7 @@ impl EventsApi {
     )]
     async fn get_events_by_event_handle(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         address: Path<Address>,
         event_handle: Path<MoveStructTagWrapper>,
         field_name: Path<IdentifierWrapper>,
@@ -71,13 +69,12 @@ impl EventsApi {
     ) -> BasicResultWith404<Vec<Event>> {
         // TODO: Assert that Event represents u64s as strings.
         fail_point_poem("endpoint_get_events_by_event_handle")?;
-        let accept_type = parse_accept(&accept)?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
         let account = Account::new(self.context.clone(), address.0, None)?;
         let key = account
             .find_event_key(event_handle.0.into(), field_name.0.into())?
             .into();
-        self.list(&accept_type, page, key)
+        self.list(accept_type, page, key)
     }
 }
 

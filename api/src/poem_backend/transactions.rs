@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use super::accept_type::{parse_accept, AcceptType};
+use super::accept_type::AcceptType;
 use super::bcs_payload::Bcs;
 use super::page::Page;
 use super::{
@@ -29,7 +29,6 @@ use aptos_types::transaction::{
     ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction, TransactionStatus,
 };
 use aptos_vm::AptosVM;
-use poem::web::Accept;
 use poem_openapi::param::{Path, Query};
 use poem_openapi::payload::Json;
 use poem_openapi::{ApiRequest, OpenApi};
@@ -83,14 +82,13 @@ impl TransactionsApi {
     )]
     async fn get_transactions(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         start: Query<Option<U64>>,
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<Transaction>> {
         fail_point_poem("endppoint_get_transactions")?;
-        let accept_type = parse_accept(&accept)?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
-        self.list(&accept_type, page)
+        self.list(accept_type, page)
     }
 
     /// Get transaction by hash
@@ -104,13 +102,12 @@ impl TransactionsApi {
     )]
     async fn get_transaction_by_hash(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         txn_hash: Path<HashValue>,
         // TODO: Use a new request type that can't return 507.
     ) -> BasicResultWith404<Transaction> {
         fail_point_poem("endpoint_transaction_by_hash")?;
-        let accept_type = parse_accept(&accept)?;
-        self.get_transaction_by_hash_inner(&accept_type, txn_hash.0)
+        self.get_transaction_by_hash_inner(accept_type, txn_hash.0)
             .await
     }
 
@@ -125,12 +122,11 @@ impl TransactionsApi {
     )]
     async fn get_transaction_by_version(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         txn_version: Path<U64>,
     ) -> BasicResultWith404<Transaction> {
         fail_point_poem("endpoint_transaction_by_version")?;
-        let accept_type = parse_accept(&accept)?;
-        self.get_transaction_by_version_inner(&accept_type, txn_version.0)
+        self.get_transaction_by_version_inner(accept_type, txn_version.0)
             .await
     }
 
@@ -146,15 +142,14 @@ impl TransactionsApi {
     // TODO: https://github.com/aptos-labs/aptos-core/issues/2285
     async fn get_accounts_transactions(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         address: Path<Address>,
         start: Query<Option<U64>>,
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<Transaction>> {
         fail_point_poem("endpoint_get_accounts_transactions")?;
-        let accept_type = parse_accept(&accept)?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
-        self.list_by_account(&accept_type, page, address.0)
+        self.list_by_account(accept_type, page, address.0)
     }
 
     //
@@ -169,13 +164,12 @@ impl TransactionsApi {
     )]
     async fn submit_transaction(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         data: SubmitTransactionPost,
     ) -> SubmitTransactionResult<PendingTransaction> {
         fail_point_poem("endpoint_submit_transaction")?;
-        let accept_type = parse_accept(&accept)?;
         let signed_transaction = self.get_signed_transaction(data)?;
-        self.create(&accept_type, signed_transaction).await
+        self.create(accept_type, signed_transaction).await
     }
 
     /// Simulate transaction
@@ -191,13 +185,12 @@ impl TransactionsApi {
     )]
     async fn simulate_transaction(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         data: SubmitTransactionPost,
     ) -> SimulateTransactionResult<Vec<Transaction>> {
         fail_point_poem("endpoint_simulate_transaction")?;
-        let accept_type = parse_accept(&accept)?;
         let signed_transaction = self.get_signed_transaction(data)?;
-        self.simulate(&accept_type, signed_transaction).await
+        self.simulate(accept_type, signed_transaction).await
     }
 
     /// Encode submission
@@ -228,13 +221,12 @@ impl TransactionsApi {
     )]
     async fn encode_submission(
         &self,
-        accept: Accept,
+        accept_type: &AcceptType,
         data: Json<EncodeSubmissionRequest>,
         // TODO: Use a new request type that can't return 507 but still returns all the other necessary errors.
     ) -> BasicResult<HexEncodedBytes> {
         fail_point_poem("endpoint_encode_submission")?;
-        let accept_type = parse_accept(&accept)?;
-        self.get_signing_message(&accept_type, data.0)
+        self.get_signing_message(accept_type, data.0)
     }
 }
 
