@@ -1,0 +1,19 @@
+[package]
+name = "aptos-api-spec-generator"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Aptos API OpenAPI Spec Generator"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0.57"
+aptos-api = { path = "../", package = "aptos-api" }
+aptos-config = { path = "../../config" }
+aptos-mempool = { path = "../../mempool", features = ["fuzzing"] }
+aptos-types = { path = "../../types" }
+clap = { version = "3.1.17", features = ["derive"] }
+storage-interface = { path = "../../storage/storage-interface", features = ["fuzzing"] }
