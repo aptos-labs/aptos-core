@@ -417,7 +417,7 @@ async fn wait_for_single_account_sequence(
 ) -> Result<()> {
     let deadline = Instant::now() + wait_timeout;
     while Instant::now() <= deadline {
-        time::sleep(Duration::from_millis(500)).await;
+        time::sleep(Duration::from_millis(150)).await;
         match query_sequence_numbers(client, &[account.address()]).await {
             Ok(sequence_numbers) => {
                 if sequence_numbers[0] >= account.sequence_number() {
@@ -492,7 +492,7 @@ async fn wait_for_accounts_sequence(
                 );
             }
         }
-        time::sleep(Duration::from_millis(500)).await;
+        time::sleep(Duration::from_millis(150)).await;
     }
 
     Err(uncommitted)
