@@ -618,10 +618,9 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
                 panic!("There can be at most one validator network!");
             }
 
-            consensus_network_handles = Some(
-                network_builder
-                    .add_p2p_service(&consensus::network_interface::network_endpoint_config()),
-            );
+            consensus_network_handles = Some(network_builder.add_p2p_service(
+                &consensus::network_interface::network_endpoint_config(&node_config),
+            ));
         }
 
         let network_context = network_builder.network_context();
