@@ -8,7 +8,7 @@ use aptos_types::{
     on_chain_config::VMPublishingOption,
     transaction::{ExecutionStatus, TransactionStatus},
 };
-use aptos_vm::move_vm_ext::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
+use framework::natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
 use itertools::Itertools;
 use language_e2e_tests::{
     account::Account, compile::compile_module, current_function_name, executor::FakeExecutor,

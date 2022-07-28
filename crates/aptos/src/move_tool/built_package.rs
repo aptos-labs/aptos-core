@@ -3,7 +3,7 @@
 
 use crate::common::types::{CliError, MovePackageDir};
 use crate::CliTypedResult;
-use aptos_vm::move_vm_ext::{ModuleMetadata, PackageMetadata, UpgradePolicy};
+use framework::natives::code::{ModuleMetadata, PackageMetadata, UpgradePolicy};
 use move_deps::move_package::compilation::compiled_package::CompiledPackage;
 use move_deps::move_package::BuildConfig;
 

@@ -371,7 +371,6 @@ pub struct Builder {
     randomize_first_validator_ports: bool,
     template: NodeConfig,
     init_config: Option<InitConfigFn>,
-    min_price_per_gas_unit: u64,
     allow_new_validators: bool,
     min_stake: u64,
     max_stake: u64,
@@ -400,7 +399,6 @@ impl Builder {
             randomize_first_validator_ports: true,
             template: NodeConfig::default_for_validator(),
             init_config: None,
-            min_price_per_gas_unit: 1,
             allow_new_validators: false,
             min_stake: 0,
             max_stake: u64::MAX,
@@ -428,11 +426,6 @@ impl Builder {
 
     pub fn with_init_config(mut self, init_config: Option<InitConfigFn>) -> Self {
         self.init_config = init_config;
-        self
-    }
-
-    pub fn with_min_price_per_gas_unit(mut self, min_price_per_gas_unit: u64) -> Self {
-        self.min_price_per_gas_unit = min_price_per_gas_unit;
         self
     }
 
@@ -588,7 +581,6 @@ impl Builder {
             root_key,
             configs,
             self.move_modules.clone(),
-            self.min_price_per_gas_unit,
             self.allow_new_validators,
             self.min_stake,
             self.max_stake,

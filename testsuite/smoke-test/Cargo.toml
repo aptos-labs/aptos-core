@@ -38,6 +38,8 @@ cached-framework-packages =  { path = "../../aptos-move/framework/cached-package
 consensus = { path = "../../consensus" }
 forge = { path = "../forge" }
 move-deps = { path = "../../aptos-move/move-deps" }
+aptos-gas = { path = "../../aptos-move/aptos-gas" }
+framework = { path = "../../aptos-move/framework" }
 
 [dev-dependencies]
 base64 = "0.13.0"

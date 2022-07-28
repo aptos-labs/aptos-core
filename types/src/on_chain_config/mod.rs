@@ -18,9 +18,9 @@ use std::{collections::HashMap, fmt, sync::Arc};
 
 mod aptos_version;
 mod consensus_config;
+mod gas_schedule;
 mod registered_currencies;
 mod validator_set;
-mod vm_config;
 mod vm_publishing_option;
 
 pub use self::{
@@ -30,9 +30,9 @@ pub use self::{
     consensus_config::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerElectionType,
     },
+    gas_schedule::GasSchedule,
     registered_currencies::RegisteredCurrencies,
     validator_set::{ConsensusScheme, ValidatorSet},
-    vm_config::VMConfig,
     vm_publishing_option::VMPublishingOption,
 };
 
@@ -61,7 +61,7 @@ impl fmt::Display for ConfigID {
 
 /// State sync will panic if the value of any config in this registry is uninitialized
 pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
-    VMConfig::CONFIG_ID,
+    GasSchedule::CONFIG_ID,
     ValidatorSet::CONFIG_ID,
     VMPublishingOption::CONFIG_ID,
     Version::CONFIG_ID,

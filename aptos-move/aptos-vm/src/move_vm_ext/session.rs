@@ -15,6 +15,7 @@ use aptos_types::{
     transaction::{ChangeSet, ChangeSetExt, SignatureCheckedTransaction},
     write_set::{WriteOp, WriteSetMut},
 };
+use framework::natives::code::{NativeCodeContext, PublishRequest};
 use move_deps::{
     move_binary_format::errors::{Location, VMResult},
     move_core_types::{
@@ -111,6 +112,11 @@ where
             events,
             table_change_set,
         })
+    }
+
+    pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
+        let ctx = self.get_native_extensions().get_mut::<NativeCodeContext>();
+        ctx.requested_module_bundle.take()
     }
 }
 

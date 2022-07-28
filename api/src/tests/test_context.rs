@@ -107,7 +107,6 @@ pub fn new_test_context(test_name: String, api_version: &str) -> TestContext {
         cached_framework_packages::module_blobs().to_vec(),
     )
     .unwrap()
-    .with_min_price_per_gas_unit(0)
     .with_min_lockup_duration_secs(0)
     .with_max_lockup_duration_secs(86400)
     .with_initial_lockup_timestamp(0)

@@ -21,6 +21,7 @@ aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
 aptos-validator-interface = { path = "../aptos-validator-interface" }
 aptos-vm = { path = "../aptos-vm" }
+aptos-gas = { path = "../aptos-gas" }
 
 aptosdb = { path = "../../storage/aptosdb" }
 framework =  { path = "../framework" }

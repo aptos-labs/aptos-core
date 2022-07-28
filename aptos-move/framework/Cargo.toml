@@ -1,7 +1,7 @@
 [package]
 name = "framework"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos stdlib"
 repository = "https://github.com/aptos-labs/aptos-core"
@@ -24,6 +24,8 @@ siphasher = "0.3.10"
 smallvec = "1.8.0"
 structopt = "0.3.21"
 tempfile = "3.3.0"
+better_any = "0.1.1"
+serde = { version = "1.0.137", default-features = false }
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-sdk-builder = { path = "../aptos-sdk-builder" }
@@ -32,6 +34,7 @@ move-deps = { path = "../move-deps", features = ["address32"] }
 
 [dev-dependencies]
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
+aptos-gas = { path = "../../aptos-move/aptos-gas" }
 move-deps = { path = "../move-deps", features = ["table-extension"] }
 
 [features]

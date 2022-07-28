@@ -8,8 +8,8 @@ use aptos::common::types::MovePackageDir;
 use aptos::move_tool::BuiltPackage;
 use aptos_sdk::transaction_builder::TransactionFactory;
 use aptos_types::transaction::{ModuleBundle, TransactionPayload};
-use aptos_vm::move_vm_ext::UpgradePolicy;
 use forge::AptosContext;
+use framework::natives::code::UpgradePolicy;
 use std::path::PathBuf;
 
 /// Old style publishing via module bundle.

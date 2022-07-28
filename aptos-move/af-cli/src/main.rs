@@ -6,7 +6,7 @@ use clap::StructOpt;
 use move_deps::{
     move_cli::{Command, Move},
     move_core_types::errmap::ErrorMapping,
-    move_vm_types::gas_schedule::INITIAL_COST_SCHEDULE,
+    move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
 };
 
 #[derive(StructOpt)]
@@ -30,7 +30,9 @@ fn main() -> Result<()> {
     let args = AfCli::parse();
     match args.cmd {
         AfCommands::Command(cmd) => move_deps::move_cli::run_cli(
-            aptos_vm::natives::aptos_natives(),
+            // TODO: we should probably have some non-zero costs
+            aptos_vm::natives::aptos_natives(aptos_gas::NativeGasParameters::zeros()),
+            // TODO: we shouldn't be using this any more. Get it fixed in the Move repo!
             &INITIAL_COST_SCHEDULE,
             &error_descriptions,
             args.move_args,

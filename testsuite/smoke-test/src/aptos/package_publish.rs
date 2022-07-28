@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::aptos::move_test_helpers;
-use aptos_vm::move_vm_ext::UpgradePolicy;
 use forge::{AptosContext, AptosTest, Result, Test};
+use framework::natives::code::UpgradePolicy;
 
 /// Tests for new package publishing transaction
 pub struct PackagePublish;

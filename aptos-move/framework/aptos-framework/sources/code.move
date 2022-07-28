@@ -5,6 +5,8 @@ module aptos_framework::code {
     use std::signer;
     use std::vector;
 
+    use aptos_framework::util::from_bytes;
+
     // ----------------------------------------------------------------------
     // Code Publishing
 
@@ -164,9 +166,4 @@ module aptos_framework::code {
         bundle: vector<vector<u8>>,
         policy: u8
     );
-
-    /// Native function to deserialize a type T.
-    /// TODO: may want to move it in extra module if needed also in other places inside of the Fx.
-    /// However, should not make this function public outside of the Fx.
-    native fun from_bytes<T: copy+drop>(bytes: vector<u8>): PackageMetadata;
 }

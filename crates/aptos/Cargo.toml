@@ -51,6 +51,7 @@ aptos-temppath = { path = "../aptos-temppath" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
+aptos-gas = { path = "../../aptos-move/aptos-gas" }
 
 aptosdb = { path = "../../storage/aptosdb" }
 cached-framework-packages =  { path = "../../aptos-move/framework/cached-packages" }

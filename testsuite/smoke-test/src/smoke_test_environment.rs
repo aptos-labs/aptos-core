@@ -24,7 +24,6 @@ pub async fn new_local_swarm(
             &version,
             genesis_modules,
             // TODO: migrate to > 0
-            0,
             init_config,
         )
         .await

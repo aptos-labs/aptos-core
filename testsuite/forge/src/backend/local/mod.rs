@@ -113,7 +113,7 @@ impl LocalFactory {
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
         let version = self.versions.keys().max().unwrap();
-        self.new_swarm_with_version(rng, number_of_validators, version, None, 1, None)
+        self.new_swarm_with_version(rng, number_of_validators, version, None, None)
             .await
     }
 
@@ -123,7 +123,6 @@ impl LocalFactory {
         number_of_validators: NonZeroUsize,
         version: &Version,
         genesis_modules: Option<Vec<Vec<u8>>>,
-        min_price_per_gas_unit: u64,
         init_config: Option<InitConfigFn>,
     ) -> Result<LocalSwarm>
     where
@@ -133,7 +132,6 @@ impl LocalFactory {
         let mut builder = LocalSwarm::builder(self.versions.clone())
             .number_of_validators(number_of_validators)
             .initial_version(version.clone())
-            .min_price_per_gas_unit(min_price_per_gas_unit)
             .with_init_config(init_config);
         if let Some(genesis_modules) = genesis_modules {
             builder = builder.genesis_modules(genesis_modules);
@@ -173,7 +171,7 @@ impl Factory for LocalFactory {
             None => None,
         };
         let swarm = self
-            .new_swarm_with_version(rng, node_num, version, genesis_modules, 1, None)
+            .new_swarm_with_version(rng, node_num, version, genesis_modules, None)
             .await?;
 
         Ok(Box::new(swarm))
