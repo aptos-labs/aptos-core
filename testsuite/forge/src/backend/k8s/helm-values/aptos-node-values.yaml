@@ -8,12 +8,14 @@ chain:
 # disable NetworkPolicy and HAProxy so test can hit validators directly
 validator:
   enableNetworkPolicy: false
+  rust_log: debug
 haproxy:
   enabled: {enable_haproxy}
 
 # no VFNs in forge for now
 fullnode:
   groups: []
+  rust_log: debug
 
 # make all services internal ClusterIP and open all ports
 service:
