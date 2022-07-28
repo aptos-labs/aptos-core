@@ -34,5 +34,5 @@ aptos-log-derive = { path = "../aptos-log-derive" }
 pretty_assertions = "1.2.1"
 
 [features]
-default = []
+default = ["aptos-console"]
 aptos-console = ["tokio/tracing", "console-subscriber"]
