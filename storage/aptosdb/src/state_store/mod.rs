@@ -41,6 +41,7 @@ use crate::{
 };
 
 pub(crate) mod buffered_state;
+mod state_merkle_batch_committer;
 mod state_snapshot_committer;
 #[cfg(test)]
 mod state_store_test;
@@ -428,8 +429,14 @@ impl StateStore {
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
-        self.state_merkle_db
-            .merklize_value_set(value_set, node_hashes, version, base_version)
+        let (batch, hash) = self.state_merkle_db.merklize_value_set(
+            value_set,
+            node_hashes,
+            version,
+            base_version,
+        )?;
+        self.state_merkle_db.write_schemas(batch);
+        Ok(hash);
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
