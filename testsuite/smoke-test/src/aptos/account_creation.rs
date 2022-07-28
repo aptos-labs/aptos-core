@@ -20,7 +20,8 @@ impl AptosTest for AccountCreation {
         for _ in 0..10 {
             let local_account = ctx.random_account();
             ctx.create_user_account(local_account.public_key()).await?;
-            ctx.mint(local_account.address(), 10000).await?;
+            // TODO(Gas): double check this
+            ctx.mint(local_account.address(), 10_000_000).await?;
             accounts.push(local_account);
         }
         // created by user account

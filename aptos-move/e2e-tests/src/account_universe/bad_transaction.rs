@@ -10,14 +10,11 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     test_utils::KeyPair,
 };
+use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
 use aptos_proptest_helpers::Index;
 use aptos_types::{
     transaction::{Script, SignedTransaction, TransactionStatus},
     vm_status::StatusCode,
-};
-use move_deps::{
-    move_core_types::gas_schedule::{AbstractMemorySize, GasAlgebra, GasCarrier, GasConstants},
-    move_vm_types::gas_schedule::calculate_intrinsic_gas,
 };
 use proptest::prelude::*;
 use proptest_derive::Arbitrary;
@@ -89,19 +86,15 @@ impl AUTransactionGen for InsufficientBalanceGen {
         );
 
         // TODO: Move such config to AccountUniverse
-        let default_constants = GasConstants::default();
-        let raw_bytes_len = AbstractMemorySize::new(txn.raw_txn_bytes_len() as GasCarrier);
-        let min_cost = GasConstants::default()
-            .to_external_units(calculate_intrinsic_gas(
-                raw_bytes_len,
-                &GasConstants::default(),
-            ))
-            .get();
+        let txn_gas_params = TransactionGasParameters::initial();
+        let raw_bytes_len = txn.raw_txn_bytes_len() as u64;
+        let min_cost =
+            txn_gas_params.to_external_units(txn_gas_params.calculate_intrinsic_gas(raw_bytes_len));
 
         (
             txn,
             (
-                if max_gas_unit > default_constants.maximum_number_of_gas_units.get() {
+                if max_gas_unit > txn_gas_params.maximum_number_of_gas_units {
                     TransactionStatus::Discard(
                         StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
                     )
@@ -109,9 +102,9 @@ impl AUTransactionGen for InsufficientBalanceGen {
                     TransactionStatus::Discard(
                         StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
                     )
-                } else if self.gas_unit_price > default_constants.max_price_per_gas_unit.get() {
+                } else if self.gas_unit_price > txn_gas_params.max_price_per_gas_unit {
                     TransactionStatus::Discard(StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND)
-                } else if self.gas_unit_price < default_constants.min_price_per_gas_unit.get() {
+                } else if self.gas_unit_price < txn_gas_params.min_price_per_gas_unit {
                     TransactionStatus::Discard(StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND)
                 } else {
                     TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE)

@@ -186,7 +186,8 @@ impl TransactionGenerator {
         TransactionFactory::new(ChainId::test())
             .with_transaction_expiration_time(300)
             .with_gas_unit_price(1)
-            .with_max_gas_amount(1000)
+            // TODO(Gas): double check if this is correct
+            .with_max_gas_amount(4_000_000)
     }
 
     // Write metadata
@@ -245,6 +246,8 @@ impl TransactionGenerator {
         block_size: usize,
         seed_account_balance: u64,
     ) -> Vec<Vec<Transaction>> {
+        println!("{}", seed_account_balance);
+
         let mut txn_block = Vec::new();
 
         // We don't store the # of existing seed accounts now. Thus here we just blindly re-create
@@ -304,6 +307,8 @@ impl TransactionGenerator {
         init_account_balance: u64,
         block_size: usize,
     ) -> Vec<Vec<Transaction>> {
+        println!("{}", init_account_balance);
+
         let mut txn_block = vec![];
 
         println!(

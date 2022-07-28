@@ -9,6 +9,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
+aptos-gas = { path = "../aptos-gas" }
 clap = "3.1.8"
 
 aptos-types = { path = "../../types" }

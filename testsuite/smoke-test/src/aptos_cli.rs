@@ -181,7 +181,6 @@ async fn test_join_and_leave_validator() {
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
             genesis_config.epoch_duration_secs = 3600;
-            genesis_config.min_price_per_gas_unit = 0;
         }))
         .build_with_cli(0)
         .await;
