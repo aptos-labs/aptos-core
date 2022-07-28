@@ -197,20 +197,31 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             )),
             special_fields: Default::default(),
         },
-        WriteSetChange::DeleteTableItem(delete_table_item) => extractor::WriteSetChange {
-            type_: protobuf::EnumOrUnknown::new(
-                extractor::write_set_change::WriteSetChangeType::DELETE_TABLE_ITEM,
-            ),
-            change: Some(extractor::write_set_change::Change::DeleteTableItem(
-                extractor::DeleteTableItem {
-                    state_key_hash: convert_hex_string_to_bytes(&delete_table_item.state_key_hash),
-                    handle: delete_table_item.handle.to_string(),
-                    key: delete_table_item.key.to_string(),
-                    special_fields: Default::default(),
-                },
-            )),
-            special_fields: Default::default(),
-        },
+        WriteSetChange::DeleteTableItem(delete_table_item) => {
+            let data = delete_table_item.data.as_ref().unwrap();
+
+            extractor::WriteSetChange {
+                type_: protobuf::EnumOrUnknown::new(
+                    extractor::write_set_change::WriteSetChangeType::DELETE_TABLE_ITEM,
+                ),
+                change: Some(extractor::write_set_change::Change::DeleteTableItem(
+                    extractor::DeleteTableItem {
+                        state_key_hash: convert_hex_string_to_bytes(
+                            &delete_table_item.state_key_hash,
+                        ),
+                        handle: delete_table_item.handle.to_string(),
+                        key: delete_table_item.key.to_string(),
+                        data: protobuf::MessageField::some(extractor::DeleteTableData {
+                            key: data.key.to_string(),
+                            key_type: data.key_type.clone(),
+                            special_fields: Default::default(),
+                        }),
+                        special_fields: Default::default(),
+                    },
+                )),
+                special_fields: Default::default(),
+            }
+        }
         WriteSetChange::WriteModule(write_module) => extractor::WriteSetChange {
             type_: protobuf::EnumOrUnknown::new(
                 extractor::write_set_change::WriteSetChangeType::DELETE_MODULE,
