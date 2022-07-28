@@ -42,6 +42,7 @@ members = [
     "crates/aptos-faucet-cli",
     "crates/aptos-genesis",
     "crates/aptos-id-generator",
+    "crates/aptos-indexer-api",
     "crates/aptos-infallible",
     "crates/aptos-keygen",
     "crates/aptos-log-derive",

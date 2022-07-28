@@ -1,0 +1,24 @@
+[package]
+name = "aptos-indexer-api"
+version = "0.0.1"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "Aptos Indexer Api"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+poem = { version = "1.3.35", features = ["anyhow", "rustls"] }
+poem-openapi = { version = "2.0.5", features = ["swagger-ui", "url"] }
+tokio = { version = "1.18.2", features = ["full"] }
+async-graphql = "4.0.5"
+async-graphql-poem = "4.0.5"
+clap = "3.1.17"
+
+aptos-logger = { path = "../aptos-logger" }
+aptos-indexer = {path = "../../ecosystem/indexer" }
+aptos-rest-client = {path = "../aptos-rest-client" }
+diesel = { version = "1.4.8", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }
+diesel_migrations = { version = "1.4.0", features = ["postgres"] }

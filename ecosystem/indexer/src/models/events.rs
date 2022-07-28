@@ -3,9 +3,10 @@
 
 use crate::{models::transactions::Transaction, schema::events};
 use aptos_rest_client::aptos_api_types::Event as APIEvent;
+use async_graphql::SimpleObject;
 use serde::Serialize;
 
-#[derive(Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(Associations, Debug, Identifiable, Insertable, Queryable, Serialize, SimpleObject)]
 #[diesel(table_name = "events")]
 #[belongs_to(Transaction, foreign_key = "transaction_hash")]
 #[primary_key(key, sequence_number)]

@@ -13,13 +13,14 @@ use aptos_rest_client::aptos_api_types::{
     Address, BlockMetadataTransaction as APIBlockMetadataTransaction,
     Transaction as APITransaction, TransactionInfo, UserTransaction as APIUserTransaction, U64,
 };
+use async_graphql::SimpleObject;
 use diesel::{
     BelongingToDsl, ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl,
 };
 use futures::future::Either;
 use serde::Serialize;
 
-#[derive(AsChangeset, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(AsChangeset, Debug, Identifiable, Insertable, Queryable, Serialize, SimpleObject)]
 #[primary_key(hash)]
 #[diesel(table_name = "transactions")]
 pub struct Transaction {
@@ -275,7 +276,9 @@ impl Transaction {
     }
 }
 
-#[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(
+    AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize, SimpleObject,
+)]
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key(hash)]
 #[diesel(table_name = "user_transactions")]
@@ -316,7 +319,9 @@ impl UserTransaction {
     }
 }
 
-#[derive(AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
+#[derive(
+    AsChangeset, Associations, Debug, Identifiable, Insertable, Queryable, Serialize, SimpleObject,
+)]
 #[belongs_to(Transaction, foreign_key = "hash")]
 #[primary_key("hash")]
 #[diesel(table_name = "block_metadata_transactions")]
