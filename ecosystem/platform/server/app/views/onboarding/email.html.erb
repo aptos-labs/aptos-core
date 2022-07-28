@@ -4,8 +4,8 @@
   <%= render 'layouts/flash' %>
 
   <% if current_user.errors.any? %>
-    <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200" role="alert">
-      <div class="ml-3 text-sm font-medium text-red-700 dark:text-red-800">
+    <div id="error_explanation" class="flex p-4 mb-4 bg-red-100 rounded-lg" role="alert">
+      <div class="ml-3 text-sm font-medium text-red-700">
         <h2><%= pluralize(current_user.errors.count, 'error') %> prohibited this user from being saved:</h2>
 
         <ul>
@@ -50,7 +50,7 @@
     <div class="text-sm mb-4">
       <label class="flex mb-4 gap-2 items-center cursor-pointer">
         <%= f.check_box :terms_accepted, required: true %>
-        <span>I agree to the Aptos <a href="https://aptoslabs.com/terms/" class="font-bold text-teal-400">Terms of Use</a> and <a href="https://aptoslabs.com/privacy/" class="font-bold text-teal-400">Privacy Policy</a>.</span>
+        <span>I agree to the Aptos <%= link_to 'Terms of Use', terms_path, class: 'font-bold text-teal-400' %> and <%= link_to 'Privacy Policy', privacy_path, class: 'font-bold text-teal-400' %>.</span>
       </label>
     </div>
     <div class="text-xs text-neutral-500">

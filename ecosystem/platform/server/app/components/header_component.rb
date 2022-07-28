@@ -9,16 +9,18 @@ class HeaderComponent < ViewComponent::Base
 
   NAV_GROUPS = [
     NavGroup.new(
-      NavItem.new('/', 'Community', 'Aptos Community'),
+      NavItem.new('#', 'Community', 'Aptos Community'),
       [
+        NavItem.new('/community', 'Aptos Community', 'Aptos Community'),
         NavItem.new('/it1', 'AIT1', 'Incentivized Testnet 1 Results'),
         NavItem.new('/it2', 'AIT2', 'Incentivized Testnet 2'),
         NavItem.new('https://forum.aptoslabs.com/', 'Forum', 'Aptos Forum')
       ]
     ),
     NavGroup.new(
-      NavItem.new('https://aptoslabs.com/developers', 'Developers', 'Aptos Developers'),
+      NavItem.new('#', 'Developers', 'Aptos Developers'),
       [
+        NavItem.new('/developers', 'Developer Resources', 'Aptos Developers'),
         NavItem.new('https://aptos.dev/', 'Documentation', 'Aptos Documentation')
       ]
     ),
@@ -32,11 +34,11 @@ class HeaderComponent < ViewComponent::Base
     NavGroup.new(
       NavItem.new('#', 'About', 'About Aptos'),
       [
-        NavItem.new('https://aptoslabs.com/careers', 'Careers', 'Aptos Careers')
+        NavItem.new('/careers', 'Careers', 'Aptos Careers')
       ]
     ),
     NavGroup.new(
-      NavItem.new('https://aptoslabs.com/currents', 'Currents', 'Aptos Currents'),
+      NavItem.new('/currents', 'Currents', 'Aptos Currents'),
       []
     )
   ].freeze
