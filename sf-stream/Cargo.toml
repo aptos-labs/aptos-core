@@ -19,9 +19,9 @@ protobuf = "3.1.0"
 serde = { version = "1.0.137", features = ["derive"], default-features = false }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 tokio = { version = "1.18.2", features = ["full"] }
+aptos-api = { path = "../api", package = "aptos-api" }
 
 aptos-api-types = { path = "../api/types" }
-aptos-api = { path = "../api", package = "aptos-api" }
 aptos-config = { path = "../config" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-mempool = { path = "../mempool" }
@@ -50,7 +50,6 @@ executor-types = { path = "../execution/executor-types" }
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
 move-deps = { path = "../aptos-move/move-deps" }
 vm-validator = { path = "../vm-validator" }
-
 
 [features]
 failpoints = ["fail/failpoints"]
