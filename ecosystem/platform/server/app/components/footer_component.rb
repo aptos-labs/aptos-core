@@ -18,7 +18,7 @@ class FooterComponent < ViewComponent::Base
   def initialize(**rest)
     @rest = rest
     @rest[:class] = [
-      'bg-black text-white',
+      'bg-neutral-900 text-white',
       @rest[:class]
     ]
   end
