@@ -182,7 +182,6 @@ async fn test_join_and_leave_validator() {
             genesis_config.allow_new_validators = true;
             genesis_config.epoch_duration_secs = 3600;
             genesis_config.recurring_lockup_duration_secs = 2;
-            genesis_config.min_price_per_gas_unit = 0;
         }))
         .build_with_cli(0)
         .await;

@@ -12,30 +12,27 @@ use crate::{
     transaction_metadata::TransactionMetadata,
 };
 use aptos_crypto::HashValue;
+use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule, NativeGasParameters};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_config::{ChainSpecificAccountInfo, APTOS_CHAIN_INFO, CORE_CODE_ADDRESS},
-    on_chain_config::{ConfigStorage, OnChainConfig, VMConfig, Version, APTOS_VERSION_3},
+    on_chain_config::{GasSchedule, OnChainConfig, Version, APTOS_VERSION_3},
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
 use fail::fail_point;
 use move_deps::{
-    move_binary_format::{
-        errors::{Location, VMResult},
-        CompiledModule,
-    },
+    move_binary_format::{errors::VMResult, CompiledModule},
     move_core_types::{
-        account_address::AccountAddress,
-        gas_schedule::{CostTable, GasAlgebra, GasCarrier, GasUnits, InternalGasUnits},
+        gas_schedule::GasAlgebra,
         language_storage::ModuleId,
         move_resource::MoveStructType,
         resolver::ResourceResolver,
         value::{serialize_values, MoveValue},
     },
-    move_vm_runtime::{logging::expect_no_verification_errors, session::Session},
-    move_vm_types::gas_schedule::GasStatus,
+    move_vm_runtime::logging::expect_no_verification_errors,
+    move_vm_types::gas::UnmeteredGasMeter,
 };
 use std::sync::Arc;
 
@@ -43,7 +40,7 @@ use std::sync::Arc;
 /// A wrapper to make VMRuntime standalone and thread safe.
 pub struct AptosVMImpl {
     move_vm: Arc<MoveVmExt>,
-    on_chain_config: Option<VMConfig>,
+    gas_params: Option<AptosGasParameters>,
     version: Option<Version>,
     chain_account_info: Option<ChainSpecificAccountInfo>,
 }
@@ -51,25 +48,46 @@ pub struct AptosVMImpl {
 impl AptosVMImpl {
     #[allow(clippy::new_without_default)]
     pub fn new<S: StateView>(state: &S) -> Self {
-        let inner = MoveVmExt::new()
+        let storage = RemoteStorage::new(state);
+
+        // TODO(Gas): this should not panic
+        let gas_params = GasSchedule::fetch_config(&storage).and_then(|gas_schedule| {
+            let gas_schedule = gas_schedule.to_btree_map();
+            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule)
+        });
+
+        // TODO(Gas): this doesn't look right.
+        let native_gas_params = match &gas_params {
+            Some(gas_params) => gas_params.natives.clone(),
+            None => NativeGasParameters::zeros(),
+        };
+
+        let inner = MoveVmExt::new(native_gas_params)
             .expect("should be able to create Move VM; check if there are duplicated natives");
+
         let mut vm = Self {
             move_vm: Arc::new(inner),
-            on_chain_config: None,
+            gas_params,
             version: None,
             chain_account_info: None,
         };
-        vm.load_configs_impl(&RemoteStorage::new(state));
+        vm.version = Version::fetch_config(&storage);
         vm.chain_account_info = Self::get_chain_specific_account_info(&RemoteStorage::new(state));
         vm
     }
 
-    pub fn init_with_config(version: Version, on_chain_config: VMConfig) -> Self {
-        let inner = MoveVmExt::new()
+    pub fn init_with_config(version: Version, gas_schedule: GasSchedule) -> Self {
+        // TODO(Gas): this should not panic
+        let gas_params =
+            AptosGasParameters::from_on_chain_gas_schedule(&gas_schedule.to_btree_map())
+                .expect("failed to get gas parameters");
+
+        let inner = MoveVmExt::new(gas_params.natives.clone())
             .expect("should be able to create Move VM; check if there are duplicated natives");
+
         Self {
             move_vm: Arc::new(inner),
-            on_chain_config: Some(on_chain_config),
+            gas_params: Some(gas_params),
             version: Some(version),
             chain_account_info: None,
         }
@@ -86,11 +104,6 @@ impl AptosVMImpl {
             .unwrap_or(&APTOS_CHAIN_INFO)
     }
 
-    fn load_configs_impl<S: ConfigStorage>(&mut self, data_cache: &S) {
-        self.on_chain_config = VMConfig::fetch_config(data_cache);
-        self.version = Version::fetch_config(data_cache);
-    }
-
     // TODO: Move this to an on-chain config once those are a part of the core framework
     fn get_chain_specific_account_info<S: ResourceResolver>(
         remote_cache: &S,
@@ -104,15 +117,15 @@ impl AptosVMImpl {
         }
     }
 
-    pub fn get_gas_schedule(&self, log_context: &AdapterLogSchema) -> Result<&CostTable, VMStatus> {
-        self.on_chain_config
-            .as_ref()
-            .map(|config| &config.gas_schedule)
-            .ok_or_else(|| {
-                log_context.alert();
-                error!(*log_context, "VM Startup Failed. Gas Schedule Not Found");
-                VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
-            })
+    pub fn get_gas_parameters(
+        &self,
+        log_context: &AdapterLogSchema,
+    ) -> Result<&AptosGasParameters, VMStatus> {
+        self.gas_params.as_ref().ok_or_else(|| {
+            log_context.alert();
+            error!(*log_context, "VM Startup Failed. Gas Parameters Not Found");
+            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
+        })
     }
 
     pub fn get_version(&self) -> Result<Version, VMStatus> {
@@ -128,14 +141,14 @@ impl AptosVMImpl {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let gas_constants = &self.get_gas_schedule(log_context)?.gas_constants;
+        let gas_constants = &self.get_gas_parameters(log_context)?.txn;
         let raw_bytes_len = txn_data.transaction_size;
         // The transaction is too large.
-        if txn_data.transaction_size.get() > gas_constants.max_transaction_size_in_bytes {
+        if txn_data.transaction_size > gas_constants.max_transaction_size_in_bytes {
             warn!(
                 *log_context,
                 "[VM] Transaction size too big {} (max {})",
-                raw_bytes_len.get(),
+                raw_bytes_len,
                 gas_constants.max_transaction_size_in_bytes,
             );
             return Err(VMStatus::Error(StatusCode::EXCEEDED_MAX_TRANSACTION_SIZE));
@@ -143,17 +156,17 @@ impl AptosVMImpl {
 
         // Check is performed on `txn.raw_txn_bytes_len()` which is the same as
         // `raw_bytes_len`
-        assume!(raw_bytes_len.get() <= gas_constants.max_transaction_size_in_bytes);
+        assume!(raw_bytes_len <= gas_constants.max_transaction_size_in_bytes);
 
         // The submitted max gas units that the transaction can consume is greater than the
         // maximum number of gas units bound that we have set for any
         // transaction.
-        if txn_data.max_gas_amount().get() > gas_constants.maximum_number_of_gas_units.get() {
+        if txn_data.max_gas_amount() > gas_constants.maximum_number_of_gas_units {
             warn!(
                 *log_context,
                 "[VM] Gas unit error; max {}, submitted {}",
-                gas_constants.maximum_number_of_gas_units.get(),
-                txn_data.max_gas_amount().get(),
+                gas_constants.maximum_number_of_gas_units,
+                txn_data.max_gas_amount(),
             );
             return Err(VMStatus::Error(
                 StatusCode::MAX_GAS_UNITS_EXCEEDS_MAX_GAS_UNITS_BOUND,
@@ -166,21 +179,21 @@ impl AptosVMImpl {
         let min_txn_fee = {
             let min_transaction_fee = gas_constants.min_transaction_gas_units;
 
-            if raw_bytes_len.get() > gas_constants.large_transaction_cutoff.get() {
-                let excess = raw_bytes_len.sub(gas_constants.large_transaction_cutoff);
-                min_transaction_fee.add(gas_constants.intrinsic_gas_per_byte.mul(excess))
+            if raw_bytes_len > gas_constants.large_transaction_cutoff {
+                let excess = raw_bytes_len - gas_constants.large_transaction_cutoff;
+                min_transaction_fee + gas_constants.intrinsic_gas_per_byte * excess
             } else {
-                min_transaction_fee.unitary_cast()
+                min_transaction_fee
             }
         };
         let min_txn_fee = gas_constants.to_external_units(min_txn_fee);
 
-        if txn_data.max_gas_amount().get() < min_txn_fee.get() {
+        if txn_data.max_gas_amount() < min_txn_fee {
             warn!(
                 *log_context,
                 "[VM] Gas unit error; min {}, submitted {}",
-                min_txn_fee.get(),
-                txn_data.max_gas_amount().get(),
+                min_txn_fee,
+                txn_data.max_gas_amount(),
             );
             return Err(VMStatus::Error(
                 StatusCode::MAX_GAS_UNITS_BELOW_MIN_TRANSACTION_GAS_UNITS,
@@ -192,23 +205,23 @@ impl AptosVMImpl {
         // we turn off the clippy warning.
         #[allow(clippy::absurd_extreme_comparisons)]
         let below_min_bound =
-            txn_data.gas_unit_price().get() < gas_constants.min_price_per_gas_unit.get();
+            txn_data.gas_unit_price().get() < gas_constants.min_price_per_gas_unit;
         if below_min_bound {
             warn!(
                 *log_context,
                 "[VM] Gas unit error; min {}, submitted {}",
-                gas_constants.min_price_per_gas_unit.get(),
+                gas_constants.min_price_per_gas_unit,
                 txn_data.gas_unit_price().get(),
             );
             return Err(VMStatus::Error(StatusCode::GAS_UNIT_PRICE_BELOW_MIN_BOUND));
         }
 
         // The submitted gas price is greater than the maximum gas unit price set by the VM.
-        if txn_data.gas_unit_price().get() > gas_constants.max_price_per_gas_unit.get() {
+        if txn_data.gas_unit_price().get() > gas_constants.max_price_per_gas_unit {
             warn!(
                 *log_context,
                 "[VM] Gas unit error; min {}, submitted {}",
-                gas_constants.max_price_per_gas_unit.get(),
+                gas_constants.max_price_per_gas_unit,
                 txn_data.gas_unit_price().get(),
             );
             return Err(VMStatus::Error(StatusCode::GAS_UNIT_PRICE_ABOVE_MAX_BOUND));
@@ -229,10 +242,10 @@ impl AptosVMImpl {
         let txn_sequence_number = txn_data.sequence_number();
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
         let txn_gas_price = txn_data.gas_unit_price().get();
-        let txn_max_gas_units = txn_data.max_gas_amount().get();
+        let txn_max_gas_units = txn_data.max_gas_amount();
         let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
         let chain_id = txn_data.chain_id();
-        let mut gas_status = GasStatus::new_unmetered();
+        let mut gas_meter = UnmeteredGasMeter;
         let secondary_public_key_hashes: Vec<MoveValue> = txn_data
             .secondary_authentication_key_preimages
             .iter()
@@ -274,7 +287,7 @@ impl AptosVMImpl {
                 prologue_function_name,
                 gas_currency,
                 serialize_values(&args),
-                &mut gas_status,
+                &mut gas_meter,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
@@ -294,10 +307,10 @@ impl AptosVMImpl {
         let txn_sequence_number = txn_data.sequence_number();
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
         let txn_gas_price = txn_data.gas_unit_price().get();
-        let txn_max_gas_units = txn_data.max_gas_amount().get();
+        let txn_max_gas_units = txn_data.max_gas_amount();
         let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
         let chain_id = txn_data.chain_id();
-        let mut gas_status = GasStatus::new_unmetered();
+        let mut gas_meter = UnmeteredGasMeter;
         session
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
@@ -312,7 +325,7 @@ impl AptosVMImpl {
                     MoveValue::U64(txn_expiration_timestamp_secs),
                     MoveValue::U8(chain_id.id()),
                 ]),
-                &mut gas_status,
+                &mut gas_meter,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
@@ -324,7 +337,7 @@ impl AptosVMImpl {
     pub(crate) fn run_success_epilogue<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
-        gas_status: &mut GasStatus,
+        gas_remaining: u64,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -338,8 +351,7 @@ impl AptosVMImpl {
         let chain_specific_info = self.chain_info();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price().get();
-        let txn_max_gas_units = txn_data.max_gas_amount().get();
-        let gas_remaining = gas_status.remaining_gas().get();
+        let txn_max_gas_units = txn_data.max_gas_amount();
         session
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
@@ -352,7 +364,7 @@ impl AptosVMImpl {
                     MoveValue::U64(txn_max_gas_units),
                     MoveValue::U64(gas_remaining),
                 ]),
-                gas_status,
+                &mut UnmeteredGasMeter,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
@@ -364,7 +376,7 @@ impl AptosVMImpl {
     pub(crate) fn run_failure_epilogue<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
-        gas_status: &mut GasStatus,
+        gas_remaining: u64,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
@@ -372,8 +384,7 @@ impl AptosVMImpl {
         let chain_specific_info = self.chain_info();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price().get();
-        let txn_max_gas_units = txn_data.max_gas_amount().get();
-        let gas_remaining = gas_status.remaining_gas().get();
+        let txn_max_gas_units = txn_data.max_gas_amount();
         session
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
@@ -386,7 +397,7 @@ impl AptosVMImpl {
                     MoveValue::U64(txn_max_gas_units),
                     MoveValue::U64(gas_remaining),
                 ]),
-                gas_status,
+                &mut UnmeteredGasMeter,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
@@ -413,7 +424,7 @@ impl AptosVMImpl {
         let chain_id = txn_data.chain_id();
         let chain_specific_info = self.chain_info();
 
-        let mut gas_status = GasStatus::new_unmetered();
+        let mut gas_meter = UnmeteredGasMeter;
         session
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
@@ -426,7 +437,7 @@ impl AptosVMImpl {
                     MoveValue::U64(txn_expiration_timestamp_secs),
                     MoveValue::U8(chain_id.id()),
                 ]),
-                &mut gas_status,
+                &mut gas_meter,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
@@ -442,7 +453,7 @@ impl AptosVMImpl {
         should_trigger_reconfiguration: bool,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let mut gas_status = GasStatus::new_unmetered();
+        let mut gas_meter = UnmeteredGasMeter;
         let chain_specific_info = self.chain_info();
         session
             .execute_function_bypass_visibility(
@@ -454,7 +465,7 @@ impl AptosVMImpl {
                     MoveValue::U64(txn_data.sequence_number),
                     MoveValue::Bool(should_trigger_reconfiguration),
                 ]),
-                &mut gas_status,
+                &mut gas_meter,
             )
             .map(|_return_vals| ())
             .map_err(expect_no_verification_errors)
@@ -499,8 +510,11 @@ impl<'a> AptosVMInternals<'a> {
     }
 
     /// Returns the internal gas schedule if it has been loaded, or an error if it hasn't.
-    pub fn gas_schedule(self, log_context: &AdapterLogSchema) -> Result<&'a CostTable, VMStatus> {
-        self.0.get_gas_schedule(log_context)
+    pub fn gas_params(
+        self,
+        log_context: &AdapterLogSchema,
+    ) -> Result<&'a AptosGasParameters, VMStatus> {
+        self.0.get_gas_parameters(log_context)
     }
 
     /// Returns the version of Move Runtime.
@@ -525,31 +539,14 @@ impl<'a> AptosVMInternals<'a> {
     }
 }
 
-pub(crate) fn charge_global_write_gas_usage<R: MoveResolverExt>(
-    gas_status: &mut GasStatus,
-    session: &Session<R>,
-    sender: &AccountAddress,
-) -> Result<(), VMStatus> {
-    let total_cost = session.num_mutated_accounts(sender)
-        * gas_status
-            .cost_table()
-            .gas_constants
-            .global_memory_per_byte_write_cost
-            .mul(gas_status.cost_table().gas_constants.default_account_size)
-            .get();
-    gas_status
-        .deduct_gas(InternalGasUnits::new(total_cost))
-        .map_err(|p_err| p_err.finish(Location::Undefined).into_vm_status())
-}
-
 pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     ap_cache: &mut A,
     session: SessionExt<S>,
-    gas_left: GasUnits<GasCarrier>,
+    gas_left: u64,
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
 ) -> Result<TransactionOutputExt, VMStatus> {
-    let gas_used: u64 = txn_data.max_gas_amount().sub(gas_left).get();
+    let gas_used: u64 = txn_data.max_gas_amount() - gas_left;
 
     let session_out = session.finish().map_err(|e| e.into_vm_status())?;
     let (delta_change_set, change_set) = session_out.into_change_set_ext(ap_cache)?.into_inner();

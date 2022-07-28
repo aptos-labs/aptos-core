@@ -3,6 +3,7 @@
 
 use anyhow::format_err;
 use aptos_crypto::HashValue;
+use aptos_gas::NativeGasParameters;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
@@ -21,7 +22,7 @@ use move_deps::{
         value::{serialize_values, MoveValue},
     },
     move_vm_runtime::session::SerializedReturnValues,
-    move_vm_types::gas_schedule::GasStatus,
+    move_vm_types::gas::UnmeteredGasMeter,
 };
 
 pub struct GenesisSession<'r, 'l, S>(SessionExt<'r, 'l, S>);
@@ -43,7 +44,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
                 &Identifier::new(function_name).unwrap(),
                 ty_args,
                 args,
-                &mut GasStatus::new_unmetered(),
+                &mut UnmeteredGasMeter,
             )
             .unwrap_or_else(|e| {
                 panic!(
@@ -67,7 +68,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
                 script.code().to_vec(),
                 script.ty_args().to_vec(),
                 temp,
-                &mut GasStatus::new_unmetered(),
+                &mut UnmeteredGasMeter,
             )
             .unwrap()
     }
@@ -106,7 +107,7 @@ pub fn build_changeset<S: StateView, F>(state_view: &S, procedure: F) -> ChangeS
 where
     F: FnOnce(&mut GenesisSession<RemoteStorage<S>>),
 {
-    let move_vm = MoveVmExt::new().unwrap();
+    let move_vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
     let state_view_storage = RemoteStorage::new(state_view);
     let session_out = {
         // TODO: specify an id by human and pass that in.

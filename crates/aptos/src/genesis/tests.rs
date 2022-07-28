@@ -139,7 +139,6 @@ fn create_layout_file(
         max_stake: u64::MAX,
         recurring_lockup_duration_secs: 86400, // One day
         epoch_duration_secs: 86400,            // One day
-        min_price_per_gas_unit: 1,
     };
     let file = TempPath::new();
     file.create_as_file().unwrap();

@@ -1,11 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::NativeCodeContext;
 use crate::{
-    move_vm_ext::{MoveResolverExt, NativeTransactionContext, SessionExt, SessionId},
+    move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
+use aptos_gas::NativeGasParameters;
+use framework::natives::{code::NativeCodeContext, transaction_context::NativeTransactionContext};
 use move_deps::{
     move_binary_format::errors::VMResult,
     move_table_extension::NativeTableContext,
@@ -18,9 +19,9 @@ pub struct MoveVmExt {
 }
 
 impl MoveVmExt {
-    pub fn new() -> VMResult<Self> {
+    pub fn new(native_gas_params: NativeGasParameters) -> VMResult<Self> {
         Ok(Self {
-            inner: MoveVM::new(aptos_natives())?,
+            inner: MoveVM::new(aptos_natives(native_gas_params))?,
         })
     }
 

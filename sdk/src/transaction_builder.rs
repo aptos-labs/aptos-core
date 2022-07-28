@@ -82,7 +82,8 @@ pub struct TransactionFactory {
 impl TransactionFactory {
     pub fn new(chain_id: ChainId) -> Self {
         Self {
-            max_gas_amount: 2_000,
+            // TODO: double check if this right
+            max_gas_amount: 4_000_000,
             gas_unit_price: 0,
             transaction_expiration_time: 30,
             chain_id,

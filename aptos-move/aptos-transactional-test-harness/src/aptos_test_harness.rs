@@ -8,6 +8,7 @@ use aptos_crypto::{
     hash::HashValue,
     ValidCryptoMaterialStringExt,
 };
+use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -36,7 +37,6 @@ use move_deps::{
     move_compiler::{self, shared::PackagePaths, FullyCompiledProgram},
     move_core_types::{
         account_address::AccountAddress,
-        gas_schedule::{GasAlgebra, GasConstants},
         identifier::{IdentStr, Identifier},
         language_storage::{ModuleId, ResourceKey, TypeTag},
         move_resource::MoveStructType,
@@ -439,19 +439,17 @@ impl<'a> AptosTestAdapter<'a> {
         let account_resource = self.fetch_account_resource(signer_addr)?;
 
         let sequence_number = sequence_number.unwrap_or_else(|| account_resource.sequence_number());
-        let max_number_of_gas_units = GasConstants::default().maximum_number_of_gas_units;
+        let max_number_of_gas_units =
+            TransactionGasParameters::initial().maximum_number_of_gas_units;
         let gas_unit_price = gas_unit_price.unwrap_or(1);
         let max_gas_amount = match max_gas_amount {
             Some(max_gas_amount) => max_gas_amount,
             None => {
                 if gas_unit_price == 0 {
-                    max_number_of_gas_units.get()
+                    max_number_of_gas_units
                 } else {
                     let account_balance = self.fetch_account_balance(signer_addr).unwrap();
-                    std::cmp::min(
-                        max_number_of_gas_units.get(),
-                        account_balance / gas_unit_price,
-                    )
+                    std::cmp::min(max_number_of_gas_units, account_balance / gas_unit_price)
                 }
             }
         };
