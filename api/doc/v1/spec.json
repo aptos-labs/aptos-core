@@ -3,7 +3,7 @@
   "info": {
     "title": "Aptos Node API",
     "description": "The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.",
-    "version": "0.2.1",
+    "version": "0.1.0",
     "contact": {
       "name": "Aptos Labs",
       "url": "https://github.com/aptos-labs/aptos-core"
@@ -48,8 +48,7 @@
           {
             "name": "address",
             "schema": {
-              "type": "string",
-              "format": "Address"
+              "$ref": "#/components/schemas/Address"
             },
             "in": "path",
             "required": true,
@@ -58,8 +57,7 @@
           {
             "name": "ledger_version",
             "schema": {
-              "type": "string",
-              "format": "U64"
+              "$ref": "#/components/schemas/U64"
             },
             "in": "query",
             "required": false,
@@ -77,7 +75,11 @@
               },
               "application/x-bcs": {
                 "schema": {
-                  "$ref": "#/components/schemas/AccountData"
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
                 }
               }
             },
@@ -94,32 +96,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -169,8 +171,7 @@
           {
             "name": "address",
             "schema": {
-              "type": "string",
-              "format": "Address"
+              "$ref": "#/components/schemas/Address"
             },
             "in": "path",
             "required": true,
@@ -179,8 +180,7 @@
           {
             "name": "ledger_version",
             "schema": {
-              "type": "string",
-              "format": "U64"
+              "$ref": "#/components/schemas/U64"
             },
             "in": "query",
             "required": false,
@@ -203,7 +203,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/MoveResource"
+                    "type": "integer",
+                    "format": "uint8"
                   }
                 }
               }
@@ -221,32 +222,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -296,8 +297,7 @@
           {
             "name": "address",
             "schema": {
-              "type": "string",
-              "format": "Address"
+              "$ref": "#/components/schemas/Address"
             },
             "in": "path",
             "required": true,
@@ -306,8 +306,7 @@
           {
             "name": "ledger_version",
             "schema": {
-              "type": "string",
-              "format": "U64"
+              "$ref": "#/components/schemas/U64"
             },
             "in": "query",
             "required": false,
@@ -330,7 +329,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/MoveModuleBytecode"
+                    "type": "integer",
+                    "format": "uint8"
                   }
                 }
               }
@@ -348,32 +348,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -418,7 +418,7 @@
           "General"
         ],
         "summary": "Show OpenAPI explorer",
-        "description": "Provides a UI that you can use to explore the API. You can also retrieve the API directly at `/openapi.yaml` and `/openapi.json`.",
+        "description": "Provides a UI that you can use to explore the API. You can also retrieve the API directly at `/spec.yaml` and `/spec.json`.",
         "responses": {
           "200": {
             "description": "",
@@ -431,7 +431,7 @@
             }
           }
         },
-        "operationId": "openapi"
+        "operationId": "spec"
       }
     },
     "/events/{event_key}": {
@@ -445,8 +445,7 @@
           {
             "name": "event_key",
             "schema": {
-              "type": "string",
-              "format": "EventKey"
+              "$ref": "#/components/schemas/EventKey"
             },
             "in": "path",
             "required": true,
@@ -455,8 +454,7 @@
           {
             "name": "start",
             "schema": {
-              "type": "string",
-              "format": "U64"
+              "$ref": "#/components/schemas/U64"
             },
             "in": "query",
             "required": false,
@@ -489,7 +487,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Event"
+                    "type": "integer",
+                    "format": "uint8"
                   }
                 }
               }
@@ -507,32 +506,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -582,8 +581,7 @@
           {
             "name": "address",
             "schema": {
-              "type": "string",
-              "format": "Address"
+              "$ref": "#/components/schemas/Address"
             },
             "in": "path",
             "required": true,
@@ -592,8 +590,7 @@
           {
             "name": "event_handle",
             "schema": {
-              "type": "string",
-              "format": "MoveStructTagWrapper"
+              "$ref": "#/components/schemas/MoveStructTag"
             },
             "in": "path",
             "required": true,
@@ -602,8 +599,7 @@
           {
             "name": "field_name",
             "schema": {
-              "type": "string",
-              "format": "IdentifierWrapper"
+              "$ref": "#/components/schemas/IdentifierWrapper"
             },
             "in": "path",
             "required": true,
@@ -612,8 +608,7 @@
           {
             "name": "start",
             "schema": {
-              "type": "string",
-              "format": "U64"
+              "$ref": "#/components/schemas/U64"
             },
             "in": "query",
             "required": false,
@@ -646,7 +641,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Event"
+                    "type": "integer",
+                    "format": "uint8"
                   }
                 }
               }
@@ -664,32 +660,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -746,7 +742,11 @@
               },
               "application/x-bcs": {
                 "schema": {
-                  "$ref": "#/components/schemas/IndexResponse"
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
                 }
               }
             },
@@ -763,32 +763,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -817,6 +817,403 @@
         "operationId": "get_ledger_info"
       }
     },
+    "/accounts/{address}/resource/{resource_type}": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Get specific account resource",
+        "description": "This endpoint returns the resource of a specific type residing at a given\naccount at a specified ledger version (AKA transaction version). If the\nledger version is not specified in the request, the latest ledger version\nis used.\n\nThe Aptos nodes prune account state history, via a configurable time window (link).\nIf the requested data has been pruned, the server responds with a 404.",
+        "parameters": [
+          {
+            "name": "address",
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false
+          },
+          {
+            "name": "resource_type",
+            "schema": {
+              "$ref": "#/components/schemas/MoveStructTag"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false
+          },
+          {
+            "name": "ledger_version",
+            "schema": {
+              "$ref": "#/components/schemas/U64"
+            },
+            "in": "query",
+            "required": false,
+            "deprecated": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveResource"
+                }
+              },
+              "application/x-bcs": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint16"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_account_resource"
+      }
+    },
+    "/accounts/{address}/module/{module_name}": {
+      "get": {
+        "tags": [
+          "Accounts"
+        ],
+        "summary": "Get specific account module",
+        "description": "This endpoint returns the module with a specific name residing at a given\naccount at a specified ledger version (AKA transaction version). If the\nledger version is not specified in the request, the latest ledger version\nis used.\n\nThe Aptos nodes prune account state history, via a configurable time window (link).\nIf the requested data has been pruned, the server responds with a 404.",
+        "parameters": [
+          {
+            "name": "address",
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false
+          },
+          {
+            "name": "module_name",
+            "schema": {
+              "$ref": "#/components/schemas/IdentifierWrapper"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false
+          },
+          {
+            "name": "ledger_version",
+            "schema": {
+              "$ref": "#/components/schemas/U64"
+            },
+            "in": "query",
+            "required": false,
+            "deprecated": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveModuleBytecode"
+                }
+              },
+              "application/x-bcs": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint16"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_account_module"
+      }
+    },
+    "/tables/{table_handle}/item": {
+      "post": {
+        "tags": [
+          "Tables"
+        ],
+        "summary": "Get table item",
+        "description": "todo",
+        "parameters": [
+          {
+            "name": "table_handle",
+            "schema": {
+              "$ref": "#/components/schemas/U128"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false
+          },
+          {
+            "name": "ledger_version",
+            "schema": {
+              "$ref": "#/components/schemas/U64"
+            },
+            "in": "query",
+            "required": false,
+            "deprecated": false
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TableItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MoveValue"
+                }
+              },
+              "application/x-bcs": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint16"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_table_item"
+      }
+    },
     "/transactions": {
       "get": {
         "tags": [
@@ -828,8 +1225,7 @@
           {
             "name": "start",
             "schema": {
-              "type": "string",
-              "format": "U64"
+              "$ref": "#/components/schemas/U64"
             },
             "in": "query",
             "required": false,
@@ -862,7 +1258,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Transaction"
+                    "type": "integer",
+                    "format": "uint8"
                   }
                 }
               }
@@ -880,32 +1277,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -979,7 +1376,11 @@
               },
               "application/x-bcs": {
                 "schema": {
-                  "$ref": "#/components/schemas/PendingTransaction"
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
                 }
               }
             },
@@ -996,32 +1397,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1081,8 +1482,7 @@
           {
             "name": "txn_hash",
             "schema": {
-              "type": "string",
-              "format": "HashValue"
+              "$ref": "#/components/schemas/HashValue"
             },
             "in": "path",
             "required": true,
@@ -1100,7 +1500,11 @@
               },
               "application/x-bcs": {
                 "schema": {
-                  "$ref": "#/components/schemas/Transaction"
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
                 }
               }
             },
@@ -1117,32 +1521,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1192,8 +1596,7 @@
           {
             "name": "txn_version",
             "schema": {
-              "type": "string",
-              "format": "U64"
+              "$ref": "#/components/schemas/U64"
             },
             "in": "path",
             "required": true,
@@ -1211,7 +1614,11 @@
               },
               "application/x-bcs": {
                 "schema": {
-                  "$ref": "#/components/schemas/Transaction"
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
                 }
               }
             },
@@ -1228,32 +1635,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1298,13 +1705,12 @@
           "Transactions"
         ],
         "summary": "Get account transactions",
-        "description": "todo\ntodo, note that this currently returns [] even if the account doesn't\nexist, when it should really return a 404.",
+        "description": "todo",
         "parameters": [
           {
             "name": "address",
             "schema": {
-              "type": "string",
-              "format": "Address"
+              "$ref": "#/components/schemas/Address"
             },
             "in": "path",
             "required": true,
@@ -1313,8 +1719,7 @@
           {
             "name": "start",
             "schema": {
-              "type": "string",
-              "format": "U64"
+              "$ref": "#/components/schemas/U64"
             },
             "in": "query",
             "required": false,
@@ -1347,7 +1752,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Transaction"
+                    "type": "integer",
+                    "format": "uint8"
                   }
                 }
               }
@@ -1365,32 +1771,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1471,7 +1877,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Transaction"
+                    "type": "integer",
+                    "format": "uint8"
                   }
                 }
               }
@@ -1489,32 +1896,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1586,14 +1993,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "string",
-                  "format": "HexEncodedBytes"
+                  "$ref": "#/components/schemas/HexEncodedBytes"
                 }
               },
               "application/x-bcs": {
                 "schema": {
-                  "type": "string",
-                  "format": "HexEncodedBytes"
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
                 }
               }
             },
@@ -1610,32 +2019,32 @@
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-OLDEST-VERSION": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-LEDGER-TIMESTAMPUSEC": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               },
               "X-APTOS-EPOCH": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
-                  "type": "string",
-                  "format": "U64"
+                  "type": "integer",
+                  "format": "uint64"
                 }
               }
             }
@@ -1675,12 +2084,10 @@
         ],
         "properties": {
           "sequence_number": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "authentication_key": {
-            "type": "string",
-            "format": "HexEncodedBytes"
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },
@@ -1697,8 +2104,8 @@
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "Ed25519Signature": "#/components/schemas/AccountSignature_Ed25519Signature",
-            "MultiEd25519Signature": "#/components/schemas/AccountSignature_MultiEd25519Signature"
+            "ed_25519_signature": "#/components/schemas/AccountSignature_Ed25519Signature",
+            "multi_ed_25519_signature": "#/components/schemas/AccountSignature_MultiEd25519Signature"
           }
         }
       },
@@ -1712,7 +2119,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "Ed25519Signature"
+                "example": "ed_25519_signature"
               }
             }
           },
@@ -1731,7 +2138,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "MultiEd25519Signature"
+                "example": "multi_ed_25519_signature"
               }
             }
           },
@@ -1739,6 +2146,12 @@
             "$ref": "#/components/schemas/MultiEd25519Signature"
           }
         ]
+      },
+      "Address": {
+        "type": "string",
+        "format": "hex",
+        "description": "Hex encoded 32 byte Aptos account address",
+        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
       },
       "AptosError": {
         "type": "object",
@@ -1754,8 +2167,7 @@
             "$ref": "#/components/schemas/AptosErrorCode"
           },
           "aptos_ledger_version": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           }
         }
       },
@@ -1794,24 +2206,19 @@
         ],
         "properties": {
           "version": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "state_root_hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "success": {
             "type": "boolean"
@@ -1820,8 +2227,7 @@
             "type": "string"
           },
           "accumulator_root_hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "changes": {
             "type": "array",
@@ -1830,16 +2236,13 @@
             }
           },
           "id": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "epoch": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "round": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "events": {
             "type": "array",
@@ -1854,8 +2257,7 @@
             }
           },
           "proposer": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "failed_proposer_indices": {
             "type": "array",
@@ -1865,8 +2267,26 @@
             }
           },
           "timestamp": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
+          }
+        }
+      },
+      "DecodedTableData": {
+        "type": "object",
+        "required": [
+          "key",
+          "key_type",
+          "value",
+          "value_type"
+        ],
+        "properties": {
+          "key": {},
+          "key_type": {
+            "type": "string"
+          },
+          "value": {},
+          "value_type": {
+            "type": "string"
           }
         }
       },
@@ -1879,8 +2299,7 @@
         ],
         "properties": {
           "address": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "state_key_hash": {
             "type": "string"
@@ -1899,8 +2318,7 @@
         ],
         "properties": {
           "address": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "state_key_hash": {
             "type": "string"
@@ -1922,12 +2340,26 @@
             "type": "string"
           },
           "handle": {
-            "type": "string",
-            "format": "HexEncodedBytes"
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "key": {
-            "type": "string",
-            "format": "HexEncodedBytes"
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DeletedTableData"
+          }
+        }
+      },
+      "DeletedTableData": {
+        "type": "object",
+        "required": [
+          "key",
+          "key_type"
+        ],
+        "properties": {
+          "key": {},
+          "key_type": {
+            "type": "string"
           }
         }
       },
@@ -1960,12 +2392,10 @@
         ],
         "properties": {
           "public_key": {
-            "type": "string",
-            "format": "HexEncodedBytes"
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "signature": {
-            "type": "string",
-            "format": "HexEncodedBytes"
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },
@@ -1981,24 +2411,19 @@
         ],
         "properties": {
           "sender": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "sequence_number": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "max_gas_amount": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "gas_unit_price": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "expiration_timestamp_secs": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "payload": {
             "$ref": "#/components/schemas/TransactionPayload"
@@ -2006,8 +2431,7 @@
           "secondary_signers": {
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "Address"
+              "$ref": "#/components/schemas/Address"
             }
           }
         }
@@ -2022,19 +2446,22 @@
         ],
         "properties": {
           "key": {
-            "type": "string",
-            "format": "EventKey"
+            "$ref": "#/components/schemas/EventKey"
           },
           "sequence_number": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "type": {
-            "type": "string",
-            "format": "MoveType"
+            "$ref": "#/components/schemas/MoveType"
           },
           "data": {}
         }
+      },
+      "EventKey": {
+        "type": "string",
+        "format": "hex",
+        "description": "Event key is a global index for an event stream.\n\nIt is hex-encoded BCS bytes of `EventHandle` `guid` field value, which is\na combination of a `uint64` creation number and account address (without\ntrimming leading zeros).\n\nFor example, event key `0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1` is combined by the following 2 parts:\n  1. `0000000000000000`: `uint64` representation of `0`.\n  2. `88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1`: 32 bytes of account address.\n",
+        "example": "0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
       },
       "GenesisPayload": {
         "type": "object",
@@ -2046,7 +2473,7 @@
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "WriteSetPayload": "#/components/schemas/GenesisPayload_WriteSetPayload"
+            "write_set_payload": "#/components/schemas/GenesisPayload_WriteSetPayload"
           }
         }
       },
@@ -2060,7 +2487,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "WriteSetPayload"
+                "example": "write_set_payload"
               }
             }
           },
@@ -2086,24 +2513,19 @@
         ],
         "properties": {
           "version": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "state_root_hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "success": {
             "type": "boolean"
@@ -2112,8 +2534,7 @@
             "type": "string"
           },
           "accumulator_root_hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "changes": {
             "type": "array",
@@ -2132,6 +2553,18 @@
           }
         }
       },
+      "HashValue": {
+        "type": "string"
+      },
+      "HexEncodedBytes": {
+        "type": "string",
+        "format": "hex",
+        "description": "All bytes (Vec<u8>) data is represented as hex-encoded string prefixed with `0x` and fulfilled with\ntwo hex digits per byte.\n\nUnlike the `Address` type, HexEncodedBytes will not trim any zeros.\n",
+        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+      },
+      "IdentifierWrapper": {
+        "type": "string"
+      },
       "IndexResponse": {
         "type": "object",
         "description": "The struct holding all data returned to the client by the\nindex endpoint (i.e., GET \"/\").",
@@ -2149,20 +2582,16 @@
             "format": "uint8"
           },
           "epoch": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "ledger_version": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "oldest_ledger_version": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "ledger_timestamp": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "node_role": {
             "$ref": "#/components/schemas/RoleType"
@@ -2183,6 +2612,9 @@
           }
         }
       },
+      "MoveAbility": {
+        "type": "string"
+      },
       "MoveFunction": {
         "type": "object",
         "required": [
@@ -2195,8 +2627,7 @@
         ],
         "properties": {
           "name": {
-            "type": "string",
-            "format": "IdentifierWrapper"
+            "$ref": "#/components/schemas/IdentifierWrapper"
           },
           "visibility": {
             "$ref": "#/components/schemas/MoveFunctionVisibility"
@@ -2213,15 +2644,13 @@
           "params": {
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "MoveType"
+              "$ref": "#/components/schemas/MoveType"
             }
           },
           "return": {
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "MoveType"
+              "$ref": "#/components/schemas/MoveType"
             }
           }
         }
@@ -2235,8 +2664,7 @@
           "constraints": {
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "MoveAbility"
+              "$ref": "#/components/schemas/MoveAbility"
             }
           }
         }
@@ -2244,9 +2672,9 @@
       "MoveFunctionVisibility": {
         "type": "string",
         "enum": [
-          "Private",
-          "Public",
-          "Friend"
+          "private",
+          "public",
+          "friend"
         ]
       },
       "MoveModule": {
@@ -2260,12 +2688,10 @@
         ],
         "properties": {
           "address": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "name": {
-            "type": "string",
-            "format": "IdentifierWrapper"
+            "$ref": "#/components/schemas/IdentifierWrapper"
           },
           "friends": {
             "type": "array",
@@ -2294,8 +2720,7 @@
         ],
         "properties": {
           "bytecode": {
-            "type": "string",
-            "format": "HexEncodedBytes"
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "abi": {
             "$ref": "#/components/schemas/MoveModule"
@@ -2310,12 +2735,10 @@
         ],
         "properties": {
           "address": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "name": {
-            "type": "string",
-            "format": "IdentifierWrapper"
+            "$ref": "#/components/schemas/IdentifierWrapper"
           }
         }
       },
@@ -2330,8 +2753,7 @@
             "$ref": "#/components/schemas/MoveStructTag"
           },
           "data": {
-            "type": "object",
-            "additionalProperties": {}
+            "$ref": "#/components/schemas/MoveStructValue"
           }
         }
       },
@@ -2342,8 +2764,7 @@
         ],
         "properties": {
           "bytecode": {
-            "type": "string",
-            "format": "HexEncodedBytes"
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "abi": {
             "$ref": "#/components/schemas/MoveFunction"
@@ -2361,8 +2782,7 @@
         ],
         "properties": {
           "name": {
-            "type": "string",
-            "format": "IdentifierWrapper"
+            "$ref": "#/components/schemas/IdentifierWrapper"
           },
           "is_native": {
             "type": "boolean"
@@ -2370,8 +2790,7 @@
           "abilities": {
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "MoveAbility"
+              "$ref": "#/components/schemas/MoveAbility"
             }
           },
           "generic_type_params": {
@@ -2396,12 +2815,10 @@
         ],
         "properties": {
           "name": {
-            "type": "string",
-            "format": "IdentifierWrapper"
+            "$ref": "#/components/schemas/IdentifierWrapper"
           },
           "type": {
-            "type": "string",
-            "format": "MoveType"
+            "$ref": "#/components/schemas/MoveType"
           }
         }
       },
@@ -2415,8 +2832,7 @@
           "constraints": {
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "MoveAbility"
+              "$ref": "#/components/schemas/MoveAbility"
             }
           },
           "is_phantom": {
@@ -2434,25 +2850,80 @@
         ],
         "properties": {
           "address": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "module": {
-            "type": "string",
-            "format": "IdentifierWrapper"
+            "$ref": "#/components/schemas/IdentifierWrapper"
           },
           "name": {
-            "type": "string",
-            "format": "IdentifierWrapper"
+            "$ref": "#/components/schemas/IdentifierWrapper"
           },
           "generic_type_params": {
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "MoveType"
+              "$ref": "#/components/schemas/MoveType"
             }
           }
         }
+      },
+      "MoveStructValue": {
+        "type": "object",
+        "description": "This is a JSON representation of some data within an account resource. More specifically,\nit is a map of strings to arbitrary JSON values / objects, where the keys are top level\nfields within the given resource.\n\nTo clarify, you might query for 0x1::account::Account and see the example data.\n\nMove `bool` type value is serialized into `boolean`.\n\nMove `u8` type value is serialized into `integer`.\n\nMove `u64` and `u128` type value is serialized into `string`.\n\nMove `address` type value (32 byte Aptos account address) is serialized into a HexEncodedBytes string.\nFor example:\n  - `0x1`\n  - `0x1668f6be25668c1a17cd8caf6b8d2f25`\n\nMove `vector` type value is serialized into `array`, except `vector<u8>` which is serialized into a\nHexEncodedBytes string with `0x` prefix.\nFor example:\n  - `vector<u64>{255, 255}` => `[\"255\", \"255\"]`\n  - `vector<u8>{255, 255}` => `0xffff`\n\nMove `struct` type value is serialized into `object` that looks like this (except some Move stdlib types, see the following section):\n  ```json\n  {\n    field1_name: field1_value,\n    field2_name: field2_value,\n    ......\n  }\n  ```\n\nFor example:\n  `{ \"created\": \"0xa550c18\", \"role_id\": \"0\" }`\n\n**Special serialization for Move stdlib types**:\n  - [0x1::string::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ascii.md)\n    is serialized into `string`. For example, struct value `0x1::string::String{bytes: b\"Hello World!\"}`\n    is serialized as `\"Hello World!\"` in JSON.\n",
+        "example": {
+          "authentication_key": "0x0000000000000000000000000000000000000000000000000000000000000001",
+          "coin_register_events": {
+            "counter": "0",
+            "guid": {
+              "id": {
+                "addr": "0x1",
+                "creation_num": "0"
+              }
+            }
+          },
+          "self_address": "0x1",
+          "sequence_number": "0"
+        }
+      },
+      "MoveType": {
+        "type": "string",
+        "description": "String representation of an on-chain Move type tag that is exposed in transaction payload.\n    Values:\n      - bool\n      - u8\n      - u64\n      - u128\n      - address\n      - signer\n      - vector: `vector<{non-reference MoveTypeId}>`\n      - struct: `{address}::{module_name}::{struct_name}::<{generic types}>`\n\n    Vector type value examples:\n      - `vector<u8>`\n      - `vector<vector<u64>>`\n      - `vector<0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>>`\n\n    Struct type value examples:\n      - `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>\n      - `0x1::account::Account`\n\n    Note:\n      1. Empty chars should be ignored when comparing 2 struct tag ids.\n      2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).\n",
+        "pattern": "^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+)$"
+      },
+      "MoveValue": {
+        "type": "object",
+        "anyOf": [
+          {
+            "type": "integer",
+            "format": "uint8"
+          },
+          {
+            "$ref": "#/components/schemas/U64"
+          },
+          {
+            "$ref": "#/components/schemas/U128"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "$ref": "#/components/schemas/Address"
+          },
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoveValue"
+            }
+          },
+          {
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          },
+          {
+            "$ref": "#/components/schemas/MoveStructValue"
+          },
+          {
+            "type": "string"
+          }
+        ]
       },
       "MultiAgentSignature": {
         "type": "object",
@@ -2468,8 +2939,7 @@
           "secondary_signer_addresses": {
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "Address"
+              "$ref": "#/components/schemas/Address"
             }
           },
           "secondary_signers": {
@@ -2492,15 +2962,13 @@
           "public_keys": {
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "HexEncodedBytes"
+              "$ref": "#/components/schemas/HexEncodedBytes"
             }
           },
           "signatures": {
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "HexEncodedBytes"
+              "$ref": "#/components/schemas/HexEncodedBytes"
             }
           },
           "threshold": {
@@ -2508,8 +2976,7 @@
             "format": "uint8"
           },
           "bitmap": {
-            "type": "string",
-            "format": "HexEncodedBytes"
+            "$ref": "#/components/schemas/HexEncodedBytes"
           }
         }
       },
@@ -2526,28 +2993,22 @@
         ],
         "properties": {
           "hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "sender": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "sequence_number": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "max_gas_amount": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "gas_unit_price": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "expiration_timestamp_secs": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "payload": {
             "$ref": "#/components/schemas/TransactionPayload"
@@ -2575,8 +3036,7 @@
             "$ref": "#/components/schemas/MoveModuleId"
           },
           "name": {
-            "type": "string",
-            "format": "IdentifierWrapper"
+            "$ref": "#/components/schemas/IdentifierWrapper"
           }
         }
       },
@@ -2594,8 +3054,7 @@
           "type_arguments": {
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "MoveType"
+              "$ref": "#/components/schemas/MoveType"
             }
           },
           "arguments": {
@@ -2618,8 +3077,7 @@
           "type_arguments": {
             "type": "array",
             "items": {
-              "type": "string",
-              "format": "MoveType"
+              "$ref": "#/components/schemas/MoveType"
             }
           },
           "arguments": {
@@ -2636,8 +3094,7 @@
         ],
         "properties": {
           "execute_as": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "script": {
             "$ref": "#/components/schemas/ScriptPayload"
@@ -2660,24 +3117,19 @@
         ],
         "properties": {
           "version": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "state_root_hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "success": {
             "type": "boolean"
@@ -2686,8 +3138,7 @@
             "type": "string"
           },
           "accumulator_root_hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "changes": {
             "type": "array",
@@ -2696,8 +3147,7 @@
             }
           },
           "timestamp": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           }
         }
       },
@@ -2714,24 +3164,19 @@
         ],
         "properties": {
           "sender": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "sequence_number": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "max_gas_amount": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "gas_unit_price": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "expiration_timestamp_secs": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "payload": {
             "$ref": "#/components/schemas/TransactionPayload"
@@ -2739,6 +3184,23 @@
           "signature": {
             "$ref": "#/components/schemas/TransactionSignature"
           }
+        }
+      },
+      "TableItemRequest": {
+        "type": "object",
+        "required": [
+          "key_type",
+          "value_type",
+          "key"
+        ],
+        "properties": {
+          "key_type": {
+            "$ref": "#/components/schemas/MoveType"
+          },
+          "value_type": {
+            "$ref": "#/components/schemas/MoveType"
+          },
+          "key": {}
         }
       },
       "Transaction": {
@@ -2763,11 +3225,11 @@
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "PendingTransaction": "#/components/schemas/Transaction_PendingTransaction",
-            "UserTransaction": "#/components/schemas/Transaction_UserTransaction",
-            "GenesisTransaction": "#/components/schemas/Transaction_GenesisTransaction",
-            "BlockMetadataTransaction": "#/components/schemas/Transaction_BlockMetadataTransaction",
-            "StateCheckpointTransaction": "#/components/schemas/Transaction_StateCheckpointTransaction"
+            "pending_transaction": "#/components/schemas/Transaction_PendingTransaction",
+            "user_transaction": "#/components/schemas/Transaction_UserTransaction",
+            "genesis_transaction": "#/components/schemas/Transaction_GenesisTransaction",
+            "block_metadata_transaction": "#/components/schemas/Transaction_BlockMetadataTransaction",
+            "state_checkpoint_transaction": "#/components/schemas/Transaction_StateCheckpointTransaction"
           }
         }
       },
@@ -2790,10 +3252,10 @@
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "ScriptFunctionPayload": "#/components/schemas/TransactionPayload_ScriptFunctionPayload",
-            "ScriptPayload": "#/components/schemas/TransactionPayload_ScriptPayload",
-            "ModuleBundlePayload": "#/components/schemas/TransactionPayload_ModuleBundlePayload",
-            "WriteSetPayload": "#/components/schemas/TransactionPayload_WriteSetPayload"
+            "script_function_payload": "#/components/schemas/TransactionPayload_ScriptFunctionPayload",
+            "script_payload": "#/components/schemas/TransactionPayload_ScriptPayload",
+            "module_bundle_payload": "#/components/schemas/TransactionPayload_ModuleBundlePayload",
+            "write_set_payload": "#/components/schemas/TransactionPayload_WriteSetPayload"
           }
         }
       },
@@ -2807,7 +3269,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "ModuleBundlePayload"
+                "example": "module_bundle_payload"
               }
             }
           },
@@ -2826,7 +3288,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "ScriptFunctionPayload"
+                "example": "script_function_payload"
               }
             }
           },
@@ -2845,7 +3307,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "ScriptPayload"
+                "example": "script_payload"
               }
             }
           },
@@ -2864,7 +3326,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "WriteSetPayload"
+                "example": "write_set_payload"
               }
             }
           },
@@ -2889,9 +3351,9 @@
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "Ed25519Signature": "#/components/schemas/TransactionSignature_Ed25519Signature",
-            "MultiEd25519Signature": "#/components/schemas/TransactionSignature_MultiEd25519Signature",
-            "MultiAgentSignature": "#/components/schemas/TransactionSignature_MultiAgentSignature"
+            "ed_25519_signature": "#/components/schemas/TransactionSignature_Ed25519Signature",
+            "multi_ed_25519_signature": "#/components/schemas/TransactionSignature_MultiEd25519Signature",
+            "multi_agent_signature": "#/components/schemas/TransactionSignature_MultiAgentSignature"
           }
         }
       },
@@ -2905,7 +3367,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "Ed25519Signature"
+                "example": "ed_25519_signature"
               }
             }
           },
@@ -2924,7 +3386,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "MultiAgentSignature"
+                "example": "multi_agent_signature"
               }
             }
           },
@@ -2943,7 +3405,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "MultiEd25519Signature"
+                "example": "multi_ed_25519_signature"
               }
             }
           },
@@ -2962,7 +3424,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "BlockMetadataTransaction"
+                "example": "block_metadata_transaction"
               }
             }
           },
@@ -2981,7 +3443,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "GenesisTransaction"
+                "example": "genesis_transaction"
               }
             }
           },
@@ -3000,7 +3462,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "PendingTransaction"
+                "example": "pending_transaction"
               }
             }
           },
@@ -3019,7 +3481,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "StateCheckpointTransaction"
+                "example": "state_checkpoint_transaction"
               }
             }
           },
@@ -3038,7 +3500,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "UserTransaction"
+                "example": "user_transaction"
               }
             }
           },
@@ -3046,6 +3508,18 @@
             "$ref": "#/components/schemas/UserTransaction"
           }
         ]
+      },
+      "U128": {
+        "type": "string",
+        "format": "uint64",
+        "description": "A string containing a 128-bit unsigned integer.\n\nWe represent u128 values as a string to ensure compatability with languages such\nas JavaScript that do not parse u64s in JSON natively.\n",
+        "example": "340282366920938463463374607431768211454"
+      },
+      "U64": {
+        "type": "string",
+        "format": "uint64",
+        "description": "A string containing a 64-bit unsigned integer.\n\nWe represent u64 values as a string to ensure compatability with languages such\nas JavaScript that do not parse u64s in JSON natively.\n",
+        "example": "32425224034"
       },
       "UserTransaction": {
         "type": "object",
@@ -3070,24 +3544,19 @@
         ],
         "properties": {
           "version": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "state_root_hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "success": {
             "type": "boolean"
@@ -3096,8 +3565,7 @@
             "type": "string"
           },
           "accumulator_root_hash": {
-            "type": "string",
-            "format": "HashValue"
+            "$ref": "#/components/schemas/HashValue"
           },
           "changes": {
             "type": "array",
@@ -3106,24 +3574,19 @@
             }
           },
           "sender": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "sequence_number": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "max_gas_amount": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "gas_unit_price": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "expiration_timestamp_secs": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           },
           "payload": {
             "$ref": "#/components/schemas/TransactionPayload"
@@ -3138,8 +3601,7 @@
             }
           },
           "timestamp": {
-            "type": "string",
-            "format": "U64"
+            "$ref": "#/components/schemas/U64"
           }
         }
       },
@@ -3152,8 +3614,7 @@
         ],
         "properties": {
           "address": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "state_key_hash": {
             "type": "string"
@@ -3172,8 +3633,7 @@
         ],
         "properties": {
           "address": {
-            "type": "string",
-            "format": "Address"
+            "$ref": "#/components/schemas/Address"
           },
           "state_key_hash": {
             "type": "string"
@@ -3196,8 +3656,8 @@
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "ScriptWriteSet": "#/components/schemas/WriteSet_ScriptWriteSet",
-            "DirectWriteSet": "#/components/schemas/WriteSet_DirectWriteSet"
+            "script_write_set": "#/components/schemas/WriteSet_ScriptWriteSet",
+            "direct_write_set": "#/components/schemas/WriteSet_DirectWriteSet"
           }
         }
       },
@@ -3226,12 +3686,12 @@
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "DeleteModule": "#/components/schemas/WriteSetChange_DeleteModule",
-            "DeleteResource": "#/components/schemas/WriteSetChange_DeleteResource",
-            "DeleteTableItem": "#/components/schemas/WriteSetChange_DeleteTableItem",
-            "WriteModule": "#/components/schemas/WriteSetChange_WriteModule",
-            "WriteResource": "#/components/schemas/WriteSetChange_WriteResource",
-            "WriteTableItem": "#/components/schemas/WriteSetChange_WriteTableItem"
+            "delete_module": "#/components/schemas/WriteSetChange_DeleteModule",
+            "delete_resource": "#/components/schemas/WriteSetChange_DeleteResource",
+            "delete_table_item": "#/components/schemas/WriteSetChange_DeleteTableItem",
+            "write_module": "#/components/schemas/WriteSetChange_WriteModule",
+            "write_resource": "#/components/schemas/WriteSetChange_WriteResource",
+            "write_table_item": "#/components/schemas/WriteSetChange_WriteTableItem"
           }
         }
       },
@@ -3245,7 +3705,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "DeleteModule"
+                "example": "delete_module"
               }
             }
           },
@@ -3264,7 +3724,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "DeleteResource"
+                "example": "delete_resource"
               }
             }
           },
@@ -3283,7 +3743,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "DeleteTableItem"
+                "example": "delete_table_item"
               }
             }
           },
@@ -3302,7 +3762,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "WriteModule"
+                "example": "write_module"
               }
             }
           },
@@ -3321,7 +3781,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "WriteResource"
+                "example": "write_resource"
               }
             }
           },
@@ -3340,7 +3800,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "WriteTableItem"
+                "example": "write_table_item"
               }
             }
           },
@@ -3370,7 +3830,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "DirectWriteSet"
+                "example": "direct_write_set"
               }
             }
           },
@@ -3389,7 +3849,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "ScriptWriteSet"
+                "example": "script_write_set"
               }
             }
           },
@@ -3411,16 +3871,16 @@
             "type": "string"
           },
           "handle": {
-            "type": "string",
-            "format": "HexEncodedBytes"
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "key": {
-            "type": "string",
-            "format": "HexEncodedBytes"
+            "$ref": "#/components/schemas/HexEncodedBytes"
           },
           "value": {
-            "type": "string",
-            "format": "HexEncodedBytes"
+            "$ref": "#/components/schemas/HexEncodedBytes"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DecodedTableData"
           }
         }
       }

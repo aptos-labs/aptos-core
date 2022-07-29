@@ -1,0 +1,36 @@
+name: "Confirm generated file changes are checked in"
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - devnet
+      - testnet
+      - auto
+      - canary
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+# Cancel redundant builds
+concurrency:
+  # Cancel redundant builds on PRs (only on PR, not on branches)
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  # Confirm that any changes to the API specs have been checked in.
+  api-spec-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust-setup
+      - run: mkdir -p /tmp/api_specs
+      - run: cargo run -p aptos-api-spec-generator -- -f yaml -o /tmp/api_specs/spec.yaml
+      - run: cargo run -p aptos-api-spec-generator -- -f json -o /tmp/api_specs/spec.json
+      - run: echo "If this lint fails, run the following commands locally to fix it:"
+      - run: echo "  cargo run -p aptos-api-spec-generator -- -f yaml -o api/doc/v1/spec.yaml"
+      - run: echo "  cargo run -p aptos-api-spec-generator -- -f json -o api/doc/v1/spec.json"
+      - run: diff /tmp/api_specs/spec.yaml api/doc/v1/spec.yaml
+      - run: diff /tmp/api_specs/spec.json api/doc/v1/spec.json
