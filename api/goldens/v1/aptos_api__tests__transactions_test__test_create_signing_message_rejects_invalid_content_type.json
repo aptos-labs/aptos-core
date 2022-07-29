@@ -1,0 +1,5 @@
+{
+  "message": "the `Content-Type` requested by the client is not supported: invalid",
+  "error_code": null,
+  "aptos_ledger_version": null
+}

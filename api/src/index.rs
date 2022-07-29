@@ -21,8 +21,8 @@ use warp::{
     reply, Filter, Rejection, Reply,
 };
 
-const OPEN_API_HTML: &str = include_str!("../doc/spec.html");
-const OPEN_API_SPEC: &str = include_str!("../doc/openapi.yaml");
+const OPEN_API_HTML: &str = include_str!("../doc/v0/spec.html");
+const OPEN_API_SPEC: &str = include_str!("../doc/v0/openapi.yaml");
 
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
     index(context.clone())

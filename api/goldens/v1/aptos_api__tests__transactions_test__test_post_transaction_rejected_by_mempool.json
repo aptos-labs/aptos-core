@@ -1,0 +1,5 @@
+{
+  "message": "transaction is rejected: InvalidUpdate - Transaction already in mempool with different payload",
+  "error_code": null,
+  "aptos_ledger_version": null
+}

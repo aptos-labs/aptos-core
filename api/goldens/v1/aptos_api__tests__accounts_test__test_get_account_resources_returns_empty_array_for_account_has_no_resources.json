@@ -1,0 +1,424 @@
+[
+  {
+    "type": {
+      "address": "0x1",
+      "module": "coin",
+      "name": "CoinInfo",
+      "generic_type_params": [
+        "0x1::aptos_coin::AptosCoin"
+      ]
+    },
+    "data": {
+      "decimals": "8",
+      "name": "Aptos Coin",
+      "supply": {
+        "vec": []
+      },
+      "symbol": "APTOS"
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "guid",
+      "name": "Generator",
+      "generic_type_params": []
+    },
+    "data": {
+      "counter": "10"
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "block",
+      "name": "BlockMetadata",
+      "generic_type_params": []
+    },
+    "data": {
+      "epoch_internal": "86400000000",
+      "height": "0",
+      "new_block_events": {
+        "counter": "1",
+        "guid": {
+          "id": {
+            "addr": "0x1",
+            "creation_num": "2"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "stake",
+      "name": "ValidatorSet",
+      "generic_type_params": []
+    },
+    "data": {
+      "active_validators": [
+        {
+          "addr": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
+          "config": {
+            "consensus_pubkey": "0xaa7023a1ea88520c0b163c530367dfbfe9269621c96dc9dc9147aca9c278b1340c07b21600b2b5423a2fb88c679b0c5a",
+            "fullnode_addresses": "0x012d040000000000052518072022b18b21ecf48f18a1ebb1b8fbe0347af7913e84ad27473669eca6efc8df087a0800",
+            "network_addresses": "0x012d040000000000052418072093c5ad141db18cfef10f1452d9019922745c7b8cec22ea40118b9e1a76a756680800",
+            "validator_index": "0"
+          },
+          "voting_power": "1"
+        }
+      ],
+      "consensus_scheme": 0,
+      "pending_active": [],
+      "pending_inactive": []
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "stake",
+      "name": "ValidatorPerformance",
+      "generic_type_params": []
+    },
+    "data": {
+      "missed_votes": [
+        "0"
+      ],
+      "num_blocks": "0"
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "stake",
+      "name": "AptosCoinCapabilities",
+      "generic_type_params": []
+    },
+    "data": {
+      "mint_cap": {
+        "dummy_field": false
+      }
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "stake",
+      "name": "ValidatorSetConfiguration",
+      "generic_type_params": []
+    },
+    "data": {
+      "allow_validator_set_change": false,
+      "max_lockup_duration_secs": "86400",
+      "maximum_stake": "18446744073709551615",
+      "min_lockup_duration_secs": "0",
+      "minimum_stake": "0",
+      "rewards_rate": "273972",
+      "rewards_rate_denominator": "1000000000"
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "voting",
+      "name": "VotingForum",
+      "generic_type_params": [
+        "0x1::governance_proposal::GovernanceProposal"
+      ]
+    },
+    "data": {
+      "events": {
+        "create_proposal_events": {
+          "counter": "0",
+          "guid": {
+            "id": {
+              "addr": "0x1",
+              "creation_num": "3"
+            }
+          }
+        },
+        "register_forum_events": {
+          "counter": "1",
+          "guid": {
+            "id": {
+              "addr": "0x1",
+              "creation_num": "4"
+            }
+          }
+        },
+        "resolve_proposal_events": {
+          "counter": "0",
+          "guid": {
+            "id": {
+              "addr": "0x1",
+              "creation_num": "5"
+            }
+          }
+        },
+        "vote_events": {
+          "counter": "0",
+          "guid": {
+            "id": {
+              "addr": "0x1",
+              "creation_num": "6"
+            }
+          }
+        }
+      },
+      "next_proposal_id": "0",
+      "proposals": {
+        "handle": "66250964772389598023276627514581198483",
+        "length": "0"
+      }
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "account",
+      "name": "Account",
+      "generic_type_params": []
+    },
+    "data": {
+      "authentication_key": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "coin_register_events": {
+        "counter": "0",
+        "guid": {
+          "id": {
+            "addr": "0x1",
+            "creation_num": "0"
+          }
+        }
+      },
+      "self_address": "0x1",
+      "sequence_number": "0"
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "account",
+      "name": "ChainSpecificAccountInfo",
+      "generic_type_params": []
+    },
+    "data": {
+      "currency_code_required": false,
+      "module_addr": "0x1",
+      "module_name": "0x6163636f756e74",
+      "module_prologue_name": "0x6d6f64756c655f70726f6c6f677565",
+      "multi_agent_prologue_name": "0x6d756c74695f6167656e745f7363726970745f70726f6c6f677565",
+      "script_prologue_name": "0x7363726970745f70726f6c6f677565",
+      "user_epilogue_name": "0x6570696c6f677565",
+      "writeset_epilogue_name": "0x77726974657365745f6570696c6f677565",
+      "writeset_prologue_name": "0x77726974657365745f70726f6c6f677565"
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "version",
+      "name": "Version",
+      "generic_type_params": []
+    },
+    "data": {
+      "major": "4"
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "chain_id",
+      "name": "ChainId",
+      "generic_type_params": []
+    },
+    "data": {
+      "id": 4
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "timestamp",
+      "name": "CurrentTimeMicroseconds",
+      "generic_type_params": []
+    },
+    "data": {
+      "microseconds": "0"
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "vm_config",
+      "name": "VMConfig",
+      "generic_type_params": []
+    },
+    "data": {
+      "gas_schedule": {
+        "gas_constants": {
+          "default_account_size": "800",
+          "gas_unit_scaling_factor": "1000",
+          "global_memory_per_byte_cost": "4",
+          "global_memory_per_byte_write_cost": "9",
+          "intrinsic_gas_per_byte": "8",
+          "large_transaction_cutoff": "600",
+          "max_price_per_gas_unit": "10000",
+          "max_transaction_size_in_bytes": "262144",
+          "maximum_number_of_gas_units": "4000000",
+          "min_price_per_gas_unit": "0",
+          "min_transaction_gas_units": "600"
+        },
+        "instruction_schedule": "0x47010000000000000001000000000000007e02000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000020000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000006c0400000000000001000000000000000200000000000000010000000000000002000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000030000000000000001000000000000000200000000000000010000000000000002000000000000000100000000000000010000000000000001000000000000000200000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000002000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000290000000000000001000000000000001500000000000000010000000000000017000000000000000100000000000000cb0100000000000001000000000000000d00000000000000010000000000000001000000000000000100000000000000020000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000200000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000010000000000000001000000000000000100000000000000460200000000000001000000000000000200000000000000010000000000000002000000000000000100000000000000220000000000000001000000000000000f0000000000000001000000000000000e0000000000000001000000000000000d0000000000000001000000000000001b0000000000000001000000000000005400000000000000010000000000000062000000000000000100000000000000360500000000000001000000000000006e07000000000000010000000000000035000000000000000100000000000000e30000000000000001000000000000003c0200000000000001000000000000009c050000000000000100000000000000",
+        "native_schedule": "0x1215000000000000000100000000000000400000000000000001000000000000003d000000000000000100000000000000170d0000000000000100000000000000b50000000000000001000000000000006200000000000000010000000000000054000000000000000100000000000000360500000000000001000000000000006e07000000000000010000000000000035000000000000000100000000000000e30000000000000001000000000000003c0200000000000001000000000000009c0500000000000001000000000000001a0000000000000001000000000000006101000000000000010000000000000018000000000000000100000000000000d400000000000000010000000000000034000000000000000100000000000000"
+      }
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "aptos_coin",
+      "name": "Capabilities",
+      "generic_type_params": []
+    },
+    "data": {
+      "mint_cap": {
+        "dummy_field": false
+      }
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "reconfiguration",
+      "name": "Configuration",
+      "generic_type_params": []
+    },
+    "data": {
+      "epoch": "1",
+      "events": {
+        "counter": "1",
+        "guid": {
+          "id": {
+            "addr": "0x1",
+            "creation_num": "1"
+          }
+        }
+      },
+      "last_reconfiguration_time": "0"
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "transaction_fee",
+      "name": "AptosCoinCapabilities",
+      "generic_type_params": []
+    },
+    "data": {
+      "burn_cap": {
+        "dummy_field": false
+      }
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "aptos_governance",
+      "name": "VotingRecords",
+      "generic_type_params": []
+    },
+    "data": {
+      "votes": {
+        "handle": "250572580766766989648150312918132283230",
+        "length": "0"
+      }
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "aptos_governance",
+      "name": "GovernanceConfig",
+      "generic_type_params": []
+    },
+    "data": {
+      "min_voting_threshold": "0",
+      "required_proposer_stake": "0",
+      "voting_period_secs": "604800"
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "aptos_governance",
+      "name": "GovernanceEvents",
+      "generic_type_params": []
+    },
+    "data": {
+      "create_proposal_events": {
+        "counter": "0",
+        "guid": {
+          "id": {
+            "addr": "0x1",
+            "creation_num": "7"
+          }
+        }
+      },
+      "update_config_events": {
+        "counter": "0",
+        "guid": {
+          "id": {
+            "addr": "0x1",
+            "creation_num": "8"
+          }
+        }
+      },
+      "vote_events": {
+        "counter": "0",
+        "guid": {
+          "id": {
+            "addr": "0x1",
+            "creation_num": "9"
+          }
+        }
+      }
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "aptos_governance",
+      "name": "GovernanceResponsbility",
+      "generic_type_params": []
+    },
+    "data": {
+      "signer_cap": {
+        "account": "0x1"
+      }
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "consensus_config",
+      "name": "ConsensusConfig",
+      "generic_type_params": []
+    },
+    "data": {
+      "config": "0x00010a0000000000000014000000000000000201e8030000000000000a0000000000000001000000000000000a0000000a0000000000000001000000000000000a00000000000000"
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "transaction_publishing_option",
+      "name": "TransactionPublishingOption",
+      "generic_type_params": []
+    },
+    "data": {
+      "module_publishing_allowed": true,
+      "script_allow_list": []
+    }
+  }
+]

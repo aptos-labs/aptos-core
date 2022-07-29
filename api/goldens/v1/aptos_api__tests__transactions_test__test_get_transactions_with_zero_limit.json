@@ -1,0 +1,5 @@
+{
+  "message": "Given limit value (0) must not be zero",
+  "error_code": "InvalidLimitParam",
+  "aptos_ledger_version": null
+}
