@@ -10,8 +10,9 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
+    delta_change_set::DeltaChangeSet,
     state_store::state_key::StateKey,
-    transaction::{ChangeSet, SignatureCheckedTransaction},
+    transaction::{ChangeSet, ChangeSetExt, SignatureCheckedTransaction},
     write_set::{WriteOp, WriteSetMut},
 };
 use move_deps::{
@@ -192,6 +193,16 @@ impl SessionOutput {
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
         Ok(ChangeSet::new(write_set, events))
+    }
+
+    pub fn into_change_set_ext<C: AccessPathCache>(
+        self,
+        ap_cache: &mut C,
+    ) -> Result<ChangeSetExt, VMStatus> {
+        // TODO: extract `DeltaChangeSet` from Aggregator extension (when it lands)
+        // and initialize `ChangeSetExt` properly.
+        self.into_change_set(ap_cache)
+            .map(|change_set| ChangeSetExt::new(DeltaChangeSet::empty(), change_set))
     }
 
     pub fn squash(&mut self, other: Self) -> Result<(), VMStatus> {

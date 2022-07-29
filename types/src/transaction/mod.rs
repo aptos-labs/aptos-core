@@ -6,6 +6,7 @@ use crate::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
+    delta_change_set::DeltaChangeSet,
     ledger_info::LedgerInfo,
     proof::{
         accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
@@ -40,7 +41,7 @@ mod module;
 mod script;
 mod transaction_argument;
 
-pub use change_set::ChangeSet;
+pub use change_set::{ChangeSet, ChangeSetExt};
 pub use module::{Module, ModuleBundle};
 pub use script::{
     ArgumentABI, Script, ScriptABI, ScriptFunction, ScriptFunctionABI, TransactionScriptABI,
@@ -948,6 +949,55 @@ impl TransactionOutput {
             status,
         } = self;
         (write_set, events, gas_used, status)
+    }
+}
+
+/// Extension of `TransactionOutput` that also holds `DeltaChangeSet`
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransactionOutputExt {
+    delta_change_set: DeltaChangeSet,
+    output: TransactionOutput,
+}
+
+impl TransactionOutputExt {
+    pub fn new(delta_change_set: DeltaChangeSet, output: TransactionOutput) -> Self {
+        TransactionOutputExt {
+            delta_change_set,
+            output,
+        }
+    }
+
+    pub fn delta_change_set(&self) -> &DeltaChangeSet {
+        &self.delta_change_set
+    }
+
+    pub fn write_set(&self) -> &WriteSet {
+        &self.output.write_set
+    }
+
+    pub fn events(&self) -> &[ContractEvent] {
+        &self.output.events
+    }
+
+    pub fn gas_used(&self) -> u64 {
+        self.output.gas_used
+    }
+
+    pub fn status(&self) -> &TransactionStatus {
+        &self.output.status
+    }
+
+    pub fn into(self) -> (DeltaChangeSet, TransactionOutput) {
+        (self.delta_change_set, self.output)
+    }
+}
+
+impl From<TransactionOutput> for TransactionOutputExt {
+    fn from(output: TransactionOutput) -> Self {
+        TransactionOutputExt {
+            delta_change_set: DeltaChangeSet::empty(),
+            output,
+        }
     }
 }
 

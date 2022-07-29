@@ -18,7 +18,7 @@ use aptos_types::{
     on_chain_config::{
         ConfigStorage, OnChainConfig, VMConfig, VMPublishingOption, Version, APTOS_VERSION_3,
     },
-    transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionOutput, TransactionOutputExt, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
 use fail::fail_point;
@@ -569,18 +569,17 @@ pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     gas_left: GasUnits<GasCarrier>,
     txn_data: &TransactionMetadata,
     status: ExecutionStatus,
-) -> Result<TransactionOutput, VMStatus> {
+) -> Result<TransactionOutputExt, VMStatus> {
     let gas_used: u64 = txn_data.max_gas_amount().sub(gas_left).get();
 
     let session_out = session.finish().map_err(|e| e.into_vm_status())?;
-    let (write_set, events) = session_out.into_change_set(ap_cache)?.into_inner();
+    let (delta_change_set, change_set) = session_out.into_change_set_ext(ap_cache)?.into_inner();
+    let (write_set, events) = change_set.into_inner();
 
-    Ok(TransactionOutput::new(
-        write_set,
-        events,
-        gas_used,
-        TransactionStatus::Keep(status),
-    ))
+    let txn_output =
+        TransactionOutput::new(write_set, events, gas_used, TransactionStatus::Keep(status));
+
+    Ok(TransactionOutputExt::new(delta_change_set, txn_output))
 }
 
 #[test]

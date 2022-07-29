@@ -72,9 +72,6 @@ impl<'a, S: StateView> StateViewCache<'a, S> {
                     self.data_map.remove(ap);
                     self.data_map.insert(ap.clone(), None);
                 }
-                WriteOp::Delta(..) => {
-                    unimplemented!("sequential execution is not supported for deltas")
-                }
             }
         }
     }
