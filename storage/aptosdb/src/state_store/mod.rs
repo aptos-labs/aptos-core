@@ -41,6 +41,7 @@ use crate::{
 };
 
 pub(crate) mod buffered_state;
+mod state_merkle_batch_committer;
 mod state_snapshot_committer;
 #[cfg(test)]
 mod state_store_test;
@@ -50,7 +51,7 @@ type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, StateVa
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 // We assume TARGET_SNAPSHOT_INTERVAL_IN_VERSION > block size.
 const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT_INTERVAL_IN_VERSION
-    * (buffered_state::ASYNC_COMMIT_CHANNEL_BUFFER_SIZE + 2)
+    * ((buffered_state::ASYNC_COMMIT_CHANNEL_BUFFER_SIZE + 2) * 2 - 1)
     * 2;
 
 #[derive(Debug)]
@@ -428,8 +429,14 @@ impl StateStore {
         version: Version,
         base_version: Option<Version>,
     ) -> Result<HashValue> {
-        self.state_merkle_db
-            .merklize_value_set(value_set, node_hashes, version, base_version)
+        let (batch, hash) = self.state_merkle_db.merklize_value_set(
+            value_set,
+            node_hashes,
+            version,
+            base_version,
+        )?;
+        self.state_merkle_db.write_schemas(batch)?;
+        Ok(hash)
     }
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {

@@ -103,7 +103,7 @@ impl StateMerkleDb {
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
-    ) -> Result<HashValue> {
+    ) -> Result<(SchemaBatch, HashValue)> {
         let (new_root_hash, tree_update_batch) = {
             let _timer = OTHER_TIMERS_SECONDS
                 .with_label_values(&["jmt_update"])
@@ -139,12 +139,7 @@ impl StateMerkleDb {
                 .collect::<Result<Vec<()>>>()?;
         }
 
-        // commit jellyfish merkle nodes
-        let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["commit_jellyfish_merkle_nodes"])
-            .start_timer();
-        self.write_schemas(batch)?;
-        Ok(new_root_hash)
+        Ok((batch, new_root_hash))
     }
 
     /// Finds the rightmost leaf by scanning the entire DB.
