@@ -263,6 +263,7 @@ dependencies = [
  "poem-openapi",
  "serde 1.0.137",
  "serde_json",
+ "storage-interface",
  "warp",
 ]
 
@@ -1186,6 +1187,7 @@ dependencies = [
  "once_cell",
  "serde 1.0.137",
  "serde_json",
+ "storage-interface",
  "vm-genesis",
 ]
 
@@ -7591,6 +7593,7 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "aptos-vault-client",
+ "aptos-vm",
  "aptos-writeset-generator",
  "aptosdb",
  "async-trait",

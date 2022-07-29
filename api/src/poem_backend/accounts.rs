@@ -176,7 +176,7 @@ impl Account {
         let resources = account_state.get_resources();
         let move_resolver = self.context.move_resolver_poem()?;
         let converted_resources = move_resolver
-            .as_converter()
+            .as_converter(self.context.db.clone())
             .try_into_resources(resources)
             .context("Failed to build move resource response from data in DB")
             .map_err(BasicErrorWith404::internal)
@@ -317,7 +317,7 @@ impl Account {
             .ok_or_else(|| self.resource_not_found(struct_tag))?;
         let move_resolver = self.context.move_resolver_poem()?;
         move_resolver
-            .as_converter()
+            .as_converter(self.context.db.clone())
             .move_struct_fields(&typ, data)
             .context("Failed to convert move structs")
             .map_err(BasicErrorWith404::internal)

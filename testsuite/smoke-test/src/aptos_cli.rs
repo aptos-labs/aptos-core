@@ -70,8 +70,14 @@ pub fn launch_faucet(
 async fn test_account_flow() {
     let (_swarm, cli, _faucet) = setup_cli_test(1, 2).await;
 
-    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(0).await.unwrap());
-    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(1).await.unwrap());
+    assert_eq!(
+        DEFAULT_FUNDED_COINS,
+        cli.wait_for_balance(0, DEFAULT_FUNDED_COINS).await.unwrap()
+    );
+    assert_eq!(
+        DEFAULT_FUNDED_COINS,
+        cli.wait_for_balance(1, DEFAULT_FUNDED_COINS).await.unwrap()
+    );
 
     // Transfer an amount between the accounts
     let transfer_amount = 100;
@@ -107,7 +113,7 @@ async fn test_account_flow() {
 #[tokio::test]
 async fn test_show_validator_set() {
     let (swarm, cli, _faucet) = setup_cli_test(1, 1).await;
-    let validator_set = cli.show_validator_set(0).await.unwrap();
+    let validator_set = cli.show_validator_set().await.unwrap();
 
     assert_eq!(1, validator_set.active_validators.len());
     assert_eq!(0, validator_set.pending_inactive.len());
@@ -124,13 +130,13 @@ async fn test_show_validator_set() {
 
 #[tokio::test]
 async fn test_register_and_update_validator() {
-    let (mut swarm, cli, _faucet) = setup_cli_test(1, 0).await;
+    let (mut swarm, mut cli, _faucet) = setup_cli_test(1, 0).await;
     let transaction_factory = swarm.chain_info().transaction_factory();
     let rest_client = swarm.validators().next().unwrap().rest_client();
 
     let mut keygen = KeyGen::from_os_rng();
     let validator_cli_index = 0;
-    let keys = init_validator_account(&cli, &mut keygen, validator_cli_index).await;
+    let keys = init_validator_account(&mut cli, &mut keygen, validator_cli_index).await;
     // faucet can make our root LocalAccount sequence number get out of sync.
     swarm
         .chain_info()
@@ -138,10 +144,7 @@ async fn test_register_and_update_validator() {
         .await
         .unwrap();
 
-    assert!(cli
-        .show_validator_config(validator_cli_index)
-        .await
-        .is_err()); // validator not registered yet
+    assert!(cli.show_validator_config().await.is_err()); // validator not registered yet
 
     let port = 1234;
     cli.register_validator_candidate(
@@ -157,10 +160,7 @@ async fn test_register_and_update_validator() {
     .await
     .unwrap();
 
-    let validator_config = cli
-        .show_validator_config(validator_cli_index)
-        .await
-        .unwrap();
+    let validator_config = cli.show_validator_config().await.unwrap();
     assert_eq!(
         validator_config.consensus_public_key,
         keys.consensus_public_key()
@@ -180,10 +180,7 @@ async fn test_register_and_update_validator() {
     .await
     .unwrap();
 
-    let validator_config = cli
-        .show_validator_config(validator_cli_index)
-        .await
-        .unwrap();
+    let validator_config = cli.show_validator_config().await.unwrap();
 
     let address_new = validator_config
         .validator_network_addresses()
@@ -205,7 +202,7 @@ async fn test_register_and_update_validator() {
     .await;
 
     // because we haven't joined the validator set yet, we shouldn't be there
-    let validator_set = cli.show_validator_set(validator_cli_index).await.unwrap();
+    let validator_set = cli.show_validator_set().await.unwrap();
     assert_eq!(1, validator_set.active_validators.len());
     assert_eq!(0, validator_set.pending_inactive.len());
     assert_eq!(0, validator_set.pending_active.len());
@@ -236,7 +233,7 @@ impl ValidatorNodeKeys {
 }
 
 async fn init_validator_account(
-    cli: &CliTestFramework,
+    cli: &mut CliTestFramework,
     keygen: &mut KeyGen,
     validator_cli_index: usize,
 ) -> ValidatorNodeKeys {
@@ -245,12 +242,13 @@ async fn init_validator_account(
         network_private_key: keygen.generate_x25519_private_key().unwrap(),
         consensus_private_key: keygen.generate_bls12381_private_key(),
     };
-    cli.init(
-        validator_cli_index,
-        &validator_node_keys.account_private_key,
-    )
-    .await
-    .unwrap();
+    cli.init(&validator_node_keys.account_private_key)
+        .await
+        .unwrap();
+
+    // Push the private key into the system
+    cli.add_private_key(validator_node_keys.account_private_key.clone());
+
     assert_eq!(
         DEFAULT_FUNDED_COINS,
         cli.account_balance(validator_cli_index).await.unwrap()
