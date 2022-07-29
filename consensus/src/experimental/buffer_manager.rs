@@ -291,6 +291,7 @@ impl BufferManager {
     /// Internal requests are managed with ongoing_tasks.
     /// Incoming ordered blocks are pulled, it should only have existing blocks but no new blocks until reset finishes.
     async fn reset(&mut self) {
+        info!("BufferManager.reset called to flush items");
         self.buffer = Buffer::new();
         self.execution_root = None;
         self.signing_root = None;
@@ -298,8 +299,13 @@ impl BufferManager {
         while let Ok(Some(_)) = self.block_rx.try_next() {}
         // Wait for ongoing tasks to finish before sending back ack.
         while self.ongoing_tasks.load(Ordering::SeqCst) > 0 {
+            info!(
+                "BufferManager.ongoing tasks {}",
+                self.ongoing_tasks.load(Ordering::SeqCst)
+            );
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
+        info!("BufferManager.reset finished");
     }
 
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
