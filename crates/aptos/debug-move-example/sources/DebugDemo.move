@@ -1,7 +1,7 @@
 module DebugDemo::Message {
     use std::string;
     use std::signer;
-    use std::Debug;
+    use aptos_std::debug;
 
     struct MessageHolder has key {
         message: string::String,
@@ -10,7 +10,7 @@ module DebugDemo::Message {
 
     public entry fun set_message(account: signer, message_bytes: vector<u8>)
     acquires MessageHolder {
-        Debug::print_stack_trace();
+        debug::print_stack_trace();
         let message = string::utf8(message_bytes);
         let account_addr = signer::address_of(&account);
         if (!exists<MessageHolder>(account_addr)) {
@@ -26,7 +26,7 @@ module DebugDemo::Message {
     #[test(account = @0x1)]
     public entry fun sender_can_set_message(account: signer) acquires MessageHolder {
         let addr = signer::address_of(&account);
-        Debug::print<address>(&addr);
+        debug::print<address>(&addr);
         set_message(account,  b"Hello, Blockchain");
     }
 }

@@ -38,9 +38,8 @@ impl Fixture {
             package: PackageMetadata {
                 name: name.to_string(),
                 upgrade_policy,
+                manifest: "".to_string(),
                 modules: vec![],
-                address_aliases: vec![],
-                deps: vec![],
             },
             code: vec![],
             txn_seq_no: 10,
@@ -74,8 +73,9 @@ impl Fixture {
         );
         self.package.modules.push(ModuleMetadata {
             name: name.to_string(),
-            source_map: vec![],
             source: program.clone(),
+            source_map: vec![],
+            abi: vec![],
         });
         self.code.push(compile_module(&program).1.into_inner());
     }

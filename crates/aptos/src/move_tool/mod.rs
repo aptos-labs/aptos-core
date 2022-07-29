@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod aptos_debug_natives;
+mod built_package;
+pub use built_package::*;
 
 use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
 use crate::{
@@ -17,12 +19,13 @@ use crate::{
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
+use aptos_vm;
+use aptos_vm::move_vm_ext::UpgradePolicy;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 use move_deps::move_cli::base::test::UnitTestResult;
 use move_deps::{
     move_cli,
-    move_command_line_common::env::get_bytecode_version_from_env,
     move_core_types::{
         identifier::Identifier,
         language_storage::{ModuleId, TypeTag},
@@ -165,8 +168,10 @@ impl CliCommand<Vec<String>> for CompilePackage {
             install_dir: self.move_options.output_dir.clone(),
             ..Default::default()
         };
-        let compiled_package =
-            compile_move(build_config, self.move_options.get_package_dir()?.as_path())?;
+        let compiled_package = compile_move(
+            build_config,
+            self.move_options.get_package_path()?.as_path(),
+        )?;
         let mut ids = Vec::new();
         for &module in compiled_package.root_modules_map().iter_modules().iter() {
             verify_module_init_function(module)
@@ -202,7 +207,7 @@ impl CliCommand<&'static str> for TestPackage {
             ..Default::default()
         };
         let result = move_cli::base::test::run_move_unit_tests(
-            self.move_options.get_package_dir()?.as_path(),
+            self.move_options.get_package_path()?.as_path(),
             config,
             UnitTestingConfig {
                 filter: self.filter,
@@ -249,7 +254,7 @@ impl CliCommand<&'static str> for ProvePackage {
         let result = task::spawn_blocking(move || {
             move_cli::base::prove::run_move_prover(
                 config,
-                self.move_options.get_package_dir()?.as_path(),
+                self.move_options.get_package_path()?.as_path(),
                 &self.filter,
                 true,
                 move_prover::cli::Options::default(),
@@ -280,6 +285,13 @@ pub struct PublishPackage {
     move_options: MovePackageDir,
     #[clap(flatten)]
     txn_options: TransactionOptions,
+    /// Whether to use the new publishing flow.
+    #[clap(long)]
+    new_flow: bool,
+    /// The upgrade policy used for the published package (new flow only). One of
+    /// `arbitrary`, `compatible`, or `immutable`. Defaults to `compatible`.
+    #[clap(long)]
+    upgrade_policy: Option<UpgradePolicy>,
 }
 
 #[async_trait]
@@ -289,31 +301,42 @@ impl CliCommand<TransactionSummary> for PublishPackage {
     }
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
-        let build_config = BuildConfig {
-            additional_named_addresses: self.move_options.named_addresses(),
-            generate_abis: false,
-            generate_docs: true,
-            install_dir: self.move_options.output_dir.clone(),
-            ..Default::default()
-        };
-        let package = compile_move(build_config, self.move_options.get_package_dir()?.as_path())?;
-        let compiled_units: Vec<Vec<u8>> = package
-            .root_compiled_units
-            .iter()
-            .map(|unit_with_source| {
-                unit_with_source
-                    .unit
-                    .serialize(get_bytecode_version_from_env())
-            })
-            .collect();
-
-        // Send the compiled module
-        self.txn_options
-            .submit_transaction(TransactionPayload::ModuleBundle(ModuleBundle::new(
+        let PublishPackage {
+            move_options,
+            txn_options,
+            new_flow,
+            upgrade_policy,
+        } = self;
+        let package = BuiltPackage::build(move_options, true, true)?;
+        let compiled_units = package.extract_code();
+        if !new_flow {
+            if upgrade_policy.is_some() {
+                return Err(CliError::CommandArgumentError(
+                    "`--upgrade-policy` can only be used with the `--new-flow` option".to_owned(),
+                ));
+            }
+            // Send the compiled module using a module bundle
+            txn_options
+                .submit_transaction(TransactionPayload::ModuleBundle(ModuleBundle::new(
+                    compiled_units,
+                )))
+                .await
+                .map(TransactionSummary::from)
+        } else {
+            // Send the compiled module and metadata using the code::publish_package_txn.
+            let metadata = package.extract_metadata(
+                package.name().to_owned(),
+                upgrade_policy.unwrap_or_else(UpgradePolicy::compat),
+            )?;
+            let payload = aptos_transaction_builder::aptos_stdlib::code_publish_package_txn(
+                bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
                 compiled_units,
-            )))
-            .await
-            .map(TransactionSummary::from)
+            );
+            txn_options
+                .submit_transaction(payload)
+                .await
+                .map(TransactionSummary::from)
+        }
     }
 }
 
