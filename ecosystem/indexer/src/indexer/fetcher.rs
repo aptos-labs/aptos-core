@@ -124,9 +124,7 @@ impl TransactionFetcherTrait for TransactionFetcher {
 /// For mocking TransactionFetcher in tests
 #[async_trait::async_trait]
 pub trait TransactionFetcherTrait: Send + Sync {
-    fn set_version(&mut self, _version: u64) {
-        unimplemented!();
-    }
+    fn set_version(&mut self, version: u64);
 
     async fn fetch_ledger_info(&mut self) -> State {
         unimplemented!();
