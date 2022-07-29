@@ -9,10 +9,13 @@ use crate::{
     types::{Block, BlockIdentifier, BlockRequest, BlockResponse, Transaction},
     RosettaContext,
 };
-use aptos_logger::{debug, trace};
+use aptos_logger::sample::SampleRate;
+use aptos_logger::sample::Sampling;
+use aptos_logger::{debug, sample, trace};
 use aptos_rest_client::aptos_api_types::{BlockInfo, HashValue};
+use std::cmp::Ordering;
+use std::time::Duration;
 use std::{
-    cmp::Ordering,
     collections::BTreeMap,
     sync::{Arc, RwLock},
 };
@@ -129,6 +132,10 @@ async fn get_block_by_index(
     }
 }
 
+/// Prune the BlockCache every 6 hours
+/// TODO: Make configurable
+const PRUNE_PERIOD_SECS: u64 = 21600;
+
 /// A cache of [`BlockInfo`] to allow us to keep track of the block boundaries
 #[derive(Debug)]
 pub struct BlockCache {
@@ -172,81 +179,126 @@ impl BlockCache {
         Ok(block_cache)
     }
 
+    /// Prunes versions older than the oldest version
+    pub async fn prune(&self) {
+        if let Ok(Some(oldest_version)) = self
+            .rest_client
+            .get_ledger_information()
+            .await
+            .map(|response| response.into_inner().oldest_ledger_version)
+        {
+            // Check first if there's a version older than the oldest version
+            {
+                let versions = self.versions.read().unwrap();
+                if versions.range(..oldest_version).next_back().is_none() {
+                    return;
+                }
+            }
+
+            // Prune based on version
+            {
+                // Lock all three in order that they're written
+                let mut blocks = self.blocks.write().unwrap();
+                let mut hashes = self.hashes.write().unwrap();
+                let mut versions = self.versions.write().unwrap();
+
+                // Grab all later versions after the oldest version (including it)
+                let mut active = versions.split_off(&oldest_version);
+
+                // All remaining versions need to be cleared from the rest of the stores
+                for (_, block_index) in versions.iter() {
+                    if let Some(info) = blocks.remove(block_index) {
+                        hashes.remove(&info.block_hash);
+                    }
+                }
+
+                // Clear the versions cache and append the active versions
+                versions.clear();
+                versions.append(&mut active);
+            }
+        }
+    }
+
     /// Retrieve the block info for the index
     pub async fn get_block_info(&self, block_index: u64) -> ApiResult<BlockInfo> {
+        sample!(
+            SampleRate::Duration(Duration::from_secs(PRUNE_PERIOD_SECS)),
+            self.prune().await
+        );
+
         // If we already have the block info, let's roll with it
-        let (start_version, range, traverse_right) = {
+        let (closest_below, closest_above) = {
             let map = self.blocks.read().unwrap();
             if let Some(block_info) = map.get(&block_index) {
                 return Ok(*block_info);
             }
 
-            // Find the closest, left or right, and build up blocks from there
-            // Search from right to left because we're less likely to search far into the past
-            let mut search_left = None;
-            let mut search_right = None;
-            for (i, info) in map.iter().rev() {
-                let i = *i;
-                match i.cmp(&block_index) {
-                    Ordering::Less => {
-                        let start_version = info.end_version.saturating_add(1);
-                        let block_range = i.saturating_add(1)..=block_index;
-                        let distance = block_index.saturating_sub(i);
-                        search_left = Some((start_version, block_range, distance));
-                        // We've passed our block_index so we can stop now
-                        break;
-                    }
-                    Ordering::Greater => {
-                        let start_version = info.start_version.saturating_sub(1);
-                        let block_range = block_index..=(i.saturating_sub(1));
-                        let distance = i.saturating_sub(block_index);
-                        search_right = Some((start_version, block_range, distance));
-                    }
-                    Ordering::Equal => {}
+            // Find the location of the one above and the one below
+            let mut closest_below = None;
+            let mut closest_above = None;
+            for (i, info) in map.iter() {
+                if *i < block_index {
+                    closest_below = Some(info);
+                } else if *i > block_index {
+                    closest_above = Some(info);
+                    break;
                 }
             }
 
-            // Choose the shortest distance and search in that direction
-            match (search_left, search_right) {
-                (Some((left_version, left_range, _)), None) => (left_version, left_range, true),
-                (None, Some((right_version, right_range, _))) => {
-                    (right_version, right_range, false)
-                }
-                (
-                    Some((left_version, left_range, left_distance)),
-                    Some((right_version, right_range, right_distance)),
-                ) => {
-                    if left_distance < right_distance {
-                        (left_version, left_range, true)
-                    } else {
-                        (right_version, right_range, false)
-                    }
-                }
-                // This shouldn't happen as the first thing we do when we initialize the cache
-                // is put the first and last blocks into it
-                _ => unreachable!("There should always be a block in the cache!"),
-            }
+            (closest_below.copied(), closest_above.copied())
         };
 
-        // Go through the blocks, and add them into the cache
-        let mut running_version = start_version;
-        for _ in range {
-            let info = self.add_block(running_version).await?;
+        let info = match (closest_below, closest_above) {
+            (Some(info), None) => {
+                // Search linearly up
+                let mut info = info;
+                while info.block_height < block_index {
+                    info = self.add_block(info.end_version.saturating_add(1)).await?;
+                }
 
-            // Increment to the next block
-            if traverse_right {
-                running_version = info.end_version.saturating_add(1);
-            } else {
-                running_version = info.start_version.saturating_sub(1);
+                info
             }
-        }
+            (None, Some(info)) => {
+                // Search linearly down, though this will likely be pruned
+                let mut info = info;
+                while info.block_height > block_index {
+                    info = self.add_block(info.start_version.saturating_sub(1)).await?;
+                }
+                info
+            }
+            (Some(below), Some(above)) => {
+                let mut below = below;
+                let mut above = above;
 
-        if let Some(info) = self.blocks.read().unwrap().get(&block_index) {
-            Ok(*info)
-        } else {
-            // If for some reason the block doesn't get found, retry with block incomplete
-            Err(ApiError::BlockIncomplete)
+                // Binary search for block
+                while below.block_height < above.block_height.saturating_sub(1) {
+                    let version = above
+                        .start_version
+                        .saturating_sub(below.end_version)
+                        .saturating_div(2)
+                        .saturating_add(below.end_version);
+                    let info = self.add_block(version).await?;
+                    match info.block_height.cmp(&block_index) {
+                        Ordering::Less => below = info,
+                        Ordering::Equal => return Ok(info),
+                        Ordering::Greater => above = info,
+                    }
+                }
+                return Err(ApiError::AptosError(Some(
+                    "Failed to find block".to_string(),
+                )));
+            }
+            _ => unreachable!(
+                "Block cache is initialized with blocks, there should always be some other blocks"
+            ),
+        };
+
+        if info.block_height != block_index {
+            return Err(ApiError::AptosError(Some(
+                "Failed to find block".to_string(),
+            )));
         }
+        Ok(info)
     }
 
     /// Retrieve block info, and add it to the index
@@ -309,7 +361,9 @@ impl BlockCache {
             Ok(*version)
         } else {
             // If for some reason the block doesn't get found, retry with block incomplete
-            Err(ApiError::BlockIncomplete)
+            return Err(ApiError::AptosError(Some(
+                "Can't find block by block hash".to_string(),
+            )));
         }
     }
 }
