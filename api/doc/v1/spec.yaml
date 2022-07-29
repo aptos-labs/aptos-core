@@ -1248,7 +1248,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Transaction"
+                  $ref: "#/components/schemas/UserTransaction"
             application/x-bcs:
               schema:
                 type: array
