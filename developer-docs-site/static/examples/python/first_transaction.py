@@ -104,10 +104,10 @@ class RestClient:
         response = requests.post(f"{self.url}/transactions", headers=headers, json=txn)
         assert response.status_code == 202, f"{response.text} - {txn}"
         return response.json()
-    
+
     def execute_transaction_with_payload(self, account_from: Account, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a transaction for the given payload."""
-        
+
         txn_request = self.generate_transaction(account_from.address(), payload)
         signed_txn = self.sign_transaction(account_from, txn_request)
         return self.submit_transaction(signed_txn)
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     print(f"Alice: {alice.address()}")
     print(f"Bob: {bob.address()}")
 
-    faucet_client.fund_account(alice.address(), 1_000_000)
+    faucet_client.fund_account(alice.address(), 5_000)
     faucet_client.fund_account(bob.address(), 0)
 
     print("\n=== Initial Balances ===")

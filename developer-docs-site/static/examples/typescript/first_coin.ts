@@ -3,99 +3,165 @@
 
 import assert from "assert";
 import fs from "fs";
-import { Account, RestClient, TESTNET_URL, FAUCET_URL, FaucetClient } from "./first_transaction";
-import { HelloBlockchainClient } from "./hello_blockchain";
+import { NODE_URL, FAUCET_URL } from "./first_transaction";
+import { AptosAccount, AptosClient, TxnBuilderTypes, BCS, MaybeHexString, HexString, FaucetClient } from "aptos";
+import { publishModule } from "./hello_blockchain";
 
 const readline = require("readline").createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
-class FirstCoinClient extends RestClient {
-  //:!:>section_1
-  /** Initializes the new coin */
-  async initializeCoin(accountFrom: Account, coinTypeAddress: string): Promise<string> {
-    let payload: { function: string; arguments: any[]; type: string; type_arguments: any[] } = {
-      type: "script_function_payload",
-      function: `0x1::managed_coin::initialize`,
-      type_arguments: [`0x${coinTypeAddress}::MoonCoin::MoonCoin`],
-      arguments: [
-        Buffer.from("Moon Coin", "utf-8").toString("hex"),
-        Buffer.from("MOON", "utf-8").toString("hex"),
-        "6",
-        false,
-      ],
-    };
-    return await this.executeTransactionWithPayload(accountFrom, payload);
-  }
-  //<:!:section_1
+//:!:>section_1
+const client = new AptosClient(NODE_URL);
+/** Initializes the new coin */
+async function initializeCoin(accountFrom: AptosAccount, coinTypeAddress: HexString): Promise<string> {
+  const token = new TxnBuilderTypes.TypeTagStruct(
+    TxnBuilderTypes.StructTag.fromString(`${coinTypeAddress.hex()}::MoonCoin::MoonCoin`),
+  );
 
-  //:!:>section_2
-  /** Receiver needs to register the coin before they can receive it */
-  async registerCoin(coinReceiver: Account, coinTypeAddress: string): Promise<string> {
-    let payload: { function: string; arguments: string[]; type: string; type_arguments: any[] };
-    payload = {
-      type: "script_function_payload",
-      function: `0x1::coin::register`,
-      type_arguments: [`0x${coinTypeAddress}::MoonCoin::MoonCoin`],
-      arguments: [],
-    };
-    return await this.executeTransactionWithPayload(coinReceiver, payload);
-  }
-  //<:!:section_2
+  const serializer = new BCS.Serializer();
+  serializer.serializeBool(false);
 
-  //:!:>section_3
-  /** Mints the newly created coin to a specified receiver address */
-  async mintCoin(
-    coinOwner: Account,
-    coinTypeAddress: string,
-    receiverAddress: string,
-    amount: number,
-  ): Promise<string> {
-    let payload: { function: string; arguments: string[]; type: string; type_arguments: any[] };
-    payload = {
-      type: "script_function_payload",
-      function: `0x1::managed_coin::mint`,
-      type_arguments: [`0x${coinTypeAddress}::MoonCoin::MoonCoin`],
-      arguments: [receiverAddress, amount.toString()],
-    };
-    return await this.executeTransactionWithPayload(coinOwner, payload);
-  }
-  //<:!:section_3
+  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+    TxnBuilderTypes.ScriptFunction.natural(
+      "0x1::managed_coin",
+      "initialize",
+      [token],
+      [BCS.bcsSerializeStr("Moon Coin"), BCS.bcsSerializeStr("MOON"), BCS.bcsSerializeUint64(6), serializer.getBytes()],
+    ),
+  );
 
-  //:!:>section_4
-  /** Return the balance of the newly created coin */
-  async getBalance(accountAddress: string, coinTypeAddress: string): Promise<string> {
-    const resource = await this.accountResource(
-      accountAddress,
-      `0x1::coin::CoinStore<0x${coinTypeAddress}::MoonCoin::MoonCoin>`,
-    );
-    if (resource == null) {
-      return null;
-    } else {
-      return resource["data"]["coin"]["value"];
-    }
-  }
-  //<:!:section_4
+  const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
+    client.getAccount(accountFrom.address()),
+    client.getChainId(),
+  ]);
+
+  const rawTxn = new TxnBuilderTypes.RawTransaction(
+    TxnBuilderTypes.AccountAddress.fromHex(accountFrom.address()),
+    BigInt(sequenceNumber),
+    scriptFunctionPayload,
+    1000n,
+    1n,
+    BigInt(Math.floor(Date.now() / 1000) + 10),
+    new TxnBuilderTypes.ChainId(chainId),
+  );
+
+  const bcsTxn = AptosClient.generateBCSTransaction(accountFrom, rawTxn);
+  const pendingTxn = await client.submitSignedBCSTransaction(bcsTxn);
+
+  return pendingTxn.hash;
 }
+//<:!:section_1
+
+//:!:>section_2
+/** Receiver needs to register the coin before they can receive it */
+async function registerCoin(coinReceiver: AptosAccount, coinTypeAddress: HexString): Promise<string> {
+  const token = new TxnBuilderTypes.TypeTagStruct(
+    TxnBuilderTypes.StructTag.fromString(`${coinTypeAddress.hex()}::MoonCoin::MoonCoin`),
+  );
+
+  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+    TxnBuilderTypes.ScriptFunction.natural("0x1::coin", "register", [token], []),
+  );
+
+  const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
+    client.getAccount(coinReceiver.address()),
+    client.getChainId(),
+  ]);
+
+  const rawTxn = new TxnBuilderTypes.RawTransaction(
+    TxnBuilderTypes.AccountAddress.fromHex(coinReceiver.address()),
+    BigInt(sequenceNumber),
+    scriptFunctionPayload,
+    1000n,
+    1n,
+    BigInt(Math.floor(Date.now() / 1000) + 10),
+    new TxnBuilderTypes.ChainId(chainId),
+  );
+
+  const bcsTxn = AptosClient.generateBCSTransaction(coinReceiver, rawTxn);
+  const pendingTxn = await client.submitSignedBCSTransaction(bcsTxn);
+
+  return pendingTxn.hash;
+}
+//<:!:section_2
+
+//:!:>section_3
+/** Mints the newly created coin to a specified receiver address */
+async function mintCoin(
+  coinOwner: AptosAccount,
+  coinTypeAddress: HexString,
+  receiverAddress: HexString,
+  amount: number,
+): Promise<string> {
+  const token = new TxnBuilderTypes.TypeTagStruct(
+    TxnBuilderTypes.StructTag.fromString(`${coinTypeAddress.hex()}::MoonCoin::MoonCoin`),
+  );
+
+  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+    TxnBuilderTypes.ScriptFunction.natural(
+      "0x1::managed_coin",
+      "mint",
+      [token],
+      [BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiverAddress.hex())), BCS.bcsSerializeUint64(amount)],
+    ),
+  );
+
+  const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
+    client.getAccount(coinOwner.address()),
+    client.getChainId(),
+  ]);
+
+  const rawTxn = new TxnBuilderTypes.RawTransaction(
+    TxnBuilderTypes.AccountAddress.fromHex(coinOwner.address()),
+    BigInt(sequenceNumber),
+    scriptFunctionPayload,
+    1000n,
+    1n,
+    BigInt(Math.floor(Date.now() / 1000) + 10),
+    new TxnBuilderTypes.ChainId(chainId),
+  );
+
+  const bcsTxn = AptosClient.generateBCSTransaction(coinOwner, rawTxn);
+  const pendingTxn = await client.submitSignedBCSTransaction(bcsTxn);
+  return pendingTxn.hash;
+}
+//<:!:section_3
+
+//:!:>section_4
+/** Return the balance of the newly created coin */
+async function getBalance(accountAddress: MaybeHexString, coinTypeAddress: HexString): Promise<string | number> {
+  try {
+    const resource = await client.getAccountResource(
+      accountAddress,
+      `0x1::coin::CoinStore<${coinTypeAddress.hex()}::MoonCoin::MoonCoin>`,
+    );
+
+    return parseInt((resource.data as any)["coin"]["value"]);
+  } catch (_) {
+    return 0;
+  }
+}
+//<:!:section_4
 
 /** run our demo! */
 async function main() {
-  assert(process.argv.length == 3, "Expecting an argument that points to the helloblockchain module");
+  assert(process.argv.length == 3, "Expecting an argument that points to the moon coin module");
 
-  const restClient = new FirstCoinClient(TESTNET_URL);
-  const faucetClient = new FaucetClient(FAUCET_URL, restClient);
+  const client = new AptosClient(NODE_URL);
+  const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
   // Create two accounts, Alice and Bob, and fund Alice but not Bob
-  const alice = new Account();
-  const bob = new Account();
+  const alice = new AptosAccount();
+  const bob = new AptosAccount();
 
   console.log("\n=== Addresses ===");
   console.log(`Alice: ${alice.address()}`);
   console.log(`Bob: ${bob.address()}`);
 
-  await faucetClient.fundAccount(alice.address(), 10_000_000);
-  await faucetClient.fundAccount(bob.address(), 10_000_000);
+  await faucetClient.fundAccount(alice.address(), 5_000);
+  await faucetClient.fundAccount(bob.address(), 5_000);
 
   await new Promise<void>((resolve) => {
     readline.question(
@@ -110,23 +176,22 @@ async function main() {
   const moduleHex = fs.readFileSync(modulePath).toString("hex");
 
   console.log("Publishing MoonCoinType module...");
-  const helloBlockchainClient = new HelloBlockchainClient(TESTNET_URL);
-  let txHash = await helloBlockchainClient.publishModule(alice, moduleHex);
-  await helloBlockchainClient.waitForTransaction(txHash);
+  let txHash = await publishModule(alice, moduleHex);
+  await client.waitForTransaction(txHash);
 
   console.log("Alice will initialize the new coin");
-  txHash = await restClient.initializeCoin(alice, alice.address());
-  await restClient.waitForTransaction(txHash);
+  txHash = await initializeCoin(alice, alice.address());
+  await client.waitForTransaction(txHash);
 
   console.log("Bob registers the newly created coin so he can receive it from Alice");
-  txHash = await restClient.registerCoin(bob, alice.address());
-  await restClient.waitForTransaction(txHash);
-  console.log(`Bob's initial balance: ${await restClient.getBalance(bob.address(), alice.address())}`);
+  txHash = await registerCoin(bob, alice.address());
+  await client.waitForTransaction(txHash);
+  console.log(`Bob's initial balance: ${await getBalance(bob.address(), alice.address())}`);
 
   console.log("Alice mints Bob some of the new coin");
-  txHash = await restClient.mintCoin(alice, alice.address(), bob.address(), 100);
-  await restClient.waitForTransaction(txHash);
-  console.log(`Bob's new balance: ${await restClient.getBalance(bob.address(), alice.address())}`);
+  txHash = await mintCoin(alice, alice.address(), bob.address(), 100);
+  await client.waitForTransaction(txHash);
+  console.log(`Bob's new balance: ${await getBalance(bob.address(), alice.address())}`);
 }
 
 if (require.main === module) {
