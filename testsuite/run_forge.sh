@@ -182,13 +182,12 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     fi
 
 elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
-    # try deleting existing forge pod of same name
-    # since forge test runner will run in a pod that matches the namespace
-    # this will pre-empt the existing forge test in the same namespace and ensures
-    # we do not have any dangling test runners
-    FORGE_POD_NAME=$FORGE_NAMESPACE
-    kubectl delete pod -n default $FORGE_POD_NAME || true
-    kubectl wait -n default --for=delete "pod/${FORGE_POD_NAME}" || true
+    # try deleting pod corresponding to the same forge test (namespace, image_tag/git_ref)
+    # this will pre-empt the existing forge test and ensures we do not have any dangling test runners
+    FORGE_POD_NAME="${FORGE_NAMESPACE}-$(date '+%s')-${IMAGE_TAG}"
+    FORGE_POD_NAME=${FORGE_POD_NAME:0:64}
+    kubectl delete pod -n default -l "forge-namespace=${FORGE_NAMESPACE}" --force || true
+    kubectl wait -n default --for=delete pod -l "forge-namespace=${FORGE_NAMESPACE}" || true
 
     specfile=$(mktemp)
     echo "Forge test-runner pod Spec : ${specfile}"
@@ -216,11 +215,14 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     kubectl logs -n default -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
 
     # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
-    forge_pod_status=$(kubectl get pod -n default $FORGE_POD_NAME -o jsonpath="{.status.phase}")
+    forge_pod_status=$(kubectl get pod -n default $FORGE_POD_NAME -o jsonpath="{.status.phase}" 2>&1)
     echo "Forge pod status: ${forge_pod_status}"
-    if [ "$forge_pod_status" = "Succeeded" ]; then
+
+    if [ "$forge_pod_status" = "Succeeded" ]; then # the current pod succeeded
         FORGE_EXIT_CODE=0
-    else
+    elif echo $forge_pod_status | grep -E "(not found)|(not found)"; then # the current test in this namespace was likely preempted and deleted
+        FORGE_EXIT_CODE=10
+    else # it did not succeed
         FORGE_EXIT_CODE=1
     fi
 elif [ "$FORGE_RUNNER_MODE" = "dry-run" ]; then
@@ -243,13 +245,11 @@ cat $FORGE_OUTPUT | awk '/====json-report-begin===/{f=1;next} /====json-report-e
 # If no report was generated, fill with default report
 if [ ! -s "${FORGE_REPORT}" ]; then
     echo '{"text": "Forge test runner terminated"}' >"${FORGE_REPORT}"
-    FORGE_EXIT_CODE=1
 fi
 # If no report text was generated, fill with default text
 FORGE_REPORT_TXT=$(cat $FORGE_REPORT | jq -r .text)
 if [ -z "$FORGE_REPORT_TXT" ]; then
     FORGE_REPORT_TXT="Forge report text empty. See test runner output."
-    FORGE_EXIT_CODE=1
 fi
 
 # print the Forge report
@@ -276,6 +276,10 @@ if [ "$FORGE_EXIT_CODE" = "0" ]; then
     FORGE_COMMENT_HEADER="### :white_check_mark: Forge test success on \`${IMAGE_TAG}\`"
 elif [ "$FORGE_EXIT_CODE" = "2" ]; then
     FORGE_COMMENT_HEADER"### :x: Forge test perf regression on \`${IMAGE_TAG}\`"
+elif [ "$FORGE_EXIT_CODE" = "10" ]; then
+    FORGE_COMMENT_HEADER"### :thought_balloon: Forge test preempted on \`${IMAGE_TAG}\`"
+    # don't actually fail if tests pre-empted
+    FORGE_EXIT_CODE=0
 else
     FORGE_COMMENT_HEADER="### :x: Forge test failure on \`${IMAGE_TAG}\`"
 fi
