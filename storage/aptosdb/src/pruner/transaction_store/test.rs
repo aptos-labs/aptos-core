@@ -1,9 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{pruner::*, AptosDB, ChangeSet, LedgerStore, TransactionStore};
+use crate::{
+    AptosDB, ChangeSet, LedgerPrunerManager, LedgerStore, PrunerManager, TransactionStore,
+};
 use aptos_temppath::TempPath;
 use proptest::proptest;
+use std::sync::Arc;
 
 use aptos_types::{
     account_address::AccountAddress,
@@ -11,6 +14,7 @@ use aptos_types::{
     transaction::{SignedTransaction, Transaction},
 };
 
+use aptos_config::config::StoragePrunerConfig;
 use aptos_types::{
     transaction::{TransactionInfo, Version},
     write_set::WriteSet,
@@ -47,9 +51,8 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
     let transaction_store = &aptos_db.transaction_store;
     let num_write_sets = write_sets.len();
 
-    let pruner = Pruner::new(
+    let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: Some(0),
@@ -69,7 +72,7 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
     // start pruning write sets in batches of size 2 and verify transactions have been pruned from DB
     for i in (0..=num_write_sets).step_by(2) {
         pruner
-            .wake_and_wait_ledger_pruner(i as u64 /* latest_version */)
+            .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();
         // ensure that all transaction up to i * 2 has been pruned
         for j in 0..i {
@@ -94,9 +97,8 @@ fn verify_txn_store_pruner(
     let ledger_store = LedgerStore::new(Arc::clone(&aptos_db.ledger_db));
     let num_transaction = txns.len();
 
-    let pruner = Pruner::new(
+    let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: Some(0),
@@ -117,11 +119,11 @@ fn verify_txn_store_pruner(
     // start pruning transactions batches of size step_size and verify transactions have been pruned from DB
     for i in (0..=num_transaction).step_by(step_size) {
         pruner
-            .wake_and_wait_ledger_pruner(i as u64 /* latest_version */)
+            .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();
         // ensure that all transaction up to i * 2 has been pruned
         assert_eq!(
-            *pruner.last_version_sent_to_state_pruner.as_ref().lock(),
+            *pruner.last_version_sent_to_pruner.as_ref().lock(),
             i as u64
         );
         for j in 0..i {
