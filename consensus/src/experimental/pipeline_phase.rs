@@ -69,6 +69,7 @@ impl<T: StatelessPipeline> PipelinePhase<T> {
         while let Some(counted_req) = self.rx.next().await {
             let CountedRequest { req, guard: _guard } = counted_req;
             let response = self.processor.process(req).await;
+            panic!("This should die! Does it get reported?");
             if let Some(tx) = &mut self.maybe_tx {
                 if tx.send(response).await.is_err() {
                     break;
