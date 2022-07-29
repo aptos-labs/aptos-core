@@ -93,9 +93,9 @@ Assets can be programmed to be entirely constrained within a module by making it
 Contrast the following two functions of implementing a coins transfer using deposit and withdraw:
 
 ```rust
-public fun transfer<T>(sender: &signer, reciepient: address, amount: u64) {
+public fun transfer<T>(sender: &signer, recipient: address, amount: u64) {
     let coin = withdraw(&signer, amount);
-    deposit(reciepient, coin);
+    deposit(recipient, coin);
 }
 ```
 
