@@ -68,9 +68,10 @@ function TransferDrawer() {
   } = useDisclosure();
 
   const {
-    formState: { isSubmitting },
+    formState: { isSubmitted, isSubmitting },
     handleSubmit,
     register,
+    reset: resetForm,
     watch,
   } = useForm<CoinTransferFormData>();
 
@@ -117,10 +118,18 @@ function TransferDrawer() {
     }
   };
 
+  // When the drawer is closed, reset the form only if the
+  // transfer was successful
+  const onCloseComplete = () => {
+    if (isSubmitted) {
+      resetForm();
+    }
+  };
+
   const explorerAddress = `https://explorer.devnet.aptos.dev/account/${recipient}`;
   const estimatedGasFee = debouncedAmount && simulatedTxn && Number(simulatedTxn.gas_used);
   const maxAmount = coinBalance && estimatedGasFee && coinBalance - estimatedGasFee;
-  const isBalanceEnough = !maxAmount || debouncedAmount < maxAmount;
+  const isBalanceEnough = !maxAmount || debouncedAmount <= maxAmount;
 
   const canSubmitForm = canSubmitTransaction
     && debouncedAmount
@@ -140,6 +149,7 @@ function TransferDrawer() {
         isOpen={isDrawerOpen}
         onClose={closeDrawer}
         placement="bottom"
+        onCloseComplete={onCloseComplete}
       >
         <DrawerOverlay />
         <form onSubmit={handleSubmit(onSubmit)}>

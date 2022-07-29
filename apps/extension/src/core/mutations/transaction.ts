@@ -7,7 +7,6 @@ import {
   TxnBuilderTypes,
   BCS,
   RequestError,
-  HexString,
 } from 'aptos';
 import { toast } from 'core/components/Toast';
 import useWalletState from 'core/hooks/useWalletState';
@@ -19,6 +18,7 @@ import { useMutation, useQuery, useQueryClient } from 'react-query';
 import { AptosError, ScriptFunctionPayload, UserTransaction } from 'aptos/dist/api/data-contracts';
 import { useChainId } from 'core/queries/network';
 import { aptosCoinStructTag, coinNamespace } from 'core/constants';
+import { MoveExecutionStatus, parseMoveVmStatus } from 'core/utils/move';
 
 /* function parseTypeTag(typeTag: string): TxnBuilderTypes.TypeTag {
   if (typeTag.startsWith('vector')) {
@@ -118,49 +118,78 @@ function createCoinTransferTransaction({
   );
 }
 
+/**
+ * Get a raw coin transfer transaction factory for the current account
+ */
+function useCreateCoinTransferTransaction() {
+  const { aptosAccount } = useWalletState();
+  const { data: chainId } = useChainId();
+  const { get: getSequenceNumber } = useSequenceNumber();
+
+  const sender = aptosAccount?.address().hex();
+  const isReady = sender && chainId !== undefined;
+
+  return isReady
+    ? async ({
+      amount,
+      recipient,
+    }: SubmitCoinTransferParams) => createCoinTransferTransaction({
+      amount,
+      chainId,
+      recipient,
+      sender,
+      sequenceNumber: await getSequenceNumber(),
+    })
+    : undefined;
+}
+
 export interface UseCoinTransferParams {
   amount?: number,
   enabled?: boolean,
-  recipient?: MaybeHexString,
+  recipient?: string,
 }
 
 /**
- * Query for simulating a coin transfer
+ * Query a coin transfer simulation for the specified recipient and amount
  */
 export function useCoinTransferSimulation({
   amount,
   enabled,
-  recipient: maybeRecipient,
+  recipient,
 } : UseCoinTransferParams) {
   const { aptosAccount, nodeUrl } = useWalletState();
-  const { data: chainId } = useChainId();
-  const { data: sequenceNumber } = useSequenceNumber();
+  const { refetch: refetchSeqNumber } = useSequenceNumber();
+  const createTxn = useCreateCoinTransferTransaction();
 
-  const sender = aptosAccount!.address().hex();
-  const recipient = maybeRecipient && HexString.ensure(maybeRecipient).hex();
-  const isReady = chainId !== undefined && sequenceNumber !== undefined;
+  const isReady = Boolean(aptosAccount && createTxn);
   const isInputValid = Boolean(amount && recipient);
 
   return useQuery(
-    [queryKeys.getCoinTransferSimulation, sender, recipient, amount],
+    [queryKeys.getCoinTransferSimulation, recipient, amount],
     async () => {
-      const rawTxn = createCoinTransferTransaction({
+      const rawTxn = await createTxn!({
         amount: amount!,
-        chainId: chainId!,
         recipient: recipient!,
-        sender,
-        sequenceNumber: sequenceNumber!,
       });
 
       const aptosClient = new AptosClient(nodeUrl);
       const simulatedTxn = AptosClient.generateBCSSimulation(aptosAccount!, rawTxn);
-      return (await aptosClient.submitBCSSimulation(simulatedTxn)) as UserTransaction;
+      const userTxn = (await aptosClient.submitBCSSimulation(simulatedTxn)) as UserTransaction;
+      if (!userTxn.success) {
+        // Miscellaneous error is probably associated with invalid sequence number
+        if (parseMoveVmStatus(userTxn.vm_status) === MoveExecutionStatus.MiscellaneousError) {
+          await refetchSeqNumber();
+          throw new Error(userTxn.vm_status);
+        }
+      }
+      return userTxn;
     },
     {
       cacheTime: 0,
       enabled: isReady && enabled && isInputValid,
       keepPreviousData: true,
       refetchInterval: 5000,
+      retry: 1,
     },
   );
 }
@@ -175,24 +204,20 @@ export interface SubmitCoinTransferParams {
  */
 export function useCoinTransferTransaction() {
   const { aptosAccount, nodeUrl } = useWalletState();
-  const { data: chainId } = useChainId();
-  const { data: sequenceNumber } = useSequenceNumber();
+  const {
+    increment: incrementSeqNumber,
+    refetch: refetchSeqNumber,
+  } = useSequenceNumber();
+  const createTxn = useCreateCoinTransferTransaction();
   const queryClient = useQueryClient();
 
-  const sender = aptosAccount!.address().hex();
-  const isReady = chainId !== undefined && sequenceNumber !== undefined;
+  const isReady = Boolean(aptosAccount && createTxn);
 
   const submitCoinTransferTransaction = async ({
     amount,
     recipient,
   }: SubmitCoinTransferParams) => {
-    const rawTxn = createCoinTransferTransaction({
-      amount,
-      chainId: chainId!,
-      recipient,
-      sender,
-      sequenceNumber: sequenceNumber!,
-    });
+    const rawTxn = await createTxn!({ amount, recipient });
 
     const aptosClient = new AptosClient(nodeUrl);
     const signedTxn = AptosClient.generateBCSTransaction(aptosAccount!, rawTxn);
@@ -205,7 +230,7 @@ export function useCoinTransferTransaction() {
       if (err instanceof RequestError) {
         const errorMsg = (err.response?.data as AptosError)?.message;
         if (errorMsg && errorMsg.indexOf('SEQUENCE_NUMBER_TOO_OLD') >= 0) {
-          await queryClient.invalidateQueries(queryKeys.getSequenceNumber);
+          await refetchSeqNumber();
         }
       }
       throw err;
@@ -215,7 +240,7 @@ export function useCoinTransferTransaction() {
   const mutation = useMutation(submitCoinTransferTransaction, {
     onSuccess: async (txn: UserTransaction, { amount }: SubmitCoinTransferParams) => {
       // Optimistic update of sequence number
-      queryClient.setQueryData(queryKeys.getSequenceNumber, Number(txn.sequence_number) + 1);
+      incrementSeqNumber();
       queryClient.invalidateQueries(queryKeys.getAccountCoinBalance);
 
       const eventType = txn.success
@@ -243,7 +268,7 @@ export function useCoinTransferTransaction() {
         title: `Transaction ${txn.success ? 'success' : 'error'}`,
       });
     },
-    retry: 2,
+    retry: 1,
   });
 
   return { isReady, ...mutation };

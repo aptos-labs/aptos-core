@@ -5,8 +5,7 @@ import {
   AptosClient, MaybeHexString,
 } from 'aptos';
 import useWalletState from 'core/hooks/useWalletState';
-import { useCallback } from 'react';
-import { useQuery } from 'react-query';
+import { useQuery, useQueryClient } from 'react-query';
 import { aptosCoinStoreStructTag } from 'core/constants';
 
 export interface GetAccountResourcesProps {
@@ -86,18 +85,38 @@ export function useAccountCoinBalance({
 
 /**
  * Query sequence number for current account,
- * which is required to BCD-encode a transaction locally
+ * which is required to BCD-encode a transaction locally.
+ * The value is queried lazily the first time `get` is called, and is
+ * refetched only when an error occurs, by invalidating the cache or
+ * manually refetching.
  */
 export function useSequenceNumber() {
-  const walletState = useWalletState();
-  const nodeUrl = walletState.nodeUrl!;
-  const aptosAccount = walletState.aptosAccount!;
+  const { aptosAccount, nodeUrl } = useWalletState();
+  const accountAddress = aptosAccount?.address()?.hex();
+  const queryClient = useQueryClient();
 
-  const sequenceNumberQuery = useCallback(async () => {
+  const queryKey = [accountQueryKeys.getSequenceNumber, nodeUrl, accountAddress];
+
+  const { refetch } = useQuery(queryKey, async () => {
+    if (!accountAddress) {
+      return undefined;
+    }
     const aptosClient = new AptosClient(nodeUrl);
-    return aptosClient.getAccount(aptosAccount.address())
-      .then(({ sequence_number }) => Number(sequence_number));
-  }, [nodeUrl, aptosAccount]);
+    const account = await aptosClient.getAccount(accountAddress!);
+    return Number(account.sequence_number);
+  }, { enabled: false });
 
-  return useQuery([accountQueryKeys.getSequenceNumber], sequenceNumberQuery);
+  return {
+    get: async () => {
+      const value = queryClient.getQueryData<number>(queryKey);
+      return value !== undefined
+        ? value
+        : (await refetch({ throwOnError: true })).data!;
+    },
+    increment: () => queryClient.setQueryData<number | undefined>(
+      queryKey,
+      (prev?: number) => prev && prev + 1,
+    ),
+    refetch,
+  };
 }
