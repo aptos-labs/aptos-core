@@ -28,7 +28,7 @@ You can find the python project [here](https://github.com/aptos-labs/aptos-core/
   </TabItem>
   <TabItem value="rust" label="Rust" default>
 
-For this tutorial, will be focusing on `first_coin.rs` and re-using the `first_transaction.rs` library from the previous tutorial.
+For this tutorial, will be focusing on `first_coin/src` and re-using the `first_transaction/src` library from the previous tutorial.
 
 You can find the rust project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust).
 

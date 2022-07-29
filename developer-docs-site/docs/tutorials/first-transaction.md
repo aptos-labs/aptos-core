@@ -73,7 +73,7 @@ See the `first_transaction.py` code in the [Python version](https://github.com/a
   </TabItem>
   <TabItem value="rust" label="Rust" default>
 
-See the `first_transaction.rs` code in the [Rust project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust) of the tutorial.
+See the `first_transaction/src` code in the [Rust project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust) of the tutorial.
 
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
