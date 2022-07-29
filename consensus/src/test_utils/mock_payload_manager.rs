@@ -19,7 +19,7 @@ use rand::Rng;
 
 pub struct MockPayloadManager {
     // used non-mocked TxnManager to test interaction with shared mempool
-    quorum_store_client: Option<QuorumStoreClient>,
+    _quorum_store_client: Option<QuorumStoreClient>,
 }
 
 impl MockPayloadManager {
@@ -27,13 +27,13 @@ impl MockPayloadManager {
         let quorum_store_client =
             consensus_to_quorum_store_sender.map(|s| QuorumStoreClient::new(s, 1, 1));
         Self {
-            quorum_store_client,
+            _quorum_store_client: quorum_store_client,
         }
     }
 }
 
 // mock transaction status on the fly
-fn mock_transaction_status(count: usize) -> Vec<TransactionStatus> {
+fn _mock_transaction_status(count: usize) -> Vec<TransactionStatus> {
     let mut statuses = vec![];
     // generate count + 1 status to mock the block metadata txn in mempool proxy
     for _ in 0..=count {
