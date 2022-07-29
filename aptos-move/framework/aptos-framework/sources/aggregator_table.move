@@ -21,7 +21,7 @@ module aptos_framework::aggregator_table {
 
     /// Creates a new table for aggregators.
     public fun initialize_aggregator_table(account: &signer) {
-        // Currently `AggregatorTable` can live ony on aptos framework and
+        // Currently `AggregatorTable` can live only on aptos framework and
         // should be created with Genesis.
         timestamp::assert_genesis();
         system_addresses::assert_aptos_framework(account);

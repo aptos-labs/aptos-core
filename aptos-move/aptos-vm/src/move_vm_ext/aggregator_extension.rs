@@ -131,25 +131,21 @@ impl Aggregator {
                     Some(bytes) => {
                         let base = deserialize(&bytes);
 
+                        // The only remaining case is PositiveDelta. But assert just in case.
+                        assert!(self.state == AggregatorState::PositiveDelta);
+
                         // At this point, we fetched the "true" value of the
                         // aggregator from the previously executed transaction.
-                        match self.state {
-                            AggregatorState::PositiveDelta => {
-                                match addition(base, self.value, self.limit) {
-                                    Some(result) => {
-                                        self.value = result;
-                                        self.state = AggregatorState::Data;
-                                        Ok(())
-                                    }
-                                    None => Err(abort_error(
-                                        "aggregator's value overflowed when materializing the delta",
-                                        EAGGREGATOR_OVERFLOW,
-                                    )),
-                                }
+                        match addition(base, self.value, self.limit) {
+                            Some(result) => {
+                                self.value = result;
+                                self.state = AggregatorState::Data;
+                                Ok(())
                             }
-                            AggregatorState::Data => {
-                                unreachable!("aggregator's value is already materialized")
-                            }
+                            None => Err(abort_error(
+                                "aggregator's value overflowed when materializing the delta",
+                                EAGGREGATOR_OVERFLOW,
+                            )),
                         }
                     }
                     None => Err(extension_error("aggregator's value not found")),
@@ -353,6 +349,11 @@ pub fn aggregator_natives(aggregator_addr: AccountAddress) -> NativeFunctionTabl
     )
 }
 
+/// Move signature:
+/// fun new_aggregator(
+///   aggregator_table: &mut AggregatorTable,
+///   limit: u128
+/// ): Aggregator;
 fn native_new_aggregator(
     context: &mut NativeContext,
     _ty_args: Vec<Type>,
@@ -362,7 +363,7 @@ fn native_new_aggregator(
 
     // Extract fields: `limit` of the new aggregator and a `table_handle`
     // associated with the associated aggregator table.
-    let limit = pop_arg!(args, IntegerValue).value_as::<u128>()?;
+    let limit = pop_arg!(args, u128);
     let table_handle = get_table_handle(&pop_arg!(args, StructRef))?;
 
     // Get the current aggregator table.
@@ -374,8 +375,8 @@ fn native_new_aggregator(
     // strategy from `table` implementation: taking hash of transaction and
     // number of aggregator instances created so far and truncating them to
     // 128 bits.
-    let txn_hash_buffer = serialize(&aggregator_context.txn_hash);
-    let num_aggregators_buffer = serialize(&aggregator_table.num_aggregators());
+    let txn_hash_buffer = u128::to_be_bytes(aggregator_context.txn_hash);
+    let num_aggregators_buffer = u128::to_be_bytes(aggregator_table.num_aggregators());
 
     let mut sha3 = Sha3::v256();
     sha3.update(&txn_hash_buffer);
@@ -383,7 +384,7 @@ fn native_new_aggregator(
 
     let mut key_bytes = [0_u8; 16];
     sha3.finalize(&mut key_bytes);
-    let key = deserialize(&key_bytes.to_vec());
+    let key = u128::from_be_bytes(key_bytes);
 
     aggregator_table.create_new_aggregator(key, limit);
 
@@ -401,6 +402,8 @@ fn native_new_aggregator(
     ))
 }
 
+/// Move signature:
+/// fun add(aggregator: &mut Aggregator, value: u128);
 fn native_add(
     context: &mut NativeContext,
     _ty_args: Vec<Type>,
@@ -409,7 +412,7 @@ fn native_add(
     assert!(args.len() == 2);
 
     // Get aggregator fields and a value to subtract.
-    let value = pop_arg!(args, IntegerValue).value_as::<u128>()?;
+    let value = pop_arg!(args, u128);
     let aggregator_ref = pop_arg!(args, StructRef);
     let (table_handle, key, limit) = get_aggregator_fields(&aggregator_ref)?;
 
@@ -428,6 +431,8 @@ fn native_add(
     })
 }
 
+/// Move signature:
+/// fun read(aggregator: &Aggregator): u128;
 fn native_read(
     context: &mut NativeContext,
     _ty_args: Vec<Type>,
@@ -461,6 +466,8 @@ fn native_read(
         })
 }
 
+/// Move signature:
+/// fun sub(aggregator: &mut Aggregator, value: u128);
 fn native_sub(
     context: &mut NativeContext,
     _ty_args: Vec<Type>,
@@ -469,7 +476,7 @@ fn native_sub(
     assert!(args.len() == 2);
 
     // Get aggregator fields and a value to subtract.
-    let value = pop_arg!(args, IntegerValue).value_as::<u128>()?;
+    let value = pop_arg!(args, u128);
     let aggregator_ref = pop_arg!(args, StructRef);
     let (table_handle, key, limit) = get_aggregator_fields(&aggregator_ref)?;
 
@@ -494,6 +501,8 @@ fn native_sub(
         })
 }
 
+/// Move signature:
+/// fun remove_aggregator(table_handle: u128, key: u128);
 fn native_remove_aggregator(
     context: &mut NativeContext,
     _ty_args: Vec<Type>,
@@ -502,7 +511,7 @@ fn native_remove_aggregator(
     assert!(args.len() == 2);
 
     // Get table handle and aggregator key for removal.
-    let key = pop_arg!(args, IntegerValue).value_as::<u128>()?;
+    let key = pop_arg!(args, u128);
     let table_handle = pop_arg!(args, IntegerValue)
         .value_as::<u128>()
         .map(TableHandle)?;
@@ -579,6 +588,7 @@ fn extension_error(message: impl ToString) -> PartialVMError {
 
 // ================================= Tests =================================
 
+#[cfg(test)]
 mod test {
     use super::*;
     use claim::{assert_matches, assert_none};
