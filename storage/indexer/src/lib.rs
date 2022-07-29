@@ -169,7 +169,6 @@ impl<'a> TableInfoParser<'a> {
                 StateKey::Raw(_) => (),
             },
             WriteOp::Deletion => (),
-            WriteOp::Delta(_, _) => (),
         }
         Ok(())
     }

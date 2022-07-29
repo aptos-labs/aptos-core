@@ -274,8 +274,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     data: self.try_into_resource(&typ, &val)?,
                 }),
             },
-            // Deltas never use access paths.
-            WriteOp::Delta(..) => unreachable!("unexpected conversion"),
         };
         Ok(ret)
     }
@@ -312,8 +310,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     data,
                 })
             }
-            // Deltas are materialized into WriteOP::Value(..) in executor.
-            WriteOp::Delta(..) => unreachable!("unexpected conversion"),
         };
         Ok(ret)
     }

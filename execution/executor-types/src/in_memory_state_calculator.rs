@@ -259,7 +259,6 @@ fn process_state_key_write_op(
     let state_value = match write_op {
         WriteOp::Value(new_value) => StateValue::from(new_value),
         WriteOp::Deletion => StateValue::empty(),
-        WriteOp::Delta(..) => unreachable!("deltas are only used in executor"),
     };
     match state_cache.entry(state_key.clone()) {
         hash_map::Entry::Occupied(mut entry) => {

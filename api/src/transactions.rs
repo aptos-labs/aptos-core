@@ -349,6 +349,10 @@ impl Transactions {
             TransactionStatus::Keep(exec_status) => exec_status,
             _ => ExecutionStatus::MiscellaneousError(None),
         };
+
+        // TODO: Here we need to materialize deltas.
+        let (_, output) = output.into();
+
         let zero_hash = HashValue::zero();
         let info = TransactionInfo::new(
             zero_hash,
