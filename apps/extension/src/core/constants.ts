@@ -16,7 +16,7 @@ export const NODE_URL = DEVNET_NODE_URL;
 export const FAUCET_URL = DEVNET_FAUCET_URL;
 
 export const coinNamespace = '0x1::coin';
-export const aptosCoinStructTag = '0x1::test_coin::TestCoin';
+export const aptosCoinStructTag = '0x1::aptos_coin::AptosCoin';
 export const coinStoreStructTag = `${coinNamespace}::CoinStore`;
 export const aptosCoinStoreStructTag = `${coinStoreStructTag}<${aptosCoinStructTag}>`;
 
