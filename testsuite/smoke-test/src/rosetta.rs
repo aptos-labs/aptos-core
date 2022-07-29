@@ -201,7 +201,6 @@ async fn get_balance(
     try_until_ok_default(|| rosetta_client.account_balance(&request)).await
 }
 
-#[ignore]
 #[tokio::test]
 async fn test_block() {
     let (swarm, _cli, _faucet, rosetta_client) = setup_test(1, 0).await;
