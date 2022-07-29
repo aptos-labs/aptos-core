@@ -171,15 +171,12 @@ impl AggregatorTable {
     /// initialize this aggregator, then the actual value is not known, and the
     /// aggregator state must be a delta, zero-intialized.
     fn get_or_create_aggregator(&mut self, key: u128, limit: u128) -> &mut Aggregator {
-        if !self.table.contains_key(&key) {
-            let aggregator = Aggregator {
-                key,
-                state: AggregatorState::PositiveDelta,
-                value: 0,
-                limit,
-            };
-            self.table.insert(key, aggregator);
-        }
+        self.table.entry(key).or_insert_with(|| Aggregator {
+            key,
+            state: AggregatorState::PositiveDelta,
+            value: 0,
+            limit,
+        });
         self.table.get_mut(&key).unwrap()
     }
 
@@ -424,10 +421,10 @@ fn native_add(
         .get_or_create_aggregator_table(table_handle)
         .get_or_create_aggregator(key, limit);
 
-    aggregator.add(value).and_then(|_| {
+    aggregator.add(value).map(|_| {
         // TODO: charge gas properly.
         let cost = GasCost::new(0, 0).total();
-        Ok(NativeResult::ok(cost, smallvec![]))
+        NativeResult::ok(cost, smallvec![])
     })
 }
 
@@ -454,15 +451,12 @@ fn native_read(
     // First, materialize the value.
     aggregator
         .materialize(aggregator_context, &table_handle)
-        .and_then(|_| {
+        .map(|_| {
             // TODO: charge gas properly.
             let cost = GasCost::new(0, 0).total();
 
             // Value has been materialized, return it.
-            Ok(NativeResult::ok(
-                cost,
-                smallvec![Value::u128(aggregator.value)],
-            ))
+            NativeResult::ok(cost, smallvec![Value::u128(aggregator.value)])
         })
 }
 
@@ -493,10 +487,10 @@ fn native_sub(
     aggregator
         .materialize(aggregator_context, &table_handle)
         .and_then(|_| {
-            aggregator.sub(value).and_then(|_| {
+            aggregator.sub(value).map(|_| {
                 // TODO: charge gas properly.
                 let cost = GasCost::new(0, 0).total();
-                Ok(NativeResult::ok(cost, smallvec![]))
+                NativeResult::ok(cost, smallvec![])
             })
         })
 }
