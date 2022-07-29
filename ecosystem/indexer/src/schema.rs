@@ -1,6 +1,3 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
 table! {
     block_metadata_transactions (hash) {
         hash -> Varchar,
@@ -38,6 +35,12 @@ table! {
         type_ -> Text,
         data -> Jsonb,
         inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    ledger_infos (chain_id) {
+        chain_id -> Int8,
     }
 }
 
@@ -158,6 +161,7 @@ allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
     collections,
     events,
+    ledger_infos,
     metadatas,
     ownerships,
     processor_statuses,
