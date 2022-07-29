@@ -39,7 +39,7 @@ impl Default for ConsensusConfig {
             round_initial_timeout_ms: 1000,
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
-            channel_size: 30, // hard-coded
+            channel_size: 1000, // hard-coded
             use_quorum_store: false,
             quorum_store_pull_timeout_ms: 1000,
             quorum_store_poll_count: 20,

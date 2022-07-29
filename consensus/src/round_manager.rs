@@ -777,6 +777,7 @@ impl RoundManager {
                     self.process_local_timeout(round).await
                 ),
                 VerifiedEvent::Shutdown(ack_sender) => {
+                    info!("Shutdown round manager received");
                     ack_sender
                         .send(())
                         .expect("[RoundManager] Fail to ack shutdown");

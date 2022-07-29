@@ -349,6 +349,7 @@ impl EpochManager {
 
         // shutdown existing processor first to avoid race condition with state sync.
         self.shutdown_current_processor().await;
+        info!("shutdown_current_processor finished");
         // make sure storage is on this ledger_info too, it should be no-op if it's already committed
         // panic if this doesn't succeed since the current processors are already shutdown.
         self.commit_state_computer
@@ -359,6 +360,7 @@ impl EpochManager {
                 ledger_info
             ))
             .expect("Failed to sync to new epoch");
+        info!("sycned to new epoch through commit_state_computer");
 
         monitor!("reconfig", self.await_reconfig_notification().await);
         Ok(())
@@ -424,6 +426,7 @@ impl EpochManager {
     }
 
     async fn shutdown_current_processor(&mut self) {
+        info!("Dropping round manager");
         if self.round_manager_tx.is_some() {
             // Release the previous RoundManager, especially the SafetyRule client
             let (ack_tx, ack_rx) = oneshot::channel();
@@ -434,7 +437,9 @@ impl EpochManager {
                 .expect("[EpochManager] Fail to drop round manager");
         }
         self.round_manager_tx = None;
+        info!("Dropped round manager");
 
+        info!("Dropping buffer manager");
         // Shutdown the previous buffer manager, to release the SafetyRule client
         self.buffer_manager_msg_tx = None;
         if let Some(mut tx) = self.buffer_manager_reset_tx.take() {
@@ -449,6 +454,7 @@ impl EpochManager {
                 .await
                 .expect("[EpochManager] Fail to drop buffer manager");
         }
+        info!("Dropped buffer manager");
     }
 
     async fn start_round_manager(
