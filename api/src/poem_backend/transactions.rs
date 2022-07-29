@@ -21,7 +21,7 @@ use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     Address, AsConverter, EncodeSubmissionRequest, HashValue, HexEncodedBytes, LedgerInfo,
     PendingTransaction, SubmitTransactionRequest, Transaction, TransactionData,
-    TransactionOnChainData, U64,
+    TransactionOnChainData, UserTransaction, U64,
 };
 use aptos_crypto::signing_message;
 use aptos_types::mempool_status::MempoolStatusCode;
@@ -187,7 +187,7 @@ impl TransactionsApi {
         &self,
         accept_type: &AcceptType,
         data: SubmitTransactionPost,
-    ) -> SimulateTransactionResult<Vec<Transaction>> {
+    ) -> SimulateTransactionResult<Vec<UserTransaction>> {
         fail_point_poem("endpoint_simulate_transaction")?;
         let signed_transaction = self.get_signed_transaction(data)?;
         self.simulate(accept_type, signed_transaction).await
@@ -250,23 +250,20 @@ impl TransactionsApi {
             .map_err(BasicErrorWith404::internal)
             .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
 
-        self.render_transactions(data, accept_type, &latest_ledger_info)
+        BasicResponse::try_from_rust_value((
+            self.render_transactions(data)?,
+            &latest_ledger_info,
+            BasicResponseStatus::Ok,
+            accept_type,
+        ))
     }
 
     fn render_transactions<E: InternalError>(
         &self,
         data: Vec<TransactionOnChainData>,
-        accept_type: &AcceptType,
-        latest_ledger_info: &LedgerInfo,
-    ) -> Result<BasicResponse<Vec<Transaction>>, E> {
+    ) -> Result<Vec<Transaction>, E> {
         if data.is_empty() {
-            let data: Vec<Transaction> = vec![];
-            return BasicResponse::try_from_rust_value((
-                data,
-                latest_ledger_info,
-                BasicResponseStatus::Ok,
-                accept_type,
-            ));
+            return Ok(vec![]);
         }
 
         let resolver = self.context.move_resolver_poem()?;
@@ -283,12 +280,7 @@ impl TransactionsApi {
             .context("Failed to convert transaction data from storage")
             .map_err(E::internal)?;
 
-        BasicResponse::try_from_rust_value((
-            txns,
-            latest_ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+        Ok(txns)
     }
 
     async fn get_transaction_by_hash_inner(
@@ -420,7 +412,12 @@ impl TransactionsApi {
             .context("Failed to get account transactions for the given account")
             .map_err(BasicErrorWith404::internal)?;
 
-        self.render_transactions(data, accept_type, &latest_ledger_info)
+        BasicResponse::try_from_rust_value((
+            self.render_transactions(data)?,
+            &latest_ledger_info,
+            BasicResponseStatus::Ok,
+            accept_type,
+        ))
     }
 
     fn get_signed_transaction(
@@ -489,8 +486,6 @@ impl TransactionsApi {
 
     // TODO: This returns a Vec<Transaction>, but is it possible for a single
     // transaction request to result in multiple executed transactions?
-    // TODO: Look at just returning (a) UserTransaction, since that's all users
-    // are allowed to submit in the first place.
     // TODO: This function leverages a lot of types from aptos_types, use the
     // local API types and just return those directly, instead of converting
     // from these types in render_transactions.
@@ -498,7 +493,7 @@ impl TransactionsApi {
         &self,
         accept_type: &AcceptType,
         txn: SignedTransaction,
-    ) -> SimulateTransactionResult<Vec<Transaction>> {
+    ) -> SimulateTransactionResult<Vec<UserTransaction>> {
         if txn.clone().check_signature().is_ok() {
             return Err(SubmitTransactionError::bad_request_str(
                 "Transaction simulation request has a valid signature, this is not allowed",
@@ -530,7 +525,25 @@ impl TransactionsApi {
             changes: output.write_set().clone(),
         };
 
-        self.render_transactions(vec![simulated_txn], accept_type, &ledger_info)
+        let transactions = self.render_transactions(vec![simulated_txn])?;
+
+        // Users can only make requests to simulate UserTransactions, so unpack
+        // the Vec<Transaction> into Vec<UserTransaction>.
+        let mut user_transactions = Vec::new();
+        for transaction in transactions.into_iter() {
+            match transaction {
+                Transaction::UserTransaction(user_txn) => user_transactions.push(*user_txn),
+                _ => return Err(SubmitTransactionError::internal_str(
+                    "Simulation unexpectedly resulted in something other than a UserTransaction",
+                )),
+            }
+        }
+        BasicResponse::try_from_rust_value((
+            user_transactions,
+            &ledger_info,
+            BasicResponseStatus::Ok,
+            accept_type,
+        ))
     }
 
     pub fn get_signing_message(
