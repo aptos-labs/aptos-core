@@ -18,7 +18,7 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "2",
+            "height": "1",
             "new_block_events": {
               "counter": "2",
               "guid": {
