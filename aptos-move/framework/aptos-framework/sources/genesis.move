@@ -32,8 +32,7 @@ module aptos_framework::genesis {
         epoch_interval: u64,
         minimum_stake: u64,
         maximum_stake: u64,
-        min_lockup_duration_secs: u64,
-        max_lockup_duration_secs: u64,
+        recurring_lockup_duration_secs: u64,
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
@@ -73,8 +72,7 @@ module aptos_framework::genesis {
             &aptos_framework_account,
             minimum_stake,
             maximum_stake,
-            min_lockup_duration_secs,
-            max_lockup_duration_secs,
+            recurring_lockup_duration_secs,
             allow_validator_set_change,
             rewards_rate,
             rewards_rate_denominator,
@@ -124,7 +122,6 @@ module aptos_framework::genesis {
         validator_network_addresses: vector<vector<u8>>,
         full_node_network_addresses: vector<vector<u8>>,
         staking_distribution: vector<u64>,
-        initial_lockup_timestamp: u64,
     ) {
         let num_owners = vector::length(&owners);
         let num_validator_network_addresses = vector::length(&validator_network_addresses);
@@ -151,7 +148,7 @@ module aptos_framework::genesis {
                 cur_validator_network_addresses,
                 cur_full_node_network_addresses,
             );
-            stake::increase_lockup(&owner_account, initial_lockup_timestamp);
+            stake::increase_lockup(&owner_account);
             let amount = *vector::borrow(&staking_distribution, i);
             // Transfer coins from the root account to the validator, so they can stake and have non-zero voting power
             // and can complete consensus on the genesis block.
@@ -179,7 +176,6 @@ module aptos_framework::genesis {
             1,
             0,
             1,
-            0,
             1,
             true,
             1,

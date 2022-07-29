@@ -138,10 +138,8 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         layout.allow_new_validators,
         layout.min_stake,
         layout.max_stake,
-        layout.min_lockup_duration_secs,
-        layout.max_lockup_duration_secs,
+        layout.recurring_lockup_duration_secs,
         layout.epoch_duration_secs,
-        layout.initial_lockup_timestamp,
     )?)
 }
 
