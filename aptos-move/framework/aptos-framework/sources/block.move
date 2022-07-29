@@ -90,7 +90,7 @@ module aptos_framework::block {
         );
 
         let block_metadata_ref = borrow_global_mut<BlockMetadata>(@aptos_framework);
-        block_metadata_ref.height = block_metadata_ref.height + 1;
+        block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
 
         let new_block_event = NewBlockEvent {
             epoch,
@@ -122,6 +122,7 @@ module aptos_framework::block {
     /// Emit the event and update height and global timestamp
     fun emit_new_block_event(vm: &signer, event_handle: &mut EventHandle<NewBlockEvent>, new_block_event: NewBlockEvent) {
         timestamp::update_global_time(vm, new_block_event.proposer, new_block_event.time_microseconds);
+        assert!(event::counter(event_handle) == new_block_event.height, error::invalid_argument(EBLOCK_METADATA));
         event::emit_event<NewBlockEvent>(event_handle, new_block_event);
     }
 
