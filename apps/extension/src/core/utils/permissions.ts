@@ -111,7 +111,7 @@ export default class Permissions {
     return domains.has(domain);
   }
 
-  static async getDomains(): Promise<Set<string>> {
+  public static async getDomains(): Promise<Set<string>> {
     const result = await Browser.storage()?.get([PERMISSIONS_STORAGE_KEY]);
     if (result && result[PERMISSIONS_STORAGE_KEY]) {
       return new Set(result[PERMISSIONS_STORAGE_KEY]);

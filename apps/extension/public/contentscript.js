@@ -25,3 +25,8 @@ window.addEventListener('message', function (event) {
     })
   }
 })
+
+// Send extension messages to window for event listening
+chrome.runtime.onMessage.addListener((message) => {
+  window.postMessage(message)
+})

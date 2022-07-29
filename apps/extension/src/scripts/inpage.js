@@ -6,8 +6,23 @@ import { MessageMethod } from '../core/types/dappTypes';
 class Web3 {
   requestId;
 
+  eventListenerMap;
+
   constructor() {
     this.requestId = 0;
+    this.eventListenerMap = {};
+
+    // init the event listener helper
+    window.addEventListener('message', (request) => {
+      const { data } = request;
+      if (data && this.eventListenerMap[data.event]) {
+        this.eventListenerMap[data.event](data.params);
+      }
+    });
+  }
+
+  on(event, callback) {
+    this.eventListenerMap[event] = callback;
   }
 
   connect() {

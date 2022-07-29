@@ -22,6 +22,7 @@ import {
   removeAccountToast,
   removeAccountErrorToast,
 } from 'core/components/Toast';
+import { ProviderEvent, sendProviderEvent } from 'core/utils/providerEvents';
 
 const defaultValue: LocalStorageState = {
   accounts: null,
@@ -92,6 +93,7 @@ export default function useWalletState() {
       );
       Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateString });
       addAccountToast();
+      sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED, account);
     } catch (err) {
       addAccountErrorToast();
       console.error(err);
@@ -107,6 +109,9 @@ export default function useWalletState() {
       console.error('No account found');
       return;
     }
+    const account = AptosAccount.fromAptosAccountObject(
+      localStorageState.accounts![accountAddress].aptosAccount,
+    );
     const localStorageStateCopy = {
       ...localStorageState,
       currAccountAddress: accountAddress,
@@ -120,6 +125,7 @@ export default function useWalletState() {
       );
       Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateString });
       switchAccountToast(accountAddress);
+      sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED, account);
     } catch (error) {
       switchAccountErrorToast();
       console.error(error);

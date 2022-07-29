@@ -6,6 +6,16 @@ function App() {
   const [isConnected, setIsConnected] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
+    window.aptos.on('accountChanged', (account: any) => {
+      if (account.address) {
+        setIsConnected(true);
+        setAddress(account.address);
+      } else {
+        setAddress(undefined);
+        setIsConnected(true);
+      }
+    });
+
     const fetchStatus = async () => {
       const flag = await window.aptos.isConnected();
       if (flag) {
