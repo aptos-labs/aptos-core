@@ -63,10 +63,6 @@ pub async fn setup_test(
         .await
         .unwrap();
 
-    // Create accounts
-    for i in 0..num_accounts {
-        cli.create_account_with_faucet(i).await.unwrap();
-    }
     (swarm, cli, faucet, rosetta_client)
 }
 
@@ -115,9 +111,8 @@ async fn test_network() {
 async fn test_account_balance() {
     let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 2).await;
 
-    cli.create_account_with_faucet(0).await.unwrap();
-    let account_1 = CliTestFramework::account_id(0);
-    let account_2 = CliTestFramework::account_id(1);
+    let account_1 = cli.account_id(0);
+    let account_2 = cli.account_id(1);
     let chain_id = swarm.chain_id();
 
     // At time 0, there should be 0 balance
@@ -134,13 +129,15 @@ async fn test_account_balance() {
 
     // At some time both accounts should exist with initial amounts
     try_until_ok(Duration::from_secs(5), DEFAULT_INTERVAL_DURATION, || {
-        account_created(&rosetta_client, chain_id, account_1)
+        account_has_balance(&rosetta_client, chain_id, account_1, DEFAULT_FUNDED_COINS)
     })
     .await
     .unwrap();
-    try_until_ok_default(|| account_created(&rosetta_client, chain_id, account_2))
-        .await
-        .unwrap();
+    try_until_ok_default(|| {
+        account_has_balance(&rosetta_client, chain_id, account_2, DEFAULT_FUNDED_COINS)
+    })
+    .await
+    .unwrap();
 
     // Send money, and expect the gas and fees to show up accordingly
     const TRANSFER_AMOUNT: u64 = 5000;
@@ -164,16 +161,7 @@ async fn test_account_balance() {
     .await
     .unwrap();
 
-    // TODO: Receive money by faucet
     // TODO: Make a bad transaction, which will cause gas to be spent but no transfer
-}
-
-async fn account_created(
-    rosetta_client: &RosettaClient,
-    chain_id: ChainId,
-    account: AccountAddress,
-) -> anyhow::Result<u64> {
-    account_has_balance(rosetta_client, chain_id, account, DEFAULT_FUNDED_COINS).await
 }
 
 async fn account_has_balance(
