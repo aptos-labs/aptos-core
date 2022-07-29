@@ -37,16 +37,13 @@ pub fn bootstrap(
 
     let node_config = config.clone();
 
-    // TODO: put this into an arg param
-    let starting_version: Option<u64> = None;
-
     runtime.spawn(async move {
         if node_config.sf_stream.enabled {
             let context = Context::new(chain_id, db, mp_sender.clone(), node_config.clone());
             let context_arc = Arc::new(context);
             let mut streamer = SfStreamer::new(
                 context_arc,
-                starting_version.unwrap_or_default(),
+                node_config.sf_stream.starting_version,
                 Some(mp_sender),
             );
             streamer.start().await;

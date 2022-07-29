@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub struct SfStreamerConfig {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
+    pub starting_version: u64,
 }
 
 fn default_enabled() -> bool {
@@ -18,6 +19,7 @@ impl Default for SfStreamerConfig {
     fn default() -> SfStreamerConfig {
         SfStreamerConfig {
             enabled: default_enabled(),
+            starting_version: 0,
         }
     }
 }
