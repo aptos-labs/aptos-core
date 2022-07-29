@@ -163,7 +163,7 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "14",
+            "height": "13",
             "new_block_events": {
               "counter": "14",
               "guid": {
@@ -394,7 +394,7 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "15",
+            "height": "14",
             "new_block_events": {
               "counter": "15",
               "guid": {
@@ -625,7 +625,7 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "16",
+            "height": "15",
             "new_block_events": {
               "counter": "16",
               "guid": {
@@ -856,7 +856,7 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "17",
+            "height": "16",
             "new_block_events": {
               "counter": "17",
               "guid": {
@@ -1087,7 +1087,7 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "18",
+            "height": "17",
             "new_block_events": {
               "counter": "18",
               "guid": {
@@ -1318,7 +1318,7 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "19",
+            "height": "18",
             "new_block_events": {
               "counter": "19",
               "guid": {
@@ -1549,7 +1549,7 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "20",
+            "height": "19",
             "new_block_events": {
               "counter": "20",
               "guid": {
@@ -1780,7 +1780,7 @@
           "type": "0x1::block::BlockMetadata",
           "data": {
             "epoch_internal": "86400000000",
-            "height": "21",
+            "height": "20",
             "new_block_events": {
               "counter": "21",
               "guid": {
