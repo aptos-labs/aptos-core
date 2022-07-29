@@ -36,7 +36,7 @@ validator:
     sync_only: false
     concurrency_level: 8
     enable_state_sync_v2: true
-    round_initial_timeout_ms:
+    round_initial_timeout_ms: 1000
     quorum_store_poll_count: 1
     ledger_prune_window: 10000000
     state_store_prune_window: 1000000
