@@ -3,7 +3,6 @@
 
 use crate::{Address, Bytecode, IdentifierWrapper};
 use anyhow::{bail, format_err};
-use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
 use move_deps::{
     move_binary_format::{
@@ -23,7 +22,7 @@ use move_deps::{
     move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue},
 };
 
-use poem_openapi::{Enum, NewType, Object};
+use poem_openapi::{Enum, Object, Union};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
@@ -52,7 +51,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
     }
 }
 
-#[derive(Clone, Debug, Default, Eq, PartialEq, Copy, NewType)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Copy)]
 pub struct U64(pub u64);
 
 impl U64 {
@@ -64,18 +63,6 @@ impl U64 {
 impl From<u64> for U64 {
     fn from(d: u64) -> Self {
         Self(d)
-    }
-}
-
-impl FromStr for U64 {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let data = s
-            .parse::<u64>()
-            .map_err(|e| format_err!("parse u64 string {:?} failed, caused by error: {}", s, e))?;
-
-        Ok(U64(data))
     }
 }
 
@@ -119,8 +106,20 @@ impl<'de> Deserialize<'de> for U64 {
     }
 }
 
+impl FromStr for U64 {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let data = s.parse::<u64>().map_err(|e| {
+            format_err!("Parsing u64 string {:?} failed, caused by error: {}", s, e)
+        })?;
+
+        Ok(U64(data))
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Copy)]
-pub struct U128(u128);
+pub struct U128(pub u128);
 
 impl U128 {
     pub fn inner(&self) -> &u128 {
@@ -159,6 +158,18 @@ impl<'de> Deserialize<'de> for U128 {
     {
         let s = <String>::deserialize(deserializer)?;
         let data = s.parse::<u128>().map_err(D::Error::custom)?;
+
+        Ok(U128(data))
+    }
+}
+
+impl FromStr for U128 {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let data = s.parse::<u128>().map_err(|e| {
+            format_err!("Parsing u128 string {:?} failed, caused by error: {}", s, e)
+        })?;
 
         Ok(U128(data))
     }
@@ -264,7 +275,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Union)]
 pub enum MoveValue {
     U8(u8),
     U64(U64),
@@ -455,6 +466,7 @@ pub enum MoveType {
     Struct(MoveStructTag),
     GenericTypeParam { index: u16 },
     Reference { mutable: bool, to: Box<MoveType> },
+    Unparsable(String),
 }
 
 impl MoveType {
@@ -477,6 +489,7 @@ impl MoveType {
                 "string<move_struct_tag_id>".to_owned()
             }
             MoveType::Reference { mutable: _, to } => to.json_type_name(),
+            MoveType::Unparsable(string) => string.to_string(),
         }
     }
 }
@@ -500,19 +513,46 @@ impl fmt::Display for MoveType {
                     write!(f, "&{}", to)
                 }
             }
+            MoveType::Unparsable(string) => write!(f, "unparsable<{}>", string),
         }
     }
 }
 
-// Implementation is imperfect, only parses type tags,
-// can't parse generic type params and references.
+// This function cannot handle the full range of types that MoveType can
+// represent. Internally, it uses parse_type_tag, which cannot handle references
+// or generic type parameters. This function adds nominal support for references
+// on top of parse_type_tag, but it still does not work for generic type params.
+// For that, we have the Unparsable variant of MoveType, so the deserialization
+// doesn't fail when dealing with these values.
 impl FromStr for MoveType {
     type Err = anyhow::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(parse_type_tag(s)
-            .map_err(|e| format_err!("parse Move type {:?} failed, caused by error: {}", s, e))?
-            .into())
+    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
+        let mut is_ref = false;
+        let mut is_mut = false;
+        if s.starts_with('&') {
+            s = &s[1..];
+            is_ref = true;
+        }
+        if is_ref && s.starts_with("mut ") {
+            s = &s[4..];
+            is_mut = true;
+        }
+        // Previously this would just crap out, but this meant the API could
+        // return a serialized version of an object and not be able to
+        // deserialize it using that same object.
+        let inner = match parse_type_tag(s) {
+            Ok(inner) => inner.into(),
+            Err(_e) => MoveType::Unparsable(s.to_string()),
+        };
+        if is_ref {
+            Ok(MoveType::Reference {
+                mutable: is_mut,
+                to: Box::new(inner),
+            })
+        } else {
+            Ok(inner)
+        }
     }
 }
 
@@ -522,8 +562,7 @@ impl Serialize for MoveType {
     }
 }
 
-// Implementation is imperfect, only parses type tags,
-// can't parse generic type params and references.
+// This deserialization has limitations, see the FromStr impl for MoveType.
 impl<'de> Deserialize<'de> for MoveType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -818,6 +857,7 @@ impl From<&CompiledScript> for MoveFunction {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Enum)]
 #[serde(rename_all = "snake_case")]
+#[oai(rename_all = "snake_case")]
 pub enum MoveFunctionVisibility {
     Private,
     Public,
@@ -972,10 +1012,7 @@ impl fmt::Display for ScriptFunctionId {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        move_types::ScriptFunctionId, HexEncodedBytes, MoveModuleId, MoveResource, MoveType, U128,
-        U64,
-    };
+    use super::*;
 
     use aptos_types::account_address::AccountAddress;
     use move_deps::{
@@ -1309,12 +1346,3 @@ mod tests {
         serde_json::to_string_pretty(val).unwrap()
     }
 }
-
-// This macro derives all the necessary traits to make it possible to use the
-// given types in a Poem API. This macro in many ways is a short cut compared
-// to deriving the traits properly (e.g. #[derive(Type)] on a struct), use it
-// with great caution, since it essentially rewrites the type to be a string
-// from the perspective of the OpenAPI spec, potentially losing some useful
-// type information that the client could use.
-impl_poem_type!(MoveAbility, MoveStructValue, MoveType, HexEncodedBytes);
-impl_poem_parameter!(HexEncodedBytes);

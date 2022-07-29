@@ -1,0 +1,61 @@
+{
+  "version": "2",
+  "hash": "",
+  "state_root_hash": "",
+  "event_root_hash": "",
+  "gas_used": "1",
+  "success": false,
+  "vm_status": "Transaction Executed and Committed with Error MALFORMED",
+  "accumulator_root_hash": "",
+  "changes": [
+    {
+      "address": "0xa550c18",
+      "state_key_hash": "",
+      "data": {
+        "type": {
+          "address": "0x1",
+          "module": "account",
+          "name": "Account",
+          "generic_type_params": []
+        },
+        "data": {
+          "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
+          "coin_register_events": {
+            "counter": "0",
+            "guid": {
+              "id": {
+                "addr": "0xa550c18",
+                "creation_num": "0"
+              }
+            }
+          },
+          "self_address": "0xa550c18",
+          "sequence_number": "1"
+        }
+      },
+      "type": "write_resource"
+    }
+  ],
+  "sender": "0xa550c18",
+  "sequence_number": "0",
+  "max_gas_amount": "2000",
+  "gas_unit_price": "0",
+  "expiration_timestamp_secs": "18446744073709551615",
+  "payload": {
+    "modules": [
+      {
+        "bytecode": "0xa11ceb0b030000",
+        "abi": null
+      }
+    ],
+    "type": "module_bundle_payload"
+  },
+  "signature": {
+    "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
+    "signature": "0xd81d745f9595ef481907796ee853a15bb6c0fb4f8c18fcf25fc3461739c00f40cf6da86eb78727ca03390a04360733ae9f31475f45858809e933164444e96d00",
+    "type": "ed_25519_signature"
+  },
+  "events": [],
+  "timestamp": "1",
+  "type": "user_transaction"
+}

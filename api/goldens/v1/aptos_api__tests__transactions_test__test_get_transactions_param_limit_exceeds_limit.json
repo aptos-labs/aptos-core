@@ -1,0 +1,5 @@
+{
+  "message": "Given limit value (2000) is too large, it must be < 1000",
+  "error_code": "InvalidLimitParam",
+  "aptos_ledger_version": null
+}

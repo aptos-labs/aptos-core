@@ -3,7 +3,7 @@
 
 use crate::param::{Param, TransactionVersionParam};
 
-use aptos_api_types::{Error, TransactionId};
+use aptos_api_types::{Error, TransactionId, U64};
 
 use anyhow::Result;
 use serde::Deserialize;
@@ -28,7 +28,7 @@ impl Page {
         if version > max {
             return Err(Error::not_found(
                 "transaction",
-                TransactionId::Version(version),
+                TransactionId::Version(U64::from(version)),
                 max,
             ));
         }

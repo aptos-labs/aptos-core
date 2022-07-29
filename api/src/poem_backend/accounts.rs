@@ -1,20 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::Context as AnyhowContext;
-use std::convert::TryInto;
-use std::fmt::Display;
-use std::sync::Arc;
-
 use super::accept_type::{parse_accept, AcceptType};
 use super::{
-    ApiTags, AptosErrorResponse, BadRequestError, BasicResponse, BasicResponseStatus,
-    InternalError, NotFoundError,
+    build_not_found, ApiTags, AptosErrorResponse, BadRequestError, BasicResponse,
+    BasicResponseStatus, InternalError,
 };
 use super::{AptosErrorCode, BasicErrorWith404, BasicResultWith404};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
-use aptos_api_types::{AccountData, Address, AsConverter, MoveStructTag, TransactionId};
+use anyhow::Context as AnyhowContext;
+use aptos_api_types::{AccountData, Address, AsConverter, MoveStructTag, TransactionId, U64};
 use aptos_api_types::{LedgerInfo, MoveModuleBytecode, MoveResource};
 use aptos_types::access_path::AccessPath;
 use aptos_types::account_config::AccountResource;
@@ -31,6 +27,8 @@ use move_deps::move_core_types::{
 use poem::web::Accept;
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
+use std::convert::TryInto;
+use std::sync::Arc;
 
 pub struct AccountsApi {
     pub context: Arc<Context>,
@@ -45,13 +43,13 @@ impl AccountsApi {
         path = "/accounts/:address",
         method = "get",
         operation_id = "get_account",
-        tag = "ApiTags::General"
+        tag = "ApiTags::Accounts"
     )]
     async fn get_account(
         &self,
         accept: Accept,
         address: Path<Address>,
-        ledger_version: Query<Option<u64>>,
+        ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<AccountData> {
         fail_point_poem("endpoint_get_account")?;
         let accept_type = parse_accept(&accept)?;
@@ -61,21 +59,23 @@ impl AccountsApi {
 
     /// Get account resources
     ///
-    /// This API returns account resources for a specific ledger version (AKA transaction version).
-    /// If not present, the latest version is used. <---- TODO Update this comment
+    /// This endpoint returns all account resources at a given address at a
+    /// specific ledger version (AKA transaction version). If the ledger
+    /// version is not specified in the request, the latest ledger version is used.
+    ///
     /// The Aptos nodes prune account state history, via a configurable time window (link).
-    /// If the requested data has been pruned, the server responds with a 404
+    /// If the requested data has been pruned, the server responds with a 404.
     #[oai(
         path = "/accounts/:address/resources",
         method = "get",
         operation_id = "get_account_resources",
-        tag = "ApiTags::General"
+        tag = "ApiTags::Accounts"
     )]
     async fn get_account_resources(
         &self,
         accept: Accept,
         address: Path<Address>,
-        ledger_version: Query<Option<u64>>,
+        ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<Vec<MoveResource>> {
         fail_point_poem("endpoint_get_account_resources")?;
         let accept_type = parse_accept(&accept)?;
@@ -85,7 +85,7 @@ impl AccountsApi {
 
     /// Get account modules
     ///
-    /// This API returns account resources for a specific ledger version (AKA transaction version).
+    /// This endpoint returns account resources for a specific ledger version (AKA transaction version).
     /// If not present, the latest version is used. <---- TODO Update this comment
     /// The Aptos nodes prune account state history, via a configurable time window (link).
     /// If the requested data has been pruned, the server responds with a 404
@@ -93,13 +93,13 @@ impl AccountsApi {
         path = "/accounts/:address/modules",
         method = "get",
         operation_id = "get_account_modules",
-        tag = "ApiTags::General"
+        tag = "ApiTags::Accounts"
     )]
     async fn get_account_modules(
         &self,
         accept: Accept,
         address: Path<Address>,
-        ledger_version: Query<Option<u64>>,
+        ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
         fail_point_poem("endpoint_get_account_modules")?;
         let accept_type = parse_accept(&accept)?;
@@ -119,16 +119,17 @@ impl Account {
     pub fn new(
         context: Arc<Context>,
         address: Address,
-        requested_ledger_version: Option<u64>,
+        requested_ledger_version: Option<U64>,
     ) -> Result<Self, BasicErrorWith404> {
         let latest_ledger_info = context.get_latest_ledger_info_poem()?;
-        let ledger_version: u64 =
-            requested_ledger_version.unwrap_or_else(|| latest_ledger_info.version());
+        let ledger_version: u64 = requested_ledger_version
+            .map(|v| v.0)
+            .unwrap_or_else(|| latest_ledger_info.version());
 
         if ledger_version > latest_ledger_info.version() {
-            return Err(Self::not_found(
+            return Err(build_not_found(
                 "ledger",
-                TransactionId::Version(ledger_version),
+                TransactionId::Version(U64::from(ledger_version)),
                 latest_ledger_info.version(),
             ));
         }
@@ -224,17 +225,8 @@ impl Account {
 
     // Helpers for building errors.
 
-    pub fn not_found<S: Display>(
-        resource: &str,
-        identifier: S,
-        ledger_version: u64,
-    ) -> BasicErrorWith404 {
-        BasicErrorWith404::not_found_str(&format!("{} not found by {}", resource, identifier))
-            .aptos_ledger_version(ledger_version)
-    }
-
     fn account_not_found(&self) -> BasicErrorWith404 {
-        Self::not_found(
+        build_not_found(
             "account",
             format!(
                 "address({}) and ledger version({})",
@@ -245,7 +237,7 @@ impl Account {
     }
 
     fn resource_not_found(&self, struct_tag: &StructTag) -> BasicErrorWith404 {
-        Self::not_found(
+        build_not_found(
             "resource",
             format!(
                 "address({}), struct tag({}) and ledger version({})",
@@ -260,7 +252,7 @@ impl Account {
         struct_tag: &StructTag,
         field_name: &Identifier,
     ) -> BasicErrorWith404 {
-        Self::not_found(
+        build_not_found(
             "resource",
             format!(
                 "address({}), struct tag({}), field name({}) and ledger version({})",
@@ -269,9 +261,6 @@ impl Account {
             self.latest_ledger_info.version(),
         )
     }
-
-    // TODO: Break this up into 3 structs / traits. There is common stuff,
-    // account specific stuff, and event specific stuff.
 
     // Events specific stuff.
 
@@ -323,27 +312,3 @@ impl Account {
             .map_err(BasicErrorWith404::internal)
     }
 }
-
-// TODO: For the BCS response type, instead of constructing the Rust type from
-// BCS just to serialize it back again, return the bytes directly. This is an
-// example of doing that, but it requires extensive testing:
-/*
-        let state_values = self
-            .context
-            .get_state_values(self.address.into(), self.ledger_version)
-            .ok_or_else(|| self.account_not_found())?;
-        match accept_type {
-            AcceptType::Bcs => Ok(BasicResponse::from_bcs(
-                state_value,
-                &self.latest_ledger_info,
-            )),
-            AcceptType::Json => {
-                let account_resource = deserialize_from_bcs::<AccountResource>(&state_value)?;
-                let account_data: AccountData = account_resource.into();
-                Ok(BasicResponse::from_json(
-                    account_data,
-                    &self.latest_ledger_info,
-                ))
-            }
-        }
-*/

@@ -1,20 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-mod accounts_test;
-mod converter_test;
-mod events_test;
 mod golden_output;
-mod index_test;
-mod invalid_post_request_test;
-mod state_test;
-mod string_resource_test;
 mod test_context;
-mod transaction_vector_test;
-mod transactions_test;
+
+pub mod v0;
+pub mod v1;
+
+pub use golden_output::*;
+pub use test_context::*;
 
 use serde_json::Value;
-pub use test_context::{new_test_context, TestContext};
 
 pub fn find_value(val: &Value, filter: for<'r> fn(&'r &Value) -> bool) -> Value {
     let resources = val
@@ -48,8 +44,9 @@ pub fn pretty(val: &Value) -> String {
     serde_json::to_string_pretty(val).unwrap() + "\n"
 }
 
-/// Returns the name of the current function. This macro is used to derive the name for the golden
-/// file of each test case.
+/// Returns the name of the current function. This macro is used to derive the
+/// name for the golden file of each test case. We remove the API version
+/// (e.g. v0) from the path.
 #[macro_export]
 macro_rules! current_function_name {
     () => {{
@@ -58,10 +55,15 @@ macro_rules! current_function_name {
             std::any::type_name::<T>()
         }
         let name = type_name_of(f);
+
+        // Remove the per-API module stuff from the name.
+        let re = regex::Regex::new(r"::v[0-9]+::").unwrap();
+        let name = re.replace_all(&name, "::").to_string();
+
         let mut strip = 3;
         if name.contains("::{{closure}}") {
             strip += 13;
         }
-        &name[..name.len() - strip]
+        name[..name.len() - strip].to_string()
     }};
 }

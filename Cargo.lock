@@ -210,6 +210,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptosdb",
+ "async-trait",
  "bcs",
  "bytes 1.1.0",
  "cached-framework-packages",
@@ -234,7 +235,9 @@ dependencies = [
  "reqwest",
  "serde 1.0.137",
  "serde_json",
+ "serde_path_to_error",
  "storage-interface",
+ "thiserror",
  "tokio",
  "url",
  "vm-validator",
@@ -257,6 +260,7 @@ dependencies = [
  "async-trait",
  "bcs",
  "hex",
+ "indoc",
  "mime",
  "move-deps",
  "poem",
@@ -1209,7 +1213,6 @@ dependencies = [
  "num-derive",
  "num-traits 0.2.15",
  "once_cell",
- "poem-openapi",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
@@ -4063,6 +4066,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "indoc"
+version = "1.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05a0bd019339e5d968b37855180087b7b9d512c5046fbd244cf8c95687927d6e"
+
+[[package]]
 name = "inspection-service"
 version = "0.1.0"
 dependencies = [
@@ -6281,9 +6290,8 @@ dependencies = [
 
 [[package]]
 name = "poem"
-version = "1.3.35"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01e479ed477ea11939bea754109eaa024e55bf1639e19c1753fb250026351da8"
+version = "1.3.36"
+source = "git+https://github.com/poem-web/poem#6c786c3d6e5ef46f3d45659f6c7ddf3e2407eace"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6320,9 +6328,8 @@ dependencies = [
 
 [[package]]
 name = "poem-derive"
-version = "1.3.35"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d454ac05b5299eb8e6261214fcb823f0c3c1b02f47167f8809c9dc2db0ee033"
+version = "1.3.36"
+source = "git+https://github.com/poem-web/poem#6c786c3d6e5ef46f3d45659f6c7ddf3e2407eace"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2 1.0.39",
@@ -6332,9 +6339,8 @@ dependencies = [
 
 [[package]]
 name = "poem-openapi"
-version = "2.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c27cd1c97d45a9552b0c80bab1d51f93a1050c3f7f91e9312239b3b87c336b0f"
+version = "2.0.6"
+source = "git+https://github.com/poem-web/poem#6c786c3d6e5ef46f3d45659f6c7ddf3e2407eace"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.1.0",
@@ -6356,9 +6362,8 @@ dependencies = [
 
 [[package]]
 name = "poem-openapi-derive"
-version = "2.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5105e426a8a747fefc4be06ab7705cb63bc3ab1b2db373867e1d83b1d95877a"
+version = "2.0.6"
+source = "git+https://github.com/poem-web/poem#6c786c3d6e5ef46f3d45659f6c7ddf3e2407eace"
 dependencies = [
  "Inflector",
  "darling",
@@ -7493,6 +7498,15 @@ dependencies = [
  "indexmap",
  "itoa 1.0.2",
  "ryu",
+ "serde 1.0.137",
+]
+
+[[package]]
+name = "serde_path_to_error"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7868ad3b8196a8a0aea99a8220b124278ee5320a55e4fde97794b6f85b1a377"
+dependencies = [
  "serde 1.0.137",
 ]
 
