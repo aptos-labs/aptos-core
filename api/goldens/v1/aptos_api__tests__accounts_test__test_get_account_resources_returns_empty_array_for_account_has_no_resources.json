@@ -37,7 +37,7 @@
     },
     "data": {
       "epoch_internal": "86400000000",
-      "height": "1",
+      "height": "0",
       "new_block_events": {
         "counter": "1",
         "guid": {

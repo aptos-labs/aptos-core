@@ -32,15 +32,13 @@ paths:
       parameters:
         - name: address
           schema:
-            type: string
-            format: Address
+            $ref: "#/components/schemas/Address"
           in: path
           required: true
           deprecated: false
         - name: ledger_version
           schema:
-            type: string
-            format: U64
+            $ref: "#/components/schemas/U64"
           in: query
           required: false
           deprecated: false
@@ -122,15 +120,13 @@ paths:
       parameters:
         - name: address
           schema:
-            type: string
-            format: Address
+            $ref: "#/components/schemas/Address"
           in: path
           required: true
           deprecated: false
         - name: ledger_version
           schema:
-            type: string
-            format: U64
+            $ref: "#/components/schemas/U64"
           in: query
           required: false
           deprecated: false
@@ -214,15 +210,13 @@ paths:
       parameters:
         - name: address
           schema:
-            type: string
-            format: Address
+            $ref: "#/components/schemas/Address"
           in: path
           required: true
           deprecated: false
         - name: ledger_version
           schema:
-            type: string
-            format: U64
+            $ref: "#/components/schemas/U64"
           in: query
           required: false
           deprecated: false
@@ -320,15 +314,13 @@ paths:
       parameters:
         - name: event_key
           schema:
-            type: string
-            format: EventKey
+            $ref: "#/components/schemas/EventKey"
           in: path
           required: true
           deprecated: false
         - name: start
           schema:
-            type: string
-            format: U64
+            $ref: "#/components/schemas/U64"
           in: query
           required: false
           deprecated: false
@@ -419,8 +411,7 @@ paths:
       parameters:
         - name: address
           schema:
-            type: string
-            format: Address
+            $ref: "#/components/schemas/Address"
           in: path
           required: true
           deprecated: false
@@ -432,15 +423,13 @@ paths:
           deprecated: false
         - name: field_name
           schema:
-            type: string
-            format: IdentifierWrapper
+            $ref: "#/components/schemas/IdentifierWrapper"
           in: path
           required: true
           deprecated: false
         - name: start
           schema:
-            type: string
-            format: U64
+            $ref: "#/components/schemas/U64"
           in: query
           required: false
           deprecated: false
@@ -600,8 +589,7 @@ paths:
       parameters:
         - name: address
           schema:
-            type: string
-            format: Address
+            $ref: "#/components/schemas/Address"
           in: path
           required: true
           deprecated: false
@@ -613,8 +601,7 @@ paths:
           deprecated: false
         - name: ledger_version
           schema:
-            type: string
-            format: U64
+            $ref: "#/components/schemas/U64"
           in: query
           required: false
           deprecated: false
@@ -696,22 +683,19 @@ paths:
       parameters:
         - name: address
           schema:
-            type: string
-            format: Address
+            $ref: "#/components/schemas/Address"
           in: path
           required: true
           deprecated: false
         - name: module_name
           schema:
-            type: string
-            format: IdentifierWrapper
+            $ref: "#/components/schemas/IdentifierWrapper"
           in: path
           required: true
           deprecated: false
         - name: ledger_version
           schema:
-            type: string
-            format: U64
+            $ref: "#/components/schemas/U64"
           in: query
           required: false
           deprecated: false
@@ -793,15 +777,13 @@ paths:
       parameters:
         - name: table_handle
           schema:
-            type: string
-            format: U128
+            $ref: "#/components/schemas/U128"
           in: path
           required: true
           deprecated: false
         - name: ledger_version
           schema:
-            type: string
-            format: U64
+            $ref: "#/components/schemas/U64"
           in: query
           required: false
           deprecated: false
@@ -889,8 +871,7 @@ paths:
       parameters:
         - name: start
           schema:
-            type: string
-            format: U64
+            $ref: "#/components/schemas/U64"
           in: query
           required: false
           deprecated: false
@@ -1073,8 +1054,7 @@ paths:
       parameters:
         - name: txn_hash
           schema:
-            type: string
-            format: HashValue
+            $ref: "#/components/schemas/HashValue"
           in: path
           required: true
           deprecated: false
@@ -1156,8 +1136,7 @@ paths:
       parameters:
         - name: txn_version
           schema:
-            type: string
-            format: U64
+            $ref: "#/components/schemas/U64"
           in: path
           required: true
           deprecated: false
@@ -1239,15 +1218,13 @@ paths:
       parameters:
         - name: address
           schema:
-            type: string
-            format: Address
+            $ref: "#/components/schemas/Address"
           in: path
           required: true
           deprecated: false
         - name: start
           schema:
-            type: string
-            format: U64
+            $ref: "#/components/schemas/U64"
           in: query
           required: false
           deprecated: false
@@ -1442,8 +1419,7 @@ paths:
           content:
             application/json:
               schema:
-                type: string
-                format: HexEncodedBytes
+                $ref: "#/components/schemas/HexEncodedBytes"
             application/x-bcs:
               schema:
                 type: array
@@ -1509,11 +1485,9 @@ components:
         - authentication_key
       properties:
         sequence_number:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         authentication_key:
-          type: string
-          format: HexEncodedBytes
+          $ref: "#/components/schemas/HexEncodedBytes"
     AccountSignature:
       type: object
       oneOf:
@@ -1544,6 +1518,8 @@ components:
               type: string
               example: MultiEd25519Signature
         - $ref: "#/components/schemas/MultiEd25519Signature"
+    Address:
+      type: string
     AptosError:
       type: object
       description: "This is the generic struct we use for all API errors, it contains a string\nmessage and an Aptos API specific error code."
@@ -1555,8 +1531,7 @@ components:
         error_code:
           $ref: "#/components/schemas/AptosErrorCode"
         aptos_ledger_version:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
     AptosErrorCode:
       type: string
       description: "These codes provide more granular error information beyond just the HTTP\nstatus code of the response."
@@ -1589,40 +1564,31 @@ components:
         - timestamp
       properties:
         version:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         state_root_hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         event_root_hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         gas_used:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         success:
           type: boolean
         vm_status:
           type: string
         accumulator_root_hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         changes:
           type: array
           items:
             $ref: "#/components/schemas/WriteSetChange"
         id:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         epoch:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         round:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         events:
           type: array
           items:
@@ -1632,16 +1598,14 @@ components:
           items:
             type: boolean
         proposer:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         failed_proposer_indices:
           type: array
           items:
             type: integer
             format: uint32
         timestamp:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
     DeleteModule:
       type: object
       required:
@@ -1650,8 +1614,7 @@ components:
         - module
       properties:
         address:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         state_key_hash:
           type: string
         module:
@@ -1664,8 +1627,7 @@ components:
         - resource
       properties:
         address:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         state_key_hash:
           type: string
         resource:
@@ -1680,11 +1642,9 @@ components:
         state_key_hash:
           type: string
         handle:
-          type: string
-          format: HexEncodedBytes
+          $ref: "#/components/schemas/HexEncodedBytes"
         key:
-          type: string
-          format: HexEncodedBytes
+          $ref: "#/components/schemas/HexEncodedBytes"
     DirectWriteSet:
       type: object
       required:
@@ -1706,11 +1666,9 @@ components:
         - signature
       properties:
         public_key:
-          type: string
-          format: HexEncodedBytes
+          $ref: "#/components/schemas/HexEncodedBytes"
         signature:
-          type: string
-          format: HexEncodedBytes
+          $ref: "#/components/schemas/HexEncodedBytes"
     EncodeSubmissionRequest:
       type: object
       required:
@@ -1722,27 +1680,21 @@ components:
         - payload
       properties:
         sender:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         sequence_number:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         max_gas_amount:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         gas_unit_price:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         expiration_timestamp_secs:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         payload:
           $ref: "#/components/schemas/TransactionPayload"
         secondary_signers:
           type: array
           items:
-            type: string
-            format: Address
+            $ref: "#/components/schemas/Address"
     Event:
       type: object
       required:
@@ -1752,15 +1704,14 @@ components:
         - data
       properties:
         key:
-          type: string
-          format: EventKey
+          $ref: "#/components/schemas/EventKey"
         sequence_number:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         type:
-          type: string
-          format: MoveType
+          $ref: "#/components/schemas/MoveType"
         data: {}
+    EventKey:
+      type: string
     GenesisPayload:
       type: object
       oneOf:
@@ -1795,27 +1746,21 @@ components:
         - events
       properties:
         version:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         state_root_hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         event_root_hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         gas_used:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         success:
           type: boolean
         vm_status:
           type: string
         accumulator_root_hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         changes:
           type: array
           items:
@@ -1826,6 +1771,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Event"
+    HashValue:
+      type: string
+    HexEncodedBytes:
+      type: string
+      example: "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+    IdentifierWrapper:
+      type: string
     IndexResponse:
       type: object
       description: "The struct holding all data returned to the client by the\nindex endpoint (i.e., GET \"/\")."
@@ -1841,17 +1793,13 @@ components:
           type: integer
           format: uint8
         epoch:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         ledger_version:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         oldest_ledger_version:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         ledger_timestamp:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         node_role:
           $ref: "#/components/schemas/RoleType"
     ModuleBundlePayload:
@@ -1863,6 +1811,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MoveModuleBytecode"
+    MoveAbility:
+      type: string
     MoveFunction:
       type: object
       required:
@@ -1874,8 +1824,7 @@ components:
         - return
       properties:
         name:
-          type: string
-          format: IdentifierWrapper
+          $ref: "#/components/schemas/IdentifierWrapper"
         visibility:
           $ref: "#/components/schemas/MoveFunctionVisibility"
         is_entry:
@@ -1900,8 +1849,7 @@ components:
         constraints:
           type: array
           items:
-            type: string
-            format: MoveAbility
+            $ref: "#/components/schemas/MoveAbility"
     MoveFunctionVisibility:
       type: string
       enum:
@@ -1918,11 +1866,9 @@ components:
         - structs
       properties:
         address:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         name:
-          type: string
-          format: IdentifierWrapper
+          $ref: "#/components/schemas/IdentifierWrapper"
         friends:
           type: array
           items:
@@ -1941,8 +1887,7 @@ components:
         - bytecode
       properties:
         bytecode:
-          type: string
-          format: HexEncodedBytes
+          $ref: "#/components/schemas/HexEncodedBytes"
         abi:
           $ref: "#/components/schemas/MoveModule"
     MoveModuleId:
@@ -1952,11 +1897,9 @@ components:
         - name
       properties:
         address:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         name:
-          type: string
-          format: IdentifierWrapper
+          $ref: "#/components/schemas/IdentifierWrapper"
     MoveResource:
       type: object
       required:
@@ -1966,16 +1909,14 @@ components:
         type:
           $ref: "#/components/schemas/MoveStructTag"
         data:
-          type: string
-          format: MoveStructValue
+          $ref: "#/components/schemas/MoveStructValue"
     MoveScriptBytecode:
       type: object
       required:
         - bytecode
       properties:
         bytecode:
-          type: string
-          format: HexEncodedBytes
+          $ref: "#/components/schemas/HexEncodedBytes"
         abi:
           $ref: "#/components/schemas/MoveFunction"
     MoveStruct:
@@ -1988,15 +1929,13 @@ components:
         - fields
       properties:
         name:
-          type: string
-          format: IdentifierWrapper
+          $ref: "#/components/schemas/IdentifierWrapper"
         is_native:
           type: boolean
         abilities:
           type: array
           items:
-            type: string
-            format: MoveAbility
+            $ref: "#/components/schemas/MoveAbility"
         generic_type_params:
           type: array
           items:
@@ -2012,8 +1951,7 @@ components:
         - type
       properties:
         name:
-          type: string
-          format: IdentifierWrapper
+          $ref: "#/components/schemas/IdentifierWrapper"
         type:
           $ref: "#/components/schemas/MoveTypeWrapper"
     MoveStructGenericTypeParam:
@@ -2025,8 +1963,7 @@ components:
         constraints:
           type: array
           items:
-            type: string
-            format: MoveAbility
+            $ref: "#/components/schemas/MoveAbility"
         is_phantom:
           type: boolean
     MoveStructTag:
@@ -2038,43 +1975,38 @@ components:
         - generic_type_params
       properties:
         address:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         module:
-          type: string
-          format: IdentifierWrapper
+          $ref: "#/components/schemas/IdentifierWrapper"
         name:
-          type: string
-          format: IdentifierWrapper
+          $ref: "#/components/schemas/IdentifierWrapper"
         generic_type_params:
           type: array
           items:
             $ref: "#/components/schemas/MoveTypeWrapper"
+    MoveStructValue:
+      type: object
+    MoveType:
+      type: object
     MoveTypeWrapper:
       type: object
       anyOf:
-        - type: string
-          format: MoveType
+        - $ref: "#/components/schemas/MoveType"
         - type: string
     MoveValue:
       type: object
       anyOf:
         - type: integer
           format: uint8
-        - type: string
-          format: U64
-        - type: string
-          format: U128
+        - $ref: "#/components/schemas/U64"
+        - $ref: "#/components/schemas/U128"
         - type: boolean
-        - type: string
-          format: Address
+        - $ref: "#/components/schemas/Address"
         - type: array
           items:
             $ref: "#/components/schemas/MoveValue"
-        - type: string
-          format: HexEncodedBytes
-        - type: string
-          format: MoveStructValue
+        - $ref: "#/components/schemas/HexEncodedBytes"
+        - $ref: "#/components/schemas/MoveStructValue"
         - type: string
     MultiAgentSignature:
       type: object
@@ -2088,8 +2020,7 @@ components:
         secondary_signer_addresses:
           type: array
           items:
-            type: string
-            format: Address
+            $ref: "#/components/schemas/Address"
         secondary_signers:
           type: array
           items:
@@ -2105,19 +2036,16 @@ components:
         public_keys:
           type: array
           items:
-            type: string
-            format: HexEncodedBytes
+            $ref: "#/components/schemas/HexEncodedBytes"
         signatures:
           type: array
           items:
-            type: string
-            format: HexEncodedBytes
+            $ref: "#/components/schemas/HexEncodedBytes"
         threshold:
           type: integer
           format: uint8
         bitmap:
-          type: string
-          format: HexEncodedBytes
+          $ref: "#/components/schemas/HexEncodedBytes"
     PendingTransaction:
       type: object
       required:
@@ -2130,23 +2058,17 @@ components:
         - payload
       properties:
         hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         sender:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         sequence_number:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         max_gas_amount:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         gas_unit_price:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         expiration_timestamp_secs:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         payload:
           $ref: "#/components/schemas/TransactionPayload"
         signature:
@@ -2165,8 +2087,7 @@ components:
         module:
           $ref: "#/components/schemas/MoveModuleId"
         name:
-          type: string
-          format: IdentifierWrapper
+          $ref: "#/components/schemas/IdentifierWrapper"
     ScriptFunctionPayload:
       type: object
       required:
@@ -2179,8 +2100,7 @@ components:
         type_arguments:
           type: array
           items:
-            type: string
-            format: MoveType
+            $ref: "#/components/schemas/MoveType"
         arguments:
           type: array
           items: {}
@@ -2196,8 +2116,7 @@ components:
         type_arguments:
           type: array
           items:
-            type: string
-            format: MoveType
+            $ref: "#/components/schemas/MoveType"
         arguments:
           type: array
           items: {}
@@ -2208,8 +2127,7 @@ components:
         - script
       properties:
         execute_as:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         script:
           $ref: "#/components/schemas/ScriptPayload"
     StateCheckpointTransaction:
@@ -2227,34 +2145,27 @@ components:
         - timestamp
       properties:
         version:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         state_root_hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         event_root_hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         gas_used:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         success:
           type: boolean
         vm_status:
           type: string
         accumulator_root_hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         changes:
           type: array
           items:
             $ref: "#/components/schemas/WriteSetChange"
         timestamp:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
     SubmitTransactionRequest:
       type: object
       required:
@@ -2267,20 +2178,15 @@ components:
         - signature
       properties:
         sender:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         sequence_number:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         max_gas_amount:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         gas_unit_price:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         expiration_timestamp_secs:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         payload:
           $ref: "#/components/schemas/TransactionPayload"
         signature:
@@ -2293,11 +2199,9 @@ components:
         - key
       properties:
         key_type:
-          type: string
-          format: MoveType
+          $ref: "#/components/schemas/MoveType"
         value_type:
-          type: string
-          format: MoveType
+          $ref: "#/components/schemas/MoveType"
         key: {}
     Transaction:
       type: object
@@ -2461,6 +2365,10 @@ components:
               type: string
               example: UserTransaction
         - $ref: "#/components/schemas/UserTransaction"
+    U128:
+      type: string
+    U64:
+      type: string
     UserTransaction:
       type: object
       required:
@@ -2483,46 +2391,35 @@ components:
         - timestamp
       properties:
         version:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         state_root_hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         event_root_hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         gas_used:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         success:
           type: boolean
         vm_status:
           type: string
         accumulator_root_hash:
-          type: string
-          format: HashValue
+          $ref: "#/components/schemas/HashValue"
         changes:
           type: array
           items:
             $ref: "#/components/schemas/WriteSetChange"
         sender:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         sequence_number:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         max_gas_amount:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         gas_unit_price:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         expiration_timestamp_secs:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
         payload:
           $ref: "#/components/schemas/TransactionPayload"
         signature:
@@ -2532,8 +2429,7 @@ components:
           items:
             $ref: "#/components/schemas/Event"
         timestamp:
-          type: string
-          format: U64
+          $ref: "#/components/schemas/U64"
     WriteModule:
       type: object
       required:
@@ -2542,8 +2438,7 @@ components:
         - data
       properties:
         address:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         state_key_hash:
           type: string
         data:
@@ -2556,8 +2451,7 @@ components:
         - data
       properties:
         address:
-          type: string
-          format: Address
+          $ref: "#/components/schemas/Address"
         state_key_hash:
           type: string
         data:
@@ -2688,13 +2582,10 @@ components:
         state_key_hash:
           type: string
         handle:
-          type: string
-          format: HexEncodedBytes
+          $ref: "#/components/schemas/HexEncodedBytes"
         key:
-          type: string
-          format: HexEncodedBytes
+          $ref: "#/components/schemas/HexEncodedBytes"
         value:
-          type: string
-          format: HexEncodedBytes
+          $ref: "#/components/schemas/HexEncodedBytes"
 externalDocs:
   url: "https://github.com/aptos-labs/aptos-core"

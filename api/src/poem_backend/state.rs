@@ -165,7 +165,7 @@ impl StateApi {
 
         let resource = state_view
             .as_move_resolver()
-            .as_converter()
+            .as_converter(self.context.db.clone())
             .try_into_resource(&resource_type, &bytes)
             .context("Failed to deserialize resource data retrieved from DB")
             .map_err(BasicErrorWith404::internal)?;
@@ -230,7 +230,7 @@ impl StateApi {
         let (ledger_info, ledger_version, state_view) = self.preprocess_request(ledger_version)?;
 
         let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter();
+        let converter = resolver.as_converter(self.context.db.clone());
 
         let vm_key = converter
             .try_into_vm_value(&key_type, key.clone())

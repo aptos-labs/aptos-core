@@ -7,10 +7,10 @@
     "start": "node dist/server",
     "clean": "rm -rf dist",
     "build": "npm -s run clean && npm -s run generate && tsc",
-    "generate": "npm -s run generate:prisma && npx openapi-typescript ../doc/v0/openapi.yaml --output src/openapi-schema.ts",
-    "generate:openapi-express": "java -jar openapi-generator-cli-5.4.0.jar generate -g nodejs-express-server -i ../doc/v0/openapi.yaml -o src/openapi-express",
+    "generate": "npm -s run generate:prisma && npx openapi-typescript ../doc/openapi.yaml --output src/openapi-schema.ts",
+    "generate:openapi-express": "java -jar openapi-generator-cli-5.4.0.jar generate -g nodejs-express-server -i ../doc/openapi.yaml -o src/openapi-express",
     "generate:prisma": "prisma generate",
-    "generate:openapi": "npx openapi-typescript ../doc/v0/openapi.yaml --output src/openapi-schema.ts",
+    "generate:openapi": "npx openapi-typescript ../doc/openapi.yaml --output src/openapi-schema.ts",
     "test": "jest",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix"

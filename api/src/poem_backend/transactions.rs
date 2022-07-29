@@ -200,12 +200,6 @@ impl TransactionsApi {
         self.simulate(&accept_type, signed_transaction).await
     }
 
-    // TODO: The previous language around this endpoint used "signing message".
-    // From what I can tell, all this endpoint is really doing is encoding the
-    // request as BCS. To your average user (read: not knowledgable about
-    // cryptography), "signing message" is needlessly confusing, hence the name
-    // change. Discuss this further with the team.
-
     /// Encode submission
     ///
     /// This endpoint accepts an EncodeSubmissionRequest, which internally is a
@@ -358,13 +352,13 @@ impl TransactionsApi {
                     .context("Failed to get block timestamp from DB")
                     .map_err(BasicErrorWith404::internal)?;
                 resolver
-                    .as_converter()
+                    .as_converter(self.context.db.clone())
                     .try_into_onchain_transaction(timestamp, txn)
                     .context("Failed to convert on chain transaction to Transaction")
                     .map_err(BasicErrorWith404::internal)?
             }
             TransactionData::Pending(txn) => resolver
-                .as_converter()
+                .as_converter(self.context.db.clone())
                 .try_into_pending_transaction(*txn)
                 .context("Failed to convert on pending transaction to Transaction")
                 .map_err(BasicErrorWith404::internal)?,
@@ -451,7 +445,7 @@ impl TransactionsApi {
             SubmitTransactionPost::Json(data) => self
                 .context
                 .move_resolver_poem()?
-                .as_converter()
+                .as_converter(self.context.db.clone())
                 .try_into_signed_transaction_poem(data.0, self.context.chain_id())
                 .context("Failed to create SignedTransaction from SubmitTransactionRequest")
                 .map_err(SubmitTransactionError::bad_request),
@@ -474,7 +468,7 @@ impl TransactionsApi {
             MempoolStatusCode::Accepted => {
                 let resolver = self.context.move_resolver_poem()?;
                 let pending_txn = resolver
-                    .as_converter()
+                    .as_converter(self.context.db.clone())
                     .try_into_pending_transaction_poem(txn)
                     .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
                     .map_err(SubmitTransactionError::internal)?;
@@ -554,7 +548,7 @@ impl TransactionsApi {
     ) -> BasicResult<HexEncodedBytes> {
         let resolver = self.context.move_resolver_poem()?;
         let raw_txn: RawTransaction = resolver
-            .as_converter()
+            .as_converter(self.context.db.clone())
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")
             .map_err(BasicError::bad_request)?;

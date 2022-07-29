@@ -6,6 +6,7 @@ mod address;
 mod block;
 mod bytecode;
 mod convert;
+mod derives;
 mod error;
 mod event_key;
 mod hash;

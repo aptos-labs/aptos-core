@@ -11,14 +11,10 @@
         "is_entry": false,
         "generic_type_params": [],
         "params": [
-          {
-            "Parsed": "&signer"
-          }
+          "&signer"
         ],
         "return": [
-          {
-            "Parsed": "0x1::guid::GUID"
-          }
+          "0x1::guid::GUID"
         ]
       },
       {
@@ -27,17 +23,11 @@
         "is_entry": false,
         "generic_type_params": [],
         "params": [
-          {
-            "Parsed": "address"
-          },
-          {
-            "Parsed": "u64"
-          }
+          "address",
+          "u64"
         ],
         "return": [
-          {
-            "Parsed": "0x1::guid::ID"
-          }
+          "0x1::guid::ID"
         ]
       },
       {
@@ -46,17 +36,11 @@
         "is_entry": false,
         "generic_type_params": [],
         "params": [
-          {
-            "Parsed": "address"
-          },
-          {
-            "Parsed": "&0x1::guid::CreateCapability"
-          }
+          "address",
+          "&0x1::guid::CreateCapability"
         ],
         "return": [
-          {
-            "Parsed": "0x1::guid::GUID"
-          }
+          "0x1::guid::GUID"
         ]
       },
       {
@@ -65,14 +49,10 @@
         "is_entry": false,
         "generic_type_params": [],
         "params": [
-          {
-            "Parsed": "&0x1::guid::GUID"
-          }
+          "&0x1::guid::GUID"
         ],
         "return": [
-          {
-            "Parsed": "u64"
-          }
+          "u64"
         ]
       },
       {
@@ -81,14 +61,10 @@
         "is_entry": false,
         "generic_type_params": [],
         "params": [
-          {
-            "Parsed": "&0x1::guid::GUID"
-          }
+          "&0x1::guid::GUID"
         ],
         "return": [
-          {
-            "Parsed": "address"
-          }
+          "address"
         ]
       },
       {
@@ -97,17 +73,11 @@
         "is_entry": false,
         "generic_type_params": [],
         "params": [
-          {
-            "Parsed": "&0x1::guid::GUID"
-          },
-          {
-            "Parsed": "&0x1::guid::ID"
-          }
+          "&0x1::guid::GUID",
+          "&0x1::guid::ID"
         ],
         "return": [
-          {
-            "Parsed": "bool"
-          }
+          "bool"
         ]
       },
       {
@@ -116,14 +86,10 @@
         "is_entry": false,
         "generic_type_params": [],
         "params": [
-          {
-            "Parsed": "&signer"
-          }
+          "&signer"
         ],
         "return": [
-          {
-            "Parsed": "0x1::guid::CreateCapability"
-          }
+          "0x1::guid::CreateCapability"
         ]
       },
       {
@@ -132,14 +98,10 @@
         "is_entry": false,
         "generic_type_params": [],
         "params": [
-          {
-            "Parsed": "address"
-          }
+          "address"
         ],
         "return": [
-          {
-            "Parsed": "u64"
-          }
+          "u64"
         ]
       },
       {
@@ -148,14 +110,10 @@
         "is_entry": false,
         "generic_type_params": [],
         "params": [
-          {
-            "Parsed": "&0x1::guid::GUID"
-          }
+          "&0x1::guid::GUID"
         ],
         "return": [
-          {
-            "Parsed": "0x1::guid::ID"
-          }
+          "0x1::guid::ID"
         ]
       },
       {
@@ -164,14 +122,10 @@
         "is_entry": false,
         "generic_type_params": [],
         "params": [
-          {
-            "Parsed": "&0x1::guid::ID"
-          }
+          "&0x1::guid::ID"
         ],
         "return": [
-          {
-            "Parsed": "u64"
-          }
+          "u64"
         ]
       },
       {
@@ -180,14 +134,10 @@
         "is_entry": false,
         "generic_type_params": [],
         "params": [
-          {
-            "Parsed": "&0x1::guid::ID"
-          }
+          "&0x1::guid::ID"
         ],
         "return": [
-          {
-            "Parsed": "address"
-          }
+          "address"
         ]
       },
       {
@@ -196,9 +146,7 @@
         "is_entry": false,
         "generic_type_params": [],
         "params": [
-          {
-            "Parsed": "&signer"
-          }
+          "&signer"
         ],
         "return": []
       }
@@ -216,9 +164,7 @@
         "fields": [
           {
             "name": "addr",
-            "type": {
-              "Parsed": "address"
-            }
+            "type": "address"
           }
         ]
       },
@@ -233,9 +179,7 @@
         "fields": [
           {
             "name": "id",
-            "type": {
-              "Parsed": "0x1::guid::ID"
-            }
+            "type": "0x1::guid::ID"
           }
         ]
       },
@@ -249,9 +193,7 @@
         "fields": [
           {
             "name": "counter",
-            "type": {
-              "Parsed": "u64"
-            }
+            "type": "u64"
           }
         ]
       },
@@ -267,15 +209,11 @@
         "fields": [
           {
             "name": "creation_num",
-            "type": {
-              "Parsed": "u64"
-            }
+            "type": "u64"
           },
           {
             "name": "addr",
-            "type": {
-              "Parsed": "address"
-            }
+            "type": "address"
           }
         ]
       }

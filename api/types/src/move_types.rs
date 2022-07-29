@@ -1,9 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{wrappers::MoveTypeWrapper, Address, Bytecode, IdentifierWrapper};
+use crate::{Address, Bytecode, IdentifierWrapper};
 use anyhow::{bail, format_err};
-use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
 use move_deps::{
     move_binary_format::{
@@ -370,7 +369,7 @@ pub struct MoveStructTag {
     pub address: Address,
     pub module: IdentifierWrapper,
     pub name: IdentifierWrapper,
-    pub generic_type_params: Vec<MoveTypeWrapper>,
+    pub generic_type_params: Vec<MoveType>,
 }
 
 impl MoveStructTag {
@@ -378,7 +377,7 @@ impl MoveStructTag {
         address: Address,
         module: IdentifierWrapper,
         name: IdentifierWrapper,
-        generic_type_params: Vec<MoveTypeWrapper>,
+        generic_type_params: Vec<MoveType>,
     ) -> Self {
         Self {
             address,
@@ -403,11 +402,7 @@ impl From<StructTag> for MoveStructTag {
             address: tag.address.into(),
             module: tag.module.into(),
             name: tag.name.into(),
-            generic_type_params: tag
-                .type_params
-                .into_iter()
-                .map(MoveTypeWrapper::from)
-                .collect(),
+            generic_type_params: tag.type_params.into_iter().map(MoveType::from).collect(),
         }
     }
 }
@@ -471,6 +466,7 @@ pub enum MoveType {
     Struct(MoveStructTag),
     GenericTypeParam { index: u16 },
     Reference { mutable: bool, to: Box<MoveType> },
+    Unparsable(String),
 }
 
 impl MoveType {
@@ -493,6 +489,7 @@ impl MoveType {
                 "string<move_struct_tag_id>".to_owned()
             }
             MoveType::Reference { mutable: _, to } => to.json_type_name(),
+            MoveType::Unparsable(string) => string.to_string(),
         }
     }
 }
@@ -516,6 +513,7 @@ impl fmt::Display for MoveType {
                     write!(f, "&{}", to)
                 }
             }
+            MoveType::Unparsable(string) => write!(f, "unparsable<{}>", string),
         }
     }
 }
@@ -524,9 +522,8 @@ impl fmt::Display for MoveType {
 // represent. Internally, it uses parse_type_tag, which cannot handle references
 // or generic type parameters. This function adds nominal support for references
 // on top of parse_type_tag, but it still does not work for generic type params.
-// As such, all types in the API that expect to work with a MoveType should
-// instead work with the MoveTypeWrapper, a class that can represent the parsing
-// failure case as well with just the original raw string.
+// For that, we have the Unparsable variant of MoveType, so the deserialization
+// doesn't fail when dealing with these values.
 impl FromStr for MoveType {
     type Err = anyhow::Error;
 
@@ -541,9 +538,13 @@ impl FromStr for MoveType {
             s = &s[4..];
             is_mut = true;
         }
-        let inner = parse_type_tag(s)
-            .map_err(|e| format_err!("parse Move type {:?} failed, caused by error: {}", s, e))?
-            .into();
+        // Previously this would just crap out, but this meant the API could
+        // return a serialized version of an object and not be able to
+        // deserialize it using that same object.
+        let inner = match parse_type_tag(s) {
+            Ok(inner) => inner.into(),
+            Err(_e) => MoveType::Unparsable(s.to_string()),
+        };
         if is_ref {
             Ok(MoveType::Reference {
                 mutable: is_mut,
@@ -817,7 +818,7 @@ pub struct MoveStructField {
     pub name: IdentifierWrapper,
     #[serde(rename = "type")]
     #[oai(rename = "type")]
-    pub typ: MoveTypeWrapper,
+    pub typ: MoveType,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
@@ -826,10 +827,10 @@ pub struct MoveFunction {
     pub visibility: MoveFunctionVisibility,
     pub is_entry: bool,
     pub generic_type_params: Vec<MoveFunctionGenericTypeParam>,
-    pub params: Vec<MoveTypeWrapper>,
+    pub params: Vec<MoveType>,
     #[serde(rename = "return")]
     #[oai(rename = "return")]
-    pub return_: Vec<MoveTypeWrapper>,
+    pub return_: Vec<MoveType>,
 }
 
 impl From<&CompiledScript> for MoveFunction {
@@ -847,7 +848,7 @@ impl From<&CompiledScript> for MoveFunction {
                 .signature_at(script.parameters)
                 .0
                 .iter()
-                .map(|s| script.new_move_type(s).into())
+                .map(|s| script.new_move_type(s))
                 .collect(),
             return_: vec![],
         }
@@ -1207,16 +1208,6 @@ mod tests {
     }
 
     #[test]
-    fn test_serialize_deserialize_move_function_non_mut_param() {
-        test_serialize_deserialize_move_function(false);
-    }
-
-    #[test]
-    fn test_serialize_deserialize_move_function_mut_param() {
-        test_serialize_deserialize_move_function(true);
-    }
-
-    #[test]
     fn test_parse_invalid_move_script_function_id_string() {
         assert_eq!(
             "invalid script function id \"0x1\"",
@@ -1276,57 +1267,6 @@ mod tests {
     fn test_serialize_deserialize_hex_encoded_bytes() {
         let bytes = hex::decode("abcd").unwrap();
         test_serialize_deserialize(HexEncodedBytes::from(bytes), json!("0xabcd"))
-    }
-
-    // We don't support parsing these right now, so we expect this to end up
-    // being the raw variant of MoveTypeWrapper.
-    #[test]
-    fn test_deserialize_generic_type_param() {
-        assert_eq!(
-            MoveTypeWrapper::from_str("0x1::table::Table<u64, 0x1::voting::Proposal<T0>>").unwrap(),
-            MoveTypeWrapper::Raw("0x1::table::Table<u64, 0x1::voting::Proposal<T0>>".to_string())
-        );
-    }
-
-    fn test_serialize_deserialize_move_function(use_mut_param: bool) {
-        let param = if use_mut_param {
-            "&mut signer"
-        } else {
-            "&signer"
-        };
-        test_serialize_deserialize(
-            MoveFunction {
-                name: IdentifierWrapper::from_str("register").unwrap(),
-                visibility: MoveFunctionVisibility::Public,
-                is_entry: false,
-                generic_type_params: vec![MoveFunctionGenericTypeParam {
-                    constraints: vec![MoveAbility(Ability::Store)],
-                }],
-                params: vec![MoveTypeWrapper::Parsed(MoveType::Reference {
-                    mutable: use_mut_param,
-                    to: Box::new(MoveType::Signer),
-                })],
-                return_: vec![],
-            },
-            json!({
-                "name": "register",
-                "visibility": "public",
-                "is_entry": false,
-                "generic_type_params": [
-                    {
-                        "constraints": [
-                            "store"
-                        ]
-                    }
-                ],
-                "params": [
-                    {
-                        "Parsed": param,
-                    }
-                ],
-                "return": [],
-            }),
-        );
     }
 
     fn test_serialize_deserialize<O>(obj: O, expected: Value)
@@ -1406,20 +1346,3 @@ mod tests {
         serde_json::to_string_pretty(val).unwrap()
     }
 }
-
-// This macro derives all the necessary traits to make it possible to use the
-// given types in a Poem API. This macro in many ways is a short cut compared
-// to deriving the traits properly (e.g. #[derive(Type)] on a struct), use it
-// with great caution, since it essentially rewrites the type to be a string
-// from the perspective of the OpenAPI spec, potentially losing some useful
-// type information that the client could use.
-// See https://github.com/aptos-labs/aptos-core/issues/2319.
-impl_poem_type!(
-    MoveAbility,
-    MoveStructValue,
-    MoveType,
-    HexEncodedBytes,
-    U64,
-    U128
-);
-impl_poem_parameter!(HexEncodedBytes, U64, U128);

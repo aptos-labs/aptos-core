@@ -7,7 +7,6 @@ use crate::{
         ModuleBundlePayload, StateCheckpointTransaction, UserTransactionRequestInner, WriteModule,
         WriteResource, WriteTableItem,
     },
-    wrappers::MoveTypeWrapper,
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
     MoveResource, MoveScriptBytecode, MoveValue, PendingTransaction, ScriptFunctionId,
     ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
@@ -549,7 +548,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             arg_types
                 .into_iter()
                 .map(|t| t.json_type_name())
-                .collect::<Result<Vec<String>>>()?
+                .collect::<Vec<String>>()
                 .join(", "),
             args.len(),
             args,
@@ -561,14 +560,10 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             .map(|(i, (arg_type, arg))| {
                 self.try_into_vm_value(&arg_type.clone().try_into()?, arg)
                     .map_err(|e| {
-                        let expect_str = match &arg_type {
-                            MoveTypeWrapper::Parsed(t) => format!("expect {}", t.json_type_name()),
-                            MoveTypeWrapper::Raw(s) => format!("using {}", s),
-                        };
                         format_err!(
-                            "parse arguments[{}] failed, {}, caused by error: {}",
+                            "parse arguments[{}] failed, expect {}, caused by error: {}",
                             i,
-                            expect_str,
+                            arg_type.json_type_name(),
                             e,
                         )
                     })
