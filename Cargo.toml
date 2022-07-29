@@ -162,3 +162,7 @@ codegen-units = 1
 
 [profile.bench]
 debug = true
+
+[patch.crates-io]
+lz4 = { git = 'https://github.com/msmouse/lz4-rs' }
+rocksdb = { git = 'https://github.com/msmouse/rust-rocksdb' }

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_compression::compress;
 use aptos_config::config::StoragePrunerConfig;
 use aptos_secure_push_metrics::MetricsPusher;
 use aptos_vm::AptosVM;
