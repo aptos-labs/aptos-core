@@ -1,16 +1,66 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-/// This macro helps implement necessary traits for a type to be used in
-/// a struct that is used in a poem-openapi server. Where possible, prefer
-/// to use the existing poem-openapi macros such as Object, NewType, etc.
-/// This macro erases the type information, instead returning the data as
-/// a string in its JSON representation. For newtypes wrapping strings,
-/// this is perfect, but otherwise this is a bit scary, so use it with caution.
+//! In order to use a type with poem-openapi, it must implement a certain set
+//! of traits, depending on the context in which you want to use the type.
+//! For example, if you want to use a type in a struct that you return from
+//! an endpoint, it must implement Type. Normally you get this by deriving
+//! traits such as Object, Enum, Union, etc. However, in some cases, it is
+//! not feasible to use these derives.
+//!
+//!   - The type is outside of reach, e.g. in a crate in aptos-core that is
+//!     too unrelated, or even worse, in a totally different crate (the move
+//!     types are a great example of this).
+//!   - The type is not expressible via OpenAPI. For example, an enum that
+//!     has some enum variants with values and others without values.This is
+//!     not allowed in OpenAPI, types must be either unions (variants with
+//!     values) or enums (variants without values).
+//!   - We would prefer to serialize the data differently than its standard
+//!     representation. HexEncodedBytes is a good example of this. Internally,
+//!     this is a Vec<u8>, but we know it is hex and prefer to represent it as
+//!     a 0x string.
+//!
+//! For those cases, we have these macros. We can use these to implement the
+//! necessary traits for using these types with poem-openapi, without using
+//! the derives.
+//!
+//! Each macro explains itself in further detail.
+
+/// This macro allows you to use a type in a request / response type for use
+/// with poem-openapi. In order to use this macro, your type must implement
+/// Serialize and Deserialize, so we can encode it as JSON / a string.
+///
+/// With this macro, you can express what OpenAPI type you want your type to be
+/// expressed as in the spec. For example, if your type serializes just to a
+/// string, you likely want to invoke the macro like this:
+///
+///   impl_poem_type!(MyType, "string", ());
+///
+/// If your type is more complex, and you'd rather it become an "object" in the
+/// spec, you should invoke the macro like this:
+///
+///   impl_poem_type!(MyType, "object", ());
+///
+/// This macro supports applying additional information to the generated type.
+/// For example, you could invoke the macro like this:
+///
+///   impl_poem_type!(
+///       HexEncodedBytes,
+///       "string",
+///       (
+///           example = Some(serde_json::Value::String(
+///               "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1".to_string())),
+///           description = Some("A hex encoded string"),
+///       )
+///   );
+///
+/// To see what different metadata you can apply to the generated type in the
+/// spec, take a look at MetaSchema here:
+/// https://github.com/poem-web/poem/blob/master/poem-openapi/src/registry/mod.rs
 #[macro_export]
 macro_rules! impl_poem_type {
-    ($($ty:ty),*) => {
-        $(
+    ($ty:ty, $spec_type:literal, ($($key:ident = $value:expr),*)) => {
+
         impl ::poem_openapi::types::Type for $ty {
             const IS_REQUIRED: bool = true;
 
@@ -22,8 +72,38 @@ macro_rules! impl_poem_type {
                 format!("string({})", stringify!($ty)).into()
             }
 
+            // We generate a MetaSchema for our type so we can use it as a
+            // a reference in `schema_ref`. The alternative is `schema_ref`
+            // generates its own schema there and uses it inline, which leads
+            // to lots of repetition in the spec.
+            //
+            // For example:
+            //
+            //   gas_unit_price:
+            //     $ref: "#/components/schemas/U64"
+            //
+            // Which refers to:
+            //
+            //   components:
+            //       U64:
+            //         type: string
+            //         pattern: [0-9]+
+            fn register(registry: &mut poem_openapi::registry::Registry) {
+                registry.create_schema::<Self, _>(stringify!($ty).to_string(), |_registry| {
+                    #[allow(unused_mut)]
+                    let mut meta_schema = poem_openapi::registry::MetaSchema::new($spec_type);
+                    $(
+                    meta_schema.$key = $value;
+                    )*
+                    meta_schema
+                })
+            }
+
+            // This function determines what the schema looks like when this
+            // type appears in the spec. In our case, it will look like a
+            // a reference to the type we generate in the spec.
             fn schema_ref() -> ::poem_openapi::registry::MetaSchemaRef {
-                ::poem_openapi::registry::MetaSchemaRef::Inline(Box::new(::poem_openapi::registry::MetaSchema::new_with_format("string", stringify!($ty))))
+                ::poem_openapi::registry::MetaSchemaRef::Reference(format!("{}", stringify!($ty)))
             }
 
             fn as_raw_value(&self) -> Option<&Self::RawValueType> {
@@ -56,14 +136,12 @@ macro_rules! impl_poem_type {
                 ::poem::http::HeaderValue::from_str(&string).ok()
             }
         }
-
-        )*
     };
 }
 
-// This macro implements the traits necessary for using a type as a parameter
-// in a poem-openapi endpoint handler, specifically as an argument like Path<T>.
-// A type must impl FromStr for this to work, hence why it is a seperate macro.
+/// This macro implements the traits necessary for using a type as a parameter
+/// in a poem-openapi endpoint handler, specifically as an argument like Path<T>.
+/// A type must impl FromStr for this to work, hence why it is a seperate macro.
 #[macro_export]
 macro_rules! impl_poem_parameter {
     ($($ty:ty),*) => {
@@ -110,9 +188,9 @@ mod test {
 
     #[test]
     fn test() {
-        impl_poem_type!(This);
+        impl_poem_type!(This, "string", ());
 
-        impl_poem_type!(That);
+        impl_poem_type!(That, "string", ());
         impl_poem_parameter!(That);
     }
 }

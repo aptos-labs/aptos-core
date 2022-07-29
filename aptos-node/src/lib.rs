@@ -166,6 +166,7 @@ pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()
         .channel_size(config.logger.chan_size)
         .is_async(config.logger.is_async)
         .level(config.logger.level)
+        .console_port(config.logger.console_port)
         .read_env();
     if config.logger.enable_backtrace {
         logger.enable_backtrace();
