@@ -3,9 +3,7 @@
 
 use crate::{
     smoke_test_environment::new_local_swarm_with_aptos,
-    test_utils::{
-        assert_balance, create_and_fund_account, transfer_coins, transfer_coins_non_blocking,
-    },
+    test_utils::{assert_balance, create_and_fund_account, transfer_coins},
 };
 use aptos_config::{
     config::{DiscoveryMethod, NodeConfig, Peer, PeerRole, HANDSHAKE_VERSION},
