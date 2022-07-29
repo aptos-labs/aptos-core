@@ -21,14 +21,14 @@ use url::Url;
 #[derive(StructOpt, Debug)]
 struct Args {
     // general options
-    #[structopt(long, default_value = "4")]
+    #[structopt(long, default_value = "1")]
     accounts_per_client: usize,
     #[structopt(long)]
     workers_per_ac: Option<usize>,
     #[structopt(long, default_value = "0")]
-    wait_millis: u64,
+    _wait_millis: u64,
     #[structopt(long)]
-    burst: bool,
+    _burst: bool,
     #[structopt(long, default_value = "300")]
     duration_secs: usize,
     #[structopt(flatten)]
@@ -185,8 +185,8 @@ fn main() -> Result<()> {
         .accounts_per_client(args.accounts_per_client)
         .duration(Duration::from_secs(args.duration_secs as u64))
         .thread_params(EmitThreadParams {
-            wait_millis: args.wait_millis,
-            wait_committed: !args.burst,
+            wait_millis: 0,
+            wait_committed: true,
             txn_expiration_time_secs: 300,
             check_stats_at_end: false,
         });
