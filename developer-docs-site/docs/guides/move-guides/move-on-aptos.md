@@ -114,7 +114,7 @@ public fun deposit<T>(account: address, coin: Coin<T>)
 ### Type-safety
 
 In Move, given a specific struct, say `A`, different instances can be made distinct in two fashions:
-* Internal identifiers, such as [GUID](https://github.com/stephenLee/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/guid.move)s
+* Internal identifiers, such as [GUID](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/guid.move)s
 * Generics such as `A<T>`, where `T` is another struct
 
 Internal identifiers can be convenient due to their simplicity and easier programmability. Generics, however, provide much higher guarantees including explicit compile or validation time checks though with some costs.
