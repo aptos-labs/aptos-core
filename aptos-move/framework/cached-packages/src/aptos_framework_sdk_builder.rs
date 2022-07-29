@@ -145,9 +145,7 @@ pub enum ScriptFunctionCall {
     },
 
     /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
-    StakeIncreaseLockup {
-        new_locked_until_secs: u64,
-    },
+    StakeIncreaseLockup {},
 
     /// This can only called by the operator of the validator/staking pool.
     StakeJoinValidatorSet {
@@ -286,9 +284,7 @@ impl ScriptFunctionCall {
                 optional_auth_key,
             } => resource_account_create_resource_account(seed, optional_auth_key),
             StakeAddStake { amount } => stake_add_stake(amount),
-            StakeIncreaseLockup {
-                new_locked_until_secs,
-            } => stake_increase_lockup(new_locked_until_secs),
+            StakeIncreaseLockup {} => stake_increase_lockup(),
             StakeJoinValidatorSet { pool_address } => stake_join_validator_set(pool_address),
             StakeLeaveValidatorSet { pool_address } => stake_leave_validator_set(pool_address),
             StakeRegisterValidatorCandidate {
@@ -717,7 +713,7 @@ pub fn stake_add_stake(amount: u64) -> TransactionPayload {
 }
 
 /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
-pub fn stake_increase_lockup(new_locked_until_secs: u64) -> TransactionPayload {
+pub fn stake_increase_lockup() -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -728,7 +724,7 @@ pub fn stake_increase_lockup(new_locked_until_secs: u64) -> TransactionPayload {
         ),
         ident_str!("increase_lockup").to_owned(),
         vec![],
-        vec![bcs::to_bytes(&new_locked_until_secs).unwrap()],
+        vec![],
     ))
 }
 
@@ -1171,10 +1167,8 @@ mod decoder {
     }
 
     pub fn stake_increase_lockup(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeIncreaseLockup {
-                new_locked_until_secs: bcs::from_bytes(script.args().get(0)?).ok()?,
-            })
+        if let TransactionPayload::ScriptFunction(_script) = payload {
+            Some(ScriptFunctionCall::StakeIncreaseLockup {})
         } else {
             None
         }

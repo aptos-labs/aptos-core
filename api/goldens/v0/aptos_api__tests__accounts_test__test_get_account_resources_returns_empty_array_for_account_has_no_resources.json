@@ -73,10 +73,9 @@
     "type": "0x1::stake::ValidatorSetConfiguration",
     "data": {
       "allow_validator_set_change": false,
-      "max_lockup_duration_secs": "86400",
       "maximum_stake": "18446744073709551615",
-      "min_lockup_duration_secs": "0",
       "minimum_stake": "0",
+      "recurring_lockup_duration_secs": "86400",
       "rewards_rate": "273972",
       "rewards_rate_denominator": "1000000000"
     }
