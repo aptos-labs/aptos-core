@@ -640,6 +640,7 @@ dependencies = [
  "strum_macros",
  "tokio",
  "tracing",
+ "tracing-flame",
  "tracing-subscriber",
 ]
 
@@ -8756,6 +8757,17 @@ checksum = "f54c8ca710e81886d498c2fd3331b56c93aa248d49de2222ad2742247c60072f"
 dependencies = [
  "lazy_static 1.4.0",
  "valuable",
+]
+
+[[package]]
+name = "tracing-flame"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bae117ee14789185e129aaee5d93750abe67fdc5a9a62650452bfe4e122a3a9"
+dependencies = [
+ "lazy_static 1.4.0",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

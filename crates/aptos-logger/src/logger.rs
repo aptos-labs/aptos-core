@@ -9,8 +9,18 @@ use once_cell::sync::OnceCell;
 use std::sync::Arc;
 use tracing_subscriber::prelude::*;
 
+#[cfg(feature = "aptos-console")]
+use std::fs::File;
+#[cfg(feature = "aptos-console")]
+use std::io::BufWriter;
+#[cfg(feature = "aptos-console")]
+use tracing_flame::{FlameLayer, FlushGuard};
+
 /// The global `Logger`
 static LOGGER: OnceCell<Arc<dyn Logger>> = OnceCell::new();
+
+#[cfg(feature = "aptos-console")]
+static FLAME_GUARD: OnceCell<FlushGuard<BufWriter<File>>> = OnceCell::new();
 
 /// A trait encapsulating the operations required of a logger.
 pub trait Logger: Sync + Send + 'static {
@@ -60,7 +70,17 @@ pub fn set_global_logger(logger: Arc<dyn Logger>, console_port: Option<u16>) {
                 .server_addr(([0, 0, 0, 0], p))
                 .spawn();
 
-            tracing_subscriber::registry().with(console_layer).init();
+            //let fmt_layer = fmt::Layer::default();
+            let (flame_layer, guard) = FlameLayer::with_file("/tmp/tracing.folded").unwrap();
+
+            tracing_subscriber::registry()
+                .with(console_layer)
+                .with(flame_layer)
+                .init();
+
+            if FLAME_GUARD.set(guard).is_err() {
+                error!("Impossible...\n");
+            }
             return;
         }
     }
@@ -78,5 +98,9 @@ pub fn set_global_logger(logger: Arc<dyn Logger>, console_port: Option<u16>) {
 pub fn flush() {
     if let Some(logger) = LOGGER.get() {
         logger.flush();
+    }
+    #[cfg(feature = "aptos-console")]
+    if let Some(flame_guard) = FLAME_GUARD.get() {
+        drop(flame_guard);
     }
 }
