@@ -440,7 +440,7 @@
           "Events"
         ],
         "summary": "Get events by event key",
-        "description": "todo",
+        "description": "This endpoint allows you to get a list of events of a specific type\nas identified by its event key, which is a globally unique ID.",
         "parameters": [
           {
             "name": "event_key",
@@ -730,7 +730,7 @@
           "General"
         ],
         "summary": "Get ledger info",
-        "description": "Get the latest ledger information, including data such as chain ID, role type, ledger versions, epoch, etc.",
+        "description": "Get the latest ledger information, including data such as chain ID,\nrole type, ledger versions, epoch, etc.",
         "responses": {
           "200": {
             "description": "",
@@ -1087,7 +1087,7 @@
           "Tables"
         ],
         "summary": "Get table item",
-        "description": "todo",
+        "description": "Get a table item from the table identified by {table_handle} in the\npath and the \"key\" (TableItemRequest) provided in the request body.\n\nThis is a POST endpoint because the \"key\" for requesting a specific\ntable item (TableItemRequest) could be quite complex, as each of its\nfields could themselves be composed of other structs. This makes it\nimpractical to express using query params, meaning GET isn't an option.",
         "parameters": [
           {
             "name": "table_handle",
@@ -1220,7 +1220,7 @@
           "Transactions"
         ],
         "summary": "Get transactions",
-        "description": "todo",
+        "description": "Get on-chain (meaning, committed) transactions. You may specify from\nwhen you want the transactions and how to include in the response.",
         "parameters": [
           {
             "name": "start",
@@ -1345,7 +1345,7 @@
           "Transactions"
         ],
         "summary": "Submit transaction",
-        "description": "todo",
+        "description": "This endpoint accepts transaction submissions in two formats.\n\nTo submit a transaction as JSON, you must submit a SubmitTransactionRequest.\nTo build this request, do the following:\n\n1. Encode the transaction as BCS. If you are using a language that has\nnative BCS support, make sure of that library. If not, you may take\nadvantage of /transactions/encode_submission. When using this\nendpoint, make sure you trust the node you're talking to, as it is\npossible they could manipulate your request.\n2. Sign the encoded transaction and use it to create a TransactionSignature.\n3. Submit the request. Make sure to use the \"application/json\" Content-Type.\n\nTo submit a transaction as BCS, you must submit a SignedTransaction\nencoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1477,7 +1477,7 @@
           "Transactions"
         ],
         "summary": "Get transaction by hash",
-        "description": "todo",
+        "description": "Look up a transaction by its hash. This is the same hash that is returned\nby the API when submitting a transaction (see PendingTransaction).\n\nWhen given a transaction hash, the server first looks for the transaction\nin storage (on-chain, committed). If no on-chain transaction is found, it\nlooks the transaction up by hash in the mempool (pending, not yet committed).\n\nTo create a transaction hash by yourself, do the following:\n1. Hash message bytes: \"RawTransaction\" bytes + BCS bytes of [Transaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/enum.Transaction.html).\n2. Apply hash algorithm `SHA3-256` to the hash message bytes.\n3. Hex-encode the hash bytes with `0x` prefix.",
         "parameters": [
           {
             "name": "txn_hash",

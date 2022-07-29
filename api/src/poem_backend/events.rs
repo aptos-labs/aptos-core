@@ -26,7 +26,8 @@ pub struct EventsApi {
 impl EventsApi {
     /// Get events by event key
     ///
-    /// todo
+    /// This endpoint allows you to get a list of events of a specific type
+    /// as identified by its event key, which is a globally unique ID.
     #[oai(
         path = "/events/:event_key",
         method = "get",
