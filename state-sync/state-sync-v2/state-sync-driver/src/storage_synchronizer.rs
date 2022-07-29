@@ -360,67 +360,87 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
 ) -> JoinHandle<()> {
     // Create an executor
     let executor = async move {
-        loop {
-            ::futures::select! {
-                storage_data_chunk = executor_listener.select_next_some() => {
-                    // Execute/apply the storage data chunk
-                    let (notification_id, result) = match storage_data_chunk {
-                        StorageDataChunk::Transactions(notification_id, transactions_with_proof, target_ledger_info, end_of_epoch_ledger_info) => {
-                            let num_transactions = transactions_with_proof.transactions.len();
-                            let result = chunk_executor
-                               .execute_chunk(
-                                    transactions_with_proof,
-                                    &target_ledger_info,
-                                    end_of_epoch_ledger_info.as_ref(),
-                                );
-                            if result.is_ok() {
-                                metrics::increment_gauge(
-                                    &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                                    metrics::StorageSynchronizerOperations::ExecutedTransactions
-                                        .get_label(),
-                                    num_transactions as u64,
-                                );
-                            }
-                            (notification_id, result)
-                        },
-                        StorageDataChunk::TransactionOutputs(notification_id, outputs_with_proof, target_ledger_info, end_of_epoch_ledger_info) => {
-                            let num_outputs = outputs_with_proof.transactions_and_outputs.len();
-                            let result = chunk_executor
-                                .apply_chunk(
-                                    outputs_with_proof,
-                                    &target_ledger_info,
-                                    end_of_epoch_ledger_info.as_ref(),
-                                );
-                            if result.is_ok() {
-                                metrics::increment_gauge(
-                                    &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                                    metrics::StorageSynchronizerOperations::AppliedTransactionOutputs
-                                        .get_label(),
-                                    num_outputs as u64,
-                                );
-                            }
-                            (notification_id, result)
-                        }
-                        storage_data_chunk => {
-                            panic!("Invalid storage data chunk sent to executor: {:?}", storage_data_chunk);
-                        }
-                    };
-
-                    // Notify the committer of new executed chunks
-                    match result {
-                        Ok(()) => {
-                            if let Err(error) = committer_notifier.try_send(notification_id) {
-                                let error = format!("Failed to notify the committer! Error: {:?}", error);
-                                send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
-                                decrement_pending_data_chunks(pending_transaction_chunks.clone());
-                            }
-                        },
-                        Err(error) => {
-                            let error = format!("Failed to execute/apply the storage data chunk! Error: {:?}", error);
-                            send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
-                            decrement_pending_data_chunks(pending_transaction_chunks.clone());
-                        }
+        while let Some(storage_data_chunk) = executor_listener.next().await {
+            // Execute/apply the storage data chunk
+            let (notification_id, result) = match storage_data_chunk {
+                StorageDataChunk::Transactions(
+                    notification_id,
+                    transactions_with_proof,
+                    target_ledger_info,
+                    end_of_epoch_ledger_info,
+                ) => {
+                    let num_transactions = transactions_with_proof.transactions.len();
+                    let result = chunk_executor.execute_chunk(
+                        transactions_with_proof,
+                        &target_ledger_info,
+                        end_of_epoch_ledger_info.as_ref(),
+                    );
+                    if result.is_ok() {
+                        metrics::increment_gauge(
+                            &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                            metrics::StorageSynchronizerOperations::ExecutedTransactions
+                                .get_label(),
+                            num_transactions as u64,
+                        );
                     }
+                    (notification_id, result)
+                }
+                StorageDataChunk::TransactionOutputs(
+                    notification_id,
+                    outputs_with_proof,
+                    target_ledger_info,
+                    end_of_epoch_ledger_info,
+                ) => {
+                    let num_outputs = outputs_with_proof.transactions_and_outputs.len();
+                    let result = chunk_executor.apply_chunk(
+                        outputs_with_proof,
+                        &target_ledger_info,
+                        end_of_epoch_ledger_info.as_ref(),
+                    );
+                    if result.is_ok() {
+                        metrics::increment_gauge(
+                            &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                            metrics::StorageSynchronizerOperations::AppliedTransactionOutputs
+                                .get_label(),
+                            num_outputs as u64,
+                        );
+                    }
+                    (notification_id, result)
+                }
+                storage_data_chunk => {
+                    panic!(
+                        "Invalid storage data chunk sent to executor: {:?}",
+                        storage_data_chunk
+                    );
+                }
+            };
+
+            // Notify the committer of new executed chunks
+            match result {
+                Ok(()) => {
+                    if let Err(error) = committer_notifier.try_send(notification_id) {
+                        let error = format!("Failed to notify the committer! Error: {:?}", error);
+                        send_storage_synchronizer_error(
+                            error_notification_sender.clone(),
+                            notification_id,
+                            error,
+                        )
+                        .await;
+                        decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                    }
+                }
+                Err(error) => {
+                    let error = format!(
+                        "Failed to execute/apply the storage data chunk! Error: {:?}",
+                        error
+                    );
+                    send_storage_synchronizer_error(
+                        error_notification_sender.clone(),
+                        notification_id,
+                        error,
+                    )
+                    .await;
+                    decrement_pending_data_chunks(pending_transaction_chunks.clone());
                 }
             }
         }
@@ -446,52 +466,54 @@ fn spawn_committer<
 ) -> JoinHandle<()> {
     // Create a committer
     let committer = async move {
-        loop {
-            ::futures::select! {
-                notification_id = committer_listener.select_next_some() => {
-                    // Commit the executed chunk
-                    match chunk_executor.commit_chunk() {
-                        Ok(notification) => {
-                             // Log the event and update the metrics
-                             debug!(
-                                LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
-                                    "Committed a new transaction chunk! \
+        while let Some(notification_id) = committer_listener.next().await {
+            // Commit the executed chunk
+            match chunk_executor.commit_chunk() {
+                Ok(notification) => {
+                    // Log the event and update the metrics
+                    debug!(
+                        LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                            "Committed a new transaction chunk! \
                                     Transaction total: {:?}, event total: {:?}",
-                                   notification.committed_transactions.len(),
-                                   notification.committed_events.len()
-                                ))
-                            );
-                            metrics::increment_gauge(
-                                &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                                metrics::StorageSynchronizerOperations::Synced
-                                    .get_label(),
-                                notification.committed_transactions.len() as u64,
-                            );
-                            if notification.reconfiguration_occurred {
-                                utils::update_new_epoch_metrics(storage.clone());
-                            }
+                            notification.committed_transactions.len(),
+                            notification.committed_events.len()
+                        ))
+                    );
+                    metrics::increment_gauge(
+                        &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                        metrics::StorageSynchronizerOperations::Synced.get_label(),
+                        notification.committed_transactions.len() as u64,
+                    );
+                    if notification.reconfiguration_occurred {
+                        utils::update_new_epoch_metrics(storage.clone());
+                    }
 
-                            // Handle the committed transaction notification (e.g., notify mempool).
-                            // We do this here due to synchronization issues with mempool and
-                            // storage. See: https://github.com/aptos-labs/aptos-core/issues/553
-                            let committed_transactions = CommittedTransactions {
-                                events: notification.committed_events,
-                                transactions: notification.committed_transactions,
-                            };
-                            utils::handle_committed_transactions(committed_transactions,
-                                storage.clone(),
-                                mempool_notification_handler.clone(),
-                                event_subscription_service.clone(),
-                            ).await;
-                        }
-                        Err(error) => {
-                            let error = format!("Failed to commit executed chunk! Error: {:?}", error);
-                            send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
-                        }
+                    // Handle the committed transaction notification (e.g., notify mempool).
+                    // We do this here due to synchronization issues with mempool and
+                    // storage. See: https://github.com/aptos-labs/aptos-core/issues/553
+                    let committed_transactions = CommittedTransactions {
+                        events: notification.committed_events,
+                        transactions: notification.committed_transactions,
                     };
-                    decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                    utils::handle_committed_transactions(
+                        committed_transactions,
+                        storage.clone(),
+                        mempool_notification_handler.clone(),
+                        event_subscription_service.clone(),
+                    )
+                    .await;
                 }
-            }
+                Err(error) => {
+                    let error = format!("Failed to commit executed chunk! Error: {:?}", error);
+                    send_storage_synchronizer_error(
+                        error_notification_sender.clone(),
+                        notification_id,
+                        error,
+                    )
+                    .await;
+                }
+            };
+            decrement_pending_data_chunks(pending_transaction_chunks.clone());
         }
     };
 
@@ -531,85 +553,133 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
             .expect("Failed to initialize the state snapshot receiver!");
 
         // Handle state value chunks
-        loop {
-            ::futures::select! {
-                storage_data_chunk = state_snapshot_listener.select_next_some() => {
-                    // Process the chunk
-                    match storage_data_chunk {
-                        StorageDataChunk::States(notification_id, states_with_proof) => {
-                            let all_states_synced = states_with_proof.is_last_chunk();
-                            let last_committed_state_index = states_with_proof.last_index;
+        while let Some(storage_data_chunk) = state_snapshot_listener.next().await {
+            // Process the chunk
+            match storage_data_chunk {
+                StorageDataChunk::States(notification_id, states_with_proof) => {
+                    let all_states_synced = states_with_proof.is_last_chunk();
+                    let last_committed_state_index = states_with_proof.last_index;
 
-                            // Attempt to commit the chunk
-                            let commit_result = state_snapshot_receiver.add_chunk(
-                                states_with_proof.raw_values,
-                                states_with_proof.proof.clone(),
+                    // Attempt to commit the chunk
+                    let commit_result = state_snapshot_receiver.add_chunk(
+                        states_with_proof.raw_values,
+                        states_with_proof.proof.clone(),
+                    );
+                    match commit_result {
+                        Ok(()) => {
+                            // Update the metrics
+                            metrics::set_gauge(
+                                &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
+                                metrics::StorageSynchronizerOperations::SyncedStates.get_label(),
+                                last_committed_state_index as u64,
                             );
-                            match commit_result {
-                                Ok(()) => {
-                                    // Update the metrics
-                                    metrics::set_gauge(
-                                        &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
-                                        metrics::StorageSynchronizerOperations::SyncedStates
-                                            .get_label(),
-                                        last_committed_state_index as u64,
+
+                            if !all_states_synced {
+                                // Send a commit notification to the listener
+                                let commit_notification = CommitNotification::new_committed_states(
+                                    all_states_synced,
+                                    last_committed_state_index,
+                                    None,
+                                );
+                                if let Err(error) =
+                                    commit_notification_sender.send(commit_notification).await
+                                {
+                                    let error = format!(
+                                        "Failed to send state commit notification! Error: {:?}",
+                                        error
                                     );
-
-                                    if !all_states_synced {
-                                        // Send a commit notification to the listener
-                                        let commit_notification = CommitNotification::new_committed_states(all_states_synced, last_committed_state_index, None);
-                                        if let Err(error) = commit_notification_sender.send(commit_notification).await {
-                                            let error = format!("Failed to send state commit notification! Error: {:?}", error);
-                                            send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
-                                        }
-
-                                        decrement_pending_data_chunks(pending_transaction_chunks.clone());
-                                        continue; // Wait for the next chunk
-                                    }
-
-                                    // All states have been synced! Create a new commit notification
-                                    let commit_notification = create_final_commit_notification(&target_output_with_proof, last_committed_state_index);
-
-                                    // Finalize storage, reset the executor and send a commit
-                                    // notification to the listener.
-                                    let finalized_result = if let Err(error) = state_snapshot_receiver.finish_box() {
-                                        Err(format!("Failed to finish the state value synchronization! Error: {:?}", error))
-                                    } else if let Err(error) = storage.writer.finalize_state_snapshot(version, target_output_with_proof) {
-                                        Err(format!("Failed to finalize the state snapshot! Error: {:?}", error))
-                                    } else if let Err(error) = storage.writer.save_ledger_infos(&epoch_change_proofs) {
-                                        Err(format!("Failed to save all epoch ending ledger infos! Error: {:?}", error))
-                                    } else if let Err(error) = storage.writer.delete_genesis() {
-                                        Err(format!("Failed to delete the genesis transaction! Error: {:?}", error))
-                                    } else if let Err(error) = chunk_executor.reset() {
-                                        Err(format!("Failed to reset the chunk executor after states synchronization! Error: {:?}", error))
-                                    } else if let Err(error) = commit_notification_sender.send(commit_notification).await {
-                                       Err(format!("Failed to send the final state commit notification! Error: {:?}", error))
-                                    } else if let Err(error) = utils::initialize_sync_gauges(storage.reader) {
-                                       Err(format!("Failed to initialize the state sync version gauges! Error: {:?}", error))
-                                    } else {
-                                        Ok(())
-                                    };
-
-                                    // Notify the state sync driver of any errors
-                                    if let Err(error) = finalized_result {
-                                      send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
-                                    }
-                                    decrement_pending_data_chunks(pending_transaction_chunks.clone());
-                                    return; // There's nothing left to do!
-                                },
-                                Err(error) => {
-                                    let error = format!("Failed to commit state value chunk! Error: {:?}", error);
-                                    send_storage_synchronizer_error(error_notification_sender.clone(), notification_id, error).await;
+                                    send_storage_synchronizer_error(
+                                        error_notification_sender.clone(),
+                                        notification_id,
+                                        error,
+                                    )
+                                    .await;
                                 }
+
+                                decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                                continue; // Wait for the next chunk
                             }
-                        },
-                        storage_data_chunk => {
-                            panic!("Invalid storage data chunk sent to state snapshot receiver: {:?}", storage_data_chunk);
+
+                            // All states have been synced! Create a new commit notification
+                            let commit_notification = create_final_commit_notification(
+                                &target_output_with_proof,
+                                last_committed_state_index,
+                            );
+
+                            // Finalize storage, reset the executor and send a commit
+                            // notification to the listener.
+                            let finalized_result = if let Err(error) =
+                                state_snapshot_receiver.finish_box()
+                            {
+                                Err(format!(
+                                    "Failed to finish the state value synchronization! Error: {:?}",
+                                    error
+                                ))
+                            } else if let Err(error) = storage
+                                .writer
+                                .finalize_state_snapshot(version, target_output_with_proof)
+                            {
+                                Err(format!(
+                                    "Failed to finalize the state snapshot! Error: {:?}",
+                                    error
+                                ))
+                            } else if let Err(error) =
+                                storage.writer.save_ledger_infos(&epoch_change_proofs)
+                            {
+                                Err(format!(
+                                    "Failed to save all epoch ending ledger infos! Error: {:?}",
+                                    error
+                                ))
+                            } else if let Err(error) = storage.writer.delete_genesis() {
+                                Err(format!(
+                                    "Failed to delete the genesis transaction! Error: {:?}",
+                                    error
+                                ))
+                            } else if let Err(error) = chunk_executor.reset() {
+                                Err(format!("Failed to reset the chunk executor after states synchronization! Error: {:?}", error))
+                            } else if let Err(error) =
+                                commit_notification_sender.send(commit_notification).await
+                            {
+                                Err(format!("Failed to send the final state commit notification! Error: {:?}", error))
+                            } else if let Err(error) = utils::initialize_sync_gauges(storage.reader)
+                            {
+                                Err(format!("Failed to initialize the state sync version gauges! Error: {:?}", error))
+                            } else {
+                                Ok(())
+                            };
+
+                            // Notify the state sync driver of any errors
+                            if let Err(error) = finalized_result {
+                                send_storage_synchronizer_error(
+                                    error_notification_sender.clone(),
+                                    notification_id,
+                                    error,
+                                )
+                                .await;
+                            }
+                            decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                            return; // There's nothing left to do!
+                        }
+                        Err(error) => {
+                            let error =
+                                format!("Failed to commit state value chunk! Error: {:?}", error);
+                            send_storage_synchronizer_error(
+                                error_notification_sender.clone(),
+                                notification_id,
+                                error,
+                            )
+                            .await;
                         }
                     }
-                    decrement_pending_data_chunks(pending_transaction_chunks.clone());
+                }
+                storage_data_chunk => {
+                    panic!(
+                        "Invalid storage data chunk sent to state snapshot receiver: {:?}",
+                        storage_data_chunk
+                    );
                 }
             }
+            decrement_pending_data_chunks(pending_transaction_chunks.clone());
         }
     };
 
