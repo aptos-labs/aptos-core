@@ -277,7 +277,6 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
     }
 }
 
-
 pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOutputExt) {
     let vm_status = err.clone();
     let error_code = match err.keep_or_discard() {

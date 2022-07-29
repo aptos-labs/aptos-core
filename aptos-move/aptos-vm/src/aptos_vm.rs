@@ -5,13 +5,11 @@ use crate::move_vm_ext::{NativeCodeContext, PublishRequest};
 use crate::{
     adapter_common,
     adapter_common::{
-        discard_error_output, discard_error_vm_status, discard_error_vm_status_ext,
-        validate_signature_checked_transaction, validate_signed_transaction,
-        PreprocessedTransaction, VMAdapter,
+        discard_error_output, discard_error_vm_status, validate_signature_checked_transaction,
+        validate_signed_transaction, PreprocessedTransaction, VMAdapter,
     },
     aptos_vm_impl::{
-        charge_global_write_gas_usage, get_transaction_output, get_transaction_output_ext,
-        AptosVMImpl, AptosVMInternals,
+        charge_global_write_gas_usage, get_transaction_output, AptosVMImpl, AptosVMInternals,
     },
     counters::*,
     data_cache::{AsMoveResolver, StateViewCache},
@@ -189,22 +187,21 @@ impl AptosVM {
                     self.0
                         .run_failure_epilogue(&mut session, gas_status, txn_data, log_context)
                 {
-                    return discard_error_vm_status_ext(e);
+                    return discard_error_vm_status(e);
                 }
-                let txn_output = get_transaction_output_ext(
+                let txn_output = get_transaction_output(
                     &mut (),
                     session,
                     gas_status.remaining_gas(),
                     txn_data,
                     status,
                 )
-                .unwrap_or_else(|e| discard_error_vm_status_ext(e).1);
+                .unwrap_or_else(|e| discard_error_vm_status(e).1);
                 (error_code, txn_output)
             }
-            TransactionStatus::Discard(status) => (
-                VMStatus::Error(status),
-                TransactionOutputExt::from(discard_error_output(status)),
-            ),
+            TransactionStatus::Discard(status) => {
+                (VMStatus::Error(status), discard_error_output(status))
+            }
             TransactionStatus::Retry => unreachable!(),
         }
     }
@@ -222,7 +219,7 @@ impl AptosVM {
 
         Ok((
             VMStatus::Executed,
-            get_transaction_output_ext(
+            get_transaction_output(
                 &mut (),
                 session,
                 gas_status.remaining_gas(),
@@ -232,7 +229,7 @@ impl AptosVM {
         ))
     }
 
-    fn execute_script_or_script_function_ext<S: MoveResolverExt>(
+    fn execute_script_or_script_function<S: MoveResolverExt>(
         &self,
         mut session: SessionExt<S>,
         gas_status: &mut GasStatus,
@@ -307,24 +304,6 @@ impl AptosVM {
 
             self.success_transaction_cleanup(session, gas_status, txn_data, log_context)
         }
-    }
-
-    fn execute_script_or_script_function<S: MoveResolverExt>(
-        &self,
-        session: SessionExt<S>,
-        gas_status: &mut GasStatus,
-        txn_data: &TransactionMetadata,
-        payload: &TransactionPayload,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
-        self.execute_script_or_script_function_ext(
-            session,
-            gas_status,
-            txn_data,
-            payload,
-            log_context,
-        )
-        .map(|(vm_status, output)| (vm_status, output.into_transaction_output()))
     }
 
     fn verify_module_bundle<S: MoveResolverExt>(
@@ -409,7 +388,7 @@ impl AptosVM {
     /// Execute a module bundle load request.
     /// TODO: this is going to be deprecated and removed in favor of code publishing via
     /// NativeCodeContext
-    fn execute_modules_ext<S: MoveResolverExt>(
+    fn execute_modules<S: MoveResolverExt>(
         &self,
         mut session: SessionExt<S>,
         gas_status: &mut GasStatus,
@@ -450,18 +429,6 @@ impl AptosVM {
         )?;
 
         self.success_transaction_cleanup(session, gas_status, txn_data, log_context)
-    }
-
-    fn execute_modules<S: MoveResolverExt>(
-        &self,
-        session: SessionExt<S>,
-        gas_status: &mut GasStatus,
-        txn_data: &TransactionMetadata,
-        modules: &ModuleBundle,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
-        self.execute_modules_ext(session, gas_status, txn_data, modules, log_context)
-            .map(|(vm_status, output)| (vm_status, output.into_transaction_output()))
     }
 
     /// Resolve a pending code publish request registered via the NativeCodeContext.
@@ -533,7 +500,7 @@ impl AptosVM {
             ($res: expr) => {
                 match $res {
                     Ok(s) => s,
-                    Err(e) => return discard_error_vm_status_ext(e),
+                    Err(e) => return discard_error_vm_status(e),
                 }
             };
         }
@@ -547,7 +514,7 @@ impl AptosVM {
             false,
             log_context,
         ) {
-            return discard_error_vm_status_ext(err);
+            return discard_error_vm_status(err);
         };
 
         let gas_schedule = unwrap_or_discard!(self.0.get_gas_schedule(log_context));
@@ -557,7 +524,7 @@ impl AptosVM {
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
             | payload @ TransactionPayload::ScriptFunction(_) => self
-                .execute_script_or_script_function_ext(
+                .execute_script_or_script_function(
                     session,
                     &mut gas_status,
                     &txn_data,
@@ -565,10 +532,10 @@ impl AptosVM {
                     log_context,
                 ),
             TransactionPayload::ModuleBundle(m) => {
-                self.execute_modules_ext(session, &mut gas_status, &txn_data, m, log_context)
+                self.execute_modules(session, &mut gas_status, &txn_data, m, log_context)
             }
             TransactionPayload::WriteSet(_) => {
-                return discard_error_vm_status_ext(VMStatus::Error(StatusCode::UNREACHABLE));
+                return discard_error_vm_status(VMStatus::Error(StatusCode::UNREACHABLE));
             }
         };
 
@@ -583,7 +550,7 @@ impl AptosVM {
             Err(err) => {
                 let txn_status = TransactionStatus::from(err.clone());
                 if txn_status.is_discarded() {
-                    discard_error_vm_status_ext(err)
+                    discard_error_vm_status(err)
                 } else {
                     self.failed_transaction_cleanup_and_keep_vm_status(
                         err,
@@ -1091,11 +1058,7 @@ impl VMAdapter for AptosVM {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 let (vm_status, output) =
                     self.process_block_prologue(data_cache, block_metadata.clone(), log_context)?;
-                (
-                    vm_status,
-                    TransactionOutputExt::from(output),
-                    Some("block_prologue".to_string()),
-                )
+                (vm_status, output, Some("block_prologue".to_string()))
             }
             PreprocessedTransaction::WaypointWriteSet(write_set_payload) => {
                 let (vm_status, output) = self.process_waypoint_change_set(
@@ -1103,11 +1066,7 @@ impl VMAdapter for AptosVM {
                     write_set_payload.clone(),
                     log_context,
                 )?;
-                (
-                    vm_status,
-                    TransactionOutputExt::from(output),
-                    Some("waypoint_write_set".to_string()),
-                )
+                (vm_status, output, Some("waypoint_write_set".to_string()))
             }
             PreprocessedTransaction::UserTransaction(txn) => {
                 let sender = txn.sender().to_string();
@@ -1129,16 +1088,12 @@ impl VMAdapter for AptosVM {
             PreprocessedTransaction::WriteSet(txn) => {
                 let (vm_status, output) =
                     self.process_writeset_transaction(data_cache, txn, log_context)?;
-                (
-                    vm_status,
-                    TransactionOutputExt::from(output),
-                    Some("write_set".to_string()),
-                )
+                (vm_status, output, Some("write_set".to_string()))
             }
             PreprocessedTransaction::InvalidSignature => {
                 let (vm_status, output) =
                     discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE));
-                (vm_status, TransactionOutputExt::from(output), None)
+                (vm_status, output, None)
             }
             PreprocessedTransaction::StateCheckpoint => {
                 let output = TransactionOutput::new(

@@ -563,7 +563,7 @@ pub(crate) fn charge_global_write_gas_usage<R: MoveResolverExt>(
         .map_err(|p_err| p_err.finish(Location::Undefined).into_vm_status())
 }
 
-pub(crate) fn get_transaction_output_ext<A: AccessPathCache, S: MoveResolverExt>(
+pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
     ap_cache: &mut A,
     session: SessionExt<S>,
     gas_left: GasUnits<GasCarrier>,
