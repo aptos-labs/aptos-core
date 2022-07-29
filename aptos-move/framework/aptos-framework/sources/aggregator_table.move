@@ -9,7 +9,7 @@ module aptos_framework::aggregator_table {
     use aptos_framework::timestamp;
 
     /// When aggregator table has already been published.
-    const EAGGREGATOR_TABLE_EXISTS: u64 = 1500;
+    const EAGGREGATOR_TABLE_EXISTS: u64 = 0x1;
 
     /// Struct that stores aggregators, as a (key, value) pair, where `key` is
     /// a unique key that can be used to identify an aggregator, and `value` is
@@ -69,7 +69,7 @@ module aptos_framework::aggregator_table {
     }
 
     #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 1600)]
+    #[expected_failure(abort_code = 0x020001)]
     fun test_overflow(account: signer) acquires AggregatorTable {
         initialize_aggregator_table(&account);
 
@@ -85,7 +85,7 @@ module aptos_framework::aggregator_table {
     }
 
     #[test(account = @aptos_framework)]
-    #[expected_failure(abort_code = 1601)]
+    #[expected_failure(abort_code = 0x020002)]
     fun test_underflow(account: signer) acquires AggregatorTable {
         initialize_aggregator_table(&account);
 

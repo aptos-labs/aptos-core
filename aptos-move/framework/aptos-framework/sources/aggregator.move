@@ -4,7 +4,11 @@ module aptos_framework::aggregator {
 
     /// When aggregator's value (actual or accumulated) overflows (raised by
     /// native code).
-    const EAGGREGATOR_OVERFLOW: u64 = 1600;
+    const EAGGREGATOR_OVERFLOW: u64 = 0x1;
+
+    /// When aggregator's value (actual or accumulated) underflows (raised by
+    /// native code).
+    const EAGGREGATOR_UNDERFLOW: u64 = 0x2;
 
     struct Aggregator has store {
         table_handle: u128,

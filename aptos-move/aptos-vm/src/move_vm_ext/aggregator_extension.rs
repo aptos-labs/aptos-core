@@ -49,10 +49,10 @@ struct Aggregator {
 }
 
 /// When `Aggregator` overflows the `limit`.
-const EAGGREGATOR_OVERFLOW: u64 = 1600;
+const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
 
 /// When `Aggregator`'s underflows.
-const EAGGREGATOR_UNDERFLOW: u64 = 1601;
+const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
 
 impl Aggregator {
     /// Implements logic for adding to an aggregator.
