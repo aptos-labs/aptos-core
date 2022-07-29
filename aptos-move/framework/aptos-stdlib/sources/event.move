@@ -37,9 +37,14 @@ module aptos_std::event {
         handle_ref.counter = handle_ref.counter + 1;
     }
 
-    /// Return the GUIID associated with this EventHandle
+    /// Return the GUID associated with this EventHandle
     public fun guid<T: drop + store>(handle_ref: &EventHandle<T>): &GUID {
         &handle_ref.guid
+    }
+
+    /// Return the current counter associated with this EventHandle
+    public fun counter<T: drop + store>(handle_ref: &EventHandle<T>): u64 {
+        handle_ref.counter
     }
 
     /// Log `msg` as the `count`th event associated with the event stream identified by `guid`
@@ -56,12 +61,6 @@ module aptos_std::event {
     public fun create_guid_wrapper_for_test<T: drop + store>(s: &signer): GUID {
         let EventHandle<T> { counter: _, guid } = new_event_handle<T>(s);
         guid
-    }
-
-    #[test_only]
-    public fun get_event_handle_counter<T: drop + store>(handle : &EventHandle<T>): u64 {
-        let counter = handle.counter;
-        counter
     }
 
     // ****************** SPECIFICATIONS *******************

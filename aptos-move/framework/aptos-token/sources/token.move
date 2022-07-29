@@ -1010,7 +1010,7 @@ module aptos_token::token {
     fun test_create_events_generation(creator: signer) acquires Collections, TokenStore {
         create_collection_and_token(&creator, 1, 2, 1);
         let collections = borrow_global<Collections>(signer::address_of(&creator));
-        assert!(event::get_event_handle_counter(&collections.create_collection_events) == 1, 1);
+        assert!(event::counter(&collections.create_collection_events) == 1, 1);
     }
 
     #[test(creator = @0xAF)]
