@@ -9,6 +9,7 @@ use crate::{
     page::Page,
     param::{AddressParam, TransactionIdParam},
 };
+use std::time::Instant;
 
 use aptos_api_types::{
     mime_types::{BCS, BCS_SIGNED_TRANSACTION},
@@ -26,6 +27,7 @@ use aptos_crypto::HashValue;
 use aptos_vm::AptosVM;
 
 use anyhow::Result;
+use aptos_logger::warn;
 use aptos_types::transaction::{ExecutionStatus, TransactionInfo, TransactionStatus};
 use warp::{
     filters::BoxedFilter,
@@ -236,9 +238,21 @@ async fn handle_submit_bcs_transactions(
     context: Context,
 ) -> Result<impl Reply, Rejection> {
     fail_point("endpoint_submit_bcs_transactions")?;
+    let loop_start_time = Instant::now();
     let txn = bcs::from_bytes(&body)
         .map_err(|err| Error::invalid_request_body(format!("deserialize error: {}", err)))?;
-    Ok(Transactions::new(context)?.create(txn).await?)
+    let txns = Transactions::new(context)?;
+    // warn!(
+    //     "Time taken for the context is {:?} ",
+    //     Instant::now() - loop_start_time
+    // );
+    let ret = txns.create(txn).await?;
+    let loop_end_time = Instant::now();
+    // warn!(
+    //     "Time taken for the handle_submit_bcs_transactions is {:?} ",
+    //     loop_end_time - loop_start_time
+    // );
+    Ok(ret)
 }
 
 async fn handle_simulate_bcs_transactions(

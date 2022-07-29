@@ -12,7 +12,7 @@ pub mod performance_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
 
-use anyhow::ensure;
+use anyhow::{anyhow, ensure};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use forge::{NetworkContext, NodeExt, Result, TxnEmitter, TxnStats, Version};
 use rand::SeedableRng;
@@ -20,7 +20,7 @@ use std::{
     convert::TryInto,
     time::{Duration, Instant},
 };
-use tokio::runtime::Runtime;
+use tokio::runtime::{Builder, Runtime};
 
 async fn batch_update(
     ctx: &mut NetworkContext<'_>,
@@ -52,7 +52,15 @@ pub fn generate_traffic<'t>(
     fixed_tps: Option<u64>,
 ) -> Result<TxnStats> {
     ensure!(gas_price > 0, "gas_price is required to be non zero");
-    let rt = Runtime::new()?;
+    let mut runtime_builder = Builder::new_multi_thread();
+    runtime_builder.enable_all();
+    runtime_builder.worker_threads(64);
+    let rt = runtime_builder.build().map_err(|err| {
+        anyhow!(
+            "Failed to start runtime.  Won't be able to start networking. {}",
+            err
+        )
+    })?;
     let rng = SeedableRng::from_rng(ctx.core().rng())?;
     let validator_clients = ctx
         .swarm()

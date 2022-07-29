@@ -54,13 +54,16 @@ impl TransactionGenerator for AccountGenerator {
         _invalid_transaction_ratio: usize,
         gas_price: u64,
     ) -> Vec<SignedTransaction> {
-        let mut requests = Vec::with_capacity(accounts.len());
+        let mut requests = Vec::with_capacity(accounts.len() * 5);
         for account in accounts {
-            let receiver = all_addresses
-                .choose(&mut self.rng)
-                .expect("all_addresses can't be empty");
-            let request = self.gen_single_txn(account, receiver, 0, &self.txn_factory, gas_price);
-            requests.push(request);
+            for _ in 0..5 {
+                let receiver = all_addresses
+                    .choose(&mut self.rng)
+                    .expect("all_addresses can't be empty");
+                let request =
+                    self.gen_single_txn(account, receiver, 0, &self.txn_factory, gas_price);
+                requests.push(request);
+            }
         }
         requests
     }

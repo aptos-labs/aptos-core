@@ -108,6 +108,11 @@ impl LocalNode {
             )
         })?;
 
+        println!(
+            "Successfully started a node with log file at {:?}",
+            self.log_path()
+        );
+
         self.process = Some(Process(process));
 
         Ok(())

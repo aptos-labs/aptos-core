@@ -248,12 +248,12 @@ impl<'t> TxnEmitter<'t> {
         let workers_per_endpoint = match req.workers_per_endpoint {
             Some(x) => x,
             None => {
-                let target_threads = 5000;
+                let target_threads = 20000;
                 // Trying to create somewhere between target_threads/2..target_threads threads
                 // We want to have equal numbers of threads for each endpoint, so that they are equally loaded
                 // Otherwise things like flamegrap/perf going to show different numbers depending on which endpoint is chosen
                 // Also limiting number of threads as max 10 per endpoint for use cases with very small number of nodes or use --peers
-                min(200, max(1, target_threads / req.rest_clients.len()))
+                min(800, max(1, target_threads / req.rest_clients.len()))
             }
         };
         let num_clients = req.rest_clients.len() * workers_per_endpoint;
@@ -418,6 +418,7 @@ async fn wait_for_single_account_sequence(
     let deadline = Instant::now() + wait_timeout;
     while Instant::now() <= deadline {
         time::sleep(Duration::from_millis(1000)).await;
+        let loop_start_time = Instant::now();
         match query_sequence_numbers(client, &[account.address()]).await {
             Ok(sequence_numbers) => {
                 if sequence_numbers[0] >= account.sequence_number() {
@@ -431,6 +432,12 @@ async fn wait_for_single_account_sequence(
                 );
             }
         }
+
+        let loop_end_time = Instant::now();
+        // warn!(
+        //     "Time taken for query_sequence_number is {:?} ",
+        //     loop_end_time - loop_start_time
+        // );
     }
     Err(anyhow!(
         "Timed out waiting for single account {:?} sequence number for instance {:?}",
@@ -470,6 +477,11 @@ async fn wait_for_accounts_sequence(
         .is_err()
     {
         return Err(uncommitted);
+    }
+
+    // Special case for single account
+    if accounts.len() == 1 {
+        return Ok(());
     }
 
     while Instant::now() <= deadline {
