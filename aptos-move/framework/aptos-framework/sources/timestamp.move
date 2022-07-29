@@ -164,11 +164,16 @@ module aptos_framework::timestamp {
     }
 
     #[test_only]
-    public fun update_global_time_for_test(timestamp: u64) acquires CurrentTimeMicroseconds {
+    public fun update_global_time_for_test(timestamp_microsecs: u64) acquires CurrentTimeMicroseconds {
         let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@aptos_framework);
         let now = global_timer.microseconds;
-        assert!(now < timestamp, error::invalid_argument(ETIMESTAMP));
-        global_timer.microseconds = timestamp;
+        assert!(now < timestamp_microsecs, error::invalid_argument(ETIMESTAMP));
+        global_timer.microseconds = timestamp_microsecs;
+    }
+
+    #[test_only]
+    public fun fast_forward_seconds(timestamp_seconds: u64) acquires CurrentTimeMicroseconds {
+        update_global_time_for_test(now_microseconds() + timestamp_seconds * 1000000);
     }
 
 // ====================

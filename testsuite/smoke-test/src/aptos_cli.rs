@@ -13,7 +13,7 @@ use aptos_types::network_address::DnsName;
 use forge::{NodeExt, Swarm};
 use std::convert::TryFrom;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 
 #[tokio::test]
 async fn test_account_flow() {
@@ -181,6 +181,7 @@ async fn test_join_and_leave_validator() {
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
             genesis_config.epoch_duration_secs = 3600;
+            genesis_config.recurring_lockup_duration_secs = 2;
             genesis_config.min_price_per_gas_unit = 0;
         }))
         .build_with_cli(0)
@@ -244,15 +245,6 @@ async fn test_join_and_leave_validator() {
 
     assert_validator_set_sizes(&cli, 1, 0, 0).await;
 
-    let lockup_duration = Duration::from_secs(15);
-    gas_used += get_gas(
-        cli.increase_lockup(validator_cli_index, lockup_duration)
-            .await
-            .unwrap(),
-    );
-
-    let lockup_start = SystemTime::now();
-
     reconfig(
         &rest_client,
         &transaction_factory,
@@ -301,38 +293,17 @@ async fn test_join_and_leave_validator() {
     );
     let unlock_stake = 3;
 
-    // can only check if test was fast enough:
-    let lockup_left = lockup_duration
-        .as_secs()
-        .saturating_sub(lockup_start.elapsed().unwrap().as_secs());
-    // Conservatively expect less to make sure lockup didn't expire.
-    if lockup_left > 2 {
-        // cannot widthdraw before lockup expires.
-        assert!(cli
-            .unlock_stake(validator_cli_index, unlock_stake)
-            .await
-            .is_err());
-
-        // unknown gas used on failed transaction, need to check
-        gas_used = DEFAULT_FUNDED_COINS
-            - stake_coins
-            - cli.account_balance(validator_cli_index).await.unwrap();
-    }
-    // Conservatively wait more
-    let to_wait_for_lockup =
-        (2 + lockup_duration.as_secs()).saturating_sub(lockup_start.elapsed().unwrap().as_secs());
-    if to_wait_for_lockup > 0 {
-        tokio::time::sleep(Duration::from_secs(to_wait_for_lockup)).await;
-    }
-
+    // Unlock stake.
     gas_used += get_gas(
         cli.unlock_stake(validator_cli_index, unlock_stake)
             .await
             .unwrap(),
     );
 
-    let withdraw_stake = 2;
+    // Conservatively wait until the recurring lockup is over.
+    tokio::time::sleep(Duration::from_secs(2)).await;
 
+    let withdraw_stake = 2;
     gas_used += get_gas(
         cli.withdraw_stake(validator_cli_index, withdraw_stake)
             .await

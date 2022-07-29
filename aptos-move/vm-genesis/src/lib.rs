@@ -54,10 +54,8 @@ pub struct GenesisConfigurations {
     pub epoch_duration_secs: u64,
     pub min_stake: u64,
     pub max_stake: u64,
-    pub min_lockup_duration_secs: u64,
-    pub max_lockup_duration_secs: u64,
+    pub recurring_lockup_duration_secs: u64,
     pub allow_new_validators: bool,
-    pub initial_lockup_timestamp: u64,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -116,11 +114,7 @@ pub fn encode_genesis_change_set(
         genesis_configs,
     );
     // generate the genesis WriteSet
-    create_and_initialize_validators(
-        &mut session,
-        validators,
-        genesis_configs.initial_lockup_timestamp,
-    );
+    create_and_initialize_validators(&mut session, validators);
 
     // Initialize on-chain governance.
     initialize_on_chain_governance(&mut session);
@@ -230,8 +224,7 @@ fn create_and_initialize_main_accounts(
             MoveValue::U64(epoch_interval_usecs),
             MoveValue::U64(genesis_configs.min_stake),
             MoveValue::U64(genesis_configs.max_stake),
-            MoveValue::U64(genesis_configs.min_lockup_duration_secs),
-            MoveValue::U64(genesis_configs.max_lockup_duration_secs),
+            MoveValue::U64(genesis_configs.recurring_lockup_duration_secs),
             MoveValue::Bool(genesis_configs.allow_new_validators),
             MoveValue::U64(rewards_rate_numerator),
             MoveValue::U64(rewards_rate_denominator),
@@ -266,7 +259,6 @@ fn initialize_on_chain_governance(session: &mut SessionExt<impl MoveResolver>) {
 fn create_and_initialize_validators(
     session: &mut SessionExt<impl MoveResolver>,
     validators: &[Validator],
-    initial_lockup_timestamp: u64,
 ) {
     let mut owners = vec![];
     let mut consensus_pubkeys = vec![];
@@ -297,7 +289,6 @@ fn create_and_initialize_validators(
             MoveValue::Vector(validator_network_addresses),
             MoveValue::Vector(full_node_network_addresses),
             MoveValue::Vector(staking_distribution),
-            MoveValue::U64(initial_lockup_timestamp),
         ]),
     );
 }
@@ -541,10 +532,8 @@ pub fn generate_test_genesis(
             epoch_duration_secs: 86400,
             min_stake: 0,
             max_stake: 1000000,
-            min_lockup_duration_secs: 0,
-            max_lockup_duration_secs: 86400 * 365,
+            recurring_lockup_duration_secs: 1,
             allow_new_validators: false,
-            initial_lockup_timestamp: 0,
         },
     );
     (genesis, test_validators)

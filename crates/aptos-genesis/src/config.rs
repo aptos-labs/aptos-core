@@ -39,13 +39,9 @@ pub struct Layout {
     /// Maximum stake to be in the validator set
     pub max_stake: u64,
     /// Minimum number of seconds to lockup staked coins
-    pub min_lockup_duration_secs: u64,
-    /// Maximum number of seconds to lockup staked coins
-    pub max_lockup_duration_secs: u64,
+    pub recurring_lockup_duration_secs: u64,
     /// Duration of an epoch
     pub epoch_duration_secs: u64,
-    /// Initial timestamp for genesis validators to be locked up
-    pub initial_lockup_timestamp: u64,
     /// Min price per gas unit
     pub min_price_per_gas_unit: u64,
 }
