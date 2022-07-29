@@ -61,16 +61,6 @@ pub enum ScriptFunctionCall {
         amount: u64,
     },
 
-    /// Create a proposal with the backing `stake_pool`.
-    /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
-    /// only the exact script with matching hash can be successfully executed.
-    AptosGovernanceCreateProposal {
-        stake_pool: AccountAddress,
-        execution_hash: Bytes,
-        metadata_location: Bytes,
-        metadata_hash: Bytes,
-    },
-
     /// Vote on proposal with `proposal_id` and voting power from `stake_pool`.
     AptosGovernanceVote {
         stake_pool: AccountAddress,
@@ -372,17 +362,6 @@ impl ScriptFunctionCall {
             AptosCoinClaimMintCapability {} => aptos_coin_claim_mint_capability(),
             AptosCoinDelegateMintCapability { to } => aptos_coin_delegate_mint_capability(to),
             AptosCoinMint { dst_addr, amount } => aptos_coin_mint(dst_addr, amount),
-            AptosGovernanceCreateProposal {
-                stake_pool,
-                execution_hash,
-                metadata_location,
-                metadata_hash,
-            } => aptos_governance_create_proposal(
-                stake_pool,
-                execution_hash,
-                metadata_location,
-                metadata_hash,
-            ),
             AptosGovernanceVote {
                 stake_pool,
                 proposal_id,
@@ -736,34 +715,6 @@ pub fn aptos_coin_mint(dst_addr: AccountAddress, amount: u64) -> TransactionPayl
         vec![
             bcs::to_bytes(&dst_addr).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
-        ],
-    ))
-}
-
-/// Create a proposal with the backing `stake_pool`.
-/// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
-/// only the exact script with matching hash can be successfully executed.
-pub fn aptos_governance_create_proposal(
-    stake_pool: AccountAddress,
-    execution_hash: Vec<u8>,
-    metadata_location: Vec<u8>,
-    metadata_hash: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("aptos_governance").to_owned(),
-        ),
-        ident_str!("create_proposal").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&stake_pool).unwrap(),
-            bcs::to_bytes(&execution_hash).unwrap(),
-            bcs::to_bytes(&metadata_location).unwrap(),
-            bcs::to_bytes(&metadata_hash).unwrap(),
         ],
     ))
 }
@@ -1758,21 +1709,6 @@ mod decoder {
         }
     }
 
-    pub fn aptos_governance_create_proposal(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::AptosGovernanceCreateProposal {
-                stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
-                execution_hash: bcs::from_bytes(script.args().get(1)?).ok()?,
-                metadata_location: bcs::from_bytes(script.args().get(2)?).ok()?,
-                metadata_hash: bcs::from_bytes(script.args().get(3)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn aptos_governance_vote(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::AptosGovernanceVote {
@@ -2359,10 +2295,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "aptos_coin_mint".to_string(),
             Box::new(decoder::aptos_coin_mint),
-        );
-        map.insert(
-            "aptos_governance_create_proposal".to_string(),
-            Box::new(decoder::aptos_governance_create_proposal),
         );
         map.insert(
             "aptos_governance_vote".to_string(),

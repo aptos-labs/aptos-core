@@ -14,7 +14,7 @@ use aptos_types::{
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
-use state::State;
+pub use state::State;
 use std::time::Duration;
 use url::Url;
 

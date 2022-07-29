@@ -9,3 +9,4 @@ pub mod processor_statuses;
 pub mod token;
 pub mod transactions;
 pub mod write_set_changes;
+pub mod ledger_info;
