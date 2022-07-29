@@ -405,8 +405,7 @@ impl TransactionRestoreBatchController {
         txns_to_execute_stream: impl Stream<Item = Result<(Transaction, TransactionInfo)>>,
     ) -> Result<()> {
         let first_version = self.replay_from_version.unwrap();
-        let expected_latest_version = first_version.checked_sub(1);
-        restore_handler.maybe_reset_state_store(expected_latest_version);
+        restore_handler.reset_state_store();
         let replay_start = Instant::now();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
         let chunk_replayer = Arc::new(ChunkExecutor::<AptosVM>::new(db));

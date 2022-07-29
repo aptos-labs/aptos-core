@@ -61,7 +61,16 @@ pub async fn reconfig(
     let txn = root_account.sign_with_transaction_builder(
         transaction_factory.payload(aptos_stdlib::version_set_version(current_version + 1)),
     );
-    client.submit_and_wait(&txn).await.unwrap();
+    client
+        .submit_and_wait(&txn)
+        .await
+        .map_err(|e| {
+            panic!(
+                "Couldn't execute {:?}, for account {:?}, error {:?}",
+                txn, root_account, e
+            )
+        })
+        .unwrap();
 
     println!("Changing aptos version to {}", current_version + 1,);
 }

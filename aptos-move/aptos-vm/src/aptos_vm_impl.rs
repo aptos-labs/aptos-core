@@ -582,17 +582,6 @@ pub(crate) fn get_transaction_output_ext<A: AccessPathCache, S: MoveResolverExt>
     Ok(TransactionOutputExt::new(delta_change_set, txn_output))
 }
 
-pub(crate) fn get_transaction_output<A: AccessPathCache, S: MoveResolverExt>(
-    ap_cache: &mut A,
-    session: SessionExt<S>,
-    gas_left: GasUnits<GasCarrier>,
-    txn_data: &TransactionMetadata,
-    status: ExecutionStatus,
-) -> Result<TransactionOutput, VMStatus> {
-    get_transaction_output_ext(ap_cache, session, gas_left, txn_data, status)
-        .map(TransactionOutputExt::into_transaction_output)
-}
-
 #[test]
 fn vm_thread_safe() {
     fn assert_send<T: Send>() {}

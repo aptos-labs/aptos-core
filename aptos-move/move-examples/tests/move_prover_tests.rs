@@ -37,7 +37,6 @@ pub fn run_prover_for_pkg(
     .unwrap();
 }
 
-#[ignore] // TODO: Ignored because Prover dependencies are not installed in CI.
 #[test]
 fn test_hello_prover() {
     let named_address = BTreeMap::new();

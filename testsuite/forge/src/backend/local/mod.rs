@@ -129,6 +129,7 @@ impl LocalFactory {
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
+        println!("Preparing a new swarm");
         let mut builder = LocalSwarm::builder(self.versions.clone())
             .number_of_validators(number_of_validators)
             .initial_version(version.clone())

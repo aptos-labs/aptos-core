@@ -3,6 +3,7 @@ module aptos_framework::block {
     use std::error;
     use std::vector;
     use aptos_std::event;
+    use aptos_std::event::EventHandle;
 
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
@@ -88,20 +89,20 @@ module aptos_framework::block {
         error::permission_denied(EVM_OR_VALIDATOR)
         );
 
-        let height = borrow_global_mut<BlockMetadata>(@aptos_framework).height;
+        let block_metadata_ref = borrow_global_mut<BlockMetadata>(@aptos_framework);
+        block_metadata_ref.height = block_metadata_ref.height + 1;
 
         let new_block_event = NewBlockEvent {
             epoch,
             round,
-            height,
+            height: block_metadata_ref.height,
             previous_block_votes,
             proposer,
             failed_proposer_indices,
             time_microseconds: timestamp,
         };
-        emit_new_block_event(&vm, new_block_event);
+        emit_new_block_event(&vm, &mut block_metadata_ref.new_block_events, new_block_event);
 
-        let block_metadata_ref = borrow_global_mut<BlockMetadata>(@aptos_framework);
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
@@ -119,19 +120,18 @@ module aptos_framework::block {
     }
 
     /// Emit the event and update height and global timestamp
-    fun emit_new_block_event(vm: &signer, new_block_event: NewBlockEvent) acquires BlockMetadata {
-        let block_metadata_ref = borrow_global_mut<BlockMetadata>(@aptos_framework);
-        assert!(block_metadata_ref.height == new_block_event.height, error::invalid_state(EBLOCK_METADATA));
-        block_metadata_ref.height = new_block_event.height + 1;
+    fun emit_new_block_event(vm: &signer, event_handle: &mut EventHandle<NewBlockEvent>, new_block_event: NewBlockEvent) {
         timestamp::update_global_time(vm, new_block_event.proposer, new_block_event.time_microseconds);
-        event::emit_event<NewBlockEvent>(&mut block_metadata_ref.new_block_events, new_block_event);
+        event::emit_event<NewBlockEvent>(event_handle, new_block_event);
     }
 
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
     fun emit_genesis_block_event(vm: signer) acquires BlockMetadata {
+        let block_metadata_ref = borrow_global_mut<BlockMetadata>(@aptos_framework);
         emit_new_block_event(
             &vm,
+            &mut block_metadata_ref.new_block_events,
             NewBlockEvent {
                 epoch: 0,
                 round: 0,

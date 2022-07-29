@@ -161,6 +161,10 @@ impl AptosDebugger {
                 &AdapterLogSchema::new(state_view.id(), 0),
             )
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
+
+        // Since we execute write sets, deltas cannot be produced.
+        let (_, output) = output.into();
+
         if save_write_set {
             self.save_write_sets(&output)?;
         }

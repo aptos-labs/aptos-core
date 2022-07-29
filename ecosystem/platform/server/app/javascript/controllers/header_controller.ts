@@ -45,4 +45,10 @@ export default class extends Controller {
     const navGroup = button.nextElementSibling;
     navGroup?.toggleAttribute("open");
   }
+
+  windowResize(event: Event) {
+    if (this.navTarget.hasAttribute('open')) {
+      this.toggleNav();
+    }
+  }
 }

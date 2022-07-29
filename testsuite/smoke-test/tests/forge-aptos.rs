@@ -3,7 +3,11 @@
 
 use forge::{forge_main, ForgeConfig, LocalFactory, Options, Result};
 use smoke_test::{
-    aptos::{AccountCreation, ErrorReport, GasCheck, MintTransfer, ModulePublish, StringArgs},
+    aptos::{
+        AccountCreation, ErrorReport, GasCheck, MintTransfer,
+        ModulePublish, /*PackagePublish,*/
+        StringArgs,
+    },
     transaction::ExternalTransactionSigner,
 };
 
@@ -16,6 +20,8 @@ fn main() -> Result<()> {
             &GasCheck,
             &MintTransfer,
             &ModulePublish,
+            // re-enable after package publishing is turned on in nodes
+            // &PackagePublish,
             &StringArgs,
             &smoke_test::nft_transaction::NFTTransaction,
             // re-enable after delegation is enabled

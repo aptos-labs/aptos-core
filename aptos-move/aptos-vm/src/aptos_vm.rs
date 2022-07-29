@@ -603,7 +603,7 @@ impl AptosVM {
         writeset_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
-    ) -> Result<ChangeSet, Result<(VMStatus, TransactionOutput), VMStatus>> {
+    ) -> Result<ChangeSet, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
         let mut gas_status = GasStatus::new_unmetered();
 
         Ok(match writeset_payload {
@@ -689,7 +689,7 @@ impl AptosVM {
         storage: &S,
         writeset_payload: WriteSetPayload,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
         let change_set = match self.execute_writeset(
@@ -707,7 +707,12 @@ impl AptosVM {
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
         Ok((
             VMStatus::Executed,
-            TransactionOutput::new(write_set, events, 0, VMStatus::Executed.into()),
+            TransactionOutputExt::from(TransactionOutput::new(
+                write_set,
+                events,
+                0,
+                VMStatus::Executed.into(),
+            )),
         ))
     }
 
@@ -716,7 +721,7 @@ impl AptosVM {
         storage: &S,
         block_metadata: BlockMetadata,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::process_block_prologue", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -794,7 +799,7 @@ impl AptosVM {
         storage: &S,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::process_writeset_transaction", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -837,7 +842,7 @@ impl AptosVM {
         writeset_payload: &WriteSetPayload,
         txn_data: TransactionMetadata,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         let change_set = match self.execute_writeset(
             storage,
             writeset_payload,
@@ -917,12 +922,12 @@ impl AptosVM {
 
         Ok((
             VMStatus::Executed,
-            TransactionOutput::new(
+            TransactionOutputExt::from(TransactionOutput::new(
                 write_set,
                 events,
                 0,
                 TransactionStatus::Keep(ExecutionStatus::Success),
-            ),
+            )),
         ))
     }
 
@@ -944,7 +949,7 @@ impl AptosVM {
     pub fn simulate_signed_transaction(
         txn: &SignedTransaction,
         state_view: &impl StateView,
-    ) -> (VMStatus, TransactionOutput) {
+    ) -> (VMStatus, TransactionOutputExt) {
         let vm = AptosVM::new(state_view);
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -1185,7 +1190,7 @@ impl AptosSimulationVM {
         storage: &S,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
-    ) -> (VMStatus, TransactionOutput) {
+    ) -> (VMStatus, TransactionOutputExt) {
         // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
         // may execute them without user's explicit permission.
         if txn.clone().check_signature().is_ok() {
@@ -1241,7 +1246,7 @@ impl AptosSimulationVM {
                         storage,
                         log_context,
                     );
-                    (vm_status, output.into_transaction_output())
+                    (vm_status, output)
                 }
             }
         }

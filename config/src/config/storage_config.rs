@@ -8,6 +8,8 @@ use std::{
     path::PathBuf,
 };
 
+pub const TARGET_SNAPSHOT_SIZE: usize = 100_000;
+
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
@@ -23,6 +25,7 @@ pub struct RocksdbConfig {
 pub struct RocksdbConfigs {
     pub ledger_db_config: RocksdbConfig,
     pub state_merkle_db_config: RocksdbConfig,
+    pub index_db_config: RocksdbConfig,
 }
 
 impl Default for RocksdbConfigs {
@@ -48,6 +51,16 @@ impl Default for RocksdbConfigs {
                 // threads to use internally.
                 max_background_jobs: 16,
             },
+            index_db_config: RocksdbConfig {
+                // Allow db to close old sst files, saving memory.
+                max_open_files: 1000,
+                // For now we set the max total WAL size to be 1G. This config can be useful when column
+                // families are updated at non-uniform frequencies.
+                max_total_wal_size: 1u64 << 30,
+                // This includes threads for flashing and compaction. Rocksdb will decide the # of
+                // threads to use internally.
+                max_background_jobs: 16,
+            },
         }
     }
 }
@@ -64,8 +77,14 @@ pub struct StorageConfig {
     data_dir: PathBuf,
     /// Read, Write, Connect timeout for network operations in milliseconds
     pub timeout_ms: u64,
+    /// The threshold that determine whether a snapshot should be committed to state merkle db.
+    pub target_snapshot_size: usize,
     /// Rocksdb-specific configurations
     pub rocksdb_configs: RocksdbConfigs,
+    /// Try to enable the internal indexer. The indexer expects to have seen all transactions
+    /// since genesis. To recover operation after data loss, or to bootstrap a node in fast sync
+    /// mode, the indexer db needs to be copied in from another node.
+    pub enable_indexer: bool,
 }
 
 pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig {
@@ -135,6 +154,8 @@ impl Default for StorageConfig {
             // Default read/write/connection timeout, in milliseconds
             timeout_ms: 30_000,
             rocksdb_configs: RocksdbConfigs::default(),
+            enable_indexer: false,
+            target_snapshot_size: TARGET_SNAPSHOT_SIZE,
         }
     }
 }

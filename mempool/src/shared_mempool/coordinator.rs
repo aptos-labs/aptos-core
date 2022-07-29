@@ -161,7 +161,9 @@ fn handle_commit_notification<V>(
     V: TransactionValidation,
 {
     debug!(
-        LogSchema::event_log(LogEntry::StateSyncCommit, LogEvent::Received).state_sync_msg(&msg)
+        block_timestamp_usecs = msg.block_timestamp_usecs,
+        num_committed_txns = msg.transactions.len(),
+        LogSchema::event_log(LogEntry::StateSyncCommit, LogEvent::Received),
     );
 
     // Process and time committed user transactions.

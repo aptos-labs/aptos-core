@@ -990,10 +990,6 @@ impl TransactionOutputExt {
     pub fn into(self) -> (DeltaChangeSet, TransactionOutput) {
         (self.delta_change_set, self.output)
     }
-
-    pub fn into_transaction_output(self) -> TransactionOutput {
-        self.output
-    }
 }
 
 impl From<TransactionOutput> for TransactionOutputExt {
@@ -1113,6 +1109,10 @@ impl TransactionInfoV0 {
         self.state_change_hash
     }
 
+    pub fn is_state_checkpoint(&self) -> bool {
+        self.state_checkpoint_hash().is_some()
+    }
+
     pub fn state_checkpoint_hash(&self) -> Option<HashValue> {
         self.state_checkpoint_hash
     }
@@ -1152,6 +1152,7 @@ pub struct TransactionToCommit {
     state_updates: HashMap<StateKey, StateValue>,
     write_set: WriteSet,
     events: Vec<ContractEvent>,
+    is_reconfig: bool,
 }
 
 impl TransactionToCommit {
@@ -1161,6 +1162,7 @@ impl TransactionToCommit {
         state_updates: HashMap<StateKey, StateValue>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
+        is_reconfig: bool,
     ) -> Self {
         TransactionToCommit {
             transaction,
@@ -1168,6 +1170,7 @@ impl TransactionToCommit {
             state_updates,
             write_set,
             events,
+            is_reconfig,
         }
     }
 
@@ -1180,7 +1183,7 @@ impl TransactionToCommit {
     }
 
     pub fn is_state_checkpoint(&self) -> bool {
-        self.transaction_info().state_checkpoint_hash.is_some()
+        self.transaction_info().is_state_checkpoint()
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -1206,6 +1209,10 @@ impl TransactionToCommit {
 
     pub fn status(&self) -> &ExecutionStatus {
         &self.transaction_info.status
+    }
+
+    pub fn is_reconfig(&self) -> bool {
+        self.is_reconfig
     }
 }
 

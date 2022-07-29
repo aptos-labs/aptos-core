@@ -277,12 +277,8 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
     }
 }
 
-pub(crate) fn discard_error_vm_status_ext(err: VMStatus) -> (VMStatus, TransactionOutputExt) {
-    let (vm_status, empty_output) = discard_error_vm_status(err);
-    (vm_status, TransactionOutputExt::from(empty_output))
-}
 
-pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOutput) {
+pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOutputExt) {
     let vm_status = err.clone();
     let error_code = match err.keep_or_discard() {
         Ok(_) => {
@@ -294,12 +290,12 @@ pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOu
     (vm_status, discard_error_output(error_code))
 }
 
-pub(crate) fn discard_error_output(err: StatusCode) -> TransactionOutput {
+pub(crate) fn discard_error_output(err: StatusCode) -> TransactionOutputExt {
     // Since this transaction will be discarded, no writeset will be included.
-    TransactionOutput::new(
+    TransactionOutputExt::from(TransactionOutput::new(
         WriteSet::default(),
         vec![],
         0,
         TransactionStatus::Discard(err),
-    )
+    ))
 }

@@ -1,0 +1,109 @@
+[
+  {
+    "type": "write_resource",
+    "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+    "state_key_hash": "",
+    "data": {
+      "type": "0x1::account::Account",
+      "data": {
+        "authentication_key": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+        "coin_register_events": {
+          "counter": "1",
+          "guid": {
+            "id": {
+              "addr": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+              "creation_num": "0"
+            }
+          }
+        },
+        "self_address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+        "sequence_number": "1"
+      }
+    }
+  },
+  {
+    "type": "write_resource",
+    "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+    "state_key_hash": "",
+    "data": {
+      "type": "0x1::guid::Generator",
+      "data": {
+        "counter": "6"
+      }
+    }
+  },
+  {
+    "type": "write_resource",
+    "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+    "state_key_hash": "",
+    "data": {
+      "type": "0x1::token::Collections",
+      "data": {
+        "burn_capabilities": {
+          "handle": "168667328656111253118486712107912293335",
+          "length": "0"
+        },
+        "collections": {
+          "handle": "289233980808638807779268266229635965202",
+          "length": "1"
+        },
+        "create_collection_events": {
+          "counter": "1",
+          "guid": {
+            "id": {
+              "addr": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+              "creation_num": "3"
+            }
+          }
+        },
+        "create_token_events": {
+          "counter": "0",
+          "guid": {
+            "id": {
+              "addr": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+              "creation_num": "4"
+            }
+          }
+        },
+        "mint_capabilities": {
+          "handle": "320092724183974385308123126434592627346",
+          "length": "0"
+        },
+        "mint_token_events": {
+          "counter": "0",
+          "guid": {
+            "id": {
+              "addr": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
+              "creation_num": "5"
+            }
+          }
+        },
+        "token_data": {
+          "handle": "47387505257877758666710590976362900572",
+          "length": "0"
+        }
+      }
+    }
+  },
+  {
+    "type": "write_table_item",
+    "state_key_hash": "",
+    "handle": "0xd998703ebdf87ff34cb87c80905b6112",
+    "key": "0x076d79206e616d65",
+    "value": "0x12617765736f6d6520636f6c6c656374696f6e076d79206e616d6520687474703a2f2f6170746f736c6162732e636f6d2f69666f6e6c792e6a736f6e000000000000000000",
+    "data": {
+      "key": "my name",
+      "key_type": "0x1::string::String",
+      "value": {
+        "count": "0",
+        "description": "awesome collection",
+        "maximum": {
+          "vec": []
+        },
+        "name": "my name",
+        "uri": "http://aptoslabs.com/ifonly.json"
+      },
+      "value_type": "0x1::token::Collection"
+    }
+  }
+]

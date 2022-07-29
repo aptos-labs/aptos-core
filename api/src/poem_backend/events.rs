@@ -104,7 +104,7 @@ impl EventsApi {
 
         let resolver = self.context.move_resolver_poem()?;
         let events = resolver
-            .as_converter()
+            .as_converter(self.context.db.clone())
             .try_into_events(&contract_events)
             .context("Failed to convert events from storage into response {}")
             .map_err(BasicErrorWith404::internal)?;
