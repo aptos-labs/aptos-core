@@ -1013,7 +1013,7 @@
                     "type": "u64"
                   },
                   {
-                    "name": "epoch_internal",
+                    "name": "epoch_interval",
                     "type": "u64"
                   },
                   {
@@ -5937,7 +5937,7 @@
         "data": {
           "type": "0x1::block::BlockMetadata",
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "0",
             "new_block_events": {
               "counter": "0",
@@ -7295,7 +7295,7 @@
                         "type": "u64"
                       },
                       {
-                        "name": "epoch_internal",
+                        "name": "epoch_interval",
                         "type": "u64"
                       },
                       {
@@ -12219,7 +12219,7 @@
             "data": {
               "type": "0x1::block::BlockMetadata",
               "data": {
-                "epoch_internal": "86400000000",
+                "epoch_interval": "86400000000",
                 "height": "0",
                 "new_block_events": {
                   "counter": "0",

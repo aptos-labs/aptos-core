@@ -419,6 +419,6 @@ impl Context {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BlockMetadataState {
-    epoch_internal: U64,
+    epoch_interval: U64,
     height: U64,
 }

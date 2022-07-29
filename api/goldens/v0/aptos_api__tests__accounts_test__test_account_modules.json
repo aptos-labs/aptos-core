@@ -1018,7 +1018,7 @@
               "type": "u64"
             },
             {
-              "name": "epoch_internal",
+              "name": "epoch_interval",
               "type": "u64"
             },
             {
