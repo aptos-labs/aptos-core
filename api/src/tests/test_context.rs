@@ -107,10 +107,13 @@ pub fn new_test_context(test_name: String, api_version: &str) -> TestContext {
         cached_framework_packages::module_blobs().to_vec(),
     )
     .unwrap()
-    .with_min_price_per_gas_unit(0)
-    .with_min_lockup_duration_secs(0)
-    .with_max_lockup_duration_secs(86400)
-    .with_initial_lockup_timestamp(0)
+    .with_init_genesis_config(Some(Arc::new(|genesis_config| {
+        genesis_config.min_price_per_gas_unit = 0;
+        genesis_config.min_lockup_duration_secs = 0;
+        genesis_config.max_lockup_duration_secs = 86400;
+        // changed from lockup_timestamp being 0
+        genesis_config.initial_lockup_duration_secs = 0;
+    })))
     .with_randomize_first_validator_ports(false);
 
     let (root_key, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();

@@ -54,7 +54,7 @@ use std::{
         Arc,
     },
     thread,
-    time::{Instant, SystemTime, UNIX_EPOCH},
+    time::Instant,
 };
 use storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
@@ -252,15 +252,18 @@ where
         }
 
         // Build genesis and validator node
-        let now_secs = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let builder = aptos_genesis::builder::Builder::new(&test_dir, genesis_modules)?
-            .with_allow_new_validators(true)
-            .with_epoch_duration_secs(EPOCH_LENGTH_SECS)
-            .with_template(template)
-            .with_randomize_first_validator_ports(random_ports)
-            .with_initial_lockup_timestamp(now_secs + EPOCH_LENGTH_SECS)
-            .with_min_lockup_duration_secs(0)
-            .with_max_lockup_duration_secs(86400 * 14);
+            .with_init_config(Some(Arc::new(move |_, config, _| {
+                *config = template.clone();
+            })))
+            .with_init_genesis_config(Some(Arc::new(|genesis_config| {
+                genesis_config.allow_new_validators = true;
+                genesis_config.epoch_duration_secs = EPOCH_LENGTH_SECS;
+                genesis_config.initial_lockup_duration_secs = EPOCH_LENGTH_SECS;
+                genesis_config.min_lockup_duration_secs = 0;
+                genesis_config.max_lockup_duration_secs = 86400 * 14;
+            })))
+            .with_randomize_first_validator_ports(random_ports);
 
         let (root_key, _genesis, genesis_waypoint, validators) = builder.build(rng)?;
 

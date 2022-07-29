@@ -141,6 +141,9 @@ impl CliCommand<Transaction> for UnlockStake {
 pub struct WithdrawStake {
     #[clap(flatten)]
     pub(crate) node_op_options: TransactionOptions,
+    /// Amount of coins to withdraw
+    #[clap(long)]
+    pub amount: u64,
 }
 
 #[async_trait]
@@ -151,7 +154,13 @@ impl CliCommand<Transaction> for WithdrawStake {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         self.node_op_options
-            .submit_script_function(AccountAddress::ONE, "stake", "withdraw", vec![], vec![])
+            .submit_script_function(
+                AccountAddress::ONE,
+                "stake",
+                "withdraw",
+                vec![],
+                vec![bcs::to_bytes(&self.amount)?],
+            )
             .await
     }
 }

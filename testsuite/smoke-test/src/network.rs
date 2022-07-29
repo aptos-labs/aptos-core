@@ -1,9 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::{
-    new_local_swarm_with_aptos, new_local_swarm_with_aptos_and_config,
-};
+use crate::smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder};
 use aptos::op::key::GenerateKey;
 use aptos_config::{
     config::{DiscoveryMethod, Identity, NetworkConfig, NodeConfig, PeerSet},
@@ -143,9 +141,9 @@ async fn test_file_discovery() {
     let (private_key, peer_set) = generate_private_key_and_peer(&op_tool).await;
     let discovery_file = Arc::new(create_discovery_file(peer_set));
     let discovery_file_for_closure = discovery_file.clone();
-    let swarm = new_local_swarm_with_aptos_and_config(
-        1,
-        Arc::new(move |_, config| {
+    let swarm = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(move |_, config, _| {
             let discovery_file_for_closure2 = discovery_file_for_closure.clone();
             modify_network_config(config, &NetworkId::Validator, move |network| {
                 network.discovery_method = DiscoveryMethod::None;
@@ -157,9 +155,9 @@ async fn test_file_discovery() {
                     ),
                 ];
             });
-        }),
-    )
-    .await;
+        }))
+        .build()
+        .await;
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
 
     // At first we should be able to connect
