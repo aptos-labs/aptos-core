@@ -193,7 +193,7 @@
             "generic_type_params": []
           },
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "13",
             "new_block_events": {
               "counter": "14",
@@ -467,7 +467,7 @@
             "generic_type_params": []
           },
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "14",
             "new_block_events": {
               "counter": "15",
@@ -741,7 +741,7 @@
             "generic_type_params": []
           },
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "15",
             "new_block_events": {
               "counter": "16",
@@ -1015,7 +1015,7 @@
             "generic_type_params": []
           },
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "16",
             "new_block_events": {
               "counter": "17",
@@ -1289,7 +1289,7 @@
             "generic_type_params": []
           },
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "17",
             "new_block_events": {
               "counter": "18",
@@ -1563,7 +1563,7 @@
             "generic_type_params": []
           },
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "18",
             "new_block_events": {
               "counter": "19",
@@ -1837,7 +1837,7 @@
             "generic_type_params": []
           },
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "19",
             "new_block_events": {
               "counter": "20",
@@ -2111,7 +2111,7 @@
             "generic_type_params": []
           },
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "20",
             "new_block_events": {
               "counter": "21",

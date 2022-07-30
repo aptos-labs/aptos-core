@@ -14,7 +14,7 @@ module aptos_framework::block {
         /// Height of the current block
         height: u64,
         /// Time period between epochs.
-        epoch_internal: u64,
+        epoch_interval: u64,
         /// Handle where events with the time of new blocks are emitted
         new_block_events: event::EventHandle<Self::NewBlockEvent>,
     }
@@ -36,7 +36,7 @@ module aptos_framework::block {
     const EVM_OR_VALIDATOR: u64 = 1;
 
     /// This can only be called during Genesis.
-    public fun initialize_block_metadata(account: &signer, epoch_internal: u64) {
+    public fun initialize_block_metadata(account: &signer, epoch_interval: u64) {
         timestamp::assert_genesis();
         system_addresses::assert_aptos_framework(account);
 
@@ -45,7 +45,7 @@ module aptos_framework::block {
             account,
             BlockMetadata {
                 height: 0,
-                epoch_internal,
+                epoch_interval,
                 new_block_events: event::new_event_handle<Self::NewBlockEvent>(account),
             }
         );
@@ -59,7 +59,7 @@ module aptos_framework::block {
     ) acquires BlockMetadata {
         system_addresses::assert_aptos_framework(aptos_framework);
         let block_metadata = borrow_global_mut<BlockMetadata>(@aptos_framework);
-        block_metadata.epoch_internal = new_epoch_interval;
+        block_metadata.epoch_interval = new_epoch_interval;
     }
 
     /// Helper function to determine whether this module has been initialized.
@@ -108,7 +108,7 @@ module aptos_framework::block {
         // transition is the last block in the previous epoch.
         stake::update_performance_statistics(missed_votes);
 
-        if (timestamp - reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_internal) {
+        if (timestamp - reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_interval) {
             reconfiguration::reconfigure();
         };
     }
@@ -148,9 +148,9 @@ module aptos_framework::block {
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockMetadata {
         initialize_block_metadata(&aptos_framework, 1);
-        assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_internal == 1, 0);
+        assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_interval == 1, 0);
         update_epoch_interval(&aptos_framework, 2);
-        assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_internal == 2, 1);
+        assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_interval == 2, 1);
     }
 
     #[test(aptos_framework = @aptos_framework, account = @0x123)]
