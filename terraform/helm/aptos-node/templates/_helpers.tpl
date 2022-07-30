@@ -35,7 +35,9 @@ Create chart name and version as used by the chart label.
 Common labels
 */}}
 {{- define "aptos-validator.labels" -}}
-{{ toYaml .Values.labels }}
+{{- range $k, $v := .Values.labels }}
+{{ $k }}: {{ $v }}
+{{- end }}
 helm.sh/chart: {{ include "aptos-validator.chart" . }}
 {{ include "aptos-validator.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
@@ -48,7 +50,9 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 Selector labels
 */}}
 {{- define "aptos-validator.selectorLabels" -}}
-{{ toYaml .Values.labels }}
+{{- range $k, $v := .Values.labels }}
+{{ $k }}: {{ $v }}
+{{- end }}
 app.kubernetes.io/part-of: {{ include "aptos-validator.name" . }}
 app.kubernetes.io/managed-by: helm
 {{- end -}}
