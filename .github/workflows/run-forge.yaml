@@ -5,17 +5,18 @@ on:
   workflow_call:
     inputs:
       GIT_SHA:
-        required: true
+        required: false
         type: string
         description:
-      merge_or_canary:
-        required: true
-        type: string
-        description: "indicate whether this is a forge run for an auto-merge or a canary, must be `merge` or `canary`"
       FORGE_NAMESPACE:
         required: true
         type: string
         description: The Forge k8s namespace to be used for test. This value should manage Forge test concurrency. It may be truncated.
+      FORGE_CLUSTER_NAME:
+        required: true
+        type: string
+        default: aptos-forge-0
+        description: The Forge k8s cluster to be used for test
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
@@ -25,7 +26,7 @@ env:
   IMAGE_TAG: ${{ inputs.GIT_SHA }}
   FORGE_ENABLED: ${{ secrets.FORGE_ENABLED }}
   FORGE_BLOCKING: ${{ secrets.FORGE_BLOCKING }}
-  FORGE_CLUSTER_NAME: ${{ secrets.FORGE_CLUSTER_NAME }}
+  FORGE_CLUSTER_NAME: ${{ inputs.FORGE_CLUSTER_NAME }}
   FORGE_OUTPUT: forge_output.txt
   FORGE_REPORT: forge_report.json
   FORGE_COMMENT: forge_comment.txt
@@ -44,6 +45,8 @@ jobs:
         if: env.FORGE_ENABLED == 'true'
         with:
           ref: ${{ inputs.GIT_SHA }}
+          # get the last 10 commits if IMAGE_TAG is not specified
+          fetch-depth: env.IMAGE_TAG != null && 0 || 10
       - name: Set kubectl context
         if: env.FORGE_ENABLED == 'true'
         run: aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME

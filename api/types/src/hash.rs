@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_openapi::impl_poem_type;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     fmt,
@@ -64,7 +63,11 @@ impl LowerHex for HashValue {
     }
 }
 
-impl_poem_type!(HashValue);
+impl HashValue {
+    pub fn zero() -> Self {
+        Self(aptos_crypto::hash::HashValue::zero())
+    }
+}
 
 #[cfg(test)]
 mod tests {

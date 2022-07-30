@@ -12,16 +12,11 @@
 
 use crate::MoveStructTag;
 
-use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use move_deps::move_core_types::identifier::{IdentStr, Identifier};
 
+use poem_openapi::NewType;
 use serde::{Deserialize, Serialize};
-use std::{
-    convert::{From, Into},
-    fmt,
-    ops::Deref,
-    str::FromStr,
-};
+use std::{convert::From, fmt, ops::Deref, str::FromStr};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct IdentifierWrapper(pub Identifier);
@@ -72,10 +67,8 @@ impl fmt::Display for IdentifierWrapper {
     }
 }
 
-impl_poem_type!(IdentifierWrapper);
-impl_poem_parameter!(IdentifierWrapper);
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, NewType)]
+#[oai(from_parameter = false, from_multipart = false, to_header = false)]
 pub struct MoveStructTagWrapper(pub MoveStructTag);
 
 impl FromStr for MoveStructTagWrapper {
@@ -103,6 +96,3 @@ impl fmt::Display for MoveStructTagWrapper {
         MoveStructTag::fmt(&self.0, f)
     }
 }
-
-impl_poem_type!(MoveStructTagWrapper);
-impl_poem_parameter!(MoveStructTagWrapper);

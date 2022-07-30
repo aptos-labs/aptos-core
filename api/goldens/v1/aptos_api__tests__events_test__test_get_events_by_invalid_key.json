@@ -1,0 +1,5 @@
+{
+  "message": "failed to parse path `event_key`: failed to parse \"string(EventKey)\": Odd number of digits",
+  "error_code": null,
+  "aptos_ledger_version": null
+}

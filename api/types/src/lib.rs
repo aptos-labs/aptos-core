@@ -6,6 +6,7 @@ mod address;
 mod block;
 mod bytecode;
 mod convert;
+mod derives;
 mod error;
 mod event_key;
 mod hash;
@@ -30,19 +31,19 @@ pub use index::IndexResponse;
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
     HexEncodedBytes, MoveFunction, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStructTag, MoveStructValue, MoveType, MoveValue, ScriptFunctionId,
-    U128, U64,
+    MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, ScriptFunctionId, U128, U64,
 };
 pub use response::{
     Response, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
 pub use table::TableItemRequest;
 pub use transaction::{
-    BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem, DirectWriteSet, Event,
-    GenesisTransaction, PendingTransaction, ScriptFunctionPayload, ScriptPayload, ScriptWriteSet,
-    Transaction, TransactionData, TransactionId, TransactionInfo, TransactionOnChainData,
-    TransactionPayload, TransactionSigningMessage, UserCreateSigningMessageRequest,
-    UserTransaction, UserTransactionRequest, WriteModule, WriteResource, WriteSet, WriteSetChange,
-    WriteSetPayload, WriteTableItem,
+    BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem, DirectWriteSet,
+    EncodeSubmissionRequest, Event, GenesisTransaction, PendingTransaction, ScriptFunctionPayload,
+    ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction, TransactionData,
+    TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
+    TransactionSigningMessage, UserCreateSigningMessageRequest, UserTransaction,
+    UserTransactionRequest, WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload,
+    WriteTableItem,
 };
 pub use wrappers::{IdentifierWrapper, MoveStructTagWrapper};

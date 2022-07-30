@@ -5,7 +5,9 @@ use crate::{counters::*, data_cache::StateViewCache};
 use anyhow::Result;
 use aptos_state_view::StateView;
 use aptos_types::{
-    transaction::{SignatureCheckedTransaction, SignedTransaction, VMValidatorResult},
+    transaction::{
+        SignatureCheckedTransaction, SignedTransaction, TransactionOutputExt, VMValidatorResult,
+    },
     vm_status::{StatusCode, VMStatus},
 };
 
@@ -64,7 +66,7 @@ pub trait VMAdapter {
         txn: &PreprocessedTransaction,
         data_cache: &S,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput, Option<String>), VMStatus>;
+    ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus>;
 }
 
 /// Validate a signed transaction by performing the following:
@@ -204,6 +206,8 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
             &data_cache.as_move_resolver(),
             &log_context,
         )?;
+        // TODO: apply deltas.
+        let (_, output) = output.into();
         if !output.status().is_discarded() {
             data_cache.push_write_set(output.write_set());
         } else {
@@ -273,7 +277,7 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
     }
 }
 
-pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOutput) {
+pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOutputExt) {
     let vm_status = err.clone();
     let error_code = match err.keep_or_discard() {
         Ok(_) => {
@@ -285,12 +289,12 @@ pub(crate) fn discard_error_vm_status(err: VMStatus) -> (VMStatus, TransactionOu
     (vm_status, discard_error_output(error_code))
 }
 
-pub(crate) fn discard_error_output(err: StatusCode) -> TransactionOutput {
+pub(crate) fn discard_error_output(err: StatusCode) -> TransactionOutputExt {
     // Since this transaction will be discarded, no writeset will be included.
-    TransactionOutput::new(
+    TransactionOutputExt::from(TransactionOutput::new(
         WriteSet::default(),
         vec![],
         0,
         TransactionStatus::Discard(err),
-    )
+    ))
 }

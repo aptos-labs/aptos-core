@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::move_vm_ext::{MoveResolverExt, SessionExt};
+use anyhow::bail;
 use aptos_types::transaction::ModuleBundle;
 use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
@@ -25,6 +26,7 @@ use move_deps::{
 use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
 use std::collections::{BTreeSet, VecDeque};
+use std::str::FromStr;
 
 // ========================================================================================
 // Rust representation of PackageMetadata
@@ -45,34 +47,22 @@ pub struct PackageMetadata {
     pub name: String,
     /// The upgrade policy of this package.
     pub upgrade_policy: UpgradePolicy,
+    /// The package manifest, in the Move.toml format.
+    pub manifest: String,
     /// The list of modules installed by this package.
     pub modules: Vec<ModuleMetadata>,
-    /// Address aliases which where used when the modules above were compiled.
-    pub address_aliases: Vec<AddressAlias>,
-    /// Dependencies which were used when this package was compiled.
-    pub deps: Vec<PackageDep>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ModuleMetadata {
     /// Name of the module.
     pub name: String,
-    /// Source map, in internal encoding
-    pub source_map: Vec<u8>,
-    /// Source text.
+    /// Source text if available.
     pub source: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PackageDep {
-    pub addr: AccountAddress,
-    pub name: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct AddressAlias {
-    pub alias: String,
-    pub addr: AccountAddress,
+    /// Source map, in internal encoding.
+    pub source_map: Vec<u8>,
+    /// ABI, in JSON byte encoding.
+    pub abi: Vec<u8>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -89,6 +79,18 @@ impl UpgradePolicy {
     }
     pub fn immutable() -> Self {
         UpgradePolicy { policy: 2 }
+    }
+}
+
+impl FromStr for UpgradePolicy {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "arbitrary" => Ok(UpgradePolicy::no_compat()),
+            "compatible" => Ok(UpgradePolicy::compat()),
+            "immutable" => Ok(UpgradePolicy::immutable()),
+            _ => bail!("unknown policy"),
+        }
     }
 }
 

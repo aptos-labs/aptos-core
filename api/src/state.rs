@@ -13,6 +13,7 @@ use crate::{
 use anyhow::anyhow;
 use aptos_api_types::{
     AsConverter, Error, LedgerInfo, MoveModuleBytecode, Response, TableItemRequest, TransactionId,
+    U64,
 };
 use aptos_state_view::StateView;
 use aptos_types::state_store::table::TableHandle;
@@ -24,7 +25,9 @@ use move_deps::move_core_types::{
     language_storage::{ModuleId, ResourceKey, StructTag},
 };
 use std::convert::TryInto;
+use std::sync::Arc;
 use storage_interface::state_view::DbStateView;
+use storage_interface::DbReader;
 use warp::{filters::BoxedFilter, Filter, Rejection, Reply};
 
 // GET /accounts/<address>/resource/<resource_type>
@@ -116,6 +119,7 @@ pub(crate) struct State {
     state_view: DbStateView,
     ledger_version: aptos_types::transaction::Version,
     latest_ledger_info: LedgerInfo,
+    db: Arc<dyn DbReader>,
 }
 
 impl State {
@@ -131,7 +135,7 @@ impl State {
         if ledger_version > latest_ledger_info.version() {
             return Err(Error::not_found(
                 "ledger",
-                TransactionId::Version(ledger_version),
+                TransactionId::Version(U64::from(ledger_version)),
                 latest_ledger_info.version(),
             ));
         }
@@ -142,6 +146,7 @@ impl State {
             state_view,
             ledger_version,
             latest_ledger_info,
+            db: context.db.clone(),
         })
     }
 
@@ -161,7 +166,7 @@ impl State {
         let resource = self
             .state_view
             .as_move_resolver()
-            .as_converter()
+            .as_converter(self.db.clone())
             .try_into_resource(&struct_tag, &bytes)?;
         Response::new(self.latest_ledger_info, &resource)
     }
@@ -195,7 +200,7 @@ impl State {
         let value_type = value_type.try_into()?;
 
         let resolver = self.state_view.as_move_resolver();
-        let converter = resolver.as_converter();
+        let converter = resolver.as_converter(self.db.clone());
 
         let vm_key = converter
             .try_into_vm_value(&key_type, key.clone())

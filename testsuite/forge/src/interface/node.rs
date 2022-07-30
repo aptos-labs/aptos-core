@@ -102,9 +102,16 @@ pub trait FullNode: Node + Sync {
         const DIRECTION: Option<&str> = Some("outbound");
         const EXPECTED_PEERS: usize = 1;
 
-        self.get_connected_peers(NetworkId::Public, DIRECTION)
-            .await
-            .map(|maybe_n| maybe_n.map(|n| n >= EXPECTED_PEERS as i64).unwrap_or(false))
+        for &network_id in &[NetworkId::Public, NetworkId::Vfn] {
+            let r = self
+                .get_connected_peers(network_id, DIRECTION)
+                .await
+                .map(|maybe_n| maybe_n.map(|n| n >= EXPECTED_PEERS as i64).unwrap_or(false));
+            if let Ok(true) = r {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     async fn wait_for_connectivity(&self, deadline: Instant) -> Result<()> {

@@ -30,3 +30,7 @@ service:
       type: "ClusterIP"
     enableRestApi: true
     enableMetricsPort: true
+
+labels:
+  forge-namespace: {namespace}
+  forge-image-tag: {image_tag}

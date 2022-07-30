@@ -1,0 +1,5 @@
+{
+  "message": "Deserialization error, field(epoch) type is not EventHandle struct: unexpected end of input",
+  "error_code": null,
+  "aptos_ledger_version": null
+}
