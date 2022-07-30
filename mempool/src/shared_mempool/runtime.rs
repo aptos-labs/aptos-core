@@ -17,6 +17,9 @@ use event_notifications::ReconfigNotificationListener;
 use futures::channel::mpsc::{self, Receiver, UnboundedSender};
 use mempool_notifications::MempoolNotificationListener;
 use network::application::storage::PeerMetadataStorage;
+use rand::distributions::{Alphanumeric, DistString};
+use std::io::Write;
+use std::time::Duration;
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::DbReader;
 use tokio::runtime::{Builder, Handle, Runtime};
@@ -63,25 +66,91 @@ pub(crate) fn start_shared_mempool<V>(
         peer_metadata_storage,
     );
 
-    executor.spawn(coordinator(
-        smp,
-        executor.clone(),
-        all_network_events,
-        client_events,
-        quorum_store_requests,
-        mempool_listener,
-        mempool_reconfig_events,
-    ));
+    let handle_clone = executor.clone();
 
-    executor.spawn(gc_coordinator(
-        mempool.clone(),
-        config.mempool.system_transaction_gc_interval_ms,
-    ));
+    let system_transaction_gc_interval_ms = config.mempool.system_transaction_gc_interval_ms;
+    let mempool_snapshot_interval_secs = config.mempool.mempool_snapshot_interval_secs;
 
-    executor.spawn(snapshot_job(
-        mempool,
-        config.mempool.mempool_snapshot_interval_secs,
-    ));
+    executor.spawn(async move {
+        let coordinator_monitor = tokio_metrics::TaskMonitor::new();
+        let gc_monitor = tokio_metrics::TaskMonitor::new();
+        let snapshot_monitor = tokio_metrics::TaskMonitor::new();
+
+        tokio::task::Builder::new()
+            .name("[Mempool] Coordinator Job")
+            .spawn(coordinator_monitor.instrument(coordinator(
+                smp,
+                handle_clone.clone(),
+                all_network_events,
+                client_events,
+                quorum_store_requests,
+                mempool_listener,
+                mempool_reconfig_events,
+            )));
+
+        tokio::task::Builder::new()
+            .name("[Mempool] GC Job")
+            .spawn(gc_monitor.instrument(gc_coordinator(
+                mempool.clone(),
+                system_transaction_gc_interval_ms,
+            )));
+
+        tokio::task::Builder::new()
+            .name("[Mempool] Snapshot Job")
+            .spawn(
+                snapshot_monitor.instrument(snapshot_job(mempool, mempool_snapshot_interval_secs)),
+            );
+
+        let runtime_monitor = tokio_metrics::RuntimeMonitor::new(&handle_clone);
+        let string = Alphanumeric.sample_string(&mut rand::thread_rng(), 8);
+        let str_clone = string.clone();
+
+        tokio::task::Builder::new()
+            .name("Mempool Task Metrics Reporter")
+            .spawn(async move {
+                let coodrinator_intervals = coordinator_monitor.intervals();
+                let gc_intervals = gc_monitor.intervals();
+                let snapshot_intyervals = snapshot_monitor.intervals();
+
+                let intervals = coodrinator_intervals.zip(gc_intervals.zip(snapshot_intyervals));
+
+                let file_appender =
+                    tracing_appender::rolling::minutely("/tmp", format!("{}.task_metrics", string));
+                let (mut non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+                for (coordinator, (gc, snapshot)) in intervals {
+                    non_blocking
+                        .write_fmt(format_args!("coordinator = {:#?}\n", coordinator))
+                        .expect("write_fmt should work");
+                    non_blocking
+                        .write_fmt(format_args!("gc = {:#?}\n", gc))
+                        .expect("write_fmt should work");
+                    non_blocking
+                        .write_fmt(format_args!("snapshot = {:#?}\n", snapshot))
+                        .expect("write_fmt should work");
+                    tokio::time::sleep(Duration::from_millis(2000)).await;
+                }
+            });
+
+        tokio::task::Builder::new()
+            .name("Mempool Runtime Metrics Reporter")
+            .spawn(async move {
+                let file_appender = tracing_appender::rolling::minutely(
+                    "/tmp",
+                    format!("{}.runtime_metrics", str_clone),
+                );
+                let (mut non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+
+                for interval in runtime_monitor.intervals() {
+                    // pretty-print the metric interval
+                    non_blocking
+                        .write_fmt(format_args!("{:?}\n", interval))
+                        .expect("write_fmt should work");
+                    // wait 2s
+                    tokio::time::sleep(Duration::from_millis(2000)).await;
+                }
+            });
+    });
 }
 
 pub fn bootstrap(
