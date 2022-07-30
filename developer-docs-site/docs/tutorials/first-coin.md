@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 This tutorial details how to deploy and manage a new Coin. The steps are:
 
-1. Deploy MoonCoin module. Let's call it MoonCoin.
+1. Deploy moon_coin module. Let's call it moon_coin.
 2. Initialize MoonCoin via the standard Coin framework module.
 3. Register a recipient account to receive MoonCoin.
 4. Mint MoonCoin to the recipient as the owner of the MoonCoin.
@@ -41,7 +41,7 @@ You can find the rust project [here](https://github.com/aptos-labs/aptos-core/tr
   </TabItem>
 </Tabs>
 
-## Step 1) Deploy MoonCoin module
+## Step 1) Deploy moon_coin module
 
 ### Step 1.1) Download Aptos-core
 
@@ -67,10 +67,10 @@ cargo install --git https://github.com/aptos-labs/aptos-core.git aptos
 
 In this terminal, change directories to `aptos-move/move-examples/moon_coin`. Keep this terminal window for the rest of this tutorial- we will refer to it later as the "Move Window". The rest of this section will review the file `sources/MoonCoinType.move`.
 
-This module enables users to create a new MoonCoinType::MoonCoin::MoonCoin that can be used to register with the framework Coin module (0x1::coin) to create a standard Coin. Developers can write their own functionalities in the MoonCoin module if they want to do more than what's provided by the standard 0x1::coin or 0x1::managed_coin (adds mint/burn functionalities).
+This module enables users to create a new MoonCoinType::moon_coin::MoonCoin that can be used to register with the framework Coin module (0x1::coin) to create a standard Coin. Developers can write their own functionalities in the moon_coin module if they want to do more than what's provided by the standard 0x1::coin or 0x1::managed_coin (adds mint/burn functionalities).
 
 ```rust
-module MoonCoinType::MoonCoin {
+module MoonCoinType::moon_coin {
     struct MoonCoin {}
 }
 ```
@@ -86,7 +86,7 @@ For Typescript:
 - Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript).
 - Open your favorite terminal and navigate to where you downloaded the above example project
 - Install the required libraries: `yarn install`
-- Execute the example: `yarn first_coin MoonCoin.mv`
+- Execute the example: `yarn first_coin moon_coin.mv`
 
 </TabItem>
 <TabItem value="python" label="Python">
@@ -95,7 +95,7 @@ For Python3:
 - Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python).
 - Open your favorite terminal and navigate to where you downloaded the above example project
 - Install the required libraries: `pip3 install -r requirements.txt`.
-- Execute the example: `python3 first_coin.py MoonCoin.mv`
+- Execute the example: `python3 first_coin.py moon_coin.mv`
 
 </TabItem>
 <TabItem value="rust" label="Rust">
@@ -103,7 +103,7 @@ For Rust:
 
 - Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust).
 - Open your favorite terminal and navigate to where you downloaded the above example project
-- Execute the example: `cargo run --bin first_coin -- MoonCoin.mv`
+- Execute the example: `cargo run --bin first_coin -- moon_coin.mv`
 
 </TabItem>
 </Tabs>
@@ -130,7 +130,7 @@ Update the module with Alice's address, build, copy to the provided path, and pr
 
 ## Step 2) Initialize MoonCoin
 
-The MoonCoin module has alreayd been deployed. The next step is to initialize MoonCoin. In this example, we'll be using 0x1::managed_coin::initialize since we want the ability to mint/burn our new MoonCoin. This adds standard functionalities to MoonCoin such as transfer, mint, burn and standard events (register, deposit, withdraw).
+The moon_coin module has alreayd been deployed. The next step is to initialize MoonCoin. In this example, we'll be using 0x1::managed_coin::initialize since we want the ability to mint/burn our new MoonCoin. This adds standard functionalities to MoonCoin such as transfer, mint, burn and standard events (register, deposit, withdraw).
 
 <Tabs>
   <TabItem value="typescript" label="Typescript" default>

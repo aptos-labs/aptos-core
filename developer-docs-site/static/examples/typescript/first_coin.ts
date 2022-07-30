@@ -17,7 +17,7 @@ const client = new AptosClient(NODE_URL);
 /** Initializes the new coin */
 async function initializeCoin(accountFrom: AptosAccount, coinTypeAddress: HexString): Promise<string> {
   const token = new TxnBuilderTypes.TypeTagStruct(
-    TxnBuilderTypes.StructTag.fromString(`${coinTypeAddress.hex()}::MoonCoin::MoonCoin`),
+    TxnBuilderTypes.StructTag.fromString(`${coinTypeAddress.hex()}::moon_coin::MoonCoin`),
   );
 
   const serializer = new BCS.Serializer();
@@ -58,7 +58,7 @@ async function initializeCoin(accountFrom: AptosAccount, coinTypeAddress: HexStr
 /** Receiver needs to register the coin before they can receive it */
 async function registerCoin(coinReceiver: AptosAccount, coinTypeAddress: HexString): Promise<string> {
   const token = new TxnBuilderTypes.TypeTagStruct(
-    TxnBuilderTypes.StructTag.fromString(`${coinTypeAddress.hex()}::MoonCoin::MoonCoin`),
+    TxnBuilderTypes.StructTag.fromString(`${coinTypeAddress.hex()}::moon_coin::MoonCoin`),
   );
 
   const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
@@ -96,7 +96,7 @@ async function mintCoin(
   amount: number,
 ): Promise<string> {
   const token = new TxnBuilderTypes.TypeTagStruct(
-    TxnBuilderTypes.StructTag.fromString(`${coinTypeAddress.hex()}::MoonCoin::MoonCoin`),
+    TxnBuilderTypes.StructTag.fromString(`${coinTypeAddress.hex()}::moon_coin::MoonCoin`),
   );
 
   const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
@@ -135,7 +135,7 @@ async function getBalance(accountAddress: MaybeHexString, coinTypeAddress: HexSt
   try {
     const resource = await client.getAccountResource(
       accountAddress,
-      `0x1::coin::CoinStore<${coinTypeAddress.hex()}::MoonCoin::MoonCoin>`,
+      `0x1::coin::CoinStore<${coinTypeAddress.hex()}::moon_coin::MoonCoin>`,
     );
 
     return parseInt((resource.data as any)["coin"]["value"]);

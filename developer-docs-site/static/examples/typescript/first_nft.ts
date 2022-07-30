@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { FAUCET_URL, NODE_URL, accountBalance } from "./first_transaction";
-import { AptosAccount, TxnBuilderTypes, BCS, MaybeHexString, AptosClient, HexString, FaucetClient } from "aptos";
+import { AptosAccount, TxnBuilderTypes, BCS, AptosClient, HexString, FaucetClient } from "aptos";
 
 //:!:>section_1
 function serializeVectorBool(vecBool: boolean[]) {
@@ -256,12 +256,17 @@ async function getTokenBalance(
   collection_name: string,
   token_name: string,
 ): Promise<number> {
-  const token_store = await client.getAccountResource(creator, "0x1::token::TokenStore");
+  const token_store = await client.getAccountResource(owner, "0x3::token::TokenStore");
 
-  const token_id = {
+  const token_data_id = {
     creator: creator.hex(),
     collection: collection_name,
     name: token_name,
+  };
+
+  const token_id = {
+    token_data_id,
+    property_version: "0",
   };
 
   const token = await tableItem(
@@ -271,7 +276,7 @@ async function getTokenBalance(
     token_id,
   );
 
-  return token.data.value;
+  return token.data.amount;
 }
 
 async function getTokenData(creator: HexString, collection_name: string, token_name: string): Promise<any> {
@@ -285,7 +290,7 @@ async function getTokenData(creator: HexString, collection_name: string, token_n
 
   const token = await tableItem(
     (collections.data as any)["token_data"]["handle"],
-    "0x3::token::TokenId",
+    "0x3::token::TokenDataId",
     "0x3::token::TokenData",
     token_data_id,
   );
