@@ -78,12 +78,12 @@ Follow the below links to access the source code for the tutorial:
 See the `first_transaction.ts` code in the [Typescript project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript) of the tutorial.
 
   </TabItem>
-  <TabItem value="python" label="Python" default>
+  <TabItem value="python" label="Python">
 
 See the `first_transaction.py` code in the [Python version](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python) of the tutorial.
 
   </TabItem>
-  <TabItem value="rust" label="Rust" default>
+  <TabItem value="rust" label="Rust">
 
 See the `first_transaction/src` code in the [Rust project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust) of the tutorial.
 
@@ -102,14 +102,14 @@ This step creates the representation of an account. See also [Aptos accounts][ac
 ```
 
   </TabItem>
-  <TabItem value="python" label="Python" default>
+  <TabItem value="python" label="Python">
 
 ```python
 :!: static/examples/python/first_transaction.py section_1
 ```
 
   </TabItem>
-  <TabItem value="rust" label="Rust" default>
+  <TabItem value="rust" label="Rust">
 
 ```rust
 :!: static/examples/rust/first_transaction/src/lib.rs section_1
@@ -133,14 +133,14 @@ While the data from the REST interface can be read directly, the following code 
 ```
 
   </TabItem>
-  <TabItem value="python" label="Python" default>
+  <TabItem value="python" label="Python">
 
 ```python
 :!: static/examples/python/first_transaction.py section_2
 ```
 
   </TabItem>
-  <TabItem value="rust" label="Rust" default>
+  <TabItem value="rust" label="Rust">
 
 ```rust
 :!: static/examples/rust/first_transaction/src/lib.rs section_2
@@ -161,14 +161,14 @@ The following are wrappers for querying account data.
 ```
 
   </TabItem>
-  <TabItem value="python" label="Python" default>
+  <TabItem value="python" label="Python">
 
 ```python
 :!: static/examples/python/first_transaction.py section_3
 ```
 
   </TabItem>
-  <TabItem value="rust" label="Rust" default>
+  <TabItem value="rust" label="Rust">
 
 ```rust
 :!: static/examples/rust/first_transaction/src/lib.rs section_3
@@ -189,14 +189,14 @@ The following demonstrates the core functionality for constructing, signing, and
 ```
 
   </TabItem>
-<TabItem value="python" label="Python" default>
+<TabItem value="python" label="Python">
 
 ```python
 :!: static/examples/python/first_transaction.py section_4
 ```
 
   </TabItem>
-  <TabItem value="rust" label="Rust" default>
+  <TabItem value="rust" label="Rust">
 
 ```rust
 :!: static/examples/rust/first_transaction/src/lib.rs section_4
@@ -217,14 +217,14 @@ The following demonstrates how to read data from the blockchain and how to submi
 ```
 
 </TabItem>
-<TabItem value="python" label="Python" default>
+<TabItem value="python" label="Python">
 
 ```python
 :!: static/examples/python/first_transaction.py section_5
 ```
 
   </TabItem>
-  <TabItem value="rust" label="Rust" default>
+  <TabItem value="rust" label="Rust">
 
 ```rust
 :!: static/examples/rust/first_transaction/src/lib.rs section_5
@@ -245,14 +245,14 @@ Aptos Blockchain faucets issue test tokens to accounts. These test tokens can be
 ```
 
   </TabItem>
-<TabItem value="python" label="Python" default>
+<TabItem value="python" label="Python" >
 
 ```python
 :!: static/examples/python/first_transaction.py section_6
 ```
 
   </TabItem>
-  <TabItem value="rust" label="Rust" default>
+  <TabItem value="rust" label="Rust" >
 
 ```rust
 :!: static/examples/rust/first_transaction/src/lib.rs section_6
@@ -266,7 +266,7 @@ Aptos Blockchain faucets issue test tokens to accounts. These test tokens can be
 Finally, we can run the application and verify the output.
 
 <Tabs>
-<TabItem value="typescript" label="Typescript">
+<TabItem value="typescript" label="Typescript" default>
 For Typescript:
 
 1. Make sure you followed the prerequisites described in [Before you start](#before-you-start).
@@ -275,7 +275,7 @@ For Typescript:
 4. Execute the example: `yarn first_transaction`.
 
 </TabItem>
-<TabItem value="python" label="Python" default>
+<TabItem value="python" label="Python">
 For Python3:
 
 1. Make sure you followed the prerequisites described in [Before you start](#before-you-start).
