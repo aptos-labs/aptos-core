@@ -46,13 +46,13 @@ impl AccountsApi {
     )]
     async fn get_account(
         &self,
-        accept_type: &AcceptType,
+        accept_type: AcceptType,
         address: Path<Address>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<AccountData> {
         fail_point_poem("endpoint_get_account")?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
-        account.account(accept_type)
+        account.account(&accept_type)
     }
 
     /// Get account resources
@@ -71,21 +71,23 @@ impl AccountsApi {
     )]
     async fn get_account_resources(
         &self,
-        accept_type: &AcceptType,
+        accept_type: AcceptType,
         address: Path<Address>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<Vec<MoveResource>> {
         fail_point_poem("endpoint_get_account_resources")?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
-        account.resources(accept_type)
+        account.resources(&accept_type)
     }
 
     /// Get account modules
     ///
-    /// This endpoint returns account resources for a specific ledger version (AKA transaction version).
-    /// If not present, the latest version is used. <---- TODO Update this comment
+    /// This endpoint returns all account modules at a given address at a
+    /// specific ledger version (AKA transaction version). If the ledger
+    /// version is not specified in the request, the latest ledger version is used.
+    ///
     /// The Aptos nodes prune account state history, via a configurable time window (link).
-    /// If the requested data has been pruned, the server responds with a 404
+    /// If the requested data has been pruned, the server responds with a 404.
     #[oai(
         path = "/accounts/:address/modules",
         method = "get",
@@ -94,13 +96,13 @@ impl AccountsApi {
     )]
     async fn get_account_modules(
         &self,
-        accept_type: &AcceptType,
+        accept_type: AcceptType,
         address: Path<Address>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
         fail_point_poem("endpoint_get_account_modules")?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
-        account.modules(accept_type)
+        account.modules(&accept_type)
     }
 }
 

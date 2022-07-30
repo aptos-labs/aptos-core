@@ -13,8 +13,8 @@ use serde_json::json;
 
 use crate::{
     move_types::{MoveAbility, MoveStructValue},
-    Address, EventKey, HashValue, HexEncodedBytes, IdentifierWrapper, MoveStructTagWrapper,
-    MoveType, U128, U64,
+    Address, EventKey, HashValue, HexEncodedBytes, IdentifierWrapper, MoveStructTagParam, MoveType,
+    U128, U64,
 };
 use indoc::indoc;
 
@@ -75,6 +75,35 @@ impl_poem_type!(
 impl_poem_type!(IdentifierWrapper, "string", ());
 
 impl_poem_type!(MoveAbility, "string", ());
+
+impl_poem_type!(
+    MoveStructTagParam,
+    "string",
+    (
+        example = Some(serde_json::Value::String(
+            "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>".to_string()
+        )),
+        pattern = Some("^0x[0-9a-zA-Z:_<>]+$".to_string()),
+        description = Some(indoc! {"
+        String representation of a MoveStructTag (on-chain Move struct type). This exists so you
+        can specify MoveStructTags as path / query parameters, e.g. for get_events_by_event_handle.
+
+        It is a combination of:
+          1. `move_module_address`, `module_name` and `struct_name`, all joined by `::`
+          2. `struct generic type parameters` joined by `, `
+
+        Examples:
+          * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`
+          * `0x1::account::Account`
+
+        Note:
+          1. Empty chars should be ignored when comparing 2 struct tag ids.
+          2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
+
+        See [doc](https://aptos.dev/concepts/basics-accounts) for more details.
+      "})
+    )
+);
 
 impl_poem_type!(
     MoveStructValue,
@@ -210,7 +239,7 @@ impl_poem_parameter!(
     HashValue,
     IdentifierWrapper,
     HexEncodedBytes,
-    MoveStructTagWrapper,
+    MoveStructTagParam,
     U64,
     U128
 );

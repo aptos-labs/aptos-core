@@ -14,7 +14,6 @@ use crate::MoveStructTag;
 
 use move_deps::move_core_types::identifier::{IdentStr, Identifier};
 
-use poem_openapi::NewType;
 use serde::{Deserialize, Serialize};
 use std::{convert::From, fmt, ops::Deref, str::FromStr};
 
@@ -67,31 +66,30 @@ impl fmt::Display for IdentifierWrapper {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, NewType)]
-#[oai(from_parameter = false, from_multipart = false, to_header = false)]
-pub struct MoveStructTagWrapper(pub MoveStructTag);
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MoveStructTagParam(pub MoveStructTag);
 
-impl FromStr for MoveStructTagWrapper {
+impl FromStr for MoveStructTagParam {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
-        Ok(MoveStructTagWrapper(MoveStructTag::from_str(s)?))
+        Ok(MoveStructTagParam(MoveStructTag::from_str(s)?))
     }
 }
 
-impl From<MoveStructTagWrapper> for MoveStructTag {
-    fn from(value: MoveStructTagWrapper) -> MoveStructTag {
+impl From<MoveStructTagParam> for MoveStructTag {
+    fn from(value: MoveStructTagParam) -> MoveStructTag {
         value.0
     }
 }
 
-impl From<MoveStructTag> for MoveStructTagWrapper {
-    fn from(value: MoveStructTag) -> MoveStructTagWrapper {
+impl From<MoveStructTag> for MoveStructTagParam {
+    fn from(value: MoveStructTag) -> MoveStructTagParam {
         Self(value)
     }
 }
 
-impl fmt::Display for MoveStructTagWrapper {
+impl fmt::Display for MoveStructTagParam {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         MoveStructTag::fmt(&self.0, f)
     }

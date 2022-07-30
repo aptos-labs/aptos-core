@@ -292,7 +292,7 @@
           "Accounts"
         ],
         "summary": "Get account modules",
-        "description": "This endpoint returns account resources for a specific ledger version (AKA transaction version).\nIf not present, the latest version is used. <---- TODO Update this comment\nThe Aptos nodes prune account state history, via a configurable time window (link).\nIf the requested data has been pruned, the server responds with a 404",
+        "description": "This endpoint returns all account modules at a given address at a\nspecific ledger version (AKA transaction version). If the ledger\nversion is not specified in the request, the latest ledger version is used.\n\nThe Aptos nodes prune account state history, via a configurable time window (link).\nIf the requested data has been pruned, the server responds with a 404.",
         "parameters": [
           {
             "name": "address",
@@ -590,7 +590,7 @@
           {
             "name": "event_handle",
             "schema": {
-              "$ref": "#/components/schemas/MoveStructTag"
+              "$ref": "#/components/schemas/MoveStructTagParam"
             },
             "in": "path",
             "required": true,
@@ -837,7 +837,7 @@
           {
             "name": "resource_type",
             "schema": {
-              "$ref": "#/components/schemas/MoveStructTag"
+              "$ref": "#/components/schemas/MoveStructTagParam"
             },
             "in": "path",
             "required": true,
@@ -2865,6 +2865,12 @@
             }
           }
         }
+      },
+      "MoveStructTagParam": {
+        "type": "string",
+        "description": "String representation of a MoveStructTag (on-chain Move struct type). This exists so you\ncan specify MoveStructTags as path / query parameters, e.g. for get_events_by_event_handle.\n\nIt is a combination of:\n  1. `move_module_address`, `module_name` and `struct_name`, all joined by `::`\n  2. `struct generic type parameters` joined by `, `\n\nExamples:\n  * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`\n  * `0x1::account::Account`\n\nNote:\n  1. Empty chars should be ignored when comparing 2 struct tag ids.\n  2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).\n\nSee [doc](https://aptos.dev/concepts/basics-accounts) for more details.\n",
+        "example": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+        "pattern": "^0x[0-9a-zA-Z:_<>]+$"
       },
       "MoveStructValue": {
         "type": "object",

@@ -13,7 +13,7 @@ use super::{
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{Address, EventKey, IdentifierWrapper, MoveStructTagWrapper, U64};
+use aptos_api_types::{Address, EventKey, IdentifierWrapper, MoveStructTagParam, U64};
 use aptos_api_types::{AsConverter, Event};
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
@@ -37,7 +37,7 @@ impl EventsApi {
     // TODO: https://github.com/aptos-labs/aptos-core/issues/2284
     async fn get_events_by_event_key(
         &self,
-        accept_type: &AcceptType,
+        accept_type: AcceptType,
         // TODO: https://github.com/aptos-labs/aptos-core/issues/2278
         event_key: Path<EventKey>,
         start: Query<Option<U64>>,
@@ -61,9 +61,9 @@ impl EventsApi {
     )]
     async fn get_events_by_event_handle(
         &self,
-        accept_type: &AcceptType,
+        accept_type: AcceptType,
         address: Path<Address>,
-        event_handle: Path<MoveStructTagWrapper>,
+        event_handle: Path<MoveStructTagParam>,
         field_name: Path<IdentifierWrapper>,
         start: Query<Option<U64>>,
         limit: Query<Option<u16>>,
@@ -82,7 +82,7 @@ impl EventsApi {
 impl EventsApi {
     fn list(
         &self,
-        accept_type: &AcceptType,
+        accept_type: AcceptType,
         page: Page,
         event_key: EventKey,
     ) -> BasicResultWith404<Vec<Event>> {
@@ -111,7 +111,7 @@ impl EventsApi {
             events,
             &latest_ledger_info,
             BasicResponseStatus::Ok,
-            accept_type,
+            &accept_type,
         ))
     }
 }
