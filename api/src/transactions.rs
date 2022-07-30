@@ -290,7 +290,7 @@ impl Transactions {
         let txn = self
             .context
             .move_resolver()?
-            .as_converter()
+            .as_converter(self.context.db.clone())
             .try_into_signed_transaction(req, self.context.chain_id())
             .map_err(|e| {
                 Error::invalid_request_body(format!(
@@ -308,7 +308,7 @@ impl Transactions {
         let txn = self
             .context
             .move_resolver()?
-            .as_converter()
+            .as_converter(self.context.db.clone())
             .try_into_signed_transaction(req, self.context.chain_id())
             .map_err(|e| {
                 Error::invalid_request_body(format!(
@@ -324,7 +324,9 @@ impl Transactions {
         match mempool_status.code {
             MempoolStatusCode::Accepted => {
                 let resolver = self.context.move_resolver()?;
-                let pending_txn = resolver.as_converter().try_into_pending_transaction(txn)?;
+                let pending_txn = resolver
+                    .as_converter(self.context.db.clone())
+                    .try_into_pending_transaction(txn)?;
                 let resp = Response::new(self.ledger_info, &pending_txn)?;
                 Ok(reply::with_status(resp, StatusCode::ACCEPTED))
             }
@@ -357,6 +359,10 @@ impl Transactions {
             TransactionStatus::Keep(exec_status) => exec_status,
             _ => ExecutionStatus::MiscellaneousError(None),
         };
+
+        // TODO: Here we need to materialize deltas.
+        let (_, output) = output.into();
+
         let zero_hash = HashValue::zero();
         let info = TransactionInfo::new(
             zero_hash,
@@ -418,7 +424,7 @@ impl Transactions {
         }
 
         let resolver = self.context.move_resolver()?;
-        let converter = resolver.as_converter();
+        let converter = resolver.as_converter(self.context.db.clone());
         let txns: Vec<Transaction> = data
             .into_iter()
             .map(|t| {
@@ -438,7 +444,7 @@ impl Transactions {
     ) -> Result<impl Reply, Error> {
         let txn_data = match id.clone() {
             TransactionId::Hash(hash) => self.get_by_hash(hash.into()).await?,
-            TransactionId::Version(version) => self.get_by_version(version)?,
+            TransactionId::Version(version) => self.get_by_version(version.0)?,
         }
         .ok_or_else(|| self.transaction_not_found(id))?;
 
@@ -451,12 +457,12 @@ impl Transactions {
             TransactionData::OnChain(txn) => {
                 let timestamp = self.context.get_block_timestamp(txn.version)?;
                 resolver
-                    .as_converter()
+                    .as_converter(self.context.db.clone())
                     .try_into_onchain_transaction(timestamp, txn)?
             }
-            TransactionData::Pending(txn) => {
-                resolver.as_converter().try_into_pending_transaction(*txn)?
-            }
+            TransactionData::Pending(txn) => resolver
+                .as_converter(self.context.db.clone())
+                .try_into_pending_transaction(*txn)?,
         };
 
         Response::new(self.ledger_info, &txn)
@@ -471,7 +477,7 @@ impl Transactions {
     ) -> Result<impl Reply, Error> {
         let resolver = self.context.move_resolver()?;
         let raw_txn: RawTransaction = resolver
-            .as_converter()
+            .as_converter(self.context.db.clone())
             .try_into_raw_transaction(transaction, self.context.chain_id())
             .map_err(|e| {
                 Error::invalid_request_body(format!("invalid UserTransactionRequest: {:?}", e))

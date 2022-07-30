@@ -47,3 +47,6 @@ serviceAccount:
 
 # LEGACY: create PodSecurityPolicy, which exists at the cluster-level
 podSecurityPolicy: true
+
+# Additional labels
+labels:

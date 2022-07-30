@@ -446,7 +446,7 @@ module aptos_framework::stake {
     ) {
         let account_address = signer::address_of(account);
         assert!(!exists<StakePool>(account_address), error::invalid_argument(EALREADY_REGISTERED));
-        assert!(signature::bls12381_validate_pubkey(consensus_pubkey, proof_of_possession), error::invalid_argument(EINVALID_PUBLIC_KEY));
+        assert!(signature::bls12381_verify_proof_of_possession(consensus_pubkey, proof_of_possession), error::invalid_argument(EINVALID_PUBLIC_KEY));
 
         move_to(account, StakePool {
             active: coin::zero<AptosCoin>(),
@@ -605,7 +605,7 @@ module aptos_framework::stake {
         assert!(exists<ValidatorConfig>(pool_address), error::not_found(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
         let old_consensus_pubkey = validator_info.consensus_pubkey;
-        assert!(signature::bls12381_validate_pubkey(new_consensus_pubkey, proof_of_possession), error::invalid_argument(EINVALID_PUBLIC_KEY));
+        assert!(signature::bls12381_verify_proof_of_possession(new_consensus_pubkey, proof_of_possession), error::invalid_argument(EINVALID_PUBLIC_KEY));
         validator_info.consensus_pubkey = new_consensus_pubkey;
 
         let stake_pool_events = borrow_global_mut<StakePoolEvents>(pool_address);

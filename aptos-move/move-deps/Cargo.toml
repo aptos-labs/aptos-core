@@ -23,6 +23,7 @@ move-ir-compiler = { git = "https://github.com/move-language/move", rev = "a3426
 move-model = { git = "https://github.com/move-language/move", rev = "a34266fc6c51bfc669d44f4c0faa337058e7833f" }
 move-package = { git = "https://github.com/move-language/move", rev = "a34266fc6c51bfc669d44f4c0faa337058e7833f" }
 move-prover = { git = "https://github.com/move-language/move", rev = "a34266fc6c51bfc669d44f4c0faa337058e7833f" }
+move-prover-test-utils = { git = "https://github.com/move-language/move", rev = "a34266fc6c51bfc669d44f4c0faa337058e7833f" }
 move-resource-viewer = { git = "https://github.com/move-language/move", rev = "a34266fc6c51bfc669d44f4c0faa337058e7833f" }
 move-stackless-bytecode-interpreter = { git = "https://github.com/move-language/move", rev = "a34266fc6c51bfc669d44f4c0faa337058e7833f" }
 move-stdlib = { git = "https://github.com/move-language/move", rev = "a34266fc6c51bfc669d44f4c0faa337058e7833f" }

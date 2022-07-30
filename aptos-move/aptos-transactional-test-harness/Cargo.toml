@@ -35,6 +35,7 @@ aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-state-view = { path = "../../storage/state-view" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types", features = ["fuzzing"] }
+storage-interface = { path = "../../storage/storage-interface" }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"

@@ -120,3 +120,6 @@ podSecurityPolicy: true
 
 # Load test-data for starting a test network
 loadTestGenesis: false
+
+# Additional labels
+labels:

@@ -32,9 +32,15 @@ pub struct BufferedState {
     state_until_checkpoint: Option<Box<StateDelta>>,
     // state after the latest checkpoint.
     state_after_checkpoint: StateDelta,
-    state_commit_sender: SyncSender<(Option<Arc<StateDelta>>, Option<Sender<()>>)>,
+    state_commit_sender: SyncSender<CommitMessage<Arc<StateDelta>>>,
     target_snapshot_size: usize,
     join_handle: Option<JoinHandle<()>>,
+}
+
+pub(crate) enum CommitMessage<T> {
+    Data(T),
+    Sync(Sender<()>),
+    Exit,
 }
 
 impl BufferedState {
@@ -74,10 +80,14 @@ impl BufferedState {
 
     fn maybe_commit(&mut self, sync_commit: bool) {
         if sync_commit {
-            let to_commit = self.state_until_checkpoint.take().map(Arc::from);
             let (commit_sync_sender, commit_sync_receiver) = mpsc::channel();
+            if let Some(to_commit) = self.state_until_checkpoint.take().map(Arc::from) {
+                self.state_commit_sender
+                    .send(CommitMessage::Data(to_commit))
+                    .unwrap();
+            }
             self.state_commit_sender
-                .send((to_commit, Some(commit_sync_sender)))
+                .send(CommitMessage::Sync(commit_sync_sender))
                 .unwrap();
             commit_sync_receiver.recv().unwrap();
         } else if self.state_until_checkpoint.is_some() {
@@ -90,8 +100,14 @@ impl BufferedState {
                         >= TARGET_SNAPSHOT_INTERVAL_IN_VERSION
             };
             if take_out_to_commit {
-                let to_commit = self.state_until_checkpoint.take().map(Arc::from);
-                self.state_commit_sender.send((to_commit, None)).unwrap();
+                let to_commit = self
+                    .state_until_checkpoint
+                    .take()
+                    .map(Arc::from)
+                    .expect("Must exist");
+                self.state_commit_sender
+                    .send(CommitMessage::Data(to_commit))
+                    .unwrap();
             }
         }
     }
@@ -140,7 +156,7 @@ impl BufferedState {
 impl Drop for BufferedState {
     fn drop(&mut self) {
         self.sync_commit();
-        self.state_commit_sender.send((None, None)).unwrap();
+        self.state_commit_sender.send(CommitMessage::Exit).unwrap();
         self.join_handle
             .take()
             .expect("snapshot commit thread must exist.")

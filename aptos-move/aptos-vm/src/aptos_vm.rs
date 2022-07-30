@@ -32,8 +32,8 @@ use aptos_types::{
     on_chain_config::{new_epoch_event_key, VMConfig, VMPublishingOption, Version},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
-        Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
-        WriteSetPayload,
+        Transaction, TransactionOutput, TransactionOutputExt, TransactionPayload,
+        TransactionStatus, VMValidatorResult, WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteSet, WriteSetMut},
@@ -154,7 +154,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         storage: &S,
         log_context: &AdapterLogSchema,
-    ) -> TransactionOutput {
+    ) -> TransactionOutputExt {
         self.failed_transaction_cleanup_and_keep_vm_status(
             error_code,
             gas_status,
@@ -172,7 +172,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         storage: &S,
         log_context: &AdapterLogSchema,
-    ) -> (VMStatus, TransactionOutput) {
+    ) -> (VMStatus, TransactionOutputExt) {
         gas_status.set_metering(false);
         let mut session = self.0.new_session(storage, SessionId::txn_meta(txn_data));
         match TransactionStatus::from(error_code.clone()) {
@@ -212,7 +212,7 @@ impl AptosVM {
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         gas_status.set_metering(false);
         self.0
             .run_success_epilogue(&mut session, gas_status, txn_data, log_context)?;
@@ -236,7 +236,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         payload: &TransactionPayload,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_script_or_script_function", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -395,7 +395,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         modules: &ModuleBundle,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_module", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -495,7 +495,7 @@ impl AptosVM {
         storage: &S,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
-    ) -> (VMStatus, TransactionOutput) {
+    ) -> (VMStatus, TransactionOutputExt) {
         macro_rules! unwrap_or_discard {
             ($res: expr) => {
                 match $res {
@@ -570,7 +570,7 @@ impl AptosVM {
         writeset_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
-    ) -> Result<ChangeSet, Result<(VMStatus, TransactionOutput), VMStatus>> {
+    ) -> Result<ChangeSet, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
         let mut gas_status = GasStatus::new_unmetered();
 
         Ok(match writeset_payload {
@@ -656,7 +656,7 @@ impl AptosVM {
         storage: &S,
         writeset_payload: WriteSetPayload,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
         let change_set = match self.execute_writeset(
@@ -674,7 +674,12 @@ impl AptosVM {
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
         Ok((
             VMStatus::Executed,
-            TransactionOutput::new(write_set, events, 0, VMStatus::Executed.into()),
+            TransactionOutputExt::from(TransactionOutput::new(
+                write_set,
+                events,
+                0,
+                VMStatus::Executed.into(),
+            )),
         ))
     }
 
@@ -683,7 +688,7 @@ impl AptosVM {
         storage: &S,
         block_metadata: BlockMetadata,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::process_block_prologue", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -761,7 +766,7 @@ impl AptosVM {
         storage: &S,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::process_writeset_transaction", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -804,7 +809,7 @@ impl AptosVM {
         writeset_payload: &WriteSetPayload,
         txn_data: TransactionMetadata,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         let change_set = match self.execute_writeset(
             storage,
             writeset_payload,
@@ -884,12 +889,12 @@ impl AptosVM {
 
         Ok((
             VMStatus::Executed,
-            TransactionOutput::new(
+            TransactionOutputExt::from(TransactionOutput::new(
                 write_set,
                 events,
                 0,
                 TransactionStatus::Keep(ExecutionStatus::Success),
-            ),
+            )),
         ))
     }
 
@@ -911,7 +916,7 @@ impl AptosVM {
     pub fn simulate_signed_transaction(
         txn: &SignedTransaction,
         state_view: &impl StateView,
-    ) -> (VMStatus, TransactionOutput) {
+    ) -> (VMStatus, TransactionOutputExt) {
         let vm = AptosVM::new(state_view);
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -1048,7 +1053,7 @@ impl VMAdapter for AptosVM {
         txn: &PreprocessedTransaction,
         data_cache: &S,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput, Option<String>), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus> {
         Ok(match txn {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 let (vm_status, output) =
@@ -1097,7 +1102,11 @@ impl VMAdapter for AptosVM {
                     0,
                     TransactionStatus::Keep(ExecutionStatus::Success),
                 );
-                (VMStatus::Executed, output, Some("state_checkpoint".into()))
+                (
+                    VMStatus::Executed,
+                    TransactionOutputExt::from(output),
+                    Some("state_checkpoint".into()),
+                )
             }
         })
     }
@@ -1136,7 +1145,7 @@ impl AptosSimulationVM {
         storage: &S,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
-    ) -> (VMStatus, TransactionOutput) {
+    ) -> (VMStatus, TransactionOutputExt) {
         // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
         // may execute them without user's explicit permission.
         if txn.clone().check_signature().is_ok() {
@@ -1185,13 +1194,14 @@ impl AptosSimulationVM {
                 if txn_status.is_discarded() {
                     discard_error_vm_status(err)
                 } else {
-                    self.0.failed_transaction_cleanup_and_keep_vm_status(
+                    let (vm_status, output) = self.0.failed_transaction_cleanup_and_keep_vm_status(
                         err,
                         &mut gas_status,
                         &txn_data,
                         storage,
                         log_context,
-                    )
+                    );
+                    (vm_status, output)
                 }
             }
         }

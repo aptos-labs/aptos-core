@@ -4,6 +4,8 @@ metadata:
   name: {FORGE_POD_NAME}
   labels:
     app.kubernetes.io/name: forge
+    forge-namespace: {FORGE_NAMESPACE}
+    forge-image-tag: {IMAGE_TAG}
 spec:
   restartPolicy: Never
   serviceAccountName: forge
@@ -20,6 +22,8 @@ spec:
     env:
     - name: FORGE_TRIGGERED_BY
       value: {FORGE_TRIGGERED_BY}
+    # - name: RUST_LOG
+    #   value: debug
   affinity:
     # avoid scheduling with other forge or validator/fullnode pods
     podAntiAffinity:

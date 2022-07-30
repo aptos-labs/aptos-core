@@ -15,3 +15,7 @@ genesis:
   fullnode:
     # use non-HAProxy service for fullnode AptosNet in genesis
     internal_host_suffix: {fullnode_internal_host_suffix}
+
+labels:
+  forge-namespace: {namespace}
+  forge-image-tag: {image_tag}

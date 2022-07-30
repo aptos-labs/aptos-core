@@ -3,7 +3,7 @@
 
 use crate::{context::Context, failpoint::fail_point, metrics::metrics, param::LedgerVersionParam};
 use anyhow::Result;
-use aptos_api_types::{Error, LedgerInfo, Response, TransactionId};
+use aptos_api_types::{Error, LedgerInfo, Response, TransactionId, U64};
 use warp::{filters::BoxedFilter, Filter, Rejection, Reply};
 
 // GET /blocks/<version>
@@ -43,7 +43,7 @@ impl Block {
         if ledger_version > latest_ledger_info.version() {
             return Err(Error::not_found(
                 "ledger",
-                TransactionId::Version(ledger_version),
+                TransactionId::Version(U64::from(ledger_version)),
                 latest_ledger_info.version(),
             ));
         }

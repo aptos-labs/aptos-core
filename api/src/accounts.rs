@@ -11,7 +11,7 @@ use crate::{
 
 use aptos_api_types::{
     AccountData, Address, AsConverter, Error, LedgerInfo, MoveModuleBytecode, Response,
-    TransactionId,
+    TransactionId, U64,
 };
 use aptos_types::{
     account_config::AccountResource,
@@ -113,7 +113,7 @@ impl Account {
         if ledger_version > latest_ledger_info.version() {
             return Err(Error::not_found(
                 "ledger",
-                TransactionId::Version(ledger_version),
+                TransactionId::Version(U64::from(ledger_version)),
                 latest_ledger_info.version(),
             ));
         }
@@ -151,7 +151,7 @@ impl Account {
         let resources = self
             .context
             .move_resolver()?
-            .as_converter()
+            .as_converter(self.context.db.clone())
             .try_into_resources(self.account_state()?.get_resources())?;
         Response::new(self.latest_ledger_info, &resources)
     }
@@ -205,7 +205,7 @@ impl Account {
         Ok(self
             .context
             .move_resolver()?
-            .as_converter()
+            .as_converter(self.context.db.clone())
             .move_struct_fields(&typ, data)?)
     }
 

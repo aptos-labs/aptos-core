@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use super::golden_output::GoldenOutputs;
+use super::pretty;
 use crate::{
-    context::Context,
-    index,
-    tests::{golden_output::GoldenOutputs, pretty},
+    context::Context, index, poem_backend::attach_poem_to_runtime, runtime::get_routes_with_poem,
 };
 use aptos_api_types::{
     mime_types, HexEncodedBytes, TransactionOnChainData, X_APTOS_CHAIN_ID,
@@ -36,7 +36,7 @@ use aptosdb::AptosDB;
 use bytes::Bytes;
 use executor::{block_executor::BlockExecutor, db_bootstrapper};
 use executor_types::BlockExecutorTrait;
-use hyper::Response;
+use hyper::{HeaderMap, Response};
 use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
@@ -44,12 +44,60 @@ use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc};
+use std::{boxed::Box, collections::BTreeMap, iter::once, net::SocketAddr, sync::Arc};
 use storage_interface::state_view::DbStateView;
 use vm_validator::vm_validator::VMValidator;
 use warp::http::header::CONTENT_TYPE;
 
-pub fn new_test_context(test_name: &'static str) -> TestContext {
+#[derive(Clone, Debug)]
+pub enum ApiSpecificConfig {
+    V0,
+
+    // The SocketAddr is the address where the Poem backend is running.
+    V1(SocketAddr),
+}
+
+impl ApiSpecificConfig {
+    pub fn get_api_base_path(&self) -> String {
+        match &self {
+            ApiSpecificConfig::V0 => "".to_string(),
+            ApiSpecificConfig::V1(_) => "/v1".to_string(),
+        }
+    }
+
+    pub fn get_version_dir(&self) -> String {
+        match &self {
+            ApiSpecificConfig::V0 => "v0".to_string(),
+            ApiSpecificConfig::V1(_) => "v1".to_string(),
+        }
+    }
+
+    pub fn assert_content_type(&self, headers: &HeaderMap) {
+        match &self {
+            ApiSpecificConfig::V0 => assert_eq!(headers[CONTENT_TYPE], mime_types::JSON,),
+            ApiSpecificConfig::V1(_) => assert!(headers[CONTENT_TYPE]
+                .to_str()
+                .unwrap()
+                .starts_with(mime_types::JSON),),
+        }
+    }
+
+    pub fn signing_message_endpoint(&self) -> &'static str {
+        match &self {
+            ApiSpecificConfig::V0 => "/transactions/signing_message",
+            ApiSpecificConfig::V1(_) => "/transactions/encode_submission",
+        }
+    }
+
+    pub fn unwrap_signing_message_response(&self, resp: serde_json::Value) -> HexEncodedBytes {
+        match self {
+            ApiSpecificConfig::V0 => resp["message"].as_str().unwrap().parse().unwrap(),
+            ApiSpecificConfig::V1(_) => resp.as_str().unwrap().parse().unwrap(),
+        }
+    }
+}
+
+pub fn new_test_context(test_name: String, api_version: &str) -> TestContext {
     let tmp_dir = TempPath::new();
     tmp_dir.create_as_dir().unwrap();
 
@@ -86,13 +134,30 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
 
+    let node_config = NodeConfig::default();
+
+    let context = Context::new(
+        ChainId::test(),
+        db.clone(),
+        mempool.ac_client.clone(),
+        node_config.clone(),
+    );
+
+    // Configure the testing depending on which API version we're testing.
+    let api_specific_config = match api_version {
+        "v0" => ApiSpecificConfig::V0,
+        "v1" => {
+            let runtime_handle = tokio::runtime::Handle::current();
+            let poem_address =
+                attach_poem_to_runtime(&runtime_handle, context.clone(), &node_config)
+                    .expect("Failed to attach poem to runtime");
+            ApiSpecificConfig::V1(poem_address)
+        }
+        wildcard => panic!("Unknown API version for test: {}", wildcard),
+    };
+
     TestContext::new(
-        Context::new(
-            ChainId::test(),
-            db.clone(),
-            mempool.ac_client.clone(),
-            NodeConfig::default(),
-        ),
+        context,
         rng,
         root_key,
         validator_owner,
@@ -100,6 +165,7 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
         mempool,
         db,
         test_name,
+        api_specific_config,
     )
 }
 
@@ -113,9 +179,10 @@ pub struct TestContext {
     root_key: ConfigKey<Ed25519PrivateKey>,
     executor: Arc<dyn BlockExecutorTrait>,
     expect_status_code: u16,
-    test_name: &'static str,
+    test_name: String,
     golden_output: Option<GoldenOutputs>,
     fake_time: u64,
+    pub api_specific_config: ApiSpecificConfig,
 }
 
 impl TestContext {
@@ -127,7 +194,8 @@ impl TestContext {
         executor: Box<dyn BlockExecutorTrait>,
         mempool: MockSharedMempool,
         db: Arc<AptosDB>,
-        test_name: &'static str,
+        test_name: String,
+        api_specific_config: ApiSpecificConfig,
     ) -> Self {
         Self {
             context,
@@ -141,12 +209,18 @@ impl TestContext {
             test_name,
             golden_output: None,
             fake_time: 0,
+            api_specific_config,
         }
     }
 
     pub fn check_golden_output(&mut self, msg: Value) {
+        // Temporary while the old API still lives at /
+        let version_dir = self.api_specific_config.get_version_dir();
         if self.golden_output.is_none() {
-            self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(':', "_")));
+            self.golden_output = Some(GoldenOutputs::new(
+                self.test_name.replace(':', "_"),
+                &version_dir,
+            ));
         }
 
         let msg = pretty(&msg);
@@ -282,10 +356,13 @@ impl TestContext {
             .unwrap();
     }
 
+    // TODO: Add support for generic_type_params if necessary.
     pub async fn api_get_account_resource(
         &self,
         account: &LocalAccount,
-        type_name: String,
+        resource_account_address: &str,
+        module: &str,
+        name: &str,
     ) -> serde_json::Value {
         let resources = self
             .get(&format!(
@@ -294,21 +371,62 @@ impl TestContext {
             ))
             .await;
         let vals: Vec<serde_json::Value> = serde_json::from_value(resources).unwrap();
-        vals.into_iter().find(|v| v["type"] == type_name).unwrap()
+        match self.api_specific_config {
+            ApiSpecificConfig::V0 => vals
+                .into_iter()
+                .find(|v| {
+                    v["type"] == format!("{}::{}::{}", resource_account_address, module, name,)
+                })
+                .unwrap(),
+            ApiSpecificConfig::V1(_) => vals
+                .into_iter()
+                .find(|v| {
+                    v["type"]
+                        == json!({
+                            "address": resource_account_address,
+                            "module": module,
+                            "name": name,
+                            "generic_type_params": []
+                        })
+                })
+                .unwrap(),
+        }
     }
 
     pub async fn api_execute_script_function(
         &mut self,
         account: &mut LocalAccount,
-        func_id: &str,
+        module: &str,
+        func: &str,
         type_args: serde_json::Value,
         args: serde_json::Value,
     ) {
+        let (typ, function) = match self.api_specific_config {
+            ApiSpecificConfig::V0 => (
+                "script_function_payload",
+                json!(format!(
+                    "{}::{}::{}",
+                    account.address().to_hex_literal(),
+                    module,
+                    func
+                )),
+            ),
+            ApiSpecificConfig::V1(_) => (
+                "script_function_payload",
+                json!({
+                    "module": json!({
+                        "address": account.address().to_hex_literal(),
+                        "name": module,
+                    }),
+                    "name": func,
+                }),
+            ),
+        };
         self.api_execute_txn(
             account,
             json!({
-                "type": "script_function_payload",
-                "function": format!("{}::{}", account.address().to_hex_literal(), func_id),
+                "type": typ,
+                "function": function,
                 "type_arguments": type_args,
                 "arguments": args
             }),
@@ -339,18 +457,28 @@ impl TestContext {
             "expiration_timestamp_secs": "16373698888888",
             "payload": payload,
         });
+
         let resp = self
-            .post("/transactions/signing_message", request.clone())
+            .post(
+                self.api_specific_config.signing_message_endpoint(),
+                request.clone(),
+            )
             .await;
 
-        let signing_msg: HexEncodedBytes = resp["message"].as_str().unwrap().parse().unwrap();
+        let signing_msg = self
+            .api_specific_config
+            .unwrap_signing_message_response(resp);
 
         let sig = account
             .private_key()
             .sign_arbitrary_message(signing_msg.inner());
 
+        let typ = match self.api_specific_config {
+            ApiSpecificConfig::V0 => "ed25519_signature",
+            ApiSpecificConfig::V1(_) => "ed_25519_signature",
+        };
         request["signature"] = json!({
-            "type": "ed25519_signature",
+            "type": typ,
             "public_key": HexEncodedBytes::from(account.public_key().to_bytes().to_vec()),
             "signature": HexEncodedBytes::from(sig.to_bytes().to_vec()),
         });
@@ -362,21 +490,34 @@ impl TestContext {
         *account.sequence_number_mut() += 1;
     }
 
+    pub fn prepend_path(&self, path: &str) -> String {
+        format!("{}{}", self.api_specific_config.get_api_base_path(), path)
+    }
+
     pub async fn get(&self, path: &str) -> Value {
-        self.execute(warp::test::request().method("GET").path(path))
-            .await
+        self.execute(
+            warp::test::request()
+                .method("GET")
+                .path(&self.prepend_path(path)),
+        )
+        .await
     }
 
     pub async fn post(&self, path: &str, body: Value) -> Value {
-        self.execute(warp::test::request().method("POST").path(path).json(&body))
-            .await
+        self.execute(
+            warp::test::request()
+                .method("POST")
+                .path(&self.prepend_path(path))
+                .json(&body),
+        )
+        .await
     }
 
     pub async fn post_bcs_txn(&self, path: &str, body: impl AsRef<[u8]>) -> Value {
         self.execute(
             warp::test::request()
                 .method("POST")
-                .path(path)
+                .path(&self.prepend_path(path))
                 .header(CONTENT_TYPE, mime_types::BCS_SIGNED_TRANSACTION)
                 .body(body),
         )
@@ -384,14 +525,21 @@ impl TestContext {
     }
 
     pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
-        req.reply(&index::routes(self.context.clone())).await
+        match self.api_specific_config {
+            ApiSpecificConfig::V0 => req.reply(&index::routes(self.context.clone())).await,
+            ApiSpecificConfig::V1(address) => {
+                req.reply(&get_routes_with_poem(address, self.context.clone()))
+                    .await
+            }
+        }
     }
 
     pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
         let resp = self.reply(req).await;
 
         let headers = resp.headers();
-        assert_eq!(headers[CONTENT_TYPE], mime_types::JSON);
+
+        self.api_specific_config.assert_content_type(headers);
 
         let body = serde_json::from_slice(resp.body()).expect("response body is JSON");
         assert_eq!(

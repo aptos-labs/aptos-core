@@ -21,7 +21,7 @@ consensus:
 
 execution:
   genesis_file_location: "/opt/aptos/genesis/genesis.blob"
-  concurrency_level: 4
+  concurrency_level: 8
 
 validator_network:
   discovery_method: "onchain"

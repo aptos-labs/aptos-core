@@ -41,7 +41,7 @@ Currently the team is moving forward with pure python, but leaves the following 
 
 ```bash
 npm install  -g @apidevtools/swagger-cli
-swagger-cli bundle --dereference ../../../api/doc/openapi.yaml  -t yaml > openapi.yaml
+swagger-cli bundle --dereference ../../../api/doc/v0/openapi.yaml  -t yaml > openapi.yaml
 python -m openapi_python_client generate --path openapi.yaml
 mv aptos-dev-api-specification-client/aptos_dev_api_specification_client/ aptos_sdk/openapi
 ```
