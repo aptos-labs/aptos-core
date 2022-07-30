@@ -27,8 +27,8 @@ fn main() -> () {
     println!("Alice: 0x{}", alice.address());
     println!("Bob: 0x{}", bob.address());
 
-    faucet_client.fund_account(&alice.auth_key(), 10_000_000);
-    faucet_client.fund_account(&bob.auth_key(), 10_000_000);
+    faucet_client.fund_account(&alice.auth_key(), 5_000);
+    faucet_client.fund_account(&bob.auth_key(), 5_000);
 
     println!("\nUpdate the module with Alice's address, build, copy to the provided path, and press enter.");
     match std::io::stdin().read_line(&mut String::new()) {

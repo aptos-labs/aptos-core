@@ -90,8 +90,8 @@ if __name__ == "__main__":
     print(f"Alice: {alice.address()}")
     print(f"Bob: {bob.address()}")
 
-    faucet_client.fund_account(alice.address(), 10_000_000)
-    faucet_client.fund_account(bob.address(), 10_000_000)
+    faucet_client.fund_account(alice.address(), 5_000)
+    faucet_client.fund_account(bob.address(), 5_000)
 
     input("\nUpdate the module with Alice's address, build, copy to the provided path, and press enter.")
     module_path = sys.argv[1]
@@ -106,12 +106,12 @@ if __name__ == "__main__":
     print("Alice will initialize the new coin")
     tx_hash = client.initialize_coin(alice)
     client.wait_for_transaction(tx_hash)
-    
+
     print("Bob registers the newly created coin so he can receive it from Alice")
     tx_hash = client.register_coin(bob, alice.address())
     client.wait_for_transaction(tx_hash)
     print(f"Bob's initial MoonCoinType balance: {client.get_balance(bob.address(), alice.address())}")
-    
+
     print("Alice mints Bob some of the new coin")
     tx_hash = client.mint_coin(alice, bob.address(), 100)
     client.wait_for_transaction(tx_hash)
