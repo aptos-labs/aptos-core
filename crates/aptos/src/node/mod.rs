@@ -674,21 +674,20 @@ impl CliCommand<()> for RunLocalTestnet {
             }
 
             // Start the faucet
-            Some(
-                FaucetArgs {
-                    address: "0.0.0.0".to_string(),
-                    port: self.faucet_port,
-                    server_url: rest_url,
-                    mint_key_file_path: test_dir.join("mint.key"),
-                    mint_key: None,
-                    mint_account_address: None,
-                    chain_id: ChainId::test(),
-                    maximum_amount: None,
-                    do_not_delegate: false,
-                }
-                .run()
-                .await,
-            )
+            FaucetArgs {
+                address: "0.0.0.0".to_string(),
+                port: self.faucet_port,
+                server_url: rest_url,
+                mint_key_file_path: test_dir.join("mint.key"),
+                mint_key: None,
+                mint_account_address: None,
+                chain_id: ChainId::test(),
+                maximum_amount: None,
+                do_not_delegate: false,
+            }
+            .run()
+            .await;
+            Some(())
         } else {
             None
         };

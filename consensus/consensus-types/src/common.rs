@@ -4,6 +4,7 @@
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::fmt::Write;
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
 /// monotonically. It is used for the protocol safety and liveness (please see the detailed
@@ -113,7 +114,7 @@ impl fmt::Display for PayloadFilter {
             PayloadFilter::DirectMempool(excluded_txns) => {
                 let mut txns_str = "".to_string();
                 for tx in excluded_txns.iter() {
-                    txns_str += &format!("{} ", tx);
+                    write!(txns_str, "{} ", tx)?;
                 }
                 write!(f, "{}", txns_str)
             }

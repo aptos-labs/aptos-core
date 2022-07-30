@@ -8,7 +8,7 @@ use aptos_logger::Schema;
 use aptos_types::{account_address::AccountAddress, on_chain_config::OnChainConfigPayload};
 use mempool_notifications::MempoolCommitNotification;
 use serde::Serialize;
-use std::{fmt, time::SystemTime};
+use std::{fmt, fmt::Write, time::SystemTime};
 
 pub struct TxnsLog {
     txns: Vec<(AccountAddress, u64, Option<String>, Option<SystemTime>)>,
@@ -53,13 +53,13 @@ impl fmt::Display for TxnsLog {
         for (account, seq_num, status, timestamp) in self.txns.iter() {
             let mut txn = format!("{}:{}", account, seq_num);
             if let Some(status) = status {
-                txn += &format!(":{}", status)
+                write!(txn, ":{}", status)?;
             }
             if let Some(timestamp) = timestamp {
-                txn += &format!(":{:?}", timestamp)
+                write!(txn, ":{:?}", timestamp)?;
             }
 
-            txns += &format!("{} ", txn);
+            write!(txns, "{} ", txn)?;
         }
 
         write!(f, "{}", txns)
