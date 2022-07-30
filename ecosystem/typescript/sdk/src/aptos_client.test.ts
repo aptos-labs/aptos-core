@@ -14,7 +14,7 @@ import {
   TransactionBuilder,
   TransactionBuilderEd25519,
 } from "./transaction_builder";
-import { TransactionPayload, WriteResource } from "./api/data-contracts";
+import { WriteResource } from "./api/data-contracts";
 import { TokenClient } from "./token_client";
 import { HexString } from "./hex_string";
 
@@ -128,20 +128,7 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
-      client.getAccount(account1.address()),
-      client.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      TxnBuilderTypes.AccountAddress.fromHex(account1.address()),
-      BigInt(sequenceNumber),
-      scriptFunctionPayload,
-      1000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
+    const rawTxn = await client.buildRawTransaction(account1.address(), scriptFunctionPayload);
 
     const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
     const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
@@ -199,20 +186,7 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
-      client.getAccount(mutisigAccountAddress),
-      client.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      TxnBuilderTypes.AccountAddress.fromHex(mutisigAccountAddress),
-      BigInt(sequenceNumber),
-      scriptFunctionPayload,
-      1000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
+    const rawTxn = await client.buildRawTransaction(mutisigAccountAddress, scriptFunctionPayload);
 
     const txnBuilder = new TransactionBuilderMultiEd25519((signingMessage: TxnBuilderTypes.SigningMessage) => {
       const sigHexStr1 = account1.signBuffer(signingMessage);
@@ -238,58 +212,6 @@ test(
     resources = await client.getAccountResources(account4.address());
     accountResource = resources.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
     expect((accountResource.data as any).coin.value).toBe("123");
-  },
-  30 * 1000,
-);
-
-test(
-  "submits json transaction simulation",
-  async () => {
-    const client = new AptosClient(NODE_URL);
-    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
-
-    const account1 = new AptosAccount();
-    const account2 = new AptosAccount();
-    const txns1 = await faucetClient.fundAccount(account1.address(), 5000);
-    const txns2 = await faucetClient.fundAccount(account2.address(), 1000);
-    const tx1 = await client.getTransaction(txns1[1]);
-    const tx2 = await client.getTransaction(txns2[1]);
-    expect(tx1.type).toBe("user_transaction");
-    expect(tx2.type).toBe("user_transaction");
-    const checkAptosCoin = async () => {
-      const resources1 = await client.getAccountResources(account1.address());
-      const resources2 = await client.getAccountResources(account2.address());
-      const account1Resource = resources1.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
-      const account2Resource = resources2.find((r) => r.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>");
-      expect((account1Resource.data as { coin: { value: string } }).coin.value).toBe("5000");
-      expect((account2Resource.data as { coin: { value: string } }).coin.value).toBe("1000");
-    };
-    await checkAptosCoin();
-
-    const payload: TransactionPayload = {
-      type: "script_function_payload",
-      function: "0x1::coin::transfer",
-      type_arguments: ["0x1::aptos_coin::AptosCoin"],
-      arguments: [account2.address().hex(), "1000"],
-    };
-    const txnRequest = await client.generateTransaction(account1.address(), payload);
-    const transactionRes = await client.simulateTransaction(account1, txnRequest);
-    expect(parseInt(transactionRes.gas_used, 10) > 0);
-    expect(transactionRes.success);
-    const account2AptosCoin = transactionRes.changes.filter((change) => {
-      if (change.type !== "write_resource") {
-        return false;
-      }
-      const write = change as WriteResource;
-
-      return (
-        write.address === account2.address().toShortString() &&
-        write.data.type === "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>" &&
-        (write.data.data as { coin: { value: string } }).coin.value === "2000"
-      );
-    });
-    expect(account2AptosCoin).toHaveLength(1);
-    await checkAptosCoin();
   },
   30 * 1000,
 );
@@ -328,20 +250,7 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
-      client.getAccount(account1.address()),
-      client.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      TxnBuilderTypes.AccountAddress.fromHex(account1.address()),
-      BigInt(sequenceNumber),
-      scriptFunctionPayload,
-      1000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
+    const rawTxn = await client.buildRawTransaction(account1.address(), scriptFunctionPayload);
 
     const bcsTxn = AptosClient.generateBCSSimulation(account1, rawTxn);
     const transactionRes = await client.submitBCSSimulation(bcsTxn);
@@ -423,20 +332,7 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
-      client.getAccount(alice.address()),
-      client.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      aliceAccountAddress,
-      BigInt(sequenceNumber),
-      scriptFunctionPayload,
-      1000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
+    const rawTxn = await client.buildRawTransaction(alice.address(), scriptFunctionPayload);
 
     const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [bobAccountAddress]);
 
@@ -563,20 +459,7 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
-      client.getAccount(account1.address()),
-      client.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      TxnBuilderTypes.AccountAddress.fromHex(account1.address()),
-      BigInt(sequenceNumber),
-      scriptFunctionPayload,
-      1000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
+    const rawTxn = await client.buildRawTransaction(account1.address(), scriptFunctionPayload);
 
     const txnBuilder = new TransactionBuilderEd25519((signingMessage: TxnBuilderTypes.SigningMessage) => {
       // @ts-ignore
