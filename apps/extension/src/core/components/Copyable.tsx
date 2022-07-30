@@ -1,9 +1,13 @@
 import React, { SyntheticEvent } from 'react';
 import { Box, Tooltip, useClipboard } from '@chakra-ui/react';
 
+export const defaultTimeout = 500;
+export const defaultOpenDelay = 300;
+
 interface CopyableProps {
   children: React.ReactNode | React.ReactNode[],
   copiedPrompt?: string,
+  openDelay?: number,
   prompt?: string,
   timeout?: number,
   value: any,
@@ -20,7 +24,8 @@ export default function Copyable({
 }: CopyableProps) {
   const prompt = options.prompt ?? 'Copy';
   const copiedPrompt = options.copiedPrompt ?? 'Copied!';
-  const timeout = options.timeout ?? 500;
+  const timeout = options.timeout ?? defaultTimeout;
+  const openDelay = options.openDelay ?? defaultOpenDelay;
 
   const { hasCopied, onCopy } = useClipboard(value, { timeout });
 
@@ -35,6 +40,7 @@ export default function Copyable({
       <Tooltip
         label={hasCopied ? copiedPrompt : prompt}
         isOpen={hasCopied || undefined}
+        openDelay={openDelay}
       >
         { children }
       </Tooltip>

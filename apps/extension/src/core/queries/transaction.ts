@@ -4,7 +4,7 @@
 import { AptosClient, MaybeHexString } from 'aptos';
 import useWalletState from 'core/hooks/useWalletState';
 import { useCallback } from 'react';
-import { useQuery } from 'react-query';
+import { useQuery, UseQueryOptions } from 'react-query';
 import { ScriptFunctionPayload, UserTransaction } from 'aptos/dist/api/data-contracts';
 
 export const transactionQueryKeys = Object.freeze({
@@ -54,7 +54,7 @@ export async function getAccountUserTransactions({
   nodeUrl,
 }: GetAccountUserTransactionsProps) {
   const aptosClient = new AptosClient(nodeUrl);
-  const transactions = await aptosClient.getAccountTransactions(address);
+  const transactions = await aptosClient.getAccountTransactions(address, { limit: 200 });
 
   return transactions
     .filter((txn) => !txn.vm_status.includes('Move abort'))
@@ -82,21 +82,27 @@ export async function getScriptFunctionTransactions({
       && (t.payload as ScriptFunctionPayload).function === functionName);
 }
 
-export function useCoinTransferTransactions() {
-  const { aptosAccount, nodeUrl } = useWalletState();
+interface UseCoinTransferTransactionParams {
+  address?: string,
+}
 
-  const getCoinTransferTransactionsQuery = useCallback(
-    async () => (aptosAccount ? getScriptFunctionTransactions({
-      address: aptosAccount.address(),
+export function useCoinTransferTransactions(
+  { address }: UseCoinTransferTransactionParams,
+  options?: UseQueryOptions<UserTransaction[]>,
+) {
+  const { nodeUrl } = useWalletState();
+
+  return useQuery<UserTransaction[]>(
+    [transactionQueryKeys.getCoinTransferTransactions, address],
+    () => getScriptFunctionTransactions({
+      address: address!,
       functionName: '0x1::coin::transfer',
       nodeUrl,
-    }) : null),
-    [aptosAccount, nodeUrl],
-  );
-
-  return useQuery(
-    transactionQueryKeys.getCoinTransferTransactions,
-    getCoinTransferTransactionsQuery,
+    }),
+    {
+      ...options,
+      enabled: Boolean(address) && options?.enabled,
+    },
   );
 }
 

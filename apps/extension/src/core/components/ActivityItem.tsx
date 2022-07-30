@@ -1,17 +1,29 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  Circle, HStack, Text, Tooltip, useColorMode, VStack,
+  Circle,
+  HStack,
+  Text,
+  Tooltip,
+  useColorMode,
+  useInterval,
+  VStack,
 } from '@chakra-ui/react';
 import { HiDownload } from '@react-icons/all-files/hi/HiDownload';
 import { BsArrowUpRight } from '@react-icons/all-files/bs/BsArrowUpRight';
 import { UserTransaction } from 'aptos/src/api/data-contracts';
 import { ScriptFunctionPayload } from 'aptos/dist/api/data-contracts';
 import ChakraLink from 'core/components/ChakraLink';
-import Copyable from 'core/components/Copyable';
 import { collapseHexString } from 'core/utils/hex';
+import {
+  secondaryGridBgColor,
+  secondaryGridHoverBgColor,
+  secondaryTextColor,
+  timestampColor,
+} from 'core/colors';
+import useWalletState from 'core/hooks/useWalletState';
 
 /**
  * Convert a timestamp into a relative time short string. If the time difference
@@ -19,7 +31,7 @@ import { collapseHexString } from 'core/utils/hex';
  * @param ts timestamp in milliseconds
  * @param thresholdInDays
  */
-function relativeTime(ts: number, thresholdInDays: number = 7) {
+function getRelativeTime(ts: number, thresholdInDays: number = 7) {
   const secondsInMinute = 60;
   const secondsInHour = secondsInMinute * 60;
   const secondsInDay = secondsInHour * 24;
@@ -27,7 +39,7 @@ function relativeTime(ts: number, thresholdInDays: number = 7) {
   const seconds = (Date.now() - ts) / 1000;
 
   if (seconds < secondsInMinute) {
-    return `${Math.round(seconds)}s`;
+    return 'Moments ago';
   }
   if (seconds < secondsInHour) {
     return `${Math.round(seconds / secondsInMinute)}m`;
@@ -43,53 +55,46 @@ function relativeTime(ts: number, thresholdInDays: number = 7) {
   return new Date(ts).toLocaleDateString('en-us', { day: 'numeric', month: 'short' });
 }
 
-interface ActivityItemProps {
-  isSent: boolean,
-  transaction: UserTransaction,
-}
-
-const secondaryGridHoverBgColor = {
-  dark: 'gray.600',
-  light: 'gray.200',
-};
-
-const secondaryGridBgColor = {
-  dark: 'gray.700',
-  light: 'gray.100',
-};
-
-const secondaryTextColor = {
-  dark: 'white',
-  light: 'black',
-};
-
-const timestampColor = {
-  dark: 'gray.500',
-  light: 'gray.500',
-};
-
-export function ActivityItem({ isSent, transaction }: ActivityItemProps) {
-  const { colorMode } = useColorMode();
-
-  const typedPayload = transaction.payload as ScriptFunctionPayload;
-  const [recipient, amount]: string[] = typedPayload.arguments;
-
-  const otherAddress = isSent ? recipient : transaction.sender;
-
-  const coinName = typedPayload.type_arguments[0].split('::').pop();
-
-  const timestampMs = Number(transaction.timestamp) / 1000;
-
+function getAbsoluteDateTime(timestampMs: number) {
   const formattedDate = new Date(timestampMs).toLocaleDateString('en-us', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
   });
-
   const formattedTime = new Date(timestampMs).toLocaleTimeString('en-us', {
     hour: 'numeric',
     minute: 'numeric',
   });
+  return `${formattedDate} at ${formattedTime}`;
+}
+
+function useRelativeTime(ts: number, updateIntervalMs = 5000) {
+  const [value, setValue] = useState<string>(getRelativeTime(ts));
+  useInterval(() => {
+    setValue(getRelativeTime(ts));
+  }, updateIntervalMs);
+  return value;
+}
+
+interface ActivityItemProps {
+  transaction: UserTransaction,
+}
+
+export function ActivityItem({ transaction }: ActivityItemProps) {
+  const { colorMode } = useColorMode();
+  const { aptosAccount } = useWalletState();
+
+  const typedPayload = transaction.payload as ScriptFunctionPayload;
+  const [recipient, amount]: string[] = typedPayload.arguments;
+  const coinName = typedPayload.type_arguments[0].split('::').pop();
+
+  const myAddress = aptosAccount!.address().toShortString();
+  const isSent = myAddress === transaction.sender;
+  const otherAddress = isSent ? recipient : transaction.sender;
+
+  const timestampMs = Number(transaction.timestamp) / 1000;
+  const absDateTime = getAbsoluteDateTime(timestampMs);
+  const relTime = useRelativeTime(timestampMs);
 
   return (
     <ChakraLink to={`/transactions/${transaction.version}`} w="100%">
@@ -113,18 +118,21 @@ export function ActivityItem({ isSent, transaction }: ActivityItemProps) {
           <HStack w="100%" fontSize="sm">
             <Text flexGrow={1}>
               { `${isSent ? 'To' : 'From'} ` }
-              <Copyable prompt="Copy address" value={otherAddress}>
-                { collapseHexString(otherAddress, 8) }
-              </Copyable>
+              { collapseHexString(otherAddress, 8) }
             </Text>
-            <Text color={isSent ? 'red.500' : 'green.500'} fontWeight={500}>
+            <Text
+              maxWidth="45%"
+              color={isSent ? 'red.500' : 'green.500'}
+              fontWeight={500}
+              whiteSpace="nowrap"
+              overflow="hidden"
+              textOverflow="ellipsis"
+            >
               { `${isSent ? '-' : '+'}${amount} ${coinName}` }
             </Text>
           </HStack>
           <Text color={timestampColor[colorMode]} fontSize="xs">
-            <Tooltip label={`${formattedDate} at ${formattedTime}`}>
-              { relativeTime(timestampMs) }
-            </Tooltip>
+            <Tooltip label={absDateTime}>{ relTime }</Tooltip>
           </Text>
         </VStack>
       </HStack>

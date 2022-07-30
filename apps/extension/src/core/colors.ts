@@ -28,6 +28,11 @@ export const secondaryExtensionBodyTextColor = {
   light: 'gray.400',
 };
 
+export const timestampColor = {
+  dark: 'gray.500',
+  light: 'gray.500',
+};
+
 // Button
 
 export const secondaryButtonColor = {

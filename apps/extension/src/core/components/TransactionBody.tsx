@@ -3,6 +3,7 @@
 
 import React from 'react';
 import {
+  Badge,
   Box,
   Button,
   Heading,
@@ -20,6 +21,7 @@ import useWalletState from 'core/hooks/useWalletState';
 import { MaybeHexString } from 'aptos';
 import { useParams } from 'react-router-dom';
 import { useUserTransaction } from 'core/queries/transaction';
+import ChakraLink from 'core/components/ChakraLink';
 import Copyable from './Copyable';
 
 interface DetailItemProps {
@@ -29,15 +31,11 @@ interface DetailItemProps {
 
 function DetailItem({ children, label }: DetailItemProps) {
   return (
-    <HStack w="100%" justify="space-between">
+    <HStack w="100%" fontSize="md" justify="space-between">
       <Text as="span" fontWeight={700}>{ label }</Text>
       { children }
     </HStack>
   );
-}
-
-function copyableHexString(hexString: MaybeHexString) {
-  return <Copyable value={hexString}>{ collapseHexString(hexString, 12) }</Copyable>;
 }
 
 function useTransactionDetails(version: string) {
@@ -75,7 +73,19 @@ function TransactionBody() {
   const { version } = useParams();
 
   const txn = useTransactionDetails(version!);
-  const userAddress = aptosAccount!.address().hex();
+  const userAddress = aptosAccount!.address().toShortString();
+
+  function clickableAddress(address: MaybeHexString) {
+    return address === userAddress
+      ? <Text>You</Text>
+      : (
+        <Badge fontSize="sm" textTransform="none">
+          <ChakraLink to={`/accounts/${address}`}>
+            { collapseHexString(address, 12) }
+          </ChakraLink>
+        </Badge>
+      );
+  }
 
   return txn && (
     <VStack
@@ -100,10 +110,10 @@ function TransactionBody() {
         View on Aptos explorer
       </Button>
       <DetailItem label="From">
-        { txn.sender === userAddress ? <Text>You</Text> : copyableHexString(txn.sender) }
+        { clickableAddress(txn.sender) }
       </DetailItem>
       <DetailItem label="To">
-        { txn.recipient === userAddress ? <Text>You</Text> : copyableHexString(txn.recipient) }
+        { clickableAddress(txn.recipient) }
       </DetailItem>
       <DetailItem label="Amount">
         <Text>{ `${txn.amount} ${txn.coinName}` }</Text>
@@ -113,12 +123,16 @@ function TransactionBody() {
       </DetailItem>
       <DetailItem label="Hash">
         <Copyable prompt="Copy full hash" value={txn.hash}>
-          { collapseHexString(txn.hash) }
+          <Badge fontSize="sm" textTransform="lowercase">
+            { collapseHexString(txn.hash) }
+          </Badge>
         </Copyable>
       </DetailItem>
       <DetailItem label="Timestamp">
         <Copyable prompt="Copy timestamp" value={txn.timestamp}>
-          { txn.fullDatetime }
+          <Badge fontSize="sm" textTransform="none">
+            { txn.fullDatetime }
+          </Badge>
         </Copyable>
       </DetailItem>
       <DetailItem label="Status">

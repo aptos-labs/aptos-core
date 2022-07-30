@@ -14,7 +14,7 @@ import { Routes as PageRoutes } from 'core/routes';
 function Network() {
   return (
     <AuthLayout routePath={PageRoutes.network.routePath}>
-      <WalletLayout backPage="/settings">
+      <WalletLayout showBackButton>
         <VStack width="100%" paddingTop={8}>
           <Box px={4} pb={4} width="100%">
             <NetworkBody />

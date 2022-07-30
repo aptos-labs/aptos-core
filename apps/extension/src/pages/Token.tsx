@@ -10,7 +10,7 @@ import { Routes as PageRoutes } from 'core/routes';
 function Token() {
   return (
     <AuthLayout routePath={PageRoutes.token.routePath}>
-      <WalletLayout backPage="/gallery">
+      <WalletLayout showBackButton>
         <TokenBody />
       </WalletLayout>
     </AuthLayout>

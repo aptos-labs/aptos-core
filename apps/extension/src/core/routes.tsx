@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import Account from 'pages/Account';
 import Activity from 'pages/Activity';
 import CreateWallet from 'pages/CreateWallet';
 import Credentials from 'pages/Credentials';
@@ -17,6 +18,10 @@ import Transaction from 'pages/Transaction';
 import NoWallet from 'pages/NoWallet';
 
 export const Routes = Object.freeze({
+  account: {
+    element: <Account />,
+    routePath: '/accounts/:address',
+  },
   activity: {
     element: <Activity />,
     routePath: '/activity',

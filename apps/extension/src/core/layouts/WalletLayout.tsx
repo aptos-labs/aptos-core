@@ -8,17 +8,17 @@ import WalletHeader from 'core/components/WalletHeader';
 import { secondaryBgColor } from 'core/colors';
 
 interface WalletLayoutProps {
-  backPage?: string;
   children: React.ReactNode;
   hasWalletFooter?: boolean;
   hasWalletHeader?: boolean;
+  showBackButton?: boolean;
 }
 
 export default function WalletLayout({
-  backPage,
   children,
   hasWalletFooter = true,
   hasWalletHeader = true,
+  showBackButton,
 }: WalletLayoutProps) {
   const { colorMode } = useColorMode();
 
@@ -44,7 +44,7 @@ export default function WalletLayout({
       bgColor={secondaryBgColor[colorMode]}
     >
       {hasWalletHeader ? (
-        <WalletHeader backPage={backPage} />
+        <WalletHeader showBackButton={showBackButton} />
       ) : undefined}
       <Box maxH="100%" overflowY="auto" pb={4}>
         {children}

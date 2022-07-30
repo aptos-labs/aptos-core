@@ -39,15 +39,14 @@ import { AptosAccount } from 'aptos';
 import { useNavigate } from 'react-router-dom';
 import Routes from 'core/routes';
 import { createNewMnemonic } from 'core/utils/account';
-import ChakraLink from './ChakraLink';
 import WalletDrawerBody from './WalletDrawerBody';
 
 interface WalletHeaderProps {
-  backPage?: string;
+  showBackButton?: boolean;
 }
 
 export default function WalletHeader({
-  backPage,
+  showBackButton,
 }: WalletHeaderProps) {
   const { addAccount, aptosAccount } = useWalletState();
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -73,21 +72,19 @@ export default function WalletHeader({
       width="100%"
       py={4}
       height="64px"
-      templateColumns={backPage ? '40px 1fr' : '1fr'}
+      templateColumns={showBackButton ? '40px 1fr' : '1fr'}
       borderBottomColor={secondaryBorderColor[colorMode]}
       borderBottomWidth="1px"
     >
-      {(backPage) ? (
-        <Center>
-          <ChakraLink to={backPage}>
-            <ChevronLeftIcon fontSize="xl" aria-label={backPage} />
-          </ChakraLink>
+      {(showBackButton) ? (
+        <Center cursor="pointer" onClick={() => navigate(-1)}>
+          <ChevronLeftIcon fontSize="xl" />
         </Center>
       ) : <Box />}
       <Center width="100%">
         <HStack
           px={4}
-          pl={(backPage) ? 0 : 4}
+          pl={showBackButton ? 0 : 4}
           width="100%"
         >
           <InputGroup size="sm">
