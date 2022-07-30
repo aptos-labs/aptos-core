@@ -320,7 +320,7 @@ impl NodeConfig {
         self.api.randomize_ports();
         self.inspection_service.randomize_ports();
         self.storage.randomize_ports();
-        self.logger.disable_console();
+        self.logger.randomize_ports();
 
         if let Some(network) = self.validator_network.as_mut() {
             network.listen_address = crate::utils::get_available_port_in_multiaddr(true);
