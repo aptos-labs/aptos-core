@@ -1,54 +1,55 @@
----
 openapi: 3.0.0
 info:
   title: Aptos Node API
-  description: The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.
+  description: The Aptos Node API is a RESTful API for client applications to interact
+    with the Aptos blockchain.
   version: 0.1.0
   contact:
     name: Aptos Labs
-    url: "https://github.com/aptos-labs/aptos-core"
+    url: https://github.com/aptos-labs/aptos-core
   license:
     name: Apache 2.0
-    url: "https://www.apache.org/licenses/LICENSE-2.0.html"
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
 servers: []
 tags:
-  - name: Accounts
-    description: Access to account resources and modules
-  - name: Events
-    description: Access to events
-  - name: General
-    description: General information
-  - name: Tables
-    description: Access to tables
-  - name: Transactions
-    description: Access to transactions
+- name: Accounts
+  description: Access to account resources and modules
+- name: Events
+  description: Access to events
+- name: General
+  description: General information
+- name: Tables
+  description: Access to tables
+- name: Transactions
+  description: Access to transactions
 paths:
-  "/accounts/{address}":
+  /accounts/{address}:
     get:
       tags:
-        - Accounts
+      - Accounts
       summary: Get account
-      description: Return high level information about an account such as its sequence number.
+      description: Return high level information about an account such as its sequence
+        number.
       parameters:
-        - name: address
-          schema:
-            $ref: "#/components/schemas/Address"
-          in: path
-          required: true
-          deprecated: false
-        - name: ledger_version
-          schema:
-            $ref: "#/components/schemas/U64"
-          in: query
-          required: false
-          deprecated: false
+      - name: address
+        schema:
+          $ref: '#/components/schemas/Address'
+        in: path
+        required: true
+        deprecated: false
+      - name: ledger_version
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        required: false
+        deprecated: false
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AccountData"
+                $ref: '#/components/schemas/AccountData'
             application/x-bcs:
               schema:
                 type: array
@@ -86,53 +87,59 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "404":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '404':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_account
-  "/accounts/{address}/resources":
+  /accounts/{address}/resources:
     get:
       tags:
-        - Accounts
+      - Accounts
       summary: Get account resources
-      description: "This endpoint returns all account resources at a given address at a\nspecific ledger version (AKA transaction version). If the ledger\nversion is not specified in the request, the latest ledger version is used.\n\nThe Aptos nodes prune account state history, via a configurable time window (link).\nIf the requested data has been pruned, the server responds with a 404."
+      description: |-
+        This endpoint returns all account resources at a given address at a
+        specific ledger version (AKA transaction version). If the ledger
+        version is not specified in the request, the latest ledger version is used.
+
+        The Aptos nodes prune account state history, via a configurable time window (link).
+        If the requested data has been pruned, the server responds with a 404.
       parameters:
-        - name: address
-          schema:
-            $ref: "#/components/schemas/Address"
-          in: path
-          required: true
-          deprecated: false
-        - name: ledger_version
-          schema:
-            $ref: "#/components/schemas/U64"
-          in: query
-          required: false
-          deprecated: false
+      - name: address
+        schema:
+          $ref: '#/components/schemas/Address'
+        in: path
+        required: true
+        deprecated: false
+      - name: ledger_version
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        required: false
+        deprecated: false
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/MoveResource"
+                  $ref: '#/components/schemas/MoveResource'
             application/x-bcs:
               schema:
                 type: array
@@ -170,53 +177,57 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "404":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '404':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_account_resources
-  "/accounts/{address}/modules":
+  /accounts/{address}/modules:
     get:
       tags:
-        - Accounts
+      - Accounts
       summary: Get account modules
-      description: "This endpoint returns account resources for a specific ledger version (AKA transaction version).\nIf not present, the latest version is used. <---- TODO Update this comment\nThe Aptos nodes prune account state history, via a configurable time window (link).\nIf the requested data has been pruned, the server responds with a 404"
+      description: |-
+        This endpoint returns account resources for a specific ledger version (AKA transaction version).
+        If not present, the latest version is used. <---- TODO Update this comment
+        The Aptos nodes prune account state history, via a configurable time window (link).
+        If the requested data has been pruned, the server responds with a 404
       parameters:
-        - name: address
-          schema:
-            $ref: "#/components/schemas/Address"
-          in: path
-          required: true
-          deprecated: false
-        - name: ledger_version
-          schema:
-            $ref: "#/components/schemas/U64"
-          in: query
-          required: false
-          deprecated: false
+      - name: address
+        schema:
+          $ref: '#/components/schemas/Address'
+        in: path
+        required: true
+        deprecated: false
+      - name: ledger_version
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        required: false
+        deprecated: false
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/MoveModuleBytecode"
+                  $ref: '#/components/schemas/MoveModuleBytecode'
             application/x-bcs:
               schema:
                 type: array
@@ -254,74 +265,77 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "404":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '404':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_account_modules
   /spec:
     get:
       tags:
-        - General
+      - General
       summary: Show OpenAPI explorer
-      description: "Provides a UI that you can use to explore the API. You can also retrieve the API directly at `/spec.yaml` and `/spec.json`."
+      description: Provides a UI that you can use to explore the API. You can also
+        retrieve the API directly at `/spec.yaml` and `/spec.json`.
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             text/html:
               schema:
                 type: string
       operationId: spec
-  "/events/{event_key}":
+  /events/{event_key}:
     get:
       tags:
-        - Events
+      - Events
       summary: Get events by event key
-      description: todo
+      description: |-
+        This endpoint allows you to get a list of events of a specific type
+        as identified by its event key, which is a globally unique ID.
       parameters:
-        - name: event_key
-          schema:
-            $ref: "#/components/schemas/EventKey"
-          in: path
-          required: true
-          deprecated: false
-        - name: start
-          schema:
-            $ref: "#/components/schemas/U64"
-          in: query
-          required: false
-          deprecated: false
-        - name: limit
-          schema:
-            type: integer
-            format: uint16
-          in: query
-          required: false
-          deprecated: false
+      - name: event_key
+        schema:
+          $ref: '#/components/schemas/EventKey'
+        in: path
+        required: true
+        deprecated: false
+      - name: start
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        required: false
+        deprecated: false
+      - name: limit
+        schema:
+          type: integer
+          format: uint16
+        in: query
+        required: false
+        deprecated: false
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Event"
+                  $ref: '#/components/schemas/Event'
             application/x-bcs:
               schema:
                 type: array
@@ -359,72 +373,75 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "404":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '404':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_events_by_event_key
-  "/accounts/{address}/events/{event_handle}/{field_name}":
+  /accounts/{address}/events/{event_handle}/{field_name}:
     get:
       tags:
-        - Events
+      - Events
       summary: Get events by event handle
-      description: "This API extracts event key from the account resource identified\nby the `event_handle_struct` and `field_name`, then returns\nevents identified by the event key."
+      description: |-
+        This API extracts event key from the account resource identified
+        by the `event_handle_struct` and `field_name`, then returns
+        events identified by the event key.
       parameters:
-        - name: address
-          schema:
-            $ref: "#/components/schemas/Address"
-          in: path
-          required: true
-          deprecated: false
-        - name: event_handle
-          schema:
-            $ref: "#/components/schemas/MoveStructTag"
-          in: path
-          required: true
-          deprecated: false
-        - name: field_name
-          schema:
-            $ref: "#/components/schemas/IdentifierWrapper"
-          in: path
-          required: true
-          deprecated: false
-        - name: start
-          schema:
-            $ref: "#/components/schemas/U64"
-          in: query
-          required: false
-          deprecated: false
-        - name: limit
-          schema:
-            type: integer
-            format: uint16
-          in: query
-          required: false
-          deprecated: false
+      - name: address
+        schema:
+          $ref: '#/components/schemas/Address'
+        in: path
+        required: true
+        deprecated: false
+      - name: event_handle
+        schema:
+          $ref: '#/components/schemas/MoveStructTag'
+        in: path
+        required: true
+        deprecated: false
+      - name: field_name
+        schema:
+          $ref: '#/components/schemas/IdentifierWrapper'
+        in: path
+        required: true
+        deprecated: false
+      - name: start
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        required: false
+        deprecated: false
+      - name: limit
+        schema:
+          type: integer
+          format: uint16
+        in: query
+        required: false
+        deprecated: false
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Event"
+                  $ref: '#/components/schemas/Event'
             application/x-bcs:
               schema:
                 type: array
@@ -462,38 +479,40 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "404":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '404':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_events_by_event_handle
   /:
     get:
       tags:
-        - General
+      - General
       summary: Get ledger info
-      description: "Get the latest ledger information, including data such as chain ID, role type, ledger versions, epoch, etc."
+      description: |-
+        Get the latest ledger information, including data such as chain ID,
+        role type, ledger versions, epoch, etc.
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/IndexResponse"
+                $ref: '#/components/schemas/IndexResponse'
             application/x-bcs:
               schema:
                 type: array
@@ -531,51 +550,58 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_ledger_info
-  "/accounts/{address}/resource/{resource_type}":
+  /accounts/{address}/resource/{resource_type}:
     get:
       tags:
-        - Accounts
+      - Accounts
       summary: Get specific account resource
-      description: "This endpoint returns the resource of a specific type residing at a given\naccount at a specified ledger version (AKA transaction version). If the\nledger version is not specified in the request, the latest ledger version\nis used.\n\nThe Aptos nodes prune account state history, via a configurable time window (link).\nIf the requested data has been pruned, the server responds with a 404."
+      description: |-
+        This endpoint returns the resource of a specific type residing at a given
+        account at a specified ledger version (AKA transaction version). If the
+        ledger version is not specified in the request, the latest ledger version
+        is used.
+
+        The Aptos nodes prune account state history, via a configurable time window (link).
+        If the requested data has been pruned, the server responds with a 404.
       parameters:
-        - name: address
-          schema:
-            $ref: "#/components/schemas/Address"
-          in: path
-          required: true
-          deprecated: false
-        - name: resource_type
-          schema:
-            $ref: "#/components/schemas/MoveStructTag"
-          in: path
-          required: true
-          deprecated: false
-        - name: ledger_version
-          schema:
-            $ref: "#/components/schemas/U64"
-          in: query
-          required: false
-          deprecated: false
+      - name: address
+        schema:
+          $ref: '#/components/schemas/Address'
+        in: path
+        required: true
+        deprecated: false
+      - name: resource_type
+        schema:
+          $ref: '#/components/schemas/MoveStructTag'
+        in: path
+        required: true
+        deprecated: false
+      - name: ledger_version
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        required: false
+        deprecated: false
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MoveResource"
+                $ref: '#/components/schemas/MoveResource'
             application/x-bcs:
               schema:
                 type: array
@@ -613,57 +639,64 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "404":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '404':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_account_resource
-  "/accounts/{address}/module/{module_name}":
+  /accounts/{address}/module/{module_name}:
     get:
       tags:
-        - Accounts
+      - Accounts
       summary: Get specific account module
-      description: "This endpoint returns the module with a specific name residing at a given\naccount at a specified ledger version (AKA transaction version). If the\nledger version is not specified in the request, the latest ledger version\nis used.\n\nThe Aptos nodes prune account state history, via a configurable time window (link).\nIf the requested data has been pruned, the server responds with a 404."
+      description: |-
+        This endpoint returns the module with a specific name residing at a given
+        account at a specified ledger version (AKA transaction version). If the
+        ledger version is not specified in the request, the latest ledger version
+        is used.
+
+        The Aptos nodes prune account state history, via a configurable time window (link).
+        If the requested data has been pruned, the server responds with a 404.
       parameters:
-        - name: address
-          schema:
-            $ref: "#/components/schemas/Address"
-          in: path
-          required: true
-          deprecated: false
-        - name: module_name
-          schema:
-            $ref: "#/components/schemas/IdentifierWrapper"
-          in: path
-          required: true
-          deprecated: false
-        - name: ledger_version
-          schema:
-            $ref: "#/components/schemas/U64"
-          in: query
-          required: false
-          deprecated: false
+      - name: address
+        schema:
+          $ref: '#/components/schemas/Address'
+        in: path
+        required: true
+        deprecated: false
+      - name: module_name
+        schema:
+          $ref: '#/components/schemas/IdentifierWrapper'
+        in: path
+        required: true
+        deprecated: false
+      - name: ledger_version
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        required: false
+        deprecated: false
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MoveModuleBytecode"
+                $ref: '#/components/schemas/MoveModuleBytecode'
             application/x-bcs:
               schema:
                 type: array
@@ -701,57 +734,64 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "404":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '404':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_account_module
-  "/tables/{table_handle}/item":
+  /tables/{table_handle}/item:
     post:
       tags:
-        - Tables
+      - Tables
       summary: Get table item
-      description: todo
+      description: |-
+        Get a table item from the table identified by {table_handle} in the
+        path and the "key" (TableItemRequest) provided in the request body.
+
+        This is a POST endpoint because the "key" for requesting a specific
+        table item (TableItemRequest) could be quite complex, as each of its
+        fields could themselves be composed of other structs. This makes it
+        impractical to express using query params, meaning GET isn't an option.
       parameters:
-        - name: table_handle
-          schema:
-            $ref: "#/components/schemas/U128"
-          in: path
-          required: true
-          deprecated: false
-        - name: ledger_version
-          schema:
-            $ref: "#/components/schemas/U64"
-          in: query
-          required: false
-          deprecated: false
+      - name: table_handle
+        schema:
+          $ref: '#/components/schemas/U128'
+        in: path
+        required: true
+        deprecated: false
+      - name: ledger_version
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        required: false
+        deprecated: false
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TableItemRequest"
+              $ref: '#/components/schemas/TableItemRequest'
         required: true
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MoveValue"
+                $ref: '#/components/schemas/MoveValue'
             application/x-bcs:
               schema:
                 type: array
@@ -789,54 +829,56 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "404":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '404':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_table_item
   /transactions:
     get:
       tags:
-        - Transactions
+      - Transactions
       summary: Get transactions
-      description: todo
+      description: |-
+        Get on-chain (meaning, committed) transactions. You may specify from
+        when you want the transactions and how to include in the response.
       parameters:
-        - name: start
-          schema:
-            $ref: "#/components/schemas/U64"
-          in: query
-          required: false
-          deprecated: false
-        - name: limit
-          schema:
-            type: integer
-            format: uint16
-          in: query
-          required: false
-          deprecated: false
+      - name: start
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        required: false
+        deprecated: false
+      - name: limit
+        schema:
+          type: integer
+          format: uint16
+        in: query
+        required: false
+        deprecated: false
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Transaction"
+                  $ref: '#/components/schemas/Transaction'
             application/x-bcs:
               schema:
                 type: array
@@ -874,35 +916,50 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "404":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '404':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_transactions
     post:
       tags:
-        - Transactions
+      - Transactions
       summary: Submit transaction
-      description: todo
+      description: |-
+        This endpoint accepts transaction submissions in two formats.
+
+        To submit a transaction as JSON, you must submit a SubmitTransactionRequest.
+        To build this request, do the following:
+
+        1. Encode the transaction as BCS. If you are using a language that has
+        native BCS support, make sure of that library. If not, you may take
+        advantage of /transactions/encode_submission. When using this
+        endpoint, make sure you trust the node you're talking to, as it is
+        possible they could manipulate your request.
+        2. Sign the encoded transaction and use it to create a TransactionSignature.
+        3. Submit the request. Make sure to use the "application/json" Content-Type.
+
+        To submit a transaction as BCS, you must submit a SignedTransaction
+        encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SubmitTransactionRequest"
+              $ref: '#/components/schemas/SubmitTransactionRequest'
           application/x.aptos.signed_transaction+bcs:
             schema:
               type: array
@@ -911,12 +968,12 @@ paths:
                 format: uint8
         required: true
       responses:
-        "202":
-          description: ""
+        '202':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PendingTransaction"
+                $ref: '#/components/schemas/PendingTransaction'
             application/x-bcs:
               schema:
                 type: array
@@ -954,51 +1011,62 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "413":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '413':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "507":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '507':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: submit_transaction
-  "/transactions/by_hash/{txn_hash}":
+  /transactions/by_hash/{txn_hash}:
     get:
       tags:
-        - Transactions
+      - Transactions
       summary: Get transaction by hash
-      description: todo
+      description: |-
+        Look up a transaction by its hash. This is the same hash that is returned
+        by the API when submitting a transaction (see PendingTransaction).
+
+        When given a transaction hash, the server first looks for the transaction
+        in storage (on-chain, committed). If no on-chain transaction is found, it
+        looks the transaction up by hash in the mempool (pending, not yet committed).
+
+        To create a transaction hash by yourself, do the following:
+        1. Hash message bytes: "RawTransaction" bytes + BCS bytes of [Transaction](https://aptos-labs.github.io/aptos-core/aptos_types/transaction/enum.Transaction.html).
+        2. Apply hash algorithm `SHA3-256` to the hash message bytes.
+        3. Hex-encode the hash bytes with `0x` prefix.
       parameters:
-        - name: txn_hash
-          schema:
-            $ref: "#/components/schemas/HashValue"
-          in: path
-          required: true
-          deprecated: false
+      - name: txn_hash
+        schema:
+          $ref: '#/components/schemas/HashValue'
+        in: path
+        required: true
+        deprecated: false
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Transaction"
+                $ref: '#/components/schemas/Transaction'
             application/x-bcs:
               schema:
                 type: array
@@ -1036,45 +1104,45 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "404":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '404':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_transaction_by_hash
-  "/transactions/by_version/{txn_version}":
+  /transactions/by_version/{txn_version}:
     get:
       tags:
-        - Transactions
+      - Transactions
       summary: Get transaction by version
       description: todo
       parameters:
-        - name: txn_version
-          schema:
-            $ref: "#/components/schemas/U64"
-          in: path
-          required: true
-          deprecated: false
+      - name: txn_version
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: path
+        required: true
+        deprecated: false
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Transaction"
+                $ref: '#/components/schemas/Transaction'
             application/x-bcs:
               schema:
                 type: array
@@ -1112,60 +1180,60 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "404":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '404':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_transaction_by_version
-  "/accounts/{address}/transactions":
+  /accounts/{address}/transactions:
     get:
       tags:
-        - Transactions
+      - Transactions
       summary: Get account transactions
       description: todo
       parameters:
-        - name: address
-          schema:
-            $ref: "#/components/schemas/Address"
-          in: path
-          required: true
-          deprecated: false
-        - name: start
-          schema:
-            $ref: "#/components/schemas/U64"
-          in: query
-          required: false
-          deprecated: false
-        - name: limit
-          schema:
-            type: integer
-            format: uint16
-          in: query
-          required: false
-          deprecated: false
+      - name: address
+        schema:
+          $ref: '#/components/schemas/Address'
+        in: path
+        required: true
+        deprecated: false
+      - name: start
+        schema:
+          $ref: '#/components/schemas/U64'
+        in: query
+        required: false
+        deprecated: false
+      - name: limit
+        schema:
+          type: integer
+          format: uint16
+        in: query
+        required: false
+        deprecated: false
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Transaction"
+                  $ref: '#/components/schemas/Transaction'
             application/x-bcs:
               schema:
                 type: array
@@ -1203,36 +1271,39 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "404":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '404':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: get_account_transactions
   /transactions/simulate:
     post:
       tags:
-        - Transactions
+      - Transactions
       summary: Simulate transaction
-      description: "Simulate submitting a transaction. To use this, you must:\n- Create a SignedTransaction with a zero-padded signature.\n- Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature."
+      description: |-
+        Simulate submitting a transaction. To use this, you must:
+        - Create a SignedTransaction with a zero-padded signature.
+        - Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature.
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SubmitTransactionRequest"
+              $ref: '#/components/schemas/SubmitTransactionRequest'
           application/x.aptos.signed_transaction+bcs:
             schema:
               type: array
@@ -1241,14 +1312,14 @@ paths:
                 format: uint8
         required: true
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/UserTransaction"
+                  $ref: '#/components/schemas/UserTransaction'
             application/x-bcs:
               schema:
                 type: array
@@ -1286,50 +1357,66 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "413":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '413':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "507":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '507':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: simulate_transaction
   /transactions/encode_submission:
     post:
       tags:
-        - Transactions
+      - Transactions
       summary: Encode submission
-      description: "This endpoint accepts an EncodeSubmissionRequest, which internally is a\nUserTransactionRequestInner (and optionally secondary signers) encoded\nas JSON, validates the request format, and then returns that request\nencoded in BCS. The client can then use this to create a transaction\nsignature to be used in a SubmitTransactionRequest, which it then\npasses to the /transactions POST endpoint.\n\nTo be clear, this endpoint makes it possible to submit transaction\nrequests to the API from languages that do not have library support for\nBCS. If you are using an SDK that has BCS support, such as the official\nRust, TypeScript, or Python SDKs, you do not need to use this endpoint.\n\nTo sign a message using the response from this endpoint:\n- Decode the hex encoded string in the response to bytes.\n- Sign the bytes to create the signature.\n- Use that as the signature field in something like Ed25519Signature, which you then use to build a TransactionSignature."
+      description: |-
+        This endpoint accepts an EncodeSubmissionRequest, which internally is a
+        UserTransactionRequestInner (and optionally secondary signers) encoded
+        as JSON, validates the request format, and then returns that request
+        encoded in BCS. The client can then use this to create a transaction
+        signature to be used in a SubmitTransactionRequest, which it then
+        passes to the /transactions POST endpoint.
+
+        To be clear, this endpoint makes it possible to submit transaction
+        requests to the API from languages that do not have library support for
+        BCS. If you are using an SDK that has BCS support, such as the official
+        Rust, TypeScript, or Python SDKs, you do not need to use this endpoint.
+
+        To sign a message using the response from this endpoint:
+        - Decode the hex encoded string in the response to bytes.
+        - Sign the bytes to create the signature.
+        - Use that as the signature field in something like Ed25519Signature, which you then use to build a TransactionSignature.
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/EncodeSubmissionRequest"
+              $ref: '#/components/schemas/EncodeSubmissionRequest'
         required: true
       responses:
-        "200":
-          description: ""
+        '200':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HexEncodedBytes"
+                $ref: '#/components/schemas/HexEncodedBytes'
             application/x-bcs:
               schema:
                 type: array
@@ -1367,159 +1454,163 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        "400":
-          description: ""
+        '400':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
-        "500":
-          description: ""
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AptosError"
+                $ref: '#/components/schemas/AptosError'
       operationId: encode_submission
 components:
   schemas:
     AccountData:
       type: object
       required:
-        - sequence_number
-        - authentication_key
+      - sequence_number
+      - authentication_key
       properties:
         sequence_number:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         authentication_key:
-          $ref: "#/components/schemas/HexEncodedBytes"
+          $ref: '#/components/schemas/HexEncodedBytes'
     AccountSignature:
       type: object
       oneOf:
-        - $ref: "#/components/schemas/AccountSignature_Ed25519Signature"
-        - $ref: "#/components/schemas/AccountSignature_MultiEd25519Signature"
+      - $ref: '#/components/schemas/AccountSignature_Ed25519Signature'
+      - $ref: '#/components/schemas/AccountSignature_MultiEd25519Signature'
       discriminator:
         propertyName: type
         mapping:
-          ed_25519_signature: "#/components/schemas/AccountSignature_Ed25519Signature"
-          multi_ed_25519_signature: "#/components/schemas/AccountSignature_MultiEd25519Signature"
+          ed_25519_signature: '#/components/schemas/AccountSignature_Ed25519Signature'
+          multi_ed_25519_signature: '#/components/schemas/AccountSignature_MultiEd25519Signature'
     AccountSignature_Ed25519Signature:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: ed_25519_signature
-        - $ref: "#/components/schemas/Ed25519Signature"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: ed_25519_signature
+      - $ref: '#/components/schemas/Ed25519Signature'
     AccountSignature_MultiEd25519Signature:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: multi_ed_25519_signature
-        - $ref: "#/components/schemas/MultiEd25519Signature"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: multi_ed_25519_signature
+      - $ref: '#/components/schemas/MultiEd25519Signature'
     Address:
       type: string
       format: hex
       description: Hex encoded 32 byte Aptos account address
-      example: "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+      example: 0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1
     AptosError:
       type: object
-      description: "This is the generic struct we use for all API errors, it contains a string\nmessage and an Aptos API specific error code."
+      description: |-
+        This is the generic struct we use for all API errors, it contains a string
+        message and an Aptos API specific error code.
       required:
-        - message
+      - message
       properties:
         message:
           type: string
         error_code:
-          $ref: "#/components/schemas/AptosErrorCode"
+          $ref: '#/components/schemas/AptosErrorCode'
         aptos_ledger_version:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
     AptosErrorCode:
       type: string
-      description: "These codes provide more granular error information beyond just the HTTP\nstatus code of the response."
+      description: |-
+        These codes provide more granular error information beyond just the HTTP
+        status code of the response.
       enum:
-        - UnsupportedAcceptType
-        - ReadFromStorageError
-        - InvalidBcsInStorageError
-        - BcsSerializationError
-        - InvalidStartParam
-        - InvalidLimitParam
+      - UnsupportedAcceptType
+      - ReadFromStorageError
+      - InvalidBcsInStorageError
+      - BcsSerializationError
+      - InvalidStartParam
+      - InvalidLimitParam
     BlockMetadataTransaction:
       type: object
       required:
-        - version
-        - hash
-        - state_root_hash
-        - event_root_hash
-        - gas_used
-        - success
-        - vm_status
-        - accumulator_root_hash
-        - changes
-        - id
-        - epoch
-        - round
-        - events
-        - previous_block_votes
-        - proposer
-        - failed_proposer_indices
-        - timestamp
+      - version
+      - hash
+      - state_root_hash
+      - event_root_hash
+      - gas_used
+      - success
+      - vm_status
+      - accumulator_root_hash
+      - changes
+      - id
+      - epoch
+      - round
+      - events
+      - previous_block_votes
+      - proposer
+      - failed_proposer_indices
+      - timestamp
       properties:
         version:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         state_root_hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         event_root_hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         gas_used:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         success:
           type: boolean
         vm_status:
           type: string
         accumulator_root_hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         changes:
           type: array
           items:
-            $ref: "#/components/schemas/WriteSetChange"
+            $ref: '#/components/schemas/WriteSetChange'
         id:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         epoch:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         round:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         events:
           type: array
           items:
-            $ref: "#/components/schemas/Event"
+            $ref: '#/components/schemas/Event'
         previous_block_votes:
           type: array
           items:
             type: boolean
         proposer:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         failed_proposer_indices:
           type: array
           items:
             type: integer
             format: uint32
         timestamp:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
     DecodedTableData:
       type: object
       required:
-        - key
-        - key_type
-        - value
-        - value_type
+      - key
+      - key_type
+      - value
+      - value_type
       properties:
         key: {}
         key_type:
@@ -1530,49 +1621,49 @@ components:
     DeleteModule:
       type: object
       required:
-        - address
-        - state_key_hash
-        - module
+      - address
+      - state_key_hash
+      - module
       properties:
         address:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         state_key_hash:
           type: string
         module:
-          $ref: "#/components/schemas/MoveModuleId"
+          $ref: '#/components/schemas/MoveModuleId'
     DeleteResource:
       type: object
       required:
-        - address
-        - state_key_hash
-        - resource
+      - address
+      - state_key_hash
+      - resource
       properties:
         address:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         state_key_hash:
           type: string
         resource:
-          $ref: "#/components/schemas/MoveStructTag"
+          $ref: '#/components/schemas/MoveStructTag'
     DeleteTableItem:
       type: object
       required:
-        - state_key_hash
-        - handle
-        - key
+      - state_key_hash
+      - handle
+      - key
       properties:
         state_key_hash:
           type: string
         handle:
-          $ref: "#/components/schemas/HexEncodedBytes"
+          $ref: '#/components/schemas/HexEncodedBytes'
         key:
-          $ref: "#/components/schemas/HexEncodedBytes"
+          $ref: '#/components/schemas/HexEncodedBytes'
         data:
-          $ref: "#/components/schemas/DeletedTableData"
+          $ref: '#/components/schemas/DeletedTableData'
     DeletedTableData:
       type: object
       required:
-        - key
-        - key_type
+      - key
+      - key_type
       properties:
         key: {}
         key_type:
@@ -1580,965 +1671,1050 @@ components:
     DirectWriteSet:
       type: object
       required:
-        - changes
-        - events
+      - changes
+      - events
       properties:
         changes:
           type: array
           items:
-            $ref: "#/components/schemas/WriteSetChange"
+            $ref: '#/components/schemas/WriteSetChange'
         events:
           type: array
           items:
-            $ref: "#/components/schemas/Event"
+            $ref: '#/components/schemas/Event'
     Ed25519Signature:
       type: object
       required:
-        - public_key
-        - signature
+      - public_key
+      - signature
       properties:
         public_key:
-          $ref: "#/components/schemas/HexEncodedBytes"
+          $ref: '#/components/schemas/HexEncodedBytes'
         signature:
-          $ref: "#/components/schemas/HexEncodedBytes"
+          $ref: '#/components/schemas/HexEncodedBytes'
     EncodeSubmissionRequest:
       type: object
       required:
-        - sender
-        - sequence_number
-        - max_gas_amount
-        - gas_unit_price
-        - expiration_timestamp_secs
-        - payload
+      - sender
+      - sequence_number
+      - max_gas_amount
+      - gas_unit_price
+      - expiration_timestamp_secs
+      - payload
       properties:
         sender:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         sequence_number:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         max_gas_amount:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         gas_unit_price:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         expiration_timestamp_secs:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         payload:
-          $ref: "#/components/schemas/TransactionPayload"
+          $ref: '#/components/schemas/TransactionPayload'
         secondary_signers:
           type: array
           items:
-            $ref: "#/components/schemas/Address"
+            $ref: '#/components/schemas/Address'
     Event:
       type: object
       required:
-        - key
-        - sequence_number
-        - type
-        - data
+      - key
+      - sequence_number
+      - type
+      - data
       properties:
         key:
-          $ref: "#/components/schemas/EventKey"
+          $ref: '#/components/schemas/EventKey'
         sequence_number:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         type:
-          $ref: "#/components/schemas/MoveType"
+          $ref: '#/components/schemas/MoveType'
         data: {}
     EventKey:
       type: string
       format: hex
-      description: "Event key is a global index for an event stream.\n\nIt is hex-encoded BCS bytes of `EventHandle` `guid` field value, which is\na combination of a `uint64` creation number and account address (without\ntrimming leading zeros).\n\nFor example, event key `0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1` is combined by the following 2 parts:\n  1. `0000000000000000`: `uint64` representation of `0`.\n  2. `88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1`: 32 bytes of account address.\n"
-      example: "0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+      description: |
+        Event key is a global index for an event stream.
+
+        It is hex-encoded BCS bytes of `EventHandle` `guid` field value, which is
+        a combination of a `uint64` creation number and account address (without
+        trimming leading zeros).
+
+        For example, event key `0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1` is combined by the following 2 parts:
+          1. `0000000000000000`: `uint64` representation of `0`.
+          2. `88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1`: 32 bytes of account address.
+      example: 0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1
     GenesisPayload:
       type: object
       oneOf:
-        - $ref: "#/components/schemas/GenesisPayload_WriteSetPayload"
+      - $ref: '#/components/schemas/GenesisPayload_WriteSetPayload'
       discriminator:
         propertyName: type
         mapping:
-          write_set_payload: "#/components/schemas/GenesisPayload_WriteSetPayload"
+          write_set_payload: '#/components/schemas/GenesisPayload_WriteSetPayload'
     GenesisPayload_WriteSetPayload:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: write_set_payload
-        - $ref: "#/components/schemas/WriteSetPayload"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: write_set_payload
+      - $ref: '#/components/schemas/WriteSetPayload'
     GenesisTransaction:
       type: object
       required:
-        - version
-        - hash
-        - state_root_hash
-        - event_root_hash
-        - gas_used
-        - success
-        - vm_status
-        - accumulator_root_hash
-        - changes
-        - payload
-        - events
+      - version
+      - hash
+      - state_root_hash
+      - event_root_hash
+      - gas_used
+      - success
+      - vm_status
+      - accumulator_root_hash
+      - changes
+      - payload
+      - events
       properties:
         version:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         state_root_hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         event_root_hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         gas_used:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         success:
           type: boolean
         vm_status:
           type: string
         accumulator_root_hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         changes:
           type: array
           items:
-            $ref: "#/components/schemas/WriteSetChange"
+            $ref: '#/components/schemas/WriteSetChange'
         payload:
-          $ref: "#/components/schemas/GenesisPayload"
+          $ref: '#/components/schemas/GenesisPayload'
         events:
           type: array
           items:
-            $ref: "#/components/schemas/Event"
+            $ref: '#/components/schemas/Event'
     HashValue:
       type: string
     HexEncodedBytes:
       type: string
       format: hex
-      description: "All bytes (Vec<u8>) data is represented as hex-encoded string prefixed with `0x` and fulfilled with\ntwo hex digits per byte.\n\nUnlike the `Address` type, HexEncodedBytes will not trim any zeros.\n"
-      example: "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+      description: |
+        All bytes (Vec<u8>) data is represented as hex-encoded string prefixed with `0x` and fulfilled with
+        two hex digits per byte.
+
+        Unlike the `Address` type, HexEncodedBytes will not trim any zeros.
+      example: 0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1
     IdentifierWrapper:
       type: string
     IndexResponse:
       type: object
-      description: "The struct holding all data returned to the client by the\nindex endpoint (i.e., GET \"/\")."
+      description: |-
+        The struct holding all data returned to the client by the
+        index endpoint (i.e., GET "/").
       required:
-        - chain_id
-        - epoch
-        - ledger_version
-        - oldest_ledger_version
-        - ledger_timestamp
-        - node_role
+      - chain_id
+      - epoch
+      - ledger_version
+      - oldest_ledger_version
+      - ledger_timestamp
+      - node_role
       properties:
         chain_id:
           type: integer
           format: uint8
         epoch:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         ledger_version:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         oldest_ledger_version:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         ledger_timestamp:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         node_role:
-          $ref: "#/components/schemas/RoleType"
+          $ref: '#/components/schemas/RoleType'
     ModuleBundlePayload:
       type: object
       required:
-        - modules
+      - modules
       properties:
         modules:
           type: array
           items:
-            $ref: "#/components/schemas/MoveModuleBytecode"
+            $ref: '#/components/schemas/MoveModuleBytecode'
     MoveAbility:
       type: string
     MoveFunction:
       type: object
       required:
-        - name
-        - visibility
-        - is_entry
-        - generic_type_params
-        - params
-        - return
+      - name
+      - visibility
+      - is_entry
+      - generic_type_params
+      - params
+      - return
       properties:
         name:
-          $ref: "#/components/schemas/IdentifierWrapper"
+          $ref: '#/components/schemas/IdentifierWrapper'
         visibility:
-          $ref: "#/components/schemas/MoveFunctionVisibility"
+          $ref: '#/components/schemas/MoveFunctionVisibility'
         is_entry:
           type: boolean
         generic_type_params:
           type: array
           items:
-            $ref: "#/components/schemas/MoveFunctionGenericTypeParam"
+            $ref: '#/components/schemas/MoveFunctionGenericTypeParam'
         params:
           type: array
           items:
-            $ref: "#/components/schemas/MoveType"
+            $ref: '#/components/schemas/MoveType'
         return:
           type: array
           items:
-            $ref: "#/components/schemas/MoveType"
+            $ref: '#/components/schemas/MoveType'
     MoveFunctionGenericTypeParam:
       type: object
       required:
-        - constraints
+      - constraints
       properties:
         constraints:
           type: array
           items:
-            $ref: "#/components/schemas/MoveAbility"
+            $ref: '#/components/schemas/MoveAbility'
     MoveFunctionVisibility:
       type: string
       enum:
-        - private
-        - public
-        - friend
+      - private
+      - public
+      - friend
     MoveModule:
       type: object
       required:
-        - address
-        - name
-        - friends
-        - exposed_functions
-        - structs
+      - address
+      - name
+      - friends
+      - exposed_functions
+      - structs
       properties:
         address:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         name:
-          $ref: "#/components/schemas/IdentifierWrapper"
+          $ref: '#/components/schemas/IdentifierWrapper'
         friends:
           type: array
           items:
-            $ref: "#/components/schemas/MoveModuleId"
+            $ref: '#/components/schemas/MoveModuleId'
         exposed_functions:
           type: array
           items:
-            $ref: "#/components/schemas/MoveFunction"
+            $ref: '#/components/schemas/MoveFunction'
         structs:
           type: array
           items:
-            $ref: "#/components/schemas/MoveStruct"
+            $ref: '#/components/schemas/MoveStruct'
     MoveModuleBytecode:
       type: object
       required:
-        - bytecode
+      - bytecode
       properties:
         bytecode:
-          $ref: "#/components/schemas/HexEncodedBytes"
+          $ref: '#/components/schemas/HexEncodedBytes'
         abi:
-          $ref: "#/components/schemas/MoveModule"
+          $ref: '#/components/schemas/MoveModule'
     MoveModuleId:
       type: object
       required:
-        - address
-        - name
+      - address
+      - name
       properties:
         address:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         name:
-          $ref: "#/components/schemas/IdentifierWrapper"
+          $ref: '#/components/schemas/IdentifierWrapper'
     MoveResource:
       type: object
       required:
-        - type
-        - data
+      - type
+      - data
       properties:
         type:
-          $ref: "#/components/schemas/MoveStructTag"
+          $ref: '#/components/schemas/MoveStructTag'
         data:
-          $ref: "#/components/schemas/MoveStructValue"
+          $ref: '#/components/schemas/MoveStructValue'
     MoveScriptBytecode:
       type: object
       required:
-        - bytecode
+      - bytecode
       properties:
         bytecode:
-          $ref: "#/components/schemas/HexEncodedBytes"
+          $ref: '#/components/schemas/HexEncodedBytes'
         abi:
-          $ref: "#/components/schemas/MoveFunction"
+          $ref: '#/components/schemas/MoveFunction'
     MoveStruct:
       type: object
       required:
-        - name
-        - is_native
-        - abilities
-        - generic_type_params
-        - fields
+      - name
+      - is_native
+      - abilities
+      - generic_type_params
+      - fields
       properties:
         name:
-          $ref: "#/components/schemas/IdentifierWrapper"
+          $ref: '#/components/schemas/IdentifierWrapper'
         is_native:
           type: boolean
         abilities:
           type: array
           items:
-            $ref: "#/components/schemas/MoveAbility"
+            $ref: '#/components/schemas/MoveAbility'
         generic_type_params:
           type: array
           items:
-            $ref: "#/components/schemas/MoveStructGenericTypeParam"
+            $ref: '#/components/schemas/MoveStructGenericTypeParam'
         fields:
           type: array
           items:
-            $ref: "#/components/schemas/MoveStructField"
+            $ref: '#/components/schemas/MoveStructField'
     MoveStructField:
       type: object
       required:
-        - name
-        - type
+      - name
+      - type
       properties:
         name:
-          $ref: "#/components/schemas/IdentifierWrapper"
+          $ref: '#/components/schemas/IdentifierWrapper'
         type:
-          $ref: "#/components/schemas/MoveType"
+          $ref: '#/components/schemas/MoveType'
     MoveStructGenericTypeParam:
       type: object
       required:
-        - constraints
-        - is_phantom
+      - constraints
+      - is_phantom
       properties:
         constraints:
           type: array
           items:
-            $ref: "#/components/schemas/MoveAbility"
+            $ref: '#/components/schemas/MoveAbility'
         is_phantom:
           type: boolean
     MoveStructTag:
       type: object
       required:
-        - address
-        - module
-        - name
-        - generic_type_params
+      - address
+      - module
+      - name
+      - generic_type_params
       properties:
         address:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         module:
-          $ref: "#/components/schemas/IdentifierWrapper"
+          $ref: '#/components/schemas/IdentifierWrapper'
         name:
-          $ref: "#/components/schemas/IdentifierWrapper"
+          $ref: '#/components/schemas/IdentifierWrapper'
         generic_type_params:
           type: array
           items:
-            $ref: "#/components/schemas/MoveType"
+            $ref: '#/components/schemas/MoveType'
     MoveStructValue:
       type: object
-      description: "This is a JSON representation of some data within an account resource. More specifically,\nit is a map of strings to arbitrary JSON values / objects, where the keys are top level\nfields within the given resource.\n\nTo clarify, you might query for 0x1::account::Account and see the example data.\n\nMove `bool` type value is serialized into `boolean`.\n\nMove `u8` type value is serialized into `integer`.\n\nMove `u64` and `u128` type value is serialized into `string`.\n\nMove `address` type value (32 byte Aptos account address) is serialized into a HexEncodedBytes string.\nFor example:\n  - `0x1`\n  - `0x1668f6be25668c1a17cd8caf6b8d2f25`\n\nMove `vector` type value is serialized into `array`, except `vector<u8>` which is serialized into a\nHexEncodedBytes string with `0x` prefix.\nFor example:\n  - `vector<u64>{255, 255}` => `[\"255\", \"255\"]`\n  - `vector<u8>{255, 255}` => `0xffff`\n\nMove `struct` type value is serialized into `object` that looks like this (except some Move stdlib types, see the following section):\n  ```json\n  {\n    field1_name: field1_value,\n    field2_name: field2_value,\n    ......\n  }\n  ```\n\nFor example:\n  `{ \"created\": \"0xa550c18\", \"role_id\": \"0\" }`\n\n**Special serialization for Move stdlib types**:\n  - [0x1::string::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ascii.md)\n    is serialized into `string`. For example, struct value `0x1::string::String{bytes: b\"Hello World!\"}`\n    is serialized as `\"Hello World!\"` in JSON.\n"
+      description: |
+        This is a JSON representation of some data within an account resource. More specifically,
+        it is a map of strings to arbitrary JSON values / objects, where the keys are top level
+        fields within the given resource.
+
+        To clarify, you might query for 0x1::account::Account and see the example data.
+
+        Move `bool` type value is serialized into `boolean`.
+
+        Move `u8` type value is serialized into `integer`.
+
+        Move `u64` and `u128` type value is serialized into `string`.
+
+        Move `address` type value (32 byte Aptos account address) is serialized into a HexEncodedBytes string.
+        For example:
+          - `0x1`
+          - `0x1668f6be25668c1a17cd8caf6b8d2f25`
+
+        Move `vector` type value is serialized into `array`, except `vector<u8>` which is serialized into a
+        HexEncodedBytes string with `0x` prefix.
+        For example:
+          - `vector<u64>{255, 255}` => `["255", "255"]`
+          - `vector<u8>{255, 255}` => `0xffff`
+
+        Move `struct` type value is serialized into `object` that looks like this (except some Move stdlib types, see the following section):
+          ```json
+          {
+            field1_name: field1_value,
+            field2_name: field2_value,
+            ......
+          }
+          ```
+
+        For example:
+          `{ "created": "0xa550c18", "role_id": "0" }`
+
+        **Special serialization for Move stdlib types**:
+          - [0x1::string::String](https://github.com/aptos-labs/aptos-core/blob/main/language/move-stdlib/docs/ascii.md)
+            is serialized into `string`. For example, struct value `0x1::string::String{bytes: b"Hello World!"}`
+            is serialized as `"Hello World!"` in JSON.
       example:
-        authentication_key: "0x0000000000000000000000000000000000000000000000000000000000000001"
+        authentication_key: '0x0000000000000000000000000000000000000000000000000000000000000001'
         coin_register_events:
-          counter: "0"
+          counter: '0'
           guid:
             id:
-              addr: "0x1"
-              creation_num: "0"
-        self_address: "0x1"
-        sequence_number: "0"
+              addr: '0x1'
+              creation_num: '0'
+        self_address: '0x1'
+        sequence_number: '0'
     MoveType:
       type: string
-      description: "String representation of an on-chain Move type tag that is exposed in transaction payload.\n    Values:\n      - bool\n      - u8\n      - u64\n      - u128\n      - address\n      - signer\n      - vector: `vector<{non-reference MoveTypeId}>`\n      - struct: `{address}::{module_name}::{struct_name}::<{generic types}>`\n\n    Vector type value examples:\n      - `vector<u8>`\n      - `vector<vector<u64>>`\n      - `vector<0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>>`\n\n    Struct type value examples:\n      - `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>\n      - `0x1::account::Account`\n\n    Note:\n      1. Empty chars should be ignored when comparing 2 struct tag ids.\n      2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).\n"
-      pattern: "^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+)$"
+      description: |
+        String representation of an on-chain Move type tag that is exposed in transaction payload.
+            Values:
+              - bool
+              - u8
+              - u64
+              - u128
+              - address
+              - signer
+              - vector: `vector<{non-reference MoveTypeId}>`
+              - struct: `{address}::{module_name}::{struct_name}::<{generic types}>`
+
+            Vector type value examples:
+              - `vector<u8>`
+              - `vector<vector<u64>>`
+              - `vector<0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>>`
+
+            Struct type value examples:
+              - `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
+              - `0x1::account::Account`
+
+            Note:
+              1. Empty chars should be ignored when comparing 2 struct tag ids.
+              2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
+      pattern: ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+)$
     MoveValue:
       type: object
       anyOf:
-        - type: integer
-          format: uint8
-        - $ref: "#/components/schemas/U64"
-        - $ref: "#/components/schemas/U128"
-        - type: boolean
-        - $ref: "#/components/schemas/Address"
-        - type: array
-          items:
-            $ref: "#/components/schemas/MoveValue"
-        - $ref: "#/components/schemas/HexEncodedBytes"
-        - $ref: "#/components/schemas/MoveStructValue"
-        - type: string
+      - type: integer
+        format: uint8
+      - $ref: '#/components/schemas/U64'
+      - $ref: '#/components/schemas/U128'
+      - type: boolean
+      - $ref: '#/components/schemas/Address'
+      - type: array
+        items:
+          $ref: '#/components/schemas/MoveValue'
+      - $ref: '#/components/schemas/HexEncodedBytes'
+      - $ref: '#/components/schemas/MoveStructValue'
+      - type: string
     MultiAgentSignature:
       type: object
       required:
-        - sender
-        - secondary_signer_addresses
-        - secondary_signers
+      - sender
+      - secondary_signer_addresses
+      - secondary_signers
       properties:
         sender:
-          $ref: "#/components/schemas/AccountSignature"
+          $ref: '#/components/schemas/AccountSignature'
         secondary_signer_addresses:
           type: array
           items:
-            $ref: "#/components/schemas/Address"
+            $ref: '#/components/schemas/Address'
         secondary_signers:
           type: array
           items:
-            $ref: "#/components/schemas/AccountSignature"
+            $ref: '#/components/schemas/AccountSignature'
     MultiEd25519Signature:
       type: object
       required:
-        - public_keys
-        - signatures
-        - threshold
-        - bitmap
+      - public_keys
+      - signatures
+      - threshold
+      - bitmap
       properties:
         public_keys:
           type: array
           items:
-            $ref: "#/components/schemas/HexEncodedBytes"
+            $ref: '#/components/schemas/HexEncodedBytes'
         signatures:
           type: array
           items:
-            $ref: "#/components/schemas/HexEncodedBytes"
+            $ref: '#/components/schemas/HexEncodedBytes'
         threshold:
           type: integer
           format: uint8
         bitmap:
-          $ref: "#/components/schemas/HexEncodedBytes"
+          $ref: '#/components/schemas/HexEncodedBytes'
     PendingTransaction:
       type: object
       required:
-        - hash
-        - sender
-        - sequence_number
-        - max_gas_amount
-        - gas_unit_price
-        - expiration_timestamp_secs
-        - payload
+      - hash
+      - sender
+      - sequence_number
+      - max_gas_amount
+      - gas_unit_price
+      - expiration_timestamp_secs
+      - payload
       properties:
         hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         sender:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         sequence_number:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         max_gas_amount:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         gas_unit_price:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         expiration_timestamp_secs:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         payload:
-          $ref: "#/components/schemas/TransactionPayload"
+          $ref: '#/components/schemas/TransactionPayload'
         signature:
-          $ref: "#/components/schemas/TransactionSignature"
+          $ref: '#/components/schemas/TransactionSignature'
     RoleType:
       type: string
       enum:
-        - Validator
-        - FullNode
+      - Validator
+      - FullNode
     ScriptFunctionId:
       type: object
       required:
-        - module
-        - name
+      - module
+      - name
       properties:
         module:
-          $ref: "#/components/schemas/MoveModuleId"
+          $ref: '#/components/schemas/MoveModuleId'
         name:
-          $ref: "#/components/schemas/IdentifierWrapper"
+          $ref: '#/components/schemas/IdentifierWrapper'
     ScriptFunctionPayload:
       type: object
       required:
-        - function
-        - type_arguments
-        - arguments
+      - function
+      - type_arguments
+      - arguments
       properties:
         function:
-          $ref: "#/components/schemas/ScriptFunctionId"
+          $ref: '#/components/schemas/ScriptFunctionId'
         type_arguments:
           type: array
           items:
-            $ref: "#/components/schemas/MoveType"
+            $ref: '#/components/schemas/MoveType'
         arguments:
           type: array
           items: {}
     ScriptPayload:
       type: object
       required:
-        - code
-        - type_arguments
-        - arguments
+      - code
+      - type_arguments
+      - arguments
       properties:
         code:
-          $ref: "#/components/schemas/MoveScriptBytecode"
+          $ref: '#/components/schemas/MoveScriptBytecode'
         type_arguments:
           type: array
           items:
-            $ref: "#/components/schemas/MoveType"
+            $ref: '#/components/schemas/MoveType'
         arguments:
           type: array
           items: {}
     ScriptWriteSet:
       type: object
       required:
-        - execute_as
-        - script
+      - execute_as
+      - script
       properties:
         execute_as:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         script:
-          $ref: "#/components/schemas/ScriptPayload"
+          $ref: '#/components/schemas/ScriptPayload'
     StateCheckpointTransaction:
       type: object
       required:
-        - version
-        - hash
-        - state_root_hash
-        - event_root_hash
-        - gas_used
-        - success
-        - vm_status
-        - accumulator_root_hash
-        - changes
-        - timestamp
+      - version
+      - hash
+      - state_root_hash
+      - event_root_hash
+      - gas_used
+      - success
+      - vm_status
+      - accumulator_root_hash
+      - changes
+      - timestamp
       properties:
         version:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         state_root_hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         event_root_hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         gas_used:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         success:
           type: boolean
         vm_status:
           type: string
         accumulator_root_hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         changes:
           type: array
           items:
-            $ref: "#/components/schemas/WriteSetChange"
+            $ref: '#/components/schemas/WriteSetChange'
         timestamp:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
     SubmitTransactionRequest:
       type: object
       required:
-        - sender
-        - sequence_number
-        - max_gas_amount
-        - gas_unit_price
-        - expiration_timestamp_secs
-        - payload
-        - signature
+      - sender
+      - sequence_number
+      - max_gas_amount
+      - gas_unit_price
+      - expiration_timestamp_secs
+      - payload
+      - signature
       properties:
         sender:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         sequence_number:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         max_gas_amount:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         gas_unit_price:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         expiration_timestamp_secs:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         payload:
-          $ref: "#/components/schemas/TransactionPayload"
+          $ref: '#/components/schemas/TransactionPayload'
         signature:
-          $ref: "#/components/schemas/TransactionSignature"
+          $ref: '#/components/schemas/TransactionSignature'
     TableItemRequest:
       type: object
       required:
-        - key_type
-        - value_type
-        - key
+      - key_type
+      - value_type
+      - key
       properties:
         key_type:
-          $ref: "#/components/schemas/MoveType"
+          $ref: '#/components/schemas/MoveType'
         value_type:
-          $ref: "#/components/schemas/MoveType"
+          $ref: '#/components/schemas/MoveType'
         key: {}
     Transaction:
       type: object
       oneOf:
-        - $ref: "#/components/schemas/Transaction_PendingTransaction"
-        - $ref: "#/components/schemas/Transaction_UserTransaction"
-        - $ref: "#/components/schemas/Transaction_GenesisTransaction"
-        - $ref: "#/components/schemas/Transaction_BlockMetadataTransaction"
-        - $ref: "#/components/schemas/Transaction_StateCheckpointTransaction"
+      - $ref: '#/components/schemas/Transaction_PendingTransaction'
+      - $ref: '#/components/schemas/Transaction_UserTransaction'
+      - $ref: '#/components/schemas/Transaction_GenesisTransaction'
+      - $ref: '#/components/schemas/Transaction_BlockMetadataTransaction'
+      - $ref: '#/components/schemas/Transaction_StateCheckpointTransaction'
       discriminator:
         propertyName: type
         mapping:
-          pending_transaction: "#/components/schemas/Transaction_PendingTransaction"
-          user_transaction: "#/components/schemas/Transaction_UserTransaction"
-          genesis_transaction: "#/components/schemas/Transaction_GenesisTransaction"
-          block_metadata_transaction: "#/components/schemas/Transaction_BlockMetadataTransaction"
-          state_checkpoint_transaction: "#/components/schemas/Transaction_StateCheckpointTransaction"
+          pending_transaction: '#/components/schemas/Transaction_PendingTransaction'
+          user_transaction: '#/components/schemas/Transaction_UserTransaction'
+          genesis_transaction: '#/components/schemas/Transaction_GenesisTransaction'
+          block_metadata_transaction: '#/components/schemas/Transaction_BlockMetadataTransaction'
+          state_checkpoint_transaction: '#/components/schemas/Transaction_StateCheckpointTransaction'
     TransactionPayload:
       type: object
       oneOf:
-        - $ref: "#/components/schemas/TransactionPayload_ScriptFunctionPayload"
-        - $ref: "#/components/schemas/TransactionPayload_ScriptPayload"
-        - $ref: "#/components/schemas/TransactionPayload_ModuleBundlePayload"
-        - $ref: "#/components/schemas/TransactionPayload_WriteSetPayload"
+      - $ref: '#/components/schemas/TransactionPayload_ScriptFunctionPayload'
+      - $ref: '#/components/schemas/TransactionPayload_ScriptPayload'
+      - $ref: '#/components/schemas/TransactionPayload_ModuleBundlePayload'
+      - $ref: '#/components/schemas/TransactionPayload_WriteSetPayload'
       discriminator:
         propertyName: type
         mapping:
-          script_function_payload: "#/components/schemas/TransactionPayload_ScriptFunctionPayload"
-          script_payload: "#/components/schemas/TransactionPayload_ScriptPayload"
-          module_bundle_payload: "#/components/schemas/TransactionPayload_ModuleBundlePayload"
-          write_set_payload: "#/components/schemas/TransactionPayload_WriteSetPayload"
+          script_function_payload: '#/components/schemas/TransactionPayload_ScriptFunctionPayload'
+          script_payload: '#/components/schemas/TransactionPayload_ScriptPayload'
+          module_bundle_payload: '#/components/schemas/TransactionPayload_ModuleBundlePayload'
+          write_set_payload: '#/components/schemas/TransactionPayload_WriteSetPayload'
     TransactionPayload_ModuleBundlePayload:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: module_bundle_payload
-        - $ref: "#/components/schemas/ModuleBundlePayload"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: module_bundle_payload
+      - $ref: '#/components/schemas/ModuleBundlePayload'
     TransactionPayload_ScriptFunctionPayload:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: script_function_payload
-        - $ref: "#/components/schemas/ScriptFunctionPayload"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: script_function_payload
+      - $ref: '#/components/schemas/ScriptFunctionPayload'
     TransactionPayload_ScriptPayload:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: script_payload
-        - $ref: "#/components/schemas/ScriptPayload"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: script_payload
+      - $ref: '#/components/schemas/ScriptPayload'
     TransactionPayload_WriteSetPayload:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: write_set_payload
-        - $ref: "#/components/schemas/WriteSetPayload"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: write_set_payload
+      - $ref: '#/components/schemas/WriteSetPayload'
     TransactionSignature:
       type: object
       oneOf:
-        - $ref: "#/components/schemas/TransactionSignature_Ed25519Signature"
-        - $ref: "#/components/schemas/TransactionSignature_MultiEd25519Signature"
-        - $ref: "#/components/schemas/TransactionSignature_MultiAgentSignature"
+      - $ref: '#/components/schemas/TransactionSignature_Ed25519Signature'
+      - $ref: '#/components/schemas/TransactionSignature_MultiEd25519Signature'
+      - $ref: '#/components/schemas/TransactionSignature_MultiAgentSignature'
       discriminator:
         propertyName: type
         mapping:
-          ed_25519_signature: "#/components/schemas/TransactionSignature_Ed25519Signature"
-          multi_ed_25519_signature: "#/components/schemas/TransactionSignature_MultiEd25519Signature"
-          multi_agent_signature: "#/components/schemas/TransactionSignature_MultiAgentSignature"
+          ed_25519_signature: '#/components/schemas/TransactionSignature_Ed25519Signature'
+          multi_ed_25519_signature: '#/components/schemas/TransactionSignature_MultiEd25519Signature'
+          multi_agent_signature: '#/components/schemas/TransactionSignature_MultiAgentSignature'
     TransactionSignature_Ed25519Signature:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: ed_25519_signature
-        - $ref: "#/components/schemas/Ed25519Signature"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: ed_25519_signature
+      - $ref: '#/components/schemas/Ed25519Signature'
     TransactionSignature_MultiAgentSignature:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: multi_agent_signature
-        - $ref: "#/components/schemas/MultiAgentSignature"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: multi_agent_signature
+      - $ref: '#/components/schemas/MultiAgentSignature'
     TransactionSignature_MultiEd25519Signature:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: multi_ed_25519_signature
-        - $ref: "#/components/schemas/MultiEd25519Signature"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: multi_ed_25519_signature
+      - $ref: '#/components/schemas/MultiEd25519Signature'
     Transaction_BlockMetadataTransaction:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: block_metadata_transaction
-        - $ref: "#/components/schemas/BlockMetadataTransaction"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: block_metadata_transaction
+      - $ref: '#/components/schemas/BlockMetadataTransaction'
     Transaction_GenesisTransaction:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: genesis_transaction
-        - $ref: "#/components/schemas/GenesisTransaction"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: genesis_transaction
+      - $ref: '#/components/schemas/GenesisTransaction'
     Transaction_PendingTransaction:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: pending_transaction
-        - $ref: "#/components/schemas/PendingTransaction"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: pending_transaction
+      - $ref: '#/components/schemas/PendingTransaction'
     Transaction_StateCheckpointTransaction:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: state_checkpoint_transaction
-        - $ref: "#/components/schemas/StateCheckpointTransaction"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: state_checkpoint_transaction
+      - $ref: '#/components/schemas/StateCheckpointTransaction'
     Transaction_UserTransaction:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: user_transaction
-        - $ref: "#/components/schemas/UserTransaction"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: user_transaction
+      - $ref: '#/components/schemas/UserTransaction'
     U128:
       type: string
       format: uint64
-      description: "A string containing a 128-bit unsigned integer.\n\nWe represent u128 values as a string to ensure compatability with languages such\nas JavaScript that do not parse u64s in JSON natively.\n"
-      example: "340282366920938463463374607431768211454"
+      description: |
+        A string containing a 128-bit unsigned integer.
+
+        We represent u128 values as a string to ensure compatability with languages such
+        as JavaScript that do not parse u64s in JSON natively.
+      example: '340282366920938463463374607431768211454'
     U64:
       type: string
       format: uint64
-      description: "A string containing a 64-bit unsigned integer.\n\nWe represent u64 values as a string to ensure compatability with languages such\nas JavaScript that do not parse u64s in JSON natively.\n"
-      example: "32425224034"
+      description: |
+        A string containing a 64-bit unsigned integer.
+
+        We represent u64 values as a string to ensure compatability with languages such
+        as JavaScript that do not parse u64s in JSON natively.
+      example: '32425224034'
     UserTransaction:
       type: object
       required:
-        - version
-        - hash
-        - state_root_hash
-        - event_root_hash
-        - gas_used
-        - success
-        - vm_status
-        - accumulator_root_hash
-        - changes
-        - sender
-        - sequence_number
-        - max_gas_amount
-        - gas_unit_price
-        - expiration_timestamp_secs
-        - payload
-        - events
-        - timestamp
+      - version
+      - hash
+      - state_root_hash
+      - event_root_hash
+      - gas_used
+      - success
+      - vm_status
+      - accumulator_root_hash
+      - changes
+      - sender
+      - sequence_number
+      - max_gas_amount
+      - gas_unit_price
+      - expiration_timestamp_secs
+      - payload
+      - events
+      - timestamp
       properties:
         version:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         state_root_hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         event_root_hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         gas_used:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         success:
           type: boolean
         vm_status:
           type: string
         accumulator_root_hash:
-          $ref: "#/components/schemas/HashValue"
+          $ref: '#/components/schemas/HashValue'
         changes:
           type: array
           items:
-            $ref: "#/components/schemas/WriteSetChange"
+            $ref: '#/components/schemas/WriteSetChange'
         sender:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         sequence_number:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         max_gas_amount:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         gas_unit_price:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         expiration_timestamp_secs:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
         payload:
-          $ref: "#/components/schemas/TransactionPayload"
+          $ref: '#/components/schemas/TransactionPayload'
         signature:
-          $ref: "#/components/schemas/TransactionSignature"
+          $ref: '#/components/schemas/TransactionSignature'
         events:
           type: array
           items:
-            $ref: "#/components/schemas/Event"
+            $ref: '#/components/schemas/Event'
         timestamp:
-          $ref: "#/components/schemas/U64"
+          $ref: '#/components/schemas/U64'
     WriteModule:
       type: object
       required:
-        - address
-        - state_key_hash
-        - data
+      - address
+      - state_key_hash
+      - data
       properties:
         address:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         state_key_hash:
           type: string
         data:
-          $ref: "#/components/schemas/MoveModuleBytecode"
+          $ref: '#/components/schemas/MoveModuleBytecode'
     WriteResource:
       type: object
       required:
-        - address
-        - state_key_hash
-        - data
+      - address
+      - state_key_hash
+      - data
       properties:
         address:
-          $ref: "#/components/schemas/Address"
+          $ref: '#/components/schemas/Address'
         state_key_hash:
           type: string
         data:
-          $ref: "#/components/schemas/MoveResource"
+          $ref: '#/components/schemas/MoveResource'
     WriteSet:
       type: object
       oneOf:
-        - $ref: "#/components/schemas/WriteSet_ScriptWriteSet"
-        - $ref: "#/components/schemas/WriteSet_DirectWriteSet"
+      - $ref: '#/components/schemas/WriteSet_ScriptWriteSet'
+      - $ref: '#/components/schemas/WriteSet_DirectWriteSet'
       discriminator:
         propertyName: type
         mapping:
-          script_write_set: "#/components/schemas/WriteSet_ScriptWriteSet"
-          direct_write_set: "#/components/schemas/WriteSet_DirectWriteSet"
+          script_write_set: '#/components/schemas/WriteSet_ScriptWriteSet'
+          direct_write_set: '#/components/schemas/WriteSet_DirectWriteSet'
     WriteSetChange:
       type: object
       oneOf:
-        - $ref: "#/components/schemas/WriteSetChange_DeleteModule"
-        - $ref: "#/components/schemas/WriteSetChange_DeleteResource"
-        - $ref: "#/components/schemas/WriteSetChange_DeleteTableItem"
-        - $ref: "#/components/schemas/WriteSetChange_WriteModule"
-        - $ref: "#/components/schemas/WriteSetChange_WriteResource"
-        - $ref: "#/components/schemas/WriteSetChange_WriteTableItem"
+      - $ref: '#/components/schemas/WriteSetChange_DeleteModule'
+      - $ref: '#/components/schemas/WriteSetChange_DeleteResource'
+      - $ref: '#/components/schemas/WriteSetChange_DeleteTableItem'
+      - $ref: '#/components/schemas/WriteSetChange_WriteModule'
+      - $ref: '#/components/schemas/WriteSetChange_WriteResource'
+      - $ref: '#/components/schemas/WriteSetChange_WriteTableItem'
       discriminator:
         propertyName: type
         mapping:
-          delete_module: "#/components/schemas/WriteSetChange_DeleteModule"
-          delete_resource: "#/components/schemas/WriteSetChange_DeleteResource"
-          delete_table_item: "#/components/schemas/WriteSetChange_DeleteTableItem"
-          write_module: "#/components/schemas/WriteSetChange_WriteModule"
-          write_resource: "#/components/schemas/WriteSetChange_WriteResource"
-          write_table_item: "#/components/schemas/WriteSetChange_WriteTableItem"
+          delete_module: '#/components/schemas/WriteSetChange_DeleteModule'
+          delete_resource: '#/components/schemas/WriteSetChange_DeleteResource'
+          delete_table_item: '#/components/schemas/WriteSetChange_DeleteTableItem'
+          write_module: '#/components/schemas/WriteSetChange_WriteModule'
+          write_resource: '#/components/schemas/WriteSetChange_WriteResource'
+          write_table_item: '#/components/schemas/WriteSetChange_WriteTableItem'
     WriteSetChange_DeleteModule:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: delete_module
-        - $ref: "#/components/schemas/DeleteModule"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: delete_module
+      - $ref: '#/components/schemas/DeleteModule'
     WriteSetChange_DeleteResource:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: delete_resource
-        - $ref: "#/components/schemas/DeleteResource"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: delete_resource
+      - $ref: '#/components/schemas/DeleteResource'
     WriteSetChange_DeleteTableItem:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: delete_table_item
-        - $ref: "#/components/schemas/DeleteTableItem"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: delete_table_item
+      - $ref: '#/components/schemas/DeleteTableItem'
     WriteSetChange_WriteModule:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: write_module
-        - $ref: "#/components/schemas/WriteModule"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: write_module
+      - $ref: '#/components/schemas/WriteModule'
     WriteSetChange_WriteResource:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: write_resource
-        - $ref: "#/components/schemas/WriteResource"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: write_resource
+      - $ref: '#/components/schemas/WriteResource'
     WriteSetChange_WriteTableItem:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: write_table_item
-        - $ref: "#/components/schemas/WriteTableItem"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: write_table_item
+      - $ref: '#/components/schemas/WriteTableItem'
     WriteSetPayload:
       type: object
       required:
-        - write_set
+      - write_set
       properties:
         write_set:
-          $ref: "#/components/schemas/WriteSet"
+          $ref: '#/components/schemas/WriteSet'
     WriteSet_DirectWriteSet:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: direct_write_set
-        - $ref: "#/components/schemas/DirectWriteSet"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: direct_write_set
+      - $ref: '#/components/schemas/DirectWriteSet'
     WriteSet_ScriptWriteSet:
       allOf:
-        - type: object
-          required:
-            - type
-          properties:
-            type:
-              type: string
-              example: script_write_set
-        - $ref: "#/components/schemas/ScriptWriteSet"
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: script_write_set
+      - $ref: '#/components/schemas/ScriptWriteSet'
     WriteTableItem:
       type: object
       required:
-        - state_key_hash
-        - handle
-        - key
-        - value
+      - state_key_hash
+      - handle
+      - key
+      - value
       properties:
         state_key_hash:
           type: string
         handle:
-          $ref: "#/components/schemas/HexEncodedBytes"
+          $ref: '#/components/schemas/HexEncodedBytes'
         key:
-          $ref: "#/components/schemas/HexEncodedBytes"
+          $ref: '#/components/schemas/HexEncodedBytes'
         value:
-          $ref: "#/components/schemas/HexEncodedBytes"
+          $ref: '#/components/schemas/HexEncodedBytes'
         data:
-          $ref: "#/components/schemas/DecodedTableData"
+          $ref: '#/components/schemas/DecodedTableData'
 externalDocs:
-  url: "https://github.com/aptos-labs/aptos-core"
+  url: https://github.com/aptos-labs/aptos-core

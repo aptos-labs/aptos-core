@@ -17,7 +17,8 @@ pub struct IndexApi {
 impl IndexApi {
     /// Get ledger info
     ///
-    /// Get the latest ledger information, including data such as chain ID, role type, ledger versions, epoch, etc.
+    /// Get the latest ledger information, including data such as chain ID,
+    /// role type, ledger versions, epoch, etc.
     #[oai(
         path = "/",
         method = "get",
