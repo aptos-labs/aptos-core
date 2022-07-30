@@ -22,7 +22,7 @@ module aptos_framework::genesis {
     const EINVALID_EPOCH_DURATION: u64 = 1;
 
     fun initialize(
-        core_resource_account: signer,
+        core_resource_account: &signer,
         core_resource_account_auth_key: vector<u8>,
         initial_script_allow_list: vector<vector<u8>>,
         is_open_module: bool,
@@ -44,48 +44,6 @@ module aptos_framework::genesis {
         // This can fail genesis but is necessary so that any misconfigurations can be corrected before genesis succeeds
         assert!(epoch_interval > 0, error::invalid_argument(EINVALID_EPOCH_DURATION));
 
-        initialize_internal(
-            &core_resource_account,
-            core_resource_account_auth_key,
-            initial_script_allow_list,
-            is_open_module,
-            instruction_schedule,
-            native_schedule,
-            chain_id,
-            initial_version,
-            consensus_config,
-            min_price_per_gas_unit,
-            epoch_interval,
-            minimum_stake,
-            maximum_stake,
-            min_lockup_duration_secs,
-            max_lockup_duration_secs,
-            allow_validator_set_change,
-            rewards_rate,
-            rewards_rate_denominator,
-        )
-    }
-
-    fun initialize_internal(
-        core_resource_account: &signer,
-        core_resource_account_auth_key: vector<u8>,
-        initial_script_allow_list: vector<vector<u8>>,
-        is_open_module: bool,
-        instruction_schedule: vector<u8>,
-        native_schedule: vector<u8>,
-        chain_id: u8,
-        initial_version: u64,
-        consensus_config: vector<u8>,
-        min_price_per_gas_unit: u64,
-        epoch_interval: u64,
-        minimum_stake: u64,
-        maximum_stake: u64,
-        min_lockup_duration_secs: u64,
-        max_lockup_duration_secs: u64,
-        allow_validator_set_change: bool,
-        rewards_rate: u64,
-        rewards_rate_denominator: u64,
-    ) {
         // TODO: Only do create the core resources account in testnets
         account::create_account_internal(signer::address_of(core_resource_account));
         account::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
@@ -163,7 +121,7 @@ module aptos_framework::genesis {
     ///
     /// Network address fields are a vector per account, where each entry is a vector of addresses
     /// encoded in a single BCS byte array.
-    public entry fun create_initialize_validators(
+    fun create_initialize_validators(
         aptos_framework_account: signer,
         owners: vector<address>,
         consensus_pubkeys: vector<vector<u8>>,
@@ -214,7 +172,7 @@ module aptos_framework::genesis {
 
     #[test_only]
     public fun setup(core_resource_account: &signer) {
-        initialize_internal(
+        initialize(
             core_resource_account,
             x"0000000000000000000000000000000000000000000000000000000000000000",
             vector::empty(),

@@ -99,26 +99,6 @@ pub enum ScriptFunctionCall {
         coin_type: TypeTag,
     },
 
-    /// Sets up the initial validator set for the network.
-    /// The validator "owner" accounts, and their authentication
-    /// Addresses (and keys) are encoded in the `owners`
-    /// Each validator signs consensus messages with the private key corresponding to the Ed25519
-    /// public key in `consensus_pubkeys`.
-    /// Finally, each validator must specify the network address
-    /// (see types/src/network_address/mod.rs) for itself and its full nodes.
-    ///
-    /// Network address fields are a vector per account, where each entry is a vector of addresses
-    /// encoded in a single BCS byte array.
-    GenesisCreateInitializeValidators {
-        owners: Vec<AccountAddress>,
-        consensus_pubkeys: Vec<Bytes>,
-        proof_of_possession: Vec<Bytes>,
-        validator_network_addresses: Vec<Bytes>,
-        full_node_network_addresses: Vec<Bytes>,
-        staking_distribution: Vec<u64>,
-        initial_lockup_timestamp: u64,
-    },
-
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
         coin_type: TypeTag,
@@ -398,23 +378,6 @@ impl ScriptFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinsRegister { coin_type } => coins_register(coin_type),
-            GenesisCreateInitializeValidators {
-                owners,
-                consensus_pubkeys,
-                proof_of_possession,
-                validator_network_addresses,
-                full_node_network_addresses,
-                staking_distribution,
-                initial_lockup_timestamp,
-            } => genesis_create_initialize_validators(
-                owners,
-                consensus_pubkeys,
-                proof_of_possession,
-                validator_network_addresses,
-                full_node_network_addresses,
-                staking_distribution,
-                initial_lockup_timestamp,
-            ),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -846,47 +809,6 @@ pub fn coins_register(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("register").to_owned(),
         vec![coin_type],
         vec![],
-    ))
-}
-
-/// Sets up the initial validator set for the network.
-/// The validator "owner" accounts, and their authentication
-/// Addresses (and keys) are encoded in the `owners`
-/// Each validator signs consensus messages with the private key corresponding to the Ed25519
-/// public key in `consensus_pubkeys`.
-/// Finally, each validator must specify the network address
-/// (see types/src/network_address/mod.rs) for itself and its full nodes.
-///
-/// Network address fields are a vector per account, where each entry is a vector of addresses
-/// encoded in a single BCS byte array.
-pub fn genesis_create_initialize_validators(
-    owners: Vec<AccountAddress>,
-    consensus_pubkeys: Vec<Vec<u8>>,
-    proof_of_possession: Vec<Vec<u8>>,
-    validator_network_addresses: Vec<Vec<u8>>,
-    full_node_network_addresses: Vec<Vec<u8>>,
-    staking_distribution: Vec<u64>,
-    initial_lockup_timestamp: u64,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("genesis").to_owned(),
-        ),
-        ident_str!("create_initialize_validators").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&owners).unwrap(),
-            bcs::to_bytes(&consensus_pubkeys).unwrap(),
-            bcs::to_bytes(&proof_of_possession).unwrap(),
-            bcs::to_bytes(&validator_network_addresses).unwrap(),
-            bcs::to_bytes(&full_node_network_addresses).unwrap(),
-            bcs::to_bytes(&staking_distribution).unwrap(),
-            bcs::to_bytes(&initial_lockup_timestamp).unwrap(),
-        ],
     ))
 }
 
@@ -1818,24 +1740,6 @@ mod decoder {
         }
     }
 
-    pub fn genesis_create_initialize_validators(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::GenesisCreateInitializeValidators {
-                owners: bcs::from_bytes(script.args().get(0)?).ok()?,
-                consensus_pubkeys: bcs::from_bytes(script.args().get(1)?).ok()?,
-                proof_of_possession: bcs::from_bytes(script.args().get(2)?).ok()?,
-                validator_network_addresses: bcs::from_bytes(script.args().get(3)?).ok()?,
-                full_node_network_addresses: bcs::from_bytes(script.args().get(4)?).ok()?,
-                staking_distribution: bcs::from_bytes(script.args().get(5)?).ok()?,
-                initial_lockup_timestamp: bcs::from_bytes(script.args().get(6)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::ManagedCoinBurn {
@@ -2379,10 +2283,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "coins_register".to_string(),
             Box::new(decoder::coins_register),
-        );
-        map.insert(
-            "genesis_create_initialize_validators".to_string(),
-            Box::new(decoder::genesis_create_initialize_validators),
         );
         map.insert(
             "managed_coin_burn".to_string(),
