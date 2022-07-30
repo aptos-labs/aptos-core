@@ -10,21 +10,14 @@ on:
     branches:
       - pre-release-continuous-test
   schedule:
-    # Run every 3 hours
-    - cron: "0 */3 * * *"
+    # Run hourly
+    - cron: "0 * * * *"
 
 jobs:
-  # run two concurrent forge test jobs on the same cluster
-  # they must use different namespaces, or they will preempt each other
-  run-forge-0:
+  run-forge:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
-      FORGE_NAMESPACE: forge-continuous-0
-      FORGE_CLUSTER_NAME: aptos-forge-1
-  run-forge-1:
-    uses: ./.github/workflows/run-forge.yaml
-    secrets: inherit
-    with:
-      FORGE_NAMESPACE: forge-continuous-1
-      FORGE_CLUSTER_NAME: aptos-forge-1
+      GIT_SHA: ${{ github.sha }}
+      merge_or_canary: canary
+      FORGE_NAMESPACE: continuous
