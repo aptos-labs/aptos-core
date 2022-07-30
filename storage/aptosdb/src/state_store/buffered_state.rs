@@ -3,6 +3,7 @@
 
 //! This file defines state store buffered state that has been committed.
 
+use crate::metrics::LATEST_CHECKPOINT_VERSION;
 use crate::{
     state_merkle_db::StateMerkleDb, state_store::state_snapshot_committer::StateSnapshotCommitter,
 };
@@ -60,14 +61,17 @@ impl BufferedState {
                 committer.run();
             })
             .expect("Failed to spawn state committer thread.");
-        Self {
+
+        let myself = Self {
             state_until_checkpoint: None,
             state_after_checkpoint,
             state_commit_sender,
             target_snapshot_size,
             // The join handle of the async state commit thread for graceful drop.
             join_handle: Some(join_handle),
-        }
+        };
+        myself.report_latest_committed_version();
+        myself
     }
 
     pub fn current_state(&self) -> &StateDelta {
@@ -116,6 +120,12 @@ impl BufferedState {
         self.maybe_commit(true /* sync_commit */);
     }
 
+    fn report_latest_committed_version(&self) {
+        if let Some(version) = self.state_after_checkpoint.base_version {
+            LATEST_CHECKPOINT_VERSION.set(version as i64);
+        }
+    }
+
     pub fn update(
         &mut self,
         updates_until_next_checkpoint_since_current_option: Option<HashMap<StateKey, StateValue>>,
@@ -149,6 +159,7 @@ impl BufferedState {
             self.state_after_checkpoint = new_state_after_checkpoint;
         }
         self.maybe_commit(sync_commit);
+        self.report_latest_committed_version();
         Ok(())
     }
 }

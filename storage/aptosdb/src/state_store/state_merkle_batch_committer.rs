@@ -3,6 +3,7 @@
 
 //! This file defines the state merkle snapshot committer running in background thread.
 
+use crate::metrics::LATEST_SNAPSHOT_VERSION;
 use crate::state_merkle_db::StateMerkleDb;
 use crate::state_store::buffered_state::CommitMessage;
 use crate::OTHER_TIMERS_SECONDS;
@@ -51,8 +52,12 @@ impl StateMerkleBatchCommitter {
                     self.state_merkle_db
                         .write_schemas(batch)
                         .expect("State merkle batch commit failed.");
+                    let current_version = state_delta
+                        .current_version
+                        .expect("Current version should not be None");
+                    LATEST_SNAPSHOT_VERSION.set(current_version as i64);
                     trace!(
-                        version = state_delta.current_version,
+                        current_version = current_version,
                         base_version = state_delta.base_version,
                         root_hash = root_hash,
                         "State snapshot committed."
