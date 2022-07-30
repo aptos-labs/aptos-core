@@ -44,6 +44,22 @@ resource "kubernetes_storage_class" "gp2" {
   depends_on = [null_resource.delete-gp2]
 }
 
+resource "kubernetes_storage_class" "gp3" {
+  metadata {
+    name = "gp3"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = false
+    }
+  }
+  storage_provisioner = "ebs.csi.aws.com"
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "gp3"
+  }
+
+  depends_on = [null_resource.delete-gp2, aws_eks_addon.aws-ebs-csi-driver]
+}
+
 resource "kubernetes_role_binding" "psp-kube-system" {
   metadata {
     name      = "eks:podsecuritypolicy:privileged"
