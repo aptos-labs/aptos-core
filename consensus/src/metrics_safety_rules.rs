@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::monitor;
 use crate::persistent_liveness_storage::PersistentLivenessStorage;
 use aptos_crypto::bls12381;
 use aptos_logger::prelude::info;
-use aptos_metrics_core::monitor;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},

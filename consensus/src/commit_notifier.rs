@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::QuorumStoreError;
+use crate::monitor;
 use anyhow::{format_err, Result};
 use aptos_infallible::Mutex;
-use aptos_metrics_core::monitor;
 use consensus_types::{common::Round, request_response::ConsensusRequest};
 use futures::channel::{mpsc, mpsc::Sender, oneshot};
 use std::time::Duration;

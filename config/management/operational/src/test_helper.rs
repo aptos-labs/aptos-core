@@ -20,6 +20,7 @@ use aptos_types::{
 use itertools::Itertools;
 use std::{
     collections::{HashMap, HashSet},
+    fmt::Write,
     path::Path,
 };
 use structopt::StructOpt;
@@ -736,7 +737,7 @@ fn backend_args(backend: &config::SecureBackend) -> Result<String, Error> {
                 path = config.path.to_str().unwrap(),
             );
             if let Some(namespace) = config.namespace.as_ref() {
-                s.push_str(&format!(";namespace={}", namespace));
+                write!(s, ";namespace={}", namespace).unwrap();
             }
 
             Ok(s)

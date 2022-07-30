@@ -195,12 +195,11 @@ impl TransactionRestoreBatchController {
     pub async fn run(self) -> Result<()> {
         let name = self.name();
         info!("{} started.", name);
-        let res = self
-            .run_impl()
+        self.run_impl()
             .await
             .map_err(|e| anyhow!("{} failed: {}", name, e))?;
         info!("{} succeeded.", name);
-        Ok(res)
+        Ok(())
     }
 
     fn name(&self) -> String {

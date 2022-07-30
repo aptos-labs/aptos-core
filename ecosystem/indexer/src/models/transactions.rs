@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // This is required because a diesel macro makes clippy sad
+#![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
 use crate::{

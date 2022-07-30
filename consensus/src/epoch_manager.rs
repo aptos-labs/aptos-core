@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::monitor;
 use crate::{
     block_storage::BlockStore,
     commit_notifier::CommitNotifier,
@@ -39,7 +40,6 @@ use aptos_config::config::{ConsensusConfig, NodeConfig};
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_metrics_core::monitor;
 use aptos_types::{
     account_address::AccountAddress,
     epoch_change::EpochChangeProof,
