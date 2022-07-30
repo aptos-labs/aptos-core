@@ -7,10 +7,18 @@ use crate::{counters::STRUCT_LOG_COUNT, error, Event, Metadata};
 
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 use tracing_subscriber::prelude::*;
+
+use rand::distributions::{Alphanumeric, DistString};
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_appender::rolling::RollingFileAppender;
+use tracing_flame::{FlameLayer, FlushGuard};
 
 /// The global `Logger`
 static LOGGER: OnceCell<Arc<dyn Logger>> = OnceCell::new();
+static GUARDS: OnceCell<Arc<(WorkerGuard, FlushGuard<RollingFileAppender>)>> = OnceCell::new();
 
 /// A trait encapsulating the operations required of a logger.
 pub trait Logger: Sync + Send + 'static {
@@ -55,12 +63,54 @@ pub fn set_global_logger(logger: Arc<dyn Logger>, console_port: Option<u16>) {
      */
     #[cfg(feature = "aptos-console")]
     {
+        let string = Alphanumeric.sample_string(&mut rand::thread_rng(), 8);
+        println!("My Rand: {}", string);
+
         if let Some(p) = console_port {
+            let tracing_path = "/tmp/tracing/";
+
             let console_layer = console_subscriber::ConsoleLayer::builder()
                 .server_addr(([0, 0, 0, 0], p))
                 .spawn();
 
-            tracing_subscriber::registry().with(console_layer).init();
+            if p == 6669 {
+                if std::fs::create_dir_all(tracing_path).is_err() {
+                    println!("{tracing_path} cant be created (probably already exists)");
+                }
+                thread::spawn(move || {
+                    let mut tracing_paths = std::fs::read_dir(tracing_path).unwrap();
+
+                    loop {
+                        for file in tracing_paths {
+                            std::fs::remove_file(file.unwrap().path()).unwrap_or_default();
+                        }
+                        tracing_paths = std::fs::read_dir(tracing_path).unwrap();
+                        thread::sleep(Duration::from_secs(90));
+                    }
+                });
+            }
+
+            let file_appender =
+                tracing_appender::rolling::minutely(tracing_path, format!("{}{}", string, ".log"));
+            let file_appender2 =
+                tracing_appender::rolling::minutely(tracing_path, format!("{}.folded", string));
+            let (non_blocking, appender_guard) = tracing_appender::non_blocking(file_appender);
+            let mut flame_layer = FlameLayer::new(file_appender2); //.unwrap();
+            let flame_guard = flame_layer.flush_on_drop();
+            GUARDS
+                .set(Arc::new((appender_guard, flame_guard)))
+                .expect("This shouldn't Fail");
+
+            flame_layer = flame_layer
+                .with_threads_collapsed(true)
+                .with_file_and_line(false);
+
+            tracing_subscriber::registry()
+                .with(console_layer)
+                .with(tracing_subscriber::fmt::layer().with_writer(non_blocking))
+                .with(flame_layer)
+                .init();
+
             return;
         }
     }
