@@ -1,5 +1,3 @@
-"use strict";
-
 // src/AptosLogo.tsx
 import React from "react";
 function AptosBlackLogo() {

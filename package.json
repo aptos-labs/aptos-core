@@ -28,6 +28,7 @@
   },
   "scripts": {
     "build": "turbo run build",
+    "export": "turbo run export",
     "dev": "turbo run dev --parallel",
     "start": "turbo run start --parallel",
     "lint": "turbo run lint",

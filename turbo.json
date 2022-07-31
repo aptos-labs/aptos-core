@@ -4,6 +4,9 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "build/**", "target/**", "ios/**", "android/**"]
     },
+    "export": {
+      "outputs": ["out/**"]
+    },
     "lint": {
       "outputs": []
     },
