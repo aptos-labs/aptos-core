@@ -146,7 +146,7 @@ The Aptos Token enables creators to create finite or unlimited collections. Many
 
 Finite, that is no more than a `maximum` number of tokens can ever be minted:
 ```rust
-public(script) fun create_finite_collection_script(
+public(script) fun create_limited_collection_script (
     account: signer,
     description: vector<u8>,
     name: vector<u8>,
