@@ -14,7 +14,7 @@ use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
 use aptos_types::{
-    account_config::{ChainSpecificAccountInfo, CORE_CODE_ADDRESS, DPN_CHAIN_INFO},
+    account_config::{ChainSpecificAccountInfo, CORE_CODE_ADDRESS, APTOS_CHAIN_INFO},
     on_chain_config::{
         ConfigStorage, OnChainConfig, VMConfig, VMPublishingOption, Version, APTOS_VERSION_3,
     },
@@ -89,7 +89,7 @@ impl AptosVMImpl {
     }
 
     pub(crate) fn chain_info(&self) -> &ChainSpecificAccountInfo {
-        self.chain_account_info.as_ref().unwrap_or(&DPN_CHAIN_INFO)
+        self.chain_account_info.as_ref().unwrap_or(&APTOS_CHAIN_INFO)
     }
 
     pub(crate) fn publishing_option(
