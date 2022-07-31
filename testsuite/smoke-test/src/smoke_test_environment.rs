@@ -1,57 +1,124 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_genesis::builder::InitConfigFn;
+use aptos::test::CliTestFramework;
+use aptos_config::{keys::ConfigKey, utils::get_available_port};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_faucet::FaucetArgs;
+use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
+use aptos_types::{account_config::aptos_root_address, chain_id::ChainId};
+use forge::Node;
 use forge::{Factory, LocalFactory, LocalSwarm};
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
-use std::num::NonZeroUsize;
+use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
+use tokio::task::JoinHandle;
 
-pub async fn new_local_swarm(
-    num_validators: usize,
+pub struct SwarmBuilder {
+    local: bool,
+    num_validators: NonZeroUsize,
     genesis_modules: Option<Vec<Vec<u8>>>,
     init_config: Option<InitConfigFn>,
-) -> LocalSwarm {
-    static FACTORY: Lazy<LocalFactory> = Lazy::new(|| LocalFactory::from_workspace().unwrap());
+    init_genesis_config: Option<InitGenesisConfigFn>,
+}
 
-    ::aptos_logger::Logger::new().init();
-    let version = FACTORY.versions().max().unwrap();
+impl SwarmBuilder {
+    pub fn new(local: bool, num_validators: usize) -> Self {
+        Self {
+            local,
+            num_validators: NonZeroUsize::new(num_validators).unwrap(),
+            genesis_modules: None,
+            init_config: None,
+            init_genesis_config: None,
+        }
+    }
 
-    FACTORY
-        .new_swarm_with_version(
-            OsRng,
-            NonZeroUsize::new(num_validators).unwrap(),
-            &version,
-            genesis_modules,
-            // TODO: migrate to > 0
-            0,
-            init_config,
+    pub fn new_local(num_validators: usize) -> Self {
+        Self::new(true, num_validators)
+    }
+
+    pub fn with_aptos(mut self) -> Self {
+        self.genesis_modules = Some(cached_framework_packages::module_blobs().to_vec());
+        self
+    }
+
+    pub fn with_init_config(mut self, init_config: InitConfigFn) -> Self {
+        self.init_config = Some(init_config);
+        self
+    }
+
+    pub fn with_init_genesis_config(mut self, init_genesis_config: InitGenesisConfigFn) -> Self {
+        self.init_genesis_config = Some(init_genesis_config);
+        self
+    }
+
+    // Gas is not enabled with this setup, it's enabled via forge instance.
+    pub async fn build(self) -> LocalSwarm {
+        // TODO change to return Swarm trait
+        // Add support for forge
+        assert!(self.local);
+        static FACTORY: Lazy<LocalFactory> = Lazy::new(|| LocalFactory::from_workspace().unwrap());
+
+        ::aptos_logger::Logger::new().init();
+        let version = FACTORY.versions().max().unwrap();
+
+        let init_genesis_config = self.init_genesis_config;
+
+        FACTORY
+            .new_swarm_with_version(
+                OsRng,
+                self.num_validators,
+                &version,
+                self.genesis_modules,
+                self.init_config,
+                Some(Arc::new(move |genesis_config| {
+                    // TODO: migrate to > 0
+                    genesis_config.min_price_per_gas_unit = 0;
+
+                    if let Some(init_genesis_config) = &init_genesis_config {
+                        (init_genesis_config)(genesis_config);
+                    }
+                })),
+            )
+            .await
+            .unwrap()
+    }
+
+    pub async fn build_with_cli(
+        self,
+        num_cli_accounts: usize,
+    ) -> (LocalSwarm, CliTestFramework, JoinHandle<()>) {
+        let swarm = self.build().await;
+        let chain_id = swarm.chain_id();
+        let validator = swarm.validators().next().unwrap();
+        let root_key = swarm.root_key();
+        let faucet_port = get_available_port();
+        let faucet = launch_faucet(
+            validator.rest_api_endpoint(),
+            root_key,
+            chain_id,
+            faucet_port,
+        );
+        let faucet_endpoint: reqwest::Url =
+            format!("http://localhost:{}", faucet_port).parse().unwrap();
+        // Connect the operator tool to the node's JSON RPC API
+        let tool = CliTestFramework::new(
+            validator.rest_api_endpoint(),
+            faucet_endpoint,
+            num_cli_accounts,
         )
-        .await
-        .unwrap()
+        .await;
+
+        (swarm, tool, faucet)
+    }
 }
 
 // Gas is not enabled with this setup, it's enabled via forge instance.
 pub async fn new_local_swarm_with_aptos(num_validators: usize) -> LocalSwarm {
-    new_local_swarm(
-        num_validators,
-        Some(cached_framework_packages::module_blobs().to_vec()),
-        None,
-    )
-    .await
-}
-
-// Gas is not enabled with this setup, it's enabled via forge instance.
-pub async fn new_local_swarm_with_aptos_and_config(
-    num_validators: usize,
-    init_config: InitConfigFn,
-) -> LocalSwarm {
-    new_local_swarm(
-        num_validators,
-        Some(cached_framework_packages::module_blobs().to_vec()),
-        Some(init_config),
-    )
-    .await
+    SwarmBuilder::new_local(num_validators)
+        .with_aptos()
+        .build()
+        .await
 }
 
 #[tokio::test]
@@ -65,4 +132,24 @@ async fn test_prevent_starting_nodes_twice() {
     validator.stop();
     assert!(validator.start().is_ok());
     assert!(validator.start().is_err());
+}
+
+pub fn launch_faucet(
+    endpoint: reqwest::Url,
+    mint_key: Ed25519PrivateKey,
+    chain_id: ChainId,
+    port: u16,
+) -> JoinHandle<()> {
+    let faucet = FaucetArgs {
+        address: "127.0.0.1".to_string(),
+        port,
+        server_url: endpoint,
+        mint_key_file_path: PathBuf::new(),
+        mint_key: Some(ConfigKey::new(mint_key)),
+        mint_account_address: Some(aptos_root_address()),
+        chain_id,
+        maximum_amount: None,
+        do_not_delegate: true,
+    };
+    tokio::spawn(faucet.run())
 }
