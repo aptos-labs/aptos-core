@@ -44,8 +44,7 @@ pub fn output(
         .cloned()
         .filter(|abi| {
             if let ScriptABI::ScriptFunction(sf) = abi {
-                sf.module_name().name().as_str() != "genesis"
-                    && sf.name() != "create_initialize_validators"
+                sf.module_name().name().as_str() != "code" && sf.name() != "publish_package_txn"
             } else {
                 true
             }
