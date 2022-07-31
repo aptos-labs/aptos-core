@@ -14,10 +14,8 @@ use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
 use aptos_types::{
-    account_config::{ChainSpecificAccountInfo, CORE_CODE_ADDRESS, APTOS_CHAIN_INFO},
-    on_chain_config::{
-        ConfigStorage, OnChainConfig, VMConfig, VMPublishingOption, Version, APTOS_VERSION_3,
-    },
+    account_config::{ChainSpecificAccountInfo, APTOS_CHAIN_INFO, CORE_CODE_ADDRESS},
+    on_chain_config::{ConfigStorage, OnChainConfig, VMConfig, Version, APTOS_VERSION_3},
     transaction::{ExecutionStatus, TransactionOutput, TransactionOutputExt, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
@@ -46,7 +44,6 @@ pub struct AptosVMImpl {
     move_vm: Arc<MoveVmExt>,
     on_chain_config: Option<VMConfig>,
     version: Option<Version>,
-    publishing_option: Option<VMPublishingOption>,
     chain_account_info: Option<ChainSpecificAccountInfo>,
 }
 
@@ -59,7 +56,6 @@ impl AptosVMImpl {
             move_vm: Arc::new(inner),
             on_chain_config: None,
             version: None,
-            publishing_option: None,
             chain_account_info: None,
         };
         vm.load_configs_impl(&RemoteStorage::new(state));
@@ -67,18 +63,13 @@ impl AptosVMImpl {
         vm
     }
 
-    pub fn init_with_config(
-        version: Version,
-        on_chain_config: VMConfig,
-        publishing_option: VMPublishingOption,
-    ) -> Self {
+    pub fn init_with_config(version: Version, on_chain_config: VMConfig) -> Self {
         let inner = MoveVmExt::new()
             .expect("should be able to create Move VM; check if there are duplicated natives");
         Self {
             move_vm: Arc::new(inner),
             on_chain_config: Some(on_chain_config),
             version: Some(version),
-            publishing_option: Some(publishing_option),
             chain_account_info: None,
         }
     }
@@ -89,27 +80,14 @@ impl AptosVMImpl {
     }
 
     pub(crate) fn chain_info(&self) -> &ChainSpecificAccountInfo {
-        self.chain_account_info.as_ref().unwrap_or(&APTOS_CHAIN_INFO)
-    }
-
-    pub(crate) fn publishing_option(
-        &self,
-        log_context: &AdapterLogSchema,
-    ) -> Result<&VMPublishingOption, VMStatus> {
-        self.publishing_option.as_ref().ok_or_else(|| {
-            log_context.alert();
-            error!(
-                *log_context,
-                "VM Startup Failed. PublishingOption Not Found"
-            );
-            VMStatus::Error(StatusCode::VM_STARTUP_FAILURE)
-        })
+        self.chain_account_info
+            .as_ref()
+            .unwrap_or(&APTOS_CHAIN_INFO)
     }
 
     fn load_configs_impl<S: ConfigStorage>(&mut self, data_cache: &S) {
         self.on_chain_config = VMConfig::fetch_config(data_cache);
         self.version = Version::fetch_config(data_cache);
-        self.publishing_option = VMPublishingOption::fetch_config(data_cache);
     }
 
     // TODO: Move this to an on-chain config once those are a part of the core framework

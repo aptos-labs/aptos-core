@@ -15,7 +15,6 @@ module aptos_framework::reconfiguration {
     friend aptos_framework::consensus_config;
     friend aptos_framework::version;
     friend aptos_framework::vm_config;
-    friend aptos_framework::transaction_publishing_option;
 
     /// Event that signals consensus to start a new epoch,
     /// with new configuration information. This is also called a

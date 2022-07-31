@@ -7,7 +7,6 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config,
     chain_id::ChainId,
-    on_chain_config::VMPublishingOption,
     test_helpers::transaction_test_helpers,
     transaction::{ExecutionStatus, Script, TransactionArgument, TransactionStatus},
     vm_status::StatusCode,
@@ -435,7 +434,7 @@ fn verify_simple_payment() {
 #[test]
 pub fn test_arbitrary_script_execution() {
     // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::locked());
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // create an empty transaction
@@ -462,55 +461,6 @@ pub fn test_arbitrary_script_execution() {
         Ok(ExecutionStatus::MiscellaneousError(Some(
             StatusCode::CODE_DESERIALIZATION_ERROR
         )))
-    );
-}
-
-#[test]
-pub fn test_publish_from_aptos_root() {
-    // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::locked());
-    executor.set_golden_file(current_function_name!());
-
-    // create a transaction trying to publish a new module.
-    let sender = executor.create_raw_account_data(1_000_000, 10);
-    executor.add_account_data(&sender);
-
-    let module = format!(
-        "
-        module 0x{}.M {{
-            public max(a: u64, b: u64): u64 {{
-            label b0:
-                jump_if (copy(a) > copy(b)) b2;
-            label b1:
-                return copy(b);
-            label b2:
-                return copy(a);
-            }}
-
-            public sum(a: u64, b: u64): u64 {{
-                let c: u64;
-            label b0:
-                c = copy(a) + copy(b);
-                return copy(c);
-            }}
-        }}
-        ",
-        sender.address(),
-    );
-
-    let random_module = compile_module(&module).1;
-    let txn = sender
-        .account()
-        .transaction()
-        .module(random_module)
-        .sequence_number(10)
-        .max_gas_amount(100_000)
-        .gas_unit_price(1)
-        .sign();
-    assert_prologue_parity!(
-        executor.verify_transaction(txn.clone()).status(),
-        executor.execute_transaction(txn).status(),
-        StatusCode::INVALID_MODULE_PUBLISHER
     );
 }
 
@@ -611,7 +561,7 @@ fn verify_max_sequence_number() {
 #[test]
 pub fn test_open_publishing_invalid_address() {
     // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.
@@ -676,7 +626,7 @@ pub fn test_open_publishing_invalid_address() {
 #[test]
 pub fn test_open_publishing() {
     // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.
@@ -786,7 +736,7 @@ fn good_module_uses_bad(
 
 #[test]
 fn test_script_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -833,7 +783,7 @@ fn test_script_dependency_fails_verification() {
 
 #[test]
 fn test_module_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -869,7 +819,7 @@ fn test_module_dependency_fails_verification() {
 
 #[test]
 fn test_type_tag_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -921,7 +871,7 @@ fn test_type_tag_dependency_fails_verification() {
 
 #[test]
 fn test_script_transitive_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -972,7 +922,7 @@ fn test_script_transitive_dependency_fails_verification() {
 
 #[test]
 fn test_module_transitive_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
@@ -1033,7 +983,7 @@ fn test_module_transitive_dependency_fails_verification() {
 
 #[test]
 fn test_type_tag_transitive_dependency_fails_verification() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // Get a module that fails verification into the store.
