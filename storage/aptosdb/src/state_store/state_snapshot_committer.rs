@@ -4,7 +4,7 @@
 //! This file defines the state snapshot committer running in background thread within StateStore.
 
 use crate::state_merkle_db::StateMerkleDb;
-use crate::state_store::buffered_state::{CommitMessage, ASYNC_COMMIT_CHANNEL_BUFFER_SIZE};
+use crate::state_store::buffered_state::CommitMessage;
 use crate::state_store::state_merkle_batch_committer::{
     StateMerkleBatch, StateMerkleBatchCommitter,
 };
@@ -27,8 +27,9 @@ impl StateSnapshotCommitter {
         state_merkle_db: Arc<StateMerkleDb>,
         state_snapshot_commit_receiver: Receiver<CommitMessage<Arc<StateDelta>>>,
     ) -> Self {
+        // Rendezvous channel
         let (state_merkle_batch_commit_sender, state_merkle_batch_commit_receiver) =
-            mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
+            mpsc::sync_channel(0);
         let arc_state_merkle_db = Arc::clone(&state_merkle_db);
         let join_handle = std::thread::Builder::new()
             .name("state_merkle_batch_committer".to_string())
