@@ -21,8 +21,6 @@ import { generateMnemonicObject } from 'core/utils/account';
 
 zxcvbnOptions.setOptions(passwordOptions);
 
-const mnemonic = bip39.generateMnemonic(wordlist);
-
 export enum OnboardingPage {
   CreatePassword = 0,
   SecretRecoveryPhrase = 1,
@@ -196,6 +194,7 @@ export default function CreateWalletLayout({
   const {
     activeStep,
   } = useOnboardingStateContext();
+  const mnemonic = bip39.generateMnemonic(wordlist);
   const methods = useForm<OnboardFormValues>({
     defaultValues: {
       confirmPassword: '',
