@@ -18,7 +18,6 @@ use std::{collections::HashMap, fmt, sync::Arc};
 
 mod aptos_version;
 mod consensus_config;
-mod registered_currencies;
 mod validator_set;
 mod vm_config;
 mod vm_publishing_option;
@@ -30,7 +29,6 @@ pub use self::{
     consensus_config::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerElectionType,
     },
-    registered_currencies::RegisteredCurrencies,
     validator_set::{ConsensusScheme, ValidatorSet},
     vm_config::VMConfig,
     vm_publishing_option::VMPublishingOption,
