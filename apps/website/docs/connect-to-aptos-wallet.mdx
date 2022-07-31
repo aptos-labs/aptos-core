@@ -13,6 +13,7 @@ To check if the user has installed Wallet, perform the below check:
 const isAptosInstalled = window.aptos
 ```
 
+<br />
 If Wallet is not installed, you can prompt the user to first install the Wallet extension and provide the below installation instructions. For example, see below:
 
 ```typescript
@@ -44,7 +45,7 @@ After confirming that the web app has the `aptos` object, we can connect to Wall
 
 When you call `wallet.connect()`, it prompts the user to allow your web app to make additional calls to Wallet, and obtains from the user basic information like the `address` and `public key`. 
 
-See an example code below:
+See the example code below:
 
 ```typescript
 const wallet = getAptosWallet();
