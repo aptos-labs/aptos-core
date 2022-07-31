@@ -5,7 +5,8 @@
       "outputs": ["dist/**", ".next/**", "build/**", "target/**", "ios/**", "android/**"]
     },
     "export": {
-      "outputs": ["out/**"]
+      "outputs": ["out/**"],
+      "dependsOn": ["build"]
     },
     "lint": {
       "outputs": []
