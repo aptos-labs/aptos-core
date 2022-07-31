@@ -93,7 +93,7 @@ export class TokenClient {
   async claimToken(account: Account, sender: string, creator: string, collection_name: string, token_name: string) {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::tokenTransfers::claim_script",
+      function: "0x1::token_transfers::claim_script",
       type_arguments: [],
       arguments: [
         sender,
@@ -109,7 +109,7 @@ export class TokenClient {
   async cancelTokenOffer(account: Account, receiver: string, creator: string, token_creation_num: number) {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::tokenTransfers::cancel_offer_script",
+      function: "0x1::token_transfers::cancel_offer_script",
       type_arguments: [],
       arguments: [receiver, creator, token_creation_num.toString()],
     };
