@@ -3,14 +3,16 @@ use hex;
 use reqwest;
 use serde_json::Value;
 pub struct NftClient {
+    url: String,
     pub rest_client: RestClient,
 }
 
 impl NftClient {
     /// Represents an account as well as the private, public key-pair for the Aptos blockchain.
-    pub fn new(url: String) -> Self {
+    pub fn new(url: &str) -> Self {
         Self {
-            rest_client: RestClient::new(url),
+            url: url.to_string(),
+            rest_client: RestClient::new(url.to_string()),
         }
     }
     pub fn submit_transaction_helper(&self, account: &mut Account, payload: Value) {
@@ -135,11 +137,7 @@ impl NftClient {
         key: Value,
     ) -> Value {
         let res = reqwest::blocking::Client::new()
-            .post(format!(
-                "{}/tables/{}/item",
-                self.rest_client.get_url(),
-                handle
-            ))
+            .post(format!("{}/tables/{}/item", self.url, handle))
             .json(&serde_json::json!({
                 "key_type": key_type,
                 "value_type": value_type,

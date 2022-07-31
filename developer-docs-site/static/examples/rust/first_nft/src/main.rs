@@ -1,7 +1,7 @@
 use first_nft::NftClient;
 use first_transaction::{Account, FaucetClient, FAUCET_URL, TESTNET_URL};
 fn main() {
-    let client = NftClient::new(TESTNET_URL.to_string());
+    let client = NftClient::new(TESTNET_URL);
     let faucet_client = FaucetClient::new(FAUCET_URL.to_string(), client.rest_client.clone());
 
     let mut alice = Account::new(None);
