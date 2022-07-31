@@ -274,9 +274,8 @@ module aptos_framework::account {
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
         chain_id: u8,
-        script_hash: vector<u8>,
+        _script_hash: vector<u8>,
     ) acquires Account {
-        assert!(transaction_publishing_option::is_script_allowed(&script_hash), error::invalid_state(PROLOGUE_ESCRIPT_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 

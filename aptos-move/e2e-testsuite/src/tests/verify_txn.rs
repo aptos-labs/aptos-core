@@ -435,8 +435,7 @@ fn verify_simple_payment() {
 #[test]
 pub fn test_arbitrary_script_execution() {
     // create a FakeExecutor with a genesis from file
-    let mut executor =
-        FakeExecutor::from_genesis_with_options(VMPublishingOption::custom_scripts());
+    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::locked());
     executor.set_golden_file(current_function_name!());
 
     // create an empty transaction
@@ -469,8 +468,7 @@ pub fn test_arbitrary_script_execution() {
 #[test]
 pub fn test_publish_from_aptos_root() {
     // create a FakeExecutor with a genesis from file
-    let mut executor =
-        FakeExecutor::from_genesis_with_options(VMPublishingOption::custom_scripts());
+    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::locked());
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.

@@ -298,8 +298,7 @@
   {
     "type": "0x1::transaction_publishing_option::TransactionPublishingOption",
     "data": {
-      "module_publishing_allowed": true,
-      "script_allow_list": []
+      "module_publishing_allowed": true
     }
   }
 ]
