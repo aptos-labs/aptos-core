@@ -1,3 +1,7 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
+
 use first_transaction::{Account, RestClient};
 use hex;
 use reqwest;
