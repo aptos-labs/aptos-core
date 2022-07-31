@@ -23,7 +23,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
     block_metadata::{new_block_event_key, BlockMetadata},
-    on_chain_config::{OnChainConfig, VMPublishingOption, ValidatorSet, Version},
+    on_chain_config::{OnChainConfig, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
         ChangeSet, ExecutionStatus, SignedTransaction, Transaction, TransactionOutput,
@@ -106,25 +106,6 @@ impl FakeExecutor {
         Self::from_genesis(GENESIS_CHANGE_SET_FRESH.clone().write_set())
     }
 
-    pub fn allowlist_genesis() -> Self {
-        Self::custom_genesis(
-            cached_framework_packages::module_blobs(),
-            None,
-            VMPublishingOption::open(),
-        )
-    }
-
-    /// Creates an executor from the genesis file GENESIS_FILE_LOCATION with script/module
-    /// publishing options given by `publishing_options`. These can only be either `Open` or
-    /// `CustomScript`.
-    pub fn from_genesis_with_options(publishing_options: VMPublishingOption) -> Self {
-        Self::custom_genesis(
-            cached_framework_packages::module_blobs(),
-            None,
-            publishing_options,
-        )
-    }
-
     /// Creates an executor in which no genesis state has been applied yet.
     pub fn no_genesis() -> Self {
         FakeExecutor {
@@ -189,16 +170,8 @@ impl FakeExecutor {
     }
 
     /// Creates fresh genesis from the stdlib modules passed in.
-    pub fn custom_genesis(
-        genesis_modules: &[Vec<u8>],
-        validator_accounts: Option<usize>,
-        publishing_options: VMPublishingOption,
-    ) -> Self {
-        let genesis = vm_genesis::generate_test_genesis(
-            genesis_modules,
-            publishing_options,
-            validator_accounts,
-        );
+    pub fn custom_genesis(genesis_modules: &[Vec<u8>], validator_accounts: Option<usize>) -> Self {
+        let genesis = vm_genesis::generate_test_genesis(genesis_modules, validator_accounts);
         Self::from_genesis(genesis.0.write_set())
     }
 
