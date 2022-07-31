@@ -75,7 +75,7 @@ export class TokenClient {
   ) {
     const payload: { function: string; arguments: string[]; type: string; type_arguments: any[] } = {
       type: "script_function_payload",
-      function: "0x1::tokenTransfers::offer_script",
+      function: "0x1::token_transfers::offer_script",
       type_arguments: [],
       arguments: [
         receiver,
