@@ -29,7 +29,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     block_metadata::{new_block_event_key, BlockMetadata},
-    on_chain_config::{new_epoch_event_key, VMConfig, VMPublishingOption, Version},
+    on_chain_config::{new_epoch_event_key, VMConfig, Version},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionOutput, TransactionOutputExt, TransactionPayload,
@@ -86,17 +86,9 @@ impl AptosVM {
         Self::new(state)
     }
 
-    pub fn init_with_config(
-        version: Version,
-        on_chain_config: VMConfig,
-        publishing_option: VMPublishingOption,
-    ) -> Self {
+    pub fn init_with_config(version: Version, on_chain_config: VMConfig) -> Self {
         info!("Adapter restarted for Validation");
-        AptosVM(AptosVMImpl::init_with_config(
-            version,
-            on_chain_config,
-            publishing_option,
-        ))
+        AptosVM(AptosVMImpl::init_with_config(version, on_chain_config))
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -402,20 +394,13 @@ impl AptosVM {
             ))
         });
 
-        // Publish the module
-        let module_address = if self.0.publishing_option(log_context)?.is_open_module() {
-            txn_data.sender()
-        } else {
-            account_config::CORE_CODE_ADDRESS
-        };
-
         gas_status
             .charge_intrinsic_gas(txn_data.transaction_size())
             .map_err(|e| e.into_vm_status())?;
 
         Self::verify_module_bundle(&mut session, modules)?;
         session
-            .publish_module_bundle(modules.clone().into_inner(), module_address, gas_status)
+            .publish_module_bundle(modules.clone().into_inner(), txn_data.sender(), gas_status)
             .map_err(|e| e.into_vm_status())?;
 
         charge_global_write_gas_usage(gas_status, &session, &txn_data.sender())?;

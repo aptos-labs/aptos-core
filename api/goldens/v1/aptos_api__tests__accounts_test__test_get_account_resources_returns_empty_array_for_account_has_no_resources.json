@@ -203,7 +203,6 @@
       "generic_type_params": []
     },
     "data": {
-      "currency_code_required": false,
       "module_addr": "0x1",
       "module_name": "0x6163636f756e74",
       "module_prologue_name": "0x6d6f64756c655f70726f6c6f677565",
@@ -407,17 +406,6 @@
     },
     "data": {
       "config": "0x00010a0000000000000014000000000000000201e8030000000000000a0000000000000001000000000000000a0000000a0000000000000001000000000000000a00000000000000"
-    }
-  },
-  {
-    "type": {
-      "address": "0x1",
-      "module": "transaction_publishing_option",
-      "name": "TransactionPublishingOption",
-      "generic_type_params": []
-    },
-    "data": {
-      "module_publishing_allowed": true
     }
   }
 ]

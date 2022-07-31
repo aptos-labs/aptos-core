@@ -15,9 +15,7 @@ use aptos_types::{
     account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::ContractEvent,
-    on_chain_config::{
-        ConsensusConfigV1, OnChainConsensusConfig, VMPublishingOption, APTOS_MAX_KNOWN_VERSION,
-    },
+    on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig, APTOS_MAX_KNOWN_VERSION},
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
 };
 use aptos_vm::{
@@ -80,7 +78,6 @@ pub fn encode_genesis_transaction(
         &aptos_root_key,
         validators,
         stdlib_module_bytes,
-        VMPublishingOption::open(),
         consensus_config,
         chain_id,
         &genesis_configs,
@@ -91,7 +88,6 @@ pub fn encode_genesis_change_set(
     aptos_root_key: &Ed25519PublicKey,
     validators: &[Validator],
     stdlib_module_bytes: &[Vec<u8>],
-    vm_publishing_option: VMPublishingOption,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_configs: &GenesisConfigurations,
@@ -113,7 +109,6 @@ pub fn encode_genesis_change_set(
     create_and_initialize_main_accounts(
         &mut session,
         aptos_root_key,
-        vm_publishing_option,
         consensus_config,
         chain_id,
         genesis_configs,
@@ -188,7 +183,6 @@ fn exec_function(
 fn create_and_initialize_main_accounts(
     session: &mut SessionExt<impl MoveResolver>,
     aptos_root_key: &Ed25519PublicKey,
-    publishing_option: VMPublishingOption,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_configs: &GenesisConfigurations,
@@ -226,7 +220,6 @@ fn create_and_initialize_main_accounts(
         serialize_values(&vec![
             MoveValue::Signer(account_config::aptos_root_address()),
             MoveValue::vector_u8(aptos_root_auth_key.to_vec()),
-            MoveValue::Bool(publishing_option.is_open_module),
             MoveValue::vector_u8(instr_gas_costs),
             MoveValue::vector_u8(native_gas_costs),
             MoveValue::U8(chain_id.id()),
@@ -389,7 +382,7 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
         GenesisOptions::Fresh => framework::aptos::module_blobs(),
     };
 
-    generate_test_genesis(&modules, VMPublishingOption::open(), None).0
+    generate_test_genesis(&modules, None).0
 }
 
 pub fn test_genesis_transaction() -> Transaction {
@@ -400,11 +393,7 @@ pub fn test_genesis_transaction() -> Transaction {
 pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    generate_test_genesis(
-        cached_framework_packages::module_blobs(),
-        VMPublishingOption::open(),
-        count,
-    )
+    generate_test_genesis(cached_framework_packages::module_blobs(), count)
 }
 
 #[derive(Debug, Clone)]
@@ -471,7 +460,6 @@ impl TestValidator {
 
 pub fn generate_test_genesis(
     stdlib_modules: &[Vec<u8>],
-    vm_publishing_option: VMPublishingOption,
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
     let test_validators = TestValidator::new_test_set(count);
@@ -482,7 +470,6 @@ pub fn generate_test_genesis(
         &GENESIS_KEYPAIR.1,
         validators,
         stdlib_modules,
-        vm_publishing_option,
         OnChainConsensusConfig::default(),
         ChainId::test(),
         &GenesisConfigurations {

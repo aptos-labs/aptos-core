@@ -277,10 +277,6 @@ pub enum ScriptFunctionCall {
         amount: u64,
     },
 
-    TransactionPublishingOptionSetModulePublishingAllowed {
-        is_allowed: bool,
-    },
-
     /// Updates the major version to a larger version.
     /// This is only used in test environments and outside of them, the core resources account shouldn't exist.
     VersionSetVersion {
@@ -477,9 +473,6 @@ impl ScriptFunctionCall {
                 name,
                 amount,
             } => token_transfers_offer_script(receiver, creator, collection, name, amount),
-            TransactionPublishingOptionSetModulePublishingAllowed { is_allowed } => {
-                transaction_publishing_option_set_module_publishing_allowed(is_allowed)
-            }
             VersionSetVersion { major } => version_set_version(major),
             VmConfigSetGasConstants {
                 global_memory_per_byte_cost,
@@ -1315,23 +1308,6 @@ pub fn token_transfers_offer_script(
     ))
 }
 
-pub fn transaction_publishing_option_set_module_publishing_allowed(
-    is_allowed: bool,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("transaction_publishing_option").to_owned(),
-        ),
-        ident_str!("set_module_publishing_allowed").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&is_allowed).unwrap()],
-    ))
-}
-
 /// Updates the major version to a larger version.
 /// This is only used in test environments and outside of them, the core resources account shouldn't exist.
 pub fn version_set_version(major: u64) -> TransactionPayload {
@@ -1857,20 +1833,6 @@ mod decoder {
         }
     }
 
-    pub fn transaction_publishing_option_set_module_publishing_allowed(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(
-                ScriptFunctionCall::TransactionPublishingOptionSetModulePublishingAllowed {
-                    is_allowed: bcs::from_bytes(script.args().get(0)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
     pub fn version_set_version(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::VersionSetVersion {
@@ -2062,10 +2024,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "token_transfers_offer_script".to_string(),
             Box::new(decoder::token_transfers_offer_script),
-        );
-        map.insert(
-            "transaction_publishing_option_set_module_publishing_allowed".to_string(),
-            Box::new(decoder::transaction_publishing_option_set_module_publishing_allowed),
         );
         map.insert(
             "version_set_version".to_string(),

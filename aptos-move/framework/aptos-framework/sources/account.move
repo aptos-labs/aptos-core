@@ -12,7 +12,6 @@ module aptos_framework::account {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
-    use aptos_framework::transaction_publishing_option;
 
     friend aptos_framework::coins;
     friend aptos_framework::genesis;
@@ -259,7 +258,6 @@ module aptos_framework::account {
         txn_expiration_time: u64,
         chain_id: u8,
     ) acquires Account {
-        assert!(transaction_publishing_option::is_module_allowed(), error::invalid_state(PROLOGUE_EMODULE_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
