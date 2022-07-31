@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use first_nft::NftClient;
 use first_transaction::{Account, FaucetClient, FAUCET_URL, TESTNET_URL};
 fn main() {
