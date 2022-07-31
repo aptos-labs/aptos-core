@@ -63,7 +63,6 @@ module aptos_framework::genesis {
             b"multi_agent_script_prologue",
             b"epilogue",
             b"writeset_epilogue",
-            false,
         );
 
         // Give the decentralized on-chain governance control over the core framework account.

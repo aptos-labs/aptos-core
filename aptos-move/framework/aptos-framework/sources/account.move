@@ -40,7 +40,6 @@ module aptos_framework::account {
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
         writeset_epilogue_name: vector<u8>,
-        currency_code_required: bool,
     }
 
     struct SignerCapability has drop, store { account: address }
@@ -106,7 +105,6 @@ module aptos_framework::account {
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
         writeset_epilogue_name: vector<u8>,
-        currency_code_required: bool,
     ) {
         system_addresses::assert_aptos_framework(account);
 
@@ -119,7 +117,6 @@ module aptos_framework::account {
             multi_agent_prologue_name,
             user_epilogue_name,
             writeset_epilogue_name,
-            currency_code_required,
         });
     }
 
