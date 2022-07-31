@@ -1,0 +1,5 @@
+[[redirects]]
+  from = "/docs"
+  to = "/docs/aptos-wallet-intro"
+  status = 302
+  force = false
