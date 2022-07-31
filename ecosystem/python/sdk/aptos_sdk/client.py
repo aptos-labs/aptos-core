@@ -17,6 +17,8 @@ from type_tag import StructTag, TypeTag
 
 TESTNET_URL = "https://fullnode.devnet.aptoslabs.com"
 FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
+TESTNET_URL = "http://127.0.0.1:8080"
+FAUCET_URL = "http://127.0.0.1:8081"
 
 
 class RestClient:
@@ -153,7 +155,7 @@ class RestClient:
             time.sleep(1)
             count += 1
         response = self.client.get(f"{self.base_url}/transactions/{txn_hash}")
-        assert "success" in response.json(), f"{response.text} - {txn_hash}"
+        assert "success" in response.json() and response.json()["success"], f"{response.text} - {txn_hash}"
 
     #
     # Transaction helpers
@@ -333,7 +335,7 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x3::tokenTransfers",
+            "0x3::token_transfers",
             "offer_script",
             [],
             transaction_arguments,
@@ -359,7 +361,7 @@ class RestClient:
         ]
 
         payload = ScriptFunction.natural(
-            "0x3::tokenTransfers",
+            "0x3::token_transfers",
             "claim_script",
             [],
             transaction_arguments,
