@@ -195,14 +195,6 @@ fn create_and_initialize_main_accounts(
 ) {
     let aptos_root_auth_key = AuthenticationKey::ed25519(aptos_root_key);
 
-    let initial_allow_list = MoveValue::Vector(
-        publishing_option
-            .script_allow_list
-            .into_iter()
-            .map(|hash| MoveValue::vector_u8(hash.to_vec().into_iter().collect()))
-            .collect(),
-    );
-
     let genesis_gas_schedule = &INITIAL_COST_SCHEDULE;
     let instr_gas_costs = bcs::to_bytes(&genesis_gas_schedule.instruction_table)
         .expect("Failure serializing genesis instr gas costs");
@@ -234,7 +226,6 @@ fn create_and_initialize_main_accounts(
         serialize_values(&vec![
             MoveValue::Signer(account_config::aptos_root_address()),
             MoveValue::vector_u8(aptos_root_auth_key.to_vec()),
-            initial_allow_list,
             MoveValue::Bool(publishing_option.is_open_module),
             MoveValue::vector_u8(instr_gas_costs),
             MoveValue::vector_u8(native_gas_costs),

@@ -24,7 +24,6 @@ module aptos_framework::genesis {
     fun initialize(
         core_resource_account: &signer,
         core_resource_account_auth_key: vector<u8>,
-        initial_script_allow_list: vector<vector<u8>>,
         is_open_module: bool,
         instruction_schedule: vector<u8>,
         native_schedule: vector<u8>,
@@ -92,7 +91,7 @@ module aptos_framework::genesis {
         );
 
         consensus_config::set(&aptos_framework_account, consensus_config);
-        transaction_publishing_option::initialize(&aptos_framework_account, initial_script_allow_list, is_open_module);
+        transaction_publishing_option::initialize(&aptos_framework_account, is_open_module);
 
         // This is testnet-specific configuration and can be skipped for mainnet.
         // Mainnet can call Coin::initialize<MainnetCoin> directly and give mint capability to the Staking module.
@@ -175,7 +174,6 @@ module aptos_framework::genesis {
         initialize(
             core_resource_account,
             x"0000000000000000000000000000000000000000000000000000000000000000",
-            vector::empty(),
             true,
             x"", // instruction_schedule not needed for unit tests
             x"", // native schedule not needed for unit tests

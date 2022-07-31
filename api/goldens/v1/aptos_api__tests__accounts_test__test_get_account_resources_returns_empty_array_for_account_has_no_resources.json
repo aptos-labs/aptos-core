@@ -417,8 +417,7 @@
       "generic_type_params": []
     },
     "data": {
-      "module_publishing_allowed": true,
-      "script_allow_list": []
+      "module_publishing_allowed": true
     }
   }
 ]

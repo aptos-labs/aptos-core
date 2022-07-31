@@ -118,10 +118,6 @@ impl FakeExecutor {
     /// publishing options given by `publishing_options`. These can only be either `Open` or
     /// `CustomScript`.
     pub fn from_genesis_with_options(publishing_options: VMPublishingOption) -> Self {
-        if !publishing_options.is_open_script() {
-            panic!("Allowlisted transactions are not supported as a publishing option")
-        }
-
         Self::custom_genesis(
             cached_framework_packages::module_blobs(),
             None,
