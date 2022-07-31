@@ -83,15 +83,15 @@ export async function getScriptFunctionTransactions({
 }
 
 export function useCoinTransferTransactions() {
-  const { aptosAccount, aptosNetwork } = useWalletState();
+  const { aptosAccount, nodeUrl } = useWalletState();
 
   const getCoinTransferTransactionsQuery = useCallback(
     async () => (aptosAccount ? getScriptFunctionTransactions({
       address: aptosAccount.address(),
       functionName: '0x1::coin::transfer',
-      nodeUrl: aptosNetwork,
+      nodeUrl,
     }) : null),
-    [aptosAccount, aptosNetwork],
+    [aptosAccount, nodeUrl],
   );
 
   return useQuery(
@@ -103,11 +103,11 @@ export function useCoinTransferTransactions() {
 type UseUserTransactionProps = Omit<GetTransactionProps, 'nodeUrl'>;
 
 export const useUserTransaction = ({ txnHashOrVersion }: UseUserTransactionProps) => {
-  const { aptosNetwork } = useWalletState();
+  const { nodeUrl } = useWalletState();
 
   const getTransactionQuery = useCallback(async () => {
     const transaction = await getTransaction({
-      nodeUrl: aptosNetwork,
+      nodeUrl,
       txnHashOrVersion,
     });
 
@@ -116,7 +116,7 @@ export const useUserTransaction = ({ txnHashOrVersion }: UseUserTransactionProps
     }
 
     return transaction as UserTransaction;
-  }, [aptosNetwork, txnHashOrVersion]);
+  }, [nodeUrl, txnHashOrVersion]);
 
   return useQuery([transactionQueryKeys.getUserTransaction, txnHashOrVersion], getTransactionQuery);
 };
@@ -147,14 +147,14 @@ export function useAccountLatestTransactionTimestamp({
   address,
   refetchInterval,
 }: UseAccountLatestTransactionTimestampProps) {
-  const { aptosNetwork } = useWalletState();
+  const { nodeUrl } = useWalletState();
 
   const getCoinTransferTransactionsQuery = useCallback(
     async () => getAccountLatestTransactionTimestamp({
       address,
-      nodeUrl: aptosNetwork,
+      nodeUrl,
     }),
-    [address, aptosNetwork],
+    [address, nodeUrl],
   );
 
   return useQuery(

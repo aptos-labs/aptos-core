@@ -11,19 +11,22 @@ import {
   UseRadioProps,
 } from '@chakra-ui/react';
 import { secondaryHoverBgColor, secondaryButtonColor } from 'core/colors';
-import { LOCAL_NODE_URL } from 'core/constants';
 import {
-  AptosNetwork,
-  networkUriMap,
+  NodeUrl,
+  NetworkType,
+  nodeUrlMap,
+  nodeUrlReverseMap,
 } from 'core/utils/network';
 import React from 'react';
 
 export interface SettingsListItemProps {
-  title?: 'Mainnet' | 'Testnet' | 'Devnet' | 'Localhost';
-  value: AptosNetwork;
+  title?: NetworkType;
+  value: NodeUrl;
 }
 
-export default function NetworkListItem(props: UseRadioProps & { isLoading: boolean }) {
+export default function NetworkListItem(
+  props: UseRadioProps & { isLoading: boolean, value: NodeUrl },
+) {
   const { getCheckboxProps, getInputProps } = useRadio(props);
   const { colorMode } = useColorMode();
   const {
@@ -33,7 +36,7 @@ export default function NetworkListItem(props: UseRadioProps & { isLoading: bool
   const checkbox = getCheckboxProps();
   return (
     <Box as="label">
-      <input disabled={isDisabled && (value === LOCAL_NODE_URL)} {...input} />
+      <input disabled={isDisabled && (value === nodeUrlMap.Localhost)} {...input} />
       <Box
         {...checkbox}
         cursor="pointer"
@@ -56,13 +59,13 @@ export default function NetworkListItem(props: UseRadioProps & { isLoading: bool
           isLoading ? (
             <>
               <Text fontSize="md" fontWeight={600}>
-                {value ? networkUriMap[value] : undefined}
+                {value ? nodeUrlReverseMap[value] : undefined}
               </Text>
               <Text fontSize="md" fontWeight={400}>
                 {value}
               </Text>
               {
-                (isDisabled && value === LOCAL_NODE_URL) ? (
+                (isDisabled && value === nodeUrlMap.Localhost) ? (
                   <Text fontSize="sm">(Please start testnet and testnet faucet on localhost to switch)</Text>
                 ) : undefined
               }

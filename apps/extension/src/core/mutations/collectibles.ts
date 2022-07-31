@@ -8,7 +8,7 @@ import queryKeys from 'core/queries/queryKeys';
 import { AptosAccountState } from 'core/types/stateTypes';
 import Analytics from 'core/utils/analytics/analytics';
 import { collectiblesEvents, CombinedEventParams } from 'core/utils/analytics/events';
-import { AptosNetwork } from 'core/utils/network';
+import { NodeUrl } from 'core/utils/network';
 import { useCallback } from 'react';
 import { useMutation, useQueryClient } from 'react-query';
 
@@ -17,7 +17,7 @@ interface CreateTokenAndCollectionProps {
   collectionName?: string;
   description?: string;
   name?: string;
-  nodeUrl: AptosNetwork;
+  nodeUrl: NodeUrl;
   royalty_points_per_million?: number;
   supply: number;
   uri?: string;
@@ -121,7 +121,7 @@ export const createTokenAndCollection = async ({
 
 export const useCreateTokenAndCollection = () => {
   const queryClient = useQueryClient();
-  const { aptosNetwork } = useWalletState();
+  const { nodeUrl } = useWalletState();
 
   const createTokenAndCollectionOnSettled = useCallback(async (
     data: CombinedEventParams | undefined,
@@ -131,11 +131,11 @@ export const useCreateTokenAndCollection = () => {
     Analytics.event({
       eventType: collectiblesEvents.CREATE_NFT,
       params: {
-        network: aptosNetwork,
+        network: nodeUrl,
         ...data,
       },
     });
-  }, [aptosNetwork, queryClient]);
+  }, [nodeUrl, queryClient]);
 
   return useMutation<
   CombinedEventParams | undefined,

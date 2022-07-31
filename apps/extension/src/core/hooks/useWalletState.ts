@@ -10,7 +10,7 @@ import {
   AptosAccountState, LocalStorageState, Mnemonic, WalletAccount,
 } from 'core/types/stateTypes';
 import {
-  AptosNetwork, getFaucetNetworkFromAptosNetwork, getLocalStorageNetworkState,
+  getFaucetUrlFromNodeUrl, getLocalStorageNodeNetworkUrl, NodeUrl,
 } from 'core/utils/network';
 import Browser from 'core/utils/browser';
 import { AptosAccount, FaucetClient } from 'aptos';
@@ -57,19 +57,19 @@ export default function useWalletState() {
     ? localStorageState.accounts[currAccountAddress].mnemonic
     : undefined;
 
-  const [aptosNetwork, setAptosNetwork] = useState<AptosNetwork>(
-    () => getLocalStorageNetworkState(),
+  const [nodeUrl, setNodeUrl] = useState<NodeUrl>(
+    () => getLocalStorageNodeNetworkUrl(),
   );
 
   const faucetNetwork = useMemo(
-    () => getFaucetNetworkFromAptosNetwork(aptosNetwork),
-    [aptosNetwork],
+    () => getFaucetUrlFromNodeUrl(nodeUrl),
+    [nodeUrl],
   );
 
   const addAccount = useCallback(async ({
     account, mnemonic,
   }: AddAccountProps) => {
-    const faucetClient = new FaucetClient(aptosNetwork, faucetNetwork);
+    const faucetClient = new FaucetClient(nodeUrl, faucetNetwork);
     const newAccount: WalletAccount = {
       aptosAccount: account.toPrivateKeyObject(),
       mnemonic,
@@ -97,7 +97,7 @@ export default function useWalletState() {
       console.error(err);
       throw err;
     }
-  }, [aptosNetwork, faucetNetwork, localStorageState]);
+  }, [nodeUrl, faucetNetwork, localStorageState]);
 
   const switchAccount = useCallback(({ accountAddress }: RemoveAccountProps) => {
     if (!accountAddress
@@ -126,9 +126,9 @@ export default function useWalletState() {
     }
   }, [localStorageState]);
 
-  const updateNetworkState = useCallback((network: AptosNetwork) => {
+  const updateNetworkState = useCallback((network: NodeUrl) => {
     try {
-      setAptosNetwork(network);
+      setNodeUrl(network);
       window.localStorage.setItem(WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY, network);
     } catch (error) {
       console.error(error);
@@ -189,9 +189,9 @@ export default function useWalletState() {
     accountMnemonic,
     addAccount,
     aptosAccount,
-    aptosNetwork,
     currAccountAddress,
     faucetNetwork,
+    nodeUrl,
     removeAccount,
     switchAccount,
     updateNetworkState,

@@ -37,7 +37,7 @@ interface FormValues {
 
 function Login() {
   const { colorMode } = useColorMode();
-  const { addAccount, aptosNetwork } = useWalletState();
+  const { addAccount, nodeUrl } = useWalletState();
   const navigate = useNavigate();
   const {
     formState: { errors }, handleSubmit, register, setError, watch,
@@ -52,11 +52,11 @@ function Login() {
       const account = new AptosAccount(encodedKey, undefined);
       const response = await getAccountResources({
         address: account.address().hex(),
-        nodeUrl: aptosNetwork,
+        nodeUrl,
       });
       const analyticsParams = {
         address: account.address().hex(),
-        network: aptosNetwork,
+        network: nodeUrl,
       };
       if (!response) {
         setError('privateKey', { message: 'Account not found', type: 'custom' });
@@ -76,7 +76,7 @@ function Login() {
       Analytics.event({
         eventType: loginEvents.ERROR_LOGIN_WITH_PRIVATE_KEY,
         params: {
-          network: aptosNetwork,
+          network: nodeUrl,
         },
       });
       setError('privateKey', { message: 'Invalid private key', type: 'custom' });

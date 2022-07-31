@@ -10,14 +10,15 @@ import { faFaucet } from '@fortawesome/free-solid-svg-icons/faFaucet';
 import useWalletState from 'core/hooks/useWalletState';
 import { fundAccountWithFaucet } from 'core/queries/faucet';
 import { useMutation, useQueryClient } from 'react-query';
-import { aptosCoinStructTag, LOCAL_FAUCET_URL } from 'core/constants';
+import { aptosCoinStructTag } from 'core/constants';
 import Analytics from 'core/utils/analytics/analytics';
 import { faucetEvents } from 'core/utils/analytics/events';
 import queryKeys from 'core/queries/queryKeys';
+import { faucetUrlMap } from 'core/utils/network';
 import { toast } from './Toast';
 
 export default function Faucet() {
-  const { aptosAccount, aptosNetwork, faucetNetwork } = useWalletState();
+  const { aptosAccount, faucetNetwork, nodeUrl } = useWalletState();
   const queryClient = useQueryClient();
   const {
     isLoading: isFaucetLoading,
@@ -38,7 +39,7 @@ export default function Faucet() {
           address: aptosAccount?.address().hex(),
           amount: 5000,
           coinType: aptosCoinStructTag,
-          network: aptosNetwork,
+          network: nodeUrl,
         },
       });
     },
@@ -49,10 +50,10 @@ export default function Faucet() {
   const faucetOnClick = async () => {
     try {
       if (address) {
-        await fundWithFaucet({ address, faucetUrl: faucetNetwork, nodeUrl: aptosNetwork });
+        await fundWithFaucet({ address, faucetUrl: faucetNetwork, nodeUrl });
       }
     } catch (err) {
-      const localhostMessage = (faucetNetwork === LOCAL_FAUCET_URL)
+      const localhostMessage = (faucetNetwork === faucetUrlMap.Localhost)
         ? 'If you are on localhost, please ensure that the faucet is running.'
         : undefined;
       toast({

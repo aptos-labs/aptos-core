@@ -51,7 +51,7 @@ interface UseAccountExistsProps {
 export const useAccountExists = ({
   address,
 }: UseAccountExistsProps) => {
-  const { aptosNetwork: nodeUrl } = useWalletState();
+  const { nodeUrl } = useWalletState();
 
   return useQuery(
     [accountQueryKeys.getAccountExists, address],
@@ -71,11 +71,11 @@ interface UseAccountCoinBalanceParams {
 export function useAccountCoinBalance({
   refetchInterval,
 }: UseAccountCoinBalanceParams = {}) {
-  const { aptosAccount, aptosNetwork } = useWalletState();
+  const { aptosAccount, nodeUrl } = useWalletState();
 
   const accountAddress = aptosAccount?.address()?.hex();
   return useQuery([accountQueryKeys.getAccountCoinBalance, accountAddress], async () => {
-    const client = new AptosClient(aptosNetwork);
+    const client = new AptosClient(nodeUrl);
     const resource: any = await client.getAccountResource(accountAddress!, aptosCoinStoreStructTag);
     return Number(resource.data.coin.value);
   }, {
@@ -90,14 +90,14 @@ export function useAccountCoinBalance({
  */
 export function useSequenceNumber() {
   const walletState = useWalletState();
-  const aptosNetwork = walletState.aptosNetwork!;
+  const nodeUrl = walletState.nodeUrl!;
   const aptosAccount = walletState.aptosAccount!;
 
   const sequenceNumberQuery = useCallback(async () => {
-    const aptosClient = new AptosClient(aptosNetwork);
+    const aptosClient = new AptosClient(nodeUrl);
     return aptosClient.getAccount(aptosAccount.address())
       .then(({ sequence_number }) => Number(sequence_number));
-  }, [aptosNetwork, aptosAccount]);
+  }, [nodeUrl, aptosAccount]);
 
   return useQuery([accountQueryKeys.getSequenceNumber], sequenceNumberQuery);
 }

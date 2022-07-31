@@ -4,7 +4,7 @@
 import { AptosClient, BCS } from 'aptos';
 import fetchAdapter from '@vespaiach/axios-fetch-adapter';
 import { sign } from 'tweetnacl';
-import { DEVNET_NODE_URL } from '../core/constants';
+import { nodeUrlMap } from '../core/utils/network';
 import { MessageMethod, PermissionType } from '../core/types/dappTypes';
 import { getBackgroundAptosAccountState } from '../core/utils/account';
 import Permissions from '../core/utils/permissions';
@@ -143,7 +143,7 @@ async function handleDappRequest(request, sendResponse) {
   }
 
   // The fetch adapter is neccessary to use axios from a service worker
-  const client = new AptosClient(DEVNET_NODE_URL, { adapter: fetchAdapter });
+  const client = new AptosClient(nodeUrlMap.Devnet, { adapter: fetchAdapter });
   switch (request.method) {
     case MessageMethod.CONNECT:
       connect(account, sendResponse);

@@ -132,7 +132,7 @@ export function useCoinTransferSimulation({
   enabled,
   recipient: maybeRecipient,
 } : UseCoinTransferParams) {
-  const { aptosAccount, aptosNetwork } = useWalletState();
+  const { aptosAccount, nodeUrl } = useWalletState();
   const { data: chainId } = useChainId();
   const { data: sequenceNumber } = useSequenceNumber();
 
@@ -152,7 +152,7 @@ export function useCoinTransferSimulation({
         sequenceNumber: sequenceNumber!,
       });
 
-      const aptosClient = new AptosClient(aptosNetwork);
+      const aptosClient = new AptosClient(nodeUrl);
       const simulatedTxn = AptosClient.generateBCSSimulation(aptosAccount!, rawTxn);
       return (await aptosClient.submitBCSSimulation(simulatedTxn)) as UserTransaction;
     },
@@ -174,7 +174,7 @@ export interface SubmitCoinTransferParams {
  * Mutation for submitting a coin transfer transaction
  */
 export function useCoinTransferTransaction() {
-  const { aptosAccount, aptosNetwork } = useWalletState();
+  const { aptosAccount, nodeUrl } = useWalletState();
   const { data: chainId } = useChainId();
   const { data: sequenceNumber } = useSequenceNumber();
   const queryClient = useQueryClient();
@@ -194,7 +194,7 @@ export function useCoinTransferTransaction() {
       sequenceNumber: sequenceNumber!,
     });
 
-    const aptosClient = new AptosClient(aptosNetwork);
+    const aptosClient = new AptosClient(nodeUrl);
     const signedTxn = AptosClient.generateBCSTransaction(aptosAccount!, rawTxn);
 
     try {
@@ -229,7 +229,7 @@ export function useCoinTransferTransaction() {
         amount,
         coinType,
         fromAddress: txn.sender,
-        network: aptosNetwork,
+        network: nodeUrl,
         ...txn,
       };
 

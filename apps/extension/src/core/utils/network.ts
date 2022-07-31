@@ -1,42 +1,45 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-  DEVNET_NODE_URL,
-  LOCAL_NODE_URL,
-  WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY,
-  DEVNET_FAUCET_URL,
-  LOCAL_FAUCET_URL,
-} from 'core/constants';
+import { WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY } from 'core/constants';
 
-export type AptosNetwork = 'http://0.0.0.0:8080' | 'https://fullnode.devnet.aptoslabs.com';
-export type FaucetNetwork = 'http://0.0.0.0:8000' | 'https://faucet.devnet.aptoslabs.com';
+export enum NetworkType {
+  DEVNET = 'Devnet',
+  LOCALHOST = 'Localhost',
+}
 
-export const networkUriMap: Record<string | number, string> = {
-  'http://0.0.0.0:8080': 'Localhost',
-  'https://fullnode.devnet.aptoslabs.com': 'Devnet',
-};
-
-export const faucetUriMap = Object.freeze({
-  DEVNET_NODE_URL: DEVNET_FAUCET_URL,
-  LOCAL_NODE_URL: LOCAL_FAUCET_URL,
+export const nodeUrlMap = Object.freeze({
+  [NetworkType.DEVNET]: 'https://fullnode.devnet.aptoslabs.com',
+  [NetworkType.LOCALHOST]: 'http://0.0.0.0:8080',
 } as const);
 
-export function getLocalStorageNetworkState(): AptosNetwork {
+export const nodeUrlReverseMap = Object.freeze({
+  [nodeUrlMap.Localhost]: NetworkType.LOCALHOST,
+  [nodeUrlMap.Devnet]: NetworkType.DEVNET,
+} as const);
+
+export const faucetUrlMap = Object.freeze({
+  [NetworkType.DEVNET]: 'https://faucet.devnet.aptoslabs.com',
+  [NetworkType.LOCALHOST]: 'http://0.0.0.0:8000',
+} as const);
+
+export const faucetUrlReverseMap = Object.freeze({
+  [faucetUrlMap.Localhost]: NetworkType.LOCALHOST,
+  [faucetUrlMap.Devnet]: NetworkType.DEVNET,
+});
+
+export type NodeUrl = typeof nodeUrlMap[keyof typeof nodeUrlMap];
+export type FaucetUrl = typeof faucetUrlMap[keyof typeof faucetUrlMap];
+
+export function getLocalStorageNodeNetworkUrl(): NodeUrl {
   // Get network from local storage by key
   return (window.localStorage.getItem(
     WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY,
-  ) as AptosNetwork | null) || DEVNET_NODE_URL;
+  ) as NodeUrl | null) || nodeUrlMap.Devnet;
 }
 
-function assertNeverNetwork(x: never): never {
-  throw new Error(`Unexpected network: ${x}`);
-}
-
-export function getFaucetNetworkFromAptosNetwork(aptosNetwork: AptosNetwork): FaucetNetwork {
-  switch (aptosNetwork) {
-    case DEVNET_NODE_URL: return faucetUriMap.DEVNET_NODE_URL;
-    case LOCAL_NODE_URL: return faucetUriMap.LOCAL_NODE_URL;
-    default: return assertNeverNetwork(aptosNetwork);
-  }
+export function getFaucetUrlFromNodeUrl(
+  NodeNetworkUrlUrl: NodeUrl,
+): FaucetUrl {
+  return faucetUrlMap[nodeUrlReverseMap[NodeNetworkUrlUrl]];
 }

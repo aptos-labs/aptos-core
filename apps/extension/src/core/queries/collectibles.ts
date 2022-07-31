@@ -10,7 +10,7 @@ import { useQuery } from 'react-query';
 import { validStorageUris } from 'core/constants';
 import useWalletState from 'core/hooks/useWalletState';
 import { MetadataJson } from 'core/types/tokenMetadata';
-import { AptosNetwork } from 'core/utils/network';
+import { NodeUrl } from 'core/utils/network';
 import { useCallback, useMemo } from 'react';
 import { getTokenIdDictFromString, TokenId } from 'core/utils/token';
 import { ScriptFunctionPayload } from 'aptos/dist/api/data-contracts';
@@ -30,7 +30,7 @@ type CollectionDict = Record<string, TokenAttributes[]>;
 
 interface GetGalleryItemsProps {
   address: MaybeHexString;
-  nodeUrl: AptosNetwork;
+  nodeUrl: NodeUrl;
 }
 
 // this is a temporary workaround until we get the indexer working
@@ -135,13 +135,13 @@ export interface TokenDataResponse {
 export const useTokenData = ({
   tokenId,
 }: UseTokenDataProps) => {
-  const { aptosNetwork } = useWalletState();
+  const { nodeUrl } = useWalletState();
   const tokenIdDict = useMemo(() => getTokenIdDictFromString({ tokenId }), [tokenId]);
 
   const getGalleryItemsQuery = useCallback(async () => {
     const tokenData = await getTokenData({
       id: tokenIdDict,
-      nodeUrl: aptosNetwork,
+      nodeUrl,
     });
 
     // Cast as AxiosResponse of type TokenDataResponse
@@ -153,22 +153,22 @@ export const useTokenData = ({
     const tokenMetadata = await axios.get<MetadataJson>(reformattedTokenData.uri);
     reformattedTokenData.metadata = tokenMetadata.data;
     return reformattedTokenData;
-  }, [aptosNetwork, tokenIdDict]);
+  }, [nodeUrl, tokenIdDict]);
 
   return useQuery(collectiblesQueryKeys.getTokenData, getGalleryItemsQuery);
 };
 
 export const useGalleryItems = () => {
   const {
-    aptosAccount, aptosNetwork,
+    aptosAccount, nodeUrl,
   } = useWalletState();
 
   const getGalleryItemsQuery = useCallback(
     async () => (aptosAccount ? getGalleryItems({
       address: aptosAccount.address(),
-      nodeUrl: aptosNetwork,
+      nodeUrl,
     }) : null),
-    [aptosAccount, aptosNetwork],
+    [aptosAccount, nodeUrl],
   );
 
   return useQuery(collectiblesQueryKeys.getGalleryItems, getGalleryItemsQuery);

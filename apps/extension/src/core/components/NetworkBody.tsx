@@ -9,8 +9,7 @@ import {
   useRadioGroup,
 } from '@chakra-ui/react';
 import React, { useEffect, useState } from 'react';
-import { AptosNetwork } from 'core/utils/network';
-import { DEVNET_NODE_URL, LOCAL_NODE_URL } from 'core/constants';
+import { NodeUrl, nodeUrlMap } from 'core/utils/network';
 import useWalletState from 'core/hooks/useWalletState';
 import { useTestnetStatus } from 'core/queries/network';
 import useSwitchNetwork from 'core/mutations/network';
@@ -18,30 +17,26 @@ import NetworkListItem from './NetworkListItem';
 
 interface NetworkPreference {
   description?: string;
-  title?: 'Devnet' | 'Localhost';
-  value: AptosNetwork;
+  title: string;
+  value: NodeUrl;
 }
 
-const networkPreferences: NetworkPreference[] = [
-  {
-    title: 'Devnet',
-    value: DEVNET_NODE_URL,
-  },
-  {
-    title: 'Localhost',
-    value: LOCAL_NODE_URL,
-  },
-];
+const networkPreferences: NetworkPreference[] = Object.entries(nodeUrlMap).map(
+  ([key, value]) => ({
+    title: key,
+    value,
+  }),
+);
 
 export default function NetworkBody() {
   const {
-    aptosNetwork,
+    nodeUrl,
   } = useWalletState();
   const { data: localTestnetIsLive } = useTestnetStatus();
   const { isLoading, mutateAsync } = useSwitchNetwork();
   const [error, setError] = useState<boolean>(false);
 
-  const onClick = async (event: AptosNetwork) => {
+  const onClick = async (event: NodeUrl) => {
     try {
       await mutateAsync({ event, localTestnetIsLive });
     } catch (err) {
@@ -50,16 +45,16 @@ export default function NetworkBody() {
   };
 
   const { getRadioProps, getRootProps, setValue: radioSetValue } = useRadioGroup({
-    defaultValue: aptosNetwork,
-    name: 'aptosNetwork',
+    defaultValue: nodeUrl,
+    name: 'NodeNetworkUrl',
     onChange: onClick,
   });
 
   const group = getRootProps();
 
   useEffect(() => {
-    radioSetValue(aptosNetwork);
-  }, [aptosNetwork, error, radioSetValue]);
+    radioSetValue(nodeUrl);
+  }, [nodeUrl, error, radioSetValue]);
 
   return (
     <>
@@ -75,9 +70,10 @@ export default function NetworkBody() {
             return (
               <NetworkListItem
                 key={network.value}
-                isDisabled={network.value === LOCAL_NODE_URL && !localTestnetIsLive}
+                isDisabled={network.value === nodeUrlMap.Localhost && !localTestnetIsLive}
                 isLoading={!isLoading}
                 {...radio}
+                value={network.value}
               />
             );
           })

@@ -21,7 +21,7 @@ interface GoogleAnalyticsEventParams {
  * Analytics.event({
  *   eventType: collectiblesEvents.CREATE_NFT,
  *   params: {
- *     network: aptosNetwork,
+ *     network: NodeNetworkUrl,
  *     ...data,
  *   },
  * });

@@ -33,7 +33,7 @@ export default function CreateNFTModal() {
   const { colorMode } = useColorMode();
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { handleSubmit, register, watch } = useForm();
-  const { aptosAccount, aptosNetwork } = useWalletState();
+  const { aptosAccount, nodeUrl } = useWalletState();
 
   const collectionName: string | undefined = watch('collectionName');
   const tokenName: string | undefined = watch('tokenName');
@@ -57,7 +57,7 @@ export default function CreateNFTModal() {
       collectionName,
       description,
       name: tokenName,
-      nodeUrl: aptosNetwork,
+      nodeUrl,
       supply,
       uri,
     });
