@@ -20,6 +20,8 @@ use diesel::{
 use futures::future::Either;
 use serde::Serialize;
 
+static SECONDS_IN_10_YEARS: i64 = 60 * 60 * 24 * 365 * 10;
+
 #[derive(AsChangeset, Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[primary_key(hash)]
 #[diesel(table_name = "transactions")]
@@ -306,9 +308,9 @@ impl UserTransaction {
             sender: tx.request.sender.inner().to_hex_literal(),
             sequence_number: *tx.request.sequence_number.inner() as i64,
             max_gas_amount: *tx.request.max_gas_amount.inner() as i64,
-            expiration_timestamp_secs: chrono::NaiveDateTime::from_timestamp(
-                *tx.request.expiration_timestamp_secs.inner() as i64,
-                0,
+            expiration_timestamp_secs: parse_timestamp_secs(
+                tx.request.expiration_timestamp_secs,
+                tx.info.version,
             ),
             gas_unit_price: *tx.request.gas_unit_price.inner() as i64,
             timestamp: parse_timestamp(tx.timestamp, tx.info.version),
@@ -360,6 +362,16 @@ fn parse_timestamp(ts: U64, version: U64) -> chrono::NaiveDateTime {
         .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
 }
 
+fn parse_timestamp_secs(ts: U64, version: U64) -> chrono::NaiveDateTime {
+    let mut timestamp = ts.0 as i64;
+    let timestamp_in_10_years = chrono::offset::Utc::now().timestamp() + SECONDS_IN_10_YEARS;
+    if timestamp > timestamp_in_10_years {
+        timestamp = timestamp_in_10_years;
+    }
+    chrono::NaiveDateTime::from_timestamp_opt(timestamp, 0)
+        .unwrap_or_else(|| panic!("Could not parse timestamp {:?} for version {}", ts, version))
+}
+
 // Prevent conflicts with other things named `Transaction`
 pub type BlockMetadataTransactionModel = BlockMetadataTransaction;
 pub type TransactionModel = Transaction;
@@ -372,8 +384,16 @@ mod tests {
 
     #[test]
     fn test_parse_timestamp() {
+        let current_year = chrono::offset::Utc::now().year();
+
         let ts = parse_timestamp(U64::from(1649560602763949), U64::from(1));
         assert_eq!(ts.timestamp(), 1649560602);
-        assert_eq!(ts.year(), 2022);
+        assert_eq!(ts.year(), current_year);
+
+        let ts2 = parse_timestamp_secs(U64::from(600000000000000), U64::from(2));
+        assert_eq!(ts2.year(), current_year + 10);
+
+        let ts3 = parse_timestamp_secs(U64::from(1659386386), U64::from(2));
+        assert_eq!(ts3.timestamp(), 1659386386);
     }
 }
