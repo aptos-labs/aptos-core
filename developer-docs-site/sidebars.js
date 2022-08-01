@@ -144,16 +144,11 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "APIs",
+      label: "API",
       collapsible: true,
       collapsed: true,
-      items: [
-        {
-          type: "link",
-          label: "REST API",
-          href: "https://fullnode.devnet.aptoslabs.com/spec.html#/",
-        },
-      ],
+      link: { type: "doc", id: "api/index" },
+      items: ["api/index"],
     },
     "reference/telemetry",
     "reference/glossary",
