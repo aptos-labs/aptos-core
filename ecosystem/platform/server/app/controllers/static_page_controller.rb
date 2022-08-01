@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class StaticPageController < ApplicationController
-  layout 'it2', only: [:community]
+  layout 'it3', only: [:community]
 
   def root; end
 
