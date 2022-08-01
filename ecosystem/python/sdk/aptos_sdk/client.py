@@ -17,8 +17,8 @@ from type_tag import StructTag, TypeTag
 
 TESTNET_URL = "https://fullnode.devnet.aptoslabs.com"
 FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
-TESTNET_URL = "http://127.0.0.1:8080"
-FAUCET_URL = "http://127.0.0.1:8081"
+
+U64_MAX = 18446744073709551615
 
 
 class RestClient:
@@ -155,7 +155,9 @@ class RestClient:
             time.sleep(1)
             count += 1
         response = self.client.get(f"{self.base_url}/transactions/{txn_hash}")
-        assert "success" in response.json() and response.json()["success"], f"{response.text} - {txn_hash}"
+        assert (
+            "success" in response.json() and response.json()["success"]
+        ), f"{response.text} - {txn_hash}"
 
     #
     # Transaction helpers
@@ -272,11 +274,15 @@ class RestClient:
             TransactionArgument(name, Serializer.str),
             TransactionArgument(description, Serializer.str),
             TransactionArgument(uri, Serializer.str),
+            TransactionArgument(U64_MAX, Serializer.u64),
+            TransactionArgument(
+                [False, False, False], Serializer.sequence_serializer(Serializer.bool)
+            ),
         ]
 
         payload = ScriptFunction.natural(
             "0x3::token",
-            "create_unlimited_collection_script",
+            "create_collection_script",
             [],
             transaction_arguments,
         )
@@ -300,15 +306,24 @@ class RestClient:
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(name, Serializer.str),
             TransactionArgument(description, Serializer.str),
-            TransactionArgument(True, Serializer.bool),
+            TransactionArgument(supply, Serializer.u64),
             TransactionArgument(supply, Serializer.u64),
             TransactionArgument(uri, Serializer.str),
+            TransactionArgument(account.address(), Serializer.struct),
+            TransactionArgument(1000000, Serializer.u64),  # SDK assumes per million
             TransactionArgument(royalty_points_per_million, Serializer.u64),
+            TransactionArgument(
+                [False, False, False, False, False],
+                Serializer.sequence_serializer(Serializer.bool),
+            ),
+            TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
+            TransactionArgument([], Serializer.sequence_serializer(Serializer.bytes)),
+            TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
         ]
 
         payload = ScriptFunction.natural(
             "0x3::token",
-            "create_unlimited_token_script",
+            "create_token_script",
             [],
             transaction_arguments,
         )
@@ -324,6 +339,7 @@ class RestClient:
         creator: str,
         collection_name: str,
         token_name: str,
+        property_version: int,
         amount: int,
     ) -> str:
         transaction_arguments = [
@@ -332,6 +348,7 @@ class RestClient:
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(token_name, Serializer.str),
             TransactionArgument(amount, Serializer.u64),
+            TransactionArgument(property_version, Serializer.u64),
         ]
 
         payload = ScriptFunction.natural(
@@ -352,12 +369,14 @@ class RestClient:
         creator: str,
         collection_name: str,
         token_name: str,
+        property_version: int,
     ) -> str:
         transaction_arguments = [
             TransactionArgument(sender, Serializer.struct),
             TransactionArgument(creator, Serializer.struct),
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(token_name, Serializer.str),
+            TransactionArgument(property_version, Serializer.u64),
         ]
 
         payload = ScriptFunction.natural(
@@ -378,6 +397,7 @@ class RestClient:
         creators_address: AccountAddress,
         collection_name: str,
         token_name: str,
+        property_version: int,
         amount: int,
     ) -> str:
         transaction_arguments = [
@@ -385,6 +405,7 @@ class RestClient:
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(token_name, Serializer.str),
             TransactionArgument(amount, Serializer.u64),
+            TransactionArgument(property_version, Serializer.u64),
         ]
 
         payload = ScriptFunction.natural(
@@ -411,15 +432,19 @@ class RestClient:
         creator: AccountAddress,
         collection_name: str,
         token_name: str,
+        property_version: int,
     ) -> Any:
         token_store = self.account_resource(owner, "0x3::token::TokenStore")["data"][
             "tokens"
         ]["handle"]
 
         token_id = {
-            "creator": creator.hex(),
-            "collection": collection_name,
-            "name": token_name,
+            "token_data_id": {
+                "creator": creator.hex(),
+                "collection": collection_name,
+                "name": token_name,
+            },
+            "property_version": str(property_version),
         }
 
         return self.get_table_item(
@@ -427,16 +452,20 @@ class RestClient:
             "0x3::token::TokenId",
             "0x3::token::Token",
             token_id,
-        )["value"]
+        )["amount"]
 
     def get_token_data(
-        self, creator: AccountAddress, collection_name: str, token_name: str
+        self,
+        creator: AccountAddress,
+        collection_name: str,
+        token_name: str,
+        property_version: int,
     ) -> Any:
         token_data = self.account_resource(creator, "0x3::token::Collections")["data"][
             "token_data"
         ]["handle"]
 
-        token_id = {
+        token_data_id = {
             "creator": creator.hex(),
             "collection": collection_name,
             "name": token_name,
@@ -444,20 +473,20 @@ class RestClient:
 
         return self.get_table_item(
             token_data,
-            "0x3::token::TokenId",
+            "0x3::token::TokenDataId",
             "0x3::token::TokenData",
-            token_id,
+            token_data_id,
         )
 
     def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
         token_data = self.account_resource(creator, "0x3::token::Collections")["data"][
-            "collections"
+            "collection_data"
         ]["handle"]
 
         return self.get_table_item(
             token_data,
             "0x1::string::String",
-            "0x3::token::Collection",
+            "0x3::token::CollectionData",
             collection_name,
         )
 
@@ -561,41 +590,52 @@ def token_transfer():
         f"Alice's collection: {rest_client.get_collection(alice.address(), collection_name)}"
     )
     print(
-        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}"
+        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name, 0)}"
     )
     print(
-        f"Alice's token data: {rest_client.get_token_data(alice.address(), collection_name, token_name)}"
+        f"Alice's token data: {rest_client.get_token_data(alice.address(), collection_name, token_name, 0)}"
     )
 
     print("\n=== Transferring the token to Bob ===")
     txn_hash = rest_client.offer_token(
-        alice, bob.address(), alice.address(), collection_name, token_name, 1
+        alice,
+        bob.address(),
+        alice.address(),
+        collection_name,
+        token_name,
+        0,
+        1,
     )
     rest_client.wait_for_transaction(txn_hash)
 
     txn_hash = rest_client.claim_token(
-        bob, alice.address(), alice.address(), collection_name, token_name
+        bob,
+        alice.address(),
+        alice.address(),
+        collection_name,
+        token_name,
+        0,
     )
     rest_client.wait_for_transaction(txn_hash)
 
     print(
-        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}"
+        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name, 0)}"
     )
     print(
-        f"Bob's token balance: {rest_client.get_token_balance(bob.address(), alice.address(), collection_name, token_name)}"
+        f"Bob's token balance: {rest_client.get_token_balance(bob.address(), alice.address(), collection_name, token_name, 0)}"
     )
 
     print("\n=== Transferring the token back to Alice using MultiAgent ===")
     txn_hash = rest_client.direct_transfer_token(
-        bob, alice, alice.address(), collection_name, token_name, 1
+        bob, alice, alice.address(), collection_name, token_name, 0, 1
     )
     rest_client.wait_for_transaction(txn_hash)
 
     print(
-        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}"
+        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name, 0)}"
     )
     print(
-        f"Bob's token balance: {rest_client.get_token_balance(bob.address(), alice.address(), collection_name, token_name)}"
+        f"Bob's token balance: {rest_client.get_token_balance(bob.address(), alice.address(), collection_name, token_name, 0)}"
     )
 
 
