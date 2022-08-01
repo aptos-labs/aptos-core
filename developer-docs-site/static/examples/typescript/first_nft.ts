@@ -66,9 +66,9 @@ export class TokenClient {
         "0",
         "0",
         [false, false, false, false, false],
-        [],
-        [],
-        [],
+        [Buffer.from("age").toString("hex")],
+        [Buffer.from("2").toString("hex")],
+        [Buffer.from("integer").toString("hex")],
       ],
     };
     await this.submitTransactionHelper(account, payload);
@@ -197,8 +197,8 @@ async function main() {
 
   const alice = new Account();
   const bob = new Account();
-  const collection_name = "Alice's";
-  const token_name = "Alice's first token";
+  const collection_name = "Alice's cat collection";
+  const token_name = "Alice's tabby";
 
   console.log("\n=== Addresses ===");
   console.log(
@@ -220,9 +220,9 @@ async function main() {
     alice,
     collection_name,
     token_name,
-    "Alice's simple token",
+    "Alice's tabby",
     1,
-    "https://aptos.dev/img/nyan.jpeg",
+    "https://aptos.dev/img/nyan.jpeg", //TODO: replace with uri link matching ERC1155 off-chain standard
   );
 
   let token_balance = await client.getTokenBalance(alice.address(), alice.address(), collection_name, token_name);

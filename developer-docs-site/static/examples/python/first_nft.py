@@ -62,9 +62,9 @@ class TokenClient(RestClient):
                 str(0),
                 str(0),
                 mutate_setting,
-                [],
-                [],
-                []
+                ["age".encode("utf-8").hex()],
+                ["2".encode("utf-8").hex()],
+                ["integer".encode("utf-8").hex()]
             ]
         }
         self.submit_transaction_helper(account, payload)
@@ -205,8 +205,8 @@ if __name__ == "__main__":
 
     alice = Account()
     bob = Account()
-    collection_name = "Alice's"
-    token_name = "Alice's first token"
+    collection_name = "Alice's cat collection"
+    token_name = "Alice's tabby"
 
     print("\n=== Addresses ===")
     print(f"Alice: {alice.address()}")
@@ -221,7 +221,7 @@ if __name__ == "__main__":
 
     print("\n=== Creating Collection and Token ===")
 
-    client.create_collection(alice, collection_name, "Alice's simple collection", "https://aptos.dev")
+    client.create_collection(alice, collection_name, "Alice's cat collection", "https://aptos.dev")
     client.create_token(alice, collection_name, token_name, "Alice's simple token", 1, "https://aptos.dev/img/nyan.jpeg")
     print(f"Alice's collection: {client.get_collection(alice.address(), collection_name)}")
     print(f"Alice's token balance: {client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}")
