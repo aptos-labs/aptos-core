@@ -866,7 +866,7 @@ mod test {
     #[tokio::test]
     async fn test_chain_id_check() {
         // This is needed to avoid db errors. I think that db needs some time to reset.
-        std::thread::sleep(std::time::Duration::from_millis(300));
+        std::thread::sleep(std::time::Duration::from_millis(1000));
         if crate::should_skip_pg_tests() {
             return;
         }
