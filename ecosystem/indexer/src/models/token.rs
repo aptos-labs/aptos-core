@@ -110,6 +110,7 @@ pub struct DepositEventType {
 pub struct CreationEventType {
     pub id: TokenId,
     pub token_data: TokenData,
+    #[serde(deserialize_with = "types::deserialize_from_string")]
     pub initial_balance: i64,
 }
 
