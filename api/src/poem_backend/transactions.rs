@@ -203,6 +203,9 @@ impl TransactionsApi {
     /// Simulate submitting a transaction. To use this, you must:
     /// - Create a SignedTransaction with a zero-padded signature.
     /// - Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature.
+    ///
+    /// To use this endpoint with BCS, you must submit a SignedTransaction
+    /// encoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.
     #[oai(
         path = "/transactions/simulate",
         method = "post",
