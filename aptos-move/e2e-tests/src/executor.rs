@@ -122,7 +122,18 @@ impl FakeExecutor {
         // files can persist on windows machines.
         let file_name = test_name.replace(':', "_");
         self.executed_output = Some(GoldenOutputs::new(&file_name));
+        self.set_tracing(test_name, file_name)
+    }
 
+    pub fn set_golden_file_at(&mut self, path: &str, test_name: &str) {
+        // 'test_name' includes ':' in the names, lets re-write these to be '_'s so that these
+        // files can persist on windows machines.
+        let file_name = test_name.replace(':', "_");
+        self.executed_output = Some(GoldenOutputs::new_at_path(PathBuf::from(path), &file_name));
+        self.set_tracing(test_name, file_name)
+    }
+
+    fn set_tracing(&mut self, test_name: &str, file_name: String) {
         // NOTE: tracing is only available when
         //  - the e2e test outputs a golden file, and
         //  - the environment variable is properly set
@@ -219,7 +230,7 @@ impl FakeExecutor {
         self.read_account_resource_at_address(account.address())
     }
 
-    fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
+    pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
         let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()));
         let data_blob = StateView::get_state_value(&self.data_store, &StateKey::AccessPath(ap))
             .expect("account must exist in data store")
