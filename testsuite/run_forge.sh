@@ -76,17 +76,34 @@ set_forge_namespace() {
 
 # Set an image tag to use
 set_image_tag() {
-    if [ -z "$IMAGE_TAG" ]; then
-        IMAGE_TAG_DEFAULT=$(git rev-parse HEAD)
-        echo "IMAGE_TAG not set, defaulting to current HEAD commit as tag: ${IMAGE_TAG_DEFAULT}"
-        IMAGE_TAG=${IMAGE_TAG_DEFAULT}
-    fi
     echo "Ensure image exists"
-    img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG)
-    if [ $? != 0 ]; then
-        echo "IMAGE_TAG does not exist in ECR: ${IMAGE_TAG}. Make sure your commit has been pushed to GitHub previously."
-        echo "If you're trying to run the code from your PR, apply the label 'CICD:build-images' and wait for the builds to finish."
-        exit 1
+    # if IMAGE_TAG not set, check the last few commits on HEAD
+    if [ -z "$IMAGE_TAG" ]; then
+        echo "IMAGE_TAG not set, trying the latest commits before HEAD"
+        commit_threshold=5
+        for i in $(seq 0 $commit_threshold); do
+            IMAGE_TAG_DEFAULT=$(git rev-parse HEAD~$i)
+            echo "Trying tag: ${IMAGE_TAG_DEFAULT}"
+            git log --format=%B -n 1 $IMAGE_TAG_DEFAULT
+            img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG_DEFAULT)
+            if [ "$?" -eq 0 ]; then
+                echo "Image tag exists. Using tag: ${IMAGE_TAG_DEFAULT}"
+                IMAGE_TAG=$IMAGE_TAG_DEFAULT
+                return 0
+            fi
+        done
+        # if IMAGE_TAG still not set after checking HEAD,
+        if [ -z "$IMAGE_TAG"]; then
+            echo "None of the last ${commit_threshold} commits have been built and pushed"
+            exit 1
+        fi
+    else
+        img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG)
+        if [ "$?" -ne 0 ]; then
+            echo "IMAGE_TAG does not exist in ECR: ${IMAGE_TAG}. Make sure your commit has been pushed to GitHub previously."
+            echo "If you're trying to run the code from your PR, apply the label 'CICD:build-images' and wait for the builds to finish."
+            exit 1
+        fi
     fi
 }
 
