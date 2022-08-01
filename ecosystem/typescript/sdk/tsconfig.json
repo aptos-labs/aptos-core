@@ -1,17 +1,17 @@
 {
   "compilerOptions": {
-    "experimentalDecorators": true,
-    "outDir": "./dist",
+    "allowSyntheticDefaultImports": true,
     "allowJs": true,
-    "target": "es2020",
     "declaration": true,
     "declarationMap": true,
     "esModuleInterop": true,
-    "sourceMap": true,
+    "experimentalDecorators": true,
     "module": "commonjs",
-    "pretty": true,
     "noImplicitAny": true,
-    "allowSyntheticDefaultImports": true,
+    "outDir": "./dist",
+    "sourceMap": true,
+    "target": "es2020",
+    "pretty": true
   },
   "include": [
     "src"
