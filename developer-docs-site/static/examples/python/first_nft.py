@@ -59,12 +59,12 @@ class TokenClient(RestClient):
                 str(U64_MAX),
                 uri.encode("utf-8").hex(),
                 account.address(),
-                str(0),
+                str(0), # royalty_denominator
                 str(0),
                 mutate_setting,
-                [],
-                [],
-                []
+                ["GiftTo".encode("utf-8").hex()],
+                ["Bob".encode("utf-8").hex()],
+                ["string".encode("utf-8").hex()]
             ]
         }
         self.submit_transaction_helper(account, payload)
@@ -119,6 +119,40 @@ class TokenClient(RestClient):
         }
         self.submit_transaction_helper(account, payload)
 #<:!:section_5
+
+#:!:>section_6
+    def mutate_token_properties(
+            self,
+            account: Account,
+            token_owner: str,
+            creator: str,
+            collection_name: str,
+            token_name: str,
+            property_version: int,
+            amount: int,
+            keys: list[str],
+            values: list[str],
+            types: list[str],
+    ):
+        payload = {
+            "type": "script_function_payload",
+            "function": f"0x3::token::mutate_token_properties",
+            "type_arguments": [],
+            "arguments": [
+                token_owner,
+                creator,
+                collection_name.encode("utf-8").hex(),
+                token_name.encode("utf-8").hex(),
+                str(property_version),
+                str(amount),
+                [ k.encode("utf-8").hex() for k in keys ],
+                [ v.encode("utf-8").hex() for v in values ],
+                [ t.encode("utf-8").hex() for t in types ],
+            ]
+        }
+        self.submit_transaction_helper(account, payload)
+#<:!:section_6
+
 
 #:!:>section_3
     def get_table_item(self, handle: str, key_type: str, value_type: str, key: Any) -> Any:
@@ -205,23 +239,28 @@ if __name__ == "__main__":
 
     alice = Account()
     bob = Account()
-    collection_name = "Alice's"
-    token_name = "Alice's first token"
+    jack = Account()
+    collection_name = "Alice's cat collection"
+    token_name = "Alice's tabby"
 
     print("\n=== Addresses ===")
     print(f"Alice: {alice.address()}")
     print(f"Bob: {bob.address()}")
+    print(f"Jack: {bob.address()}")
 
-    faucet_client.fund_account(alice.address(), 5_000)
-    faucet_client.fund_account(bob.address(), 5_000)
+
+    faucet_client.fund_account(alice.address(), 10_000_000)
+    faucet_client.fund_account(bob.address(), 10_000_000)
+    faucet_client.fund_account(jack.address(), 10_000_000)
 
     print("\n=== Initial Balances ===")
     print(f"Alice: {client.account_balance(alice.address())}")
     print(f"Bob: {client.account_balance(bob.address())}")
+    print(f"Jack: {client.account_balance(jack.address())}")
 
     print("\n=== Creating Collection and Token ===")
 
-    client.create_collection(alice, collection_name, "Alice's simple collection", "https://aptos.dev")
+    client.create_collection(alice, collection_name, "Alice's cat collection", "https://aptos.dev")
     client.create_token(alice, collection_name, token_name, "Alice's simple token", 1, "https://aptos.dev/img/nyan.jpeg")
     print(f"Alice's collection: {client.get_collection(alice.address(), collection_name)}")
     print(f"Alice's token balance: {client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}")
@@ -232,3 +271,30 @@ if __name__ == "__main__":
     client.claim_token(bob, alice.address(), alice.address(), collection_name, token_name)
     print(f"Alice's token balance: {client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}")
     print(f"Bob's token balance: {client.get_token_balance(bob.address(), alice.address(), collection_name, token_name)}")
+
+    print("\n=== On-chain lazy mint through semi-fungible token ===")
+    large_volume_token_name = "Alice's fancy cat"
+    # alice creates 10 million fancy cat fungible tokens in one txn
+    client.create_token(alice, collection_name, large_volume_token_name, "Alice's high demand token", 10000000, "https://aptos.dev/img/nyan.jpeg")
+
+    # alice mutate the 1 token. The token has a new property_version and new token ID, thus become an NFT now.
+    client.mutate_token_properties(
+        alice,
+        alice.address(),
+        alice.address(),
+        collection_name,
+        large_volume_token_name,
+        0,
+        1,
+        ["GiftTo".encode("utf-8").hex()],
+        ["Jack".encode("utf-8").hex()],
+        ["string".encode("utf-8").hex()]
+    )
+    # alice transfer the token to Jack
+    client.offer_token(alice, jack.address(), alice.address(), collection_name, large_volume_token_name, 1)
+    client.claim_token(jack, alice.address(), alice.address(), collection_name, large_volume_token_name)
+    print(f"Alice's uninitialized token balance: {client.get_token_balance(alice.address(), alice.address(), collection_name, large_volume_token_name)}")
+    print(f"Jack's token balance: {client.get_token_balance(jack.address(), alice.address(), collection_name, large_volume_token_name)}")
+
+
+
