@@ -11,8 +11,8 @@ use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag,
-    MoveStructTagWrapper, MoveValue, TableItemRequest, TransactionId, U128, U64,
+    Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag, MoveStructTagParam,
+    MoveValue, TableItemRequest, TransactionId, U128, U64,
 };
 use aptos_api_types::{LedgerInfo, MoveResource};
 use aptos_state_view::StateView;
@@ -51,13 +51,13 @@ impl StateApi {
     )]
     async fn get_account_resource(
         &self,
-        accept_type: &AcceptType,
+        accept_type: AcceptType,
         address: Path<Address>,
-        resource_type: Path<MoveStructTagWrapper>,
+        resource_type: Path<MoveStructTagParam>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveResource> {
         fail_point_poem("endpoint_get_account_resource")?;
-        self.resource(accept_type, address.0, resource_type.0, ledger_version.0)
+        self.resource(&accept_type, address.0, resource_type.0, ledger_version.0)
     }
 
     /// Get specific account module
@@ -77,13 +77,13 @@ impl StateApi {
     )]
     async fn get_account_module(
         &self,
-        accept_type: &AcceptType,
+        accept_type: AcceptType,
         address: Path<Address>,
         module_name: Path<IdentifierWrapper>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveModuleBytecode> {
         fail_point_poem("endpoint_get_account_module")?;
-        self.module(accept_type, address.0, module_name.0, ledger_version.0)
+        self.module(&accept_type, address.0, module_name.0, ledger_version.0)
     }
 
     /// Get table item
@@ -103,14 +103,14 @@ impl StateApi {
     )]
     async fn get_table_item(
         &self,
-        accept_type: &AcceptType,
+        accept_type: AcceptType,
         table_handle: Path<U128>,
         table_item_request: Json<TableItemRequest>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveValue> {
         fail_point_poem("endpoint_get_table_item")?;
         self.table_item(
-            accept_type,
+            &accept_type,
             table_handle.0,
             table_item_request.0,
             ledger_version.0,
@@ -147,7 +147,7 @@ impl StateApi {
         &self,
         accept_type: &AcceptType,
         address: Address,
-        resource_type: MoveStructTagWrapper,
+        resource_type: MoveStructTagParam,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveResource> {
         let resource_type: MoveStructTag = resource_type.into();

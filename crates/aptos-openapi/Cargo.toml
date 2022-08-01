@@ -12,6 +12,7 @@ edition = "2018"
 [dependencies]
 async-trait = "0.1.53"
 mime = "0.3.16"
+percent-encoding = "2.1.0"
 poem = { git = "https://github.com/poem-web/poem" }
 poem-openapi = { git = "https://github.com/poem-web/poem" }
 serde = { version = "1.0.137", default-features = false }

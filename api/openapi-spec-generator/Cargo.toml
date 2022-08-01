@@ -1,5 +1,5 @@
 [package]
-name = "aptos-api-spec-generator"
+name = "aptos-openapi-spec-generator"
 version = "0.1.0"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos API OpenAPI Spec Generator"

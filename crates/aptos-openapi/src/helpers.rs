@@ -148,7 +148,11 @@ macro_rules! impl_poem_parameter {
         $(
         impl ::poem_openapi::types::ParseFromParameter for $ty {
             fn parse_from_parameter(value: &str) -> ::poem_openapi::types::ParseResult<Self> {
-                value.parse().map_err(::poem_openapi::types::ParseError::custom)
+                $crate::percent_encoding::percent_decode_str(value)
+                    .decode_utf8()
+                    .map_err(::poem_openapi::types::ParseError::custom)?
+                    .parse()
+                    .map_err(::poem_openapi::types::ParseError::custom)
             }
         }
 
@@ -167,16 +171,18 @@ macro_rules! impl_poem_parameter {
 }
 
 mod test {
+    #[allow(unused_imports)]
+    use poem_openapi::types::ParseFromParameter;
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
 
-    #[derive(Deserialize, Serialize)]
+    #[derive(Debug, Deserialize, Serialize)]
     struct This {
         value: String,
     }
 
-    #[derive(Deserialize, Serialize)]
-    struct That(String);
+    #[derive(Debug, Deserialize, Serialize)]
+    struct That(pub String);
 
     impl FromStr for That {
         type Err = String;
@@ -192,5 +198,12 @@ mod test {
 
         impl_poem_type!(That, "string", ());
         impl_poem_parameter!(That);
+
+        assert_eq!(
+            That::parse_from_parameter("0x1::coin::CoinStore::%3C0x1::aptos_coin::AptosCoin%3E")
+                .unwrap()
+                .0,
+            "0x1::coin::CoinStore::<0x1::aptos_coin::AptosCoin>".to_string(),
+        );
     }
 }
