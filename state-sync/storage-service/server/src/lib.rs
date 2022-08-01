@@ -366,7 +366,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
         while let Some(request) = self.network_requests.next().await {
             // Log the request
             let (peer, protocol, request, response_sender) = request;
-            debug!(LogSchema::new(LogEntry::ReceivedStorageRequest)
+            trace!(LogSchema::new(LogEntry::ReceivedStorageRequest)
                 .request(&request)
                 .message(&format!(
                     "Received storage request. Peer: {:?}, protocol: {:?}.",
