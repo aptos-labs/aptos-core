@@ -9,7 +9,7 @@ pub struct NftClient {
     url: String,
     pub rest_client: RestClient,
 }
-
+const NUMBER_MAX: i64 = 9007199254740991;
 impl NftClient {
     /// Represents an account as well as the private, public key-pair for the Aptos blockchain.
     pub fn new(url: &str) -> Self {
@@ -31,12 +31,14 @@ impl NftClient {
     ) {
         let payload = serde_json::json!({
             "type": "script_function_payload",
-            "function": "0x1::token::create_unlimited_collection_script",
+            "function": "0x3::token::create_collection_script",
             "type_arguments": [],
             "arguments": [
                 hex::encode(name.as_bytes()),
                 hex::encode(description.as_bytes()),
                 hex::encode(uri.as_bytes()),
+                NUMBER_MAX.to_string().as_str(),
+                [false, false, false]
             ]
         });
         self.submit_transaction_helper(account, payload)
@@ -52,16 +54,21 @@ impl NftClient {
     ) {
         let payload = serde_json::json!({
             "type": "script_function_payload",
-            "function": "0x1::token::create_unlimited_token_script",
+            "function": "0x3::token::create_token_script",
             "type_arguments": [],
             "arguments": [
                 hex::encode(collection_name.as_bytes()),
                 hex::encode(name.as_bytes()),
                 hex::encode(description.as_bytes()),
-                true,
                 supply.to_string().as_str(),
+                NUMBER_MAX.to_string().as_str(),
                 hex::encode(uri.as_bytes()),
                 "0",
+                "0",
+                [false, false, false, false, false],
+                [],
+                [],
+                []
             ]
         });
         self.submit_transaction_helper(account, payload)
@@ -77,14 +84,15 @@ impl NftClient {
     ) {
         let payload = serde_json::json!({
             "type": "script_function_payload",
-            "function": "0x1::token_transfers::offer_script",
+            "function": "0x3::token_transfers::offer_script",
             "type_arguments": [],
             "arguments": [
                 receiver,
                 creator,
                 hex::encode(collection_name.as_bytes()),
                 hex::encode(token_name.as_bytes()),
-                amount.to_string().as_str()
+                amount.to_string().as_str(),
+                "0"
             ]
         });
         self.submit_transaction_helper(account, payload)
@@ -99,13 +107,14 @@ impl NftClient {
     ) {
         let payload = serde_json::json!({
             "type": "script_function_payload",
-            "function": "0x1::token_transfers::claim_script",
+            "function": "0x3::token_transfers::claim_script",
             "type_arguments": [],
             "arguments": [
                 sender,
                 creator,
                 hex::encode(collection_name.as_bytes()),
-                hex::encode(token_name.as_bytes())
+                hex::encode(token_name.as_bytes()),
+                "0"
             ]
         });
         self.submit_transaction_helper(account, payload)
@@ -115,18 +124,16 @@ impl NftClient {
         account: &mut Account,
         receiver: &str,
         creator: &str,
-        collection_name: &str,
-        token_name: &str,
+        token_creation_num: i32,
     ) {
         let payload = serde_json::json!({
             "type": "script_function_payload",
-            "function": "0x1::token_transfers::cancel_offer_script",
+            "function":"0x3::token_transfers::cancel_offer_script",
             "type_arguments": [],
             "arguments": [
                 receiver,
                 creator,
-                hex::encode(collection_name.as_bytes()),
-                hex::encode(token_name.as_bytes())
+                token_creation_num.to_string().as_str(),
             ]
         });
         self.submit_transaction_helper(account, payload)
@@ -153,13 +160,13 @@ impl NftClient {
     pub fn get_collection(&self, creator: &str, collection_name: &str) -> Value {
         let collection = &self
             .rest_client
-            .account_resource(creator, "0x1::token::Collections")
+            .account_resource(creator, "0x3::token::Collections")
             .unwrap()["data"]["collections"]["handle"];
         match collection {
             Value::String(s) => self.get_table_item(
                 s.as_str(),
                 "0x1::string::String",
-                "0x1::token::Collection",
+                "0x3::token::Collection",
                 Value::String(collection_name.to_string()),
             ),
             _ => panic!("get_collection:error"),
@@ -174,16 +181,19 @@ impl NftClient {
     ) -> Value {
         let token_store = &self
             .rest_client
-            .account_resource(owner, "0x1::token::TokenStore")
+            .account_resource(owner, "0x3::token::TokenStore")
             .unwrap()["data"]["tokens"]["handle"];
         let token_id = serde_json::json!({
-            "creator": creator,
-            "collection": collection_name,
-            "name": token_name,
+            "token_data_id":{
+                "creator": creator,
+                "collection": collection_name,
+                "name": token_name
+            },
+            "property_version": "0",
         });
         match token_store {
             Value::String(s) => {
-                self.get_table_item(s, "0x1::token::TokenId", "0x1::token::Token", token_id)
+                self.get_table_item(s, "0x3::token::TokenId", "0x3::token::Token", token_id)
                     ["value"]
                     .clone()
             }
@@ -193,7 +203,7 @@ impl NftClient {
     pub fn get_token_data(&self, creator: &str, collection_name: &str, token_name: &str) -> Value {
         let token_data = &self
             .rest_client
-            .account_resource(creator, "0x1::token::Collections")
+            .account_resource(creator, "0x3::token::Collections")
             .unwrap()["data"]["token_data"]["handle"];
         let token_id = serde_json::json!({
             "creator": creator,
@@ -202,7 +212,7 @@ impl NftClient {
         });
         match token_data {
             Value::String(s) => self
-                .get_table_item(s, "0x1::token::TokenId", "0x1::token::TokenData", token_id)
+                .get_table_item(s, "0x3::token::TokenId", "0x3::token::TokenData", token_id)
                 .clone(),
             _ => panic!("get_token_data:error"),
         }
