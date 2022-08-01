@@ -131,6 +131,7 @@ const sidebars = {
         },
         "sdks/aptos-sdk-overview",
         "sdks/transactions-with-ts-sdk",
+        "sdks/python-sdk",
       ],
     },
     {
