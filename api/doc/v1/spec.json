@@ -1841,7 +1841,7 @@
           "Transactions"
         ],
         "summary": "Simulate transaction",
-        "description": "Simulate submitting a transaction. To use this, you must:\n- Create a SignedTransaction with a zero-padded signature.\n- Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature.",
+        "description": "Simulate submitting a transaction. To use this, you must:\n- Create a SignedTransaction with a zero-padded signature.\n- Submit a SubmitTransactionRequest containing a UserTransactionRequest containing that signature.\n\nTo use this endpoint with BCS, you must submit a SignedTransaction\nencoded as BCS. See SignedTransaction in types/src/transaction/mod.rs.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2175,12 +2175,11 @@
         "type": "string",
         "description": "These codes provide more granular error information beyond just the HTTP\nstatus code of the response.",
         "enum": [
-          "UnsupportedAcceptType",
-          "ReadFromStorageError",
-          "InvalidBcsInStorageError",
-          "BcsSerializationError",
-          "InvalidStartParam",
-          "InvalidLimitParam"
+          "read_from_storage_error",
+          "invalid_bcs_in_storage_error",
+          "bcs_serialization_error",
+          "invalid_start_param",
+          "invalid_limit_param"
         ]
       },
       "BlockMetadataTransaction": {

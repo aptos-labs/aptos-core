@@ -388,7 +388,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 submit_transaction_request.user_transaction_request,
                 chain_id,
             )?,
-            submit_transaction_request.signature.try_into()?,
+            submit_transaction_request.signature.try_into().context("Failed to parse transaction when building SignedTransaction from SubmitTransactionRequest")?,
         ))
     }
 
