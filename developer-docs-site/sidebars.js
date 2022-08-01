@@ -61,6 +61,7 @@ const sidebars = {
         "guides/move-guides/move-on-aptos",
         "guides/interacting-with-the-blockchain",
         "guides/building-wallet-extension",
+        "guides/system-integrators",
       ],
     },
     {
