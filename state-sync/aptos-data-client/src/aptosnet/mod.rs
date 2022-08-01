@@ -281,14 +281,7 @@ impl AptosNetDataClient {
         // Log the peers, periodically.
         sample!(
             SampleRate::Duration(Duration::from_secs(PEER_LOG_FREQ_SECS)),
-            info!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::PriorityAndRegularPeers)
-                    .message(&format!(
-                        "Number of priority peers: {:?}. Number of regular peers: {:?}",
-                        priority_peers.len(), regular_peers.len(),
-                    )))
-            );
+            update_connected_peer_metrics(priority_peers.len(), regular_peers.len());
         );
 
         Ok((priority_peers, regular_peers))
@@ -701,9 +694,34 @@ fn update_in_flight_metrics(label: &str, num_in_flight_polls: u64) {
         SampleRate::Frequency(IN_FLIGHT_METRICS_SAMPLE_FREQ),
         set_gauge(
             &metrics::IN_FLIGHT_POLLS,
-            label.into(),
+            label,
             num_in_flight_polls,
         );
+    );
+}
+
+/// Updates the metrics for the number of connected peers (priority and regular)
+fn update_connected_peer_metrics(num_priority_peers: usize, num_regular_peers: usize) {
+    // Log the number of connected peers
+    info!(
+        (LogSchema::new(LogEntry::PeerStates)
+            .event(LogEvent::PriorityAndRegularPeers)
+            .message(&format!(
+                "Number of priority peers: {:?}. Number of regular peers: {:?}",
+                num_priority_peers, num_regular_peers,
+            )))
+    );
+
+    // Update the connected peer metrics
+    set_gauge(
+        &metrics::CONNECTED_PEERS,
+        PRIORITIZED_PEER,
+        num_priority_peers as u64,
+    );
+    set_gauge(
+        &metrics::CONNECTED_PEERS,
+        REGULAR_PEER,
+        num_regular_peers as u64,
     );
 }
 
@@ -793,9 +811,9 @@ fn update_advertised_data_metrics(global_data_summary: GlobalDataSummary) {
             DataType::TransactionOutputs => optimal_chunk_sizes.transaction_output_chunk_size,
             DataType::Transactions => optimal_chunk_sizes.transaction_chunk_size,
         };
-        metrics::set_gauge(
+        set_gauge(
             &metrics::OPTIMAL_CHUNK_SIZES,
-            data_type.as_str().into(),
+            data_type.as_str(),
             optimal_chunk_size,
         );
     }
@@ -807,9 +825,9 @@ fn update_advertised_data_metrics(global_data_summary: GlobalDataSummary) {
         .map(|ledger_info| ledger_info.ledger_info().version());
     if let Some(highest_advertised_version) = highest_advertised_version {
         for data_type in DataType::get_all_types() {
-            metrics::set_gauge(
+            set_gauge(
                 &metrics::HIGHEST_ADVERTISED_DATA,
-                data_type.as_str().into(),
+                data_type.as_str(),
                 highest_advertised_version,
             );
         }
@@ -824,9 +842,9 @@ fn update_advertised_data_metrics(global_data_summary: GlobalDataSummary) {
             DataType::Transactions => advertised_data.lowest_transaction_version(),
         };
         if let Some(lowest_advertised_version) = lowest_advertised_version {
-            metrics::set_gauge(
+            set_gauge(
                 &metrics::LOWEST_ADVERTISED_DATA,
-                data_type.as_str().into(),
+                data_type.as_str(),
                 lowest_advertised_version,
             );
         }
