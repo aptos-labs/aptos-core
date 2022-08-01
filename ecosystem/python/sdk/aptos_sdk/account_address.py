@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import hashlib
 
-import ed25519
-from bcs import Deserializer, Serializer
+from . import ed25519
+from .bcs import Deserializer, Serializer
 
 
 class AccountAddress:

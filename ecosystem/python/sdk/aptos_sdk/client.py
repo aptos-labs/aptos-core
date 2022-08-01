@@ -5,15 +5,16 @@ import time
 from typing import Any, Dict, List, Optional
 
 import httpx
-from account import Account
-from account_address import AccountAddress
-from authenticator import (Authenticator, Ed25519Authenticator,
-                           MultiAgentAuthenticator)
-from bcs import Serializer
-from transactions import (MultiAgentRawTransaction, RawTransaction,
-                          ScriptFunction, SignedTransaction,
-                          TransactionArgument, TransactionPayload)
-from type_tag import StructTag, TypeTag
+
+from .account import Account
+from .account_address import AccountAddress
+from .authenticator import (Authenticator, Ed25519Authenticator,
+                            MultiAgentAuthenticator)
+from .bcs import Serializer
+from .transactions import (MultiAgentRawTransaction, RawTransaction,
+                           ScriptFunction, SignedTransaction,
+                           TransactionArgument, TransactionPayload)
+from .type_tag import StructTag, TypeTag
 
 TESTNET_URL = "https://fullnode.devnet.aptoslabs.com"
 FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
@@ -32,6 +33,9 @@ class RestClient:
         self.base_url = base_url
         self.client = httpx.Client()
         self.chain_id = int(self.info()["chain_id"])
+
+    def close(self):
+        self.client.close()
 
     #
     # Account accessors
@@ -501,6 +505,9 @@ class FaucetClient:
         self.base_url = base_url
         self.rest_client = rest_client
 
+    def close(self):
+        self.rest_client.close()
+
     def fund_account(self, address: str, amount: int):
         """This creates an account if it does not exist and mints the specified amount of
         coins into that account."""
@@ -510,135 +517,3 @@ class FaucetClient:
         assert txns.status_code == 200, txns.text
         for txn_hash in txns.json():
             self.rest_client.wait_for_transaction(txn_hash)
-
-
-def coin_transfer():
-    rest_client = RestClient(TESTNET_URL)
-    faucet_client = FaucetClient(FAUCET_URL, rest_client)
-
-    alice = Account.generate()
-    bob = Account.generate()
-
-    print("\n=== Addresses ===")
-    print(f"Alice: {alice.address()}")
-    print(f"Bob: {bob.address()}")
-
-    faucet_client.fund_account(alice.address(), 1_000_000)
-    faucet_client.fund_account(bob.address(), 0)
-
-    print("\n=== Initial Balances ===")
-    print(f"Alice: {rest_client.account_balance(alice.address())}")
-    print(f"Bob: {rest_client.account_balance(bob.address())}")
-
-    # Have Alice give Bob 1_000 coins
-    txn_hash = rest_client.transfer(alice, bob.address(), 1_000)
-    rest_client.wait_for_transaction(txn_hash)
-
-    print("\n=== Intermediate Balances ===")
-    print(f"Alice: {rest_client.account_balance(alice.address())}")
-    print(f"Bob: {rest_client.account_balance(bob.address())}")
-
-    # Have Alice give Bob another 1_000 coins using BCS
-    txn_hash = rest_client.bcs_transfer(alice, bob.address(), 1_000)
-    rest_client.wait_for_transaction(txn_hash)
-
-    print("\n=== Final Balances ===")
-    print(f"Alice: {rest_client.account_balance(alice.address())}")
-    print(f"Bob: {rest_client.account_balance(bob.address())}")
-
-
-def token_transfer():
-    rest_client = RestClient(TESTNET_URL)
-    faucet_client = FaucetClient(FAUCET_URL, rest_client)
-
-    alice = Account.generate()
-    bob = Account.generate()
-
-    collection_name = "Alice's"
-    token_name = "Alice's first token"
-
-    print("\n=== Addresses ===")
-    print(f"Alice: {alice.address()}")
-    print(f"Bob: {bob.address()}")
-
-    faucet_client.fund_account(alice.address(), 10_000_000)
-    faucet_client.fund_account(bob.address(), 10_000_000)
-
-    print("\n=== Initial Balances ===")
-    print(f"Alice: {rest_client.account_balance(alice.address())}")
-    print(f"Bob: {rest_client.account_balance(bob.address())}")
-
-    print("\n=== Creating Collection and Token ===")
-
-    txn_hash = rest_client.create_collection(
-        alice, collection_name, "Alice's simple collection", "https://aptos.dev"
-    )
-    rest_client.wait_for_transaction(txn_hash)
-
-    txn_hash = rest_client.create_token(
-        alice,
-        collection_name,
-        token_name,
-        "Alice's simple token",
-        1,
-        "https://aptos.dev/img/nyan.jpeg",
-        0,
-    )
-    rest_client.wait_for_transaction(txn_hash)
-
-    print(
-        f"Alice's collection: {rest_client.get_collection(alice.address(), collection_name)}"
-    )
-    print(
-        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name, 0)}"
-    )
-    print(
-        f"Alice's token data: {rest_client.get_token_data(alice.address(), collection_name, token_name, 0)}"
-    )
-
-    print("\n=== Transferring the token to Bob ===")
-    txn_hash = rest_client.offer_token(
-        alice,
-        bob.address(),
-        alice.address(),
-        collection_name,
-        token_name,
-        0,
-        1,
-    )
-    rest_client.wait_for_transaction(txn_hash)
-
-    txn_hash = rest_client.claim_token(
-        bob,
-        alice.address(),
-        alice.address(),
-        collection_name,
-        token_name,
-        0,
-    )
-    rest_client.wait_for_transaction(txn_hash)
-
-    print(
-        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name, 0)}"
-    )
-    print(
-        f"Bob's token balance: {rest_client.get_token_balance(bob.address(), alice.address(), collection_name, token_name, 0)}"
-    )
-
-    print("\n=== Transferring the token back to Alice using MultiAgent ===")
-    txn_hash = rest_client.direct_transfer_token(
-        bob, alice, alice.address(), collection_name, token_name, 0, 1
-    )
-    rest_client.wait_for_transaction(txn_hash)
-
-    print(
-        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name, 0)}"
-    )
-    print(
-        f"Bob's token balance: {rest_client.get_token_balance(bob.address(), alice.address(), collection_name, token_name, 0)}"
-    )
-
-
-if __name__ == "__main__":
-    coin_transfer()
-    token_transfer()
