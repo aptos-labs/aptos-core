@@ -46,8 +46,8 @@ export default function NewExtensionBody() {
               Create a new wallet
             </Button>
           </ChakraLink>
-          <ChakraLink to="/import-wallet" width="100%">
-            <Button isDisabled colorScheme="gray" variant="solid" width="100%">
+          <ChakraLink to="/import" width="100%">
+            <Button colorScheme="gray" variant="solid" width="100%">
               I already have a wallet
             </Button>
           </ChakraLink>
