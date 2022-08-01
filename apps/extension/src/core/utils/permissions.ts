@@ -71,21 +71,25 @@ export default class Permissions {
     });
   }
 
-  public static async requestPermissions(permission: string, domain: string): Promise<boolean> {
+  public static async requestPermissions(
+    permission: string,
+    domain: string,
+    address: string,
+  ): Promise<boolean> {
     switch (permission) {
       case PermissionType.CONNECT:
-        if (await this.isDomainAllowed(domain)) {
+        if (await this.isDomainAllowed(domain, address)) {
           return true;
         }
         if (await this.promptUser(permission)) {
-          await this.addDomain(domain);
+          await this.addDomain(domain, address);
           return true;
         }
         return false;
       case PermissionType.SIGN_AND_SUBMIT_TRANSACTION:
       case PermissionType.SIGN_TRANSACTION:
       case PermissionType.SIGN_MESSAGE:
-        if (!await this.isDomainAllowed(domain)) {
+        if (!await this.isDomainAllowed(domain, address)) {
           return false;
         }
         return this.promptUser(permission);
@@ -94,32 +98,39 @@ export default class Permissions {
     }
   }
 
-  static async addDomain(domain: string): Promise<void> {
-    const domains = await this.getDomains();
+  static async addDomain(domain: string, address: string): Promise<void> {
+    const domains = await this.getDomains(address);
     domains.add(domain);
-    return this.saveDomains(domains);
+    return this.saveDomains(domains, address);
   }
 
-  public static async removeDomain(domain: string): Promise<void> {
-    const domains = await this.getDomains();
+  public static async removeDomain(domain: string, address: string): Promise<void> {
+    const domains = await this.getDomains(address);
     domains.delete(domain);
-    return this.saveDomains(domains);
+    return this.saveDomains(domains, address);
   }
 
-  public static async isDomainAllowed(domain: string): Promise<boolean> {
-    const domains = await this.getDomains();
+  public static async isDomainAllowed(domain: string, address: string): Promise<boolean> {
+    const domains = await this.getDomains(address);
     return domains.has(domain);
   }
 
-  public static async getDomains(): Promise<Set<string>> {
+  static async getAllDomains(): Promise<{ [address: string]: string[] }> {
     const result = await Browser.storage()?.get([PERMISSIONS_STORAGE_KEY]);
     if (result && result[PERMISSIONS_STORAGE_KEY]) {
-      return new Set(result[PERMISSIONS_STORAGE_KEY]);
+      return result[PERMISSIONS_STORAGE_KEY];
     }
-    return new Set();
+    return {};
   }
 
-  static saveDomains(domains: Set<string>): Promise<void> {
-    return Browser.storage()!.set({ [PERMISSIONS_STORAGE_KEY]: Array.from(domains) });
+  public static async getDomains(address: string): Promise<Set<string>> {
+    const allDomains = await this.getAllDomains();
+    return new Set(allDomains[address]) ?? new Set();
+  }
+
+  static async saveDomains(domains: Set<string>, address: string): Promise<void> {
+    const allDomains = await this.getAllDomains();
+    allDomains[address] = Array.from(domains);
+    return Browser.storage()!.set({ [PERMISSIONS_STORAGE_KEY]: allDomains });
   }
 }

@@ -8,9 +8,13 @@ export const ProviderEvent = Object.freeze({
   ACCOUNT_CHANGED: 'accountChanged',
 } as const);
 
-async function sendToTabs(permissionlessMessage: {}, permissionedMessage: {}) {
+async function sendToTabs(
+  address: string | undefined,
+  permissionlessMessage: {},
+  permissionedMessage: {},
+) {
   const tabs = await chrome.tabs.query({});
-  const allowedDomains = await Permissions.getDomains();
+  const allowedDomains = address ? await Permissions.getDomains(address) : new Set();
   for (let i: number = 0; i < tabs.length; i += 1) {
     const tab = tabs[i];
     if (tab.id && tab.url) {
@@ -27,6 +31,7 @@ export async function sendProviderEvent(event: string, account: AptosAccount | u
   switch (event) {
     case ProviderEvent.ACCOUNT_CHANGED:
       await sendToTabs(
+        account?.address().hex(),
         { event, params: {} },
         {
           event,

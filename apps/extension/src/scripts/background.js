@@ -24,8 +24,8 @@ async function signTransaction(client, account, transaction) {
   return client.signTransaction(account, txn);
 }
 
-async function checkConnected(sendResponse) {
-  if (Permissions.isDomainAllowed(await getCurrentDomain())) {
+async function checkConnected(account, sendResponse) {
+  if (Permissions.isDomainAllowed(await getCurrentDomain(), account.address().hex())) {
     return true;
   }
   sendResponse({ error: DappErrorType.UNAUTHORIZED });
@@ -39,7 +39,7 @@ function rejectRequest(sendResponse) {
 // Aptos dApp methods
 
 function getAccountAddress(account, sendResponse) {
-  if (!checkConnected(sendResponse)) {
+  if (!checkConnected(account, sendResponse)) {
     return;
   }
 
@@ -51,31 +51,39 @@ function getAccountAddress(account, sendResponse) {
 }
 
 async function connect(account, sendResponse) {
-  if (await Permissions.requestPermissions(PermissionType.CONNECT, await getCurrentDomain())) {
+  if (await Permissions.requestPermissions(
+    PermissionType.CONNECT,
+    await getCurrentDomain(),
+    account.address().hex(),
+  )) {
     getAccountAddress(account, sendResponse);
   } else {
     rejectRequest(sendResponse);
   }
 }
 
-async function disconnect(sendResponse) {
-  await Permissions.removeDomain(await getCurrentDomain());
+async function disconnect(account, sendResponse) {
+  await Permissions.removeDomain(await getCurrentDomain(), account.address().hex());
   sendResponse({});
 }
 
-async function isConnected(sendResponse) {
-  const status = await Permissions.isDomainAllowed(await getCurrentDomain());
+async function isConnected(account, sendResponse) {
+  const status = await Permissions.isDomainAllowed(
+    await getCurrentDomain(),
+    account.address().hex(),
+  );
   sendResponse(status);
 }
 
 async function signAndSubmitTransaction(client, account, transaction, sendResponse) {
-  if (!checkConnected(sendResponse)) {
+  if (!checkConnected(account, sendResponse)) {
     return;
   }
 
   const permission = await Permissions.requestPermissions(
     PermissionType.SIGN_AND_SUBMIT_TRANSACTION,
     await getCurrentDomain(),
+    account.address().hex(),
   );
   if (!permission) {
     rejectRequest(sendResponse);
@@ -91,13 +99,14 @@ async function signAndSubmitTransaction(client, account, transaction, sendRespon
 }
 
 async function signTransactionAndSendResponse(client, account, transaction, sendResponse) {
-  if (!checkConnected(sendResponse)) {
+  if (!checkConnected(account, sendResponse)) {
     return;
   }
 
   const permission = await Permissions.requestPermissions(
     PermissionType.SIGN_TRANSACTION,
     await getCurrentDomain(),
+    account.address().hex(),
   );
   if (!permission) {
     rejectRequest(sendResponse);
@@ -112,13 +121,14 @@ async function signTransactionAndSendResponse(client, account, transaction, send
 }
 
 async function signMessage(account, message, sendResponse) {
-  if (!checkConnected(sendResponse)) {
+  if (!checkConnected(account, sendResponse)) {
     return;
   }
 
   const permission = await Permissions.requestPermissions(
     PermissionType.SIGN_MESSAGE,
     await getCurrentDomain(),
+    account.address().hex(),
   );
   if (!permission) {
     rejectRequest(sendResponse);
@@ -149,10 +159,10 @@ async function handleDappRequest(request, sendResponse) {
       connect(account, sendResponse);
       break;
     case MessageMethod.DISCONNECT:
-      disconnect(sendResponse);
+      disconnect(account, sendResponse);
       break;
     case MessageMethod.IS_CONNECTED:
-      isConnected(sendResponse);
+      isConnected(account, sendResponse);
       break;
     case MessageMethod.GET_ACCOUNT_ADDRESS:
       getAccountAddress(account, sendResponse);
