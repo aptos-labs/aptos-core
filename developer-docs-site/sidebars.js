@@ -150,7 +150,7 @@ const sidebars = {
         {
           type: "link",
           label: "REST API",
-          href: "https://fullnode.devnet.aptoslabs.com/spec.html#/",
+          href: "/rest-api",
         },
       ],
     },

@@ -45,7 +45,7 @@ const config = {
         // Plugin Options for loading OpenAPI files
         specs: [
           {
-            spec: "../api/doc/v0/openapi.yaml",
+            spec: "../api/doc/v1/spec.yaml",
             route: "/rest-api/",
           },
         ],
