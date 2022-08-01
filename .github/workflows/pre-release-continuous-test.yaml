@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - pre-release-continuous-test
+      - rustielin/forge-multi-nightly-canary
   schedule:
     # Run every 3 hours
     - cron: "0 */3 * * *"
