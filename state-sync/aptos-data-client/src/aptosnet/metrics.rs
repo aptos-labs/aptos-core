@@ -64,6 +64,16 @@ pub static IN_FLIGHT_POLLS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Gauge for tracking the number of connected peers (priority and regular)
+pub static CONNECTED_PEERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_data_client_connected_peers",
+        "Gauge related to the number of connected peers",
+        &["peer_type"]
+    )
+    .unwrap()
+});
+
 /// Gauge for the highest advertised data
 pub static HIGHEST_ADVERTISED_DATA: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(

@@ -281,14 +281,7 @@ impl AptosNetDataClient {
         // Log the peers, periodically.
         sample!(
             SampleRate::Duration(Duration::from_secs(PEER_LOG_FREQ_SECS)),
-            info!(
-                (LogSchema::new(LogEntry::PeerStates)
-                    .event(LogEvent::PriorityAndRegularPeers)
-                    .message(&format!(
-                        "Number of priority peers: {:?}. Number of regular peers: {:?}",
-                        priority_peers.len(), regular_peers.len(),
-                    )))
-            );
+            update_connected_peer_metrics(priority_peers.len(), regular_peers.len());
         );
 
         Ok((priority_peers, regular_peers))
@@ -704,6 +697,31 @@ fn update_in_flight_metrics(label: &str, num_in_flight_polls: u64) {
             label.into(),
             num_in_flight_polls,
         );
+    );
+}
+
+/// Updates the metrics for the number of connected peers (priority and regular)
+fn update_connected_peer_metrics(num_priority_peers: usize, num_regular_peers: usize) {
+    // Log the number of connected peers
+    info!(
+        (LogSchema::new(LogEntry::PeerStates)
+            .event(LogEvent::PriorityAndRegularPeers)
+            .message(&format!(
+                "Number of priority peers: {:?}. Number of regular peers: {:?}",
+                num_priority_peers, num_regular_peers,
+            )))
+    );
+
+    // Update the connected peer metrics
+    set_gauge(
+        &metrics::CONNECTED_PEERS,
+        PRIORITIZED_PEER.into(),
+        num_priority_peers as u64,
+    );
+    set_gauge(
+        &metrics::CONNECTED_PEERS,
+        REGULAR_PEER.into(),
+        num_regular_peers as u64,
     );
 }
 
