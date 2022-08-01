@@ -271,6 +271,25 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
     t.index ["user_id"], name: "index_nfts_on_user_id"
   end
 
+  create_table "node_maintenances", force: :cascade do |t|
+    t.string "title", null: false
+    t.text "content", null: false
+    t.datetime "created_at"
+    t.datetime "updated_at"
+  end
+
+  create_table "notifications", force: :cascade do |t|
+    t.string "recipient_type", null: false
+    t.bigint "recipient_id", null: false
+    t.string "type", null: false
+    t.jsonb "params"
+    t.datetime "read_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["read_at"], name: "index_notifications_on_read_at"
+    t.index ["recipient_type", "recipient_id"], name: "index_notifications_on_recipient"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "username"
     t.string "email"
