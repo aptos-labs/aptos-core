@@ -7,13 +7,13 @@ on:
       GIT_SHA:
         required: false
         type: string
-        description:
+        description: The git SHA1 to test. If not specified, Forge will check the latest commits on the current branch
       FORGE_NAMESPACE:
         required: true
         type: string
         description: The Forge k8s namespace to be used for test. This value should manage Forge test concurrency. It may be truncated.
       FORGE_CLUSTER_NAME:
-        required: true
+        required: false
         type: string
         default: aptos-forge-0
         description: The Forge k8s cluster to be used for test

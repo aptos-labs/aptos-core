@@ -10,8 +10,8 @@ on:
     branches:
       - pre-release-continuous-test
   schedule:
-    # Run every 3 hours
-    - cron: "0 */3 * * *"
+    # Run every 6 hours
+    - cron: "0 */6 * * *"
 
 jobs:
   # run two concurrent forge test jobs on the same cluster
