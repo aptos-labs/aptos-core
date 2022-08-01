@@ -19,8 +19,8 @@ if __name__ == "__main__":
     print(f"Alice: {alice.address()}")
     print(f"Bob: {bob.address()}")
 
-    faucet_client.fund_account(alice.address(), 10_000_000)
-    faucet_client.fund_account(bob.address(), 10_000_000)
+    faucet_client.fund_account(alice.address(), 20_000)
+    faucet_client.fund_account(bob.address(), 20_000)
 
     print("\n=== Initial Balances ===")
     print(f"Alice: {rest_client.account_balance(alice.address())}")
