@@ -15,7 +15,7 @@ use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
 };
 use consensus_types::{
-    block::Block, common::Payload, executed_block::ExecutedBlock, proof_of_store::LogicalTime,
+    block::Block, common::Payload, executed_block::ExecutedBlock
 };
 use executor_types::{Error, StateComputeResult};
 use futures::channel::mpsc;

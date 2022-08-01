@@ -65,6 +65,7 @@ use network::{
 use safety_rules::{PersistentSafetyStorage, SafetyRulesManager};
 use std::{iter::FromIterator, sync::Arc, time::Duration};
 use tokio::runtime::Handle;
+use crate::data_manager::DummyDataManager;
 
 /// Auxiliary struct that is setting up node environment for the test.
 pub struct NodeSetup {
@@ -195,6 +196,7 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
+            Arc::new(DummyDataManager::new())
         ));
 
         let proposal_generator = ProposalGenerator::new(

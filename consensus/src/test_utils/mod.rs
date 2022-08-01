@@ -28,6 +28,7 @@ pub use mock_state_computer::{
     EmptyStateComputer, MockStateComputer, RandomComputeResultStateComputer,
 };
 pub use mock_storage::{EmptyStorage, MockSharedStorage, MockStorage};
+use crate::data_manager::DummyDataManager;
 
 pub const TEST_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -74,6 +75,7 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
+        Arc::new(DummyDataManager::new())
     ))
 }
 

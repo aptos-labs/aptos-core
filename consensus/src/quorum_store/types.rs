@@ -123,7 +123,6 @@ impl Fragment {
         fragment_payload: Vec<SerializedTransaction>,
         maybe_expiration: Option<LogicalTime>,
         peer_id: PeerId,
-        // validator_signer: Arc<ValidatorSigner>,
     ) -> Self {
         let fragment_info = FragmentInfo::new(
             epoch,
@@ -132,11 +131,9 @@ impl Fragment {
             fragment_payload,
             maybe_expiration,
         );
-        // let signature = validator_signer.sign(&fragment_info);
         Self {
             source: peer_id,
             fragment_info,
-            // signature,
         }
     }
 
@@ -212,7 +209,7 @@ impl Batch {
         self.batch_info.epoch
     }
 
-    // TODO: do we need to check signatures
+    // If batch request, check the source == the sender. If batch response, check digest.
     pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
         if self.maybe_payload.is_some() {
             let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");
