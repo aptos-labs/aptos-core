@@ -351,7 +351,7 @@ impl AptosNetDataClient {
     ) -> Result<Response<StorageServiceResponse>, Error> {
         let id = self.next_response_id();
 
-        debug!(
+        trace!(
             (LogSchema::new(LogEntry::StorageServiceRequest)
                 .event(LogEvent::SendRequest)
                 .request_type(request.get_label())
@@ -373,7 +373,7 @@ impl AptosNetDataClient {
 
         match result {
             Ok(response) => {
-                debug!(
+                trace!(
                     (LogSchema::new(LogEntry::StorageServiceResponse)
                         .event(LogEvent::ResponseSuccess)
                         .request_type(request.get_label())
