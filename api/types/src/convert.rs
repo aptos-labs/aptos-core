@@ -587,7 +587,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
         use move_deps::move_core_types::value::MoveValue::*;
-
         Ok(match layout {
             MoveTypeLayout::Bool => Bool(serde_json::from_value::<bool>(val)?),
             MoveTypeLayout::U8 => U8(serde_json::from_value::<u8>(val)?),
@@ -651,7 +650,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         } else {
             bail!("Expecting a JSON Map for struct.");
         };
-
         let fields = field_layouts
             .iter()
             .map(|field_layout| {

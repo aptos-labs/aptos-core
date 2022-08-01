@@ -3,11 +3,8 @@
 
 use aptos_types::access_path::{AccessPath, Path};
 use aptos_types::transaction::ScriptFunction;
+use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use aptos_types::vm_status::StatusCode;
-use aptos_types::{
-    on_chain_config::VMPublishingOption,
-    transaction::{ExecutionStatus, TransactionStatus},
-};
 use aptos_vm::move_vm_ext::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
 use itertools::Itertools;
 use language_e2e_tests::{
@@ -34,7 +31,7 @@ impl Fixture {
     /// Creates new test for package of given name.
     fn new(name: &str, upgrade_policy: UpgradePolicy) -> Self {
         Self {
-            executor: FakeExecutor::from_genesis_with_options(VMPublishingOption::open()),
+            executor: FakeExecutor::from_genesis_file(),
             package: PackageMetadata {
                 name: name.to_string(),
                 upgrade_policy,

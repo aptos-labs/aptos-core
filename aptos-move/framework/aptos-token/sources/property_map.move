@@ -2,7 +2,7 @@
 /// It maps a String key to a PropertyValue that consists of type (string) and value (vecotr<u8>)
 module aptos_token::property_map {
     use std::vector;
-    use std::string::{Self, String};
+    use std::string::String;
     use aptos_std::simple_map::{Self, SimpleMap};
 
     const MAX_PROPERTY_MAP_SIZE: u64 = 1000;
@@ -115,16 +115,6 @@ module aptos_token::property_map {
         assert!(found, EPROPERTY_NOT_EXIST);
         let property_val = simple_map::borrow_mut(&mut list.map, key);
         *property_val = value;
-    }
-
-    public fun generate_string_vector(values: vector<vector<u8>>): vector<String> {
-        let vals: vector<String> = vector::empty<String>();
-        let i = 0;
-        while (i < vector::length(&values)) {
-            vector::push_back(&mut vals, string::utf8(*vector::borrow(&mut values, i )));
-            i = i + 1;
-        };
-        vals
     }
 
     #[test_only]

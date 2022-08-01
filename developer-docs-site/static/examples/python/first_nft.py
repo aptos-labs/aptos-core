@@ -10,6 +10,8 @@ import sys
 
 from first_transaction import Account, FaucetClient, RestClient, TESTNET_URL, FAUCET_URL
 
+U64_MAX = 18446744073709551615
+
 class TokenClient(RestClient):
     def submit_transaction_helper(self, account: Account, payload: Dict[str, Any]):
         res = self.execute_transaction_with_payload(account, payload)
@@ -18,15 +20,17 @@ class TokenClient(RestClient):
 #:!:>section_1
     def create_collection(self, account: Account, name: str, description, uri: str):
         """Creates a new collection within the specified account"""
-
+        mutate_setting = [False, False, False]
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::token::create_unlimited_collection_script",
+            "function": f"0x3::token::create_collection_script",
             "type_arguments": [],
             "arguments": [
                 name.encode("utf-8").hex(),
                 description.encode("utf-8").hex(),
                 uri.encode("utf-8").hex(),
+                str(U64_MAX),
+                mutate_setting
             ]
         }
         self.submit_transaction_helper(account, payload)
@@ -42,18 +46,25 @@ class TokenClient(RestClient):
             supply: int,
             uri: str,
     ):
+        mutate_setting = [False, False, False, False, False]
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::token::create_unlimited_token_script",
+            "function": f"0x3::token::create_token_script",
             "type_arguments": [],
             "arguments": [
                 collection_name.encode("utf-8").hex(),
                 name.encode("utf-8").hex(),
                 description.encode("utf-8").hex(),
-                True,
                 str(supply),
+                str(U64_MAX),
                 uri.encode("utf-8").hex(),
+                account.address(),
                 str(0),
+                str(0),
+                mutate_setting,
+                [],
+                [],
+                []
             ]
         }
         self.submit_transaction_helper(account, payload)
@@ -71,7 +82,7 @@ class TokenClient(RestClient):
     ):
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::tokenTransfers::offer_script",
+            "function": f"0x3::token_transfers::offer_script",
             "type_arguments": [],
             "arguments": [
                 receiver,
@@ -79,6 +90,7 @@ class TokenClient(RestClient):
                 collection_name.encode("utf-8").hex(),
                 token_name.encode("utf-8").hex(),
                 str(amount),
+                str(0),
             ]
         }
         self.submit_transaction_helper(account, payload)
@@ -95,13 +107,14 @@ class TokenClient(RestClient):
     ):
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::tokenTransfers::claim_script",
+            "function": f"0x3::token_transfers::claim_script",
             "type_arguments": [],
             "arguments": [
                 sender,
                 creator,
                 collection_name.encode("utf-8").hex(),
                 token_name.encode("utf-8").hex(),
+                str(0)
             ]
         }
         self.submit_transaction_helper(account, payload)
@@ -118,45 +131,48 @@ class TokenClient(RestClient):
         return response.json()
 
     def get_token_balance(self, owner: str, creator: str, collection_name: str, token_name: str) -> Any:
-        token_store = self.account_resource(owner, "0x1::token::TokenStore")["data"]["tokens"]["handle"]
-
+        token_store = self.account_resource(owner, "0x3::token::TokenStore")["data"]["tokens"]["handle"]
         token_id = {
-            "creator": creator,
-            "collection": collection_name,
-            "name": token_name,
+            "token_data_id": {
+                "creator": creator,
+                "collection": collection_name.encode("utf-8").hex(),
+                "name": token_name.encode("utf-8").hex(),
+            },
+            "property_version": str(0)
         }
 
         return self.get_table_item(
             token_store,
-            "0x1::token::TokenId",
-            "0x1::token::Token",
+            "0x3::token::TokenId",
+            "0x3::token::Token",
             token_id,
-        )["value"]
+        )["amount"]
 
     def get_token_data(self, creator: str, collection_name: str, token_name: str) -> Any:
-        token_data = self.account_resource(creator, "0x1::token::Collections")["data"]["token_data"]["handle"]
+        token_data = self.account_resource(creator, "0x3::token::Collections")["data"]["token_data"]["handle"]
 
-        token_id = {
+
+        token_data_id =  {
             "creator": creator,
-            "collection": collection_name,
-            "name": token_name,
+            "collection": collection_name.encode("utf-8").hex(),
+            "name": token_name.encode("utf-8").hex(),
         }
 
         return self.get_table_item(
             token_data,
-            "0x1::token::TokenId",
-            "0x1::token::TokenData",
-            token_id,
+            "0x3::token::TokenDataId",
+            "0x3::token::TokenData",
+            token_data_id,
         )
 
     def get_collection(self, creator: str, collection_name: str) -> Any:
-        token_data = self.account_resource(creator, "0x1::token::Collections")["data"]["collections"]["handle"]
+        token_data = self.account_resource(creator, "0x3::token::Collections")["data"]["collection_data"]["handle"]
 
         return self.get_table_item(
             token_data,
             "0x1::string::String",
-            "0x1::token::Collection",
-            collection_name,
+            "0x3::token::CollectionData",
+            collection_name.encode("utf-8").hex()
         )
 #<:!:section_3
 
@@ -170,13 +186,14 @@ class TokenClient(RestClient):
     ):
         payload = {
             "type": "script_function_payload",
-            "function": f"0x1::tokenTransfers::cancel_offer_script",
+            "function": f"0x3::token_transfers::cancel_offer_script",
             "type_arguments": [],
             "arguments": [
                 receiver,
                 creator,
                 collection_name.encode("utf-8").hex(),
-                name.encode("utf-8").hex(),
+                token_name.encode("utf-8").hex(),
+                0,
             ]
         }
         self.submit_transaction_helper(account, payload)

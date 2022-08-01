@@ -18,6 +18,8 @@ pub struct ApiConfig {
     // optional for compatible with old configuration
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_length_limit: Option<u64>,
+    #[serde(default = "default_disabled")]
+    pub failpoints_enabled: bool,
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -26,6 +28,10 @@ pub const DEFAULT_REQUEST_CONTENT_LENGTH_LIMIT: u64 = 4 * 1024 * 1024; // 4mb
 
 fn default_enabled() -> bool {
     true
+}
+
+fn default_disabled() -> bool {
+    false
 }
 
 impl Default for ApiConfig {
@@ -38,6 +44,7 @@ impl Default for ApiConfig {
             tls_cert_path: None,
             tls_key_path: None,
             content_length_limit: None,
+            failpoints_enabled: default_disabled(),
         }
     }
 }

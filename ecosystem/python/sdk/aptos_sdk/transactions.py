@@ -517,7 +517,7 @@ class Test(unittest.TestCase):
         ]
 
         payload = ScriptFunction.natural(
-            "0x1::token",
+            "0x3::token",
             "direct_transfer_script",
             [],
             transaction_arguments,
