@@ -69,7 +69,7 @@ spec:
       - name: fullnode
         image: {{ $.Values.validator.image.repo }}:{{ $.Values.validator.image.tag | default $.Values.imageTag }}
         imagePullPolicy: {{ $.Values.validator.image.pullPolicy }}
-        command: ["/usr/local/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
+        command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
       {{- with $.Values.fullnode }}
         resources:
           {{- toYaml .resources | nindent 10 }}
