@@ -324,10 +324,8 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 .map(TransactionSummary::from)
         } else {
             // Send the compiled module and metadata using the code::publish_package_txn.
-            let metadata = package.extract_metadata(
-                package.name().to_owned(),
-                upgrade_policy.unwrap_or_else(UpgradePolicy::compat),
-            )?;
+            let metadata =
+                package.extract_metadata(upgrade_policy.unwrap_or_else(UpgradePolicy::compat))?;
             let payload = aptos_transaction_builder::aptos_stdlib::code_publish_package_txn(
                 bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
                 compiled_units,
@@ -348,8 +346,8 @@ pub struct RunFunction {
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
-    #[clap(long, parse(try_from_str = parse_function_name))]
-    function_id: FunctionId,
+    #[clap(long)]
+    function_id: MemberId,
     /// Hex encoded arguments separated by spaces.
     ///
     /// Example: `0x01 0x02 0x03`
@@ -386,7 +384,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
         self.txn_options
             .submit_transaction(TransactionPayload::ScriptFunction(ScriptFunction::new(
                 self.function_id.module_id.clone(),
-                self.function_id.function_id.clone(),
+                self.function_id.member_id.clone(),
                 type_args,
                 args,
             )))
@@ -478,12 +476,14 @@ impl FromStr for ArgWithType {
     }
 }
 
-pub struct FunctionId {
+/// Identifier of a module member (function or struct).
+#[derive(Debug, Clone)]
+pub struct MemberId {
     pub module_id: ModuleId,
-    pub function_id: Identifier,
+    pub member_id: Identifier,
 }
 
-fn parse_function_name(function_id: &str) -> CliTypedResult<FunctionId> {
+fn parse_member_id(function_id: &str) -> CliTypedResult<MemberId> {
     let ids: Vec<&str> = function_id.split_terminator("::").collect();
     if ids.len() != 3 {
         return Err(CliError::CommandArgumentError(
@@ -494,11 +494,19 @@ fn parse_function_name(function_id: &str) -> CliTypedResult<FunctionId> {
     let address = load_account_arg(ids.get(0).unwrap())?;
     let module = Identifier::from_str(ids.get(1).unwrap())
         .map_err(|err| CliError::UnableToParse("Module Name", err.to_string()))?;
-    let function_id = Identifier::from_str(ids.get(2).unwrap())
-        .map_err(|err| CliError::UnableToParse("Function Name", err.to_string()))?;
+    let member_id = Identifier::from_str(ids.get(2).unwrap())
+        .map_err(|err| CliError::UnableToParse("Member Name", err.to_string()))?;
     let module_id = ModuleId::new(address, module);
-    Ok(FunctionId {
+    Ok(MemberId {
         module_id,
-        function_id,
+        member_id,
     })
+}
+
+impl FromStr for MemberId {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_member_id(s)
+    }
 }
