@@ -22,7 +22,7 @@ The liveness of your validator node will be evaluated using both on-chain and of
 
 If you are a node operator, then several tools are available to you (provided by the Aptos team and the community) to verify the status of your own node locally. This local status will act as a good proxy for overall node health as seen from the network level and as reported by the remote analytics system operated by Aptos Labs. 
 
-- Locally, the best way to verify your node status is to interact with your node. You can monitor your local metrics endpoint by running a `curl` command and observe various key metrics. Follow the steps described in detail in the [Verify initial synchronization](/nodes/full-node/fullnode-source-code-and-docker.md#verify-the-correctness-of-your-fullnode) document.
+- Locally, the best way to verify your node status is to interact with your node. You can monitor your local metrics endpoint by running a `curl` command and observe various key metrics. Follow the steps described in detail in the [Verify initial synchronization](/nodes/full-node/fullnode-source-code-or-docker.md#verify-the-correctness-of-your-fullnode) document.
 
 :::tip
 
