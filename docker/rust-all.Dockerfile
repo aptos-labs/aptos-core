@@ -2,6 +2,11 @@
 
 FROM debian:buster-20220228@sha256:fd510d85d7e0691ca551fe08e8a2516a86c7f24601a940a299b5fe5cdd22c03a AS debian-base
 
+# Add Tini to make sure the binaries receive proper SIGTERM signals when Docker is shut down
+ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
+RUN chmod +x /tini
+ENTRYPOINT ["/tini", "--"]
+
 FROM rust:1.61-buster AS rust-base
 WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
@@ -151,4 +156,4 @@ WORKDIR /aptos
 COPY --link --from=builder /aptos/dist/forge /usr/local/bin/forge
 ENV RUST_LOG_FORMAT=json
 
-ENTRYPOINT ["forge"]
+ENTRYPOINT ["/tini", "--", "forge"]
