@@ -11,7 +11,7 @@ use crate::{
     models::ledger_info::LedgerInfo,
     schema::ledger_infos::{self, dsl},
 };
-use anyhow::{ensure, Result};
+use anyhow::{ensure, Context, Result};
 use aptos_logger::info;
 use aptos_rest_client::Transaction;
 use diesel::{prelude::*, RunQueryDsl};
@@ -87,7 +87,7 @@ impl Tailer {
     }
 
     /// If chain id doesn't exist, save it. Otherwise make sure that we're indexing the same chain
-    pub async fn check_or_update_chain_id(&self) -> anyhow::Result<bool> {
+    pub async fn check_or_update_chain_id(&self) -> anyhow::Result<usize> {
         info!("Checking if chain id is correct");
         let conn = self
             .connection_pool
@@ -112,7 +112,7 @@ impl Tailer {
             Some(chain_id) => {
                 ensure!(*chain_id == new_chain_id, "Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", new_chain_id, chain_id);
                 info!("Chain id matches! Continuing to index chain {}", chain_id);
-                Ok(true)
+                Ok(0)
             }
             None => {
                 info!("Adding chain id {} to db, continue indexing", new_chain_id);
@@ -122,8 +122,7 @@ impl Tailer {
                         chain_id: new_chain_id,
                     }),
                 )
-                .expect("Error updating chain_id!");
-                Ok(true)
+                .context(r#"Error updating chain_id!"#)
             }
         }
     }
@@ -866,7 +865,7 @@ mod test {
 
     #[tokio::test]
     async fn test_chain_id_check() {
-        // This is needed to avoid db errors. I think that db needs some time to reset. 
+        // This is needed to avoid db errors. I think that db needs some time to reset.
         std::thread::sleep(std::time::Duration::from_millis(300));
         if crate::should_skip_pg_tests() {
             return;
