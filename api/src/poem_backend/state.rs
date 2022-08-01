@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::accept_type::{parse_accept, AcceptType};
+use super::accept_type::AcceptType;
 use super::{
     build_not_found, ApiTags, BadRequestError, BasicResponse, BasicResponseStatus, InternalError,
     NotFoundError,
@@ -11,8 +11,8 @@ use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag,
-    MoveStructTagWrapper, MoveValue, TableItemRequest, TransactionId, U128, U64,
+    Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag, MoveStructTagParam,
+    MoveValue, TableItemRequest, TransactionId, U128, U64,
 };
 use aptos_api_types::{LedgerInfo, MoveResource};
 use aptos_state_view::StateView;
@@ -21,7 +21,6 @@ use aptos_types::state_store::state_key::StateKey;
 use aptos_types::state_store::table::TableHandle;
 use aptos_vm::data_cache::AsMoveResolver;
 use move_deps::move_core_types::language_storage::{ModuleId, ResourceKey, StructTag};
-use poem::web::Accept;
 use poem_openapi::param::Query;
 use poem_openapi::payload::Json;
 use poem_openapi::{param::Path, OpenApi};
@@ -52,13 +51,12 @@ impl StateApi {
     )]
     async fn get_account_resource(
         &self,
-        accept: Accept,
+        accept_type: AcceptType,
         address: Path<Address>,
-        resource_type: Path<MoveStructTagWrapper>,
+        resource_type: Path<MoveStructTagParam>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveResource> {
         fail_point_poem("endpoint_get_account_resource")?;
-        let accept_type = parse_accept(&accept)?;
         self.resource(&accept_type, address.0, resource_type.0, ledger_version.0)
     }
 
@@ -79,19 +77,24 @@ impl StateApi {
     )]
     async fn get_account_module(
         &self,
-        accept: Accept,
+        accept_type: AcceptType,
         address: Path<Address>,
         module_name: Path<IdentifierWrapper>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveModuleBytecode> {
         fail_point_poem("endpoint_get_account_module")?;
-        let accept_type = parse_accept(&accept)?;
         self.module(&accept_type, address.0, module_name.0, ledger_version.0)
     }
 
     /// Get table item
     ///
-    /// todo
+    /// Get a table item from the table identified by {table_handle} in the
+    /// path and the "key" (TableItemRequest) provided in the request body.
+    ///
+    /// This is a POST endpoint because the "key" for requesting a specific
+    /// table item (TableItemRequest) could be quite complex, as each of its
+    /// fields could themselves be composed of other structs. This makes it
+    /// impractical to express using query params, meaning GET isn't an option.
     #[oai(
         path = "/tables/:table_handle/item",
         method = "post",
@@ -100,13 +103,12 @@ impl StateApi {
     )]
     async fn get_table_item(
         &self,
-        accept: Accept,
+        accept_type: AcceptType,
         table_handle: Path<U128>,
         table_item_request: Json<TableItemRequest>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveValue> {
         fail_point_poem("endpoint_get_table_item")?;
-        let accept_type = parse_accept(&accept)?;
         self.table_item(
             &accept_type,
             table_handle.0,
@@ -145,7 +147,7 @@ impl StateApi {
         &self,
         accept_type: &AcceptType,
         address: Address,
-        resource_type: MoveStructTagWrapper,
+        resource_type: MoveStructTagParam,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveResource> {
         let resource_type: MoveStructTag = resource_type.into();

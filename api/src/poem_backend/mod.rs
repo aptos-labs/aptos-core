@@ -43,6 +43,6 @@ pub use events::EventsApi;
 pub use index::IndexApi;
 pub use log::middleware_log;
 pub use response::*;
-pub use runtime::attach_poem_to_runtime;
+pub use runtime::{attach_poem_to_runtime, get_api_service};
 pub use state::StateApi;
 pub use transactions::TransactionsApi;

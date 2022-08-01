@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use crate::metrics::RESPONSE_STATUS;
+use crate::metrics::{HISTOGRAM, RESPONSE_STATUS};
 use aptos_logger::{
     debug, error,
     prelude::{sample, SampleRate},
@@ -51,8 +51,20 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
         debug!(log);
     }
 
+    // Log response statuses generally.
     RESPONSE_STATUS
         .with_label_values(&[log.status.to_string().as_str()])
+        .observe(elapsed.as_secs_f64());
+
+    // Log response status per-endpoint + method.
+    HISTOGRAM
+        .with_label_values(&[
+            log.method.as_str(),
+            // TODO: Log based on operation_id instead.
+            // https://github.com/poem-web/poem/issues/351
+            log.path.as_str(),
+            log.status.to_string().as_str(),
+        ])
         .observe(elapsed.as_secs_f64());
 
     Ok(response)

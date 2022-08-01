@@ -46,4 +46,4 @@ pub use transaction::{
     UserTransactionRequest, WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload,
     WriteTableItem,
 };
-pub use wrappers::{IdentifierWrapper, MoveStructTagWrapper};
+pub use wrappers::{IdentifierWrapper, MoveStructTagParam};

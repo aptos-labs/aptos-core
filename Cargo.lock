@@ -805,10 +805,24 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "mime",
+ "percent-encoding",
  "poem",
  "poem-openapi",
  "serde 1.0.137",
  "serde_json",
+]
+
+[[package]]
+name = "aptos-openapi-spec-generator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-config",
+ "aptos-mempool",
+ "aptos-types",
+ "clap 3.2.11",
+ "storage-interface",
 ]
 
 [[package]]

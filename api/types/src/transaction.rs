@@ -6,7 +6,7 @@ use crate::{
     MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, ScriptFunctionId, U64,
 };
 
-use anyhow::bail;
+use anyhow::{bail, Context as AnyhowContext};
 use aptos_crypto::{
     ed25519::{self, Ed25519PublicKey},
     multi_ed25519::{self, MultiEd25519PublicKey},
@@ -640,8 +640,14 @@ impl TryFrom<Ed25519Signature> for TransactionAuthenticator {
             signature,
         } = value;
         Ok(TransactionAuthenticator::ed25519(
-            public_key.inner().try_into()?,
-            signature.inner().try_into()?,
+            public_key
+                .inner()
+                .try_into()
+                .context("Failed to parse given public_key bytes as a Ed25519PublicKey")?,
+            signature
+                .inner()
+                .try_into()
+                .context("Failed to parse given signature as a Ed25519Signature")?,
         ))
     }
 }
@@ -655,8 +661,14 @@ impl TryFrom<Ed25519Signature> for AccountAuthenticator {
             signature,
         } = value;
         Ok(AccountAuthenticator::ed25519(
-            public_key.inner().try_into()?,
-            signature.inner().try_into()?,
+            public_key
+                .inner()
+                .try_into()
+                .context("Failed to parse given public_key bytes as a Ed25519PublicKey")?,
+            signature
+                .inner()
+                .try_into()
+                .context("Failed to parse given signature as a Ed25519Signature")?,
         ))
     }
 }
