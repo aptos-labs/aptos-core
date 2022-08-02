@@ -86,7 +86,6 @@ impl NetworkSender {
 
     /// Tries to retrieve num of blocks backwards starting from id from the given peer: the function
     /// returns a future that is fulfilled with BlockRetrievalResponse.
-    #[tracing::instrument(skip_all, level = "trace")]
     pub async fn request_block(
         &mut self,
         retrieval_request: BlockRetrievalRequest,
@@ -169,35 +168,30 @@ impl NetworkSender {
         }
     }
 
-    #[tracing::instrument(skip_all, level = "trace")]
     pub async fn broadcast_proposal(&mut self, proposal_msg: ProposalMsg) {
         fail_point!("consensus::send::broadcast_proposal", |_| ());
         let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
         self.broadcast(msg).await
     }
 
-    #[tracing::instrument(skip_all, level = "trace")]
     pub async fn broadcast_sync_info(&mut self, sync_info_msg: SyncInfo) {
         fail_point!("consensus::send::broadcast_sync_info", |_| ());
         let msg = ConsensusMsg::SyncInfo(Box::new(sync_info_msg));
         self.broadcast(msg).await
     }
 
-    #[tracing::instrument(skip_all, level = "trace")]
     pub async fn broadcast_timeout_vote(&mut self, timeout_vote_msg: VoteMsg) {
         fail_point!("consensus::send::broadcast_timeout_vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(timeout_vote_msg));
         self.broadcast(msg).await
     }
 
-    #[tracing::instrument(skip_all, level = "trace")]
     pub async fn broadcast_epoch_change(&mut self, epoch_chnage_proof: EpochChangeProof) {
         fail_point!("consensus::send::broadcast_epoch_change", |_| ());
         let msg = ConsensusMsg::EpochChangeProof(Box::new(epoch_chnage_proof));
         self.broadcast(msg).await
     }
 
-    #[tracing::instrument(skip_all, level = "trace")]
     pub async fn broadcast_commit_vote(&mut self, commit_vote: CommitVote) {
         fail_point!("consensus::send::broadcast_commit_vote", |_| ());
         let msg = ConsensusMsg::CommitVoteMsg(Box::new(commit_vote));
@@ -212,7 +206,6 @@ impl NetworkSender {
     /// internal(to provide back pressure), it does not indicate the message is delivered or sent
     /// out. It does not give indication about when the message is delivered to the recipients,
     /// as well as there is no indication about the network failures.
-    #[tracing::instrument(skip_all, level = "trace")]
     pub async fn send_vote(&self, vote_msg: VoteMsg, recipients: Vec<Author>) {
         fail_point!("consensus::send::vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
@@ -226,7 +219,6 @@ impl NetworkSender {
         self.send(msg, recipients).await
     }
 
-    #[tracing::instrument(skip_all, level = "trace")]
     pub async fn send_epoch_change(&mut self, proof: EpochChangeProof) {
         fail_point!("consensus::send::epoch_change", |_| ());
         let msg = ConsensusMsg::EpochChangeProof(Box::new(proof));
@@ -234,7 +226,6 @@ impl NetworkSender {
     }
 
     /// Sends the ledger info to self buffer manager
-    #[tracing::instrument(skip_all, level = "trace")]
     pub async fn send_commit_proof(&self, ledger_info: LedgerInfoWithSignatures) {
         fail_point!("consensus::send::commit_proof", |_| ());
 
@@ -280,7 +271,6 @@ impl NetworkTask {
         )
     }
 
-    #[tracing::instrument(skip_all, level = "trace")]
     pub async fn start(mut self) {
         while let Some(message) = self.all_events.next().await {
             match message {

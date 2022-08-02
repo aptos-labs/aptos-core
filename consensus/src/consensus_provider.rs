@@ -78,15 +78,9 @@ pub fn start_consensus(
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
-    runtime.spawn(async move {
-        tokio::task::Builder::new()
-            .name("[Consensus] Network Task")
-            .spawn(network_task.start());
 
-        tokio::task::Builder::new()
-            .name("[Consensus] Epoch Menager")
-            .spawn(epoch_mgr.start(timeout_receiver, network_receiver));
-    });
+    runtime.spawn(network_task.start());
+    runtime.spawn(epoch_mgr.start(timeout_receiver, network_receiver));
 
     debug!("Consensus started.");
     runtime

@@ -633,15 +633,11 @@ dependencies = [
  "pretty_assertions",
  "prometheus",
  "serde 1.0.141",
- "rand 0.8.5",
- "serde 1.0.137",
  "serde_json",
  "strum",
  "strum_macros",
  "tokio",
  "tracing",
- "tracing-appender",
- "tracing-flame",
  "tracing-subscriber",
 ]
 
@@ -695,7 +691,7 @@ dependencies = [
  "network",
  "once_cell",
  "proptest",
- "rand 0.8.5",
+ "rand 0.7.3",
  "rayon",
  "serde 1.0.141",
  "serde_json",
@@ -703,9 +699,7 @@ dependencies = [
  "storage-interface",
  "thiserror",
  "tokio",
- "tokio-metrics",
  "tokio-stream",
- "tracing-appender",
  "vm-validator",
 ]
 
@@ -2200,7 +2194,6 @@ dependencies = [
  "termion",
  "thiserror",
  "tokio",
- "tracing",
  "vm-validator",
 ]
 
@@ -2278,7 +2271,6 @@ dependencies = [
  "futures",
  "hdrhistogram",
  "humantime 2.1.0",
- "parking_lot 0.11.2",
  "prost-types",
  "serde 1.0.141",
  "serde_json",
@@ -8680,17 +8672,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-metrics"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcb585a0069b53171684e22d5255984ec30d1c7304fd0a4a9a603ffd8c765cdd"
-dependencies = [
- "futures-util",
- "pin-project-lite",
- "tokio",
-]
-
-[[package]]
 name = "tokio-native-tls"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8893,9 +8874,9 @@ checksum = "360dfd1d6d30e05fda32ace2c8c70e9c0a9da713275777f5a4dbb8a1893930c6"
 
 [[package]]
 name = "tracing"
-version = "0.1.36"
+version = "0.1.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fce9567bd60a67d08a16488756721ba392f24f29006402881e43b19aac64307"
+checksum = "5d0ecdcb44a79f0fe9844f0c4f33a342cbcbb5117de8001e6ba0dc2351327d09"
 dependencies = [
  "cfg-if 1.0.0",
  "log",
@@ -8905,21 +8886,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-appender"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09d48f71a791638519505cefafe162606f706c25592e4bde4d97600c0195312e"
-dependencies = [
- "crossbeam-channel",
- "time 0.3.9",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "tracing-attributes"
-version = "0.1.22"
+version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11c75893af559bc8e10716548bdef5cb2b983f8e637db9d0e15126b61b484ee2"
+checksum = "cc6b8ad3567499f98a1db7a752b07a7c8c7c7c34c332ec00effb2b0027974b7c"
 dependencies = [
  "proc-macro2 1.0.39",
  "quote 1.0.18",
@@ -8928,23 +8898,12 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.29"
+version = "0.1.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aeea4303076558a00714b823f9ad67d58a3bbda1df83d8827d21193156e22f7"
-dependencies = [
- "once_cell",
- "valuable",
-]
-
-[[package]]
-name = "tracing-flame"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bae117ee14789185e129aaee5d93750abe67fdc5a9a62650452bfe4e122a3a9"
+checksum = "f54c8ca710e81886d498c2fd3331b56c93aa248d49de2222ad2742247c60072f"
 dependencies = [
  "lazy_static 1.4.0",
- "tracing",
- "tracing-subscriber",
+ "valuable",
 ]
 
 [[package]]
@@ -8977,7 +8936,6 @@ dependencies = [
  "ansi_term 0.12.1",
  "lazy_static 1.4.0",
  "matchers",
- "parking_lot 0.12.0",
  "regex",
  "sharded-slab",
  "smallvec",
