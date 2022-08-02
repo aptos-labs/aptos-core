@@ -40,9 +40,12 @@ use network::{
     ProtocolId,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::hash_map::RandomState;
+use std::hash::BuildHasher;
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, HashMap},
+    hash::Hasher,
     ops::Add,
     sync::Arc,
     time::{Duration, Instant, SystemTime},
@@ -163,6 +166,7 @@ pub(crate) struct MempoolNetworkInterface {
     prioritized_peers: Arc<Mutex<Vec<PeerNetworkId>>>,
     role: RoleType,
     mempool_config: MempoolConfig,
+    random_state: RandomState,
 }
 
 impl MempoolNetworkInterface {
@@ -179,6 +183,7 @@ impl MempoolNetworkInterface {
             prioritized_peers: Arc::new(Mutex::new(Vec::new())),
             role,
             mempool_config,
+            random_state: RandomState::new(),
         }
     }
 
@@ -234,7 +239,9 @@ impl MempoolNetworkInterface {
         let mut prioritized_peers = self.prioritized_peers.lock();
         let peers: Vec<_> = peers
             .iter()
-            .sorted_by(|peer_a, peer_b| compare_prioritized_peers(peer_a, peer_b))
+            .sorted_by(|peer_a, peer_b| {
+                compare_prioritized_peers(&self.random_state, peer_a, peer_b)
+            })
             .map(|(peer, _)| *peer)
             .collect();
         let _ = std::mem::replace(&mut *prioritized_peers, peers);
@@ -348,8 +355,16 @@ impl MempoolNetworkInterface {
                 .find_position(|peer_network_id| *peer_network_id == &peer)
                 .map_or(usize::MAX, |(pos, _)| pos);
             if priority > self.mempool_config.default_failovers {
+                warn!(
+                    "BCHO: PeerNotPrioritized: {}, {} > {}",
+                    peer, priority, self.mempool_config.default_failovers
+                );
                 return Err(BroadcastError::PeerNotPrioritized(peer, priority));
             }
+            warn!(
+                "BCHO: Peer: {}, {}, {}",
+                peer, priority, self.mempool_config.default_failovers
+            );
         }
         Ok(())
     }
@@ -562,6 +577,7 @@ impl NetworkInterface<MempoolSyncMsg, MempoolMultiNetworkSender> for MempoolNetw
 
 /// Provides ordering for peers to send transactions to
 fn compare_prioritized_peers(
+    random_state: &RandomState,
     peer_a: &(PeerNetworkId, PeerRole),
     peer_b: &(PeerNetworkId, PeerRole),
 ) -> Ordering {
@@ -578,11 +594,18 @@ fn compare_prioritized_peers(
             let role_a = peer_a.1;
             let role_b = peer_b.1;
             match role_a.cmp(&role_b) {
-                // Then tiebreak by PeerId for stability
+                // Tiebreak by hash(PeerId). Stable within a mempool instance but random between instances.
                 Ordering::Equal => {
-                    let peer_id_a = peer_network_id_a.peer_id();
-                    let peer_id_b = peer_network_id_b.peer_id();
-                    peer_id_a.cmp(&peer_id_b)
+                    let mut hasher_a = random_state.build_hasher();
+                    let mut hasher_b = random_state.build_hasher();
+
+                    hasher_a.write(peer_network_id_a.peer_id().as_ref());
+                    hasher_b.write(peer_network_id_b.peer_id().as_ref());
+
+                    let hash_a = hasher_a.finish();
+                    let hash_b = hasher_b.finish();
+
+                    hash_a.cmp(&hash_b)
                 }
                 ordering => ordering,
             }
@@ -599,6 +622,8 @@ mod test {
 
     #[test]
     fn check_peer_prioritization() {
+        let random_state = &RandomState::default();
+
         let peer_id_1 = PeerId::from_hex_literal("0x1").unwrap();
         let peer_id_2 = PeerId::from_hex_literal("0x2").unwrap();
         let val_1 = (
@@ -619,24 +644,48 @@ mod test {
         );
 
         // NetworkId ordering
-        assert_eq!(Ordering::Greater, compare_prioritized_peers(&vfn_1, &val_1));
-        assert_eq!(Ordering::Less, compare_prioritized_peers(&val_1, &vfn_1));
+        assert_eq!(
+            Ordering::Greater,
+            compare_prioritized_peers(random_state, &vfn_1, &val_1)
+        );
+        assert_eq!(
+            Ordering::Less,
+            compare_prioritized_peers(random_state, &val_1, &vfn_1)
+        );
 
         // PeerRole ordering
         assert_eq!(
             Ordering::Greater,
-            compare_prioritized_peers(&vfn_1, &preferred_1)
+            compare_prioritized_peers(random_state, &vfn_1, &preferred_1)
         );
         assert_eq!(
             Ordering::Less,
-            compare_prioritized_peers(&preferred_1, &vfn_1)
+            compare_prioritized_peers(random_state, &preferred_1, &vfn_1)
         );
 
         // Tiebreaker on peer_id
-        assert_eq!(Ordering::Greater, compare_prioritized_peers(&val_2, &val_1));
-        assert_eq!(Ordering::Less, compare_prioritized_peers(&val_1, &val_2));
+        let mut hasher_1 = random_state.build_hasher();
+        let mut hasher_2 = random_state.build_hasher();
+
+        hasher_1.write(val_1.0.peer_id().as_ref());
+        hasher_2.write(val_2.0.peer_id().as_ref());
+
+        let hash_1 = hasher_1.finish();
+        let hash_2 = hasher_2.finish();
+
+        assert_eq!(
+            hash_2.cmp(&hash_1),
+            compare_prioritized_peers(random_state, &val_2, &val_1)
+        );
+        assert_eq!(
+            hash_1.cmp(&hash_2),
+            compare_prioritized_peers(random_state, &val_1, &val_2)
+        );
 
         // Same the only equal case
-        assert_eq!(Ordering::Equal, compare_prioritized_peers(&val_1, &val_1));
+        assert_eq!(
+            Ordering::Equal,
+            compare_prioritized_peers(random_state, &val_1, &val_1)
+        );
     }
 }
