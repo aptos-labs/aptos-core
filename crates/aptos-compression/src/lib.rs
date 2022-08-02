@@ -3,7 +3,8 @@
 
 use crate::metrics::{
     increment_compression_byte_count, increment_compression_error,
-    start_compression_operation_timer, COMPRESS, COMPRESSED_BYTES, DECOMPRESS, RAW_BYTES,
+    start_compression_operation_timer, CompressionClient, COMPRESS, COMPRESSED_BYTES, DECOMPRESS,
+    RAW_BYTES,
 };
 use aptos_logger::prelude::*;
 use lz4::block::CompressionMode;
@@ -18,7 +19,7 @@ use thiserror::Error;
 /// Note: the crate also exposes some basic compression metrics
 /// that can be used to track the cumulative compression ratio
 /// and compression/decompression durations during the runtime.
-mod metrics;
+pub mod metrics;
 #[cfg(test)]
 mod tests;
 
@@ -35,16 +36,19 @@ pub type CompressedData = Vec<u8>;
 pub struct CompressionError(String);
 
 /// Compresses the raw data stream
-pub fn compress(raw_data: Vec<u8>) -> Result<CompressedData, CompressionError> {
+pub fn compress(
+    raw_data: Vec<u8>,
+    client: CompressionClient,
+) -> Result<CompressedData, CompressionError> {
     // Start the compression timer
-    let timer = start_compression_operation_timer(COMPRESS);
+    let timer = start_compression_operation_timer(COMPRESS, client.clone());
 
     // Compress the data
     let compression_mode = CompressionMode::FAST(ACCELERATION_PARAMETER);
     let compressed_data = match lz4::block::compress(&raw_data, Some(compression_mode), true) {
         Ok(compressed_data) => compressed_data,
         Err(error) => {
-            increment_compression_error(COMPRESS);
+            increment_compression_error(COMPRESS, client);
             return Err(CompressionError(format!(
                 "Failed to compress the data: {:?}",
                 error.to_string()
@@ -54,8 +58,8 @@ pub fn compress(raw_data: Vec<u8>) -> Result<CompressedData, CompressionError> {
 
     // Stop the timer and update the metrics
     let compression_duration = timer.stop_and_record();
-    increment_compression_byte_count(RAW_BYTES, raw_data.len() as u64);
-    increment_compression_byte_count(COMPRESSED_BYTES, compressed_data.len() as u64);
+    increment_compression_byte_count(RAW_BYTES, client.clone(), raw_data.len() as u64);
+    increment_compression_byte_count(COMPRESSED_BYTES, client, compressed_data.len() as u64);
 
     // Log the relative data compression statistics
     let relative_data_size = calculate_relative_size(&raw_data, &compressed_data);
@@ -71,15 +75,18 @@ pub fn compress(raw_data: Vec<u8>) -> Result<CompressedData, CompressionError> {
 }
 
 /// Decompresses the compressed data stream
-pub fn decompress(compressed_data: &CompressedData) -> Result<Vec<u8>, CompressionError> {
+pub fn decompress(
+    compressed_data: &CompressedData,
+    client: CompressionClient,
+) -> Result<Vec<u8>, CompressionError> {
     // Start the decompression timer
-    let timer = start_compression_operation_timer(DECOMPRESS);
+    let timer = start_compression_operation_timer(DECOMPRESS, client.clone());
 
     // Decompress the data
     let raw_data = match lz4::block::decompress(compressed_data, None) {
         Ok(raw_data) => raw_data,
         Err(error) => {
-            increment_compression_error(DECOMPRESS);
+            increment_compression_error(DECOMPRESS, client);
             return Err(CompressionError(format!(
                 "Failed to decompress the data: {:?}",
                 error.to_string()
