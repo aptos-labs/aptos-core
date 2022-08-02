@@ -135,14 +135,13 @@ async fn test_block_height_and_ts_work() {
             txn.block_height as usize,
             *block_mapping.get(&i).unwrap() as usize
         );
-        let ts = txn.timestamp.seconds;
+        let ts = (txn.timestamp.seconds * 1000000) as u64 + txn.timestamp.nanos as u64;
         if txn.block_height == 0 {
             // Genesis timestamp is 0
             assert_eq!(ts, 0);
         } else {
-            assert_eq!(ts as u64, start_ts + txn.block_height);
+            assert_eq!(ts, start_ts + txn.block_height);
         }
-        return;
     }
 }
 
