@@ -166,15 +166,8 @@ impl DeltaChangeSet {
     ) -> anyhow::Result<WriteSetMut, VMStatus> {
         let mut materialized_write_set = vec![];
         for (state_key, delta_op) in self.delta_change_set {
-            match delta_op.try_into_write_op(state_view, &state_key) {
-                Ok(write_op) => {
-                    materialized_write_set.push((state_key, write_op));
-                }
-                // Delta application failed: propagate the error.
-                Err(status) => {
-                    return Err(status);
-                }
-            }
+            let write_op = delta_op.try_into_write_op(state_view, &state_key)?;
+            materialized_write_set.push((state_key, write_op));
         }
 
         // All deltas are applied successfully.
