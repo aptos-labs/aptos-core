@@ -1,6 +1,6 @@
 # API
 
-This module provides a SF Streamer for pushing protobuf data from the Aptos Blockchain
+This module provides a StreamingFast Streamer for pushing protobuf data from the Aptos Blockchain
 
 ## Overview
 

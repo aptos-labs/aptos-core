@@ -154,7 +154,7 @@ pub struct AptosHandle {
     _consensus_runtime: Option<Runtime>,
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
-    _sf_stream: Runtime,
+    _sf_stream: Option<Runtime>,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
 }
@@ -664,7 +664,8 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         aptos_db.clone(),
         mp_client_sender.clone(),
     )?;
-    let sf_runtime = bootstrap_sf_stream(&node_config, chain_id, aptos_db, mp_client_sender)?;
+    let sf_runtime = bootstrap_sf_stream(&node_config, chain_id, aptos_db, mp_client_sender)
+        .map(|runtime| runtime?);
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
