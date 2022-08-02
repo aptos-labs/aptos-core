@@ -32,18 +32,12 @@ use bytes::Bytes;
 use hyper::Response;
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{
-    boxed::Box,
-    collections::BTreeMap,
-    iter::once,
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc};
 use storage_interface::state_view::DbStateView;
 use vm_validator::vm_validator::VMValidator;
 
 #[allow(dead_code)]
-pub fn new_test_context(test_name: &'static str) -> TestContext {
+pub fn new_test_context(test_name: &'static str, fake_start_time: u64) -> TestContext {
     let tmp_dir = TempPath::new();
     tmp_dir.create_as_dir().unwrap();
 
@@ -87,6 +81,7 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
         mempool,
         db,
         test_name,
+        fake_start_time,
     )
 }
 
@@ -116,6 +111,7 @@ impl TestContext {
         mempool: MockSharedMempool,
         db: Arc<AptosDB>,
         test_name: &'static str,
+        fake_time: u64,
     ) -> Self {
         Self {
             context,
@@ -127,10 +123,7 @@ impl TestContext {
             expect_status_code: 200,
             db,
             test_name,
-            fake_time: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            fake_time,
         }
     }
     pub fn rng(&mut self) -> &mut rand::rngs::StdRng {
