@@ -24,9 +24,9 @@ impl<'a> FromRequest<'a> for AcceptType {
 fn parse_accept(accept: &Accept) -> Result<AcceptType> {
     for mime in &accept.0 {
         match mime.as_ref() {
-            "application/json" => return Ok(AcceptType::Json),
-            "application/x-bcs" => return Ok(AcceptType::Bcs),
-            "*/*" => {}
+            aptos_api_types::mime_types::JSON => return Ok(AcceptType::Json),
+            aptos_api_types::mime_types::BCS_OUTPUT => return Ok(AcceptType::Bcs),
+            aptos_api_types::mime_types::ALL => {}
             wildcard => {
                 return Err(Error::from_string(
                     &format!("Unsupported Accept type: {:?}", wildcard),

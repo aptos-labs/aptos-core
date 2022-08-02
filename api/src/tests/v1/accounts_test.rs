@@ -4,6 +4,8 @@
 use super::super::find_value;
 use super::new_test_context;
 use crate::current_function_name;
+use aptos_types::account_address::AccountAddress;
+use aptos_types::account_config::AccountResource;
 use serde_json::json;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -213,6 +215,20 @@ async fn test_get_core_account_data_not_found() {
     let mut context = new_test_context(current_function_name!());
     let resp = context.expect_status_code(404).get("/accounts/0xf").await;
     context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_bcs_accept() {
+    let context = new_test_context(current_function_name!());
+    let resp = context.get_bcs("/accounts/0x1").await;
+
+    // TODO: Golden output checks
+    // context.check_golden_output(resp.clone());
+
+    // Ensure we can deserialize the type
+    let account: AccountResource =
+        bcs::from_bytes(&resp).expect("Can deserialize account resource");
+    assert_eq!(account.address(), AccountAddress::ONE)
 }
 
 fn account_resources(address: &str) -> String {
