@@ -22,10 +22,8 @@ use url::Url;
 
 #[derive(StructOpt, Debug)]
 struct Args {
-    #[structopt(long, default_value = "45000")]
+    #[structopt(long, default_value = "30000")]
     mempool_backlog: u64,
-    #[structopt(long)]
-    _burst: bool,
     #[structopt(long, default_value = "300")]
     duration_secs: usize,
     #[structopt(flatten)]
