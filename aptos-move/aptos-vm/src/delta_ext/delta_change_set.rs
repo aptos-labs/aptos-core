@@ -5,7 +5,7 @@
 //! (for accessing the storage) and an operation: a partial function with a
 //! postcondition.
 
-use crate::state_store::state_key::StateKey;
+use aptos_types::state_store::state_key::StateKey;
 
 /// Specifies different delta partial function specifications.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]

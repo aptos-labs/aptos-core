@@ -1,13 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters::*, data_cache::StateViewCache};
+use crate::{counters::*, data_cache::StateViewCache, delta_ext::TransactionOutputExt};
 use anyhow::Result;
 use aptos_state_view::StateView;
 use aptos_types::{
-    transaction::{
-        SignatureCheckedTransaction, SignedTransaction, TransactionOutputExt, VMValidatorResult,
-    },
+    transaction::{SignatureCheckedTransaction, SignedTransaction, VMValidatorResult},
     vm_status::{StatusCode, VMStatus},
 };
 
