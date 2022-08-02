@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Tasks that are executed by coordinators (short-lived compared to coordinators)
+use crate::thread_pool::IO_POOL;
 use crate::{
     core_mempool::{CoreMempool, TimelineState, TxnPointer},
     counters,
@@ -235,16 +236,18 @@ where
 
     let start_storage_read = Instant::now();
     // Track latency: fetching seq number
-    let seq_numbers = transactions
-        .par_iter()
-        .map(|t| {
-            get_account_sequence_number(smp.db.clone(), t.sender()).map_err(|e| {
-                error!(LogSchema::new(LogEntry::DBError).error(&e));
-                counters::DB_ERROR.inc();
-                e
+    let seq_numbers = IO_POOL.install(|| {
+        transactions
+            .par_iter()
+            .map(|t| {
+                get_account_sequence_number(smp.db.clone(), t.sender()).map_err(|e| {
+                    error!(LogSchema::new(LogEntry::DBError).error(&e));
+                    counters::DB_ERROR.inc();
+                    e
+                })
             })
-        })
-        .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+    });
     // Track latency for storage read fetching sequence number
     let storage_read_latency = start_storage_read.elapsed();
     counters::PROCESS_TXN_BREAKDOWN_LATENCY
