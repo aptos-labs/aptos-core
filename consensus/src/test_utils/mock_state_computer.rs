@@ -14,9 +14,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
 };
-use consensus_types::{
-    block::Block, common::Payload, executed_block::ExecutedBlock
-};
+use consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
 use executor_types::{Error, StateComputeResult};
 use futures::channel::mpsc;
 use std::{collections::HashMap, sync::Arc};

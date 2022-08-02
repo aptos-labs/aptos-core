@@ -20,6 +20,7 @@ mod mock_payload_manager;
 mod mock_state_computer;
 mod mock_storage;
 
+use crate::data_manager::DummyDataManager;
 use crate::util::mock_time_service::SimulatedTimeService;
 use aptos_types::block_info::BlockInfo;
 use consensus_types::{block::block_test_utils::gen_test_certificate, common::Payload};
@@ -28,7 +29,6 @@ pub use mock_state_computer::{
     EmptyStateComputer, MockStateComputer, RandomComputeResultStateComputer,
 };
 pub use mock_storage::{EmptyStorage, MockSharedStorage, MockStorage};
-use crate::data_manager::DummyDataManager;
 
 pub const TEST_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -75,7 +75,7 @@ pub fn build_empty_tree() -> Arc<BlockStore> {
         10, // max pruned blocks in mem
         Arc::new(SimulatedTimeService::new()),
         10,
-        Arc::new(DummyDataManager::new())
+        Arc::new(DummyDataManager::new()),
     ))
 }
 

@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use bcs::{from_bytes, to_bytes};
-use aptos_crypto::hash::DefaultHasher;
-use aptos_types::account_address::AccountAddress;
-use consensus_types::proof_of_store::LogicalTime;
 use crate::quorum_store::tests::utils::create_vec_signed_transactions;
 use crate::quorum_store::types::{Batch, Fragment, SerializedTransaction};
+use aptos_crypto::hash::DefaultHasher;
+use aptos_types::account_address::AccountAddress;
+use bcs::{from_bytes, to_bytes};
+use consensus_types::proof_of_store::LogicalTime;
 
 #[test]
 fn test_batch() {
@@ -20,30 +20,19 @@ fn test_batch() {
     }
     let digest = hasher.finish();
 
-    let empty_batch = Batch::new(
-        epoch,
-        source,
-        digest,
-        None,
-    );
+    let empty_batch = Batch::new(epoch, source, digest, None);
 
     assert_eq!(epoch, empty_batch.epoch());
     assert!(empty_batch.verify(source).is_ok());
 
-    let batch = Batch::new(
-        epoch,
-        source,
-        digest,
-        Some(signed_txns.clone()),
-    );
+    let batch = Batch::new(epoch, source, digest, Some(signed_txns.clone()));
 
     assert!(batch.verify(source).is_ok());
     assert_eq!(batch.get_payload(), signed_txns);
 }
 
-
 #[test]
-fn test_fragment(){
+fn test_fragment() {
     let mut epoch = 0;
     let mut batch_id = 0;
     let mut fragment_id = 0;
@@ -52,7 +41,7 @@ fn test_fragment(){
     let mut source = AccountAddress::random();
 
     let signed_txns = create_vec_signed_transactions(500);
-    for txn in signed_txns.iter(){
+    for txn in signed_txns.iter() {
         data.push(SerializedTransaction::from_signed_txn(txn));
     }
 
@@ -90,7 +79,7 @@ fn test_fragment(){
 
     maybe_expiration = None;
     let mut wrong_source = AccountAddress::random();
-    while wrong_source == source{
+    while wrong_source == source {
         wrong_source = AccountAddress::random();
     }
     let fragment = Fragment::new(
@@ -121,7 +110,7 @@ fn test_fragment(){
     assert_eq!(serialized_txns, data.clone());
 
     let mut returned_signed_transactions = Vec::new();
-    for mut txn in data{
+    for mut txn in data {
         match from_bytes(&txn.take_bytes()) {
             Ok(signed_txn) => returned_signed_transactions.push(signed_txn),
             Err(_) => {

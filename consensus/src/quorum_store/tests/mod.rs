@@ -5,5 +5,5 @@
 mod direct_mempool_quorum_store_test;
 #[cfg(test)]
 mod quorum_store_wrapper_test;
-mod utils;
 mod types_test;
+mod utils;

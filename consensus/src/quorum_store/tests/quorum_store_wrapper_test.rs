@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::DbError;
+use crate::quorum_store::quorum_store::QuorumStoreConfig;
 use crate::quorum_store::quorum_store_db::BatchIdDB;
 use crate::quorum_store::types::BatchId;
 use crate::quorum_store::{
-    quorum_store::QuorumStoreCommand,
-    quorum_store_wrapper::QuorumStoreWrapper,
-    tests::utils::{create_vec_signed_transactions},
+    quorum_store::QuorumStoreCommand, quorum_store_wrapper::QuorumStoreWrapper,
+    tests::utils::create_vec_signed_transactions,
 };
 use aptos_crypto::HashValue;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
@@ -28,7 +28,6 @@ use futures::{
 use std::sync::Arc;
 use std::{collections::HashSet, time::Duration};
 use tokio::{sync::mpsc::channel as TokioChannel, time::timeout};
-use crate::quorum_store::quorum_store::QuorumStoreConfig;
 
 pub struct MockBatchIdDB {}
 
@@ -179,7 +178,6 @@ async fn test_batch_creation() {
 async fn test_block_request() {
     let (quorum_store_to_mempool_tx, mut _quorum_store_to_mempool_rx) = channel(1_024);
     let (wrapper_quorum_store_tx, mut _wrapper_quorum_store_rx) = TokioChannel(100);
-
 
     let config = QuorumStoreConfig {
         channel_size: 100,

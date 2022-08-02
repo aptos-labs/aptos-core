@@ -153,11 +153,19 @@ impl BatchReader {
         };
 
         let mut expired_keys = Vec::new();
-        debug!("QS: Batchreader {} {} {}", db_content.len(), epoch, last_committed_round);
+        debug!(
+            "QS: Batchreader {} {} {}",
+            db_content.len(),
+            epoch,
+            last_committed_round
+        );
         for (digest, value) in db_content {
             let expiration = value.expiration;
 
-            debug!("QS: Batchreader recovery content exp {:?}, digest {}", expiration, digest);
+            debug!(
+                "QS: Batchreader recovery content exp {:?}, digest {}",
+                expiration, digest
+            );
             assert!(epoch >= expiration.epoch());
 
             if epoch > expiration.epoch()
@@ -171,7 +179,10 @@ impl BatchReader {
             }
         }
 
-        debug!("QS: Batchreader recovery expired keys len {}", expired_keys.len());
+        debug!(
+            "QS: Batchreader recovery expired keys len {}",
+            expired_keys.len()
+        );
         (self_ob, expired_keys)
     }
 
@@ -291,9 +302,11 @@ impl BatchReader {
             "Non-increasing executed rounds reported to BatchStore"
         );
         let expired_keys = self.clear_expired_payload(certified_time);
-        if let Err(e) = self.batch_store_tx
+        if let Err(e) = self
+            .batch_store_tx
             .send(BatchStoreCommand::Clean(expired_keys))
-            .await {
+            .await
+        {
             debug!("QS: Failed to send to BatchStore: {:?}", e);
         }
     }

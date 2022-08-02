@@ -62,7 +62,10 @@ impl QuorumStoreDB {
         digest: HashValue,
         batch: PersistedValue,
     ) -> Result<(), DbError> {
-        debug!("QS: db persists digest {} expiration {:?}", digest, batch.expiration);
+        debug!(
+            "QS: db persists digest {} expiration {:?}",
+            digest, batch.expiration
+        );
         Ok(self.db.put::<BatchSchema>(&digest, &batch)?)
     }
 
