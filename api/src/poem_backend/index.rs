@@ -31,11 +31,16 @@ impl IndexApi {
         let node_role = self.context.node_role();
         let index_response = IndexResponse::new(ledger_info.clone(), node_role);
 
-        BasicResponse::try_from_rust_value((
-            index_response,
-            &ledger_info,
-            BasicResponseStatus::Ok,
-            &accept_type,
-        ))
+        match accept_type {
+            AcceptType::Json => BasicResponse::try_from_json((
+                index_response,
+                &ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+            AcceptType::Bcs => {
+                // TODO: Do we return a different type
+                BasicResponse::try_from_bcs((index_response, &ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 }

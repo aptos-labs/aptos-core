@@ -165,19 +165,21 @@ impl StateApi {
             .map_err(BasicErrorWith404::internal)?
             .ok_or_else(|| build_not_found("Resource", resource_key, ledger_version))?;
 
-        let resource = state_view
-            .as_move_resolver()
-            .as_converter(self.context.db.clone())
-            .try_into_resource(&resource_type, &bytes)
-            .context("Failed to deserialize resource data retrieved from DB")
-            .map_err(BasicErrorWith404::internal)?;
+        match accept_type {
+            AcceptType::Json => {
+                let resource = state_view
+                    .as_move_resolver()
+                    .as_converter(self.context.db.clone())
+                    .try_into_resource(&resource_type, &bytes)
+                    .context("Failed to deserialize resource data retrieved from DB")
+                    .map_err(BasicErrorWith404::internal)?;
 
-        BasicResponse::try_from_rust_value((
-            resource,
-            &ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+                BasicResponse::try_from_json((resource, &ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => {
+                BasicResponse::try_from_bcs((bytes, &ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 
     pub fn module(
@@ -197,17 +199,19 @@ impl StateApi {
             .map_err(BasicErrorWith404::internal)?
             .ok_or_else(|| build_not_found("Module", module_id, ledger_version))?;
 
-        let module = MoveModuleBytecode::new(bytes)
-            .try_parse_abi()
-            .context("Failed to parse move module ABI from bytes retrieved from storage")
-            .map_err(BasicErrorWith404::internal)?;
+        match accept_type {
+            AcceptType::Json => {
+                let module = MoveModuleBytecode::new(bytes)
+                    .try_parse_abi()
+                    .context("Failed to parse move module ABI from bytes retrieved from storage")
+                    .map_err(BasicErrorWith404::internal)?;
 
-        BasicResponse::try_from_rust_value((
-            module,
-            &ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+                BasicResponse::try_from_json((module, &ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => {
+                BasicResponse::try_from_bcs((bytes, &ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 
     pub fn table_item(
@@ -252,16 +256,18 @@ impl StateApi {
             .map_err(BasicErrorWith404::internal)?
             .ok_or_else(|| build_not_found("table handle or item", key, ledger_version))?;
 
-        let move_value = converter
-            .try_into_move_value(&value_type, &bytes)
-            .context("Failed to deserialize table item retrieved from DB")
-            .map_err(BasicErrorWith404::internal)?;
+        match accept_type {
+            AcceptType::Json => {
+                let move_value = converter
+                    .try_into_move_value(&value_type, &bytes)
+                    .context("Failed to deserialize table item retrieved from DB")
+                    .map_err(BasicErrorWith404::internal)?;
 
-        BasicResponse::try_from_rust_value((
-            move_value,
-            &ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+                BasicResponse::try_from_json((move_value, &ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => {
+                BasicResponse::try_from_bcs((bytes, &ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 }

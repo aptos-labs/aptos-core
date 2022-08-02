@@ -45,7 +45,7 @@ impl EventsApi {
     ) -> BasicResultWith404<Vec<Event>> {
         fail_point_poem("endpoint_get_events_by_event_key")?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
-        self.list(accept_type, page, event_key.0)
+        self.list(&accept_type, page, event_key.0)
     }
 
     /// Get events by event handle
@@ -75,14 +75,14 @@ impl EventsApi {
         let key = account
             .find_event_key(event_handle.0.into(), field_name.0.into())?
             .into();
-        self.list(accept_type, page, key)
+        self.list(&accept_type, page, key)
     }
 }
 
 impl EventsApi {
     fn list(
         &self,
-        accept_type: AcceptType,
+        accept_type: &AcceptType,
         page: Page,
         event_key: EventKey,
     ) -> BasicResultWith404<Vec<Event>> {
@@ -100,18 +100,22 @@ impl EventsApi {
             .context(format!("Failed to find events by key {}", event_key))
             .map_err(BasicErrorWith404::bad_request)?;
 
-        let resolver = self.context.move_resolver_poem()?;
-        let events = resolver
-            .as_converter(self.context.db.clone())
-            .try_into_events(&contract_events)
-            .context("Failed to convert events from storage into response {}")
-            .map_err(BasicErrorWith404::internal)?;
+        match accept_type {
+            AcceptType::Json => {
+                let resolver = self.context.move_resolver_poem()?;
+                let events = resolver
+                    .as_converter(self.context.db.clone())
+                    .try_into_events(&contract_events)
+                    .context("Failed to convert events from storage into response {}")
+                    .map_err(BasicErrorWith404::internal)?;
 
-        BasicResponse::try_from_rust_value((
-            events,
-            &latest_ledger_info,
-            BasicResponseStatus::Ok,
-            &accept_type,
-        ))
+                BasicResponse::try_from_json((events, &latest_ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => BasicResponse::try_from_bcs((
+                contract_events,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+        }
     }
 }

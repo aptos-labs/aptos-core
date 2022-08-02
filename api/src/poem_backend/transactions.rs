@@ -271,7 +271,6 @@ impl TransactionsApi {
             0
         };
         let start_version = page.start(last_page_start, ledger_version)?;
-
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)
@@ -279,12 +278,17 @@ impl TransactionsApi {
             .map_err(BasicErrorWith404::internal)
             .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
 
-        BasicResponse::try_from_rust_value((
-            self.render_transactions(data)?,
-            &latest_ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+        match accept_type {
+            AcceptType::Json => BasicResponse::try_from_json((
+                self.render_transactions(data)?,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+            AcceptType::Bcs => {
+                // TODO: Do less conversion?
+                BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 
     fn render_transactions<E: InternalError>(
@@ -356,33 +360,55 @@ impl TransactionsApi {
         transaction_data: TransactionData,
         ledger_info: &LedgerInfo,
     ) -> BasicResultWith404<Transaction> {
-        let resolver = self.context.move_resolver_poem()?;
-        let transaction = match transaction_data {
-            TransactionData::OnChain(txn) => {
-                let timestamp = self
-                    .context
-                    .get_block_timestamp(txn.version)
-                    .context("Failed to get block timestamp from DB")
-                    .map_err(BasicErrorWith404::internal)?;
-                resolver
-                    .as_converter(self.context.db.clone())
-                    .try_into_onchain_transaction(timestamp, txn)
-                    .context("Failed to convert on chain transaction to Transaction")
-                    .map_err(BasicErrorWith404::internal)?
-            }
-            TransactionData::Pending(txn) => resolver
-                .as_converter(self.context.db.clone())
-                .try_into_pending_transaction(*txn)
-                .context("Failed to convert on pending transaction to Transaction")
-                .map_err(BasicErrorWith404::internal)?,
-        };
+        match transaction_data {
+            TransactionData::OnChain(ref txn) => match accept_type {
+                AcceptType::Json => {
+                    let resolver = self.context.move_resolver_poem()?;
+                    let timestamp = self
+                        .context
+                        .get_block_timestamp(txn.version)
+                        .context("Failed to get block timestamp from DB")
+                        .map_err(BasicErrorWith404::internal)?;
+                    let transaction = resolver
+                        .as_converter(self.context.db.clone())
+                        .try_into_onchain_transaction(timestamp, txn.clone())
+                        .context("Failed to convert on chain transaction to Transaction")
+                        .map_err(BasicErrorWith404::internal)?;
 
-        BasicResponse::try_from_rust_value((
-            transaction,
-            ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+                    BasicResponse::try_from_json((
+                        transaction,
+                        ledger_info,
+                        BasicResponseStatus::Ok,
+                    ))
+                }
+                AcceptType::Bcs => BasicResponse::try_from_bcs((
+                    transaction_data,
+                    ledger_info,
+                    BasicResponseStatus::Ok,
+                )),
+            },
+            TransactionData::Pending(ref txn) => match accept_type {
+                AcceptType::Json => {
+                    let resolver = self.context.move_resolver_poem()?;
+                    let transaction = resolver
+                        .as_converter(self.context.db.clone())
+                        .try_into_pending_transaction(*txn.clone())
+                        .context("Failed to convert on pending transaction to Transaction")
+                        .map_err(BasicErrorWith404::internal)?;
+
+                    BasicResponse::try_from_json((
+                        transaction,
+                        ledger_info,
+                        BasicResponseStatus::Ok,
+                    ))
+                }
+                AcceptType::Bcs => BasicResponse::try_from_bcs((
+                    transaction_data,
+                    ledger_info,
+                    BasicResponseStatus::Ok,
+                )),
+            },
+        }
     }
 
     fn get_by_version(
@@ -441,12 +467,16 @@ impl TransactionsApi {
             .context("Failed to get account transactions for the given account")
             .map_err(BasicErrorWith404::internal)?;
 
-        BasicResponse::try_from_rust_value((
-            self.render_transactions(data)?,
-            &latest_ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+        match accept_type {
+            AcceptType::Json => BasicResponse::try_from_json((
+                self.render_transactions(data)?,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+            AcceptType::Bcs => {
+                BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 
     fn get_signed_transaction(
@@ -482,21 +512,28 @@ impl TransactionsApi {
             .await
             .context("Mempool failed to initially evaluate submitted transaction")
             .map_err(SubmitTransactionError::internal)?;
+
         match mempool_status.code {
-            MempoolStatusCode::Accepted => {
-                let resolver = self.context.move_resolver_poem()?;
-                let pending_txn = resolver
-                    .as_converter(self.context.db.clone())
-                    .try_into_pending_transaction_poem(txn)
-                    .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
-                    .map_err(SubmitTransactionError::internal)?;
-                SubmitTransactionResponse::try_from_rust_value((
-                    pending_txn,
+            MempoolStatusCode::Accepted => match accept_type {
+                AcceptType::Json => {
+                    let resolver = self.context.move_resolver_poem()?;
+                    let pending_txn = resolver
+                            .as_converter(self.context.db.clone())
+                            .try_into_pending_transaction_poem(txn)
+                            .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
+                            .map_err(SubmitTransactionError::internal)?;
+                    SubmitTransactionResponse::try_from_json((
+                        pending_txn,
+                        &ledger_info,
+                        SubmitTransactionResponseStatus::Accepted,
+                    ))
+                }
+                AcceptType::Bcs => SubmitTransactionResponse::try_from_bcs((
+                    (),
                     &ledger_info,
                     SubmitTransactionResponseStatus::Accepted,
-                    accept_type,
-                ))
-            }
+                )),
+            },
             MempoolStatusCode::MempoolIsFull => Err(
                 SubmitTransactionError::insufficient_storage_str(&mempool_status.message),
             ),
