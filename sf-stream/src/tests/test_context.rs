@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::NodeConfig;
-use aptos_crypto::hash::HashValue;
+use aptos_crypto::{hash::HashValue, SigningKey};
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
@@ -24,12 +24,21 @@ use executor_types::BlockExecutorTrait;
 use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
-use aptos_api::context::Context;
-use aptos_api_types::TransactionOnChainData;
+use aptos_api::{context::Context, index};
+use aptos_api_types::{HexEncodedBytes, TransactionOnChainData};
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
+use bytes::Bytes;
+use hyper::Response;
 use rand::SeedableRng;
-use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc};
+use serde_json::{json, Value};
+use std::{
+    boxed::Box,
+    collections::BTreeMap,
+    iter::once,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use storage_interface::state_view::DbStateView;
 use vm_validator::vm_validator::VMValidator;
 
@@ -54,7 +63,7 @@ pub fn new_test_context(test_name: &'static str) -> TestContext {
     let (validator_identity, _, _) = validators[0].get_key_objects(None).unwrap();
     let validator_owner = validator_identity.account_address.unwrap();
 
-    let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(&tmp_dir));
+    let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test_with_indexer(&tmp_dir));
     let ret =
         db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
     assert!(ret);
@@ -115,7 +124,10 @@ impl TestContext {
             expect_status_code: 200,
             db,
             test_name,
-            fake_time: 0,
+            fake_time: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
         }
     }
     pub fn rng(&mut self) -> &mut rand::rngs::StdRng {
@@ -271,5 +283,96 @@ impl TestContext {
             HashValue::zero(),
         );
         LedgerInfoWithSignatures::new(info, BTreeMap::new())
+    }
+
+    pub async fn api_execute_script_function(
+        &mut self,
+        account: &mut LocalAccount,
+        module: &str,
+        func: &str,
+        type_args: serde_json::Value,
+        args: serde_json::Value,
+    ) {
+        let function = json!(format!(
+            "{}::{}::{}",
+            account.address().to_hex_literal(),
+            module,
+            func
+        ));
+        self.api_execute_txn(
+            account,
+            json!({
+                "type": "script_function_payload",
+                "function": function,
+                "type_arguments": type_args,
+                "arguments": args
+            }),
+        )
+        .await;
+    }
+
+    pub async fn api_publish_module(&mut self, account: &mut LocalAccount, code: HexEncodedBytes) {
+        self.api_execute_txn(
+            account,
+            json!({
+                "type": "module_bundle_payload",
+                "modules" : [
+                    {"bytecode": code},
+                ],
+            }),
+        )
+        .await;
+    }
+
+    pub async fn api_execute_txn(&mut self, account: &mut LocalAccount, payload: Value) {
+        let mut request = json!({
+            "sender": account.address(),
+            "sequence_number": account.sequence_number().to_string(),
+            "gas_unit_price": "0",
+            "max_gas_amount": "1000000",
+            "gas_currency_code": "XUS",
+            "expiration_timestamp_secs": "16373698888888",
+            "payload": payload,
+        });
+
+        let resp = self
+            .post("/transactions/signing_message", request.clone())
+            .await;
+
+        let signing_msg: HexEncodedBytes = resp["message"].as_str().unwrap().parse().unwrap();
+        let sig = account
+            .private_key()
+            .sign_arbitrary_message(signing_msg.inner());
+
+        let typ = "ed25519_signature";
+
+        request["signature"] = json!({
+            "type": typ,
+            "public_key": HexEncodedBytes::from(account.public_key().to_bytes().to_vec()),
+            "signature": HexEncodedBytes::from(sig.to_bytes().to_vec()),
+        });
+
+        self.expect_status_code(202)
+            .post("/transactions", request)
+            .await;
+        self.commit_mempool_txns(1).await;
+        *account.sequence_number_mut() += 1;
+    }
+
+    pub async fn post(&self, path: &str, body: Value) -> Value {
+        self.execute(warp::test::request().method("POST").path(path).json(&body))
+            .await
+    }
+
+    pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
+        req.reply(&index::routes(self.context.clone())).await
+    }
+
+    pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
+        let resp = self.reply(req).await;
+
+        let body = serde_json::from_slice(resp.body()).expect("response body is JSON");
+
+        body
     }
 }
