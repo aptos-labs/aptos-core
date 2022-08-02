@@ -83,6 +83,7 @@ async fn test_txn_broadcast() {
     assert_balance(&vfn_client, &account_0, 9).await;
     assert_balance(&vfn_client, &account_1, 11).await;
 
+    // send to vfn_client
     transfer_coins(
         &vfn_client,
         &transaction_factory,
