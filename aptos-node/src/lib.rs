@@ -664,8 +664,10 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         aptos_db.clone(),
         mp_client_sender.clone(),
     )?;
-    let sf_runtime = bootstrap_sf_stream(&node_config, chain_id, aptos_db, mp_client_sender)
-        .map(|runtime| runtime?);
+    let sf_runtime = match bootstrap_sf_stream(&node_config, chain_id, aptos_db, mp_client_sender) {
+        None => None,
+        Some(res) => Some(res?),
+    };
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
