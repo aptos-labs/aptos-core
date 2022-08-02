@@ -12,7 +12,7 @@ use std::mem;
 
 pub(crate) type BatchId = u64;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SerializedTransaction {
     bytes: Vec<u8>,
 }
