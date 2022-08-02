@@ -1,101 +1,31 @@
-import { AxiosRequestConfig, AxiosResponse } from "axios";
-import { Memoize, MemoizeExpiring } from "typescript-memoize";
-import { Accounts } from "./api/Accounts";
-import { Events } from "./api/Events";
-import { Transactions } from "./api/Transactions";
-import { HttpClient, RequestParams } from "./api/http-client";
+import { MemoizeExpiring } from "typescript-memoize";
 import { HexString, MaybeHexString } from "./hex_string";
-import { sleep } from "./util";
+import { moveStructTagToParam, sleep } from "./util";
 import { AptosAccount } from "./aptos_account";
-import { Types } from "./types";
-import { Tables } from "./api/Tables";
-import { AptosError } from "./api/data-contracts";
-import { TxnBuilderTypes, TransactionBuilderEd25519, TransactionBuilderABI } from "./transaction_builder";
-import { Bytes } from "./transaction_builder/bcs";
-
-export class RequestError extends Error {
-  response?: AxiosResponse<any, Types.AptosError>;
-
-  requestBody?: string;
-
-  constructor(message?: string, response?: AxiosResponse<any, Types.AptosError>, requestBody?: string) {
-    const data = JSON.stringify(response.data);
-    const hostAndPath = [response.request?.host, response.request?.path].filter((e) => !!e).join("");
-    super(`${message} - ${data}${hostAndPath ? ` @ ${hostAndPath}` : ""}${requestBody ? ` : ${requestBody}` : ""}`);
-    this.response = response;
-    this.requestBody = requestBody;
-    Object.setPrototypeOf(this, new.target.prototype); // restore prototype chain
-  }
-}
-
-export type AptosClientConfig = Omit<AxiosRequestConfig, "data" | "cancelToken" | "method">;
-
-type ExtraConfig = {
-  abis: Bytes[];
-};
-
-export function raiseForStatus<T>(
-  expectedStatus: number,
-  response: AxiosResponse<T, Types.AptosError>,
-  requestContent?: any,
-) {
-  if (response.status !== expectedStatus) {
-    if (requestContent) {
-      throw new RequestError(response.statusText, response, JSON.stringify(requestContent));
-    }
-    throw new RequestError(response.statusText, response);
-  }
-}
+import * as Gen from "./generated/index";
+import { TxnBuilderTypes, TransactionBuilderEd25519 } from "./transaction_builder";
 
 /**
  * Provides methods for retrieving data from Aptos node.
- * For more detailed API specification see {@link https://fullnode.devnet.aptoslabs.com/spec.html#/}
+ * For more detailed API specification see {@link https://fullnode.devnet.aptoslabs.com/v1/spec}
  */
 export class AptosClient {
-  nodeUrl: string;
-
-  client: HttpClient;
-
-  // These are the different routes
-  accounts: Accounts;
-
-  tables: Tables;
-
-  events: Events;
-
-  transactions: Transactions;
-
-  abis: Bytes[];
+  client: Gen.AptosGeneratedClient;
 
   /**
-   * Establishes a connection to Aptos node
-   * @param nodeUrl A url of the Aptos Node API endpoint
-   * @param config An optional config for inner axios instance.
-   * Detailed `config` description: {@link https://github.com/axios/axios#request-config}
+   * Build a client configured to connect to an Aptos node at the given URL.
+   * @param nodeUrl URL of the Aptos Node API endpoint.
+   * @param config Additional configuration options for the generated Axios client.
    */
-  constructor(nodeUrl: string, config?: AptosClientConfig, extraConfig?: ExtraConfig) {
-    this.nodeUrl = nodeUrl;
-
-    // `withCredentials` ensures cookie handling
-    this.client = new HttpClient<unknown>({
-      withCredentials: false,
-      baseURL: nodeUrl,
-      validateStatus: () => true, // Don't explode here on error responses; let our code handle it
-      ...(config || {}),
-    });
-
-    // Initialize routes
-    this.accounts = new Accounts(this.client);
-    this.tables = new Tables(this.client);
-    this.events = new Events(this.client);
-    this.transactions = new Transactions(this.client);
-
-    this.abis = extraConfig?.abis;
+  constructor(nodeUrl: string, config?: Partial<Gen.OpenAPIConfig>) {
+    const conf = config === undefined || config === null ? {} : { ...config };
+    conf.BASE = nodeUrl;
+    this.client = new Gen.AptosGeneratedClient(conf);
   }
 
   /**
    * Queries an Aptos account by address
-   * @param accountAddress Hex-encoded 16 bytes Aptos account address
+   * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @returns Core account resource, used for identifying account and transaction execution
    * @example An example of the returned account
    * ```
@@ -105,32 +35,32 @@ export class AptosClient {
    * }
    * ```
    */
-  async getAccount(accountAddress: MaybeHexString): Promise<Types.Account> {
-    const response = await this.accounts.getAccount(HexString.ensure(accountAddress).hex());
-    raiseForStatus(200, response);
-    return response.data;
+  async getAccount(accountAddress: MaybeHexString): Promise<Gen.AccountData> {
+    return this.client.accounts.getAccount(HexString.ensure(accountAddress).hex());
   }
 
   /**
    * Queries transactions sent by given account
-   * @param accountAddress Hex-encoded 16 bytes Aptos account address
+   * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param query Optional pagination object
    * @param query.start The start transaction version of the page. Default is the latest ledger version
-   * @param query.limit The max number of transactions should be returned for the page. Default is 25.
+   * @param query?.limit The max number of transactions should be returned for the page. Default is 25.
    * @returns An array of on-chain transactions, sent by account
    */
   async getAccountTransactions(
     accountAddress: MaybeHexString,
-    query?: { start?: number; limit?: number },
-  ): Promise<Types.OnChainTransaction[]> {
-    const response = await this.accounts.getAccountTransactions(HexString.ensure(accountAddress).hex(), query);
-    raiseForStatus(200, response);
-    return response.data;
+    query?: { start?: BigInt; limit?: number },
+  ): Promise<Gen.Transaction[]> {
+    return this.client.transactions.getAccountTransactions(
+      HexString.ensure(accountAddress).hex(),
+      query?.start?.toString(),
+      query?.limit,
+    );
   }
 
   /**
    * Queries modules associated with given account
-   * @param accountAddress Hex-encoded 16 bytes Aptos account address
+   * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param query.version Specifies ledger version of transactions. By default latest version will be used
    * @returns Account modules array for a specific ledger version.
    * Module is represented by MoveModule interface. It contains module `bytecode` and `abi`,
@@ -138,16 +68,17 @@ export class AptosClient {
    */
   async getAccountModules(
     accountAddress: MaybeHexString,
-    query?: { version?: Types.LedgerVersion },
-  ): Promise<Types.MoveModule[]> {
-    const response = await this.accounts.getAccountModules(HexString.ensure(accountAddress).hex(), query);
-    raiseForStatus(200, response);
-    return response.data;
+    query?: { ledgerVersion?: BigInt },
+  ): Promise<Gen.MoveModuleBytecode[]> {
+    return this.client.accounts.getAccountModules(
+      HexString.ensure(accountAddress).hex(),
+      query?.ledgerVersion?.toString(),
+    );
   }
 
   /**
    * Queries module associated with given account by module name
-   * @param accountAddress Hex-encoded 16 bytes Aptos account address
+   * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param moduleName The name of the module
    * @param query.version Specifies ledger version of transactions. By default latest version will be used
    * @returns Specified module.
@@ -157,61 +88,62 @@ export class AptosClient {
   async getAccountModule(
     accountAddress: MaybeHexString,
     moduleName: string,
-    query?: { version?: Types.LedgerVersion },
-  ): Promise<Types.MoveModule> {
-    const response = await this.accounts.getAccountModule(HexString.ensure(accountAddress).hex(), moduleName, query);
-    raiseForStatus(200, response);
-    return response.data;
+    query?: { ledgerVersion?: BigInt },
+  ): Promise<Gen.MoveModuleBytecode> {
+    return this.client.accounts.getAccountModule(
+      HexString.ensure(accountAddress).hex(),
+      moduleName,
+      query?.ledgerVersion?.toString(),
+    );
   }
 
   /**
    * Queries all resources associated with given account
-   * @param accountAddress Hex-encoded 16 bytes Aptos account address
+   * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param query.version Specifies ledger version of transactions. By default latest version will be used
    * @returns Account resources for a specific ledger version
    * @example An example of an account resource
    * ```
    * {
-   *    type: "0x1::account::Coin",
+   *    type: "0x1::AptosAccount::Coin",
    *    data: { value: 6 }
    * }
    * ```
    */
   async getAccountResources(
     accountAddress: MaybeHexString,
-    query?: { version?: Types.LedgerVersion },
-  ): Promise<Types.AccountResource[]> {
-    const response = await this.accounts.getAccountResources(HexString.ensure(accountAddress).hex(), query);
-    raiseForStatus(200, response);
-    return response.data;
+    query?: { ledgerVersion?: BigInt },
+  ): Promise<Gen.MoveResource[]> {
+    return this.client.accounts.getAccountResources(
+      HexString.ensure(accountAddress).hex(),
+      query?.ledgerVersion?.toString(),
+    );
   }
 
   /**
    * Queries resource associated with given account by resource type
-   * @param accountAddress Hex-encoded 16 bytes Aptos account address
+   * @param accountAddress Hex-encoded 32 byte Aptos account address
    * @param resourceType String representation of an on-chain Move struct type
    * @param query.version Specifies ledger version of transactions. By default latest version will be used
    * @returns Account resource of specified type and ledger version
    * @example An example of an account resource
    * ```
    * {
-   *    type: "0x1::account::Coin",
+   *    type: "0x1::AptosAccount::Coin",
    *    data: { value: 6 }
    * }
    * ```
    */
   async getAccountResource(
     accountAddress: MaybeHexString,
-    resourceType: string,
-    query?: { version?: Types.LedgerVersion },
-  ): Promise<Types.AccountResource> {
-    const response = await this.accounts.getAccountResource(
+    resourceType: Gen.MoveStructTag,
+    query?: { ledgerVersion?: BigInt },
+  ): Promise<Gen.MoveResource> {
+    return this.client.accounts.getAccountResource(
       HexString.ensure(accountAddress).hex(),
-      resourceType,
-      query,
+      moveStructTagToParam(resourceType),
+      query?.ledgerVersion?.toString(),
     );
-    raiseForStatus(200, response);
-    return response.data;
   }
 
   /** Generates a signed transaction that can be submitted to the chain for execution. */
@@ -239,7 +171,7 @@ export class AptosClient {
 
   /** Generates a transaction request that can be submitted to produce a raw transaction that
    * can be signed, which upon being signed can be submitted to the blockchain
-   * @param sender Hex-encoded 16 bytes Aptos account address of transaction sender
+   * @param sender Hex-encoded 32 byte Aptos account address of transaction sender
    * @param payload Transaction payload. It depends on transaction type you want to send
    * @param options Options allow to overwrite default transaction options.
    * Defaults are:
@@ -258,17 +190,23 @@ export class AptosClient {
    */
   async generateTransaction(
     sender: MaybeHexString,
-    payload: Types.TransactionPayload,
-    options?: Partial<Types.UserTransactionRequest>,
-  ): Promise<Types.UserTransactionRequest> {
+    payload: Gen.TransactionPayload,
+    options?: Partial<Gen.SubmitTransactionRequest>,
+  ): Promise<Gen.SubmitTransactionRequest> {
     const senderAddress = HexString.ensure(sender);
     const account = await this.getAccount(senderAddress);
+    const fakeSignature: Gen.TransactionSignature = {
+      type: "ed_25519_signature",
+      public_key: sender.toString(),
+      signature: HexString.fromUint8Array(new Uint8Array(32)).hex(),
+    };
     return {
+      // Use a fake signature.
+      signature: fakeSignature,
       sender: senderAddress.hex(),
       sequence_number: account.sequence_number,
       max_gas_amount: "1000",
       gas_unit_price: "1",
-      gas_currency_code: "XUS",
       // Unix timestamp, in seconds + 10 seconds
       expiration_timestamp_secs: (Math.floor(Date.now() / 1000) + 10).toString(),
       payload,
@@ -283,34 +221,30 @@ export class AptosClient {
    * @param txnRequest A raw transaction generated by `generateTransaction` method
    * @returns A hex-encoded string prefixed with `0x` and fulfilled with two hex digits per byte
    */
-  async createSigningMessage(txnRequest: Types.UserTransactionRequest): Promise<Types.HexEncodedBytes> {
-    const response = await this.transactions.createSigningMessage(txnRequest);
-    raiseForStatus(200, response, txnRequest);
-
-    const { message } = response.data;
-    return message;
+  async createSigningMessage(request: Gen.EncodeSubmissionRequest): Promise<string> {
+    return this.client.transactions.encodeSubmission(request);
   }
 
-  /** Converts a transaction request produced by `generate_transaction` into a properly signed
-   * transaction, which can then be submitted to the blockchain
+  /** Converts a transaction request produced by `generateTransaction` into a properly
+   * signed transaction, which can then be submitted to the blockchain
    * @param accountFrom AptosAccount of transaction sender
    * @param txnRequest A raw transaction generated by `generateTransaction` method
    * @returns A transaction, signed with sender account
    */
   async signTransaction(
     accountFrom: AptosAccount,
-    txnRequest: Types.UserTransactionRequest,
-  ): Promise<Types.SubmitTransactionRequest> {
+    txnRequest: Gen.SubmitTransactionRequest,
+  ): Promise<Gen.SubmitTransactionRequest> {
     const message = await this.createSigningMessage(txnRequest);
     const signatureHex = accountFrom.signHexString(message.substring(2));
 
-    const transactionSignature: Types.TransactionSignature = {
-      type: "ed25519_signature",
+    const transactionSignature: Gen.TransactionSignature = {
+      type: "ed_25519_signature",
       public_key: accountFrom.pubKey().hex(),
       signature: signatureHex.hex(),
     };
 
-    return { signature: transactionSignature, ...txnRequest };
+    return { ...txnRequest, signature: transactionSignature };
   }
 
   /**
@@ -319,39 +253,36 @@ export class AptosClient {
    * of `guid` field in the Move struct `EventHandle`
    * @returns Array of events assotiated with given key
    */
-  async getEventsByEventKey(eventKey: Types.HexEncodedBytes): Promise<Types.Event[]> {
-    const response = await this.events.getEventsByEventKey(eventKey);
-    raiseForStatus(200, response, `eventKey: ${eventKey}`);
-    return response.data;
+  async getEventsByEventKey(eventKey: string): Promise<Gen.Event[]> {
+    return this.client.events.getEventsByEventKey(eventKey);
   }
 
   /**
    * Extracts event key from the account resource identified by the
    * `event_handle_struct` and `field_name`, then returns events identified by the event key
-   * @param address Hex-encoded 16 bytes Aptos account from which events are queried
+   * @param address Hex-encoded 32 byte Aptos account from which events are queried
    * @param eventHandleStruct String representation of an on-chain Move struct type.
-   * (e.g. `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`)
+   * (e.g. `0x1::Coin::CoinStore<0x1::aptos_coin::AptosCoin>`)
    * @param fieldName The field name of the EventHandle in the struct
    * @param query Optional query object
    * @param query.start The start sequence number in the EVENT STREAM, defaulting to the latest event.
    * The events are returned in the reverse order of sequence number
-   * @param query.limit The number of events to be returned for the page default is 5
+   * @param query?.limit The number of events to be returned for the page default is 5
    * @returns Array of events
    */
   async getEventsByEventHandle(
     address: MaybeHexString,
-    eventHandleStruct: Types.MoveStructTagId,
+    eventHandleStruct: Gen.MoveStructTag,
     fieldName: string,
-    query?: { start?: number; limit?: number },
-  ): Promise<Types.Event[]> {
-    const response = await this.accounts.getEventsByEventHandle(
+    query?: { start?: BigInt; limit?: number },
+  ): Promise<Gen.Event[]> {
+    return this.client.events.getEventsByEventHandle(
       HexString.ensure(address).hex(),
-      eventHandleStruct,
+      moveStructTagToParam(eventHandleStruct),
       fieldName,
-      query,
+      query?.start?.toString(),
+      query?.limit,
     );
-    raiseForStatus(200, response, { address, eventHandleStruct, fieldName });
-    return response.data;
   }
 
   /**
@@ -359,28 +290,24 @@ export class AptosClient {
    * @param signedTxnRequest A transaction, signed by `signTransaction` method
    * @returns Transaction that is accepted and submitted to mempool
    */
-  async submitTransaction(signedTxnRequest: Types.SubmitTransactionRequest): Promise<Types.PendingTransaction> {
-    const response = await this.transactions.submitTransaction(signedTxnRequest);
-    raiseForStatus(202, response, signedTxnRequest);
-    return response.data;
+  async submitTransaction(signedTxnRequest: Gen.SubmitTransactionRequest): Promise<Gen.PendingTransaction> {
+    return this.client.transactions.submitTransaction(signedTxnRequest);
   }
 
   /** Submits a transaction with fake signature to the transaction simulation endpoint that takes JSON payload. */
   async simulateTransaction(
     accountFrom: AptosAccount,
-    txnRequest: Types.UserTransactionRequest,
-  ): Promise<Types.OnChainTransaction> {
-    const transactionSignature: Types.TransactionSignature = {
-      type: "ed25519_signature",
+    txnRequest: Gen.SubmitTransactionRequest,
+  ): Promise<Gen.UserTransaction[]> {
+    const transactionSignature: Gen.TransactionSignature = {
+      type: "ed_25519_signature",
       public_key: accountFrom.pubKey().hex(),
       // use invalid signature for simulation
       signature: HexString.fromUint8Array(new Uint8Array(64)).hex(),
     };
 
-    const request = { signature: transactionSignature, ...txnRequest };
-    const response = await this.transactions.simulateTransaction(request);
-    raiseForStatus(200, response, request);
-    return response.data[0];
+    const request = { ...txnRequest, signature: transactionSignature };
+    return this.client.transactions.simulateTransaction(request);
   }
 
   /**
@@ -388,71 +315,58 @@ export class AptosClient {
    * @param signedTxn A BCS transaction representation
    * @returns Transaction that is accepted and submitted to mempool
    */
-  async submitSignedBCSTransaction(signedTxn: Uint8Array): Promise<Types.PendingTransaction> {
+  async submitSignedBCSTransaction(signedTxn: Uint8Array): Promise<Gen.PendingTransaction> {
     // Need to construct a customized post request for transactions in BCS payload
-    const httpClient = this.transactions.http;
-
-    const response = await httpClient.request<Types.PendingTransaction, AptosError>({
-      path: "/transactions",
+    return this.client.request.request<Gen.PendingTransaction>({
+      url: "/transactions",
       method: "POST",
       body: signedTxn,
-      // @ts-ignore
-      type: "application/x.aptos.signed_transaction+bcs",
-      format: "json",
+      mediaType: "application/x.aptos.signed_transaction+bcs",
     });
-
-    raiseForStatus(202, response, signedTxn);
-    return response.data;
   }
 
   /**
    * Submits a signed transaction to the the endpoint that takes BCS payload
    * @param signedTxn output of generateBCSSimulation()
-   * @returns Simulation result in the form of OnChainTransaction
+   * @returns Simulation result in the form of UserTransaction
    */
-  async submitBCSSimulation(bcsBody: Uint8Array): Promise<Types.OnChainTransaction> {
+  async submitBCSSimulation(bcsBody: Uint8Array): Promise<Gen.UserTransaction[]> {
     // Need to construct a customized post request for transactions in BCS payload
-    const httpClient = this.transactions.http;
-
-    const response = await httpClient.request<Types.OnChainTransaction[], AptosError>({
-      path: "/transactions/simulate",
+    return this.client.request.request<Gen.UserTransaction[]>({
+      url: "/transactions/simulate",
       method: "POST",
       body: bcsBody,
-      // @ts-ignore
-      type: "application/x.aptos.signed_transaction+bcs",
-      format: "json",
+      mediaType: "application/x.aptos.signed_transaction+bcs",
     });
-
-    raiseForStatus(200, response, bcsBody);
-    return response.data[0];
   }
 
   /**
    * Queries on-chain transactions
    * @param query Optional pagination object
    * @param query.start The start transaction version of the page. Default is the latest ledger version
-   * @param query.limit The max number of transactions should be returned for the page. Default is 25
+   * @param query?.limit The max number of transactions should be returned for the page. Default is 25
    * @returns Array of on-chain transactions
    */
-  async getTransactions(query?: { start?: number; limit?: number }): Promise<Types.OnChainTransaction[]> {
-    const response = await this.transactions.getTransactions(query);
-    raiseForStatus(200, response);
-    return response.data;
+  async getTransactions(query?: { start?: BigInt; limit?: number }): Promise<Gen.Transaction[]> {
+    return this.client.transactions.getTransactions(query?.start?.toString(), query?.limit);
   }
 
   /**
-   * Queries transaction by hash or version. When given transaction hash, server first looks up
-   * on-chain transaction by hash; if no on-chain transaction found, then look up transaction
-   * by hash in the mempool (pending) transactions.
-   * When given a transaction version, server looks up the transaction on-chain by version
    * @param txnHashOrVersion - Transaction hash should be hex-encoded bytes string with 0x prefix.
    * Transaction version is an uint64 number.
    * @returns Transaction from mempool or on-chain transaction
    */
-  async getTransaction(txnHashOrVersion: string): Promise<Types.Transaction> {
-    const response = await this.transactions.getTransaction(txnHashOrVersion);
-    raiseForStatus(200, response, { txnHashOrVersion });
-    return response.data;
+  async getTransactionByHash(txnHash: string): Promise<Gen.Transaction> {
+    return this.client.transactions.getTransactionByHash(txnHash);
+  }
+
+  /**
+   * @param txnHashOrVersion - Transaction hash should be hex-encoded bytes string with 0x prefix.
+   * Transaction version is an uint64 number.
+   * @returns Transaction from mempool or on-chain transaction
+   */
+  async getTransactionByVersion(txnVersion: BigInt): Promise<Gen.Transaction> {
+    return this.client.transactions.getTransactionByVersion(txnVersion.toString());
   }
 
   /**
@@ -461,20 +375,22 @@ export class AptosClient {
    *
    * To create a transaction hash:
    *
-   * 1. Create hash message bytes: "APTOS::RawTransaction" bytes + BCS bytes of Transaction.
+   * 1. Create hash message bytes: "Aptos::Transaction" bytes + BCS bytes of Transaction.
    * 2. Apply hash algorithm SHA3-256 to the hash message bytes.
    * 3. Hex-encode the hash bytes with 0x prefix.
    *
    * @returns `true` if transaction is in pending state and `false` otherwise
    */
-  async transactionPending(txnHash: Types.HexEncodedBytes): Promise<boolean> {
-    const response = await this.transactions.getTransaction(txnHash);
-
-    if (response.status === 404) {
-      return true;
+  async transactionPending(txnHash: string): Promise<boolean> {
+    try {
+      const response = await this.client.transactions.getTransactionByHash(txnHash);
+      return response.type === "pending_transaction";
+    } catch (e) {
+      if (e instanceof Gen.ApiError) {
+        return e.status === 404;
+      }
+      throw e;
     }
-    raiseForStatus(200, response, txnHash);
-    return response.data.type === "pending_transaction";
   }
 
   /**
@@ -490,7 +406,7 @@ export class AptosClient {
    * // do smth after transaction is accepted into blockchain
    * ```
    */
-  async waitForTransaction(txnHash: Types.HexEncodedBytes) {
+  async waitForTransaction(txnHash: string) {
     let count = 0;
     // eslint-disable-next-line no-await-in-loop
     while (await this.transactionPending(txnHash)) {
@@ -503,6 +419,8 @@ export class AptosClient {
     }
   }
 
+  // TODO: For some reason this endpoint doesn't appear in the generated client
+  // if we use --modular, so I'm not using it for now.
   /**
    * Queries the latest ledger information
    * @param params Request params
@@ -512,28 +430,22 @@ export class AptosClient {
    * {
    *   chain_id: 15,
    *   epoch: 6,
-   *   ledger_version: "2235883",
+   *   ledgerVersion: "2235883",
    *   ledger_timestamp:"1654580922321826"
    * }
    * ```
    */
-  async getLedgerInfo(params: RequestParams = {}): Promise<Types.LedgerInfo> {
-    const result = await this.client.request<Types.LedgerInfo, AptosError>({
-      path: "/",
-      method: "GET",
-      format: "json",
-      ...params,
-    });
-    return result.data;
+  async getLedgerInfo(): Promise<Gen.IndexResponse> {
+    return this.client.general.getLedgerInfo();
   }
 
   /**
    * @param params Request params
    * @returns Current chain id
    */
-  @Memoize()
-  async getChainId(params: RequestParams = {}): Promise<number> {
-    const result = await this.getLedgerInfo(params);
+  @MemoizeExpiring(5 * 60 * 1000) // cache result for 5 minutes
+  async getChainId(): Promise<number> {
+    const result = await this.getLedgerInfo();
     return result.chain_id;
   }
 
@@ -548,53 +460,8 @@ export class AptosClient {
    * @param params Request params
    * @returns Table item value rendered in JSON
    */
-  async getTableItem(handle: string, data: Types.TableItemRequest, params?: RequestParams): Promise<any> {
-    const tableItem = await this.tables.getTableItem(handle, data, params);
+  async getTableItem(handle: string, data: Gen.TableItemRequest, query?: { ledgerVersion?: BigInt }): Promise<any> {
+    const tableItem = await this.client.tables.getTableItem(handle, data, query?.ledgerVersion?.toString());
     return tableItem;
-  }
-
-  // Only cache for a short period to avoid excessive amount of memory usage
-  @MemoizeExpiring(2 * 60 * 1000) // Cache for 2min
-  async getTxnBuilderWithABI(accountFrom: AptosAccount): Promise<TransactionBuilderEd25519> {
-    if (this.abis.length === 0) {
-      throw new Error("ABIs are not provided.");
-    }
-
-    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
-      this.getAccount(accountFrom.address()),
-      this.getChainId(),
-    ]);
-
-    const rawTxnBuilder = new TransactionBuilderABI(this.abis, {
-      sender: accountFrom.address(),
-      sequenceNumber,
-      chainId,
-    });
-
-    return new TransactionBuilderEd25519(
-      (signingMessage: TxnBuilderTypes.SigningMessage) => {
-        const sigHexStr = accountFrom.signBuffer(signingMessage);
-        return new TxnBuilderTypes.Ed25519Signature(sigHexStr.toUint8Array());
-      },
-      accountFrom.pubKey().toUint8Array(),
-      rawTxnBuilder,
-    );
-  }
-
-  async sendABITransaction(
-    accountFrom: AptosAccount,
-    func: string,
-    ty_tags: string[],
-    args: any[],
-  ): Promise<Types.PendingTransaction> {
-    const [txnBuilder, { sequence_number: sequenceNumber }] = await Promise.all([
-      this.getTxnBuilderWithABI(accountFrom),
-      this.getAccount(accountFrom.address()),
-    ]);
-    txnBuilder.rawTxnBuilder?.setSequenceNumber(sequenceNumber);
-
-    const rawTxn = txnBuilder.build(func, ty_tags, args);
-
-    return this.submitSignedBCSTransaction(txnBuilder.sign(rawTxn));
   }
 }
