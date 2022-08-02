@@ -15,7 +15,12 @@ spec:
     latency: "{latency_ms}ms"
     correlation: "{correlation_percentage}"
     jitter: "{jitter_ms}ms"
-  direction: both
+  # Indicates the direction of target packets. Available vaules include:
+  # from (the packets from target)
+  # to (the packets to target)
+  # both ( the packets from or to target)
+  # This parameter makes Chaos only take effect for a specific direction of packets.
+  direction: to
   target:
     selector:
       namespaces:
