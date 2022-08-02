@@ -58,6 +58,10 @@ struct IndexerArgs {
     /// in the postgres DB tables.
     #[clap(long)]
     index_token_data: bool,
+
+    /// turn on the token URI fetcher
+    #[clap(long)]
+    index_token_uri_data: bool,
 }
 
 #[tokio::main]
@@ -80,7 +84,8 @@ async fn main() -> std::io::Result<()> {
     let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
     tailer.add_processor(Arc::new(pg_transaction_processor));
     if args.index_token_data {
-        let token_transaction_processor = TokenTransactionProcessor::new(conn_pool.clone());
+        let token_transaction_processor =
+            TokenTransactionProcessor::new(conn_pool.clone(), args.index_token_uri_data);
         tailer.add_processor(Arc::new(token_transaction_processor));
     }
 
