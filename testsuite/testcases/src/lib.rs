@@ -11,6 +11,7 @@ pub mod partial_nodes_down_test;
 pub mod performance_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
+pub mod node_delay_test;
 
 use anyhow::ensure;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};

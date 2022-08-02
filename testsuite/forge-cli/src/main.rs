@@ -14,6 +14,7 @@ use testcases::{
     compatibility_test::SimpleValidatorUpgrade, generate_traffic,
     network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
     reconfiguration_test::ReconfigurationTest, state_sync_performance::StateSyncPerformance,
+    node_delay_test::NodeDelayTest,
 };
 use tokio::runtime::Runtime;
 use url::Url;
@@ -395,6 +396,7 @@ fn single_test_suite(test_name: &str) -> ForgeConfig<'static> {
         "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
         "network_latency" => config.with_network_tests(&[&NetworkLatencyTest]),
         "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
+        "node_delay" => config.with_network_tests(&[&NodeDelayTest]),
         _ => config.with_network_tests(&[&PerformanceBenchmark]),
     }
 }

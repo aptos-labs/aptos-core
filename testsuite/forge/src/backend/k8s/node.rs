@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    scale_stateful_set_replicas, FullNode, HealthCheckError, Node, NodeExt, Result, Validator,
-    Version, KUBECTL_BIN,
+    chaos, scale_stateful_set_replicas, FullNode, HealthCheckError, Node, NodeChaos, NodeExt,
+    Result, Validator, Version, KUBECTL_BIN,
 };
-use anyhow::{anyhow, format_err, Context};
+use anyhow::{anyhow, bail, format_err, Context};
 use aptos_config::config::NodeConfig;
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
@@ -13,6 +13,7 @@ use aptos_sdk::types::PeerId;
 use reqwest::Url;
 use serde_json::Value;
 use std::{
+    collections::HashSet,
     fmt::{Debug, Formatter},
     process::{Command, Stdio},
     str::FromStr,
@@ -39,6 +40,7 @@ pub struct K8sNode {
     pub namespace: String,
     // this controls whether the connection routes to HAProxy first
     pub enable_haproxy: bool,
+    pub chaoses: HashSet<NodeChaos>,
 }
 
 impl K8sNode {
@@ -240,6 +242,21 @@ impl Node for K8sNode {
         thread::sleep(Duration::from_secs(5));
 
         Ok(port)
+    }
+
+    fn inject_chaos(&mut self, chaos: NodeChaos) -> Result<()> {
+        chaos::inject_node_chaos(&self.namespace, &self.name, &chaos)?;
+        self.chaoses.insert(chaos);
+        Ok(())
+    }
+
+    fn remove_chaos(&mut self, chaos: NodeChaos) -> Result<()> {
+        if self.chaoses.remove(&chaos) {
+            chaos::remove_node_chaos(&self.namespace, &self.name, &chaos)?;
+        } else {
+            bail!("Chaos {:?} not found", chaos);
+        }
+        Ok(())
     }
 }
 

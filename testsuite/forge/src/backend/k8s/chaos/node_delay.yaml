@@ -2,13 +2,13 @@ kind: NetworkChaos
 apiVersion: chaos-mesh.org/v1alpha1
 metadata:
   namespace: {namespace}
-  name: forge-namespace-{latency_ms}ms-latency
+  name: forge-namespace-delay-{source_node}-to-{target_node}
 spec:
   selector:
     namespaces:
       - {namespace}
-    labelSelectors:
-      app.kubernetes.io/name: validator
+    fieldSelectors:
+      'metadata.name': {source_node}-0
   mode: all
   action: delay
   delay:
@@ -20,6 +20,6 @@ spec:
     selector:
       namespaces:
         - {namespace}
-      labelSelectors:
-        app.kubernetes.io/name: validator
+      fieldSelectors:
+        'metadata.name': {target_node}-0
     mode: all

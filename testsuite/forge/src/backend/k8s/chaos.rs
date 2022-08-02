@@ -6,10 +6,15 @@ use std::process::Command;
 use tempfile::TempDir;
 
 use crate::{
-    dump_string_to_file, Result, SwarmChaos, SwarmNetworkBandwidth, SwarmNetworkDelay,
-    SwarmNetworkPartition, KUBECTL_BIN,
+    dump_string_to_file, NodeChaos, NodeNetworkDelay, Result, SwarmChaos, SwarmNetworkBandwidth,
+    SwarmNetworkDelay, SwarmNetworkPartition, KUBECTL_BIN,
 };
 
+macro_rules! DELAY_NODE_CHAOS_TEMPLATE {
+    () => {
+        "chaos/node_delay.yaml"
+    };
+}
 macro_rules! DELAY_NETWORK_CHAOS_TEMPLATE {
     () => {
         "chaos/network_delay.yaml"
@@ -28,17 +33,45 @@ macro_rules! BANDWIDTH_NETWORK_CHAOS_TEMPLATE {
 
 /// Injects the SwarmChaos into the specified namespace
 pub fn inject_swarm_chaos(kube_namespace: &str, chaos: &SwarmChaos) -> Result<()> {
-    let template = create_chaos_template(kube_namespace, chaos)?;
+    let template = create_swarm_chaos_template(kube_namespace, chaos)?;
     inject_chaos_template(kube_namespace, template)
 }
 
 /// Removes the SwarmChaos from the specified namespace, if it exists
 pub fn remove_swarm_chaos(kube_namespace: &str, chaos: &SwarmChaos) -> Result<()> {
-    let template = create_chaos_template(kube_namespace, chaos)?;
+    let template = create_swarm_chaos_template(kube_namespace, chaos)?;
     remove_chaos_template(kube_namespace, template)
 }
 
-fn create_network_delay_template(
+/// Injects the NodeChaos into the specified namespace
+pub fn inject_node_chaos(kube_namespace: &str, node_name: &str, chaos: &NodeChaos) -> Result<()> {
+    let template = create_node_chaos_template(kube_namespace, node_name, chaos)?;
+    inject_chaos_template(kube_namespace, template)
+}
+
+/// Removes the NodeChaos from the specified namespace, if it exists
+pub fn remove_node_chaos(kube_namespace: &str, node_name: &str, chaos: &NodeChaos) -> Result<()> {
+    let template = create_node_chaos_template(kube_namespace, node_name, chaos)?;
+    remove_chaos_template(kube_namespace, template)
+}
+
+fn create_node_network_delay_template(
+    kube_namespace: &str,
+    source_node: &str,
+    node_network_delay: &NodeNetworkDelay,
+) -> String {
+    format!(
+        include_str!(DELAY_NODE_CHAOS_TEMPLATE!()),
+        namespace = kube_namespace,
+        latency_ms = node_network_delay.latency_ms,
+        jitter_ms = node_network_delay.jitter_ms,
+        correlation_percentage = node_network_delay.correlation_percentage,
+        source_node = source_node,
+        target_node = node_network_delay.target_node,
+    )
+}
+
+fn create_swarm_network_delay_template(
     kube_namespace: &str,
     swarm_network_delay: &SwarmNetworkDelay,
 ) -> String {
@@ -51,7 +84,7 @@ fn create_network_delay_template(
     )
 }
 
-fn create_network_partition_template(
+fn create_swarm_network_partition_template(
     kube_namespace: &str,
     swarm_network_partition: &SwarmNetworkPartition,
 ) -> String {
@@ -62,7 +95,7 @@ fn create_network_partition_template(
     )
 }
 
-fn create_network_bandwidth_template(
+fn create_swarm_network_bandwidth_template(
     kube_namespace: &str,
     swarm_network_bandwidth: &SwarmNetworkBandwidth,
 ) -> String {
@@ -75,11 +108,22 @@ fn create_network_bandwidth_template(
     )
 }
 
-fn create_chaos_template(kube_namespace: &str, chaos: &SwarmChaos) -> Result<String> {
+fn create_swarm_chaos_template(kube_namespace: &str, chaos: &SwarmChaos) -> Result<String> {
     let template = match chaos {
-        SwarmChaos::Delay(c) => create_network_delay_template(kube_namespace, c),
-        SwarmChaos::Partition(c) => create_network_partition_template(kube_namespace, c),
-        SwarmChaos::Bandwidth(c) => create_network_bandwidth_template(kube_namespace, c),
+        SwarmChaos::Delay(c) => create_swarm_network_delay_template(kube_namespace, c),
+        SwarmChaos::Partition(c) => create_swarm_network_partition_template(kube_namespace, c),
+        SwarmChaos::Bandwidth(c) => create_swarm_network_bandwidth_template(kube_namespace, c),
+    };
+    Ok(template)
+}
+
+fn create_node_chaos_template(
+    kube_namespace: &str,
+    node_name: &str,
+    chaos: &NodeChaos,
+) -> Result<String> {
+    let template = match chaos {
+        NodeChaos::Delay(c) => create_node_network_delay_template(kube_namespace, node_name, c),
     };
     Ok(template)
 }

@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
+use crate::{
+    FullNode, HealthCheckError, LocalVersion, Node, NodeChaos, NodeExt, Validator, Version,
+};
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_config::config::NodeConfig;
 use aptos_logger::debug;
@@ -237,6 +239,14 @@ impl Node for LocalNode {
     // local node does not need to expose metric end point
     fn expose_metric(&self) -> Result<u64> {
         Ok(0)
+    }
+
+    fn inject_chaos(&mut self, _chaos: NodeChaos) -> Result<()> {
+        todo!()
+    }
+
+    fn remove_chaos(&mut self, _chaos: NodeChaos) -> Result<()> {
+        todo!()
     }
 }
 

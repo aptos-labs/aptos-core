@@ -342,6 +342,7 @@ pub(crate) async fn get_validators(
                 version: Version::new(0, image_tag.to_string()),
                 namespace: kube_namespace.to_string(),
                 enable_haproxy,
+                chaoses: HashSet::new(),
             };
             (node.peer_id(), node)
         })
@@ -394,6 +395,7 @@ pub(crate) async fn get_fullnodes(
                 version: Version::new(0, image_tag.to_string()),
                 namespace: kube_namespace.to_string(),
                 enable_haproxy,
+                chaoses: HashSet::new(),
             };
             (node.peer_id(), node)
         })

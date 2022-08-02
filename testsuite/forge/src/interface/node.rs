@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Result, Version};
+use crate::{NodeChaos, Result, Version};
 use anyhow::anyhow;
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_rest_client::Client as RestClient;
@@ -66,6 +66,10 @@ pub trait Node: Send + Sync {
     fn counter(&self, counter: &str, port: u64) -> Result<f64>;
 
     fn expose_metric(&self) -> Result<u64>;
+
+    fn inject_chaos(&mut self, chaos: NodeChaos) -> Result<()>;
+
+    fn remove_chaos(&mut self, chaos: NodeChaos) -> Result<()>;
 }
 
 /// Trait used to represent a running Validator

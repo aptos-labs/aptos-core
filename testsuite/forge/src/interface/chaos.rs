@@ -10,7 +10,7 @@ pub enum SwarmChaos {
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub enum NodeChaos {
-    NodeNetworkDelayChaos(NodeNetworkDelay),
+    Delay(NodeNetworkDelay),
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
@@ -35,4 +35,7 @@ pub struct SwarmNetworkBandwidth {
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
 pub struct NodeNetworkDelay {
     pub latency_ms: u64,
+    pub jitter_ms: u64,
+    pub correlation_percentage: u64,
+    pub target_node: String,
 }
