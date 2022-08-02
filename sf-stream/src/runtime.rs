@@ -28,7 +28,11 @@ pub fn bootstrap(
     chain_id: ChainId,
     db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
-) -> anyhow::Result<Runtime> {
+) -> Option<anyhow::Result<Runtime>> {
+    if !config.sf_stream.enabled {
+        return None;
+    }
+
     let runtime = Builder::new_multi_thread()
         .thread_name("sf-stream")
         .enable_all()
@@ -38,18 +42,16 @@ pub fn bootstrap(
     let node_config = config.clone();
 
     runtime.spawn(async move {
-        if node_config.sf_stream.enabled {
-            let context = Context::new(chain_id, db, mp_sender.clone(), node_config.clone());
-            let context_arc = Arc::new(context);
-            let mut streamer = SfStreamer::new(
-                context_arc,
-                node_config.sf_stream.starting_version,
-                Some(mp_sender),
-            );
-            streamer.start().await;
-        }
+        let context = Context::new(chain_id, db, mp_sender.clone(), node_config.clone());
+        let context_arc = Arc::new(context);
+        let mut streamer = SfStreamer::new(
+            context_arc,
+            node_config.sf_stream.starting_version,
+            Some(mp_sender),
+        );
+        streamer.start().await;
     });
-    Ok(runtime)
+    Some(Ok(runtime))
 }
 
 pub struct SfStreamer {
