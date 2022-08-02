@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 #[derive(Debug, StructOpt)]
 struct PrunerOpt {
