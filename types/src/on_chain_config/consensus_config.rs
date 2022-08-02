@@ -111,6 +111,7 @@ impl Default for ConsensusConfigV1 {
                     // to have enough useful statistics.
                     proposer_window_num_validators_multiplier: 10,
                     voter_window_num_validators_multiplier: 1,
+                    weight_by_voting_power: true,
                 }),
             ),
         }
@@ -149,6 +150,7 @@ pub struct ActiveInactiveConfig {
     pub active_weight: u64,
     pub inactive_weight: u64,
     pub window_num_validators_multiplier: usize,
+    pub weight_by_voting_power: bool,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -168,6 +170,8 @@ pub struct ProposerAndVoterConfig {
     // Window into history considered for votre statistics, multiplier
     // on top of number of validators
     pub voter_window_num_validators_multiplier: usize,
+    // Flag whether to use voting power as multiplier to the weights
+    pub weight_by_voting_power: bool,
 }
 
 #[cfg(test)]
