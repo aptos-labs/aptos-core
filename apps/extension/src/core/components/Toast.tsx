@@ -12,7 +12,7 @@ export const { toast } = createStandaloneToast({
 });
 
 // Add Account
-export const addAccountToast = () => {
+export const createAccountToast = () => {
   toast({
     description: 'Successfully created new account',
     status: 'success',
@@ -20,11 +20,27 @@ export const addAccountToast = () => {
   });
 };
 
-export const addAccountErrorToast = () => {
+export const createAccountErrorToast = () => {
   toast({
     description: 'Error creating new account',
     status: 'error',
     title: 'Error creating account',
+  });
+};
+
+export const importAccountToast = () => {
+  toast({
+    description: 'Successfully imported new account',
+    status: 'success',
+    title: 'Imported account',
+  });
+};
+
+export const importAccountErrorToast = () => {
+  toast({
+    description: 'Error importing new account',
+    status: 'error',
+    title: 'Error importing account',
   });
 };
 

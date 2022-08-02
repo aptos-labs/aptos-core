@@ -15,12 +15,14 @@ import {
 import Browser from 'core/utils/browser';
 import { AptosAccount, FaucetClient } from 'aptos';
 import {
-  addAccountToast,
-  addAccountErrorToast,
+  createAccountToast,
+  createAccountErrorToast,
   switchAccountToast,
   switchAccountErrorToast,
   removeAccountToast,
   removeAccountErrorToast,
+  importAccountErrorToast,
+  importAccountToast,
 } from 'core/components/Toast';
 import { ProviderEvent, sendProviderEvent } from 'core/utils/providerEvents';
 
@@ -35,6 +37,7 @@ export interface UpdateWalletStateProps {
 
 export interface AddAccountProps {
   account: AptosAccount
+  isImport?: boolean;
   mnemonic?: Mnemonic
 }
 
@@ -68,7 +71,7 @@ export default function useWalletState() {
   );
 
   const addAccount = useCallback(async ({
-    account, mnemonic,
+    account, isImport = false, mnemonic,
   }: AddAccountProps) => {
     const faucetClient = new FaucetClient(nodeUrl, faucetNetwork);
     const newAccount: WalletAccount = {
@@ -92,10 +95,18 @@ export default function useWalletState() {
         localStorageStateString,
       );
       Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateString });
-      addAccountToast();
       sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED, account);
+      if (isImport) {
+        importAccountToast();
+      } else {
+        createAccountToast();
+      }
     } catch (err) {
-      addAccountErrorToast();
+      if (isImport) {
+        importAccountErrorToast();
+      } else {
+        createAccountErrorToast();
+      }
       console.error(err);
       throw err;
     }

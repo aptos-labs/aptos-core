@@ -52,7 +52,7 @@ export default function ImportAccountPrivateKeyBody() {
         eventType: loginEvents.LOGIN_WITH_PRIVATE_KEY,
         params: analyticsParams,
       });
-      await addAccount({ account });
+      await addAccount({ account, isImport: true });
       navigate(Routes.wallet.routePath);
     } catch (err) {
       Analytics.event({

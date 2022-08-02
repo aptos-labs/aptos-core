@@ -46,7 +46,7 @@ export default function ImportAccountHeader({
         </Center>
       ) : <Box />}
       <Center width="100%">
-        <Text fontWeight={600}>
+        <Text fontSize="md" fontWeight={600}>
           {headerValue}
         </Text>
       </Center>
