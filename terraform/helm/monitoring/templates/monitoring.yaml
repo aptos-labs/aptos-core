@@ -150,6 +150,23 @@ spec:
 
 ---
 
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "aptos-monitoring.fullname" . }}-prometheus
+  labels:
+    {{- include "aptos-monitoring.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "aptos-monitoring.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: monitoring
+  ports:
+  - name: prometheus-http
+    port: 9090
+  type: ClusterIP
+
+---
+
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
