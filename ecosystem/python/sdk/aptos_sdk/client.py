@@ -5,18 +5,21 @@ import time
 from typing import Any, Dict, List, Optional
 
 import httpx
-from account import Account
-from account_address import AccountAddress
-from authenticator import (Authenticator, Ed25519Authenticator,
-                           MultiAgentAuthenticator)
-from bcs import Serializer
-from transactions import (MultiAgentRawTransaction, RawTransaction,
-                          ScriptFunction, SignedTransaction,
-                          TransactionArgument, TransactionPayload)
-from type_tag import StructTag, TypeTag
+
+from .account import Account
+from .account_address import AccountAddress
+from .authenticator import (Authenticator, Ed25519Authenticator,
+                            MultiAgentAuthenticator)
+from .bcs import Serializer
+from .transactions import (MultiAgentRawTransaction, RawTransaction,
+                           ScriptFunction, SignedTransaction,
+                           TransactionArgument, TransactionPayload)
+from .type_tag import StructTag, TypeTag
 
 TESTNET_URL = "https://fullnode.devnet.aptoslabs.com"
 FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
+
+U64_MAX = 18446744073709551615
 
 
 class RestClient:
@@ -30,6 +33,9 @@ class RestClient:
         self.base_url = base_url
         self.client = httpx.Client()
         self.chain_id = int(self.info()["chain_id"])
+
+    def close(self):
+        self.client.close()
 
     #
     # Account accessors
@@ -134,7 +140,7 @@ class RestClient:
         response = self.client.post(
             f"{self.base_url}/transactions", headers=headers, json=txn_request
         )
-        assert response.status_code == 202, f"{response.text} - {txn}"
+        assert response.status_code == 202, f"{response.text} - {txn_request}"
         return response.json()["hash"]
 
     def transaction_pending(self, txn_hash: str) -> bool:
@@ -153,7 +159,9 @@ class RestClient:
             time.sleep(1)
             count += 1
         response = self.client.get(f"{self.base_url}/transactions/{txn_hash}")
-        assert "success" in response.json(), f"{response.text} - {txn_hash}"
+        assert (
+            "success" in response.json() and response.json()["success"]
+        ), f"{response.text} - {txn_hash}"
 
     #
     # Transaction helpers
@@ -270,11 +278,15 @@ class RestClient:
             TransactionArgument(name, Serializer.str),
             TransactionArgument(description, Serializer.str),
             TransactionArgument(uri, Serializer.str),
+            TransactionArgument(U64_MAX, Serializer.u64),
+            TransactionArgument(
+                [False, False, False], Serializer.sequence_serializer(Serializer.bool)
+            ),
         ]
 
         payload = ScriptFunction.natural(
             "0x3::token",
-            "create_unlimited_collection_script",
+            "create_collection_script",
             [],
             transaction_arguments,
         )
@@ -298,15 +310,24 @@ class RestClient:
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(name, Serializer.str),
             TransactionArgument(description, Serializer.str),
-            TransactionArgument(True, Serializer.bool),
+            TransactionArgument(supply, Serializer.u64),
             TransactionArgument(supply, Serializer.u64),
             TransactionArgument(uri, Serializer.str),
+            TransactionArgument(account.address(), Serializer.struct),
+            TransactionArgument(1000000, Serializer.u64),  # SDK assumes per million
             TransactionArgument(royalty_points_per_million, Serializer.u64),
+            TransactionArgument(
+                [False, False, False, False, False],
+                Serializer.sequence_serializer(Serializer.bool),
+            ),
+            TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
+            TransactionArgument([], Serializer.sequence_serializer(Serializer.bytes)),
+            TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
         ]
 
         payload = ScriptFunction.natural(
             "0x3::token",
-            "create_unlimited_token_script",
+            "create_token_script",
             [],
             transaction_arguments,
         )
@@ -322,6 +343,7 @@ class RestClient:
         creator: str,
         collection_name: str,
         token_name: str,
+        property_version: int,
         amount: int,
     ) -> str:
         transaction_arguments = [
@@ -330,10 +352,11 @@ class RestClient:
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(token_name, Serializer.str),
             TransactionArgument(amount, Serializer.u64),
+            TransactionArgument(property_version, Serializer.u64),
         ]
 
         payload = ScriptFunction.natural(
-            "0x3::tokenTransfers",
+            "0x3::token_transfers",
             "offer_script",
             [],
             transaction_arguments,
@@ -350,16 +373,18 @@ class RestClient:
         creator: str,
         collection_name: str,
         token_name: str,
+        property_version: int,
     ) -> str:
         transaction_arguments = [
             TransactionArgument(sender, Serializer.struct),
             TransactionArgument(creator, Serializer.struct),
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(token_name, Serializer.str),
+            TransactionArgument(property_version, Serializer.u64),
         ]
 
         payload = ScriptFunction.natural(
-            "0x3::tokenTransfers",
+            "0x3::token_transfers",
             "claim_script",
             [],
             transaction_arguments,
@@ -376,6 +401,7 @@ class RestClient:
         creators_address: AccountAddress,
         collection_name: str,
         token_name: str,
+        property_version: int,
         amount: int,
     ) -> str:
         transaction_arguments = [
@@ -383,6 +409,7 @@ class RestClient:
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(token_name, Serializer.str),
             TransactionArgument(amount, Serializer.u64),
+            TransactionArgument(property_version, Serializer.u64),
         ]
 
         payload = ScriptFunction.natural(
@@ -409,15 +436,19 @@ class RestClient:
         creator: AccountAddress,
         collection_name: str,
         token_name: str,
+        property_version: int,
     ) -> Any:
         token_store = self.account_resource(owner, "0x3::token::TokenStore")["data"][
             "tokens"
         ]["handle"]
 
         token_id = {
-            "creator": creator.hex(),
-            "collection": collection_name,
-            "name": token_name,
+            "token_data_id": {
+                "creator": creator.hex(),
+                "collection": collection_name,
+                "name": token_name,
+            },
+            "property_version": str(property_version),
         }
 
         return self.get_table_item(
@@ -425,16 +456,20 @@ class RestClient:
             "0x3::token::TokenId",
             "0x3::token::Token",
             token_id,
-        )["value"]
+        )["amount"]
 
     def get_token_data(
-        self, creator: AccountAddress, collection_name: str, token_name: str
+        self,
+        creator: AccountAddress,
+        collection_name: str,
+        token_name: str,
+        property_version: int,
     ) -> Any:
         token_data = self.account_resource(creator, "0x3::token::Collections")["data"][
             "token_data"
         ]["handle"]
 
-        token_id = {
+        token_data_id = {
             "creator": creator.hex(),
             "collection": collection_name,
             "name": token_name,
@@ -442,20 +477,20 @@ class RestClient:
 
         return self.get_table_item(
             token_data,
-            "0x3::token::TokenId",
+            "0x3::token::TokenDataId",
             "0x3::token::TokenData",
-            token_id,
+            token_data_id,
         )
 
     def get_collection(self, creator: AccountAddress, collection_name: str) -> Any:
         token_data = self.account_resource(creator, "0x3::token::Collections")["data"][
-            "collections"
+            "collection_data"
         ]["handle"]
 
         return self.get_table_item(
             token_data,
             "0x1::string::String",
-            "0x3::token::Collection",
+            "0x3::token::CollectionData",
             collection_name,
         )
 
@@ -470,6 +505,9 @@ class FaucetClient:
         self.base_url = base_url
         self.rest_client = rest_client
 
+    def close(self):
+        self.rest_client.close()
+
     def fund_account(self, address: str, amount: int):
         """This creates an account if it does not exist and mints the specified amount of
         coins into that account."""
@@ -479,124 +517,3 @@ class FaucetClient:
         assert txns.status_code == 200, txns.text
         for txn_hash in txns.json():
             self.rest_client.wait_for_transaction(txn_hash)
-
-
-def coin_transfer():
-    rest_client = RestClient(TESTNET_URL)
-    faucet_client = FaucetClient(FAUCET_URL, rest_client)
-
-    alice = Account.generate()
-    bob = Account.generate()
-
-    print("\n=== Addresses ===")
-    print(f"Alice: {alice.address()}")
-    print(f"Bob: {bob.address()}")
-
-    faucet_client.fund_account(alice.address(), 1_000_000)
-    faucet_client.fund_account(bob.address(), 0)
-
-    print("\n=== Initial Balances ===")
-    print(f"Alice: {rest_client.account_balance(alice.address())}")
-    print(f"Bob: {rest_client.account_balance(bob.address())}")
-
-    # Have Alice give Bob 1_000 coins
-    txn_hash = rest_client.transfer(alice, bob.address(), 1_000)
-    rest_client.wait_for_transaction(txn_hash)
-
-    print("\n=== Intermediate Balances ===")
-    print(f"Alice: {rest_client.account_balance(alice.address())}")
-    print(f"Bob: {rest_client.account_balance(bob.address())}")
-
-    # Have Alice give Bob another 1_000 coins using BCS
-    txn_hash = rest_client.bcs_transfer(alice, bob.address(), 1_000)
-    rest_client.wait_for_transaction(txn_hash)
-
-    print("\n=== Final Balances ===")
-    print(f"Alice: {rest_client.account_balance(alice.address())}")
-    print(f"Bob: {rest_client.account_balance(bob.address())}")
-
-
-def token_transfer():
-    rest_client = RestClient(TESTNET_URL)
-    faucet_client = FaucetClient(FAUCET_URL, rest_client)
-
-    alice = Account.generate()
-    bob = Account.generate()
-
-    collection_name = "Alice's"
-    token_name = "Alice's first token"
-
-    print("\n=== Addresses ===")
-    print(f"Alice: {alice.address()}")
-    print(f"Bob: {bob.address()}")
-
-    faucet_client.fund_account(alice.address(), 10_000_000)
-    faucet_client.fund_account(bob.address(), 10_000_000)
-
-    print("\n=== Initial Balances ===")
-    print(f"Alice: {rest_client.account_balance(alice.address())}")
-    print(f"Bob: {rest_client.account_balance(bob.address())}")
-
-    print("\n=== Creating Collection and Token ===")
-
-    txn_hash = rest_client.create_collection(
-        alice, collection_name, "Alice's simple collection", "https://aptos.dev"
-    )
-    rest_client.wait_for_transaction(txn_hash)
-
-    txn_hash = rest_client.create_token(
-        alice,
-        collection_name,
-        token_name,
-        "Alice's simple token",
-        1,
-        "https://aptos.dev/img/nyan.jpeg",
-        0,
-    )
-    rest_client.wait_for_transaction(txn_hash)
-
-    print(
-        f"Alice's collection: {rest_client.get_collection(alice.address(), collection_name)}"
-    )
-    print(
-        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}"
-    )
-    print(
-        f"Alice's token data: {rest_client.get_token_data(alice.address(), collection_name, token_name)}"
-    )
-
-    print("\n=== Transferring the token to Bob ===")
-    txn_hash = rest_client.offer_token(
-        alice, bob.address(), alice.address(), collection_name, token_name, 1
-    )
-    rest_client.wait_for_transaction(txn_hash)
-
-    txn_hash = rest_client.claim_token(
-        bob, alice.address(), alice.address(), collection_name, token_name
-    )
-    rest_client.wait_for_transaction(txn_hash)
-
-    print(
-        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}"
-    )
-    print(
-        f"Bob's token balance: {rest_client.get_token_balance(bob.address(), alice.address(), collection_name, token_name)}"
-    )
-
-    print("\n=== Transferring the token back to Alice using MultiAgent ===")
-    txn_hash = rest_client.direct_transfer_token(
-        bob, alice, alice.address(), collection_name, token_name, 1
-    )
-    rest_client.wait_for_transaction(txn_hash)
-
-    print(
-        f"Alice's token balance: {rest_client.get_token_balance(alice.address(), alice.address(), collection_name, token_name)}"
-    )
-    print(
-        f"Bob's token balance: {rest_client.get_token_balance(bob.address(), alice.address(), collection_name, token_name)}"
-    )
-
-
-if __name__ == "__main__":
-    coin_transfer()
-    token_transfer()

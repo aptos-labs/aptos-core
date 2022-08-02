@@ -13,7 +13,7 @@ pub mod log;
 pub mod metrics;
 mod page;
 pub mod param;
-mod poem_backend;
+pub mod poem_backend;
 pub mod runtime;
 mod set_failpoints;
 mod state;

@@ -155,6 +155,11 @@ class Serializer:
             self.fixed_bytes(key)
             self.fixed_bytes(value)
 
+    def sequence_serializer(
+        value_encoder: typing.Callable[[Serializer, typing.Any], bytes],
+    ):
+        return lambda self, values: self.sequence(values, value_encoder)
+
     def sequence(
         self,
         values: typing.List[typing.Any],
@@ -278,6 +283,17 @@ class Test(unittest.TestCase):
 
         ser = Serializer()
         ser.sequence(in_value, Serializer.str)
+        der = Deserializer(ser.output())
+        out_value = der.sequence(Deserializer.str)
+
+        self.assertEqual(in_value, out_value)
+
+    def test_sequence_serializer(self):
+        in_value = ["a", "abc", "def", "ghi"]
+
+        ser = Serializer()
+        seq_ser = Serializer.sequence_serializer(Serializer.str)
+        seq_ser(ser, in_value)
         der = Deserializer(ser.output())
         out_value = der.sequence(Deserializer.str)
 

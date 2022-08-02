@@ -18,25 +18,25 @@ This tutorial details how to write, compile, test, publish and interact with Mov
 This tutorial builds on [Your first transaction](/tutorials/your-first-transaction) as a library for this example. The following tutorial contains example code that can be downloaded in its entirety below:
 
 <Tabs>
-  <TabItem value="python" label="Python" default>
+  <TabItem value="typescript" label="Typescript" default>
+
+For this tutorial, will be focusing on `hello_blockchain.ts` and re-using the `first_transaction.ts` library from the previous tutorial.
+
+You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
+
+  </TabItem>
+  <TabItem value="python" label="Python">
 
 For this tutorial, will be focusing on `hello_blockchain.py` and re-using the `first_transaction.py` library from the previous tutorial.
 
 You can find the python project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python)
 
   </TabItem>
-  <TabItem value="rust" label="Rust" default>
+  <TabItem value="rust" label="Rust">
 
 For this tutorial, will be focusing on `hello_blockchain/src` and re-using the `first_transaction/src` library from the previous tutorial.
 
 You can find the rust project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust)
-
-  </TabItem>
-  <TabItem value="typescript" label="Typescript" default>
-
-For this tutorial, will be focusing on `hello_blockchain.ts` and re-using the `first_transaction.ts` library from the previous tutorial.
-
-You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
 
   </TabItem>
 </Tabs>
@@ -58,6 +58,7 @@ git checkout origin/devnet
 ```
 
 Install Aptos Commandline tool. Learn more about the [Aptos command line tool](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos)
+
 ```bash
 cargo install --git https://github.com/aptos-labs/aptos-core.git aptos
 ```
@@ -131,20 +132,6 @@ Now we return to our application to deploy and interact with the module on the A
 ### Step 2.1) Publishing the Move Module
 
 <Tabs>
-  <TabItem value="python" label="Python" default>
-
-```python
-:!: static/examples/python/hello_blockchain.py section_1
-```
-
-  </TabItem>
-  <TabItem value="rust" label="Rust" default>
-
-```rust
-:!: static/examples/rust/hello_blockchain/src/lib.rs section_1
-```
-
-  </TabItem>
   <TabItem value="typescript" label="Typescript" default>
 
 ```typescript
@@ -152,10 +139,25 @@ Now we return to our application to deploy and interact with the module on the A
 ```
 
   </TabItem>
+  <TabItem value="python" label="Python">
+
+```python
+:!: static/examples/python/hello_blockchain.py section_1
+```
+
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+```rust
+:!: static/examples/rust/hello_blockchain/src/lib.rs section_1
+```
+
+  </TabItem>
 </Tabs>
 
 :::tip
 To initialize the module, you can write a `init_module` function. This private function is executed automatically when the module is published. This `init_module` function must be private, it must only take signer or signer reference as a parameter, and it must not return any value. Here is an example:
+
 ```asm
  fun init_module(creator: &signer) {
         move_to(
@@ -164,6 +166,7 @@ To initialize the module, you can write a `init_module` function. This private f
         );
     }
 ```
+
 :::
 
 ### Step 2.2) Reading a resource
@@ -171,24 +174,24 @@ To initialize the module, you can write a `init_module` function. This private f
 The module is published at an address. This is the `contract_address` below. This is similar to the previous example, where the `Coin` is at `0x1`. The `contract_address` will be the same as the account that publishes it.
 
 <Tabs>
-  <TabItem value="python" label="Python" default>
+  <TabItem value="typescript" label="Typescript" default>
+
+```typescript
+:!: static/examples/typescript/hello_blockchain.ts section_2
+```
+
+  </TabItem>
+  <TabItem value="python" label="Python">
 
 ```python
 :!: static/examples/python/hello_blockchain.py section_2
 ```
 
   </TabItem>
-  <TabItem value="rust" label="Rust" default>
+  <TabItem value="rust" label="Rust">
 
 ```rust
 :!: static/examples/rust/hello_blockchain/src/lib.rs section_2
-```
-
-  </TabItem>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/hello_blockchain.ts section_2
 ```
 
   </TabItem>
@@ -202,24 +205,24 @@ from a transaction.
 Note: while the REST interface can display strings, due to limitations of JSON and Move, it cannot determine if an argument is a string or a hex-encoded string. So the transaction arguments always assume the latter. Hence, in this example, the message is encoded as a hex-string.
 
 <Tabs>
-  <TabItem value="python" label="Python" default>
+  <TabItem value="typescript" label="Typescript" default>
+
+```typescript
+:!: static/examples/typescript/hello_blockchain.ts section_3
+```
+
+  </TabItem>
+  <TabItem value="python" label="Python">
 
 ```python
 :!: static/examples/python/hello_blockchain.py section_3
 ```
 
   </TabItem>
-  <TabItem value="rust" label="Rust" default>
+  <TabItem value="rust" label="Rust">
 
 ```rust
 :!: static/examples/rust/hello_blockchain/src/lib.rs section_3
-```
-
-  </TabItem>
-  <TabItem value="typescript" label="Typescript" default>
-
-```typescript
-:!: static/examples/typescript/hello_blockchain.ts section_3
 ```
 
   </TabItem>
@@ -228,42 +231,41 @@ Note: while the REST interface can display strings, due to limitations of JSON a
 ### Step 3) Initialize and interact with the Move module
 
 <Tabs>
-<TabItem value="python" label="Python" default>
+<TabItem value="typescript" label="Typescript" default>
+For Typescript:
+
+- Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
+- Open your favorite terminal and navigate to where you downloaded the above example project
+- Install the required libraries: `yarn install`
+- Execute the example: `yarn hello_blockchain Message.mv`
+
+</TabItem>
+<TabItem value="python" label="Python">
 For Python3:
 
-* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python)
-* Open your favorite terminal and navigate to where you downloaded the above example project
-* Install the required libraries: `pip3 install -r requirements.txt`.
-* Execute the example: `python3 hello_blockchain.py Message.mv`
+- Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python)
+- Open your favorite terminal and navigate to where you downloaded the above example project
+- Install the required libraries: `pip3 install -r requirements.txt`.
+- Execute the example: `python3 hello_blockchain.py Message.mv`
 
 </TabItem>
 <TabItem value="rust" label="Rust">
 For Rust:
 
-* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust)
-* Open your favorite terminal and navigate to where you downloaded the above example project
-* Execute the example: `cargo run --bin hello-blockchain -- Message.mv`
-
-</TabItem>
-<TabItem value="typescript" label="Typescript">
-For Typescript:
-
-* Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
-* Open your favorite terminal and navigate to where you downloaded the above example project
-* Install the required libraries: `yarn install`
-* Execute the example: `yarn hello_blockchain Message.mv`
+- Download the [example project](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust)
+- Open your favorite terminal and navigate to where you downloaded the above example project
+- Execute the example: `cargo run --bin hello-blockchain -- Message.mv`
 
 </TabItem>
 </Tabs>
 
-* After a few moments it will mention that "Update the module with Alice's address, build, copy to the provided path,
+- After a few moments it will mention that "Update the module with Alice's address, build, copy to the provided path,
   and press enter."
-* In the "Move Window" terminal, and for the Move file we had previously looked at:
-  * Copy Alice's address
-  * Compile the modules with Alice's address by `aptos move compile --package-dir . --named-addresses HelloBlockchain=0x{alice_address_here}`. Here, we replace the generic named address `HelloBlockChain='_'` in `hello_blockchain/move.toml` with Alice's Address
-  * Copy `build/Examples/bytecode_modules/Message.mv` to the same folder as this tutorial project code
-* Return to your other terminal window, and press "enter" at the prompt to continue executing the rest of the code
-
+- In the "Move Window" terminal, and for the Move file we had previously looked at:
+  - Copy Alice's address
+  - Compile the modules with Alice's address by `aptos move compile --package-dir . --named-addresses HelloBlockchain=0x{alice_address_here}`. Here, we replace the generic named address `HelloBlockChain='_'` in `hello_blockchain/move.toml` with Alice's Address
+  - Copy `build/Examples/bytecode_modules/Message.mv` to the same folder as this tutorial project code
+- Return to your other terminal window, and press "enter" at the prompt to continue executing the rest of the code
 
 The output should look like the following:
 
@@ -293,8 +295,9 @@ New value: Hello, Blockchain
 The outcome shows that Alice and Bob went from having no resource to one with a `message` set to "Hello, Blockchain".
 
 The data can be verified by visiting either a REST interface or the explorer:
-* Alice's account via the [REST interface][alice_account_rest]
-* Bob's account on the [explorer][bob_account_explorer]
+
+- Alice's account via the [REST interface][alice_account_rest]
+- Bob's account on the [explorer][bob_account_explorer]
 
 [account_basics]: /concepts/basics-accounts
 [alice_account_rest]: /rest-api/#tag/accounts/a52671f10dc3479b09d0a11ce47694c0/

@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import typing
 
-from account_address import AccountAddress
-from bcs import Deserializer, Serializer
+from .account_address import AccountAddress
+from .bcs import Deserializer, Serializer
 
 
 class TypeTag:
