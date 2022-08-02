@@ -13,7 +13,6 @@
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
 # for calculating regression in local mode
-LOCAL_TPS_THRESHOLD=400
 LOCAL_P99_LATENCY_MS_THRESHOLD=60000
 
 # output files
@@ -44,6 +43,8 @@ FORGE_NAMESPACE_KEEP=${FORGE_NAMESPACE_KEEP:-false}
 FORGE_NAMESPACE_REUSE=${FORGE_NAMESPACE_REUSE:-false}
 FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-false}
 FORGE_TEST_SUITE=${FORGE_TEST_SUITE:-land_blocking}
+FORGE_RUNNER_DURATION_SECS=${FORGE_RUNNER_DURATION_SECS:-300}
+FORGE_RUNNER_TPS_THRESHOLD =${FORGE_RUNNER_TPS_THRESHOLD:-4500}
 
 [ "$FORGE_NAMESPACE_REUSE" = "true" ] && REUSE_ARGS="--reuse"
 [ "$FORGE_NAMESPACE_KEEP" = "true" ] && KEEP_ARGS="--keep"
@@ -93,7 +94,7 @@ set_image_tag() {
             fi
         done
         # if IMAGE_TAG still not set after checking HEAD,
-        if [ -z "$IMAGE_TAG"]; then
+        if [ -z "$IMAGE_TAG" ]; then
             echo "None of the last ${commit_threshold} commits have been built and pushed"
             exit 1
         fi
@@ -184,8 +185,8 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # more file descriptors for heavy txn generation
     ulimit -n 1048576
 
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 1500 --avg-tps $LOCAL_TPS_THRESHOLD \
-        --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD \
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 1500 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
+        --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD --duration-secs $FORGE_RUNNER_DURATION_SECS  \
         test k8s-swarm \
         --image-tag $IMAGE_TAG \
         --namespace $FORGE_NAMESPACE \
