@@ -355,16 +355,8 @@ impl MempoolNetworkInterface {
                 .find_position(|peer_network_id| *peer_network_id == &peer)
                 .map_or(usize::MAX, |(pos, _)| pos);
             if priority > self.mempool_config.default_failovers {
-                warn!(
-                    "BCHO: PeerNotPrioritized: {}, {} > {}",
-                    peer, priority, self.mempool_config.default_failovers
-                );
                 return Err(BroadcastError::PeerNotPrioritized(peer, priority));
             }
-            warn!(
-                "BCHO: Peer: {}, {}, {}",
-                peer, priority, self.mempool_config.default_failovers
-            );
         }
         Ok(())
     }
