@@ -85,7 +85,7 @@ impl Default for EmitThreadParams {
 #[derive(Clone, Debug)]
 pub struct EmitJobRequest {
     rest_clients: Vec<RestClient>,
-    workers_per_endpoint: usize,
+    mempool_backlog: usize,
     thread_params: EmitThreadParams,
     gas_price: u64,
     invalid_transaction_ratio: usize,
@@ -98,7 +98,7 @@ impl Default for EmitJobRequest {
     fn default() -> Self {
         Self {
             rest_clients: Vec::new(),
-            workers_per_endpoint: 200,
+            mempool_backlog: 3000,
             thread_params: EmitThreadParams::default(),
             gas_price: 0,
             invalid_transaction_ratio: 0,
@@ -139,19 +139,19 @@ impl EmitJobRequest {
         self
     }
 
-    pub fn mempool_backlog(mut self, mempool_backlog: NonZeroU64) -> Self {
+    pub fn calculate_workers_per_endpoint(&self) -> usize {
         // The target mempool backlog is set to be 3x of the target TPS because of the on an average,
         // we can ~3 blocks in consensus queue. As long as we have 3x the target TPS as backlog,
         // it should be enough to produce the target TPS.
-        let clients_count = self.rest_clients.len() as u64;
+        let clients_count = self.rest_clients.len();
         let num_workers_per_endpoint = max(
-            mempool_backlog.get() / (clients_count * TRANSACTIONS_PER_ACCOUNT as u64),
+            self.mempool_backlog / (clients_count * TRANSACTIONS_PER_ACCOUNT),
             1,
         );
 
         info!(
             " Transaction emitter target mempool backlog is {}",
-            mempool_backlog.get()
+            self.mempool_backlog
         );
 
         info!(
@@ -159,13 +159,11 @@ impl EmitJobRequest {
             clients_count, num_workers_per_endpoint
         );
 
-        self.thread_params = EmitThreadParams {
-            wait_millis: 0,
-            wait_committed: true,
-            txn_expiration_time_secs: 300,
-            check_stats_at_end: false,
-        };
-        self.workers_per_endpoint = num_workers_per_endpoint as usize;
+        num_workers_per_endpoint
+    }
+
+    pub fn mempool_backlog(mut self, mempool_backlog: NonZeroU64) -> Self {
+        self.mempool_backlog = mempool_backlog.get() as usize;
         self
     }
 
@@ -250,12 +248,12 @@ impl<'t> TxnEmitter<'t> {
     }
 
     pub async fn start_job(&mut self, req: EmitJobRequest) -> Result<EmitJob> {
-        let num_clients = req.rest_clients.len() * req.workers_per_endpoint;
+        let workers_per_endpoint = req.calculate_workers_per_endpoint();
+        let num_accounts = req.rest_clients.len() * workers_per_endpoint;
         info!(
             "Will use {} workers per endpoint for a total of {} endpoint clients",
-            req.workers_per_endpoint, num_clients
+            workers_per_endpoint, num_accounts
         );
-        let num_accounts = num_clients;
         info!("Will create a total of {} accounts", num_accounts);
         let mut account_minter = AccountMinter::new(
             self.root_account,
@@ -294,7 +292,7 @@ impl<'t> TxnEmitter<'t> {
             ),
         };
         for client in req.rest_clients {
-            for _ in 0..req.workers_per_endpoint {
+            for _ in 0..workers_per_endpoint {
                 let accounts = (&mut all_accounts).take(1).collect();
                 let all_addresses = all_addresses.clone();
                 let stop = stop.clone();
