@@ -17,13 +17,13 @@ use crate::{
 use anyhow::{anyhow, Result};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use blst::BLST_ERROR;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, fmt};
 
 /// Domain separation tag (DST) for hashing a public key before computing its proof-of-possesion (PoP),
 /// which is also just a signature.
 const DST_BLS_POP_IN_G2: &[u8] = b"BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
 
-#[derive(Debug, Clone, SerializeKey, DeserializeKey)]
+#[derive(Clone, SerializeKey, DeserializeKey)]
 /// A proof-of-possesion (PoP) of a BLS12381 private key.
 /// This is just a BLS signature on the corresponding public key.
 pub struct ProofOfPossession {
@@ -136,5 +136,17 @@ impl std::hash::Hash for ProofOfPossession {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         let encoded_signature = self.to_bytes();
         state.write(&encoded_signature);
+    }
+}
+
+impl fmt::Debug for ProofOfPossession {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.to_bytes()))
+    }
+}
+
+impl fmt::Display for ProofOfPossession {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.to_bytes()))
     }
 }

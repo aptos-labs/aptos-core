@@ -314,6 +314,34 @@ fn bls12381_random_multisig_dont_verify_with_random_pk() {
 #[ignore]
 /// Not an actual test: only used to generate test cases for testing the BLS Move module in
 /// aptos-move/framework/move-stdlib/sources/signer.move
+fn bls12381_sample_pop() {
+    let mut rng = OsRng;
+
+    let num = 5;
+
+    let mut kps = vec![];
+
+    for _i in 1..=num {
+        kps.push(KeyPair::<PrivateKey, PublicKey>::generate(&mut rng));
+    }
+
+    println!("let pks = vector[");
+    for kp in &kps {
+        println!("    x\"{}\",", kp.public_key);
+    }
+    println!("];\n");
+
+    println!("let pops = vector[");
+    for kp in &kps {
+        println!("    x\"{}\",", ProofOfPossession::create(&kp.private_key));
+    }
+    println!("];\n");
+}
+
+#[test]
+#[ignore]
+/// Not an actual test: only used to generate test cases for testing the BLS Move module in
+/// aptos-move/framework/move-stdlib/sources/signer.move
 /// For simplicity, we use `sign_arbitrary_message` to generate a signature directly on a
 /// message `m` rather than on its hash derived using the `CryptoHasher` trait. This makes it easier
 /// to verify the signature in our Move code, which uses `verify_arbitrary_message`.
