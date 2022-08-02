@@ -295,18 +295,23 @@ module aptos_token::token {
     public entry fun mutate_token_properties(
         account: &signer,
         token_owner: address,
-        token_id: TokenId,
+        creator: address,
+        collection_name: String,
+        token_name: String,
+        token_property_version: u64,
         amount: u64,
         keys: vector<String>,
         values: vector<vector<u8>>,
         types: vector<String>,
     ) acquires Collections, TokenStore {
-        assert!(signer::address_of(account) == token_id.token_data_id.creator, ENO_MUTATE_CAPABILITY);
+        assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
         // validate if the properties is mutable
-        assert!(exists<Collections>(token_id.token_data_id.creator), ECOLLECTIONS_NOT_PUBLISHED);
+        assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
         let all_token_data = &mut borrow_global_mut<Collections>(
-            token_id.token_data_id.creator
+            creator
         ).token_data;
+
+        let token_id: TokenId = create_token_id_raw(creator, collection_name, token_name, token_property_version);
         assert!(table::contains(all_token_data, token_id.token_data_id), ETOKEN_NOT_PUBLISHED);
         let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
 
@@ -1004,12 +1009,15 @@ module aptos_token::token {
 
         mutate_token_properties(
             creator,
-            signer::address_of(creator),
-            token_id,
+            token_id.token_data_id.creator,
+            token_id.token_data_id.creator,
+            token_id.token_data_id.collection,
+            token_id.token_data_id.name,
+            token_id.property_version,
             2,
             new_keys,
             new_vals,
-            new_types
+            new_types,
         );
         // should have two new property_version from the orignal two tokens
         let new_id_1 = create_token_id(token_id.token_data_id, 1);
@@ -1028,7 +1036,10 @@ module aptos_token::token {
         mutate_token_properties(
             creator,
             signer::address_of(creator),
-            new_id_1,
+            new_id_1.token_data_id.creator,
+            new_id_1.token_data_id.collection,
+            new_id_1.token_data_id.name,
+            new_id_1.property_version,
             1,
             new_keys,
             new_vals,
