@@ -1,16 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519Signature},
-    PrivateKey, Uniform,
-};
+use aptos_crypto::{ed25519::{Ed25519PrivateKey, Ed25519Signature}, HashValue, PrivateKey, Uniform};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload},
 };
 use bcs::to_bytes;
+use aptos_crypto::hash::DefaultHasher;
 
 /// Creates a single test transaction
 pub fn create_transaction() -> Transaction {
@@ -48,4 +46,15 @@ pub fn create_vec_signed_transactions(size: u64) -> Vec<SignedTransaction> {
 pub fn size_of_signed_transaction() -> usize {
     let signed_txns = create_vec_signed_transactions(1);
     to_bytes(&signed_txns[0]).unwrap().len()
+}
+
+pub fn compute_digest_from_signed_transaction(data: Vec<SignedTransaction>) -> HashValue {
+    let mut hasher = DefaultHasher::new(b"QuorumStoreTest");
+    let serialized_data: Vec<u8> = data
+        .iter()
+        .map(|txn| to_bytes(txn).unwrap())
+        .flatten()
+        .collect();
+    hasher.update(&serialized_data);
+    hasher.finish()
 }

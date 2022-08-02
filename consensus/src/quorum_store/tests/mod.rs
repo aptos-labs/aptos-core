@@ -7,3 +7,4 @@ mod direct_mempool_quorum_store_test;
 mod quorum_store_wrapper_test;
 mod types_test;
 mod utils;
+mod quorum_store_db_test;
