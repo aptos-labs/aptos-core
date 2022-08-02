@@ -6,7 +6,7 @@ use aptos_api_types::{
     Event, GenesisPayload, HashValue, MoveModuleId, ScriptPayload, Transaction, TransactionInfo,
     TransactionPayload, WriteSet, WriteSetChange,
 };
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
 pub fn convert_move_module_id(move_module_id: &MoveModuleId) -> extractor::MoveModuleId {
     extractor::MoveModuleId {
@@ -356,12 +356,13 @@ pub fn convert_timestamp_secs(
     })
 }
 
-pub fn convert_timestamp_nanos(
+pub fn convert_timestamp_usecs(
     timestamp: u64,
 ) -> protobuf::MessageField<protobuf::well_known_types::timestamp::Timestamp> {
+    let ts = Duration::from_nanos(timestamp * 1000);
     protobuf::MessageField::some(protobuf::well_known_types::timestamp::Timestamp {
-        seconds: timestamp as i64 / 1000000,
-        nanos: (timestamp % 1000000) as i32,
+        seconds: ts.as_secs() as i64,
+        nanos: ts.subsec_nanos() as i32,
         special_fields: Default::default(),
     })
 }
@@ -403,7 +404,7 @@ pub fn convert_transaction(
 
     let txn_data = match &transaction {
         Transaction::UserTransaction(ut) => {
-            timestamp = Some(convert_timestamp_nanos(ut.timestamp.0));
+            timestamp = Some(convert_timestamp_usecs(ut.timestamp.0));
             extractor::transaction::Txn_data::User(extractor::UserTransaction {
                 request: protobuf::MessageField::some(extractor::UserTransactionRequest {
                     sender: ut.request.sender.to_string(),
@@ -434,7 +435,7 @@ pub fn convert_transaction(
             })
         }
         Transaction::BlockMetadataTransaction(bm) => {
-            timestamp = Some(convert_timestamp_nanos(bm.timestamp.0));
+            timestamp = Some(convert_timestamp_usecs(bm.timestamp.0));
             extractor::transaction::Txn_data::BlockMetadata(extractor::BlockMetadataTransaction {
                 id: bm.id.to_string(),
                 events: convert_events(&bm.events),
@@ -456,7 +457,7 @@ pub fn convert_transaction(
     };
 
     extractor::Transaction {
-        timestamp: timestamp.unwrap_or_else(|| convert_timestamp_nanos(transaction.timestamp())),
+        timestamp: timestamp.unwrap_or_else(|| convert_timestamp_usecs(transaction.timestamp())),
         version: transaction.version().unwrap_or_else(|| {
             panic!(
                 "Could not extract version from Transaction '{:?}'",
