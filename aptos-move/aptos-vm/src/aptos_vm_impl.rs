@@ -5,6 +5,7 @@ use crate::{
     access_path_cache::AccessPathCache,
     counters::*,
     data_cache::RemoteStorage,
+    delta_ext::TransactionOutputExt,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
@@ -16,7 +17,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config::{ChainSpecificAccountInfo, APTOS_CHAIN_INFO, CORE_CODE_ADDRESS},
     on_chain_config::{ConfigStorage, OnChainConfig, VMConfig, Version, APTOS_VERSION_3},
-    transaction::{ExecutionStatus, TransactionOutput, TransactionOutputExt, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
 use fail::fail_point;
