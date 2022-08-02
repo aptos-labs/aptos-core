@@ -55,7 +55,7 @@ fn create_checkpoint(source_dir: impl AsRef<Path>, checkpoint_dir: impl AsRef<Pa
 
     AptosDB::open(
         &source_dir,
-        true,                        /* readonly */
+        false,                       /* readonly */
         NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
         RocksdbConfigs::default(),
         false,
