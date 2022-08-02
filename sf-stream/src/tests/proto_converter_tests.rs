@@ -24,7 +24,7 @@ use std::{convert::TryInto, path::PathBuf};
 
 #[tokio::test]
 async fn test_genesis_works() {
-    let test_context = new_test_context(current_function_name!());
+    let test_context = new_test_context(current_function_name!(), 0);
 
     let context = Arc::new(test_context.context);
     let mut streamer = SfStreamer::new(context, 0, None);
@@ -45,7 +45,7 @@ async fn test_genesis_works() {
 
 #[tokio::test]
 async fn test_block_transactions_work() {
-    let mut test_context = new_test_context(current_function_name!());
+    let mut test_context = new_test_context(current_function_name!(), 0);
 
     // create user transactions
     let account = test_context.gen_account();
@@ -95,7 +95,11 @@ async fn test_block_transactions_work() {
 
 #[tokio::test]
 async fn test_block_height_and_ts_work() {
-    let mut test_context = new_test_context(current_function_name!());
+    let start_ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let mut test_context = new_test_context(current_function_name!(), start_ts);
 
     // Creating 2 blocks w/ user transactions and 1 empty block
     let mut root_account = test_context.root_account();
@@ -124,12 +128,7 @@ async fn test_block_height_and_ts_work() {
     let mut streamer = SfStreamer::new(context, 0, None);
 
     let converted = streamer.batch_convert_once(100).await;
-    let start_ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
     // Making sure that version - block height mapping is correct and that version is in order
-    println!("hello {}", converted.len());
     for (i, txn) in converted.iter().enumerate() {
         assert_eq!(txn.version as usize, i);
         assert_eq!(
@@ -141,16 +140,14 @@ async fn test_block_height_and_ts_work() {
             // Genesis timestamp is 0
             assert_eq!(ts, 0);
         } else {
-            println!("actual ts {}, expected start_ts {}, block height {}", ts, start_ts, txn.block_height);
-            // assert_eq!(ts, start_ts + txn.block_height);
+            assert_eq!(ts, start_ts + txn.block_height);
         }
     }
-    assert!(false);
 }
 
 #[tokio::test]
 async fn test_table_item_parsing_works() {
-    let mut test_context = new_test_context(current_function_name!());
+    let mut test_context = new_test_context(current_function_name!(), 0);
     let ctx = &mut test_context;
     let mut account = ctx.gen_account();
     let acc = &mut account;
