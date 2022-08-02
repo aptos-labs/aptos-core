@@ -34,6 +34,7 @@ use crate::{
     },
     ProtocolId,
 };
+use aptos_config::config::NodeConfig;
 use aptos_config::network_id::{NetworkContext, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -88,11 +89,12 @@ pub fn network_endpoint_config() -> AppConfig {
 
 impl NewNetworkSender for HealthCheckerNetworkSender {
     fn new(
+        node_config: Option<NodeConfig>,
         peer_mgr_reqs_tx: PeerManagerRequestSender,
         connection_reqs_tx: ConnectionRequestSender,
     ) -> Self {
         Self {
-            inner: NetworkSender::new(peer_mgr_reqs_tx, connection_reqs_tx),
+            inner: NetworkSender::new(node_config, peer_mgr_reqs_tx, connection_reqs_tx),
         }
     }
 }

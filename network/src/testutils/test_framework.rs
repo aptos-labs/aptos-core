@@ -80,6 +80,7 @@ fn setup_network<NetworkSender: NewNetworkSender, NetworkEvents: NewNetworkEvent
     let (connection_inbound_sender, connection_inbound_receiver) =
         crate::peer_manager::conn_notifs_channel::new();
     let network_sender = NetworkSender::new(
+        None,
         PeerManagerRequestSender::new(reqs_outbound_sender),
         ConnectionRequestSender::new(connection_outbound_sender),
     );

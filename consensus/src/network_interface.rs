@@ -5,6 +5,7 @@
 
 use crate::counters;
 use anyhow::anyhow;
+use aptos_config::config::NodeConfig;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_types::{epoch_change::EpochChangeProof, PeerId};
@@ -83,21 +84,55 @@ pub type ConsensusNetworkEvents = NetworkEvents<ConsensusMsg>;
 #[derive(Clone)]
 pub struct ConsensusNetworkSender {
     network_sender: NetworkSender<ConsensusMsg>,
+    node_config: NodeConfig,
     peer_metadata_storage: Option<Arc<PeerMetadataStorage>>,
 }
 
-/// Supported protocols in preferred order (from highest priority to lowest).
-pub const RPC: &[ProtocolId] = &[ProtocolId::ConsensusRpcBcs, ProtocolId::ConsensusRpcJson];
-/// Supported protocols in preferred order (from highest priority to lowest).
-pub const DIRECT_SEND: &[ProtocolId] = &[
-    ProtocolId::ConsensusDirectSendBcs,
-    ProtocolId::ConsensusDirectSendJson,
-];
+/// Returns the supported direct send protocols in preferred order (from highest
+/// priority to lowest).
+pub fn preferred_direct_send_protocols(node_config: &NodeConfig) -> Vec<ProtocolId> {
+    if node_config.consensus.use_compression {
+        vec![
+            ProtocolId::ConsensusDirectSendCompressed,
+            ProtocolId::ConsensusDirectSendBcs,
+            ProtocolId::ConsensusDirectSendJson,
+        ]
+    } else {
+        vec![
+            ProtocolId::ConsensusDirectSendBcs,
+            ProtocolId::ConsensusDirectSendCompressed,
+            ProtocolId::ConsensusDirectSendJson,
+        ]
+    }
+}
+
+/// Returns the supported rpc protocols in preferred order (from highest
+/// priority to lowest).
+pub fn preferred_rpc_protocols(node_config: &NodeConfig) -> Vec<ProtocolId> {
+    if node_config.consensus.use_compression {
+        vec![
+            ProtocolId::ConsensusRpcCompressed,
+            ProtocolId::ConsensusRpcBcs,
+            ProtocolId::ConsensusRpcJson,
+        ]
+    } else {
+        vec![
+            ProtocolId::ConsensusRpcBcs,
+            ProtocolId::ConsensusRpcCompressed,
+            ProtocolId::ConsensusRpcJson,
+        ]
+    }
+}
 
 /// Configuration for the network endpoints to support consensus.
 /// TODO: make this configurable
-pub fn network_endpoint_config() -> AppConfig {
-    let protos = RPC.iter().chain(DIRECT_SEND.iter()).copied();
+pub fn network_endpoint_config(node_config: &NodeConfig) -> AppConfig {
+    let rpc_protocols = preferred_rpc_protocols(node_config);
+    let direct_send_protocols = preferred_direct_send_protocols(node_config);
+    let protos = rpc_protocols
+        .iter()
+        .chain(direct_send_protocols.iter())
+        .copied();
     AppConfig::p2p(
         protos,
         aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
@@ -107,14 +142,19 @@ pub fn network_endpoint_config() -> AppConfig {
 }
 
 impl NewNetworkSender for ConsensusNetworkSender {
-    /// Returns a Sender that only sends for the `CONSENSUS_DIRECT_SEND_PROTOCOL` and
-    /// `CONSENSUS_RPC_PROTOCOL` ProtocolId.
     fn new(
+        node_config: Option<NodeConfig>,
         peer_mgr_reqs_tx: PeerManagerRequestSender,
         connection_reqs_tx: ConnectionRequestSender,
     ) -> Self {
+        let node_config = node_config.expect("Consensus network sender requires a node config!");
         Self {
-            network_sender: NetworkSender::new(peer_mgr_reqs_tx, connection_reqs_tx),
+            network_sender: NetworkSender::new(
+                Some(node_config.clone()),
+                peer_mgr_reqs_tx,
+                connection_reqs_tx,
+            ),
+            node_config,
             peer_metadata_storage: None,
         }
     }
@@ -157,13 +197,14 @@ impl ConsensusNetworkSender {
 
 #[async_trait]
 impl ApplicationNetworkSender<ConsensusMsg> for ConsensusNetworkSender {
-    /// Send a single message to the destination peer using available ProtocolId.
+    /// Send a single message to the destination peer using the available ProtocolId.
     fn send_to(&self, recipient: PeerId, message: ConsensusMsg) -> Result<(), NetworkError> {
-        let protocol = self.preferred_protocol_for_peer(recipient, DIRECT_SEND)?;
+        let direct_send_protocols = preferred_direct_send_protocols(&self.node_config);
+        let protocol = self.preferred_protocol_for_peer(recipient, &direct_send_protocols)?;
         self.network_sender.send_to(recipient, protocol, message)
     }
 
-    /// Send a single message to the destination peers using available ProtocolId.
+    /// Send a single message to the destination peers using the available ProtocolId.
     fn send_to_many(
         &self,
         recipients: impl Iterator<Item = PeerId>,
@@ -171,8 +212,9 @@ impl ApplicationNetworkSender<ConsensusMsg> for ConsensusNetworkSender {
     ) -> Result<(), NetworkError> {
         let mut peers_per_protocol = HashMap::new();
         let mut not_available = vec![];
+        let direct_send_protocols = preferred_direct_send_protocols(&self.node_config);
         for peer in recipients {
-            match self.preferred_protocol_for_peer(peer, DIRECT_SEND) {
+            match self.preferred_protocol_for_peer(peer, &direct_send_protocols) {
                 Ok(protocol) => peers_per_protocol
                     .entry(protocol)
                     .or_insert_with(Vec::new)
@@ -191,14 +233,15 @@ impl ApplicationNetworkSender<ConsensusMsg> for ConsensusNetworkSender {
         Ok(())
     }
 
-    /// Send a RPC to the destination peer using the `CONSENSUS_RPC_PROTOCOL` ProtocolId.
+    /// Send a RPC to the destination peer using the available ProtocolId.
     async fn send_rpc(
         &self,
         recipient: PeerId,
         message: ConsensusMsg,
         timeout: Duration,
     ) -> Result<ConsensusMsg, RpcError> {
-        let protocol = self.preferred_protocol_for_peer(recipient, RPC)?;
+        let rpc_protocols = preferred_rpc_protocols(&self.node_config);
+        let protocol = self.preferred_protocol_for_peer(recipient, &rpc_protocols)?;
         self.network_sender
             .send_rpc(recipient, protocol, message, timeout)
             .await

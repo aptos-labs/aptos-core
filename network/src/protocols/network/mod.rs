@@ -25,11 +25,12 @@ use futures::{
     task::{Context, Poll},
 };
 use pin_project::pin_project;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use short_hex_str::AsShortHexStr;
 use std::{cmp::min, iter::FromIterator, marker::PhantomData, pin::Pin, time::Duration};
 
 use super::wire::handshake::v1::ProtocolIdSet;
+use aptos_config::config::NodeConfig;
 use std::fmt::Debug;
 
 pub trait Message: DeserializeOwned + Serialize {}
@@ -259,6 +260,9 @@ impl<TMessage> FusedStream for NetworkEvents<TMessage> {
 /// Provide Protobuf wrapper over `[peer_manager::PeerManagerRequestSender]`
 #[derive(Clone, Debug)]
 pub struct NetworkSender<TMessage> {
+    // TODO(joshlind): figure out how we can avoid having to pass the node config to
+    // every application network sender. Only consensus requires it today.
+    _node_config: Option<NodeConfig>,
     peer_mgr_reqs_tx: PeerManagerRequestSender,
     connection_reqs_tx: ConnectionRequestSender,
     _marker: PhantomData<TMessage>,
@@ -267,6 +271,7 @@ pub struct NetworkSender<TMessage> {
 /// Trait specifying the signature for `new()` `NetworkSender`s
 pub trait NewNetworkSender {
     fn new(
+        node_config: Option<NodeConfig>,
         peer_mgr_reqs_tx: PeerManagerRequestSender,
         connection_reqs_tx: ConnectionRequestSender,
     ) -> Self;
@@ -274,10 +279,12 @@ pub trait NewNetworkSender {
 
 impl<TMessage> NewNetworkSender for NetworkSender<TMessage> {
     fn new(
+        node_config: Option<NodeConfig>,
         peer_mgr_reqs_tx: PeerManagerRequestSender,
         connection_reqs_tx: ConnectionRequestSender,
     ) -> Self {
         Self {
+            _node_config: node_config,
             peer_mgr_reqs_tx,
             connection_reqs_tx,
             _marker: PhantomData,
@@ -382,7 +389,7 @@ pub trait SerializedRequest {
 
     /// Converts the `SerializedMessage` into its deserialized version of `TMessage` based on the
     /// `ProtocolId`.  See: [`ProtocolId::from_bytes`]
-    fn to_message<'a, TMessage: Deserialize<'a>>(&'a self) -> anyhow::Result<TMessage> {
+    fn to_message<TMessage: DeserializeOwned>(&self) -> anyhow::Result<TMessage> {
         self.protocol_id().from_bytes(self.data())
     }
 }

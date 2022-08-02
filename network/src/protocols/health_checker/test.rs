@@ -42,6 +42,7 @@ impl TestHarness {
         let (connection_notifs_tx, connection_notifs_rx) = conn_notifs_channel::new();
 
         let hc_network_tx = HealthCheckerNetworkSender::new(
+            None,
             PeerManagerRequestSender::new(peer_mgr_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );

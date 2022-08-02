@@ -106,6 +106,7 @@ impl MockSharedMempool {
         let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
         let (_, conn_notifs_rx) = conn_notifs_channel::new();
         let network_sender = MempoolNetworkSender::new(
+            None,
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );

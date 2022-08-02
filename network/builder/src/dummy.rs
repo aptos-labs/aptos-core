@@ -4,6 +4,7 @@
 //! Integration tests for validator_network.
 
 use crate::builder::NetworkBuilder;
+use aptos_config::config::NodeConfig;
 use aptos_config::{
     config::{Peer, PeerRole, PeerSet, RoleType, NETWORK_CHANNEL_SIZE},
     network_id::{NetworkContext, NetworkId},
@@ -64,11 +65,12 @@ pub struct DummyNetworkSender {
 
 impl NewNetworkSender for DummyNetworkSender {
     fn new(
+        node_config: Option<NodeConfig>,
         peer_mgr_reqs_tx: PeerManagerRequestSender,
         connection_reqs_tx: ConnectionRequestSender,
     ) -> Self {
         Self {
-            inner: NetworkSender::new(peer_mgr_reqs_tx, connection_reqs_tx),
+            inner: NetworkSender::new(node_config, peer_mgr_reqs_tx, connection_reqs_tx),
         }
     }
 }
@@ -149,7 +151,10 @@ pub fn setup_network() -> DummyNetwork {
     );
 
     let (listener_sender, mut listener_events) = network_builder
-        .add_p2p_service::<DummyNetworkSender, DummyNetworkEvents>(&network_endpoint_config());
+        .add_p2p_service::<DummyNetworkSender, DummyNetworkEvents>(
+            None,
+            &network_endpoint_config(),
+        );
     network_builder.build(runtime.handle().clone()).start();
 
     // Add the listener address with port
@@ -179,7 +184,10 @@ pub fn setup_network() -> DummyNetwork {
     );
 
     let (dialer_sender, mut dialer_events) = network_builder
-        .add_p2p_service::<DummyNetworkSender, DummyNetworkEvents>(&network_endpoint_config());
+        .add_p2p_service::<DummyNetworkSender, DummyNetworkEvents>(
+            None,
+            &network_endpoint_config(),
+        );
     network_builder.build(runtime.handle().clone()).start();
 
     // Wait for establishing connection

@@ -356,6 +356,7 @@ impl StateSyncEnvironment {
                     aptos_channel::new(QueueStyle::LIFO, 1, None);
                 let (conn_status_tx, conn_status_rx) = conn_notifs_channel::new();
                 let network_sender = StateSyncSender::new(
+                    None,
                     PeerManagerRequestSender::new(network_reqs_tx),
                     ConnectionRequestSender::new(connection_reqs_tx),
                 );
@@ -402,8 +403,8 @@ impl StateSyncEnvironment {
                 PeerMetadataStorage::new(&[NetworkId::Validator]),
             );
 
-            let (sender, events) =
-                network_builder.add_p2p_service(&state_sync_v1::network::network_endpoint_config());
+            let (sender, events) = network_builder
+                .add_p2p_service(None, &state_sync_v1::network::network_endpoint_config());
             network_builder.build(self.runtime.handle().clone()).start();
             network_handles.push((network_id, sender, events));
         };

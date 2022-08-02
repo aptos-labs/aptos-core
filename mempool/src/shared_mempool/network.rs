@@ -13,6 +13,7 @@ use crate::{
         },
     },
 };
+use aptos_config::config::NodeConfig;
 use aptos_config::{
     config::{MempoolConfig, PeerRole, RoleType},
     network_id::{NetworkId, PeerNetworkId},
@@ -102,11 +103,12 @@ pub fn network_endpoint_config(max_broadcasts_per_peer: usize) -> AppConfig {
 
 impl NewNetworkSender for MempoolNetworkSender {
     fn new(
+        node_config: Option<NodeConfig>,
         peer_mgr_reqs_tx: PeerManagerRequestSender,
         connection_reqs_tx: ConnectionRequestSender,
     ) -> Self {
         Self {
-            inner: NetworkSender::new(peer_mgr_reqs_tx, connection_reqs_tx),
+            inner: NetworkSender::new(node_config, peer_mgr_reqs_tx, connection_reqs_tx),
         }
     }
 }

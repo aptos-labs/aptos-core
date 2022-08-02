@@ -542,6 +542,7 @@ fn setup_node_network_interface(
         aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
     let (network_conn_event_notifs_tx, conn_status_rx) = conn_notifs_channel::new();
     let network_sender = MempoolNetworkSender::new(
+        None,
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );

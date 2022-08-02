@@ -27,6 +27,8 @@ pub struct ConsensusConfig {
     // the period = (poll_count - 1) * 30ms
     pub quorum_store_poll_count: u64,
     pub intra_consensus_channel_buffer_size: usize,
+    // Whether or not to use compression for consensus network messages
+    pub use_compression: bool,
 }
 
 impl Default for ConsensusConfig {
@@ -44,6 +46,7 @@ impl Default for ConsensusConfig {
             quorum_store_pull_timeout_ms: 1000,
             quorum_store_poll_count: 20,
             intra_consensus_channel_buffer_size: 10,
+            use_compression: true,
         }
     }
 }
