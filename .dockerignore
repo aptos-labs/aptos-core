@@ -1,21 +1,23 @@
-# list of files to ignore from docker's perspective
-# The more we can exclude the higher likelihood we can reuse cached layers
+# List of files to ignore from docker's perspective.
+# The more we can exclude the higher likelihood we can reuse cached layers.
 
-# exclude everything
-**/*
+# Be careful about excluding a lot (e.g. with **/*) and then including files:
+# https://github.com/moby/moby/issues/30018
+# As such, this dockerignore only explicitly excludes targeted items.
 
-# explicitly include stuff we actually need via negation
+**/goldens
+**/target
 
-!docker/build-rust-all.sh
-!docker/tools/boto.cfg
+**/.aptos
+**/.cargo
+**/.config
+**/.git
+**/.github
+**/*.md
 
-!**/Cargo.toml
-!**/Cargo.lock
-!**/*.rs
-!config/src/config/test_data
-!aptos-move/framework/
-!api/doc/
-!ecosystem/indexer/migrations/**/*.sql
-!terraform/helm/aptos-node/
-!terraform/helm/genesis/
-!testsuite/forge/src/backend/k8s/
+/dashboards
+/developer-docs-site
+/documentation
+/ecosystem/indexer-server/typescript
+/ecosystem/python
+/ecosystem/typescript
