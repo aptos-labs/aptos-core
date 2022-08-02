@@ -13,7 +13,7 @@
 //# view_table --table_handle 5713946181763753045826830927579154558 --key_type 0x1::string::String --value_type 0x3::token::CollectionData --key_value "aptos_punks"
 
 // Alice offers tokens to Bob
-//# run --signers Alice --args @Bob @Alice x"6170746f735f70756e6b73" x"6765656b5f746f6b656e" 1 0 --show-events -- 0x3::token_transfers::offer_script
+//# run --signers Alice --args @Bob @Alice x"6170746f735f70756e6b73" x"6765656b5f746f6b656e" 0 1 --show-events -- 0x3::token_transfers::offer_script
 
 // Bob accepts tokens from Alice
 //# run --signers Bob --args @Alice @Alice x"6170746f735f70756e6b73" x"6765656b5f746f6b656e" 0 --show-events -- 0x3::token_transfers::claim_script

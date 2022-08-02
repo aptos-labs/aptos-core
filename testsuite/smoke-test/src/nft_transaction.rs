@@ -66,8 +66,8 @@ impl AptosTest for NFTTransaction {
                     creator.address(),
                     collection_name.clone(),
                     token_name.clone(),
-                    1,
                     0,
+                    1,
                 ));
         let offer_txn = creator.sign_with_transaction_builder(offer_builder);
         client.submit_and_wait(&offer_txn).await?;

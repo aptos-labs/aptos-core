@@ -130,8 +130,8 @@ async function offerToken(
         BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(creator.hex())),
         BCS.bcsSerializeStr(collection_name),
         BCS.bcsSerializeStr(token_name),
-        BCS.bcsSerializeUint64(amount),
         BCS.bcsSerializeUint64(0),
+        BCS.bcsSerializeUint64(amount),
       ],
     ),
   );
