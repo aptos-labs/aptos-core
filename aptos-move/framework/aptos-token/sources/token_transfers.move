@@ -24,8 +24,8 @@ module aptos_token::token_transfers {
         creator: address,
         collection: String,
         name: String,
-        amount: u64,
         property_version: u64,
+        amount: u64,
     ) acquires TokenTransfers {
         let token_id = token::create_token_id_raw(creator, collection, name, property_version);
         offer(&sender, receiver, token_id, amount);
@@ -167,7 +167,7 @@ module aptos_token::token_transfers {
     }
 
     #[test_only]
-    fun create_token(creator: &signer, amount: u64): TokenId {
+    public entry fun create_token(creator: &signer, amount: u64): TokenId {
         use std::string::{Self, String};
 
         let collection_name = string::utf8(b"Hello, World");
@@ -186,7 +186,7 @@ module aptos_token::token_transfers {
         let default_keys = vector<String>[string::utf8(b"attack"), string::utf8(b"num_of_use")];
         let default_vals = vector<vector<u8>>[b"10", b"5"];
         let default_types = vector<String>[string::utf8(b"integer"), string::utf8(b"integer")];
-        token::create_token(
+        token::create_token_script(
             creator,
             *&collection_name,
 
@@ -202,6 +202,12 @@ module aptos_token::token_transfers {
             default_keys,
             default_vals,
             default_types,
+        );
+        token::create_token_id_raw(
+            signer::address_of(creator),
+            *&collection_name,
+            string::utf8(b"Token: Hello, Token"),
+            0
         )
     }
 }

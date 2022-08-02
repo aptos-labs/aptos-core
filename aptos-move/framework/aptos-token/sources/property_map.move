@@ -12,7 +12,7 @@ module aptos_token::property_map {
     const EKEY_COUNT_NOT_MATCH_VALUE_COUNT: u64 = 4;
     const EKEY_COUNT_NOT_MATCH_TYPE_COUNT: u64 = 5;
 
-    struct PropertyMap has store {
+    struct PropertyMap has drop, store {
         map: SimpleMap<String, PropertyValue>,
     }
 
@@ -41,6 +41,12 @@ module aptos_token::property_map {
             i = i + 1;
         };
         properties
+    }
+
+    public fun empty(): PropertyMap {
+        PropertyMap{
+            map: simple_map::create<String, PropertyValue>(),
+        }
     }
 
     public fun contains_key(list: &PropertyMap, key: &String): bool {
@@ -79,31 +85,6 @@ module aptos_token::property_map {
         assert!(found, EPROPERTY_NOT_EXIST);
 
         simple_map::remove(&mut list.map, key)
-    }
-
-    /// update a property map with new values
-    /// assume not deleting old keys, only add or update key values
-    public fun update_property_map(
-        map: &mut PropertyMap,
-        property_keys: vector<String>,
-        property_values: vector<vector<u8>>,
-        property_types: vector<String>
-    ) {
-        let i = 0;
-        while (i < vector::length(&property_keys)) {
-            let key = vector::borrow(&property_keys, i);
-            let value = *vector::borrow(&property_values, i);
-            let type = *vector::borrow(&property_types, i);
-            if (contains_key(map, key)) {
-                let pv = PropertyValue {
-                    value,
-                    type,
-                };
-
-                update_property_value(map, key, pv);
-            };
-            i = i + 1;
-        };
     }
 
     public fun update_property_value(

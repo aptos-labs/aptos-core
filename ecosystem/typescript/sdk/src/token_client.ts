@@ -75,7 +75,7 @@ export class TokenClient {
    * @param uri URL to additional info about token
    * @param royalty_payee_address the address to receive the royalty, the address can be a shared account address.
    * @param royalty_points_denominator the denominator for calculating royalty
-   * @param royalty_points_nominator the nominator for calculating royalty
+   * @param royalty_points_numerator the numerator for calculating royalty
    * @param property_keys the property keys for storing on-chain properties
    * @param property_values the property values to be stored on-chain
    * @param property_types the type of property values
@@ -90,7 +90,7 @@ export class TokenClient {
     uri: string,
     royalty_payee_address: MaybeHexString = account.address(),
     royalty_points_denominator: number = 0,
-    royalty_points_nominator: number = 0,
+    royalty_points_numerator: number = 0,
     property_keys: Array<string> = [],
     property_values: Array<string> = [],
     property_types: Array<string> = [],
@@ -108,7 +108,7 @@ export class TokenClient {
         Buffer.from(uri).toString("hex"),
         royalty_payee_address.toString(),
         royalty_points_denominator.toString(),
-        royalty_points_nominator.toString(),
+        royalty_points_numerator.toString(),
         [false, false, false, false, false],
         property_keys.map((key) => Buffer.from(key).toString("hex")),
         property_values.map((val) => Buffer.from(val).toString("hex")),
@@ -148,8 +148,8 @@ export class TokenClient {
         creator,
         Buffer.from(collectionName).toString("hex"),
         Buffer.from(name).toString("hex"),
-        amount.toString(),
         property_version.toString(),
+        amount.toString(),
       ],
     };
     const transactionHash = await this.submitTransactionHelper(account, payload);
