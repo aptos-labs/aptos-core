@@ -129,6 +129,7 @@ async fn test_block_height_and_ts_work() {
         .unwrap()
         .as_secs();
     // Making sure that version - block height mapping is correct and that version is in order
+    println!("hello {}", converted.len());
     for (i, txn) in converted.iter().enumerate() {
         assert_eq!(txn.version as usize, i);
         assert_eq!(
@@ -140,9 +141,11 @@ async fn test_block_height_and_ts_work() {
             // Genesis timestamp is 0
             assert_eq!(ts, 0);
         } else {
-            assert_eq!(ts, start_ts + txn.block_height);
+            println!("actual ts {}, expected start_ts {}, block height {}", ts, start_ts, txn.block_height);
+            // assert_eq!(ts, start_ts + txn.block_height);
         }
     }
+    assert!(false);
 }
 
 #[tokio::test]
