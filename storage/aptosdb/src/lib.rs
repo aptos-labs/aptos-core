@@ -64,6 +64,8 @@ use aptos_config::config::{
 use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_types::account_config::NewBlockEvent;
+use aptos_types::block_metadata::new_block_event_key;
 use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     account_address::AccountAddress,
@@ -1276,19 +1278,35 @@ impl DbReader for AptosDB {
 
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
-            let ts = match self.transaction_store.get_block_metadata(version)? {
-                Some((_v, block_meta)) => block_meta.timestamp_usecs(),
-                // genesis timestamp is 0
-                None => 0,
-            };
-            Ok(ts)
+            if let Some(ledger_pruner) = &self.ledger_pruner {
+                error_if_version_is_pruned(ledger_pruner, "NewBlockEvent", version)?;
+            }
+            ensure!(version <= self.get_latest_version()?);
+
+            let (_first_version, new_block_event) = self.event_store.get_block_metadata(version)?;
+            Ok(new_block_event.proposed_time())
         })
     }
 
-    fn get_block_boundaries(&self, version: u64, latest_ledger_version: u64) -> Result<(u64, u64)> {
-        gauged_api("get_block_boundaries", || {
-            self.transaction_store
-                .get_block_boundaries(version, latest_ledger_version)
+    fn get_block_info(&self, version: Version) -> Result<(Version, Version, NewBlockEvent)> {
+        gauged_api("get_block_info", || {
+            let latest_li = self.get_latest_ledger_info()?;
+            let committed_version = latest_li.ledger_info().version();
+            ensure!(
+                version <= committed_version,
+                "Requested version {} > committed version {}",
+                version,
+                committed_version
+            );
+
+            let (first_version, new_block_event) = self.event_store.get_block_metadata(version)?;
+
+            let last_version = self
+                .event_store
+                .lookup_event_after_version(&new_block_event_key(), version)?
+                .map_or(committed_version, |(v, _, _)| v - 1);
+
+            Ok((first_version, last_version, new_block_event))
         })
     }
 
