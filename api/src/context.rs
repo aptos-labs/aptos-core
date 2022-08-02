@@ -1,16 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, ensure, format_err, Context as AnyhowContext, Result};
-use aptos_api_types::{AsConverter, BlockInfo, Error, LedgerInfo, TransactionOnChainData, U64};
+use anyhow::{anyhow, bail, ensure, format_err, Context as AnyhowContext, Result};
+use aptos_api_types::{BlockInfo, Error, LedgerInfo, TransactionOnChainData, U64};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::StateView;
+use aptos_types::transaction::Transaction;
 use aptos_types::{
-    access_path::Path,
     account_address::AccountAddress,
-    account_config::CORE_CODE_ADDRESS,
     account_state::AccountState,
     chain_id::ChainId,
     contract_event::EventWithVersion,
@@ -18,11 +17,9 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{SignedTransaction, TransactionWithProof, Version},
-    write_set::WriteOp,
 };
 use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
-use move_deps::move_core_types::ident_str;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use storage_interface::{
@@ -184,104 +181,39 @@ impl Context {
 
     /// Retrieves information about a block
     pub fn get_block_info(&self, version: u64, ledger_version: u64) -> Result<BlockInfo> {
-        // We scan the DB to get the block boundaries
-        let (start, end) = match self.db.get_block_boundaries(version, ledger_version) {
-            Ok(inner) => inner,
-            Err(error) => {
-                // None means we can't find the block
-                return Err(anyhow!("Failed to find block boundaries {}", error));
-            }
-        };
+        let (first_version, last_version, new_block_event) = self.db.get_block_info(version)?;
+        ensure!(
+            last_version <= ledger_version,
+            "Block last version {} for txn version {} < ledger version {}",
+            last_version,
+            version,
+            ledger_version
+        );
 
-        let txn_with_proof = self
-            .db
-            .get_transaction_by_version(start, ledger_version, false)?;
+        let txn_with_proof =
+            self.db
+                .get_transaction_by_version(first_version, ledger_version, false)?;
 
-        // Retrieve block timestamp and hash
-        let timestamp;
-        let block_hash;
-        use aptos_types::transaction::Transaction::*;
-        match &txn_with_proof.transaction {
-            GenesisTransaction(_) => {
-                timestamp = 0;
-                block_hash = HashValue::zero();
-            }
-            BlockMetadata(inner) => {
-                timestamp = inner.timestamp_usecs();
-                block_hash = inner.id();
-            }
+        // TODO: embed block hash into the NewBlockEvent
+        let block_hash = match &txn_with_proof.transaction {
+            Transaction::GenesisTransaction(_) => HashValue::zero(),
+            Transaction::BlockMetadata(inner) => inner.id(),
             _ => {
-                return Err(anyhow!(
-                    "Failed to retrieve BlockMetadata or Genesis transaction"
-                ));
+                bail!(
+                    "Genesis or BlockMetadata transaction expected at block first version {}",
+                    first_version,
+                );
             }
-        }
-
-        // If timestamp is 0, it's the genesis transaction, and we can stop now
-        if timestamp == 0 {
-            return Ok(BlockInfo {
-                block_height: 0,
-                start_version: start,
-                end_version: end,
-                block_hash: block_hash.into(),
-                block_timestamp: timestamp,
-                num_transactions: end.saturating_sub(start).saturating_add(1) as u16,
-            });
-        }
-
-        // Retrieve block height from the transaction outputs
-        let height_id = ident_str!("height");
-        let block_metadata_type = move_deps::move_core_types::language_storage::StructTag {
-            address: CORE_CODE_ADDRESS,
-            module: ident_str!("block").into(),
-            name: ident_str!("BlockResource").into(),
-            type_params: vec![],
         };
 
-        let resolver = self.move_resolver()?;
-        let converter = resolver.as_converter(self.db.clone());
-        let txn = self.get_transaction_by_version(start, ledger_version)?;
-
-        // Parse the resources and find the block metadata resource update
-        let maybe_block_height = txn.changes.iter().find_map(|(key, op)| {
-            if let StateKey::AccessPath(path) = key {
-                if let Path::Resource(typ) = path.get_path() {
-                    // If it's block metadata, we can convert it to get the block height
-                    // And it must be the root address
-                    if path.address == CORE_CODE_ADDRESS && typ == block_metadata_type {
-                        if let WriteOp::Value(value) = op {
-                            if let Ok(mut resource) = converter.try_into_resource(&typ, value) {
-                                if let Some(value) = resource.data.0.remove(&height_id.into()) {
-                                    if let Ok(height) = serde_json::from_value::<U64>(value) {
-                                        return Some(height.0);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            None
-        });
-
-        // This should always work unless there's something unexpected in the block format
-        if let Some(block_height) = maybe_block_height {
-            Ok(BlockInfo {
-                block_height,
-                start_version: start,
-                end_version: end,
-                block_hash: block_hash.into(),
-                block_timestamp: timestamp,
-                num_transactions: end.saturating_sub(start).saturating_add(1) as u16,
-            })
-        } else {
-            Err(anyhow!(
-                "Unable to find block height in metadata transaction {}:{}",
-                start,
-                end
-            ))
-        }
+        Ok(BlockInfo {
+            block_height: new_block_event.height(),
+            start_version: first_version,
+            end_version: last_version,
+            block_hash: block_hash.into(),
+            block_timestamp: new_block_event.proposed_time(),
+            num_transactions: (last_version + 1 - first_version) as u16,
+        })
     }
 
     pub fn get_transactions(
