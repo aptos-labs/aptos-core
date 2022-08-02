@@ -17,7 +17,7 @@ use serde_json::{json, Value};
 use std::{
     collections::HashMap,
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use std::{convert::TryInto, path::PathBuf};
 
@@ -134,12 +134,12 @@ async fn test_block_height_and_ts_work() {
             txn.block_height as usize,
             *block_mapping.get(&i).unwrap() as usize
         );
-        let ts = (txn.timestamp.seconds * 1000000) as u64 + txn.timestamp.nanos as u64;
+        let ts = Duration::new(txn.timestamp.seconds as u64, txn.timestamp.nanos as u32).as_nanos() as usize;
         if txn.block_height == 0 {
             // Genesis timestamp is 0
             assert_eq!(ts, 0);
         } else {
-            assert_eq!(ts, start_ts + txn.block_height);
+            assert_eq!(ts, (start_ts + txn.block_height) as usize);
         }
     }
 }
