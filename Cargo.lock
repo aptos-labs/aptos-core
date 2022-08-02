@@ -3213,6 +3213,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptosdb",
+ "consensus-types",
  "executor",
  "executor-types",
  "move-deps",

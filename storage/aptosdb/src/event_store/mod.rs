@@ -108,9 +108,12 @@ impl EventStore {
         event_key: &EventKey,
         seq_num: u64,
         ledger_version: Version,
-    ) -> Result<ContractEvent> {
+    ) -> Result<(Version, ContractEvent)> {
         let (version, index) = self.lookup_event_by_key(event_key, seq_num, ledger_version)?;
-        self.get_event_by_version_and_index(version, index)
+        Ok((
+            version,
+            self.get_event_by_version_and_index(version, index)?,
+        ))
     }
 
     /// Get the latest sequence number on `event_key` considering all transactions with versions
@@ -204,6 +207,72 @@ impl EventStore {
         Ok((version, index))
     }
 
+    pub fn lookup_event_before_or_at_version(
+        &self,
+        event_key: &EventKey,
+        version: Version,
+    ) -> Result<
+        Option<(
+            Version, // version
+            u64,     // index
+            u64,     // sequence number
+        )>,
+    > {
+        let mut iter = self
+            .db
+            .iter::<EventByVersionSchema>(ReadOptions::default())?;
+        iter.seek_for_prev(&(*event_key, version, u64::MAX))?;
+
+        match iter.next().transpose()? {
+            None => Ok(None),
+            Some(((key, ver, seq_num), idx)) => {
+                if key == *event_key {
+                    Ok(Some((ver, idx, seq_num)))
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    }
+
+    pub fn lookup_event_after_version(
+        &self,
+        event_key: &EventKey,
+        version: Version,
+    ) -> Result<
+        Option<(
+            Version, // version
+            u64,     // index
+            u64,     // sequence number
+        )>,
+    > {
+        let mut iter = self
+            .db
+            .iter::<EventByVersionSchema>(ReadOptions::default())?;
+        iter.seek(&(*event_key, version + 1, 0))?;
+
+        match iter.next().transpose()? {
+            None => Ok(None),
+            Some(((key, ver, seq_num), idx)) => {
+                if key == *event_key {
+                    Ok(Some((ver, idx, seq_num)))
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    }
+
+    pub fn get_block_metadata(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
+        let (first_version, event_index, seq_num) = self
+            .lookup_event_before_or_at_version(&new_block_event_key(), version)?
+            .ok_or_else(|| AptosDbError::NotFound("NewBlockEvent".to_string()))?;
+
+        let new_block_event = self.get_event_by_version_and_index(first_version, event_index)?;
+        let payload = bcs::from_bytes(new_block_event.event_data())?;
+        Ok((first_version, payload))
+    }
+
     /// Save contract events yielded by the transaction at `version` and return root hash of the
     /// event accumulator formed by these events.
     pub fn put_events(
@@ -287,7 +356,7 @@ impl EventStore {
             while count > 0 {
                 let step = count / 2;
                 let mid = begin + step;
-                let event = self.get_event_by_key(event_key, mid, ledger_version)?;
+                let (_version, event) = self.get_event_by_key(event_key, mid, ledger_version)?;
                 if comp(&event)? {
                     begin = mid + 1;
                     count -= step + 1;

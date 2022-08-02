@@ -8,6 +8,8 @@ use aptos_sdk::{
     types::{AccountKey, LocalAccount},
 };
 use aptos_state_view::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
+use aptos_transaction_builder::aptos_stdlib;
+use aptos_types::block_metadata::BlockMetadata;
 use aptos_types::{
     account_config::aptos_root_address,
     account_view::AccountView,
@@ -23,6 +25,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
+use consensus_types::block::Block;
 use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;
 use rand::SeedableRng;
@@ -65,6 +68,17 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let txn_factory = TransactionFactory::new(ChainId::test());
 
+    let block1_id = gen_block_id(1);
+    let block1_meta = Transaction::BlockMetadata(BlockMetadata::new(
+        block1_id,
+        1,
+        0,
+        signer.author(),
+        Some(0),
+        vec![false],
+        vec![],
+        1,
+    ));
     let tx1 = genesis_account
         .sign_with_transaction_builder(txn_factory.create_user_account(account1.public_key()));
     let tx2 = genesis_account
@@ -97,7 +111,11 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let txn6 =
         account1.sign_with_transaction_builder(txn_factory.transfer(account3.address(), 70_000));
 
-    let block1 = block(vec![
+    let reconfig1 = genesis_account
+        .sign_with_transaction_builder(txn_factory.payload(aptos_stdlib::version_set_version(100)));
+
+    let block1: Vec<_> = vec![
+        block1_meta,
         UserTransaction(tx1),
         UserTransaction(tx2),
         UserTransaction(tx3),
@@ -107,27 +125,50 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         UserTransaction(txn4),
         UserTransaction(txn5),
         UserTransaction(txn6),
-    ]);
-    let block1_id = gen_block_id(1);
+        UserTransaction(reconfig1),
+    ];
 
-    let mut block2 = vec![];
     let block2_id = gen_block_id(2);
+    let block2_meta = Transaction::BlockMetadata(BlockMetadata::new(
+        block2_id,
+        2,
+        0,
+        signer.author(),
+        Some(0),
+        vec![false],
+        vec![],
+        2,
+    ));
+    let reconfig2 = genesis_account
+        .sign_with_transaction_builder(txn_factory.payload(aptos_stdlib::version_set_version(200)));
+    let block2 = vec![block2_meta, UserTransaction(reconfig2)];
 
+    let block3_id = gen_block_id(3);
+    let block3_meta = Transaction::BlockMetadata(BlockMetadata::new(
+        block3_id,
+        2,
+        1,
+        signer.author(),
+        Some(0),
+        vec![false],
+        vec![],
+        3,
+    ));
+    let mut block3 = vec![block3_meta];
     // Create 14 txns transferring 10k from account1 to account3 each.
     for _ in 2..=15 {
-        block2.push(UserTransaction(account1.sign_with_transaction_builder(
+        block3.push(UserTransaction(account1.sign_with_transaction_builder(
             txn_factory.transfer(account3.address(), 10_000),
         )));
     }
-    let block2 = block(block2);
+    let block3 = block(block3); // append state checkpoint txn
 
     let output1 = executor
         .execute_block((block1_id, block1.clone()), parent_block_id)
         .unwrap();
-    let ledger_info_with_sigs = gen_ledger_info_with_sigs(1, &output1, block1_id, vec![&signer]);
-    executor
-        .commit_blocks(vec![block1_id], ledger_info_with_sigs)
-        .unwrap();
+    let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, vec![&signer]);
+    let epoch2_genesis_id = Block::make_genesis_block_from_ledger_info(li1.ledger_info()).id();
+    executor.commit_blocks(vec![block1_id], li1).unwrap();
 
     let state_proof = db.reader.get_state_proof(0).unwrap();
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
@@ -136,29 +177,35 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         _ => panic!("unexpected state change"),
     };
     let current_version = state_proof.latest_ledger_info().version();
-    assert_eq!(trusted_state.version(), 10);
+    assert_eq!(trusted_state.version(), 11);
 
     let t1 = db
         .reader
         .get_account_transaction(genesis_account.address(), 3, false, current_version)
         .unwrap();
-    verify_committed_txn_status(t1.as_ref(), &block1[3]).unwrap();
+    verify_committed_txn_status(t1.as_ref(), &block1[4]).unwrap();
 
     let t2 = db
         .reader
         .get_account_transaction(genesis_account.address(), 4, false, current_version)
         .unwrap();
-    verify_committed_txn_status(t2.as_ref(), &block1[4]).unwrap();
+    verify_committed_txn_status(t2.as_ref(), &block1[5]).unwrap();
 
     let t3 = db
         .reader
         .get_account_transaction(genesis_account.address(), 5, false, current_version)
         .unwrap();
-    verify_committed_txn_status(t3.as_ref(), &block1[5]).unwrap();
+    verify_committed_txn_status(t3.as_ref(), &block1[6]).unwrap();
+
+    let reconfig1 = db
+        .reader
+        .get_account_transaction(genesis_account.address(), 6, false, current_version)
+        .unwrap();
+    verify_committed_txn_status(reconfig1.as_ref(), &block1[10]).unwrap();
 
     let tn = db
         .reader
-        .get_account_transaction(genesis_account.address(), 6, false, current_version)
+        .get_account_transaction(genesis_account.address(), 7, false, current_version)
         .unwrap();
     assert!(tn.is_none());
 
@@ -166,7 +213,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .reader
         .get_account_transaction(account1.address(), 0, true, current_version)
         .unwrap();
-    verify_committed_txn_status(t4.as_ref(), &block1[6]).unwrap();
+    verify_committed_txn_status(t4.as_ref(), &block1[7]).unwrap();
     // We requested the events to come back from this one, so verify that they did
     assert_eq!(t4.unwrap().events.unwrap().len(), 2);
 
@@ -174,71 +221,49 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .reader
         .get_account_transaction(account2.address(), 0, false, current_version)
         .unwrap();
-    verify_committed_txn_status(t5.as_ref(), &block1[7]).unwrap();
+    verify_committed_txn_status(t5.as_ref(), &block1[8]).unwrap();
 
     let t6 = db
         .reader
         .get_account_transaction(account1.address(), 1, true, current_version)
         .unwrap();
-    verify_committed_txn_status(t6.as_ref(), &block1[8]).unwrap();
+    verify_committed_txn_status(t6.as_ref(), &block1[9]).unwrap();
 
     // test the initial balance.
-    let db_state_view = db.reader.state_view_at_version(Some(6)).unwrap();
-    let account1_state_view = db_state_view.as_account_with_state_view(&account1_address);
-    verify_account_balance(get_account_balance(&account1_state_view), |x| {
-        x == 2_000_000
-    })
-    .unwrap();
+    let db_state_view = db.reader.state_view_at_version(Some(7)).unwrap();
+    let account1_view = db_state_view.as_account_with_state_view(&account1_address);
+    verify_account_balance(get_account_balance(&account1_view), |x| x == 2_000_000).unwrap();
 
-    let account2_state_view = db_state_view.as_account_with_state_view(&account2_address);
+    let account2_view = db_state_view.as_account_with_state_view(&account2_address);
+    verify_account_balance(get_account_balance(&account2_view), |x| x == 1_200_000).unwrap();
 
-    verify_account_balance(get_account_balance(&account2_state_view), |x| {
-        x == 1_200_000
-    })
-    .unwrap();
-
-    let account3_state_view = db_state_view.as_account_with_state_view(&account3_address);
-
-    verify_account_balance(get_account_balance(&account3_state_view), |x| {
-        x == 1_000_000
-    })
-    .unwrap();
+    let account3_view = db_state_view.as_account_with_state_view(&account3_address);
+    verify_account_balance(get_account_balance(&account3_view), |x| x == 1_000_000).unwrap();
 
     // test the final balance.
     let db_state_view = db
         .reader
         .state_view_at_version(Some(current_version))
         .unwrap();
-    let account1_state_view = db_state_view.as_account_with_state_view(&account1_address);
-    verify_account_balance(get_account_balance(&account1_state_view), |x| {
-        x == 1_910_000
-    })
-    .unwrap();
+    let account1_view = db_state_view.as_account_with_state_view(&account1_address);
+    verify_account_balance(get_account_balance(&account1_view), |x| x == 1_910_000).unwrap();
 
-    let account2_state_view = db_state_view.as_account_with_state_view(&account2_address);
+    let account2_view = db_state_view.as_account_with_state_view(&account2_address);
+    verify_account_balance(get_account_balance(&account2_view), |x| x == 1_210_000).unwrap();
 
-    verify_account_balance(get_account_balance(&account2_state_view), |x| {
-        x == 1_210_000
-    })
-    .unwrap();
-
-    let account3_state_view = db_state_view.as_account_with_state_view(&account3_address);
-
-    verify_account_balance(get_account_balance(&account3_state_view), |x| {
-        x == 1_080_000
-    })
-    .unwrap();
+    let account3_view = db_state_view.as_account_with_state_view(&account3_address);
+    verify_account_balance(get_account_balance(&account3_view), |x| x == 1_080_000).unwrap();
 
     let transaction_list_with_proof = db
         .reader
-        .get_transactions(3, 10, current_version, false)
+        .get_transactions(3, 12, current_version, false)
         .unwrap();
     verify_transactions(&transaction_list_with_proof, &block1[2..]).unwrap();
 
     let account1_sent_events = db
         .reader
         .get_events(
-            &EventKey::new(2, account1.address()),
+            &account1.sent_event_key(),
             0,
             Order::Ascending,
             10,
@@ -250,7 +275,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account2_sent_events = db
         .reader
         .get_events(
-            &EventKey::new(2, account2.address()),
+            &account2.sent_event_key(),
             0,
             Order::Ascending,
             10,
@@ -262,7 +287,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_sent_events = db
         .reader
         .get_events(
-            &EventKey::new(2, account3.address()),
+            &account3.sent_event_key(),
             0,
             Order::Ascending,
             10,
@@ -274,7 +299,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account1_received_events = db
         .reader
         .get_events(
-            &EventKey::new(1, account1.address()),
+            &account1.received_event_key(),
             0,
             Order::Ascending,
             10,
@@ -287,7 +312,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account2_received_events = db
         .reader
         .get_events(
-            &EventKey::new(1, account2.address()),
+            &account2.received_event_key(),
             0,
             Order::Ascending,
             10,
@@ -300,7 +325,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account3_received_events = db
         .reader
         .get_events(
-            &EventKey::new(1, account3.address()),
+            &account3.received_event_key(),
             0,
             Order::Ascending,
             10,
@@ -327,7 +352,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let account4_sent_events = db
         .reader
         .get_events(
-            &EventKey::new(2, account4.address()),
+            &account4.sent_event_key(),
             0,
             Order::Ascending,
             10,
@@ -336,60 +361,65 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .unwrap();
     assert!(account4_sent_events.is_empty());
 
-    // Execute the 2nd block.
+    // Execute block 2, 3, 4
     let output2 = executor
-        .execute_block((block2_id, block2.clone()), block1_id)
+        .execute_block((block2_id, block2), epoch2_genesis_id)
         .unwrap();
-    let ledger_info_with_sigs = gen_ledger_info_with_sigs(1, &output2, block2_id, vec![&signer]);
-    executor
-        .commit_blocks(vec![block2_id], ledger_info_with_sigs)
-        .unwrap();
+    let li2 = gen_ledger_info_with_sigs(2, &output2, block2_id, vec![&signer]);
+    let epoch3_genesis_id = Block::make_genesis_block_from_ledger_info(li2.ledger_info()).id();
+    executor.commit_blocks(vec![block2_id], li2).unwrap();
 
     let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
-    let trusted_state_change = trusted_state.verify_and_ratchet(&state_proof).unwrap();
-    assert!(matches!(
-        trusted_state_change,
-        TrustedStateChange::Version { .. }
-    ));
+    let trusted_state = match trusted_state.verify_and_ratchet(&state_proof) {
+        Ok(TrustedStateChange::Epoch { new_state, .. }) => new_state,
+        _ => panic!("unexpected state change"),
+    };
     let current_version = state_proof.latest_ledger_info().version();
-    assert_eq!(current_version, 25);
+    assert_eq!(current_version, 13);
 
+    let output3 = executor
+        .execute_block((block3_id, block3.clone()), epoch3_genesis_id)
+        .unwrap();
+    let li3 = gen_ledger_info_with_sigs(3, &output3, block3_id, vec![&signer]);
+    executor.commit_blocks(vec![block3_id], li3).unwrap();
+
+    let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
+    let _trusted_state = match trusted_state.verify_and_ratchet(&state_proof) {
+        Ok(TrustedStateChange::Version { new_state, .. }) => new_state,
+        _ => panic!("unexpected state change"),
+    };
+    let current_version = state_proof.latest_ledger_info().version();
+    assert_eq!(current_version, 29);
+
+    // More verification
     let t7 = db
         .reader
         .get_account_transaction(account1.address(), 2, false, current_version)
         .unwrap();
-    verify_committed_txn_status(t7.as_ref(), &block2[0]).unwrap();
+    verify_committed_txn_status(t7.as_ref(), &block3[1]).unwrap();
 
     let t20 = db
         .reader
         .get_account_transaction(account1.address(), 15, false, current_version)
         .unwrap();
-    verify_committed_txn_status(t20.as_ref(), &block2[13]).unwrap();
+    verify_committed_txn_status(t20.as_ref(), &block3[14]).unwrap();
 
     let db_state_view = db
         .reader
         .state_view_at_version(Some(current_version))
         .unwrap();
 
-    let account1_state_view = db_state_view.as_account_with_state_view(&account1_address);
+    let account1_view = db_state_view.as_account_with_state_view(&account1_address);
+    verify_account_balance(get_account_balance(&account1_view), |x| x == 1_770_000).unwrap();
 
-    verify_account_balance(get_account_balance(&account1_state_view), |x| {
-        x == 1_770_000
-    })
-    .unwrap();
-
-    let account3_state_view = db_state_view.as_account_with_state_view(&account3_address);
-
-    verify_account_balance(get_account_balance(&account3_state_view), |x| {
-        x == 1_220_000
-    })
-    .unwrap();
+    let account3_view = db_state_view.as_account_with_state_view(&account3_address);
+    verify_account_balance(get_account_balance(&account3_view), |x| x == 1_220_000).unwrap();
 
     let transaction_list_with_proof = db
         .reader
-        .get_transactions(11, 18, current_version, false)
+        .get_transactions(14, 16, current_version, false)
         .unwrap();
-    verify_transactions(&transaction_list_with_proof, &block2[..]).unwrap();
+    verify_transactions(&transaction_list_with_proof, &block3).unwrap();
 
     let account1_sent_events_batch1 = db
         .reader
