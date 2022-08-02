@@ -34,6 +34,12 @@ impl LaunchFullnode {
         let fullnode_peer_id = ctx
             .swarm()
             .add_full_node(&version, NodeConfig::default_for_public_full_node())?;
+        let validator_peer_id = ctx.swarm().validators().next().unwrap().peer_id();
+        let _vfn_peer_id = ctx.swarm().add_validator_full_node(
+            &version,
+            NodeConfig::default_for_validator_full_node(),
+            validator_peer_id,
+        )?;
 
         let fullnode = ctx.swarm().full_node_mut(fullnode_peer_id).unwrap();
         fullnode

@@ -28,7 +28,6 @@ async fn test_txn_broadcast() {
             NodeConfig::default_for_validator_full_node(),
             validator,
         )
-        .await
         .unwrap();
 
     for validator in swarm.validators_mut() {
