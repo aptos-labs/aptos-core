@@ -149,7 +149,10 @@ pub fn convert_write_set_changes(changes: &[WriteSetChange]) -> Vec<extractor::W
 
 #[inline]
 pub fn convert_hex_string_to_bytes(hex_string: &str) -> Vec<u8> {
-    HashValue::from_str(hex_string).unwrap().0.to_vec()
+    HashValue::from_str(hex_string)
+        .unwrap_or_else(|_| panic!("Could not convert '{}' to HashValue", hex_string))
+        .0
+        .to_vec()
 }
 
 pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetChange {
@@ -198,7 +201,12 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             special_fields: Default::default(),
         },
         WriteSetChange::DeleteTableItem(delete_table_item) => {
-            let data = delete_table_item.data.as_ref().unwrap();
+            let data = delete_table_item.data.as_ref().unwrap_or_else(|| {
+                panic!(
+                    "Could not extract data from DeletedTableItem '{:?}'",
+                    delete_table_item
+                )
+            });
 
             extractor::WriteSetChange {
                 type_: protobuf::EnumOrUnknown::new(
@@ -258,7 +266,14 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
                                 .collect(),
                             special_fields: Default::default(),
                         }),
-                        data: serde_json::to_string(&write_resource.data.data).unwrap(),
+                        data: serde_json::to_string(&write_resource.data.data).unwrap_or_else(
+                            |_| {
+                                panic!(
+                                    "Could not convert write_resource data to json '{:?}'",
+                                    write_resource
+                                )
+                            },
+                        ),
                         special_fields: Default::default(),
                     }),
                     special_fields: Default::default(),
@@ -267,7 +282,12 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             special_fields: Default::default(),
         },
         WriteSetChange::WriteTableItem(write_table_item) => {
-            let data = write_table_item.data.as_ref().unwrap();
+            let data = write_table_item.data.as_ref().unwrap_or_else(|| {
+                panic!(
+                    "Could not extract data from DecodedTableData '{:?}'",
+                    write_table_item
+                )
+            });
             extractor::WriteSetChange {
                 type_: protobuf::EnumOrUnknown::new(
                     extractor::write_set_change::WriteSetChangeType::WRITE_TABLE_ITEM,
@@ -437,9 +457,19 @@ pub fn convert_transaction(
 
     extractor::Transaction {
         timestamp: timestamp.unwrap_or_else(|| convert_timestamp_nanos(transaction.timestamp())),
-        version: transaction.version().unwrap(),
+        version: transaction.version().unwrap_or_else(|| {
+            panic!(
+                "Could not extract version from Transaction '{:?}'",
+                transaction
+            )
+        }),
         info: protobuf::MessageField::some(convert_transaction_info(
-            transaction.transaction_info().unwrap(),
+            transaction.transaction_info().unwrap_or_else(|_| {
+                panic!(
+                    "Could not extract transaction_info from Transaction '{:?}'",
+                    transaction
+                )
+            }),
         )),
         // TODO: keep track of the epoch as we iterate through BlockMetadata
         epoch: current_epoch,
