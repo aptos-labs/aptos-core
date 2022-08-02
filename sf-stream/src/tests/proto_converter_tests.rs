@@ -14,11 +14,7 @@ use aptos_sdk::types::{account_config::aptos_root_address, LocalAccount};
 use move_deps::move_core_types::value::MoveValue;
 use move_deps::{move_core_types::account_address::AccountAddress, move_package::BuildConfig};
 use serde_json::{json, Value};
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use std::{convert::TryInto, path::PathBuf};
 
 #[tokio::test]
@@ -94,11 +90,8 @@ async fn test_block_transactions_work() {
 
 #[tokio::test]
 async fn test_block_height_and_ts_work() {
-    let start_ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let mut test_context = new_test_context(start_ts);
+    let start_ts_usecs = 1000 * 1000000;
+    let mut test_context = new_test_context(start_ts_usecs as u64);
 
     // Creating 2 blocks w/ user transactions and 1 empty block
     let mut root_account = test_context.root_account();
@@ -134,12 +127,20 @@ async fn test_block_height_and_ts_work() {
             txn.block_height as usize,
             *block_mapping.get(&i).unwrap() as usize
         );
-        let ts = Duration::new(txn.timestamp.seconds as u64, txn.timestamp.nanos as u32).as_nanos() as usize;
         if txn.block_height == 0 {
             // Genesis timestamp is 0
-            assert_eq!(ts, 0);
+            assert_eq!(txn.timestamp.seconds as u64, 0);
         } else {
-            assert_eq!(ts, (start_ts + txn.block_height) as usize);
+            // Seconds should be going up once every 2 blocks because we increment twice
+            let expected_secs =
+                Duration::from_micros(start_ts_usecs).as_secs() + txn.block_height / 2;
+            assert_eq!(txn.timestamp.seconds as u64, expected_secs);
+            // Converting to nanos
+            let expected_nanos = Duration::from_micros(
+                start_ts_usecs + txn.block_height * Duration::from_secs(1).as_micros() as u64 / 2,
+            )
+            .subsec_nanos();
+            assert_eq!(txn.timestamp.nanos as u32, expected_nanos);
         }
     }
 }
