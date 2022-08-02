@@ -22,6 +22,8 @@ spec:
     env:
     - name: FORGE_TRIGGERED_BY
       value: {FORGE_TRIGGERED_BY}
+    - name: PROMETHEUS_URL
+      value: http://aptos-node-mon-aptos-monitoring-prometheus.default.svc:9090
     # - name: RUST_LOG
     #   value: debug
   affinity:
