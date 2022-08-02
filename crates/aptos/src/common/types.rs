@@ -376,12 +376,12 @@ impl EncodingType {
         match self {
             EncodingType::BCS => bcs::from_bytes(&data).map_err(|err| CliError::BCS(name, err)),
             EncodingType::Hex => {
-                let hex_string = String::from_utf8(data).unwrap();
+                let hex_string = String::from_utf8(data)?;
                 Key::from_encoded_string(hex_string.trim())
                     .map_err(|err| CliError::UnableToParse(name, err.to_string()))
             }
             EncodingType::Base64 => {
-                let string = String::from_utf8(data).unwrap();
+                let string = String::from_utf8(data)?;
                 let bytes = base64::decode(string.trim())
                     .map_err(|err| CliError::UnableToParse(name, err.to_string()))?;
                 Key::try_from(bytes.as_slice()).map_err(|err| {
@@ -689,7 +689,15 @@ pub struct MovePackageDir {
 }
 
 impl MovePackageDir {
-    pub fn get_package_dir(&self) -> CliTypedResult<PathBuf> {
+    pub fn new(package_dir: PathBuf) -> Self {
+        Self {
+            package_dir: Some(package_dir),
+            output_dir: None,
+            named_addresses: Default::default(),
+        }
+    }
+
+    pub fn get_package_path(&self) -> CliTypedResult<PathBuf> {
         dir_default_to_current(self.package_dir.clone())
     }
 

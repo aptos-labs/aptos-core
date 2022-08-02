@@ -16,7 +16,7 @@ fn main() -> () {
     println!("Alice: 0x{}", alice.address());
     println!("Bob: 0x{}", bob.address());
 
-    faucet_client.fund_account(&alice.auth_key().as_str(), 1_000_000);
+    faucet_client.fund_account(&alice.auth_key().as_str(), 5_000);
     faucet_client.fund_account(&bob.auth_key().as_str(), 0);
 
     println!("\n=== Initial Balances ===");

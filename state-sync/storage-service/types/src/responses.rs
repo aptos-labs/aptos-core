@@ -1,8 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::responses::Error::UnexpectedResponseError;
-use crate::{Epoch, StorageServiceRequest};
+use crate::requests::DataRequest::{
+    GetEpochEndingLedgerInfos, GetNewTransactionOutputsWithProof, GetNewTransactionsWithProof,
+    GetNumberOfStatesAtVersion, GetServerProtocolVersion, GetStateValuesWithProof,
+    GetStorageServerSummary, GetTransactionOutputsWithProof, GetTransactionsWithProof,
+};
+use crate::responses::Error::DegenerateRangeError;
+use crate::{Epoch, StorageServiceRequest, COMPRESSION_SUFFIX_LABEL};
+use aptos_compression::{CompressedData, CompressionError};
 use aptos_config::config::StorageServiceConfig;
 use aptos_types::epoch_change::EpochChangeProof;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
@@ -18,16 +24,78 @@ use thiserror::Error;
 
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
 pub enum Error {
-    #[error("Data range cannot be degenerate")]
+    #[error("Data range cannot be degenerate!")]
     DegenerateRangeError,
+    #[error("Unexpected error encountered: {0}")]
+    UnexpectedErrorEncountered(String),
     #[error("Unexpected response error: {0}")]
     UnexpectedResponseError(String),
+}
+
+impl From<CompressionError> for Error {
+    fn from(error: CompressionError) -> Self {
+        Error::UnexpectedErrorEncountered(error.to_string())
+    }
 }
 
 /// A storage service response.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum StorageServiceResponse {
+    CompressedResponse(String, CompressedData), // Store the label and the data (e.g., for logging/metrics)
+    RawResponse(DataResponse),
+}
+
+impl StorageServiceResponse {
+    /// Creates a new response and performs compression if required
+    pub fn new(data_response: DataResponse, perform_compression: bool) -> Result<Self, Error> {
+        if perform_compression {
+            let raw_data = bcs::to_bytes(&data_response)
+                .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+            let compressed_data = aptos_compression::compress(raw_data)?;
+            let label = data_response.get_label().to_string() + COMPRESSION_SUFFIX_LABEL;
+            Ok(StorageServiceResponse::CompressedResponse(
+                label,
+                compressed_data,
+            ))
+        } else {
+            Ok(StorageServiceResponse::RawResponse(data_response))
+        }
+    }
+
+    /// Returns the data response regardless of the inner format
+    pub fn get_data_response(&self) -> Result<DataResponse, Error> {
+        match self {
+            StorageServiceResponse::CompressedResponse(_, compressed_data) => {
+                let raw_data = aptos_compression::decompress(compressed_data)?;
+                let data_response = bcs::from_bytes::<DataResponse>(&raw_data)
+                    .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+                Ok(data_response)
+            }
+            StorageServiceResponse::RawResponse(data_response) => Ok(data_response.clone()),
+        }
+    }
+
+    /// Returns a summary label for the response
+    pub fn get_label(&self) -> String {
+        match self {
+            StorageServiceResponse::CompressedResponse(label, _) => label.clone(),
+            StorageServiceResponse::RawResponse(data_response) => {
+                data_response.get_label().to_string()
+            }
+        }
+    }
+
+    /// Returns true iff the data response is compressed
+    pub fn is_compressed(&self) -> bool {
+        matches!(self, Self::CompressedResponse(_, _))
+    }
+}
+
+/// A single data response.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[allow(clippy::large_enum_variant)]
+pub enum DataResponse {
     EpochEndingLedgerInfos(EpochChangeProof),
     NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),
     NewTransactionsWithProof((TransactionListWithProof, LedgerInfoWithSignatures)),
@@ -39,8 +107,7 @@ pub enum StorageServiceResponse {
     TransactionsWithProof(TransactionListWithProof),
 }
 
-// TODO(philiphayes): is there a proc-macro for this?
-impl StorageServiceResponse {
+impl DataResponse {
     /// Returns a summary label for the response
     pub fn get_label(&self) -> &'static str {
         match self {
@@ -57,11 +124,11 @@ impl StorageServiceResponse {
     }
 }
 
-impl Display for StorageServiceResponse {
+impl Display for DataResponse {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         // To prevent log spamming, we only display storage response data for summaries
         let data = match self {
-            StorageServiceResponse::StorageServerSummary(storage_summary) => {
+            DataResponse::StorageServerSummary(storage_summary) => {
                 format!("{:?}", storage_summary)
             }
             _ => "...".into(),
@@ -78,11 +145,12 @@ impl Display for StorageServiceResponse {
 impl TryFrom<StorageServiceResponse> for StateValueChunkWithProof {
     type Error = crate::responses::Error;
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
-        match response {
-            StorageServiceResponse::StateValueChunkWithProof(inner) => Ok(inner),
-            _ => Err(UnexpectedResponseError(format!(
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::StateValueChunkWithProof(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
                 "expected state_value_chunk_with_proof, found {}",
-                response.get_label()
+                data_response.get_label()
             ))),
         }
     }
@@ -91,11 +159,12 @@ impl TryFrom<StorageServiceResponse> for StateValueChunkWithProof {
 impl TryFrom<StorageServiceResponse> for EpochChangeProof {
     type Error = crate::responses::Error;
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
-        match response {
-            StorageServiceResponse::EpochEndingLedgerInfos(inner) => Ok(inner),
-            _ => Err(UnexpectedResponseError(format!(
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::EpochEndingLedgerInfos(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
                 "expected epoch_ending_ledger_infos, found {}",
-                response.get_label()
+                data_response.get_label()
             ))),
         }
     }
@@ -106,11 +175,12 @@ impl TryFrom<StorageServiceResponse>
 {
     type Error = crate::responses::Error;
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
-        match response {
-            StorageServiceResponse::NewTransactionOutputsWithProof(inner) => Ok(inner),
-            _ => Err(UnexpectedResponseError(format!(
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::NewTransactionOutputsWithProof(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
                 "expected new_transaction_outputs_with_proof, found {}",
-                response.get_label()
+                data_response.get_label()
             ))),
         }
     }
@@ -119,11 +189,12 @@ impl TryFrom<StorageServiceResponse>
 impl TryFrom<StorageServiceResponse> for (TransactionListWithProof, LedgerInfoWithSignatures) {
     type Error = crate::responses::Error;
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
-        match response {
-            StorageServiceResponse::NewTransactionsWithProof(inner) => Ok(inner),
-            _ => Err(UnexpectedResponseError(format!(
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::NewTransactionsWithProof(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
                 "expected new_transactions_with_proof, found {}",
-                response.get_label()
+                data_response.get_label()
             ))),
         }
     }
@@ -132,11 +203,12 @@ impl TryFrom<StorageServiceResponse> for (TransactionListWithProof, LedgerInfoWi
 impl TryFrom<StorageServiceResponse> for u64 {
     type Error = crate::responses::Error;
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
-        match response {
-            StorageServiceResponse::NumberOfStatesAtVersion(inner) => Ok(inner),
-            _ => Err(UnexpectedResponseError(format!(
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::NumberOfStatesAtVersion(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
                 "expected number_of_states_at_version, found {}",
-                response.get_label()
+                data_response.get_label()
             ))),
         }
     }
@@ -145,11 +217,12 @@ impl TryFrom<StorageServiceResponse> for u64 {
 impl TryFrom<StorageServiceResponse> for ServerProtocolVersion {
     type Error = crate::responses::Error;
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
-        match response {
-            StorageServiceResponse::ServerProtocolVersion(inner) => Ok(inner),
-            _ => Err(UnexpectedResponseError(format!(
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::ServerProtocolVersion(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
                 "expected server_protocol_version, found {}",
-                response.get_label()
+                data_response.get_label()
             ))),
         }
     }
@@ -158,11 +231,12 @@ impl TryFrom<StorageServiceResponse> for ServerProtocolVersion {
 impl TryFrom<StorageServiceResponse> for StorageServerSummary {
     type Error = crate::responses::Error;
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
-        match response {
-            StorageServiceResponse::StorageServerSummary(inner) => Ok(inner),
-            _ => Err(UnexpectedResponseError(format!(
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::StorageServerSummary(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
                 "expected storage_server_summary, found {}",
-                response.get_label()
+                data_response.get_label()
             ))),
         }
     }
@@ -171,11 +245,12 @@ impl TryFrom<StorageServiceResponse> for StorageServerSummary {
 impl TryFrom<StorageServiceResponse> for TransactionOutputListWithProof {
     type Error = crate::responses::Error;
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
-        match response {
-            StorageServiceResponse::TransactionOutputsWithProof(inner) => Ok(inner),
-            _ => Err(UnexpectedResponseError(format!(
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::TransactionOutputsWithProof(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
                 "expected transaction_outputs_with_proof, found {}",
-                response.get_label()
+                data_response.get_label()
             ))),
         }
     }
@@ -184,11 +259,12 @@ impl TryFrom<StorageServiceResponse> for TransactionOutputListWithProof {
 impl TryFrom<StorageServiceResponse> for TransactionListWithProof {
     type Error = crate::responses::Error;
     fn try_from(response: StorageServiceResponse) -> crate::Result<Self, Self::Error> {
-        match response {
-            StorageServiceResponse::TransactionsWithProof(inner) => Ok(inner),
-            _ => Err(UnexpectedResponseError(format!(
+        let data_response = response.get_data_response()?;
+        match data_response {
+            DataResponse::TransactionsWithProof(inner) => Ok(inner),
+            _ => Err(Error::UnexpectedResponseError(format!(
                 "expected transactions_with_proof, found {}",
-                response.get_label()
+                data_response.get_label()
             ))),
         }
     }
@@ -229,8 +305,7 @@ pub struct ProtocolMetadata {
 impl ProtocolMetadata {
     /// Returns true iff the request can be serviced
     pub fn can_service(&self, request: &StorageServiceRequest) -> bool {
-        use crate::StorageServiceRequest::*;
-        match request {
+        match &request.data_request {
             GetNewTransactionsWithProof(_)
             | GetNewTransactionOutputsWithProof(_)
             | GetNumberOfStatesAtVersion(_)
@@ -314,8 +389,7 @@ pub struct DataSummary {
 impl DataSummary {
     /// Returns true iff the request can be serviced
     pub fn can_service(&self, request: &StorageServiceRequest) -> bool {
-        use crate::StorageServiceRequest::*;
-        match request {
+        match &request.data_request {
             GetNewTransactionsWithProof(_)
             | GetNewTransactionOutputsWithProof(_)
             | GetServerProtocolVersion
@@ -394,10 +468,6 @@ impl DataSummary {
     }
 }
 
-#[derive(Clone, Debug, Error)]
-#[error("data range cannot be degenerate")]
-pub struct DegenerateRangeError;
-
 /// A struct representing a contiguous, non-empty data range (lowest to highest,
 /// inclusive) where data is complete (i.e. there are no missing pieces of data).
 ///
@@ -413,10 +483,7 @@ pub struct CompleteDataRange<T> {
     highest: T,
 }
 
-fn range_length_checked<T: PrimInt>(
-    lowest: T,
-    highest: T,
-) -> crate::Result<T, DegenerateRangeError> {
+fn range_length_checked<T: PrimInt>(lowest: T, highest: T) -> crate::Result<T, Error> {
     // len = highest - lowest + 1
     // Note: the order of operations here is important; we need to subtract first
     // before we (+1) to ensure we don't underflow when highest == lowest.
@@ -427,7 +494,7 @@ fn range_length_checked<T: PrimInt>(
 }
 
 impl<T: PrimInt> CompleteDataRange<T> {
-    pub fn new(lowest: T, highest: T) -> crate::Result<Self, DegenerateRangeError> {
+    pub fn new(lowest: T, highest: T) -> crate::Result<Self, Error> {
         if lowest > highest || range_length_checked(lowest, highest).is_err() {
             Err(DegenerateRangeError)
         } else {
@@ -436,7 +503,7 @@ impl<T: PrimInt> CompleteDataRange<T> {
     }
 
     /// Create a data range given the lower bound and the length of the range.
-    pub fn from_len(lowest: T, len: T) -> crate::Result<Self, DegenerateRangeError> {
+    pub fn from_len(lowest: T, len: T) -> crate::Result<Self, Error> {
         // highest = lowest + len - 1
         // Note: the order of operations here is important
         let highest = len
@@ -458,7 +525,7 @@ impl<T: PrimInt> CompleteDataRange<T> {
 
     /// Returns the length of the data range.
     #[inline]
-    pub fn len(&self) -> crate::Result<T, DegenerateRangeError> {
+    pub fn len(&self) -> crate::Result<T, Error> {
         self.highest
             .checked_sub(&self.lowest)
             .and_then(|value| value.checked_add(&T::one()))

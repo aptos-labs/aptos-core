@@ -686,6 +686,7 @@ impl AccountResourceGen {
             account_info.sequence_number,
             account_info.public_key.to_bytes().to_vec(),
             account_info.address,
+            EventHandle::random(0),
         )
     }
 }
@@ -832,6 +833,7 @@ impl TransactionToCommitGen {
             state_updates,
             WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
             events,
+            false, /* event_gen never generates reconfig events */
         )
     }
 
@@ -1144,6 +1146,7 @@ impl BlockGen {
             HashMap::new(),
             WriteSet::default(),
             Vec::new(),
+            false,
         ));
 
         // materialize ledger info

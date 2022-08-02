@@ -76,6 +76,7 @@ async fn main() -> std::io::Result<()> {
         tailer.run_migrations();
     }
 
+    tailer.check_or_update_chain_id().await.unwrap();
     let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
     tailer.add_processor(Arc::new(pg_transaction_processor));
     if args.index_token_data {

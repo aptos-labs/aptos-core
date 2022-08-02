@@ -76,6 +76,9 @@ pub trait ChunkExecutorTrait: Send + Sync {
 
     /// Resets the chunk executor by synchronizing state with storage.
     fn reset(&self) -> Result<()>;
+
+    /// Finishes the chunk executor by releasing memory held by inner data structures(SMT).
+    fn finish(&self);
 }
 
 pub struct StateSnapshotDelta {
@@ -89,7 +92,7 @@ pub trait BlockExecutorTrait: Send + Sync {
     fn committed_block_id(&self) -> HashValue;
 
     /// Reset the internal state including cache with newly fetched latest committed block from storage.
-    fn reset(&self) -> Result<(), Error>;
+    fn reset(&self);
 
     /// Executes a block.
     fn execute_block(
@@ -112,19 +115,22 @@ pub trait BlockExecutorTrait: Send + Sync {
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
         save_state_snapshots: bool,
-    ) -> Result<Option<StateSnapshotDelta>, Error>;
+    ) -> Result<(), Error>;
 
     fn commit_blocks(
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-    ) -> Result<Option<StateSnapshotDelta>, Error> {
+    ) -> Result<(), Error> {
         self.commit_blocks_ext(
             block_ids,
             ledger_info_with_sigs,
             true, /* save_state_snapshots */
         )
     }
+
+    /// Finishes the block executor by releasing memory held by inner data structures(SMT).
+    fn finish(&self);
 }
 
 pub trait TransactionReplayer: Send {
@@ -394,5 +400,9 @@ impl TransactionData {
 
     pub fn txn_info_hash(&self) -> HashValue {
         self.txn_info_hash
+    }
+
+    pub fn is_reconfig(&self) -> bool {
+        !self.reconfig_events.is_empty()
     }
 }

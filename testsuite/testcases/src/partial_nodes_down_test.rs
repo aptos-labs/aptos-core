@@ -32,9 +32,9 @@ impl NetworkTest for PartialNodesDown {
         thread::sleep(Duration::from_secs(5));
 
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &up_nodes, duration, 1, None)?;
+        let txn_stat = generate_traffic(ctx, &up_nodes, duration, 1)?;
         ctx.report
-            .report_txn_stats(self.name().to_string(), txn_stat, duration);
+            .report_txn_stats(self.name().to_string(), &txn_stat, duration);
         let runtime = Runtime::new()?;
         for n in &down_nodes {
             let node = ctx.swarm().validator_mut(*n).unwrap();

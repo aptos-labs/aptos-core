@@ -16,10 +16,7 @@ pub struct ChunkCommitQueue {
 
 impl ChunkCommitQueue {
     pub fn new_from_db(db: &Arc<dyn DbReader>) -> Result<Self> {
-        let persisted_view = db
-            .get_startup_info()?
-            .ok_or_else(|| anyhow!("DB not bootstrapped."))?
-            .into_latest_executed_trees();
+        let persisted_view = db.get_latest_executed_trees()?;
         Ok(Self::new(persisted_view))
     }
 

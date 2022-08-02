@@ -265,7 +265,7 @@ async fn create_driver_for_tests(
         mempool_notifications::new_mempool_notifier_listener_pair();
 
     // Create the chunk executor
-    let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()).unwrap());
+    let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
 
     // Create a streaming service client
     let (streaming_service_client, _) = new_streaming_service_client_listener_pair();

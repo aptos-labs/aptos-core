@@ -37,7 +37,7 @@ use crate::poem_backend::{AptosErrorCode, InternalError};
 #[derive(Clone)]
 pub struct Context {
     chain_id: ChainId,
-    db: Arc<dyn DbReader>,
+    pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
     node_config: NodeConfig,
 }
@@ -85,6 +85,10 @@ impl Context {
 
     pub fn content_length_limit(&self) -> u64 {
         self.node_config.api.content_length_limit()
+    }
+
+    pub fn failpoints_enabled(&self) -> bool {
+        self.node_config.api.failpoints_enabled
     }
 
     pub fn filter(self) -> impl Filter<Extract = (Context,), Error = Infallible> + Clone {
@@ -232,7 +236,7 @@ impl Context {
         };
 
         let resolver = self.move_resolver()?;
-        let converter = resolver.as_converter();
+        let converter = resolver.as_converter(self.db.clone());
         let txn = self.get_transaction_by_version(start, ledger_version)?;
 
         // Parse the resources and find the block metadata resource update
@@ -419,6 +423,6 @@ impl Context {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BlockMetadataState {
-    epoch_internal: U64,
+    epoch_interval: U64,
     height: U64,
 }

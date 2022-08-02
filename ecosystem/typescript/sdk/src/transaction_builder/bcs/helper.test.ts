@@ -1,6 +1,19 @@
 import { AccountAddress } from "../aptos_types";
 import { Deserializer } from "./deserializer";
-import { bcsToBytes, deserializeVector, serializeVector } from "./helper";
+import {
+  bcsSerializeBool,
+  bcsSerializeBytes,
+  bcsSerializeFixedBytes,
+  bcsSerializeStr,
+  bcsSerializeU128,
+  bcsSerializeU16,
+  bcsSerializeU32,
+  bcsSerializeU8,
+  bcsSerializeUint64,
+  bcsToBytes,
+  deserializeVector,
+  serializeVector,
+} from "./helper";
 import { Serializer } from "./serializer";
 
 test("serializes and deserializes a vector of serializables", () => {
@@ -22,5 +35,54 @@ test("bcsToBytes", () => {
 
   expect(bcsToBytes(address)).toEqual(
     new Uint8Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
+  );
+});
+
+test("bcsSerializeU8", () => {
+  expect(bcsSerializeU8(255)).toEqual(new Uint8Array([0xff]));
+});
+
+test("bcsSerializeU16", () => {
+  expect(bcsSerializeU16(65535)).toEqual(new Uint8Array([0xff, 0xff]));
+});
+
+test("bcsSerializeU32", () => {
+  expect(bcsSerializeU32(4294967295)).toEqual(new Uint8Array([0xff, 0xff, 0xff, 0xff]));
+});
+
+test("bcsSerializeU64", () => {
+  expect(bcsSerializeUint64(18446744073709551615n)).toEqual(
+    new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
+  );
+});
+
+test("bcsSerializeU128", () => {
+  expect(bcsSerializeU128(340282366920938463463374607431768211455n)).toEqual(
+    new Uint8Array([0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]),
+  );
+});
+
+test("bcsSerializeBool", () => {
+  expect(bcsSerializeBool(true)).toEqual(new Uint8Array([0x01]));
+});
+
+test("bcsSerializeStr", () => {
+  expect(bcsSerializeStr("çå∞≠¢õß∂ƒ∫")).toEqual(
+    new Uint8Array([
+      24, 0xc3, 0xa7, 0xc3, 0xa5, 0xe2, 0x88, 0x9e, 0xe2, 0x89, 0xa0, 0xc2, 0xa2, 0xc3, 0xb5, 0xc3, 0x9f, 0xe2, 0x88,
+      0x82, 0xc6, 0x92, 0xe2, 0x88, 0xab,
+    ]),
+  );
+});
+
+test("bcsSerializeBytes", () => {
+  expect(bcsSerializeBytes(new Uint8Array([0x41, 0x70, 0x74, 0x6f, 0x73]))).toEqual(
+    new Uint8Array([5, 0x41, 0x70, 0x74, 0x6f, 0x73]),
+  );
+});
+
+test("bcsSerializeFixedBytes", () => {
+  expect(bcsSerializeFixedBytes(new Uint8Array([0x41, 0x70, 0x74, 0x6f, 0x73]))).toEqual(
+    new Uint8Array([0x41, 0x70, 0x74, 0x6f, 0x73]),
   );
 });

@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path_cache::AccessPathCache, move_vm_ext::MoveResolverExt,
+    access_path_cache::AccessPathCache,
+    delta_ext::{ChangeSetExt, DeltaChangeSet},
+    move_vm_ext::MoveResolverExt,
     transaction_metadata::TransactionMetadata,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -192,6 +194,16 @@ impl SessionOutput {
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
         Ok(ChangeSet::new(write_set, events))
+    }
+
+    pub fn into_change_set_ext<C: AccessPathCache>(
+        self,
+        ap_cache: &mut C,
+    ) -> Result<ChangeSetExt, VMStatus> {
+        // TODO: extract `DeltaChangeSet` from Aggregator extension (when it lands)
+        // and initialize `ChangeSetExt` properly.
+        self.into_change_set(ap_cache)
+            .map(|change_set| ChangeSetExt::new(DeltaChangeSet::empty(), change_set))
     }
 
     pub fn squash(&mut self, other: Self) -> Result<(), VMStatus> {

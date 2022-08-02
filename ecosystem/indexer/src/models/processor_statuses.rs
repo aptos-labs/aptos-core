@@ -1,6 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-
+#![allow(clippy::extra_unused_lifetimes)]
 use crate::{
     indexer::{errors::TransactionProcessingError, processing_result::ProcessingResult},
     schema::processor_statuses as processor_statuss,

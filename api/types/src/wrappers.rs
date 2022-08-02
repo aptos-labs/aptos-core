@@ -12,16 +12,10 @@
 
 use crate::MoveStructTag;
 
-use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use move_deps::move_core_types::identifier::{IdentStr, Identifier};
 
 use serde::{Deserialize, Serialize};
-use std::{
-    convert::{From, Into},
-    fmt,
-    ops::Deref,
-    str::FromStr,
-};
+use std::{convert::From, fmt, ops::Deref, str::FromStr};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct IdentifierWrapper(pub Identifier);
@@ -72,37 +66,31 @@ impl fmt::Display for IdentifierWrapper {
     }
 }
 
-impl_poem_type!(IdentifierWrapper);
-impl_poem_parameter!(IdentifierWrapper);
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct MoveStructTagWrapper(pub MoveStructTag);
+pub struct MoveStructTagParam(pub MoveStructTag);
 
-impl FromStr for MoveStructTagWrapper {
+impl FromStr for MoveStructTagParam {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
-        Ok(MoveStructTagWrapper(MoveStructTag::from_str(s)?))
+        Ok(MoveStructTagParam(MoveStructTag::from_str(s)?))
     }
 }
 
-impl From<MoveStructTagWrapper> for MoveStructTag {
-    fn from(value: MoveStructTagWrapper) -> MoveStructTag {
+impl From<MoveStructTagParam> for MoveStructTag {
+    fn from(value: MoveStructTagParam) -> MoveStructTag {
         value.0
     }
 }
 
-impl From<MoveStructTag> for MoveStructTagWrapper {
-    fn from(value: MoveStructTag) -> MoveStructTagWrapper {
+impl From<MoveStructTag> for MoveStructTagParam {
+    fn from(value: MoveStructTag) -> MoveStructTagParam {
         Self(value)
     }
 }
 
-impl fmt::Display for MoveStructTagWrapper {
+impl fmt::Display for MoveStructTagParam {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         MoveStructTag::fmt(&self.0, f)
     }
 }
-
-impl_poem_type!(MoveStructTagWrapper);
-impl_poem_parameter!(MoveStructTagWrapper);

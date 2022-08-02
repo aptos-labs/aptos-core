@@ -380,6 +380,14 @@ impl NetworkAddress {
         })
     }
 
+    /// Retrieves the port from the network address
+    pub fn find_port(&self) -> Option<u16> {
+        self.0.iter().find_map(|proto| match proto {
+            Protocol::Tcp(port) => Some(*port),
+            _ => None,
+        })
+    }
+
     /// A temporary, hacky function to parse out the first `/noise-ik/<pubkey>` from
     /// a `NetworkAddress`. We can remove this soon, when we move to the interim
     /// "monolithic" transport model.

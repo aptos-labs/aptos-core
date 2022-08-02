@@ -12,9 +12,9 @@
 # ensure the script is run from project root
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
-# for calculating regression
-TPS_THRESHOLD=5000
-P99_LATENCY_MS_THRESHOLD=8000
+# for calculating regression in local mode
+LOCAL_TPS_THRESHOLD=400
+LOCAL_P99_LATENCY_MS_THRESHOLD=60000
 
 # output files
 FORGE_OUTPUT=${FORGE_OUTPUT:-$(mktemp)}
@@ -49,7 +49,6 @@ FORGE_TEST_SUITE=${FORGE_TEST_SUITE:-land_blocking}
 [ "$FORGE_NAMESPACE_KEEP" = "true" ] && KEEP_ARGS="--keep"
 [ "$FORGE_ENABLE_HAPROXY" = "true" ] && ENABLE_HAPROXY_ARGS="--enable-haproxy"
 
-
 # Set variables for o11y resource locations depending on the type of cluster that is running Forge
 set_o11y_resources() {
     if echo $FORGE_CLUSTER_NAME | grep "forge"; then
@@ -77,17 +76,34 @@ set_forge_namespace() {
 
 # Set an image tag to use
 set_image_tag() {
-    if [ -z "$IMAGE_TAG" ]; then
-        IMAGE_TAG_DEFAULT=$(git rev-parse HEAD)
-        echo "IMAGE_TAG not set, defaulting to current HEAD commit as tag: ${IMAGE_TAG_DEFAULT}"
-        IMAGE_TAG=${IMAGE_TAG_DEFAULT}
-    fi
     echo "Ensure image exists"
-    img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG)
-    if [ $? != 0 ]; then
-        echo "IMAGE_TAG does not exist in ECR: ${IMAGE_TAG}. Make sure your commit has been pushed to GitHub previously."
-        echo "If you're trying to run the code from your PR, apply the label 'CICD:build-images' and wait for the builds to finish."
-        exit 1
+    # if IMAGE_TAG not set, check the last few commits on HEAD
+    if [ -z "$IMAGE_TAG" ]; then
+        echo "IMAGE_TAG not set, trying the latest commits before HEAD"
+        commit_threshold=5
+        for i in $(seq 0 $commit_threshold); do
+            IMAGE_TAG_DEFAULT=$(git rev-parse HEAD~$i)
+            echo "Trying tag: ${IMAGE_TAG_DEFAULT}"
+            git log --format=%B -n 1 $IMAGE_TAG_DEFAULT
+            img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG_DEFAULT)
+            if [ "$?" -eq 0 ]; then
+                echo "Image tag exists. Using tag: ${IMAGE_TAG_DEFAULT}"
+                IMAGE_TAG=$IMAGE_TAG_DEFAULT
+                return 0
+            fi
+        done
+        # if IMAGE_TAG still not set after checking HEAD,
+        if [ -z "$IMAGE_TAG"]; then
+            echo "None of the last ${commit_threshold} commits have been built and pushed"
+            exit 1
+        fi
+    else
+        img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG)
+        if [ "$?" -ne 0 ]; then
+            echo "IMAGE_TAG does not exist in ECR: ${IMAGE_TAG}. Make sure your commit has been pushed to GitHub previously."
+            echo "If you're trying to run the code from your PR, apply the label 'CICD:build-images' and wait for the builds to finish."
+            exit 1
+        fi
     fi
 }
 
@@ -95,12 +111,12 @@ set_image_tag() {
 get_validator_logs_link() {
     # build the logs link in a readable way...
     # filter by:
-    #   * chain_name: name of the Forge cluster "chain"
+    #   * chain_name: name of the Forge cluster/chain
     #   * namespace: kubernetes namespace the Forge test was executed in
     #   * hostname: name of a kubernetes pod e.g. validator name
     if [ -n "$ENABLE_LOG_AUTO_REFRESH" ]; then
         ES_TIME_FILTER="refreshInterval:(pause:!f,value:10000),time:(from:now-15m,to:now)"
-    else 
+    else
         ES_TIME_FILTER="refreshInterval:(pause:!t,value:0),time:(from:'${ES_START_TIME}',to:'${ES_END_TIME}')"
     fi
     VAL0_HOSTNAME="aptos-node-0-validator-0"
@@ -122,7 +138,7 @@ get_dashboard_link() {
     fi
     if [ -n "$ENABLE_DASHBOARD_AUTO_REFRESH" ]; then
         GRAFANA_TIME_FILTER="&refresh=10s&from=now-15m&to=now"
-    else 
+    else
         GRAFANA_TIME_FILTER="&from=${FORGE_START_TIME_MS}&to=${FORGE_END_TIME_MS}"
     fi
     FORGE_DASHBOARD_LINK="${GRAFANA_BASE_URL}&var-namespace=${FORGE_NAMESPACE}&var-chain_name=${FORGE_CHAIN_NAME}${GRAFANA_TIME_FILTER}"
@@ -168,7 +184,9 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # more file descriptors for heavy txn generation
     ulimit -n 1048576
 
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 test k8s-swarm \
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 1500 --avg-tps $LOCAL_TPS_THRESHOLD \
+        --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD \
+        test k8s-swarm \
         --image-tag $IMAGE_TAG \
         --namespace $FORGE_NAMESPACE \
         --port-forward $REUSE_ARGS $KEEP_ARGS $ENABLE_HAPROXY_ARGS | tee $FORGE_OUTPUT
@@ -181,16 +199,17 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     fi
 
 elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
-    # try deleting existing forge pod of same name
-    # since forge test runner will run in a pod that matches the namespace
-    # this will pre-empt the existing forge test in the same namespace and ensures
-    # we do not have any dangling test runners
-    FORGE_POD_NAME=$FORGE_NAMESPACE
-    kubectl delete pod -n default $FORGE_POD_NAME || true
-    kubectl wait -n default --for=delete "pod/${FORGE_POD_NAME}" || true
+    # try deleting pod corresponding to the same forge test (namespace, image_tag/git_ref)
+    # this will pre-empt the existing forge test and ensures we do not have any dangling test runners
+    FORGE_POD_NAME="${FORGE_NAMESPACE}-$(date '+%s')-${IMAGE_TAG}"
+    FORGE_POD_NAME=${FORGE_POD_NAME:0:64}
+    kubectl delete pod -n default -l "forge-namespace=${FORGE_NAMESPACE}" --force || true
+    kubectl wait -n default --for=delete pod -l "forge-namespace=${FORGE_NAMESPACE}" || true
 
     specfile=$(mktemp)
     echo "Forge test-runner pod Spec : ${specfile}"
+
+    [[ "$GITHUB_ACTIONS" == "true" ]] && FORGE_TRIGGERED_BY=github-actions || FORGE_TRIGGERED_BY=other
 
     sed -e "s/{FORGE_POD_NAME}/${FORGE_POD_NAME}/g" \
         -e "s/{FORGE_TEST_SUITE}/${FORGE_TEST_SUITE}/g" \
@@ -201,6 +220,7 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
         -e "s/{REUSE_ARGS}/${REUSE_ARGS}/g" \
         -e "s/{KEEP_ARGS}/${KEEP_ARGS}/g" \
         -e "s/{ENABLE_HAPROXY_ARGS}/${ENABLE_HAPROXY_ARGS}/g" \
+        -e "s/{FORGE_TRIGGERED_BY}/${FORGE_TRIGGERED_BY}/g" \
         testsuite/forge-test-runner-template.yaml >${specfile}
 
     kubectl apply -n default -f $specfile
@@ -212,11 +232,14 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     kubectl logs -n default -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
 
     # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
-    forge_pod_status=$(kubectl get pod -n default $FORGE_POD_NAME -o jsonpath="{.status.phase}")
+    forge_pod_status=$(kubectl get pod -n default $FORGE_POD_NAME -o jsonpath="{.status.phase}" 2>&1)
     echo "Forge pod status: ${forge_pod_status}"
-    if [ "$forge_pod_status" = "Succeeded" ]; then
+
+    if [ "$forge_pod_status" = "Succeeded" ]; then # the current pod succeeded
         FORGE_EXIT_CODE=0
-    else
+    elif echo $forge_pod_status | grep -E "(not found)|(not found)"; then # the current test in this namespace was likely preempted and deleted
+        FORGE_EXIT_CODE=10
+    else # it did not succeed
         FORGE_EXIT_CODE=1
     fi
 elif [ "$FORGE_RUNNER_MODE" = "dry-run" ]; then
@@ -239,42 +262,26 @@ cat $FORGE_OUTPUT | awk '/====json-report-begin===/{f=1;next} /====json-report-e
 # If no report was generated, fill with default report
 if [ ! -s "${FORGE_REPORT}" ]; then
     echo '{"text": "Forge test runner terminated"}' >"${FORGE_REPORT}"
-    FORGE_EXIT_CODE=1
 fi
 # If no report text was generated, fill with default text
 FORGE_REPORT_TXT=$(cat $FORGE_REPORT | jq -r .text)
 if [ -z "$FORGE_REPORT_TXT" ]; then
     FORGE_REPORT_TXT="Forge report text empty. See test runner output."
-    FORGE_EXIT_CODE=1
 fi
 
 # print the Forge report
 cat $FORGE_REPORT
 
-# detect regressions. TODO: do this in the Forge test runner itself since it's complex
-# if this script is not triggered in GHA, use a default value
 [ -z "$GITHUB_RUN_ID" ] && GITHUB_RUN_ID=0
 AVG_TPS=$(cat $FORGE_REPORT | grep -oE '[0-9]+ TPS' | awk '{print $1}')
 P99_LATENCY=$(cat $FORGE_REPORT | grep -oE '[0-9]+ ms p99 latency' | awk '{print $1}')
 if [ -n "$AVG_TPS" ]; then
     echo "AVG_TPS: ${AVG_TPS}"
     echo "forge_job_avg_tps {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $AVG_TPS" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
-    if [[ "$AVG_TPS" -lt "$TPS_THRESHOLD" ]]; then
-        echo "(\!) AVG_TPS: ${avg_tps} < ${TPS_THRESHOLD} tps"
-        if [ "$FORGE_RUNNER_MODE" != "local" ]; then
-            FORGE_EXIT_CODE=2
-        fi
-    fi
 fi
 if [ -n "$P99_LATENCY" ]; then
     echo "P99_LATENCY: ${P99_LATENCY}"
     echo "forge_job_p99_latency {FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\",GITHUB_RUN_ID=\"$GITHUB_RUN_ID\"} $P99_LATENCY" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
-    if [[ "$P99_LATENCY" -gt "$P99_LATENCY_MS_THRESHOLD" ]]; then
-        echo "(\!) P99_LATENCY: ${P99_LATENCY} > ${P99_LATENCY_MS_THRESHOLD} ms"
-        if [ "$FORGE_RUNNER_MODE" != "local" ]; then
-            FORGE_EXIT_CODE=2
-        fi
-    fi
 fi
 
 # Get the final o11y links that are not auto-refresh
@@ -286,6 +293,10 @@ if [ "$FORGE_EXIT_CODE" = "0" ]; then
     FORGE_COMMENT_HEADER="### :white_check_mark: Forge test success on \`${IMAGE_TAG}\`"
 elif [ "$FORGE_EXIT_CODE" = "2" ]; then
     FORGE_COMMENT_HEADER"### :x: Forge test perf regression on \`${IMAGE_TAG}\`"
+elif [ "$FORGE_EXIT_CODE" = "10" ]; then
+    FORGE_COMMENT_HEADER"### :thought_balloon: Forge test preempted on \`${IMAGE_TAG}\`"
+    # don't actually fail if tests pre-empted
+    FORGE_EXIT_CODE=0
 else
     FORGE_COMMENT_HEADER="### :x: Forge test failure on \`${IMAGE_TAG}\`"
 fi

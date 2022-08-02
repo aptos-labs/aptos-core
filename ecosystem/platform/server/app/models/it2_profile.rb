@@ -30,13 +30,10 @@ class It2Profile < ApplicationRecord
   validate :check_validator_ipv4
 
   before_save :maybe_set_validated_to_false
+  before_save :set_account_address
 
   CHANGES_TO_REVALIDATE = Set.new %w[consensus_key account_key network_key validator_address validator_api_port
                                      validator_metrics_port]
-
-  def account_address
-    self.class.address_from_key account_key
-  end
 
   def validator_port
     self[:validator_port] || 6180
@@ -78,6 +75,10 @@ class It2Profile < ApplicationRecord
   end
 
   private
+
+  def set_account_address
+    self.account_address = self.class.address_from_key account_key
+  end
 
   def check_validator_ipv4
     # If the updates don't require revalidation, don't do it

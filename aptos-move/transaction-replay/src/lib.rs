@@ -161,6 +161,10 @@ impl AptosDebugger {
                 &AdapterLogSchema::new(state_view.id(), 0),
             )
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
+
+        // Since we execute write sets, deltas cannot be produced.
+        let (_, output) = output.into();
+
         if save_write_set {
             self.save_write_sets(&output)?;
         }
@@ -177,12 +181,10 @@ impl AptosDebugger {
                 access_path::Path::Resource(tag) => match op {
                     WriteOp::Deletion => state_view.delete_resource(addr, tag)?,
                     WriteOp::Value(bytes) => state_view.save_resource(addr, tag, bytes)?,
-                    WriteOp::Delta(..) => unreachable!("deltas are only used in executor"),
                 },
                 access_path::Path::Code(module_id) => match op {
                     WriteOp::Deletion => state_view.delete_module(&module_id)?,
                     WriteOp::Value(bytes) => state_view.save_module(&module_id, bytes)?,
-                    WriteOp::Delta(..) => unreachable!("deltas are only used in executor"),
                 },
             }
         }

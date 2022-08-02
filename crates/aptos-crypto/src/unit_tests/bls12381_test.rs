@@ -310,11 +310,13 @@ fn bls12381_random_multisig_dont_verify_with_random_pk() {
         .is_err());
 }
 
-/// Test that generates an example signature. We used this to create a test case for the BLS12-381
-/// Move submodule. For simplicity, we use `sign_arbitrary_message` to generate a signature directly on a
+#[test]
+#[ignore]
+/// Not an actual test: only used to generate test cases for testing the BLS Move module in
+/// aptos-move/framework/move-stdlib/sources/signer.move
+/// For simplicity, we use `sign_arbitrary_message` to generate a signature directly on a
 /// message `m` rather than on its hash derived using the `CryptoHasher` trait. This makes it easier
 /// to verify the signature in our Move code, which uses `verify_arbitrary_message`.
-#[test]
 fn bls12381_sample_signature() {
     let mut rng = OsRng;
 
@@ -332,6 +334,8 @@ fn bls12381_sample_signature() {
 }
 
 #[test]
+/// Tests deserialization and verification of a signature generated for the Move submodule via
+/// `bls12381_sample_signature` above.
 fn bls12381_sample_signature_verifies() {
     let pk = PublicKey::try_from(
         hex::decode(
@@ -346,4 +350,51 @@ fn bls12381_sample_signature_verifies() {
     ).unwrap();
 
     assert!(sig.verify_arbitrary_msg(b"Hello Aptos!", &pk).is_ok());
+}
+
+#[test]
+#[ignore]
+/// Not an actual test: only used to generate test cases for testing the BLS Move module in
+/// aptos-move/framework/move-stdlib/sources/signer.move
+fn bls12381_sample_aggregate_pk_and_multisig() {
+    let mut rng = OsRng;
+
+    let num = 5;
+    let message = b"Hello, Aptoverse!";
+
+    let mut pks = vec![];
+    let mut agg_pks = vec![];
+    let mut sigs = vec![];
+    let mut multisigs = vec![];
+
+    for _i in 1..=num {
+        let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+
+        pks.push(keypair.public_key);
+        sigs.push(keypair.private_key.sign_arbitrary_message(message));
+
+        multisigs.push(bls12381::Signature::aggregate(sigs.clone()).unwrap());
+
+        let pk_refs = pks.iter().collect::<Vec<&PublicKey>>();
+        agg_pks.push(PublicKey::aggregate(pk_refs).unwrap());
+    }
+
+    println!("let pks = vector[");
+    for pk in pks {
+        println!("    x\"{}\",", pk);
+    }
+    println!("];\n");
+
+    println!("let agg_pks = vector[");
+    for aggpk in agg_pks {
+        println!("    x\"{}\",", aggpk);
+    }
+    println!("];\n");
+
+    println!("// The signed message is \"Hello, Aptoverse!\"");
+    println!("let multisigs = vector[");
+    for multisig in multisigs {
+        println!("    x\"{}\",", multisig);
+    }
+    println!("];");
 }

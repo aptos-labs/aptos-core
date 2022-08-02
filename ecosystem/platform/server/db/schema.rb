@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_07_07_181731) do
+ActiveRecord::Schema[7.0].define(version: 2022_07_30_180322) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -110,6 +110,7 @@ ActiveRecord::Schema[7.0].define(version: 2022_07_07_181731) do
     t.boolean "selected", default: false, null: false, comment: "Whether this node is selected for participation in IT1."
     t.boolean "validator_verified_final"
     t.jsonb "metrics_data"
+    t.string "account_address"
     t.index ["user_id"], name: "index_it1_profiles_on_user_id"
   end
 
@@ -135,6 +136,7 @@ ActiveRecord::Schema[7.0].define(version: 2022_07_07_181731) do
     t.datetime "updated_at", null: false
     t.string "nhc_job_id"
     t.text "nhc_output"
+    t.string "account_address"
     t.index ["account_key"], name: "index_it2_profiles_on_account_key", unique: true
     t.index ["consensus_key"], name: "index_it2_profiles_on_consensus_key", unique: true
     t.index ["fullnode_network_key"], name: "index_it2_profiles_on_fullnode_network_key", unique: true

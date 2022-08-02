@@ -52,13 +52,13 @@ use network::{
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use storage_interface::{DbReader, ExecutedTrees, Order, StartupInfo};
 use storage_service_types::requests::{
-    EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
+    DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
     NewTransactionsWithProofRequest, StateValuesWithProofRequest, StorageServiceRequest,
     TransactionOutputsWithProofRequest, TransactionsWithProofRequest,
 };
 use storage_service_types::responses::{
-    CompleteDataRange, DataSummary, ProtocolMetadata, ServerProtocolVersion, StorageServerSummary,
-    StorageServiceResponse,
+    CompleteDataRange, DataResponse, DataSummary, ProtocolMetadata, ServerProtocolVersion,
+    StorageServerSummary, StorageServiceResponse,
 };
 use storage_service_types::{Epoch, StorageServiceError, StorageServiceMessage};
 use tokio::time::timeout;
@@ -66,6 +66,74 @@ use tokio::time::timeout;
 /// Various test constants for storage
 const MAX_RESPONSE_TIMEOUT_SECS: u64 = 30;
 const PROTOCOL_VERSION: u64 = 1;
+
+#[tokio::test]
+async fn test_cachable_requests_compression() {
+    // Create test data
+    let start_version = 0;
+    let end_version = 454;
+    let proof_version = end_version;
+    let include_events = false;
+    let compression_options = [true, false];
+
+    // Create the mock db reader
+    let mut db_reader = create_mock_db_reader();
+    let mut expectation_sequence = Sequence::new();
+    let mut transaction_lists_with_proof = vec![];
+    for _ in compression_options {
+        // Create and save test transaction lists
+        let transaction_list_with_proof = create_transaction_list_with_proof(
+            start_version,
+            end_version,
+            proof_version,
+            include_events,
+        );
+        transaction_lists_with_proof.push(transaction_list_with_proof.clone());
+
+        // Expect the data to be fetched from storage exactly once
+        db_reader
+            .expect_get_transactions()
+            .times(1)
+            .with(
+                eq(start_version),
+                eq(end_version - start_version + 1),
+                eq(proof_version),
+                eq(include_events),
+            )
+            .return_once(move |_, _, _, _| Ok(transaction_list_with_proof))
+            .in_sequence(&mut expectation_sequence);
+    }
+
+    // Create the storage client and server
+    let (mut mock_client, service, _) = MockClient::new(Some(db_reader));
+    tokio::spawn(service.start());
+
+    // Repeatedly fetch the data and verify the responses
+    for (i, use_compression) in compression_options.iter().enumerate() {
+        for _ in 0..10 {
+            let data_request =
+                DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+                    proof_version,
+                    start_version,
+                    end_version,
+                    include_events,
+                });
+            let storage_request = StorageServiceRequest::new(data_request, *use_compression);
+
+            // Process the request
+            let response = mock_client.process_request(storage_request).await.unwrap();
+
+            // Verify the response is correct
+            assert_eq!(response.is_compressed(), *use_compression);
+            match response.get_data_response().unwrap() {
+                DataResponse::TransactionsWithProof(response) => {
+                    assert_eq!(response, transaction_lists_with_proof[i]);
+                }
+                _ => panic!("Expected transactions with proof but got: {:?}", response),
+            };
+        }
+    }
+}
 
 #[tokio::test]
 async fn test_cachable_requests_eviction() {
@@ -112,27 +180,30 @@ async fn test_cachable_requests_eviction() {
 
     // Process a request to fetch a state chunk. This should cache and serve the response.
     for _ in 0..2 {
-        let request = StorageServiceRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
+        let data_request = DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
             version,
             start_index,
             end_index,
         });
-        let _ = mock_client.process_request(request).await.unwrap();
+        let storage_request = StorageServiceRequest::new(data_request, true);
+        let _ = mock_client.process_request(storage_request).await.unwrap();
     }
 
     // Process enough requests to evict the previously cached response
     for version in 0..max_lru_cache_size {
-        let request = StorageServiceRequest::GetNumberOfStatesAtVersion(version);
-        let _ = mock_client.process_request(request).await.unwrap();
+        let data_request = DataRequest::GetNumberOfStatesAtVersion(version);
+        let storage_request = StorageServiceRequest::new(data_request, true);
+        let _ = mock_client.process_request(storage_request).await.unwrap();
     }
 
     // Process a request to fetch the state chunk again. This requires refetching the data.
-    let request = StorageServiceRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
+    let data_request = DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
         version,
         start_index,
         end_index,
     });
-    let _ = mock_client.process_request(request).await.unwrap();
+    let storage_request = StorageServiceRequest::new(data_request, true);
+    let _ = mock_client.process_request(storage_request).await.unwrap();
 }
 
 #[tokio::test]
@@ -178,23 +249,32 @@ async fn test_cachable_requests_data_versions() {
     // Repeatedly fetch the data and verify the responses
     for (i, start_version) in start_versions.iter().enumerate() {
         for _ in 0..10 {
-            let request =
-                StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+            let data_request =
+                DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
                     proof_version,
                     start_version: *start_version,
                     end_version,
                     include_events,
                 });
+            let storage_request = StorageServiceRequest::new(data_request, true);
 
             // Process the request
-            let response = mock_client.process_request(request).await.unwrap();
+            let response = mock_client.process_request(storage_request).await.unwrap();
 
             // Verify the response is correct
             match response {
-                StorageServiceResponse::TransactionsWithProof(transactions_with_proof) => {
-                    assert_eq!(transactions_with_proof, transaction_lists_with_proof[i])
+                StorageServiceResponse::CompressedResponse(_, _) => {
+                    match response.get_data_response().unwrap() {
+                        DataResponse::TransactionsWithProof(transactions_with_proof) => {
+                            assert_eq!(transactions_with_proof, transaction_lists_with_proof[i])
+                        }
+                        _ => panic!(
+                            "Expected compressed transactions with proof but got: {:?}",
+                            response
+                        ),
+                    }
                 }
-                _ => panic!("Expected transactions with proof but got: {:?}", response),
+                _ => panic!("Expected compressed response but got: {:?}", response),
             };
         }
     }
@@ -207,14 +287,19 @@ async fn test_get_server_protocol_version() {
     tokio::spawn(service.start());
 
     // Process a request to fetch the protocol version
-    let request = StorageServiceRequest::GetServerProtocolVersion;
-    let response = mock_client.process_request(request).await.unwrap();
+    let data_request = DataRequest::GetServerProtocolVersion;
+    let storage_request = StorageServiceRequest::new(data_request, true);
+    let response = mock_client.process_request(storage_request).await.unwrap();
 
     // Verify the response is correct
-    let expected_response = StorageServiceResponse::ServerProtocolVersion(ServerProtocolVersion {
+    let expected_data_response = DataResponse::ServerProtocolVersion(ServerProtocolVersion {
         protocol_version: PROTOCOL_VERSION,
     });
-    assert_eq!(response, expected_response);
+    assert_matches!(response, StorageServiceResponse::CompressedResponse(_, _));
+    assert_eq!(
+        response.get_data_response().unwrap(),
+        expected_data_response
+    );
 }
 
 #[tokio::test]
@@ -253,17 +338,19 @@ async fn test_get_states_with_proof() {
         tokio::spawn(service.start());
 
         // Process a request to fetch a states chunk with a proof
-        let request = StorageServiceRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
+        let data_request = DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
             version,
             start_index,
             end_index,
         });
-        let response = mock_client.process_request(request).await.unwrap();
+        let storage_request = StorageServiceRequest::new(data_request, false);
+        let response = mock_client.process_request(storage_request).await.unwrap();
 
         // Verify the response is correct
+        assert_matches!(response, StorageServiceResponse::RawResponse(_));
         assert_eq!(
-            response,
-            StorageServiceResponse::StateValueChunkWithProof(state_value_chunk_with_proof)
+            response.get_data_response().unwrap(),
+            DataResponse::StateValueChunkWithProof(state_value_chunk_with_proof)
         );
     }
 }
@@ -278,14 +365,18 @@ async fn test_get_states_with_proof_invalid() {
     let max_state_chunk_size = StorageServiceConfig::default().max_state_chunk_size;
     let start_index = 100;
     for end_index in [99, start_index + max_state_chunk_size] {
-        let request = StorageServiceRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
+        let data_request = DataRequest::GetStateValuesWithProof(StateValuesWithProofRequest {
             version: 0,
             start_index,
             end_index,
         });
+        let storage_request = StorageServiceRequest::new(data_request, false);
 
         // Process and verify the response
-        let response = mock_client.process_request(request).await.unwrap_err();
+        let response = mock_client
+            .process_request(storage_request)
+            .await
+            .unwrap_err();
         assert_matches!(response, StorageServiceError::InvalidRequest(_));
     }
 }
@@ -661,13 +752,15 @@ async fn test_get_number_of_states_at_version() {
     tokio::spawn(service.start());
 
     // Process a request to fetch the number of states at a version
-    let request = StorageServiceRequest::GetNumberOfStatesAtVersion(version);
-    let response = mock_client.process_request(request).await.unwrap();
+    let data_request = DataRequest::GetNumberOfStatesAtVersion(version);
+    let storage_request = StorageServiceRequest::new(data_request, false);
+    let response = mock_client.process_request(storage_request).await.unwrap();
 
     // Verify the response is correct
+    assert_matches!(response, StorageServiceResponse::RawResponse(_));
     assert_eq!(
-        response,
-        StorageServiceResponse::NumberOfStatesAtVersion(number_of_states)
+        response.get_data_response().unwrap(),
+        DataResponse::NumberOfStatesAtVersion(number_of_states)
     );
 }
 
@@ -689,8 +782,12 @@ async fn test_get_number_of_states_at_version_invalid() {
     tokio::spawn(service.start());
 
     // Process a request to fetch the number of states at a version
-    let request = StorageServiceRequest::GetNumberOfStatesAtVersion(version);
-    let response = mock_client.process_request(request).await.unwrap_err();
+    let data_request = DataRequest::GetNumberOfStatesAtVersion(version);
+    let storage_request = StorageServiceRequest::new(data_request, true);
+    let response = mock_client
+        .process_request(storage_request)
+        .await
+        .unwrap_err();
 
     // Verify the response is correct
     assert_matches!(response, StorageServiceError::InternalError(_));
@@ -730,18 +827,23 @@ async fn test_get_storage_server_summary() {
     tokio::spawn(service.start());
 
     // Fetch the storage summary and verify we get a default summary response
-    let request = StorageServiceRequest::GetStorageServerSummary;
-    let response = mock_client.process_request(request).await.unwrap();
-    let default_response =
-        StorageServiceResponse::StorageServerSummary(StorageServerSummary::default());
+    let data_request = DataRequest::GetStorageServerSummary;
+    let storage_request = StorageServiceRequest::new(data_request, true);
+    let response = mock_client.process_request(storage_request).await.unwrap();
+    let default_response = StorageServiceResponse::new(
+        DataResponse::StorageServerSummary(StorageServerSummary::default()),
+        true,
+    )
+    .unwrap();
     assert_eq!(response, default_response);
 
     // Elapse enough time to force a cache update
     advance_storage_refresh_time(&mock_time).await;
 
     // Process another request to fetch the storage summary
-    let request = StorageServiceRequest::GetStorageServerSummary;
-    let response = mock_client.process_request(request).await.unwrap();
+    let data_request = DataRequest::GetStorageServerSummary;
+    let storage_request = StorageServiceRequest::new(data_request, true);
+    let response = mock_client.process_request(storage_request).await.unwrap();
 
     // Verify the response is correct (after the cache update)
     let default_storage_config = StorageServiceConfig::default();
@@ -771,7 +873,11 @@ async fn test_get_storage_server_summary() {
     };
     assert_eq!(
         response,
-        StorageServiceResponse::StorageServerSummary(expected_server_summary)
+        StorageServiceResponse::new(
+            DataResponse::StorageServerSummary(expected_server_summary),
+            true
+        )
+        .unwrap()
     );
 }
 
@@ -815,20 +921,21 @@ async fn test_get_transactions_with_proof() {
             tokio::spawn(service.start());
 
             // Create a request to fetch transactions with a proof
-            let request =
-                StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+            let data_request =
+                DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
                     proof_version,
                     start_version,
                     end_version,
                     include_events,
                 });
+            let storage_request = StorageServiceRequest::new(data_request, true);
 
             // Process the request
-            let response = mock_client.process_request(request).await.unwrap();
+            let response = mock_client.process_request(storage_request).await.unwrap();
 
             // Verify the response is correct
-            match response {
-                StorageServiceResponse::TransactionsWithProof(transactions_with_proof) => {
+            match response.get_data_response().unwrap() {
+                DataResponse::TransactionsWithProof(transactions_with_proof) => {
                     assert_eq!(transactions_with_proof, transaction_list_with_proof)
                 }
                 _ => panic!("Expected transactions with proof but got: {:?}", response),
@@ -847,16 +954,19 @@ async fn test_get_transactions_with_proof_invalid() {
     let max_transaction_chunk_size = StorageServiceConfig::default().max_transaction_chunk_size;
     let start_version = 1000;
     for end_version in [1, start_version + max_transaction_chunk_size] {
-        let request =
-            StorageServiceRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
-                proof_version: start_version,
-                start_version,
-                end_version,
-                include_events: true,
-            });
+        let data_request = DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
+            proof_version: start_version,
+            start_version,
+            end_version,
+            include_events: true,
+        });
+        let storage_request = StorageServiceRequest::new(data_request, true);
 
         // Process and verify the response
-        let response = mock_client.process_request(request).await.unwrap_err();
+        let response = mock_client
+            .process_request(storage_request)
+            .await
+            .unwrap_err();
         assert_matches!(response, StorageServiceError::InvalidRequest(_));
     }
 }
@@ -894,20 +1004,20 @@ async fn test_get_transaction_outputs_with_proof() {
         tokio::spawn(service.start());
 
         // Create a request to fetch transactions outputs with a proof
-        let request = StorageServiceRequest::GetTransactionOutputsWithProof(
-            TransactionOutputsWithProofRequest {
+        let data_request =
+            DataRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
                 proof_version,
                 start_version,
                 end_version,
-            },
-        );
+            });
+        let storage_request = StorageServiceRequest::new(data_request, true);
 
         // Process the request
-        let response = mock_client.process_request(request).await.unwrap();
+        let response = mock_client.process_request(storage_request).await.unwrap();
 
         // Verify the response is correct
-        match response {
-            StorageServiceResponse::TransactionOutputsWithProof(outputs_with_proof) => {
+        match response.get_data_response().unwrap() {
+            DataResponse::TransactionOutputsWithProof(outputs_with_proof) => {
                 assert_eq!(outputs_with_proof, output_list_with_proof)
             }
             _ => panic!(
@@ -928,16 +1038,19 @@ async fn test_get_transaction_outputs_with_proof_invalid() {
     let max_output_chunk_size = StorageServiceConfig::default().max_transaction_output_chunk_size;
     let start_version = 1000;
     for end_version in [1, start_version + max_output_chunk_size] {
-        let request = StorageServiceRequest::GetTransactionOutputsWithProof(
-            TransactionOutputsWithProofRequest {
+        let data_request =
+            DataRequest::GetTransactionOutputsWithProof(TransactionOutputsWithProofRequest {
                 proof_version: end_version,
                 start_version,
                 end_version,
-            },
-        );
+            });
+        let storage_request = StorageServiceRequest::new(data_request, true);
 
         // Process and verify the response
-        let response = mock_client.process_request(request).await.unwrap_err();
+        let response = mock_client
+            .process_request(storage_request)
+            .await
+            .unwrap_err();
         assert_matches!(response, StorageServiceError::InvalidRequest(_));
     }
 }
@@ -971,18 +1084,18 @@ async fn test_get_epoch_ending_ledger_infos() {
         tokio::spawn(service.start());
 
         // Create a request to fetch epoch ending ledger infos
-        let request =
-            StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
-                start_epoch,
-                expected_end_epoch,
-            });
+        let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+            start_epoch,
+            expected_end_epoch,
+        });
+        let storage_request = StorageServiceRequest::new(data_request, true);
 
         // Process the request
-        let response = mock_client.process_request(request).await.unwrap();
+        let response = mock_client.process_request(storage_request).await.unwrap();
 
         // Verify the response is correct
-        match response {
-            StorageServiceResponse::EpochEndingLedgerInfos(response_epoch_change_proof) => {
+        match response.get_data_response().unwrap() {
+            DataResponse::EpochEndingLedgerInfos(response_epoch_change_proof) => {
                 assert_eq!(response_epoch_change_proof, epoch_change_proof)
             }
             _ => panic!("Expected epoch ending ledger infos but got: {:?}", response),
@@ -1000,14 +1113,17 @@ async fn test_get_epoch_ending_ledger_infos_invalid() {
     let max_epoch_chunk_size = StorageServiceConfig::default().max_epoch_chunk_size;
     let start_epoch = 11;
     for expected_end_epoch in [10, start_epoch + max_epoch_chunk_size] {
-        let request =
-            StorageServiceRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
-                start_epoch,
-                expected_end_epoch,
-            });
+        let data_request = DataRequest::GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest {
+            start_epoch,
+            expected_end_epoch,
+        });
+        let storage_request = StorageServiceRequest::new(data_request, true);
 
         // Process and verify the response
-        let response = mock_client.process_request(request).await.unwrap_err();
+        let response = mock_client
+            .process_request(storage_request)
+            .await
+            .unwrap_err();
         assert_matches!(response, StorageServiceError::InvalidRequest(_));
     }
 }
@@ -1111,11 +1227,16 @@ impl MockClient {
 
 /// Waits until the storage summary has refreshed for the first time
 async fn wait_for_storage_to_refresh(mock_client: &mut MockClient, mock_time: &MockTimeService) {
+    let storage_request = StorageServiceRequest::new(DataRequest::GetStorageServerSummary, true);
     while mock_client
-        .process_request(StorageServiceRequest::GetStorageServerSummary)
+        .process_request(storage_request.clone())
         .await
         .unwrap()
-        == StorageServiceResponse::StorageServerSummary(StorageServerSummary::default())
+        == StorageServiceResponse::new(
+            DataResponse::StorageServerSummary(StorageServerSummary::default()),
+            true,
+        )
+        .unwrap()
     {
         advance_storage_refresh_time(mock_time).await;
     }
@@ -1146,13 +1267,13 @@ async fn send_new_transaction_output_request(
     known_version: u64,
     known_epoch: u64,
 ) -> Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>> {
-    let request = StorageServiceRequest::GetNewTransactionOutputsWithProof(
-        NewTransactionOutputsWithProofRequest {
+    let data_request =
+        DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {
             known_version,
             known_epoch,
-        },
-    );
-    mock_client.send_request(request).await
+        });
+    let storage_request = StorageServiceRequest::new(data_request, true);
+    mock_client.send_request(storage_request).await
 }
 
 /// Creates and sends a request for new transactions
@@ -1162,13 +1283,13 @@ async fn send_new_transaction_request(
     known_epoch: u64,
     include_events: bool,
 ) -> Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>> {
-    let request =
-        StorageServiceRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
-            known_version,
-            known_epoch,
-            include_events,
-        });
-    mock_client.send_request(request).await
+    let data_request = DataRequest::GetNewTransactionsWithProof(NewTransactionsWithProofRequest {
+        known_version,
+        known_epoch,
+        include_events,
+    });
+    let storage_request = StorageServiceRequest::new(data_request, true);
+    mock_client.send_request(storage_request).await
 }
 
 /// Creates a mock db with the basic expectations required to handle subscription requests
@@ -1359,11 +1480,14 @@ async fn verify_new_transaction_outputs_with_proof(
     output_list_with_proof: TransactionOutputListWithProof,
     expected_ledger_info: LedgerInfoWithSignatures,
 ) {
-    match mock_client.wait_for_response(receiver).await.unwrap() {
-        StorageServiceResponse::NewTransactionOutputsWithProof((
-            outputs_with_proof,
-            ledger_info,
-        )) => {
+    match mock_client
+        .wait_for_response(receiver)
+        .await
+        .unwrap()
+        .get_data_response()
+        .unwrap()
+    {
+        DataResponse::NewTransactionOutputsWithProof((outputs_with_proof, ledger_info)) => {
             assert_eq!(outputs_with_proof, output_list_with_proof);
             assert_eq!(ledger_info, expected_ledger_info);
         }
@@ -1382,11 +1506,14 @@ async fn verify_new_transactions_with_proof(
     expected_transactions_with_proof: TransactionListWithProof,
     expected_ledger_info: LedgerInfoWithSignatures,
 ) {
-    match mock_client.wait_for_response(receiver).await.unwrap() {
-        StorageServiceResponse::NewTransactionsWithProof((
-            transactions_with_proof,
-            ledger_info,
-        )) => {
+    match mock_client
+        .wait_for_response(receiver)
+        .await
+        .unwrap()
+        .get_data_response()
+        .unwrap()
+    {
+        DataResponse::NewTransactionsWithProof((transactions_with_proof, ledger_info)) => {
             assert_eq!(transactions_with_proof, expected_transactions_with_proof);
             assert_eq!(ledger_info, expected_ledger_info);
         }

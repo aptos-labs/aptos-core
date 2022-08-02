@@ -37,6 +37,7 @@ move-deps = { path = "../move-deps", features = ["address32"] }
 mvhashmap = { path = "../mvhashmap" }
 
 [dev-dependencies]
+claim = "0.5.0"
 proptest = "1.0.0"
 
 aptos-types = { path = "../../types", features = ["fuzzing"] }

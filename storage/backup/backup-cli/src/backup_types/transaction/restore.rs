@@ -40,7 +40,7 @@ use futures::{
 };
 use itertools::zip_eq;
 use std::{cmp::min, pin::Pin, sync::Arc, time::Instant};
-use storage_interface::{DbReader, DbReaderWriter};
+use storage_interface::DbReaderWriter;
 use structopt::StructOpt;
 use tokio::io::BufReader;
 
@@ -195,12 +195,11 @@ impl TransactionRestoreBatchController {
     pub async fn run(self) -> Result<()> {
         let name = self.name();
         info!("{} started.", name);
-        let res = self
-            .run_impl()
+        self.run_impl()
             .await
             .map_err(|e| anyhow!("{} failed: {}", name, e))?;
         info!("{} succeeded.", name);
-        Ok(res)
+        Ok(())
     }
 
     fn name(&self) -> String {
@@ -405,16 +404,10 @@ impl TransactionRestoreBatchController {
         txns_to_execute_stream: impl Stream<Item = Result<(Transaction, TransactionInfo)>>,
     ) -> Result<()> {
         let first_version = self.replay_from_version.unwrap();
-        let expected_latest_version = first_version.checked_sub(1);
-        restore_handler.maybe_reset_state_store(expected_latest_version);
+        restore_handler.reset_state_store();
         let replay_start = Instant::now();
         let db = DbReaderWriter::from_arc(Arc::clone(&restore_handler.aptosdb));
-        let persisted_view = restore_handler.aptosdb.get_latest_executed_trees()?;
-        assert_eq!(
-            persisted_view.state().current_version,
-            first_version.checked_sub(1)
-        );
-        let chunk_replayer = Arc::new(ChunkExecutor::<AptosVM>::new_with_view(db, persisted_view));
+        let chunk_replayer = Arc::new(ChunkExecutor::<AptosVM>::new(db));
 
         let db_commit_stream = txns_to_execute_stream
             .try_chunks(BATCH_SIZE)

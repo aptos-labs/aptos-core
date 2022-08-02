@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::delta_ext::TransactionOutputExt;
+use crate::move_vm_ext::{NativeCodeContext, PublishRequest};
 use crate::{
     adapter_common,
     adapter_common::{
@@ -28,7 +30,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     account_config,
     block_metadata::{new_block_event_key, BlockMetadata},
-    on_chain_config::{new_epoch_event_key, VMConfig, VMPublishingOption, Version},
+    on_chain_config::{new_epoch_event_key, VMConfig, Version},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
@@ -56,6 +58,7 @@ use move_deps::{
 };
 use num_cpus;
 use once_cell::sync::OnceCell;
+use std::collections::BTreeSet;
 use std::{
     cmp::min,
     collections::HashSet,
@@ -84,17 +87,9 @@ impl AptosVM {
         Self::new(state)
     }
 
-    pub fn init_with_config(
-        version: Version,
-        on_chain_config: VMConfig,
-        publishing_option: VMPublishingOption,
-    ) -> Self {
+    pub fn init_with_config(version: Version, on_chain_config: VMConfig) -> Self {
         info!("Adapter restarted for Validation");
-        AptosVM(AptosVMImpl::init_with_config(
-            version,
-            on_chain_config,
-            publishing_option,
-        ))
+        AptosVM(AptosVMImpl::init_with_config(version, on_chain_config))
     }
 
     /// Sets execution concurrency level when invoked the first time.
@@ -152,7 +147,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         storage: &S,
         log_context: &AdapterLogSchema,
-    ) -> TransactionOutput {
+    ) -> TransactionOutputExt {
         self.failed_transaction_cleanup_and_keep_vm_status(
             error_code,
             gas_status,
@@ -170,7 +165,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         storage: &S,
         log_context: &AdapterLogSchema,
-    ) -> (VMStatus, TransactionOutput) {
+    ) -> (VMStatus, TransactionOutputExt) {
         gas_status.set_metering(false);
         let mut session = self.0.new_session(storage, SessionId::txn_meta(txn_data));
         match TransactionStatus::from(error_code.clone()) {
@@ -210,7 +205,7 @@ impl AptosVM {
         gas_status: &mut GasStatus,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         gas_status.set_metering(false);
         self.0
             .run_success_epilogue(&mut session, gas_status, txn_data, log_context)?;
@@ -234,7 +229,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         payload: &TransactionPayload,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_script_or_script_function", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -296,6 +291,8 @@ impl AptosVM {
             }
             .map_err(|e| e.into_vm_status())?;
 
+            self.resolve_pending_code_publish(&mut session, gas_status)?;
+
             charge_global_write_gas_usage(gas_status, &session, &txn_data.sender())?;
 
             self.success_transaction_cleanup(session, gas_status, txn_data, log_context)
@@ -329,39 +326,48 @@ impl AptosVM {
         Ok(())
     }
 
+    /// Execute all module initializers.
     fn execute_module_initialization<S: MoveResolverExt>(
         &self,
         session: &mut SessionExt<S>,
         gas_status: &mut GasStatus,
-        modules: &ModuleBundle,
+        modules: &[CompiledModule],
         senders: &[AccountAddress],
     ) -> VMResult<()> {
         let init_func_name = ident_str!("init_module");
+        for module in modules {
+            let init_function = session.load_function(&module.self_id(), init_func_name, &[]);
+            // it is ok to not have init_module function
+            // init_module function should be (1) private and (2) has no return value
+            if init_function.is_ok() {
+                if verify_module_init_function(module).is_ok() {
+                    let args: Vec<Vec<u8>> = senders
+                        .iter()
+                        .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
+                        .collect();
+                    session.execute_function_bypass_visibility(
+                        &module.self_id(),
+                        init_func_name,
+                        vec![],
+                        args,
+                        gas_status,
+                    )?;
+                } else {
+                    return Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
+                        .finish(Location::Undefined));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Deserialize a module bundle.
+    fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
+        let mut result = vec![];
         for module_blob in modules.iter() {
-            let args: Vec<Vec<u8>> = senders
-                .iter()
-                .map(|s| MoveValue::Signer(*s).simple_serialize().unwrap())
-                .collect();
             match CompiledModule::deserialize(module_blob.code()) {
                 Ok(module) => {
-                    let init_function =
-                        session.load_function(&module.self_id(), init_func_name, &[]);
-                    // it is ok to not have init_module function
-                    // init_module function should be (1) private and (2) has no return value
-                    if init_function.is_ok() {
-                        if verify_module_init_function(&module).is_ok() {
-                            session.execute_function_bypass_visibility(
-                                &module.self_id(),
-                                init_func_name,
-                                vec![],
-                                args,
-                                gas_status,
-                            )?;
-                        } else {
-                            return Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
-                                .finish(Location::Undefined));
-                        }
-                    }
+                    result.push(module);
                 }
                 Err(_err) => {
                     return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR)
@@ -369,9 +375,12 @@ impl AptosVM {
                 }
             }
         }
-        Ok(())
+        Ok(result)
     }
 
+    /// Execute a module bundle load request.
+    /// TODO: this is going to be deprecated and removed in favor of code publishing via
+    /// NativeCodeContext
     fn execute_modules<S: MoveResolverExt>(
         &self,
         mut session: SessionExt<S>,
@@ -379,19 +388,12 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         modules: &ModuleBundle,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::execute_module", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             ))
         });
-
-        // Publish the module
-        let module_address = if self.0.publishing_option(log_context)?.is_open_module() {
-            txn_data.sender()
-        } else {
-            account_config::CORE_CODE_ADDRESS
-        };
 
         gas_status
             .charge_intrinsic_gas(txn_data.transaction_size())
@@ -399,7 +401,7 @@ impl AptosVM {
 
         Self::verify_module_bundle(&mut session, modules)?;
         session
-            .publish_module_bundle(modules.clone().into_inner(), module_address, gas_status)
+            .publish_module_bundle(modules.clone().into_inner(), txn_data.sender(), gas_status)
             .map_err(|e| e.into_vm_status())?;
 
         charge_global_write_gas_usage(gas_status, &session, &txn_data.sender())?;
@@ -408,11 +410,70 @@ impl AptosVM {
         self.execute_module_initialization(
             &mut session,
             gas_status,
-            modules,
+            &self.deserialize_module_bundle(modules)?,
             &[txn_data.sender()],
         )?;
 
         self.success_transaction_cleanup(session, gas_status, txn_data, log_context)
+    }
+
+    /// Resolve a pending code publish request registered via the NativeCodeContext.
+    fn resolve_pending_code_publish<S: MoveResolverExt>(
+        &self,
+        session: &mut SessionExt<S>,
+        gas_status: &mut GasStatus,
+    ) -> VMResult<()> {
+        if let Some(PublishRequest {
+            destination,
+            bundle,
+            expected_modules,
+            check_compat,
+        }) = NativeCodeContext::extract_publish_request(session)
+        {
+            // TODO: unfortunately we need to deserialize the entire bundle here to handle
+            // `init_module` and verify some deployment conditions, while the VM need to do
+            // the deserialization again. Consider adding an API to MoveVM which allows to
+            // directly pass CompiledModule.
+            let modules = self.deserialize_module_bundle(&bundle)?;
+
+            // Validate the module bundle
+            self.validate_publish_request(&modules, expected_modules)?;
+
+            // Publish the bundle
+            if check_compat {
+                session.publish_module_bundle(bundle.into_inner(), destination, gas_status)?
+            } else {
+                session.publish_module_bundle_relax_compatibility(
+                    bundle.into_inner(),
+                    destination,
+                    gas_status,
+                )?
+            }
+
+            // Execute initializers
+            self.execute_module_initialization(session, gas_status, &modules, &[destination])
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Validate a publish request.
+    fn validate_publish_request(
+        &self,
+        modules: &[CompiledModule],
+        expected_names: BTreeSet<String>,
+    ) -> VMResult<()> {
+        let given_names = modules
+            .iter()
+            .map(|m| m.self_id().name().as_str().to_string())
+            .collect::<BTreeSet<_>>();
+        if given_names != expected_names {
+            Err(PartialVMError::new(StatusCode::VERIFICATION_ERROR)
+                .with_message("metadata and code bundle mismatch".to_owned())
+                .finish(Location::Undefined))
+        } else {
+            Ok(())
+        }
     }
 
     pub(crate) fn execute_user_transaction<S: MoveResolverExt>(
@@ -420,7 +481,7 @@ impl AptosVM {
         storage: &S,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
-    ) -> (VMStatus, TransactionOutput) {
+    ) -> (VMStatus, TransactionOutputExt) {
         macro_rules! unwrap_or_discard {
             ($res: expr) => {
                 match $res {
@@ -495,7 +556,7 @@ impl AptosVM {
         writeset_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
-    ) -> Result<ChangeSet, Result<(VMStatus, TransactionOutput), VMStatus>> {
+    ) -> Result<ChangeSet, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
         let mut gas_status = GasStatus::new_unmetered();
 
         Ok(match writeset_payload {
@@ -581,7 +642,7 @@ impl AptosVM {
         storage: &S,
         writeset_payload: WriteSetPayload,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
         let change_set = match self.execute_writeset(
@@ -599,7 +660,12 @@ impl AptosVM {
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
         Ok((
             VMStatus::Executed,
-            TransactionOutput::new(write_set, events, 0, VMStatus::Executed.into()),
+            TransactionOutputExt::from(TransactionOutput::new(
+                write_set,
+                events,
+                0,
+                VMStatus::Executed.into(),
+            )),
         ))
     }
 
@@ -608,7 +674,7 @@ impl AptosVM {
         storage: &S,
         block_metadata: BlockMetadata,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::process_block_prologue", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -686,7 +752,7 @@ impl AptosVM {
         storage: &S,
         txn: &SignatureCheckedTransaction,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         fail_point!("move_adapter::process_writeset_transaction", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -729,7 +795,7 @@ impl AptosVM {
         writeset_payload: &WriteSetPayload,
         txn_data: TransactionMetadata,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         let change_set = match self.execute_writeset(
             storage,
             writeset_payload,
@@ -809,12 +875,12 @@ impl AptosVM {
 
         Ok((
             VMStatus::Executed,
-            TransactionOutput::new(
+            TransactionOutputExt::from(TransactionOutput::new(
                 write_set,
                 events,
                 0,
                 TransactionStatus::Keep(ExecutionStatus::Success),
-            ),
+            )),
         ))
     }
 
@@ -836,7 +902,7 @@ impl AptosVM {
     pub fn simulate_signed_transaction(
         txn: &SignedTransaction,
         state_view: &impl StateView,
-    ) -> (VMStatus, TransactionOutput) {
+    ) -> (VMStatus, TransactionOutputExt) {
         let vm = AptosVM::new(state_view);
         let simulation_vm = AptosSimulationVM(vm);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
@@ -973,7 +1039,7 @@ impl VMAdapter for AptosVM {
         txn: &PreprocessedTransaction,
         data_cache: &S,
         log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutput, Option<String>), VMStatus> {
+    ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus> {
         Ok(match txn {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
                 let (vm_status, output) =
@@ -1022,7 +1088,11 @@ impl VMAdapter for AptosVM {
                     0,
                     TransactionStatus::Keep(ExecutionStatus::Success),
                 );
-                (VMStatus::Executed, output, Some("state_checkpoint".into()))
+                (
+                    VMStatus::Executed,
+                    TransactionOutputExt::from(output),
+                    Some("state_checkpoint".into()),
+                )
             }
         })
     }
@@ -1061,7 +1131,7 @@ impl AptosSimulationVM {
         storage: &S,
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
-    ) -> (VMStatus, TransactionOutput) {
+    ) -> (VMStatus, TransactionOutputExt) {
         // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
         // may execute them without user's explicit permission.
         if txn.clone().check_signature().is_ok() {
@@ -1110,13 +1180,14 @@ impl AptosSimulationVM {
                 if txn_status.is_discarded() {
                     discard_error_vm_status(err)
                 } else {
-                    self.0.failed_transaction_cleanup_and_keep_vm_status(
+                    let (vm_status, output) = self.0.failed_transaction_cleanup_and_keep_vm_status(
                         err,
                         &mut gas_status,
                         &txn_data,
                         storage,
                         log_context,
-                    )
+                    );
+                    (vm_status, output)
                 }
             }
         }

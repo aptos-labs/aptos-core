@@ -21,6 +21,7 @@ use kube::{
     client::Client as K8sClient,
     Config, Error as KubeError,
 };
+use rand::Rng;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::{
@@ -394,6 +395,12 @@ pub async fn uninstall_testnet_resources(kube_namespace: String) -> Result<()> {
     Ok(())
 }
 
+fn generate_new_era() -> String {
+    let mut rng = rand::thread_rng();
+    let r: u8 = rng.gen();
+    format!("forge{}", r)
+}
+
 pub async fn install_testnet_resources(
     kube_namespace: String,
     base_num_validators: usize,
@@ -405,13 +412,15 @@ pub async fn install_testnet_resources(
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     assert!(base_num_validators <= MAX_NUM_VALIDATORS);
 
-    let new_era = "fg".to_string();
     let kube_client = create_k8s_client().await;
 
     // get deployment-specific helm values and cache it
     let tmp_dir = TempDir::new().expect("Could not create temp dir");
     let aptos_node_values_file = dump_helm_values_to_file(APTOS_NODE_HELM_RELEASE_NAME, &tmp_dir)?;
     let genesis_values_file = dump_helm_values_to_file(GENESIS_HELM_RELEASE_NAME, &tmp_dir)?;
+
+    // generate a random era to wipe the network state
+    let new_era = generate_new_era();
 
     // get forge override helm values and cache it
     let aptos_node_forge_helm_values_yaml = format!(
@@ -420,6 +429,7 @@ pub async fn install_testnet_resources(
         era = &new_era,
         image_tag = &base_genesis_image_tag,
         enable_haproxy = enable_haproxy,
+        namespace = &kube_namespace,
     );
     let aptos_node_forge_values_file = dump_string_to_file(
         "aptos-node-values.yaml".to_string(),
@@ -445,6 +455,7 @@ pub async fn install_testnet_resources(
         root_key = DEFAULT_ROOT_KEY,
         validator_internal_host_suffix = validator_internal_host_suffix,
         fullnode_internal_host_suffix = fullnode_internal_host_suffix,
+        namespace = &kube_namespace,
     );
     let genesis_forge_values_file = dump_string_to_file(
         "genesis-values.yaml".to_string(),
@@ -687,10 +698,10 @@ async fn create_namespace(
         .await
     {
         if api_err.code == 409 {
-            return Err(ApiError::RetryableError(format!(
+            info!(
                 "Namespace {} already exists, continuing with it",
                 &kube_namespace_name
-            )));
+            );
         } else if api_err.code == 401 {
             return Err(ApiError::FinalError(
                 "Unauthorized, did you authorize with kubernetes? \

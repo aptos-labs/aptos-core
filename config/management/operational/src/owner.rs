@@ -1,65 +1,31 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{auto_validate::AutoValidate, rest_client::RestClient, TransactionContext};
-use aptos_management::{
-    config::ConfigPath, error::Error, secure_backend::ValidatorBackend,
-    transaction::build_raw_transaction,
-};
-use aptos_transaction_builder::aptos_stdlib as transaction_builder;
+use crate::{auto_validate::AutoValidate, TransactionContext};
+use aptos_management::{config::ConfigPath, error::Error, secure_backend::ValidatorBackend};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use structopt::StructOpt;
 
 #[derive(Debug, StructOpt)]
 pub struct SetValidatorOperator {
     #[structopt(flatten)]
-    config: ConfigPath,
+    _config: ConfigPath,
     #[structopt(long)]
-    name: String,
+    _name: String,
     #[structopt(long)]
-    account_address: AccountAddress,
+    _account_address: AccountAddress,
     #[structopt(long, required_unless = "config")]
-    json_server: Option<String>,
+    _json_server: Option<String>,
     #[structopt(long, required_unless("config"))]
-    chain_id: Option<ChainId>,
+    _chain_id: Option<ChainId>,
     #[structopt(flatten)]
-    validator_backend: ValidatorBackend,
+    _validator_backend: ValidatorBackend,
     #[structopt(flatten)]
-    auto_validate: AutoValidate,
+    _auto_validate: AutoValidate,
 }
 
 impl SetValidatorOperator {
     pub async fn execute(self) -> Result<TransactionContext, Error> {
-        let config = self
-            .config
-            .load()?
-            .override_chain_id(self.chain_id)
-            .override_json_server(&self.json_server)
-            .override_validator_backend(&self.validator_backend.validator_backend)?;
-        let mut storage = config.validator_backend();
-        let owner_address = storage.account_address(aptos_global_constants::OWNER_ACCOUNT)?;
-
-        let client = RestClient::new(config.json_server.clone());
-        let txn = build_raw_transaction(
-            config.chain_id,
-            owner_address,
-            client.sequence_number(owner_address).await?,
-            transaction_builder::validator_set_script_set_validator_operator(
-                self.name.as_bytes().to_vec(),
-                self.account_address,
-            )
-            .into_script_function(),
-        );
-
-        let signed_txn = storage.sign(aptos_global_constants::OWNER_KEY, "set-operator", txn)?;
-        let mut transaction_context = client.submit_transaction(signed_txn).await?;
-
-        // Perform auto validation if required
-        transaction_context = self
-            .auto_validate
-            .execute(config.json_server, transaction_context)
-            .await?;
-
-        Ok(transaction_context)
+        unimplemented!();
     }
 }

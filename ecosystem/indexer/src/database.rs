@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Database-related functions
+#![allow(clippy::extra_unused_lifetimes)]
 use std::sync::Arc;
 
 use diesel::{

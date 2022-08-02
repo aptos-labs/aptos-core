@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import unittest
 
-from bcs import Deserializer, Serializer
 from nacl.signing import SigningKey, VerifyKey
+
+from .bcs import Deserializer, Serializer
 
 
 class PrivateKey:

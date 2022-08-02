@@ -16,6 +16,7 @@
 mod metrics;
 #[macro_use]
 pub mod schema;
+pub mod db_options;
 
 use crate::{
     metrics::{

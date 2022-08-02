@@ -88,7 +88,7 @@ The above minimum and maximums for staked amount and the lockup period are decid
 An epoch in the Aptos blockchain is defined as a duration of time, in seconds, during which a number of blocks are voted on by the validators, the validator set is updated, and the rewards are distributed to the validators. 
 
 :::tip
-Currently an epoch on the Aptos blockchain is defined as sixty seconds (one hour).
+Currently an epoch on the Aptos blockchain is defined as 3600 seconds (one hour).
 :::
 
 ### Triggers at the epoch start

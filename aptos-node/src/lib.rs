@@ -54,7 +54,7 @@ use std::{
         Arc,
     },
     thread,
-    time::{Instant, SystemTime, UNIX_EPOCH},
+    time::Instant,
 };
 use storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use storage_service_client::{StorageServiceClient, StorageServiceMultiSender};
@@ -166,6 +166,7 @@ pub fn start(config: NodeConfig, log_file: Option<PathBuf>) -> anyhow::Result<()
         .channel_size(config.logger.chan_size)
         .is_async(config.logger.is_async)
         .level(config.logger.level)
+        .console_port(config.logger.console_port)
         .read_env();
     if config.logger.enable_backtrace {
         logger.enable_backtrace();
@@ -251,15 +252,18 @@ where
         }
 
         // Build genesis and validator node
-        let now_secs = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let builder = aptos_genesis::builder::Builder::new(&test_dir, genesis_modules)?
-            .with_allow_new_validators(true)
-            .with_epoch_duration_secs(EPOCH_LENGTH_SECS)
-            .with_template(template)
-            .with_randomize_first_validator_ports(random_ports)
-            .with_initial_lockup_timestamp(now_secs + EPOCH_LENGTH_SECS)
-            .with_min_lockup_duration_secs(0)
-            .with_max_lockup_duration_secs(86400);
+            .with_init_config(Some(Arc::new(move |_, config, _| {
+                *config = template.clone();
+            })))
+            .with_init_genesis_config(Some(Arc::new(|genesis_config| {
+                genesis_config.allow_new_validators = true;
+                genesis_config.epoch_duration_secs = EPOCH_LENGTH_SECS;
+                genesis_config.initial_lockup_duration_secs = EPOCH_LENGTH_SECS;
+                genesis_config.min_lockup_duration_secs = 0;
+                genesis_config.max_lockup_duration_secs = 86400 * 14;
+            })))
+            .with_randomize_first_validator_ports(random_ports);
 
         let (root_key, _genesis, genesis_waypoint, validators) = builder.build(rng)?;
 
@@ -353,10 +357,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     )?;
 
     // Create the chunk executor
-    let chunk_executor = Arc::new(
-        ChunkExecutor::<AptosVM>::new(db_rw.clone())
-            .map_err(|err| anyhow!("Failed to create chunk executor {}", err))?,
-    );
+    let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
 
     // Create the state sync multiplexer
     let state_sync_multiplexer = StateSyncMultiplexer::new(
@@ -479,6 +480,8 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
             false, /* readonly */
             node_config.storage.storage_pruner_config,
             node_config.storage.rocksdb_configs,
+            node_config.storage.enable_indexer,
+            node_config.storage.target_snapshot_size,
         )
         .map_err(|err| anyhow!("DB failed to open {}", err))?,
     );

@@ -108,6 +108,9 @@ pub fn create_ready_storage_synchronizer(expect_reset_executor: bool) -> MockSto
         .return_const(false);
     if expect_reset_executor {
         mock_storage_synchronizer
+            .expect_finish_chunk_executor()
+            .return_const(());
+        mock_storage_synchronizer
             .expect_reset_chunk_executor()
             .return_const(Ok(()));
     }
@@ -150,6 +153,8 @@ mock! {
         fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
 
         fn reset(&self) -> Result<()>;
+
+        fn finish(&self);
     }
 }
 
@@ -311,6 +316,7 @@ mock! {
             first_version: Version,
             base_state_version: Option<Version>,
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
+            sync_commit: bool,
             in_memory_state: StateDelta,
         ) -> Result<()>;
 
@@ -422,7 +428,9 @@ mock! {
             state_value_chunk_with_proof: StateValueChunkWithProof,
         ) -> Result<(), crate::error::Error>;
 
-        fn reset_chunk_executor(&mut self) -> Result<(), crate::error::Error>;
+        fn reset_chunk_executor(&self) -> Result<(), crate::error::Error>;
+
+        fn finish_chunk_executor(&self);
     }
     impl Clone for StorageSynchronizer {
         fn clone(&self) -> Self;

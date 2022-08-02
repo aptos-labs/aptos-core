@@ -35,7 +35,7 @@ impl TestExecutor {
         let genesis = vm_genesis::test_genesis_transaction();
         let waypoint = generate_waypoint::<MockVM>(&db, &genesis).unwrap();
         maybe_bootstrap::<MockVM>(&db, &genesis, waypoint).unwrap();
-        let executor = ChunkExecutor::new(db.clone()).unwrap();
+        let executor = ChunkExecutor::new(db.clone());
 
         TestExecutor {
             _path: path,
@@ -216,7 +216,7 @@ fn test_executor_execute_and_commit_chunk_restart() {
 
     // Then we restart executor and resume to the next chunk.
     {
-        let executor = ChunkExecutor::<MockVM>::new(db.clone()).unwrap();
+        let executor = ChunkExecutor::<MockVM>::new(db.clone());
 
         executor
             .execute_and_commit_chunk(chunks[1].clone(), &ledger_info, None)
@@ -264,7 +264,9 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
     }
 
     // Fork starts. Should fail.
+    chunk_manager.finish();
     chunk_manager.reset().unwrap();
+
     assert!(chunk_manager
         .execute_and_commit_chunk(chunks[0].clone(), &ledger_info, None)
         .is_err());

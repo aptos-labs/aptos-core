@@ -4,30 +4,32 @@
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
+use forge::success_criteria::SuccessCriteria;
 use forge::{ForgeConfig, Options, Result, *};
+use std::convert::TryInto;
 use std::{env, num::NonZeroUsize, process, time::Duration};
 use structopt::StructOpt;
+use testcases::network_bandwidth_test::NetworkBandwidthTest;
+use testcases::network_latency_test::NetworkLatencyTest;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, generate_traffic,
-    network_chaos_test::NetworkChaosTest, performance_test::PerformanceBenchmark,
+    network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
     reconfiguration_test::ReconfigurationTest, state_sync_performance::StateSyncPerformance,
 };
+
 use tokio::runtime::Runtime;
 use url::Url;
 
 #[derive(StructOpt, Debug)]
 struct Args {
-    // general options
-    #[structopt(long, default_value = "15")]
-    accounts_per_client: usize,
-    #[structopt(long)]
-    workers_per_ac: Option<usize>,
-    #[structopt(long, default_value = "0")]
-    wait_millis: u64,
-    #[structopt(long)]
-    burst: bool,
+    #[structopt(long, default_value = "30000")]
+    mempool_backlog: u64,
+    #[structopt(long, default_value = "300")]
+    duration_secs: usize,
     #[structopt(flatten)]
     options: Options,
+    #[structopt(flatten)]
+    success_criteria: SuccessCriteriaArgs,
     #[structopt(
         long,
         help = "Specify a test suite to run",
@@ -40,6 +42,16 @@ struct Args {
     // subcommand groups
     #[structopt(flatten)]
     cli_cmd: CliCommand,
+}
+
+#[derive(Debug, StructOpt)]
+#[structopt(about = "Forge success criteria that includes a bunch of performance metrics")]
+pub struct SuccessCriteriaArgs {
+    // general options
+    #[structopt(long, default_value = "3500")]
+    avg_tps: usize,
+    #[structopt(long, default_value = "10000")]
+    max_latency_ms: usize,
 }
 
 #[derive(StructOpt, Debug)]
@@ -164,18 +176,15 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
-    let mut global_emit_job_request = EmitJobRequest::default()
-        .accounts_per_client(args.accounts_per_client)
-        .thread_params(EmitThreadParams {
-            wait_millis: args.wait_millis,
-            wait_committed: !args.burst,
-            txn_expiration_time_secs: 30,
-            check_stats_at_end: false,
-        });
-    if let Some(workers_per_endpoint) = args.workers_per_ac {
-        global_emit_job_request =
-            global_emit_job_request.workers_per_endpoint(workers_per_endpoint);
-    }
+    let global_emit_job_request = EmitJobRequest::default()
+        .duration(Duration::from_secs(args.duration_secs as u64))
+        .thread_params(EmitThreadParams::default())
+        .mempool_backlog(args.mempool_backlog.try_into().unwrap());
+
+    let success_criteria = SuccessCriteria::new(
+        args.success_criteria.avg_tps,
+        args.success_criteria.max_latency_ms,
+    );
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -185,6 +194,7 @@ fn main() -> Result<()> {
                 local_test_suite(),
                 LocalFactory::from_workspace()?,
                 &args.options,
+                success_criteria,
                 args.changelog,
                 global_emit_job_request,
             ),
@@ -206,6 +216,7 @@ fn main() -> Result<()> {
                     )
                     .unwrap(),
                     &args.options,
+                    success_criteria,
                     args.changelog,
                     global_emit_job_request,
                 )?;
@@ -247,10 +258,17 @@ pub fn run_forge<F: Factory>(
     tests: ForgeConfig<'_>,
     factory: F,
     options: &Options,
+    success_criteria: SuccessCriteria,
     logs: Option<Vec<String>>,
     global_job_request: EmitJobRequest,
 ) -> Result<()> {
-    let forge = Forge::new(options, tests, factory, global_job_request);
+    let forge = Forge::new(
+        options,
+        tests,
+        factory,
+        global_job_request,
+        success_criteria,
+    );
 
     if options.list {
         forge.list()?;
@@ -360,7 +378,9 @@ fn single_test_suite(test_name: &str) -> ForgeConfig<'static> {
         "state_sync" => config.with_network_tests(&[&StateSyncPerformance]),
         "compat" => config.with_network_tests(&[&SimpleValidatorUpgrade]),
         "config" => config.with_network_tests(&[&ReconfigurationTest]),
-        "network_chaos" => config.with_network_tests(&[&NetworkChaosTest]),
+        "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
+        "network_latency" => config.with_network_tests(&[&NetworkLatencyTest]),
+        "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
         _ => config.with_network_tests(&[&PerformanceBenchmark]),
     }
 }
@@ -374,7 +394,7 @@ fn land_blocking_test_suite() -> ForgeConfig<'static> {
 fn pre_release_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
-        .with_network_tests(&[&NetworkChaosTest])
+        .with_network_tests(&[&NetworkBandwidthTest])
 }
 
 //TODO Make public test later
@@ -509,9 +529,9 @@ impl NetworkTest for EmitTransaction {
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        let stats = generate_traffic(ctx, &all_validators, duration, 1, None).unwrap();
+        let stats = generate_traffic(ctx, &all_validators, duration, 1).unwrap();
         ctx.report
-            .report_txn_stats(self.name().to_string(), stats, duration);
+            .report_txn_stats(self.name().to_string(), &stats, duration);
 
         Ok(())
     }

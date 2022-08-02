@@ -1,6 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-
+#![allow(clippy::extra_unused_lifetimes)]
 use crate::{models::transactions::Transaction, schema::write_set_changes};
 use aptos_rest_client::aptos_api_types::{
     DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource,
@@ -65,6 +65,7 @@ impl WriteSetChange {
                 state_key_hash,
                 handle,
                 key,
+                ..
             }) => WriteSetChange {
                 transaction_hash,
                 hash: state_key_hash.clone(),
@@ -111,6 +112,7 @@ impl WriteSetChange {
                 handle,
                 key,
                 value,
+                ..
             }) => WriteSetChange {
                 transaction_hash,
                 hash: state_key_hash.clone(),

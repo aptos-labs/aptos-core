@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::monitor;
 use crate::{error::QuorumStoreError, state_replication::PayloadManager};
 use anyhow::Result;
 use aptos_logger::prelude::*;
-use aptos_metrics_core::monitor;
 use consensus_types::{
     common::{Payload, PayloadFilter},
     request_response::{ConsensusRequest, ConsensusResponse},

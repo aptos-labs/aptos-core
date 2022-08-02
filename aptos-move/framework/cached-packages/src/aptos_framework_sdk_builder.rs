@@ -47,11 +47,6 @@ pub enum ScriptFunctionCall {
         amount: u64,
     },
 
-    AccountUtilsCreateAndFundAccount {
-        account: AccountAddress,
-        amount: u64,
-    },
-
     /// Claim the delegated mint capability and destroy the delegated token.
     AptosCoinClaimMintCapability {},
 
@@ -83,11 +78,11 @@ pub enum ScriptFunctionCall {
         should_pass: bool,
     },
 
-    /// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
-    /// has to explicitly registers to do so. The register creates a special `CoinStore`
-    /// to hold the specified `CoinType`.
-    CoinRegister {
-        coin_type: TypeTag,
+    /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
+    /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
+    CodePublishPackageTxn {
+        pack_serialized: Bytes,
+        code: Vec<Bytes>,
     },
 
     /// Transfers `amount` of coins `CoinType` from `from` to `to`.
@@ -97,24 +92,11 @@ pub enum ScriptFunctionCall {
         amount: u64,
     },
 
-    /// Sets up the initial validator set for the network.
-    /// The validator "owner" accounts, and their authentication
-    /// Addresses (and keys) are encoded in the `owners`
-    /// Each validator signs consensus messages with the private key corresponding to the Ed25519
-    /// public key in `consensus_pubkeys`.
-    /// Finally, each validator must specify the network address
-    /// (see types/src/network_address/mod.rs) for itself and its full nodes.
-    ///
-    /// Network address fields are a vector per account, where each entry is a vector of addresses
-    /// encoded in a single BCS byte array.
-    GenesisCreateInitializeValidators {
-        owners: Vec<AccountAddress>,
-        consensus_pubkeys: Vec<Bytes>,
-        proof_of_possession: Vec<Bytes>,
-        validator_network_addresses: Vec<Bytes>,
-        full_node_network_addresses: Vec<Bytes>,
-        staking_distribution: Vec<u64>,
-        initial_lockup_timestamp: u64,
+    /// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
+    /// has to explicitly registers to do so. The register creates a special `CoinStore`
+    /// to hold the specified `CoinType`.
+    CoinsRegister {
+        coin_type: TypeTag,
     },
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
@@ -220,118 +202,8 @@ pub enum ScriptFunctionCall {
     },
 
     /// Withdraw from `account`'s inactive stake.
-    StakeWithdraw {},
-
-    TokenCreateLimitedCollectionScript {
-        name: Bytes,
-        description: Bytes,
-        uri: Bytes,
-        maximum: u64,
-    },
-
-    TokenCreateLimitedTokenScript {
-        collection: Bytes,
-        name: Bytes,
-        description: Bytes,
-        monitor_supply: bool,
-        initial_balance: u64,
-        maximum: u64,
-        uri: Bytes,
-        royalty_points_per_million: u64,
-    },
-
-    TokenCreateUnlimitedCollectionScript {
-        name: Bytes,
-        description: Bytes,
-        uri: Bytes,
-    },
-
-    TokenCreateUnlimitedTokenScript {
-        collection: Bytes,
-        name: Bytes,
-        description: Bytes,
-        monitor_supply: bool,
-        initial_balance: u64,
-        uri: Bytes,
-        royalty_points_per_million: u64,
-    },
-
-    TokenDirectTransferScript {
-        creators_address: AccountAddress,
-        collection: Bytes,
-        name: Bytes,
-        amount: u64,
-    },
-
-    TokenInitializeTokenForId {
-        creators_address: AccountAddress,
-        collection: Bytes,
-        name: Bytes,
-    },
-
-    TokenInitializeTokenScript {},
-
-    TokenTransfersCancelOfferScript {
-        receiver: AccountAddress,
-        creator: AccountAddress,
-        collection: Bytes,
-        name: Bytes,
-    },
-
-    TokenTransfersClaimScript {
-        sender: AccountAddress,
-        creator: AccountAddress,
-        collection: Bytes,
-        name: Bytes,
-    },
-
-    TokenTransfersOfferScript {
-        receiver: AccountAddress,
-        creator: AccountAddress,
-        collection: Bytes,
-        name: Bytes,
-        amount: u64,
-    },
-
-    TransactionPublishingOptionSetModulePublishingAllowed {
-        is_allowed: bool,
-    },
-
-    ValidatorSetScriptAddValidator {
-        _validator_addr: AccountAddress,
-    },
-
-    ValidatorSetScriptCreateValidatorAccount {
-        _new_account_address: AccountAddress,
-        _human_name: Bytes,
-    },
-
-    ValidatorSetScriptCreateValidatorOperatorAccount {
-        _new_account_address: AccountAddress,
-        _human_name: Bytes,
-    },
-
-    ValidatorSetScriptRegisterValidatorConfig {
-        _validator_address: AccountAddress,
-        _consensus_pubkey: Bytes,
-        _validator_network_addresses: Bytes,
-        _fullnode_network_addresses: Bytes,
-    },
-
-    ValidatorSetScriptRemoveValidator {
-        _validator_addr: AccountAddress,
-    },
-
-    ValidatorSetScriptSetValidatorConfigAndReconfigure {
-        _validator_account: AccountAddress,
-        _consensus_pubkey: Bytes,
-        _validator_network_addresses: Bytes,
-        _fullnode_network_addresses: Bytes,
-    },
-
-    ValidatorSetScriptSetValidatorOperator {
-        _operator_name: Bytes,
-        _operator_account: AccountAddress,
+    StakeWithdraw {
+        withdraw_amount: u64,
     },
 
     /// Updates the major version to a larger version.
@@ -365,9 +237,6 @@ impl ScriptFunctionCall {
                 account_rotate_authentication_key(new_auth_key)
             }
             AccountTransfer { to, amount } => account_transfer(to, amount),
-            AccountUtilsCreateAndFundAccount { account, amount } => {
-                account_utils_create_and_fund_account(account, amount)
-            }
             AptosCoinClaimMintCapability {} => aptos_coin_claim_mint_capability(),
             AptosCoinDelegateMintCapability { to } => aptos_coin_delegate_mint_capability(to),
             AptosCoinMint { dst_addr, amount } => aptos_coin_mint(dst_addr, amount),
@@ -387,29 +256,16 @@ impl ScriptFunctionCall {
                 proposal_id,
                 should_pass,
             } => aptos_governance_vote(stake_pool, proposal_id, should_pass),
-            CoinRegister { coin_type } => coin_register(coin_type),
+            CodePublishPackageTxn {
+                pack_serialized,
+                code,
+            } => code_publish_package_txn(pack_serialized, code),
             CoinTransfer {
                 coin_type,
                 to,
                 amount,
             } => coin_transfer(coin_type, to, amount),
-            GenesisCreateInitializeValidators {
-                owners,
-                consensus_pubkeys,
-                proof_of_possession,
-                validator_network_addresses,
-                full_node_network_addresses,
-                staking_distribution,
-                initial_lockup_timestamp,
-            } => genesis_create_initialize_validators(
-                owners,
-                consensus_pubkeys,
-                proof_of_possession,
-                validator_network_addresses,
-                full_node_network_addresses,
-                staking_distribution,
-                initial_lockup_timestamp,
-            ),
+            CoinsRegister { coin_type } => coins_register(coin_type),
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -467,131 +323,7 @@ impl ScriptFunctionCall {
                 new_network_addresses,
                 new_fullnode_addresses,
             ),
-            StakeWithdraw {} => stake_withdraw(),
-            TokenCreateLimitedCollectionScript {
-                name,
-                description,
-                uri,
-                maximum,
-            } => token_create_limited_collection_script(name, description, uri, maximum),
-            TokenCreateLimitedTokenScript {
-                collection,
-                name,
-                description,
-                monitor_supply,
-                initial_balance,
-                maximum,
-                uri,
-                royalty_points_per_million,
-            } => token_create_limited_token_script(
-                collection,
-                name,
-                description,
-                monitor_supply,
-                initial_balance,
-                maximum,
-                uri,
-                royalty_points_per_million,
-            ),
-            TokenCreateUnlimitedCollectionScript {
-                name,
-                description,
-                uri,
-            } => token_create_unlimited_collection_script(name, description, uri),
-            TokenCreateUnlimitedTokenScript {
-                collection,
-                name,
-                description,
-                monitor_supply,
-                initial_balance,
-                uri,
-                royalty_points_per_million,
-            } => token_create_unlimited_token_script(
-                collection,
-                name,
-                description,
-                monitor_supply,
-                initial_balance,
-                uri,
-                royalty_points_per_million,
-            ),
-            TokenDirectTransferScript {
-                creators_address,
-                collection,
-                name,
-                amount,
-            } => token_direct_transfer_script(creators_address, collection, name, amount),
-            TokenInitializeTokenForId {
-                creators_address,
-                collection,
-                name,
-            } => token_initialize_token_for_id(creators_address, collection, name),
-            TokenInitializeTokenScript {} => token_initialize_token_script(),
-            TokenTransfersCancelOfferScript {
-                receiver,
-                creator,
-                collection,
-                name,
-            } => token_transfers_cancel_offer_script(receiver, creator, collection, name),
-            TokenTransfersClaimScript {
-                sender,
-                creator,
-                collection,
-                name,
-            } => token_transfers_claim_script(sender, creator, collection, name),
-            TokenTransfersOfferScript {
-                receiver,
-                creator,
-                collection,
-                name,
-                amount,
-            } => token_transfers_offer_script(receiver, creator, collection, name, amount),
-            TransactionPublishingOptionSetModulePublishingAllowed { is_allowed } => {
-                transaction_publishing_option_set_module_publishing_allowed(is_allowed)
-            }
-            ValidatorSetScriptAddValidator { _validator_addr } => {
-                validator_set_script_add_validator(_validator_addr)
-            }
-            ValidatorSetScriptCreateValidatorAccount {
-                _new_account_address,
-                _human_name,
-            } => validator_set_script_create_validator_account(_new_account_address, _human_name),
-            ValidatorSetScriptCreateValidatorOperatorAccount {
-                _new_account_address,
-                _human_name,
-            } => validator_set_script_create_validator_operator_account(
-                _new_account_address,
-                _human_name,
-            ),
-            ValidatorSetScriptRegisterValidatorConfig {
-                _validator_address,
-                _consensus_pubkey,
-                _validator_network_addresses,
-                _fullnode_network_addresses,
-            } => validator_set_script_register_validator_config(
-                _validator_address,
-                _consensus_pubkey,
-                _validator_network_addresses,
-                _fullnode_network_addresses,
-            ),
-            ValidatorSetScriptRemoveValidator { _validator_addr } => {
-                validator_set_script_remove_validator(_validator_addr)
-            }
-            ValidatorSetScriptSetValidatorConfigAndReconfigure {
-                _validator_account,
-                _consensus_pubkey,
-                _validator_network_addresses,
-                _fullnode_network_addresses,
-            } => validator_set_script_set_validator_config_and_reconfigure(
-                _validator_account,
-                _consensus_pubkey,
-                _validator_network_addresses,
-                _fullnode_network_addresses,
-            ),
-            ValidatorSetScriptSetValidatorOperator {
-                _operator_name,
-                _operator_account,
-            } => validator_set_script_set_validator_operator(_operator_name, _operator_account),
+            StakeWithdraw { withdraw_amount } => stake_withdraw(withdraw_amount),
             VersionSetVersion { major } => version_set_version(major),
             VmConfigSetGasConstants {
                 global_memory_per_byte_cost,
@@ -681,27 +413,6 @@ pub fn account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
         ident_str!("transfer").to_owned(),
         vec![],
         vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
-    ))
-}
-
-pub fn account_utils_create_and_fund_account(
-    account: AccountAddress,
-    amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("account_utils").to_owned(),
-        ),
-        ident_str!("create_and_fund_account").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&account).unwrap(),
-            bcs::to_bytes(&amount).unwrap(),
-        ],
     ))
 }
 
@@ -808,21 +519,26 @@ pub fn aptos_governance_vote(
     ))
 }
 
-/// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
-/// has to explicitly registers to do so. The register creates a special `CoinStore`
-/// to hold the specified `CoinType`.
-pub fn coin_register(coin_type: TypeTag) -> TransactionPayload {
+/// Same as `publish_package` but as an entry function which can be called as a transaction. Because
+/// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
+pub fn code_publish_package_txn(
+    pack_serialized: Vec<u8>,
+    code: Vec<Vec<u8>>,
+) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 1,
             ]),
-            ident_str!("coin").to_owned(),
+            ident_str!("code").to_owned(),
         ),
-        ident_str!("register").to_owned(),
-        vec![coin_type],
+        ident_str!("publish_package_txn").to_owned(),
         vec![],
+        vec![
+            bcs::to_bytes(&pack_serialized).unwrap(),
+            bcs::to_bytes(&code).unwrap(),
+        ],
     ))
 }
 
@@ -842,44 +558,21 @@ pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> Tra
     ))
 }
 
-/// Sets up the initial validator set for the network.
-/// The validator "owner" accounts, and their authentication
-/// Addresses (and keys) are encoded in the `owners`
-/// Each validator signs consensus messages with the private key corresponding to the Ed25519
-/// public key in `consensus_pubkeys`.
-/// Finally, each validator must specify the network address
-/// (see types/src/network_address/mod.rs) for itself and its full nodes.
-///
-/// Network address fields are a vector per account, where each entry is a vector of addresses
-/// encoded in a single BCS byte array.
-pub fn genesis_create_initialize_validators(
-    owners: Vec<AccountAddress>,
-    consensus_pubkeys: Vec<Vec<u8>>,
-    proof_of_possession: Vec<Vec<u8>>,
-    validator_network_addresses: Vec<Vec<u8>>,
-    full_node_network_addresses: Vec<Vec<u8>>,
-    staking_distribution: Vec<u64>,
-    initial_lockup_timestamp: u64,
-) -> TransactionPayload {
+/// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
+/// has to explicitly registers to do so. The register creates a special `CoinStore`
+/// to hold the specified `CoinType`.
+pub fn coins_register(coin_type: TypeTag) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 1,
             ]),
-            ident_str!("genesis").to_owned(),
+            ident_str!("coins").to_owned(),
         ),
-        ident_str!("create_initialize_validators").to_owned(),
+        ident_str!("register").to_owned(),
+        vec![coin_type],
         vec![],
-        vec![
-            bcs::to_bytes(&owners).unwrap(),
-            bcs::to_bytes(&consensus_pubkeys).unwrap(),
-            bcs::to_bytes(&proof_of_possession).unwrap(),
-            bcs::to_bytes(&validator_network_addresses).unwrap(),
-            bcs::to_bytes(&full_node_network_addresses).unwrap(),
-            bcs::to_bytes(&staking_distribution).unwrap(),
-            bcs::to_bytes(&initial_lockup_timestamp).unwrap(),
-        ],
     ))
 }
 
@@ -1199,7 +892,7 @@ pub fn stake_update_network_and_fullnode_addresses(
 }
 
 /// Withdraw from `account`'s inactive stake.
-pub fn stake_withdraw() -> TransactionPayload {
+pub fn stake_withdraw(withdraw_amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -1210,421 +903,7 @@ pub fn stake_withdraw() -> TransactionPayload {
         ),
         ident_str!("withdraw").to_owned(),
         vec![],
-        vec![],
-    ))
-}
-
-pub fn token_create_limited_collection_script(
-    name: Vec<u8>,
-    description: Vec<u8>,
-    uri: Vec<u8>,
-    maximum: u64,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("token").to_owned(),
-        ),
-        ident_str!("create_limited_collection_script").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&description).unwrap(),
-            bcs::to_bytes(&uri).unwrap(),
-            bcs::to_bytes(&maximum).unwrap(),
-        ],
-    ))
-}
-
-pub fn token_create_limited_token_script(
-    collection: Vec<u8>,
-    name: Vec<u8>,
-    description: Vec<u8>,
-    monitor_supply: bool,
-    initial_balance: u64,
-    maximum: u64,
-    uri: Vec<u8>,
-    royalty_points_per_million: u64,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("token").to_owned(),
-        ),
-        ident_str!("create_limited_token_script").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&description).unwrap(),
-            bcs::to_bytes(&monitor_supply).unwrap(),
-            bcs::to_bytes(&initial_balance).unwrap(),
-            bcs::to_bytes(&maximum).unwrap(),
-            bcs::to_bytes(&uri).unwrap(),
-            bcs::to_bytes(&royalty_points_per_million).unwrap(),
-        ],
-    ))
-}
-
-pub fn token_create_unlimited_collection_script(
-    name: Vec<u8>,
-    description: Vec<u8>,
-    uri: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("token").to_owned(),
-        ),
-        ident_str!("create_unlimited_collection_script").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&description).unwrap(),
-            bcs::to_bytes(&uri).unwrap(),
-        ],
-    ))
-}
-
-pub fn token_create_unlimited_token_script(
-    collection: Vec<u8>,
-    name: Vec<u8>,
-    description: Vec<u8>,
-    monitor_supply: bool,
-    initial_balance: u64,
-    uri: Vec<u8>,
-    royalty_points_per_million: u64,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("token").to_owned(),
-        ),
-        ident_str!("create_unlimited_token_script").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&description).unwrap(),
-            bcs::to_bytes(&monitor_supply).unwrap(),
-            bcs::to_bytes(&initial_balance).unwrap(),
-            bcs::to_bytes(&uri).unwrap(),
-            bcs::to_bytes(&royalty_points_per_million).unwrap(),
-        ],
-    ))
-}
-
-pub fn token_direct_transfer_script(
-    creators_address: AccountAddress,
-    collection: Vec<u8>,
-    name: Vec<u8>,
-    amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("token").to_owned(),
-        ),
-        ident_str!("direct_transfer_script").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&creators_address).unwrap(),
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&amount).unwrap(),
-        ],
-    ))
-}
-
-pub fn token_initialize_token_for_id(
-    creators_address: AccountAddress,
-    collection: Vec<u8>,
-    name: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("token").to_owned(),
-        ),
-        ident_str!("initialize_token_for_id").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&creators_address).unwrap(),
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-        ],
-    ))
-}
-
-pub fn token_initialize_token_script() -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("token").to_owned(),
-        ),
-        ident_str!("initialize_token_script").to_owned(),
-        vec![],
-        vec![],
-    ))
-}
-
-pub fn token_transfers_cancel_offer_script(
-    receiver: AccountAddress,
-    creator: AccountAddress,
-    collection: Vec<u8>,
-    name: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("token_transfers").to_owned(),
-        ),
-        ident_str!("cancel_offer_script").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&receiver).unwrap(),
-            bcs::to_bytes(&creator).unwrap(),
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-        ],
-    ))
-}
-
-pub fn token_transfers_claim_script(
-    sender: AccountAddress,
-    creator: AccountAddress,
-    collection: Vec<u8>,
-    name: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("token_transfers").to_owned(),
-        ),
-        ident_str!("claim_script").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&sender).unwrap(),
-            bcs::to_bytes(&creator).unwrap(),
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-        ],
-    ))
-}
-
-pub fn token_transfers_offer_script(
-    receiver: AccountAddress,
-    creator: AccountAddress,
-    collection: Vec<u8>,
-    name: Vec<u8>,
-    amount: u64,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("token_transfers").to_owned(),
-        ),
-        ident_str!("offer_script").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&receiver).unwrap(),
-            bcs::to_bytes(&creator).unwrap(),
-            bcs::to_bytes(&collection).unwrap(),
-            bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&amount).unwrap(),
-        ],
-    ))
-}
-
-pub fn transaction_publishing_option_set_module_publishing_allowed(
-    is_allowed: bool,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("transaction_publishing_option").to_owned(),
-        ),
-        ident_str!("set_module_publishing_allowed").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&is_allowed).unwrap()],
-    ))
-}
-
-pub fn validator_set_script_add_validator(_validator_addr: AccountAddress) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("validator_set_script").to_owned(),
-        ),
-        ident_str!("add_validator").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&_validator_addr).unwrap()],
-    ))
-}
-
-pub fn validator_set_script_create_validator_account(
-    _new_account_address: AccountAddress,
-    _human_name: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("validator_set_script").to_owned(),
-        ),
-        ident_str!("create_validator_account").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&_new_account_address).unwrap(),
-            bcs::to_bytes(&_human_name).unwrap(),
-        ],
-    ))
-}
-
-pub fn validator_set_script_create_validator_operator_account(
-    _new_account_address: AccountAddress,
-    _human_name: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("validator_set_script").to_owned(),
-        ),
-        ident_str!("create_validator_operator_account").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&_new_account_address).unwrap(),
-            bcs::to_bytes(&_human_name).unwrap(),
-        ],
-    ))
-}
-
-pub fn validator_set_script_register_validator_config(
-    _validator_address: AccountAddress,
-    _consensus_pubkey: Vec<u8>,
-    _validator_network_addresses: Vec<u8>,
-    _fullnode_network_addresses: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("validator_set_script").to_owned(),
-        ),
-        ident_str!("register_validator_config").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&_validator_address).unwrap(),
-            bcs::to_bytes(&_consensus_pubkey).unwrap(),
-            bcs::to_bytes(&_validator_network_addresses).unwrap(),
-            bcs::to_bytes(&_fullnode_network_addresses).unwrap(),
-        ],
-    ))
-}
-
-pub fn validator_set_script_remove_validator(
-    _validator_addr: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("validator_set_script").to_owned(),
-        ),
-        ident_str!("remove_validator").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&_validator_addr).unwrap()],
-    ))
-}
-
-pub fn validator_set_script_set_validator_config_and_reconfigure(
-    _validator_account: AccountAddress,
-    _consensus_pubkey: Vec<u8>,
-    _validator_network_addresses: Vec<u8>,
-    _fullnode_network_addresses: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("validator_set_script").to_owned(),
-        ),
-        ident_str!("set_validator_config_and_reconfigure").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&_validator_account).unwrap(),
-            bcs::to_bytes(&_consensus_pubkey).unwrap(),
-            bcs::to_bytes(&_validator_network_addresses).unwrap(),
-            bcs::to_bytes(&_fullnode_network_addresses).unwrap(),
-        ],
-    ))
-}
-
-pub fn validator_set_script_set_validator_operator(
-    _operator_name: Vec<u8>,
-    _operator_account: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("validator_set_script").to_owned(),
-        ),
-        ident_str!("set_validator_operator").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&_operator_name).unwrap(),
-            bcs::to_bytes(&_operator_account).unwrap(),
-        ],
+        vec![bcs::to_bytes(&withdraw_amount).unwrap()],
     ))
 }
 
@@ -1718,19 +997,6 @@ mod decoder {
         }
     }
 
-    pub fn account_utils_create_and_fund_account(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::AccountUtilsCreateAndFundAccount {
-                account: bcs::from_bytes(script.args().get(0)?).ok()?,
-                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
     pub fn aptos_coin_claim_mint_capability(
         payload: &TransactionPayload,
     ) -> Option<ScriptFunctionCall> {
@@ -1791,10 +1057,11 @@ mod decoder {
         }
     }
 
-    pub fn coin_register(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+    pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::CoinRegister {
-                coin_type: script.ty_args().get(0)?.clone(),
+            Some(ScriptFunctionCall::CodePublishPackageTxn {
+                pack_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
+                code: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
             None
@@ -1813,18 +1080,10 @@ mod decoder {
         }
     }
 
-    pub fn genesis_create_initialize_validators(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
+    pub fn coins_register(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::GenesisCreateInitializeValidators {
-                owners: bcs::from_bytes(script.args().get(0)?).ok()?,
-                consensus_pubkeys: bcs::from_bytes(script.args().get(1)?).ok()?,
-                proof_of_possession: bcs::from_bytes(script.args().get(2)?).ok()?,
-                validator_network_addresses: bcs::from_bytes(script.args().get(3)?).ok()?,
-                full_node_network_addresses: bcs::from_bytes(script.args().get(4)?).ok()?,
-                staking_distribution: bcs::from_bytes(script.args().get(5)?).ok()?,
-                initial_lockup_timestamp: bcs::from_bytes(script.args().get(6)?).ok()?,
+            Some(ScriptFunctionCall::CoinsRegister {
+                coin_type: script.ty_args().get(0)?.clone(),
             })
         } else {
             None
@@ -2013,273 +1272,9 @@ mod decoder {
     }
 
     pub fn stake_withdraw(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(_script) = payload {
-            Some(ScriptFunctionCall::StakeWithdraw {})
-        } else {
-            None
-        }
-    }
-
-    pub fn token_create_limited_collection_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenCreateLimitedCollectionScript {
-                name: bcs::from_bytes(script.args().get(0)?).ok()?,
-                description: bcs::from_bytes(script.args().get(1)?).ok()?,
-                uri: bcs::from_bytes(script.args().get(2)?).ok()?,
-                maximum: bcs::from_bytes(script.args().get(3)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn token_create_limited_token_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenCreateLimitedTokenScript {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                name: bcs::from_bytes(script.args().get(1)?).ok()?,
-                description: bcs::from_bytes(script.args().get(2)?).ok()?,
-                monitor_supply: bcs::from_bytes(script.args().get(3)?).ok()?,
-                initial_balance: bcs::from_bytes(script.args().get(4)?).ok()?,
-                maximum: bcs::from_bytes(script.args().get(5)?).ok()?,
-                uri: bcs::from_bytes(script.args().get(6)?).ok()?,
-                royalty_points_per_million: bcs::from_bytes(script.args().get(7)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn token_create_unlimited_collection_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenCreateUnlimitedCollectionScript {
-                name: bcs::from_bytes(script.args().get(0)?).ok()?,
-                description: bcs::from_bytes(script.args().get(1)?).ok()?,
-                uri: bcs::from_bytes(script.args().get(2)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn token_create_unlimited_token_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenCreateUnlimitedTokenScript {
-                collection: bcs::from_bytes(script.args().get(0)?).ok()?,
-                name: bcs::from_bytes(script.args().get(1)?).ok()?,
-                description: bcs::from_bytes(script.args().get(2)?).ok()?,
-                monitor_supply: bcs::from_bytes(script.args().get(3)?).ok()?,
-                initial_balance: bcs::from_bytes(script.args().get(4)?).ok()?,
-                uri: bcs::from_bytes(script.args().get(5)?).ok()?,
-                royalty_points_per_million: bcs::from_bytes(script.args().get(6)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn token_direct_transfer_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenDirectTransferScript {
-                creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                collection: bcs::from_bytes(script.args().get(1)?).ok()?,
-                name: bcs::from_bytes(script.args().get(2)?).ok()?,
-                amount: bcs::from_bytes(script.args().get(3)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn token_initialize_token_for_id(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenInitializeTokenForId {
-                creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                collection: bcs::from_bytes(script.args().get(1)?).ok()?,
-                name: bcs::from_bytes(script.args().get(2)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn token_initialize_token_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(_script) = payload {
-            Some(ScriptFunctionCall::TokenInitializeTokenScript {})
-        } else {
-            None
-        }
-    }
-
-    pub fn token_transfers_cancel_offer_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenTransfersCancelOfferScript {
-                receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
-                creator: bcs::from_bytes(script.args().get(1)?).ok()?,
-                collection: bcs::from_bytes(script.args().get(2)?).ok()?,
-                name: bcs::from_bytes(script.args().get(3)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn token_transfers_claim_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenTransfersClaimScript {
-                sender: bcs::from_bytes(script.args().get(0)?).ok()?,
-                creator: bcs::from_bytes(script.args().get(1)?).ok()?,
-                collection: bcs::from_bytes(script.args().get(2)?).ok()?,
-                name: bcs::from_bytes(script.args().get(3)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn token_transfers_offer_script(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenTransfersOfferScript {
-                receiver: bcs::from_bytes(script.args().get(0)?).ok()?,
-                creator: bcs::from_bytes(script.args().get(1)?).ok()?,
-                collection: bcs::from_bytes(script.args().get(2)?).ok()?,
-                name: bcs::from_bytes(script.args().get(3)?).ok()?,
-                amount: bcs::from_bytes(script.args().get(4)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn transaction_publishing_option_set_module_publishing_allowed(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(
-                ScriptFunctionCall::TransactionPublishingOptionSetModulePublishingAllowed {
-                    is_allowed: bcs::from_bytes(script.args().get(0)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
-    pub fn validator_set_script_add_validator(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::ValidatorSetScriptAddValidator {
-                _validator_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn validator_set_script_create_validator_account(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(
-                ScriptFunctionCall::ValidatorSetScriptCreateValidatorAccount {
-                    _new_account_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                    _human_name: bcs::from_bytes(script.args().get(1)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
-    pub fn validator_set_script_create_validator_operator_account(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(
-                ScriptFunctionCall::ValidatorSetScriptCreateValidatorOperatorAccount {
-                    _new_account_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                    _human_name: bcs::from_bytes(script.args().get(1)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
-    pub fn validator_set_script_register_validator_config(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(
-                ScriptFunctionCall::ValidatorSetScriptRegisterValidatorConfig {
-                    _validator_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                    _consensus_pubkey: bcs::from_bytes(script.args().get(1)?).ok()?,
-                    _validator_network_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
-                    _fullnode_network_addresses: bcs::from_bytes(script.args().get(3)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
-    pub fn validator_set_script_remove_validator(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::ValidatorSetScriptRemoveValidator {
-                _validator_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn validator_set_script_set_validator_config_and_reconfigure(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(
-                ScriptFunctionCall::ValidatorSetScriptSetValidatorConfigAndReconfigure {
-                    _validator_account: bcs::from_bytes(script.args().get(0)?).ok()?,
-                    _consensus_pubkey: bcs::from_bytes(script.args().get(1)?).ok()?,
-                    _validator_network_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
-                    _fullnode_network_addresses: bcs::from_bytes(script.args().get(3)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
-    pub fn validator_set_script_set_validator_operator(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::ValidatorSetScriptSetValidatorOperator {
-                _operator_name: bcs::from_bytes(script.args().get(0)?).ok()?,
-                _operator_account: bcs::from_bytes(script.args().get(1)?).ok()?,
+            Some(ScriptFunctionCall::StakeWithdraw {
+                withdraw_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -2342,10 +1337,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
             Box::new(decoder::account_transfer),
         );
         map.insert(
-            "account_utils_create_and_fund_account".to_string(),
-            Box::new(decoder::account_utils_create_and_fund_account),
-        );
-        map.insert(
             "aptos_coin_claim_mint_capability".to_string(),
             Box::new(decoder::aptos_coin_claim_mint_capability),
         );
@@ -2366,16 +1357,16 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
             Box::new(decoder::aptos_governance_vote),
         );
         map.insert(
-            "coin_register".to_string(),
-            Box::new(decoder::coin_register),
+            "code_publish_package_txn".to_string(),
+            Box::new(decoder::code_publish_package_txn),
         );
         map.insert(
             "coin_transfer".to_string(),
             Box::new(decoder::coin_transfer),
         );
         map.insert(
-            "genesis_create_initialize_validators".to_string(),
-            Box::new(decoder::genesis_create_initialize_validators),
+            "coins_register".to_string(),
+            Box::new(decoder::coins_register),
         );
         map.insert(
             "managed_coin_burn".to_string(),
@@ -2441,78 +1432,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "stake_withdraw".to_string(),
             Box::new(decoder::stake_withdraw),
-        );
-        map.insert(
-            "token_create_limited_collection_script".to_string(),
-            Box::new(decoder::token_create_limited_collection_script),
-        );
-        map.insert(
-            "token_create_limited_token_script".to_string(),
-            Box::new(decoder::token_create_limited_token_script),
-        );
-        map.insert(
-            "token_create_unlimited_collection_script".to_string(),
-            Box::new(decoder::token_create_unlimited_collection_script),
-        );
-        map.insert(
-            "token_create_unlimited_token_script".to_string(),
-            Box::new(decoder::token_create_unlimited_token_script),
-        );
-        map.insert(
-            "token_direct_transfer_script".to_string(),
-            Box::new(decoder::token_direct_transfer_script),
-        );
-        map.insert(
-            "token_initialize_token_for_id".to_string(),
-            Box::new(decoder::token_initialize_token_for_id),
-        );
-        map.insert(
-            "token_initialize_token_script".to_string(),
-            Box::new(decoder::token_initialize_token_script),
-        );
-        map.insert(
-            "token_transfers_cancel_offer_script".to_string(),
-            Box::new(decoder::token_transfers_cancel_offer_script),
-        );
-        map.insert(
-            "token_transfers_claim_script".to_string(),
-            Box::new(decoder::token_transfers_claim_script),
-        );
-        map.insert(
-            "token_transfers_offer_script".to_string(),
-            Box::new(decoder::token_transfers_offer_script),
-        );
-        map.insert(
-            "transaction_publishing_option_set_module_publishing_allowed".to_string(),
-            Box::new(decoder::transaction_publishing_option_set_module_publishing_allowed),
-        );
-        map.insert(
-            "validator_set_script_add_validator".to_string(),
-            Box::new(decoder::validator_set_script_add_validator),
-        );
-        map.insert(
-            "validator_set_script_create_validator_account".to_string(),
-            Box::new(decoder::validator_set_script_create_validator_account),
-        );
-        map.insert(
-            "validator_set_script_create_validator_operator_account".to_string(),
-            Box::new(decoder::validator_set_script_create_validator_operator_account),
-        );
-        map.insert(
-            "validator_set_script_register_validator_config".to_string(),
-            Box::new(decoder::validator_set_script_register_validator_config),
-        );
-        map.insert(
-            "validator_set_script_remove_validator".to_string(),
-            Box::new(decoder::validator_set_script_remove_validator),
-        );
-        map.insert(
-            "validator_set_script_set_validator_config_and_reconfigure".to_string(),
-            Box::new(decoder::validator_set_script_set_validator_config_and_reconfigure),
-        );
-        map.insert(
-            "validator_set_script_set_validator_operator".to_string(),
-            Box::new(decoder::validator_set_script_set_validator_operator),
         );
         map.insert(
             "version_set_version".to_string(),
