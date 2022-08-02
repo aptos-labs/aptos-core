@@ -188,9 +188,18 @@ pub struct TestPackage {
     #[clap(flatten)]
     move_options: MovePackageDir,
 
-    /// A filter string to determine which unit tests to run
+    /// A filter string to determine which unit tests to run.
     #[clap(long)]
     pub filter: Option<String>,
+
+    /// Bound the number of instructions that can be executed by any one test.
+    #[clap(
+        name = "instructions",
+        default_value = "100000",
+        short = 'i',
+        long = "instructions"
+    )]
+    instruction_execution_bound: u64,
 }
 
 #[async_trait]
@@ -211,7 +220,8 @@ impl CliCommand<&'static str> for TestPackage {
             config,
             UnitTestingConfig {
                 filter: self.filter,
-                ..UnitTestingConfig::default_with_bound(Some(100_000))
+                instruction_execution_bound: self.instruction_execution_bound,
+                ..UnitTestingConfig::default_with_bound(None)
             },
             aptos_debug_natives::aptos_debug_natives(),
             false,
