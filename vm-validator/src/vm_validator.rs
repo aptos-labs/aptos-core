@@ -13,6 +13,7 @@ use aptos_types::{
 use aptos_vm::AptosVM;
 use fail::fail_point;
 use std::sync::Arc;
+use storage_interface::state_view::DbStateView;
 use storage_interface::{
     cached_state_view::CachedDbStateView, state_view::LatestDbStateCheckpointView, DbReader,
 };
@@ -93,7 +94,7 @@ impl TransactionValidation for VMValidator {
 
 /// returns account's sequence number from storage
 pub fn get_account_sequence_number(
-    storage: Arc<dyn DbReader>,
+    state_view: &DbStateView,
     address: AccountAddress,
 ) -> Result<AccountSequenceInfo> {
     fail_point!("vm_validator::get_account_sequence_number", |_| {
@@ -101,9 +102,8 @@ pub fn get_account_sequence_number(
             "Injected error in get_account_sequence_number"
         ))
     });
-    let db_state_view = storage.latest_state_checkpoint_view()?;
 
-    let account_state_view = db_state_view.as_account_with_state_view(&address);
+    let account_state_view = state_view.as_account_with_state_view(&address);
 
     if let Ok(Some(crsn)) = account_state_view.get_crsn_resource() {
         return Ok(AccountSequenceInfo::CRSN {

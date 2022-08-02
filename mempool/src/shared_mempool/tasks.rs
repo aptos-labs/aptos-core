@@ -36,6 +36,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use storage_interface::state_view::LatestDbStateCheckpointView;
 use tokio::runtime::Handle;
 use vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
 
@@ -235,12 +236,17 @@ where
     let mut statuses = vec![];
 
     let start_storage_read = Instant::now();
+    let state_view = smp
+        .db
+        .latest_state_checkpoint_view()
+        .expect("Failed to get latest state checkpoint view.");
+
     // Track latency: fetching seq number
     let seq_numbers = IO_POOL.install(|| {
         transactions
             .par_iter()
             .map(|t| {
-                get_account_sequence_number(smp.db.clone(), t.sender()).map_err(|e| {
+                get_account_sequence_number(&state_view, t.sender()).map_err(|e| {
                     error!(LogSchema::new(LogEntry::DBError).error(&e));
                     counters::DB_ERROR.inc();
                     e
