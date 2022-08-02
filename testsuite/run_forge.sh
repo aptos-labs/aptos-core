@@ -44,7 +44,7 @@ FORGE_NAMESPACE_REUSE=${FORGE_NAMESPACE_REUSE:-false}
 FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-false}
 FORGE_TEST_SUITE=${FORGE_TEST_SUITE:-land_blocking}
 FORGE_RUNNER_DURATION_SECS=${FORGE_RUNNER_DURATION_SECS:-300}
-FORGE_RUNNER_TPS_THRESHOLD=${FORGE_RUNNER_TPS_THRESHOLD:-4000}
+FORGE_RUNNER_TPS_THRESHOLD=${FORGE_RUNNER_TPS_THRESHOLD:-400}
 
 [ "$FORGE_NAMESPACE_REUSE" = "true" ] && REUSE_ARGS="--reuse"
 [ "$FORGE_NAMESPACE_KEEP" = "true" ] && KEEP_ARGS="--keep"
@@ -186,10 +186,14 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     ulimit -n 1048576
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 1500 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
 =======
     cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 --avg-tps 400 \
 >>>>>>> 176c75e66c (Fix thershold for local)
+=======
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
+>>>>>>> eeddd00f62 (Fix threshold for local)
         --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD --duration-secs $FORGE_RUNNER_DURATION_SECS  \
         test k8s-swarm \
         --image-tag $IMAGE_TAG \
