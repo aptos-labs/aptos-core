@@ -8,6 +8,8 @@ use forge::{NodeExt, Swarm, SwarmExt};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// Checks txn goes through consensus even if the local validator is not creating proposals.
+/// This behavior should be true with both mempool and quorum store.
 #[tokio::test]
 async fn test_txn_broadcast() {
     let mut swarm = SwarmBuilder::new_local(4)
