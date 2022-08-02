@@ -19,8 +19,9 @@ use itertools::zip;
 use once_cell::sync::Lazy;
 use rand::prelude::SliceRandom;
 use rand_core::SeedableRng;
+use std::cmp::max;
 use std::{
-    cmp::{max, min},
+    cmp::min,
     collections::HashSet,
     num::NonZeroU64,
     sync::{
@@ -45,6 +46,7 @@ use stats::{StatsAccumulator, TxnStats};
 
 /// Max transactions per account in mempool
 const MAX_TXN_BATCH_SIZE: usize = 100;
+const TRANSACTIONS_PER_ACCOUNT: usize = 3;
 const MAX_TXNS: u64 = 1_000_000;
 const SEND_AMOUNT: u64 = 1;
 const TXN_EXPIRATION_SECONDS: u64 = 180;
@@ -74,7 +76,7 @@ impl Default for EmitThreadParams {
         Self {
             wait_millis: 0,
             wait_committed: true,
-            txn_expiration_time_secs: 30,
+            txn_expiration_time_secs: 300,
             check_stats_at_end: true,
         }
     }
@@ -83,13 +85,12 @@ impl Default for EmitThreadParams {
 #[derive(Clone, Debug)]
 pub struct EmitJobRequest {
     rest_clients: Vec<RestClient>,
-    accounts_per_client: usize,
-    workers_per_endpoint: Option<usize>,
+    mempool_backlog: usize,
     thread_params: EmitThreadParams,
     gas_price: u64,
     invalid_transaction_ratio: usize,
     pub duration: Duration,
-    vasp: bool,
+    reuse_accounts: bool,
     transaction_type: TransactionType,
 }
 
@@ -97,13 +98,12 @@ impl Default for EmitJobRequest {
     fn default() -> Self {
         Self {
             rest_clients: Vec::new(),
-            accounts_per_client: 15,
-            workers_per_endpoint: None,
+            mempool_backlog: 3000,
             thread_params: EmitThreadParams::default(),
             gas_price: 0,
             invalid_transaction_ratio: 0,
             duration: Duration::from_secs(300),
-            vasp: false,
+            reuse_accounts: false,
             transaction_type: TransactionType::P2P,
         }
     }
@@ -116,16 +116,6 @@ impl EmitJobRequest {
 
     pub fn rest_clients(mut self, rest_clients: Vec<RestClient>) -> Self {
         self.rest_clients = rest_clients;
-        self
-    }
-
-    pub fn accounts_per_client(mut self, accounts_per_client: usize) -> Self {
-        self.accounts_per_client = accounts_per_client;
-        self
-    }
-
-    pub fn workers_per_endpoint(mut self, workers_per_endpoint: usize) -> Self {
-        self.workers_per_endpoint = Some(workers_per_endpoint);
         self
     }
 
@@ -149,23 +139,36 @@ impl EmitJobRequest {
         self
     }
 
-    pub fn fixed_tps(self, target_tps: NonZeroU64) -> Self {
-        let clients_count = self.rest_clients.len() as u64;
-        let num_workers = target_tps.get() / clients_count + 1;
-        let wait_time = clients_count * num_workers * 1000 / target_tps.get();
+    pub fn calculate_workers_per_endpoint(&self) -> usize {
+        // The target mempool backlog is set to be 3x of the target TPS because of the on an average,
+        // we can ~3 blocks in consensus queue. As long as we have 3x the target TPS as backlog,
+        // it should be enough to produce the target TPS.
+        let clients_count = self.rest_clients.len();
+        let num_workers_per_endpoint = max(
+            self.mempool_backlog / (clients_count * TRANSACTIONS_PER_ACCOUNT),
+            1,
+        );
 
-        self.workers_per_endpoint(num_workers as usize)
-            .thread_params(EmitThreadParams {
-                wait_millis: wait_time,
-                wait_committed: true,
-                txn_expiration_time_secs: 30,
-                check_stats_at_end: true,
-            })
-            .accounts_per_client(1)
+        info!(
+            " Transaction emitter target mempool backlog is {}",
+            self.mempool_backlog
+        );
+
+        info!(
+            " Will use {} clients and {} workers per client",
+            clients_count, num_workers_per_endpoint
+        );
+
+        num_workers_per_endpoint
     }
 
-    pub fn vasp(mut self) -> Self {
-        self.vasp = true;
+    pub fn mempool_backlog(mut self, mempool_backlog: NonZeroU64) -> Self {
+        self.mempool_backlog = mempool_backlog.get() as usize;
+        self
+    }
+
+    pub fn reuse_accounts(mut self) -> Self {
+        self.reuse_accounts = true;
         self
     }
 
@@ -245,27 +248,13 @@ impl<'t> TxnEmitter<'t> {
     }
 
     pub async fn start_job(&mut self, req: EmitJobRequest) -> Result<EmitJob> {
-        let workers_per_endpoint = match req.workers_per_endpoint {
-            Some(x) => x,
-            None => {
-                let target_threads = 800;
-                // Trying to create somewhere between target_threads/2..target_threads threads
-                // We want to have equal numbers of threads for each endpoint, so that they are equally loaded
-                // Otherwise things like flamegrap/perf going to show different numbers depending on which endpoint is chosen
-                // Also limiting number of threads as max 10 per endpoint for use cases with very small number of nodes or use --peers
-                min(60, max(1, target_threads / req.rest_clients.len()))
-            }
-        };
-        let num_clients = req.rest_clients.len() * workers_per_endpoint;
+        let workers_per_endpoint = req.calculate_workers_per_endpoint();
+        let num_accounts = req.rest_clients.len() * workers_per_endpoint;
         info!(
             "Will use {} workers per endpoint for a total of {} endpoint clients",
-            workers_per_endpoint, num_clients
+            workers_per_endpoint, num_accounts
         );
-        let num_accounts = req.accounts_per_client * num_clients;
-        info!(
-            "Will create {} accounts_per_client for a total of {} accounts",
-            req.accounts_per_client, num_accounts
-        );
+        info!("Will create a total of {} accounts", num_accounts);
         let mut account_minter = AccountMinter::new(
             self.root_account,
             self.txn_factory.clone(),
@@ -304,7 +293,7 @@ impl<'t> TxnEmitter<'t> {
         };
         for client in req.rest_clients {
             for _ in 0..workers_per_endpoint {
-                let accounts = (&mut all_accounts).take(req.accounts_per_client).collect();
+                let accounts = (&mut all_accounts).take(1).collect();
                 let all_addresses = all_addresses.clone();
                 let stop = stop.clone();
                 let params = req.thread_params.clone();
@@ -417,7 +406,8 @@ async fn wait_for_single_account_sequence(
 ) -> Result<()> {
     let deadline = Instant::now() + wait_timeout;
     while Instant::now() <= deadline {
-        time::sleep(Duration::from_millis(500)).await;
+        time::sleep(Duration::from_millis(1000)).await;
+        // let loop_start_time = Instant::now();
         match query_sequence_numbers(client, &[account.address()]).await {
             Ok(sequence_numbers) => {
                 if sequence_numbers[0] >= account.sequence_number() {
@@ -472,6 +462,11 @@ async fn wait_for_accounts_sequence(
         return Err(uncommitted);
     }
 
+    // Special case for single account
+    if accounts.len() == 1 {
+        return Ok(());
+    }
+
     while Instant::now() <= deadline {
         match query_sequence_numbers(client, &addresses).await {
             Ok(sequence_numbers) => {
@@ -492,7 +487,7 @@ async fn wait_for_accounts_sequence(
                 );
             }
         }
-        time::sleep(Duration::from_millis(500)).await;
+        time::sleep(Duration::from_millis(1000)).await;
     }
 
     Err(uncommitted)

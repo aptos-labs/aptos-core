@@ -184,7 +184,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # more file descriptors for heavy txn generation
     ulimit -n 1048576
 
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 --avg-tps $LOCAL_TPS_THRESHOLD \
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 1500 --avg-tps $LOCAL_TPS_THRESHOLD \
         --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD \
         test k8s-swarm \
         --image-tag $IMAGE_TAG \

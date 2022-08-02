@@ -23,7 +23,7 @@ impl NetworkTest for NonZeroGasPrice {
             .collect::<Vec<_>>();
 
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1, None)?;
+        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1)?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
 

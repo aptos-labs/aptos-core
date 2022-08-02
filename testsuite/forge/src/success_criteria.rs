@@ -23,7 +23,6 @@ impl SuccessCriteria {
     pub fn check_for_success(&self, stats: &TxnStats, window: &Duration) -> anyhow::Result<()> {
         // TODO: Add more success criteria like expired transactions, CPU, memory usage etc
         let avg_tps = stats.committed / window.as_secs();
-        let p99_latency = stats.latency_buckets.percentile(99, 100);
         let is_triggerd_by_github_actions =
             std::env::var("FORGE_TRIGGERED_BY").unwrap_or_default() == "github-actions";
         if avg_tps < self.avg_tps as u64 {
@@ -37,16 +36,8 @@ impl SuccessCriteria {
             }
             bail!(error_message)
         }
-        if p99_latency > self.max_latency_ms as u64 {
-            let error_message = format!(
-                "Latency requirement failed. P99 latency {}, maximum latency requirement {}",
-                p99_latency, self.max_latency_ms
-            );
-            if is_triggerd_by_github_actions {
-                println!("::error::{error_message}");
-            }
-            bail!(error_message)
-        }
+        // TODO(skedia) Add latency success criteria after we have support for querying prometheus
+        // latency
         Ok(())
     }
 }

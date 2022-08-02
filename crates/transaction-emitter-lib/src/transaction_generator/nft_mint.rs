@@ -41,19 +41,22 @@ impl TransactionGenerator for NFTMint {
     fn generate_transactions(
         &mut self,
         accounts: Vec<&mut LocalAccount>,
+        transactions_per_account: usize,
         _all_addresses: Arc<Vec<AccountAddress>>,
         _invalid_transaction_ratio: usize,
         _gas_price: u64,
     ) -> Vec<SignedTransaction> {
-        let mut requests = Vec::with_capacity(accounts.len());
+        let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
         for account in accounts {
-            requests.push(create_nft_transfer_request(
-                account,
-                &self.creator_account,
-                &self.collection_name,
-                &self.token_name,
-                &self.txn_factory,
-            ));
+            for _ in 0..transactions_per_account {
+                requests.push(create_nft_transfer_request(
+                    account,
+                    &self.creator_account,
+                    &self.collection_name,
+                    &self.token_name,
+                    &self.txn_factory,
+                ));
+            }
         }
         requests
     }

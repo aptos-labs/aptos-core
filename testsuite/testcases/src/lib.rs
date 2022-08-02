@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod compatibility_test;
-pub mod fixed_tps_test;
 pub mod gas_price_test;
 pub mod network_bandwidth_test;
 pub mod network_latency_test;
@@ -12,15 +11,12 @@ pub mod performance_test;
 pub mod reconfiguration_test;
 pub mod state_sync_performance;
 
-use anyhow::ensure;
+use anyhow::{anyhow, ensure};
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use forge::{NetworkContext, NodeExt, Result, TxnEmitter, TxnStats, Version};
 use rand::SeedableRng;
-use std::{
-    convert::TryInto,
-    time::{Duration, Instant},
-};
-use tokio::runtime::Runtime;
+use std::time::{Duration, Instant};
+use tokio::runtime::Builder;
 
 async fn batch_update(
     ctx: &mut NetworkContext<'_>,
@@ -49,10 +45,14 @@ pub fn generate_traffic<'t>(
     validators: &[PeerId],
     duration: Duration,
     gas_price: u64,
-    fixed_tps: Option<u64>,
 ) -> Result<TxnStats> {
     ensure!(gas_price > 0, "gas_price is required to be non zero");
-    let rt = Runtime::new()?;
+    let mut runtime_builder = Builder::new_multi_thread();
+    runtime_builder.enable_all();
+    runtime_builder.worker_threads(64);
+    let rt = runtime_builder
+        .build()
+        .map_err(|err| anyhow!("Failed to start runtime for transaction emitter. {}", err))?;
     let rng = SeedableRng::from_rng(ctx.core().rng())?;
     let validator_clients = ctx
         .swarm()
@@ -74,9 +74,6 @@ pub fn generate_traffic<'t>(
         .rest_clients(validator_clients)
         .gas_price(gas_price)
         .duration(duration);
-    if let Some(target_tps) = fixed_tps {
-        emit_job_request = emit_job_request.fixed_tps(target_tps.try_into().unwrap());
-    }
     let stats = rt.block_on(emitter.emit_txn_for(emit_job_request))?;
 
     Ok(stats)

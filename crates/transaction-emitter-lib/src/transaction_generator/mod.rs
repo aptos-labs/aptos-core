@@ -15,6 +15,7 @@ pub trait TransactionGenerator: Debug + Sync + Send {
     fn generate_transactions(
         &mut self,
         accounts: Vec<&mut LocalAccount>,
+        transactions_per_account: usize,
         all_addresses: Arc<Vec<AccountAddress>>,
         invalid_transaction_ratio: usize,
         gas_price: u64,

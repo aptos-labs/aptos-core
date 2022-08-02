@@ -11,6 +11,7 @@ use anyhow::{Context, Result};
 use aptos_sdk::transaction_builder::TransactionFactory;
 use rand::{rngs::StdRng, Rng};
 use rand_core::{OsRng, SeedableRng};
+use std::convert::TryInto;
 use std::{
     cmp::{max, min},
     time::Duration,
@@ -23,13 +24,13 @@ pub async fn emit_transactions(
     let cluster = Cluster::try_from_cluster_args(cluster_args)
         .await
         .context("Failed to build cluster")?;
-    emit_transactions_with_cluster(&cluster, emit_args, cluster_args.vasp).await
+    emit_transactions_with_cluster(&cluster, emit_args, cluster_args.reuse_accounts).await
 }
 
 pub async fn emit_transactions_with_cluster(
     cluster: &Cluster,
     args: &EmitArgs,
-    vasp: bool,
+    reuse_accounts: bool,
 ) -> Result<TxnStats> {
     let thread_params = EmitThreadParams {
         wait_millis: args.wait_millis,
@@ -50,17 +51,14 @@ pub async fn emit_transactions_with_cluster(
     );
     let mut emit_job_request =
         EmitJobRequest::new(cluster.all_instances().map(Instance::rest_client).collect())
-            .accounts_per_client(args.accounts_per_client)
             .thread_params(thread_params)
+            .mempool_backlog(args.mempool_backlog.try_into().unwrap())
             .invalid_transaction_ratio(args.invalid_tx)
             .transaction_type(args.transaction_type)
             .duration(duration)
             .gas_price(1);
-    if let Some(workers_per_endpoint) = args.workers_per_ac {
-        emit_job_request = emit_job_request.workers_per_endpoint(workers_per_endpoint);
-    }
-    if vasp {
-        emit_job_request = emit_job_request.vasp();
+    if reuse_accounts {
+        emit_job_request = emit_job_request.reuse_accounts();
     }
     let stats = emitter
         .emit_txn_for_with_stats(emit_job_request, min(10, max(args.duration / 5, 1)))

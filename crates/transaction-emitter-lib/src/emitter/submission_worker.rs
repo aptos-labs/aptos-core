@@ -4,7 +4,7 @@
 use crate::{
     emitter::{
         stats::StatsAccumulator, wait_for_accounts_sequence, MAX_TXN_BATCH_SIZE,
-        TXN_EXPIRATION_SECONDS,
+        TRANSACTIONS_PER_ACCOUNT, TXN_EXPIRATION_SECONDS,
     },
     transaction_generator::TransactionGenerator,
     EmitThreadParams,
@@ -21,7 +21,10 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
+use futures::future::try_join_all;
 use rand::seq::IteratorRandom;
+use rand::Rng;
+use std::sync::atomic::AtomicU64;
 use std::{sync::Arc, time::Instant};
 use tokio::time::sleep;
 
@@ -70,6 +73,11 @@ impl SubmissionWorker {
 
     #[allow(clippy::collapsible_if)]
     pub(crate) async fn run(mut self, gas_price: u64) -> Vec<LocalAccount> {
+        // Introduce a random jitter between 0 to 5 seconds so that we don't hammer the rest APIs
+        // all at once.
+        let random_jitter_ms = self.rng.gen_range(0, 5000);
+        sleep(Duration::from_millis(random_jitter_ms)).await;
+
         let check_stats_at_end = self.params.check_stats_at_end && !self.params.wait_committed;
         let wait_for_accounts_sequence_timeout = Duration::from_secs(min(
             self.params.txn_expiration_time_secs,
@@ -85,27 +93,33 @@ impl SubmissionWorker {
             let requests = self.gen_requests(gas_price);
             let num_requests = requests.len();
             total_num_requests += num_requests;
-            let loop_start_time = Instant::now();
-            let wait_until = loop_start_time + wait_duration;
-            let mut txn_offset_time = 0u64;
-            for request in requests {
-                let cur_time = Instant::now();
-                txn_offset_time += (cur_time - loop_start_time).as_millis() as u64;
-                self.stats.submitted.fetch_add(1, Ordering::Relaxed);
-                let resp = self.client.submit(&request).await;
-                if let Err(e) = resp {
-                    warn!("[{:?}] Failed to submit request: {:?}", self.client, e);
-                }
+            let loop_start_time = Arc::new(Instant::now());
+            let wait_until = *loop_start_time + wait_duration;
+            let txn_offset_time = Arc::new(AtomicU64::new(0));
+
+            if let Err(e) = try_join_all(requests.into_iter().map(|req| {
+                submit_transaction(
+                    &self.client,
+                    req,
+                    loop_start_time.clone(),
+                    txn_offset_time.clone(),
+                )
+            }))
+            .await
+            {
+                warn!("[{:?}] Failed to submit request: {:?}", self.client, e);
             }
+
             if self.params.wait_committed {
+                let loop_start_time = Instant::now();
                 self.update_stats(
                     loop_start_time,
-                    txn_offset_time,
+                    txn_offset_time.load(Ordering::Relaxed),
                     num_requests,
                     false,
                     wait_for_accounts_sequence_timeout,
                 )
-                .await
+                .await;
             }
             let now = Instant::now();
             if wait_until > now {
@@ -209,9 +223,27 @@ impl SubmissionWorker {
             .choose_multiple(&mut self.rng, batch_size);
         self.txn_generator.generate_transactions(
             accounts,
+            TRANSACTIONS_PER_ACCOUNT,
             self.all_addresses.clone(),
             self.invalid_transaction_ratio,
             gas_price,
         )
     }
+}
+
+pub async fn submit_transaction(
+    client: &RestClient,
+    txn: SignedTransaction,
+    loop_start_time: Arc<Instant>,
+    txn_offset_time: Arc<AtomicU64>,
+) -> anyhow::Result<()> {
+    let cur_time = Instant::now();
+    let offset = cur_time - *loop_start_time;
+    txn_offset_time.fetch_add(offset.as_millis() as u64, Ordering::Relaxed);
+    // self.stats.submitted.fetch_add(1, Ordering::Relaxed);
+    let resp = client.submit(&txn).await;
+    if let Err(e) = resp {
+        warn!("[{:?}] Failed to submit request: {:?}", client, e);
+    }
+    Ok(())
 }
