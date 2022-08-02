@@ -7,6 +7,8 @@ import {
 } from '@chakra-ui/react';
 import { MDXProvider } from '@mdx-js/react';
 import MDXComponents from 'core/components/MDXComponents';
+import { DefaultSeo } from 'next-seo';
+import { COMPANY_NAME, COMPANY_URL } from 'core/constants';
 
 const theme: ThemeConfig = extendTheme({
   initialColorMode: 'light',
@@ -24,6 +26,19 @@ const theme: ThemeConfig = extendTheme({
 function MyApp({ Component, pageProps }: AppProps) {
   return (
     <ChakraProvider theme={theme}>
+      <DefaultSeo
+        openGraph={{
+          locale: 'en_IE',
+          site_name: COMPANY_NAME,
+          type: 'website',
+          url: COMPANY_URL,
+        }}
+        twitter={{
+          cardType: 'summary_large_image',
+          handle: '@PetraWallet',
+          site: '@PetraWallet',
+        }}
+      />
       <MDXProvider components={MDXComponents}>
         <Component {...pageProps} />
       </MDXProvider>

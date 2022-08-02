@@ -9603,7 +9603,7 @@ next-mdx-remote@^4.0.3:
     vfile "^5.3.0"
     vfile-matter "^3.0.1"
 
-next-seo@^5.4.0:
+next-seo@^5.5.0:
   version "5.5.0"
   resolved "https://registry.yarnpkg.com/next-seo/-/next-seo-5.5.0.tgz#12bdfce60a6ae098f49617357a166c2d44dbc29e"
   integrity sha512-5ouBHFtx8YrSDW44lj0qIEQ+oMcz6stgoITB+SqHUZbhgizoJsyLmq73gJ0lxtEKpcN8vG2QgRIJfdb8OAPChw==

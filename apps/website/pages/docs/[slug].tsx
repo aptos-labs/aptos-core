@@ -5,6 +5,14 @@ import fs from 'fs';
 import path from 'path';
 import { docsFilePaths, docsSlugOrdering, DOCS_PATH } from 'docs/mdxUtils';
 import matter from 'gray-matter';
+import {
+  BASE_URL,
+  COMPANY_NAME, COMPANY_URL, DEFAULT_SEO_DESCRIPTION,
+} from 'core/constants';
+import { NextSeo } from 'next-seo';
+
+const image = 'Petra_Docs_Card.png';
+const imageUrl = `${BASE_URL}/${image}` as const;
 
 interface DocsGetStaticPropsProps {
   params: {
@@ -110,10 +118,30 @@ export const getStaticPaths = async () => {
 };
 
 export default function DocsPage({
-  docsPath, paths, source,
+  docsPath, frontMatter, paths, source,
 }: DocsGetStaticPropsReturn['props']) {
+  const docTitle: string | undefined = frontMatter?.title;
   return (
     <DocsLayout paths={paths} docsPath={docsPath}>
+      <NextSeo
+        title={`${docTitle || 'Docs'} - ${COMPANY_NAME}`}
+        description={DEFAULT_SEO_DESCRIPTION}
+        openGraph={{
+          description: DEFAULT_SEO_DESCRIPTION,
+          images: [
+            {
+              alt: COMPANY_NAME,
+              height: 600,
+              type: 'image/jpeg',
+              url: imageUrl,
+              width: 800,
+            },
+          ],
+          site_name: COMPANY_NAME,
+          title: COMPANY_NAME,
+          url: COMPANY_URL,
+        }}
+      />
       <MDXRemote {...source} />
     </DocsLayout>
   );

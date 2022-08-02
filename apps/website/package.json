@@ -22,7 +22,7 @@
     "gray-matter": "^4.0.3",
     "next": "12.2.0",
     "next-mdx-remote": "^4.0.3",
-    "next-seo": "^5.4.0",
+    "next-seo": "^5.5.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-hook-form": "^7.33.0",
