@@ -16,6 +16,7 @@ use crate::{
     test_utils::{EmptyStateComputer, MockPayloadManager, MockStorage},
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
+use aptos_config::config::NodeConfig;
 use aptos_infallible::Mutex;
 use aptos_types::{
     epoch_change::EpochChangeProof,
@@ -115,6 +116,7 @@ fn create_node_for_fuzzing() -> RoundManager {
     let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let network_sender = ConsensusNetworkSender::new(
+        Some(NodeConfig::default()),
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );

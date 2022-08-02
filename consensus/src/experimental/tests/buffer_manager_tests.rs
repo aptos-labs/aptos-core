@@ -23,6 +23,7 @@ use crate::{
         RandomComputeResultStateComputer,
     },
 };
+use aptos_config::config::NodeConfig;
 use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
@@ -91,6 +92,7 @@ pub fn prepare_buffer_manager() -> (
     let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
 
     let network_sender = ConsensusNetworkSender::new(
+        Some(NodeConfig::default()),
         PeerManagerRequestSender::new(network_reqs_tx),
         ConnectionRequestSender::new(connection_reqs_tx),
     );

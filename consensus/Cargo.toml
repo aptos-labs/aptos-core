@@ -58,6 +58,7 @@ claim = "0.5.0"
 proptest = "1.0.0"
 tempfile = "3.3.0"
 
+aptos-compression = { path = "../crates/aptos-compression" }
 aptos-config = { path = "../config", features = ["fuzzing"] }
 aptos-mempool = { path = "../mempool", features = ["fuzzing"] }
 consensus-types = { path = "consensus-types", default-features = false, features = ["fuzzing"] }

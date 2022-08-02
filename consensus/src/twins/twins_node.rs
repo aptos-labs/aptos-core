@@ -72,6 +72,7 @@ impl SMRNode {
         let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
         let (_, conn_notifs_channel) = conn_notifs_channel::new();
         let mut network_sender = ConsensusNetworkSender::new(
+            Some(NodeConfig::default()),
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );

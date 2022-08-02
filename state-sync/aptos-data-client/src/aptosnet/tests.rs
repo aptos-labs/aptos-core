@@ -88,6 +88,7 @@ impl MockNetwork {
 
         let network_sender = MultiNetworkSender::new(hashmap! {
             NetworkId::Validator => StorageServiceNetworkSender::new(
+                None,
                 PeerManagerRequestSender::new(peer_mgr_reqs_tx),
                 ConnectionRequestSender::new(connection_reqs_tx),
             )

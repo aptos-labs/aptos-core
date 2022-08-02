@@ -163,7 +163,6 @@ impl NetworkPlayground {
                         data: outbound_req.data,
                         res_tx: outbound_req.res_tx,
                     };
-
                     node_consensus_tx
                         .push(
                             (src_twin_id.author, ProtocolId::ConsensusRpcBcs),
@@ -481,6 +480,8 @@ impl DropConfigRound {
 mod tests {
     use super::*;
     use crate::network::NetworkTask;
+    use aptos_compression::metrics::CompressionClient;
+    use aptos_config::config::{ConsensusConfig, NodeConfig};
     use aptos_config::network_id::NetworkId;
     use aptos_crypto::HashValue;
     use aptos_types::validator_verifier::random_validator_verifier;
@@ -580,6 +581,7 @@ mod tests {
                 ],
             );
             let mut network_sender = ConsensusNetworkSender::new(
+                Some(NodeConfig::default()),
                 PeerManagerRequestSender::new(network_reqs_tx),
                 ConnectionRequestSender::new(connection_reqs_tx),
             );
@@ -655,105 +657,137 @@ mod tests {
     }
 
     #[test]
-    fn test_rpc() {
-        let mut runtime = consensus_runtime();
-        let num_nodes = 2;
-        let mut senders = Vec::new();
-        let mut receivers: Vec<NetworkReceivers> = Vec::new();
-        let mut playground = NetworkPlayground::new(runtime.handle().clone());
-        let mut nodes = Vec::new();
-        let (signers, validator_verifier) = random_validator_verifier(num_nodes, None, false);
-        let peers: Vec<_> = signers.iter().map(|signer| signer.author()).collect();
-        let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
-
-        for (peer_id, peer) in peers.iter().enumerate() {
-            let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-            let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-            let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-            let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
-            let (_, conn_status_rx) = conn_notifs_channel::new();
-            let mut network_sender = ConsensusNetworkSender::new(
-                PeerManagerRequestSender::new(network_reqs_tx),
-                ConnectionRequestSender::new(connection_reqs_tx),
-            );
-
-            add_peer_to_storage(
-                &peer_metadata_storage,
-                peer,
-                &[
-                    ProtocolId::ConsensusDirectSendJson,
-                    ProtocolId::ConsensusDirectSendBcs,
-                    ProtocolId::ConsensusRpcJson,
-                ],
-            );
-            network_sender.initialize(peer_metadata_storage.clone());
-            let network_events = ConsensusNetworkEvents::new(consensus_rx, conn_status_rx);
-
-            let twin_id = TwinId {
-                id: peer_id,
-                author: *peer,
+    fn test_rpc_compression() {
+        for use_compression in [false, true] {
+            let mut runtime = consensus_runtime();
+            let num_nodes = 2;
+            let mut senders = Vec::new();
+            let mut receivers: Vec<NetworkReceivers> = Vec::new();
+            let mut playground = NetworkPlayground::new(runtime.handle().clone());
+            let mut nodes = Vec::new();
+            let (signers, validator_verifier) = random_validator_verifier(num_nodes, None, false);
+            let peers: Vec<_> = signers.iter().map(|signer| signer.author()).collect();
+            let peer_metadata_storage = PeerMetadataStorage::new(&[NetworkId::Validator]);
+            let node_config = NodeConfig {
+                consensus: ConsensusConfig {
+                    use_compression,
+                    ..Default::default()
+                },
+                ..Default::default()
             };
 
-            playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
+            for (peer_id, peer) in peers.iter().enumerate() {
+                let (network_reqs_tx, network_reqs_rx) =
+                    aptos_channel::new(QueueStyle::FIFO, 8, None);
+                let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+                let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+                let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
+                let (_, conn_status_rx) = conn_notifs_channel::new();
+                let mut network_sender = ConsensusNetworkSender::new(
+                    Some(node_config.clone()),
+                    PeerManagerRequestSender::new(network_reqs_tx),
+                    ConnectionRequestSender::new(connection_reqs_tx),
+                );
 
-            let (self_sender, self_receiver) = channel::new_test(8);
-            let node = NetworkSender::new(
-                *peer,
-                network_sender.clone(),
-                self_sender,
-                validator_verifier.clone(),
-            );
-            let (task, receiver) = NetworkTask::new(network_events, self_receiver);
-            senders.push(network_sender);
-            receivers.push(receiver);
-            runtime.handle().spawn(task.start());
-            nodes.push(node);
-        }
-        let receiver_1 = receivers.remove(1);
-        let node0 = nodes[0].clone();
-        let peer1 = peers[1];
-        let vote_msg = VoteMsg::new(
-            Vote::new(
-                VoteData::new(BlockInfo::random(1), BlockInfo::random(0)),
-                peers[0],
-                placeholder_ledger_info(),
-                &signers[0],
-            ),
-            test_utils::placeholder_sync_info(),
-        );
+                let protocols = if use_compression {
+                    vec![
+                        ProtocolId::ConsensusRpcCompressed,
+                        ProtocolId::ConsensusDirectSendJson,
+                        ProtocolId::ConsensusDirectSendBcs,
+                        ProtocolId::ConsensusRpcJson,
+                    ]
+                } else {
+                    vec![
+                        ProtocolId::ConsensusDirectSendJson,
+                        ProtocolId::ConsensusDirectSendBcs,
+                        ProtocolId::ConsensusRpcJson,
+                    ]
+                };
 
-        // verify request block rpc
-        let mut block_retrieval = receiver_1.block_retrieval;
-        let on_request_block = async move {
-            while let Some(request) = block_retrieval.next().await {
-                // make sure the network task is not blocked during RPC
-                // we limit the network notification queue size to 1 so if it's blocked,
-                // we can not process 2 votes and the test will timeout
-                node0.send_vote(vote_msg.clone(), vec![peer1]).await;
-                node0.send_vote(vote_msg.clone(), vec![peer1]).await;
-                playground
-                    .wait_for_messages(2, NetworkPlayground::votes_only)
-                    .await;
-                let response =
-                    BlockRetrievalResponse::new(BlockRetrievalStatus::IdNotFound, vec![]);
-                let response = ConsensusMsg::BlockRetrievalResponse(Box::new(response));
-                let bytes = Bytes::from(serde_json::to_vec(&response).unwrap());
-                request.response_sender.send(Ok(bytes)).unwrap();
+                add_peer_to_storage(&peer_metadata_storage, peer, &protocols);
+                network_sender.initialize(peer_metadata_storage.clone());
+                let network_events = ConsensusNetworkEvents::new(consensus_rx, conn_status_rx);
+
+                let twin_id = TwinId {
+                    id: peer_id,
+                    author: *peer,
+                };
+
+                playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
+
+                let (self_sender, self_receiver) = channel::new_test(8);
+                let node = NetworkSender::new(
+                    *peer,
+                    network_sender.clone(),
+                    self_sender,
+                    validator_verifier.clone(),
+                );
+                let (task, receiver) = NetworkTask::new(network_events, self_receiver);
+                senders.push(network_sender);
+                receivers.push(receiver);
+                runtime.handle().spawn(task.start());
+                nodes.push(node);
             }
-        };
-        runtime.handle().spawn(on_request_block);
-        let peer = peers[1];
-        timed_block_on(&mut runtime, async {
-            let response = nodes[0]
-                .request_block(
-                    BlockRetrievalRequest::new(HashValue::zero(), 1),
-                    peer,
-                    Duration::from_secs(5),
-                )
-                .await
-                .unwrap();
-            assert_eq!(response.status(), BlockRetrievalStatus::IdNotFound);
-        });
+            let receiver_1 = receivers.remove(1);
+            let node0 = nodes[0].clone();
+            let peer1 = peers[1];
+            let vote_msg = VoteMsg::new(
+                Vote::new(
+                    VoteData::new(BlockInfo::random(1), BlockInfo::random(0)),
+                    peers[0],
+                    placeholder_ledger_info(),
+                    &signers[0],
+                ),
+                test_utils::placeholder_sync_info(),
+            );
+
+            // verify request block rpc
+            let mut block_retrieval = receiver_1.block_retrieval;
+            let on_request_block = async move {
+                println!("HERE!");
+                while let Some(request) = block_retrieval.next().await {
+                    println!("Inside loop");
+                    // make sure the network task is not blocked during RPC
+                    // we limit the network notification queue size to 1 so if it's blocked,
+                    // we can not process 2 votes and the test will timeout
+                    node0.send_vote(vote_msg.clone(), vec![peer1]).await;
+                    node0.send_vote(vote_msg.clone(), vec![peer1]).await;
+                    playground
+                        .wait_for_messages(2, NetworkPlayground::votes_only)
+                        .await;
+                    let response =
+                        BlockRetrievalResponse::new(BlockRetrievalStatus::IdNotFound, vec![]);
+                    let response = ConsensusMsg::BlockRetrievalResponse(Box::new(response));
+                    if use_compression {
+                        let bcs_response = bcs::to_bytes(&response).unwrap();
+                        let compressed_response =
+                            aptos_compression::compress(bcs_response, CompressionClient::Consensus)
+                                .unwrap();
+                        request
+                            .response_sender
+                            .send(Ok(Bytes::from(compressed_response)))
+                            .unwrap();
+                    } else {
+                        let bcs_response = bcs::to_bytes(&response).unwrap();
+                        let bytes = Bytes::from(bcs_response);
+                        request.response_sender.send(Ok(bytes)).unwrap();
+                    };
+                }
+            };
+            runtime.handle().spawn(on_request_block);
+            let peer = peers[1];
+            timed_block_on(&mut runtime, async {
+                let response = nodes[0]
+                    .request_block(
+                        BlockRetrievalRequest::new(HashValue::zero(), 1),
+                        peer,
+                        Duration::from_secs(5),
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(response.status(), BlockRetrievalStatus::IdNotFound);
+            });
+        }
     }
 
     #[test]

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::smoke_test_environment::SwarmBuilder;
 use crate::{
     smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{
@@ -9,6 +10,7 @@ use crate::{
 };
 use aptos_transaction_builder::aptos_stdlib;
 use forge::{NodeExt, Swarm};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 #[tokio::test]
@@ -35,9 +37,29 @@ async fn test_create_mint_transfer_block_metadata() {
 }
 
 #[tokio::test]
-async fn test_basic_fault_tolerance() {
+async fn test_basic_fault_tolerance_compression() {
     // A configuration with 4 validators should tolerate single node failure.
-    let mut swarm = new_local_swarm_with_aptos(4).await;
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.consensus.use_compression = true;
+        }))
+        .build()
+        .await;
+    swarm.validators_mut().nth(3).unwrap().stop();
+    check_create_mint_transfer(&mut swarm).await;
+}
+
+#[tokio::test]
+async fn test_basic_fault_tolerance_no_compression() {
+    // A configuration with 4 validators should tolerate single node failure.
+    let mut swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.consensus.use_compression = false;
+        }))
+        .build()
+        .await;
     swarm.validators_mut().nth(3).unwrap().stop();
     check_create_mint_transfer(&mut swarm).await;
 }

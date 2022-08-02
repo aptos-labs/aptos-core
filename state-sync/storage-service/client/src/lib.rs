@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_config::config::NodeConfig;
 use aptos_config::network_id::PeerNetworkId;
 use aptos_types::PeerId;
 use async_trait::async_trait;
@@ -117,11 +118,12 @@ pub struct StorageServiceNetworkSender {
 
 impl NewNetworkSender for StorageServiceNetworkSender {
     fn new(
+        node_config: Option<NodeConfig>,
         peer_mgr_reqs_tx: PeerManagerRequestSender,
         connection_reqs_tx: ConnectionRequestSender,
     ) -> Self {
         Self {
-            inner: NetworkSender::new(peer_mgr_reqs_tx, connection_reqs_tx),
+            inner: NetworkSender::new(node_config, peer_mgr_reqs_tx, connection_reqs_tx),
         }
     }
 }

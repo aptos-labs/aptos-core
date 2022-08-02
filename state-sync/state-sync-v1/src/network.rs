@@ -4,6 +4,7 @@
 //! Interface between State Sync and Network layers.
 
 use crate::{chunk_request::GetChunkRequest, chunk_response::GetChunkResponse, counters};
+use aptos_config::config::NodeConfig;
 use aptos_types::PeerId;
 use async_trait::async_trait;
 use channel::{aptos_channel, message_queues::QueueStyle};
@@ -51,11 +52,12 @@ pub struct StateSyncSender {
 
 impl NewNetworkSender for StateSyncSender {
     fn new(
+        node_config: Option<NodeConfig>,
         peer_mgr_reqs_tx: PeerManagerRequestSender,
         connection_reqs_tx: ConnectionRequestSender,
     ) -> Self {
         Self {
-            inner: NetworkSender::new(peer_mgr_reqs_tx, connection_reqs_tx),
+            inner: NetworkSender::new(node_config, peer_mgr_reqs_tx, connection_reqs_tx),
         }
     }
 }

@@ -21,6 +21,7 @@ use crate::{
     },
     util::time_service::{ClockTimeService, TimeService},
 };
+use aptos_config::config::NodeConfig;
 use aptos_config::network_id::NetworkId;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
@@ -162,6 +163,7 @@ impl NodeSetup {
         let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = channel::new_test(8);
         let (_, conn_status_rx) = conn_notifs_channel::new();
         let mut network_sender = ConsensusNetworkSender::new(
+            Some(NodeConfig::default()),
             PeerManagerRequestSender::new(network_reqs_tx),
             ConnectionRequestSender::new(connection_reqs_tx),
         );

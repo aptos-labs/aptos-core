@@ -585,7 +585,7 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
 
         // Create the endpoints to connect the Network to State Sync.
         let (state_sync_sender, state_sync_events) =
-            network_builder.add_p2p_service(&state_sync_v1_network_config());
+            network_builder.add_p2p_service(None, &state_sync_v1_network_config());
         state_sync_network_handles.push((network_id, state_sync_sender, state_sync_events));
 
         // TODO(philiphayes): configure which networks we serve the storage service
@@ -593,19 +593,22 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         // storage service at all.
 
         // Register the network-facing storage service with Network.
-        let storage_service_events =
-            network_builder.add_service(&storage_service_server::network::network_endpoint_config(
+        let storage_service_events = network_builder.add_service(
+            None,
+            &storage_service_server::network::network_endpoint_config(
                 node_config.state_sync.storage_service,
-            ));
+            ),
+        );
         storage_service_server_network_handles.push(storage_service_events);
 
         // Register the storage-service clients with Network
         let storage_service_sender =
-            network_builder.add_client(&storage_service_client::network_endpoint_config());
+            network_builder.add_client(None, &storage_service_client::network_endpoint_config());
         storage_service_client_network_handles.insert(network_id, storage_service_sender);
 
         // Create the endpoints to connect the Network to mempool.
         let (mempool_sender, mempool_events) = network_builder.add_p2p_service(
+            None,
             &aptos_mempool::network::network_endpoint_config(MEMPOOL_NETWORK_CHANNEL_BUFFER_SIZE),
         );
         mempool_network_handles.push((network_id, mempool_sender, mempool_events));
@@ -618,10 +621,10 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
                 panic!("There can be at most one validator network!");
             }
 
-            consensus_network_handles = Some(
-                network_builder
-                    .add_p2p_service(&consensus::network_interface::network_endpoint_config()),
-            );
+            consensus_network_handles = Some(network_builder.add_p2p_service(
+                Some(node_config.clone()),
+                &consensus::network_interface::network_endpoint_config(&node_config),
+            ));
         }
 
         let network_context = network_builder.network_context();
