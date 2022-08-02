@@ -238,17 +238,7 @@ async fn handle_submit_bcs_transactions(
     fail_point("endpoint_submit_bcs_transactions")?;
     let txn = bcs::from_bytes(&body)
         .map_err(|err| Error::invalid_request_body(format!("deserialize error: {}", err)))?;
-    let txns = Transactions::new(context)?;
-    // warn!(
-    //     "Time taken for the context is {:?} ",
-    //     Instant::now() - loop_start_time
-    // );
-    let ret = txns.create(txn).await?;
-    // warn!(
-    //     "Time taken for the handle_submit_bcs_transactions is {:?} ",
-    //     loop_end_time - loop_start_time
-    // );
-    Ok(ret)
+    Ok(Transactions::new(context)?.create(txn).await?)
 }
 
 async fn handle_simulate_bcs_transactions(
