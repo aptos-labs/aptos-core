@@ -570,7 +570,7 @@ impl AptosDB {
             lis.len() == (paging_epoch - start_epoch) as usize,
             "DB corruption: missing epoch ending ledger info for epoch {}",
             lis.last()
-                .map(|li| li.ledger_info().next_block_epoch())
+                .map(|li| li.ledger_info().next_block_epoch() - 1)
                 .unwrap_or(start_epoch),
         );
         Ok((lis, more))
