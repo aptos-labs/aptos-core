@@ -140,7 +140,7 @@ class RestClient:
         response = self.client.post(
             f"{self.base_url}/transactions", headers=headers, json=txn_request
         )
-        assert response.status_code == 202, f"{response.text} - {txn}"
+        assert response.status_code == 202, f"{response.text} - {txn_request}"
         return response.json()["hash"]
 
     def transaction_pending(self, txn_hash: str) -> bool:
