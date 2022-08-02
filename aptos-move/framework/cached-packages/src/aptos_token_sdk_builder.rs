@@ -64,12 +64,24 @@ pub enum ScriptFunctionCall {
         collection: Bytes,
         name: Bytes,
         amount: u64,
-        serial_number: u64,
+        property_version: u64,
     },
 
     TokenInitializeTokenScript {},
 
-    /// Mint more token from an existing token_data. Mint only adds more token to serial_number 0
+    TokenMutateTokenProperties {
+        token_owner: AccountAddress,
+        creator: AccountAddress,
+        collection_name: Bytes,
+        token_name: Bytes,
+        token_property_version: u64,
+        amount: u64,
+        keys: Vec<Bytes>,
+        values: Vec<Bytes>,
+        types: Vec<Bytes>,
+    },
+
+    /// Mint more token from an existing token_data. Mint only adds more token to property_version 0
     TokenMint {
         token_data_address: AccountAddress,
         collection: Bytes,
@@ -82,7 +94,7 @@ pub enum ScriptFunctionCall {
         creator: AccountAddress,
         collection: Bytes,
         name: Bytes,
-        serial_number: u64,
+        property_version: u64,
     },
 
     TokenTransfersClaimScript {
@@ -90,7 +102,7 @@ pub enum ScriptFunctionCall {
         creator: AccountAddress,
         collection: Bytes,
         name: Bytes,
-        serial_number: u64,
+        property_version: u64,
     },
 
     TokenTransfersOfferScript {
@@ -98,8 +110,8 @@ pub enum ScriptFunctionCall {
         creator: AccountAddress,
         collection: Bytes,
         name: Bytes,
+        property_version: u64,
         amount: u64,
-        serial_number: u64,
     },
 }
 
@@ -149,13 +161,13 @@ impl ScriptFunctionCall {
                 collection,
                 name,
                 amount,
-                serial_number,
+                property_version,
             } => token_direct_transfer_script(
                 creators_address,
                 collection,
                 name,
                 amount,
-                serial_number,
+                property_version,
             ),
             TokenInitializeTokenScript {} => token_initialize_token_script(),
             TokenMint {
@@ -169,35 +181,56 @@ impl ScriptFunctionCall {
                 creator,
                 collection,
                 name,
-                serial_number,
+                property_version,
             } => token_transfers_cancel_offer_script(
                 receiver,
                 creator,
                 collection,
                 name,
-                serial_number,
+                property_version,
             ),
             TokenTransfersClaimScript {
                 sender,
                 creator,
                 collection,
                 name,
-                serial_number,
-            } => token_transfers_claim_script(sender, creator, collection, name, serial_number),
+                property_version,
+            } => token_transfers_claim_script(sender, creator, collection, name, property_version),
             TokenTransfersOfferScript {
                 receiver,
                 creator,
                 collection,
                 name,
                 amount,
-                serial_number,
+                property_version,
             } => token_transfers_offer_script(
                 receiver,
                 creator,
                 collection,
                 name,
                 amount,
-                serial_number,
+                property_version,
+            ),
+            TokenMutateTokenProperties {
+                token_owner,
+                creator,
+                collection_name,
+                token_name,
+                token_property_version,
+                amount,
+                keys,
+                values,
+                types,
+            } => token_mutate_token_properties(
+                token_owner,
+                creator,
+                collection_name,
+                token_name,
+                token_property_version,
+                amount,
+                keys,
+                values,
+                types,
             ),
         }
     }
@@ -296,7 +329,7 @@ pub fn token_direct_transfer_script(
     collection: Vec<u8>,
     name: Vec<u8>,
     amount: u64,
-    serial_number: u64,
+    property_version: u64,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
@@ -313,7 +346,7 @@ pub fn token_direct_transfer_script(
             bcs::to_bytes(&collection).unwrap(),
             bcs::to_bytes(&name).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
-            bcs::to_bytes(&serial_number).unwrap(),
+            bcs::to_bytes(&property_version).unwrap(),
         ],
     ))
 }
@@ -333,7 +366,42 @@ pub fn token_initialize_token_script() -> TransactionPayload {
     ))
 }
 
-/// Mint more token from an existing token_data. Mint only adds more token to serial_number 0
+pub fn token_mutate_token_properties(
+    token_owner: AccountAddress,
+    creator: AccountAddress,
+    collection_name: Bytes,
+    token_name: Bytes,
+    token_property_version: u64,
+    amount: u64,
+    property_keys: Vec<Vec<u8>>,
+    property_values: Vec<Vec<u8>>,
+    property_types: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("token").to_owned(),
+        ),
+        ident_str!("mutate_token_properties").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&token_owner).unwrap(),
+            bcs::to_bytes(&creator).unwrap(),
+            bcs::to_bytes(&collection_name).unwrap(),
+            bcs::to_bytes(&token_name).unwrap(),
+            bcs::to_bytes(&token_property_version).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+            bcs::to_bytes(&property_keys).unwrap(),
+            bcs::to_bytes(&property_values).unwrap(),
+            bcs::to_bytes(&property_types).unwrap(),
+        ],
+    ))
+}
+
+/// Mint more token from an existing token_data. Mint only adds more token to property_version 0
 pub fn token_mint(
     token_data_address: AccountAddress,
     collection: Vec<u8>,
@@ -364,7 +432,7 @@ pub fn token_transfers_cancel_offer_script(
     creator: AccountAddress,
     collection: Vec<u8>,
     name: Vec<u8>,
-    serial_number: u64,
+    property_version: u64,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
@@ -381,7 +449,7 @@ pub fn token_transfers_cancel_offer_script(
             bcs::to_bytes(&creator).unwrap(),
             bcs::to_bytes(&collection).unwrap(),
             bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&serial_number).unwrap(),
+            bcs::to_bytes(&property_version).unwrap(),
         ],
     ))
 }
@@ -391,7 +459,7 @@ pub fn token_transfers_claim_script(
     creator: AccountAddress,
     collection: Vec<u8>,
     name: Vec<u8>,
-    serial_number: u64,
+    property_version: u64,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
@@ -408,7 +476,7 @@ pub fn token_transfers_claim_script(
             bcs::to_bytes(&creator).unwrap(),
             bcs::to_bytes(&collection).unwrap(),
             bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&serial_number).unwrap(),
+            bcs::to_bytes(&property_version).unwrap(),
         ],
     ))
 }
@@ -419,7 +487,7 @@ pub fn token_transfers_offer_script(
     collection: Vec<u8>,
     name: Vec<u8>,
     amount: u64,
-    serial_number: u64,
+    property_version: u64,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
@@ -437,7 +505,7 @@ pub fn token_transfers_offer_script(
             bcs::to_bytes(&collection).unwrap(),
             bcs::to_bytes(&name).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
-            bcs::to_bytes(&serial_number).unwrap(),
+            bcs::to_bytes(&property_version).unwrap(),
         ],
     ))
 }
@@ -490,7 +558,7 @@ mod decoder {
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(3)?).ok()?,
-                serial_number: bcs::from_bytes(script.args().get(4)?).ok()?,
+                property_version: bcs::from_bytes(script.args().get(4)?).ok()?,
             })
         } else {
             None
@@ -529,7 +597,7 @@ mod decoder {
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(2)?).ok()?,
                 name: bcs::from_bytes(script.args().get(3)?).ok()?,
-                serial_number: bcs::from_bytes(script.args().get(4)?).ok()?,
+                property_version: bcs::from_bytes(script.args().get(4)?).ok()?,
             })
         } else {
             None
@@ -545,7 +613,7 @@ mod decoder {
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(2)?).ok()?,
                 name: bcs::from_bytes(script.args().get(3)?).ok()?,
-                serial_number: bcs::from_bytes(script.args().get(4)?).ok()?,
+                property_version: bcs::from_bytes(script.args().get(4)?).ok()?,
             })
         } else {
             None
@@ -561,8 +629,8 @@ mod decoder {
                 creator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(2)?).ok()?,
                 name: bcs::from_bytes(script.args().get(3)?).ok()?,
-                amount: bcs::from_bytes(script.args().get(4)?).ok()?,
-                serial_number: bcs::from_bytes(script.args().get(5)?).ok()?,
+                property_version: bcs::from_bytes(script.args().get(4)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(5)?).ok()?,
             })
         } else {
             None
