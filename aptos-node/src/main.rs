@@ -7,7 +7,7 @@ use aptos_node::AptosNodeArgs;
 use clap::Parser;
 
 #[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 fn main() {
     AptosNodeArgs::parse().run()
