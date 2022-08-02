@@ -1,6 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-mod db_pruner;
+pub(crate) mod db_pruner;
 pub(crate) mod db_sub_pruner;
 pub(crate) mod event_store;
 pub(crate) mod ledger_pruner_worker;

@@ -20,6 +20,8 @@ use std::sync::{atomic::Ordering, Arc};
 
 pub const LEDGER_PRUNER_NAME: &str = "ledger pruner";
 
+#[derive(Debug)]
+/// Responsible for pruning everything except for the state tree.
 pub struct LedgerPruner {
     db: Arc<DB>,
     /// Keeps track of the target version that the pruner needs to achieve.
@@ -96,6 +98,11 @@ impl DBPruner for LedgerPruner {
         PRUNER_LEAST_READABLE_VERSION
             .with_label_values(&["ledger_pruner"])
             .set(min_readable_version as i64);
+    }
+
+    /// (For tests only.) Updates the minimal readable version kept by pruner.
+    fn testonly_update_min_version(&self, version: Version) {
+        self.min_readable_version.store(version, Ordering::Relaxed)
     }
 }
 

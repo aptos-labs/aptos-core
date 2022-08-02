@@ -12,7 +12,7 @@ use crate::{
     },
     test_helper,
     test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
-    AptosDB, PrunerManager, ROCKSDB_PROPERTIES,
+    AptosDB, ROCKSDB_PROPERTIES,
 };
 use aptos_config::config::StoragePrunerConfig;
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -85,7 +85,7 @@ fn test_too_many_requested() {
 fn test_error_if_version_is_pruned() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let mut state_pruner = StatePrunerManager::new(
+    let state_pruner = StatePrunerManager::new(
         Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
@@ -95,7 +95,7 @@ fn test_error_if_version_is_pruned() {
         },
     );
 
-    let mut ledger_pruner = LedgerPrunerManager::new(
+    let ledger_pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
@@ -104,8 +104,8 @@ fn test_error_if_version_is_pruned() {
             state_store_pruning_batch_size: 1,
         },
     );
-    state_pruner.testonly_update_min_version(Some(5));
-    ledger_pruner.testonly_update_min_version(Some(10));
+    state_pruner.testonly_update_min_version(5);
+    ledger_pruner.testonly_update_min_version(10);
     assert_eq!(
         error_if_version_is_pruned(&state_pruner, "State", 4)
             .unwrap_err()
