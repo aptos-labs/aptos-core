@@ -7,7 +7,6 @@ use std::sync::mpsc::channel;
 use std::sync::Arc;
 
 use aptos_crypto::HashValue;
-use aptos_infallible::Mutex;
 use aptos_temppath::TempPath;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
 use aptos_types::transaction::Version;
@@ -257,15 +256,6 @@ fn test_state_store_pruner_disabled() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let state_store = &aptos_db.state_store;
-    let pruner = StatePrunerManager::new(
-        Arc::clone(&aptos_db.ledger_db),
-        StoragePrunerConfig {
-            state_store_prune_window: None,
-            ledger_prune_window: Some(0),
-            ledger_pruning_batch_size: prune_batch_size,
-            state_store_pruning_batch_size: prune_batch_size,
-        },
-    );
 
     let mut root_hashes = vec![];
     // Insert 25 values in the db.
@@ -281,7 +271,6 @@ fn test_state_store_pruner_disabled() {
 
     // Prune till version=0. This should basically be a no-op
     {
-        pruner.ensure_disabled().unwrap();
         for i in 0..num_versions {
             verify_state_in_store(
                 state_store,
@@ -295,7 +284,6 @@ fn test_state_store_pruner_disabled() {
     // Notify the pruner to update the version to be 10 - since we use a batch size of 10,
     // we expect versions 0 to 9 to be pruned.
     {
-        pruner.ensure_disabled().unwrap();
         for i in 0..prune_batch_size {
             assert!(state_store
                 .get_state_value_with_proof_by_version(&key, i as u64)
@@ -346,10 +334,10 @@ fn test_worker_quit_eagerly() {
 
     {
         let (command_sender, command_receiver) = channel();
+        let state_pruner = utils::create_state_pruner(Arc::clone(&aptos_db.state_merkle_db));
         let worker = StatePrunerWorker::new(
-            Arc::clone(&aptos_db.state_merkle_db),
+            state_pruner,
             command_receiver,
-            Arc::new(Mutex::new(Some(0))), /* progress */
             StoragePrunerConfig {
                 state_store_prune_window: Some(1),
                 ledger_prune_window: Some(1),
@@ -359,12 +347,12 @@ fn test_worker_quit_eagerly() {
         );
         command_sender
             .send(db_pruner::Command::Prune {
-                target_db_version: Some(1),
+                target_db_version: 1,
             })
             .unwrap();
         command_sender
             .send(db_pruner::Command::Prune {
-                target_db_version: Some(2),
+                target_db_version: 2,
             })
             .unwrap();
         command_sender.send(db_pruner::Command::Quit).unwrap();

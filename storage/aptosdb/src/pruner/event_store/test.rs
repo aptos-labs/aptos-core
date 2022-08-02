@@ -102,15 +102,6 @@ fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
     let event_store = &aptos_db.event_store;
     let mut cs = ChangeSet::new();
     let num_versions = events.len();
-    let pruner = LedgerPrunerManager::new(
-        Arc::clone(&aptos_db.ledger_db),
-        StoragePrunerConfig {
-            state_store_prune_window: Some(0),
-            ledger_prune_window: None,
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 100,
-        },
-    );
 
     // Write events to DB
     for (version, events_for_version) in events.iter().enumerate() {
@@ -122,7 +113,6 @@ fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
 
     // Verify no pruning has happened.
     for _i in (0..=num_versions).step_by(2) {
-        pruner.ensure_disabled().unwrap();
         // ensure that all events up to i * 2 are valid in DB
         for version in 0..num_versions {
             verify_events_in_store(&events, version as u64, event_store);
