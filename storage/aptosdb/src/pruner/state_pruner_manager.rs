@@ -21,30 +21,34 @@ use std::{
 };
 
 use crate::pruner::db_pruner;
+use crate::pruner::db_pruner::DBPruner;
 use crate::pruner::state_pruner_worker::StatePrunerWorker;
+use crate::pruner::state_store::StateStorePruner;
+use crate::utils;
 
 /// The `Pruner` is meant to be part of a `AptosDB` instance and runs in the background to prune old
 /// data.
 ///
-/// It creates a worker thread on construction and joins it on destruction. When destructed, it
-/// quits the worker thread eagerly without waiting for all pending work to be done.
+/// If the state pruner is enabled, it creates a worker thread on construction and joins it on
+/// destruction. When destructed, it quits the worker thread eagerly without waiting for all
+/// pending work to be done.
 #[derive(Debug)]
 pub struct StatePrunerManager {
     /// DB version window, which dictates how many versions of state store
     /// to keep.
     prune_window: Option<Version>,
+    /// State pruner. Is always initialized regardless if the pruner is enabled to keep tracks
+    /// of the min_readable_version.
+    pruner: Arc<StateStorePruner>,
     /// The worker thread handle for state_pruner, created upon Pruner instance construction and
-    /// joined upon its destruction. It only becomes `None` after joined in `drop()`.
+    /// joined upon its destruction. It is `None` when state pruner is not enabled or it only
+    /// becomes `None` after joined in `drop()`.
     worker_thread: Option<JoinHandle<()>>,
-    /// The sender side of the channel talking to the state pruner worker thread.
-    command_sender: Mutex<Sender<db_pruner::Command>>,
-    /// A way for the worker thread to inform the `Pruner` the pruning progress. If it
-    /// sets value to `V`, all versions before `V` can no longer be accessed. This is protected by
-    /// Mutex as this is accessed both by the Pruner thread and the worker thread.
-    #[allow(dead_code)]
-    min_readable_version: Arc<Mutex<Option<Version>>>,
+    /// The sender side of the channel talking to the state pruner worker thread. Is `None` when the
+    /// state pruner is not enabled.
+    command_sender: Option<Mutex<Sender<db_pruner::Command>>>,
     /// We send a batch of version to the underlying pruners for performance reason. This tracks the
-    /// last version we sent to the pruners.
+    /// last version we sent to the pruner. Will only be set if the pruner is enabled.
     last_version_sent_to_pruner: Arc<Mutex<Version>>,
     /// latest version
     latest_version: Arc<Mutex<Version>>,
@@ -55,8 +59,8 @@ impl PrunerManager for StatePrunerManager {
         self.prune_window
     }
 
-    fn get_min_readable_version(&self) -> Option<Version> {
-        self.min_readable_version.lock().map(|x| x)
+    fn get_min_readable_version(&self) -> Version {
+        self.pruner.as_ref().min_readable_version()
     }
 
     /// Sends pruning command to the worker thread when necessary.
@@ -64,15 +68,21 @@ impl PrunerManager for StatePrunerManager {
         *self.latest_version.lock() = latest_version;
 
         // Always wake up the state pruner.
-        self.wake_pruner(latest_version);
-        *self.last_version_sent_to_pruner.as_ref().lock() = latest_version;
+        if self.prune_window.is_some() {
+            self.wake_pruner(latest_version);
+            *self.last_version_sent_to_pruner.as_ref().lock() = latest_version;
+        }
     }
 
     fn wake_pruner(&self, latest_version: Version) {
+        assert!(self.prune_window.is_some());
+        assert!(self.command_sender.is_some());
         self.command_sender
+            .as_ref()
+            .unwrap()
             .lock()
             .send(db_pruner::Command::Prune {
-                target_db_version: self.prune_window.map(|x| latest_version.saturating_sub(x)),
+                target_db_version: latest_version.saturating_sub(self.prune_window.unwrap()),
             })
             .expect("Receiver should not destruct prematurely.");
     }
@@ -97,7 +107,10 @@ impl PrunerManager for StatePrunerManager {
             let end = Instant::now() + TIMEOUT;
 
             while Instant::now() < end {
-                if self.min_readable_version.lock().unwrap() >= min_readable_state_store_version {
+                if self.get_min_readable_version() >= min_readable_state_store_version {
+                    // A hack to make sure the items have been removed from DB as we update the
+                    // min_readable_version before finishing deleting items from DB.
+                    sleep(Duration::from_millis(100));
                     return Ok(());
                 }
                 sleep(Duration::from_millis(1));
@@ -106,32 +119,13 @@ impl PrunerManager for StatePrunerManager {
         }
         Ok(())
     }
-
-    /// (For tests only.) Ensure a pruner is disabled.
-    #[cfg(test)]
-    fn ensure_disabled(&self) -> anyhow::Result<()> {
-        assert!(self.min_readable_version.lock().is_none());
-        Ok(())
-    }
-
-    /// (For tests only.) Updates the minimal readable version kept by pruner.
-    #[cfg(test)]
-    fn testonly_update_min_version(&mut self, version: Option<Version>) {
-        self.min_readable_version = Arc::new(Mutex::new(version));
-    }
 }
 
 impl StatePrunerManager {
     /// Creates a worker thread that waits on a channel for pruning commands.
     pub fn new(state_merkle_rocksdb: Arc<DB>, storage_pruner_config: StoragePrunerConfig) -> Self {
-        let (state_pruner_command_sender, state_pruner_command_receiver) = channel();
-
-        let state_pruner_min_readable_version = Arc::new(Mutex::new(
-            storage_pruner_config.state_store_prune_window.map(|_| 0),
-        ));
-
-        let state_pruner_min_readable_version_clone =
-            Arc::clone(&state_pruner_min_readable_version);
+        let state_db_clone = Arc::clone(&state_merkle_rocksdb);
+        let state_pruner = utils::create_state_pruner(state_db_clone);
 
         PRUNER_WINDOW
             .with_label_values(&["state_pruner"])
@@ -141,39 +135,58 @@ impl StatePrunerManager {
             .with_label_values(&["state_store_pruner"])
             .set(storage_pruner_config.state_store_pruning_batch_size as i64);
 
-        let state_pruner_worker = StatePrunerWorker::new(
-            state_merkle_rocksdb,
-            state_pruner_command_receiver,
-            state_pruner_min_readable_version,
-            storage_pruner_config,
-        );
+        let mut command_sender = None;
 
-        let state_pruner_worker_thread = std::thread::Builder::new()
-            .name("aptosdb_state_pruner".into())
-            .spawn(move || state_pruner_worker.work())
-            .expect("Creating state pruner thread should succeed.");
+        let state_pruner_worker_thread = if storage_pruner_config.state_store_prune_window.is_some()
+        {
+            let (state_pruner_command_sender, state_pruner_command_receiver) = channel();
+            command_sender = Some(Mutex::new(state_pruner_command_sender));
+            let state_pruner_worker = StatePrunerWorker::new(
+                Arc::clone(&state_pruner),
+                state_pruner_command_receiver,
+                storage_pruner_config,
+            );
+            Some(
+                std::thread::Builder::new()
+                    .name("aptosdb_state_pruner".into())
+                    .spawn(move || state_pruner_worker.work())
+                    .expect("Creating state pruner thread should succeed."),
+            )
+        } else {
+            None
+        };
 
+        let min_readable_version = state_pruner.as_ref().min_readable_version();
         Self {
             prune_window: storage_pruner_config.state_store_prune_window,
-            worker_thread: Some(state_pruner_worker_thread),
-            command_sender: Mutex::new(state_pruner_command_sender),
-            min_readable_version: state_pruner_min_readable_version_clone,
-            last_version_sent_to_pruner: Arc::new(Mutex::new(0)),
-            latest_version: Arc::new(Mutex::new(0)),
+            pruner: state_pruner,
+            worker_thread: state_pruner_worker_thread,
+            command_sender,
+            last_version_sent_to_pruner: Arc::new(Mutex::new(min_readable_version)),
+            latest_version: Arc::new(Mutex::new(min_readable_version)),
         }
+    }
+
+    #[cfg(test)]
+    pub fn testonly_update_min_version(&self, version: Version) {
+        self.pruner.testonly_update_min_version(version);
     }
 }
 
 impl Drop for StatePrunerManager {
     fn drop(&mut self) {
-        self.command_sender
-            .lock()
-            .send(db_pruner::Command::Quit)
-            .expect("State pruner receiver should not destruct.");
-        self.worker_thread
-            .take()
-            .expect("State pruner worker thread must exist.")
-            .join()
-            .expect("State pruner worker thread should join peacefully.");
+        if let Some(command_sender) = &self.command_sender {
+            command_sender
+                .lock()
+                .send(db_pruner::Command::Quit)
+                .expect("State pruner receiver should not destruct.");
+        }
+        if self.worker_thread.is_some() {
+            self.worker_thread
+                .take()
+                .expect("Ledger pruner worker thread must exist.")
+                .join()
+                .expect("Ledger pruner worker thread should join peacefully.");
+        }
     }
 }
