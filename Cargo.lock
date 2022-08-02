@@ -2993,7 +2993,7 @@ dependencies = [
  "move-deps",
  "project-root",
  "proptest",
- "serde 1.0.137",
+ "serde 1.0.141",
 ]
 
 [[package]]
