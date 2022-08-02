@@ -185,15 +185,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # more file descriptors for heavy txn generation
     ulimit -n 1048576
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 1500 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
-=======
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 --avg-tps 400 \
->>>>>>> 176c75e66c (Fix thershold for local)
-=======
     cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
->>>>>>> eeddd00f62 (Fix threshold for local)
         --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD --duration-secs $FORGE_RUNNER_DURATION_SECS  \
         test k8s-swarm \
         --image-tag $IMAGE_TAG \
@@ -222,6 +214,8 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
 
     sed -e "s/{FORGE_POD_NAME}/${FORGE_POD_NAME}/g" \
         -e "s/{FORGE_TEST_SUITE}/${FORGE_TEST_SUITE}/g" \
+        -e "s/{FORGE_RUNNER_DURATION_SECS}/${FORGE_RUNNER_DURATION_SECS}/g" \
+        -e "s/{FORGE_RUNNER_TPS_THRESHOLD}/${FORGE_RUNNER_TPS_THRESHOLD}/g" \
         -e "s/{IMAGE_TAG}/${IMAGE_TAG}/g" \
         -e "s/{AWS_ACCOUNT_NUM}/${AWS_ACCOUNT_NUM}/g" \
         -e "s/{AWS_REGION}/${AWS_REGION}/g" \
