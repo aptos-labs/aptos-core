@@ -1,8 +1,10 @@
+import isEqual from "lodash/isEqual";
+
 import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
-import { Types } from "./types";
+import * as TokenTypes from "./token_types";
+import * as Gen from "./generated/index";
 import { HexString, MaybeHexString } from "./hex_string";
-import { TokenDataId } from "./api/data-contracts";
 
 const NUMBER_MAX: number = 9007199254740991;
 /**
@@ -25,7 +27,7 @@ export class TokenClient {
    * @param payload Transaction payload. It depends on transaction type you want to send
    * @returns Promise that resolves to transaction hash
    */
-  async submitTransactionHelper(account: AptosAccount, payload: Types.TransactionPayload) {
+  async submitTransactionHelper(account: AptosAccount, payload: Gen.TransactionPayload) {
     const txnRequest = await this.aptosClient.generateTransaction(account.address(), payload, {
       max_gas_amount: "4000",
     });
@@ -43,15 +45,16 @@ export class TokenClient {
    * @param uri URL to additional info about collection
    * @returns A hash of transaction
    */
-  async createCollection(
-    account: AptosAccount,
-    name: string,
-    description: string,
-    uri: string,
-  ): Promise<Types.HexEncodedBytes> {
-    const payload: Types.TransactionPayload = {
+  async createCollection(account: AptosAccount, name: string, description: string, uri: string): Promise<string> {
+    const payload: Gen.TransactionPayload = {
       type: "script_function_payload",
-      function: "0x3::token::create_collection_script",
+      function: {
+        module: {
+          address: "0x3",
+          name: "token",
+        },
+        name: "create_collection_script",
+      },
       type_arguments: [],
       arguments: [
         Buffer.from(name).toString("hex"),
@@ -94,10 +97,16 @@ export class TokenClient {
     property_keys: Array<string> = [],
     property_values: Array<string> = [],
     property_types: Array<string> = [],
-  ): Promise<Types.HexEncodedBytes> {
-    const payload: Types.TransactionPayload = {
+  ): Promise<Gen.HexEncodedBytes> {
+    const payload: Gen.TransactionPayload = {
       type: "script_function_payload",
-      function: "0x3::token::create_token_script",
+      function: {
+        module: {
+          address: "0x3",
+          name: "token",
+        },
+        name: "create_token_script",
+      },
       type_arguments: [],
       arguments: [
         Buffer.from(collectionName).toString("hex"),
@@ -122,8 +131,8 @@ export class TokenClient {
   /**
    * Transfers specified amount of tokens from account to receiver
    * @param account AptosAccount where token from which tokens will be transfered
-   * @param receiver  Hex-encoded 16 bytes Aptos account address to which tokens will be transfered
-   * @param creator Hex-encoded 16 bytes Aptos account address to which created tokens
+   * @param receiver  Hex-encoded 32 byte Aptos account address to which tokens will be transfered
+   * @param creator Hex-encoded 32 byte Aptos account address to which created tokens
    * @param collectionName Name of collection where token is stored
    * @param name Token name
    * @param amount Amount of tokens which will be transfered
@@ -138,10 +147,16 @@ export class TokenClient {
     name: string,
     amount: number,
     property_version: number = 0,
-  ): Promise<Types.HexEncodedBytes> {
-    const payload: Types.TransactionPayload = {
+  ): Promise<string> {
+    const payload: Gen.TransactionPayload = {
       type: "script_function_payload",
-      function: "0x3::token_transfers::offer_script",
+      function: {
+        module: {
+          address: "0x3",
+          name: "token_transfers",
+        },
+        name: "offer_script",
+      },
       type_arguments: [],
       arguments: [
         receiver,
@@ -159,8 +174,8 @@ export class TokenClient {
   /**
    * Claims a token on specified account
    * @param account AptosAccount which will claim token
-   * @param sender Hex-encoded 16 bytes Aptos account address which holds a token
-   * @param creator Hex-encoded 16 bytes Aptos account address which created a token
+   * @param sender Hex-encoded 32 byte Aptos account address which holds a token
+   * @param creator Hex-encoded 32 byte Aptos account address which created a token
    * @param collectionName Name of collection where token is stored
    * @param name Token name
    * @param property_version the version of token PropertyMap with a default value 0.
@@ -173,10 +188,16 @@ export class TokenClient {
     collectionName: string,
     name: string,
     property_version: number = 0,
-  ): Promise<Types.HexEncodedBytes> {
-    const payload: Types.TransactionPayload = {
+  ): Promise<string> {
+    const payload: Gen.TransactionPayload = {
       type: "script_function_payload",
-      function: "0x3::token_transfers::claim_script",
+      function: {
+        module: {
+          address: "0x3",
+          name: "token_transfers",
+        },
+        name: "claim_script",
+      },
       type_arguments: [],
       arguments: [
         sender,
@@ -193,8 +214,8 @@ export class TokenClient {
   /**
    * Removes a token from pending claims list
    * @param account AptosAccount which will remove token from pending list
-   * @param receiver Hex-encoded 16 bytes Aptos account address which had to claim token
-   * @param creator Hex-encoded 16 bytes Aptos account address which created a token
+   * @param receiver Hex-encoded 32 byte Aptos account address which had to claim token
+   * @param creator Hex-encoded 32 byte Aptos account address which created a token
    * @param collectionName Name of collection where token is strored
    * @param name Token name
    * @param property_version the version of token PropertyMap with a default value 0.
@@ -207,10 +228,16 @@ export class TokenClient {
     collectionName: string,
     name: string,
     property_version: number = 0,
-  ): Promise<Types.HexEncodedBytes> {
-    const payload: Types.TransactionPayload = {
+  ): Promise<string> {
+    const payload: Gen.TransactionPayload = {
       type: "script_function_payload",
-      function: "0x3::token_transfers::cancel_offer_script",
+      function: {
+        module: {
+          address: "0x3",
+          name: "token_transfers",
+        },
+        name: "cancel_offer_script",
+      },
       type_arguments: [],
       arguments: [
         receiver,
@@ -226,7 +253,7 @@ export class TokenClient {
 
   /**
    * Queries collection data
-   * @param creator Hex-encoded 16 bytes Aptos account address which created a collection
+   * @param creator Hex-encoded 32 byte Aptos account address which created a collection
    * @param collectionName Collection name
    * @returns Collection data in below format
    * ```
@@ -246,9 +273,16 @@ export class TokenClient {
    */
   async getCollectionData(creator: MaybeHexString, collectionName: string): Promise<any> {
     const resources = await this.aptosClient.getAccountResources(creator);
-    const accountResource: { type: string; data: any } = resources.find((r) => r.type === "0x3::token::Collections");
+    const accountResource: { type: Gen.MoveStructTag; data: any } = resources.find((r) =>
+      isEqual(r.type, {
+        address: "0x3",
+        module: "token",
+        name: "Collections",
+        generic_type_params: [],
+      }),
+    )!;
     const { handle }: { handle: string } = accountResource.data.collection_data;
-    const getCollectionTableItemRequest: Types.TableItemRequest = {
+    const getCollectionTableItemRequest: Gen.TableItemRequest = {
       key_type: "0x1::string::String",
       value_type: "0x3::token::CollectionData",
       key: Buffer.from(collectionName).toString("hex"),
@@ -260,7 +294,7 @@ export class TokenClient {
 
   /**
    * Queries token data from collection
-   * @param creator Hex-encoded 16 bytes Aptos account address which created a token
+   * @param creator Hex-encoded 32 byte Aptos account address which created a token
    * @param collectionName Name of collection, which holds a token
    * @param tokenName Token name
    * @returns Token data in below format
@@ -281,11 +315,17 @@ export class TokenClient {
    *   }
    * ```
    */
-  async getTokenData(creator: MaybeHexString, collectionName: string, tokenName: string): Promise<Types.TokenData> {
-    const collection: { type: string; data: any } = await this.aptosClient.getAccountResource(
-      creator,
-      "0x3::token::Collections",
-    );
+  async getTokenData(
+    creator: MaybeHexString,
+    collectionName: string,
+    tokenName: string,
+  ): Promise<TokenTypes.TokenData> {
+    const collection: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(creator, {
+      address: "0x3",
+      module: "token",
+      name: "Collections",
+      generic_type_params: [],
+    });
     const { handle } = collection.data.token_data;
     const tokenDataId = {
       creator,
@@ -293,14 +333,15 @@ export class TokenClient {
       name: Buffer.from(tokenName).toString("hex"),
     };
 
-    const getTokenTableItemRequest: Types.TableItemRequest = {
+    const getTokenTableItemRequest: Gen.TableItemRequest = {
       key_type: "0x3::token::TokenDataId",
       value_type: "0x3::token::TokenData",
       key: tokenDataId,
     };
 
-    const tableItem = await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
-    return tableItem.data;
+    // We know the response will be a struct containing TokenData, hence the
+    // implicit cast.
+    return this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
   }
 
   /**
@@ -311,8 +352,8 @@ export class TokenClient {
     collectionName: string,
     tokenName: string,
     property_version: string = "0",
-  ): Promise<Types.Token> {
-    const tokenDataId: TokenDataId = {
+  ): Promise<TokenTypes.Token> {
+    const tokenDataId: TokenTypes.TokenDataId = {
       creator: creator instanceof HexString ? creator.hex() : creator,
       collection: Buffer.from(collectionName).toString("hex"),
       name: Buffer.from(tokenName).toString("hex"),
@@ -324,10 +365,12 @@ export class TokenClient {
   }
 
   /**
+   * TODO: What does this mean? Is it more like getTokenBalanceInAccount?
    * Queries token balance for a token account
-   * @param account Hex-encoded 16 bytes Aptos account address which created a token
+   * @param account Hex-encoded 32 byte Aptos account address which created a token
    * @param tokenId token id
    *
+   * TODO: Update this:
    * @example
    * ```
    * {
@@ -344,20 +387,21 @@ export class TokenClient {
    * }
    * ```
    */
-  async getTokenBalanceForAccount(account: MaybeHexString, tokenId: Types.TokenId): Promise<Types.Token> {
-    const tokenStore: { type: string; data: any } = await this.aptosClient.getAccountResource(
-      account,
-      "0x3::token::TokenStore",
-    );
+  async getTokenBalanceForAccount(account: MaybeHexString, tokenId: TokenTypes.TokenId): Promise<TokenTypes.Token> {
+    const tokenStore: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(account, {
+      address: "0x3",
+      module: "token",
+      name: "TokenStore",
+      generic_type_params: [],
+    });
     const { handle } = tokenStore.data.tokens;
 
-    const getTokenTableItemRequest: Types.TableItemRequest = {
+    const getTokenTableItemRequest: Gen.TableItemRequest = {
       key_type: "0x3::token::TokenId",
       value_type: "0x3::token::Token",
       key: tokenId,
     };
 
-    const tableItem = await this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
-    return tableItem.data;
+    return this.aptosClient.getTableItem(handle, getTokenTableItemRequest);
   }
 }
