@@ -223,12 +223,12 @@ async fn test_bcs_account() {
     let mut context = new_test_context(current_function_name!());
     let resp = context.get_bcs("/accounts/0x1").await;
 
-    context.check_golden_output_bcs(resp.clone());
-
     // Ensure we can deserialize the type
     let account: AccountResource =
         bcs::from_bytes(&resp).expect("Can't deserialize account resource");
-    assert_eq!(account.address(), AccountAddress::ONE)
+    assert_eq!(account.address(), AccountAddress::ONE);
+
+    context.check_golden_output_bcs(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -236,14 +236,14 @@ async fn test_bcs_account_resources() {
     let mut context = new_test_context(current_function_name!());
     let resp = context.get_bcs(&account_resources("0x1")).await;
 
-    context.check_golden_output_bcs(resp.clone());
-
     // Ensure we can deserialize the type
     let resources: Vec<(StructTag, &[u8])> =
         bcs::from_bytes(&resp).expect("Can't deserialize account resources");
     assert!(resources.len() > 1);
     let resource = resources.first().unwrap();
     assert!(resource.1.len() > 1);
+
+    context.check_golden_output_bcs(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -251,12 +251,12 @@ async fn test_bcs_account_modules() {
     let mut context = new_test_context(current_function_name!());
     let resp = context.get_bcs(&account_modules("0x1")).await;
 
-    context.check_golden_output_bcs(resp.clone());
-
     // Ensure we can deserialize the type
     let modules: Vec<Vec<u8>> = bcs::from_bytes(&resp).expect("Can't deserialize account modules");
     assert!(modules.len() > 1);
     assert!(modules.first().unwrap().len() > 1);
+
+    context.check_golden_output_bcs(resp);
 }
 
 fn account_resources(address: &str) -> String {

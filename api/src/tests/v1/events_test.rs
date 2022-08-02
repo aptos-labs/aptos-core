@@ -4,6 +4,7 @@
 use super::new_test_context;
 use crate::current_function_name;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use aptos_types::contract_event::ContractEvent;
 
 static EVENT_KEY: &str =
     "0x0500000000000000000000000000000000000000000000000000000000000000000000000a550c18";
@@ -15,6 +16,17 @@ async fn test_get_events() {
     let resp = context.get(format!("/events/{}", EVENT_KEY).as_str()).await;
 
     context.check_golden_output(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_get_events_bcs() {
+    let mut context = new_test_context(current_function_name!());
+
+    let resp = context.get_bcs(format!("/events/{}", EVENT_KEY).as_str()).await;
+
+    let _events: Vec<ContractEvent> = bcs::from_bytes(&resp).expect("Can't deserialize events");
+
+    context.check_golden_output_bcs(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
