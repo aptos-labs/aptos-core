@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::cmp::Ordering;
+
 use consensus_types::common::{Author, Round};
 use fallible::copy_from_slice::copy_slice_to_vec;
 
@@ -18,12 +20,47 @@ pub trait ProposerElection {
     fn get_valid_proposer(&self, round: Round) -> Author;
 }
 
-// next continuously mutates a state and returns a u64-index
-pub(crate) fn next(state: &mut Vec<u8>) -> u64 {
-    // state = SHA-3-256(state)
-    *state = aptos_crypto::HashValue::sha3_256_of(state).to_vec();
+// next consumes seed and returns random deterministic u64 value in [0, max) range
+fn next_in_range(state: Vec<u8>, max: u64) -> u64 {
+    // hash = SHA-3-256(state)
+    let hash = aptos_crypto::HashValue::sha3_256_of(&state).to_vec();
     let mut temp = [0u8; 8];
-    copy_slice_to_vec(&state[..8], &mut temp).expect("next failed");
-    // return state[0..8]
-    u64::from_le_bytes(temp)
+    copy_slice_to_vec(&hash[..8], &mut temp).expect("next failed");
+    // return hash[0..8]
+    u64::from_le_bytes(temp) % max
+}
+
+// chose index randomly, with given weight distribution
+pub(crate) fn choose_index(mut weights: Vec<u64>, state: Vec<u8>) -> usize {
+    let mut total_weight = 0;
+    // Create cumulative weights vector
+    // Since we own the vector, we can safely modify it in place
+    for w in &mut weights {
+        total_weight += *w;
+        *w = total_weight;
+    }
+    let chosen_weight = next_in_range(state, total_weight);
+    weights
+        .binary_search_by(|w| {
+            if *w <= chosen_weight {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        })
+        .unwrap_err()
+}
+
+#[test]
+fn test_bounds() {
+    // check that bounds are correct, and both first and last weight can be selected.
+    let mut selected = [0, 0];
+    let weights = [1, 1].to_vec();
+    // 10 is enough to get one of each.
+    for i in 0..10 {
+        selected[choose_index(weights.clone(), (i as i32).to_le_bytes().to_vec())] += 1;
+    }
+
+    assert!(selected[0] >= 1);
+    assert!(selected[1] >= 1);
 }

@@ -6,7 +6,7 @@ use crate::{
         COMMITTED_PROPOSALS_IN_WINDOW, COMMITTED_VOTES_IN_WINDOW, FAILED_PROPOSALS_IN_WINDOW,
         LEADER_REPUTATION_ROUND_HISTORY_SIZE,
     },
-    liveness::proposer_election::{next, ProposerElection},
+    liveness::proposer_election::{choose_index, ProposerElection},
 };
 use aptos_infallible::{Mutex, MutexGuard};
 use aptos_logger::prelude::*;
@@ -461,6 +461,7 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
 pub struct LeaderReputation {
     epoch: u64,
     proposers: Vec<Author>,
+    voting_powers: Vec<u64>,
     backend: Box<dyn MetadataBackend>,
     heuristic: Box<dyn ReputationHeuristic>,
     exclude_round: u64,
@@ -470,6 +471,7 @@ impl LeaderReputation {
     pub fn new(
         epoch: u64,
         proposers: Vec<Author>,
+        voting_powers: Vec<u64>,
         backend: Box<dyn MetadataBackend>,
         heuristic: Box<dyn ReputationHeuristic>,
         exclude_round: u64,
@@ -480,10 +482,12 @@ impl LeaderReputation {
                 .map(|o| o != Ordering::Greater)
                 .unwrap_or(false)
         }));
+        assert_eq!(proposers.len(), voting_powers.len());
 
         Self {
             epoch,
             proposers,
+            voting_powers,
             backend,
             heuristic,
             exclude_round,
@@ -499,22 +503,17 @@ impl ProposerElection for LeaderReputation {
             .heuristic
             .get_weights(self.epoch, &self.proposers, &sliding_window);
         assert_eq!(weights.len(), self.proposers.len());
-        let mut total_weight = 0;
-        for w in &mut weights {
-            total_weight += *w;
-            *w = total_weight;
-        }
-        let mut state = round.to_le_bytes().to_vec();
-        let chosen_weight = next(&mut state) % total_weight;
-        let chosen_index = weights
-            .binary_search_by(|w| {
-                if *w <= chosen_weight {
-                    Ordering::Less
-                } else {
-                    Ordering::Greater
-                }
-            })
-            .unwrap_err();
+        // Multiply weights by voting power:
+        weights
+            .iter_mut()
+            .enumerate()
+            .for_each(|(i, w)| *w *= self.voting_powers[i]);
+
+        let state = [self.epoch.to_le_bytes(), round.to_le_bytes()]
+            .concat()
+            .to_vec();
+
+        let chosen_index = choose_index(weights, state);
         self.proposers[chosen_index]
     }
 }
