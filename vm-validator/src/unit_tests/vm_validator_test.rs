@@ -18,6 +18,7 @@ use move_deps::move_core_types::{
     gas_schedule::{GasAlgebra, GasConstants},
 };
 use rand::SeedableRng;
+use storage_interface::state_view::LatestDbStateCheckpointView;
 use storage_interface::DbReaderWriter;
 
 const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 262144;
@@ -202,15 +203,20 @@ fn test_validate_max_gas_units_below_min() {
 fn test_get_account_sequence_number() {
     let vm_validator = TestValidator::new();
     let root_address = account_config::aptos_root_address();
+    let state_view = vm_validator
+        .vm_validator
+        .db_reader
+        .latest_state_checkpoint_view()
+        .unwrap();
     assert_eq!(
-        get_account_sequence_number(vm_validator.vm_validator.db_reader.clone(), root_address,)
+        get_account_sequence_number(&state_view, root_address,)
             .unwrap()
             .min_seq(),
         0
     );
     assert_eq!(
         get_account_sequence_number(
-            vm_validator.vm_validator.db_reader,
+            &state_view,
             AccountAddress::new([5u8; AccountAddress::LENGTH]),
         )
         .unwrap()
