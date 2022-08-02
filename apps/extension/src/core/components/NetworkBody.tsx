@@ -70,7 +70,9 @@ export default function NetworkBody() {
             return (
               <NetworkListItem
                 key={network.value}
-                isDisabled={network.value === nodeUrlMap.Localhost && !localTestnetIsLive}
+                isDisabled={(
+                  network.value === nodeUrlMap.Localhost && !localTestnetIsLive)
+                  || network.value === nodeUrlMap.Testnet}
                 isLoading={!isLoading}
                 {...radio}
                 value={network.value}
