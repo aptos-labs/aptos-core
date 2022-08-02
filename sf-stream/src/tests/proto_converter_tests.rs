@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    current_function_name,
     protos::extractor::{
         transaction::{TransactionType, Txn_data},
         transaction_payload::{Payload, PayloadType},
@@ -24,11 +23,11 @@ use std::{convert::TryInto, path::PathBuf};
 
 #[tokio::test]
 async fn test_genesis_works() {
-    let test_context = new_test_context(current_function_name!(), 0);
+    let test_context = new_test_context(0);
 
     let context = Arc::new(test_context.context);
     let mut streamer = SfStreamer::new(context, 0, None);
-    let converted = streamer.batch_convert_once(10).await;
+    let converted = streamer.batch_convert(10).await;
 
     // position 0 should be genesis
     let txn = converted.first().unwrap().clone();
@@ -45,7 +44,7 @@ async fn test_genesis_works() {
 
 #[tokio::test]
 async fn test_block_transactions_work() {
-    let mut test_context = new_test_context(current_function_name!(), 0);
+    let mut test_context = new_test_context(0);
 
     // create user transactions
     let account = test_context.gen_account();
@@ -56,13 +55,13 @@ async fn test_block_transactions_work() {
     let mut streamer = SfStreamer::new(context, 0, None);
 
     // emulating real stream, getting first block
-    let converted_0 = streamer.batch_convert_once(1).await;
+    let converted_0 = streamer.batch_convert(1).await;
     let txn = converted_0.first().unwrap().clone();
     assert_eq!(txn.version, 0);
     assert_eq!(txn.type_.unwrap(), TransactionType::GENESIS);
 
     // getting second block
-    let converted_1 = streamer.batch_convert_once(3).await;
+    let converted_1 = streamer.batch_convert(3).await;
     // block metadata expected
     let txn = converted_1[0].clone();
     assert_eq!(txn.version, 1);
@@ -99,7 +98,7 @@ async fn test_block_height_and_ts_work() {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    let mut test_context = new_test_context(current_function_name!(), start_ts);
+    let mut test_context = new_test_context(start_ts);
 
     // Creating 2 blocks w/ user transactions and 1 empty block
     let mut root_account = test_context.root_account();
@@ -127,7 +126,7 @@ async fn test_block_height_and_ts_work() {
     let context = Arc::new(test_context.clone().context);
     let mut streamer = SfStreamer::new(context, 0, None);
 
-    let converted = streamer.batch_convert_once(100).await;
+    let converted = streamer.batch_convert(100).await;
     // Making sure that version - block height mapping is correct and that version is in order
     for (i, txn) in converted.iter().enumerate() {
         assert_eq!(txn.version as usize, i);
@@ -147,7 +146,7 @@ async fn test_block_height_and_ts_work() {
 
 #[tokio::test]
 async fn test_table_item_parsing_works() {
-    let mut test_context = new_test_context(current_function_name!(), 0);
+    let mut test_context = new_test_context(0);
     let ctx = &mut test_context;
     let mut account = ctx.gen_account();
     let acc = &mut account;
@@ -169,7 +168,7 @@ async fn test_table_item_parsing_works() {
     let context = Arc::new(test_context.clone().context);
     let mut streamer = SfStreamer::new(context, 0, None);
 
-    let converted = streamer.batch_convert_once(100).await;
+    let converted = streamer.batch_convert(100).await;
     let mut table_kv: HashMap<String, String> = HashMap::new();
     for parsed_txn in converted {
         if parsed_txn.type_.unwrap() != TransactionType::USER {
