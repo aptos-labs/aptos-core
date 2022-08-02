@@ -72,10 +72,20 @@ impl SfStreamer {
         let latest = context.get_latest_ledger_info().unwrap();
         let block_info = context
             .get_block_info(starting_version, latest.ledger_version.0)
-            .unwrap();
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Could not get block_info for starting version {} and ledger_version {}",
+                    starting_version, latest.ledger_version.0
+                )
+            });
         let starting_tnx = context
             .get_transaction_by_version(block_info.start_version, latest.ledger_version.0)
-            .unwrap();
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Could not get starting_tnx for starting version {} and ledger_version {}",
+                    starting_version, latest.ledger_version.0
+                )
+            });
 
         let (version, epoch) = match starting_tnx.transaction {
             aptos_types::transaction::Transaction::BlockMetadata(bmt) => {
@@ -158,12 +168,22 @@ impl SfStreamer {
                     let timestamp = self
                         .context
                         .get_block_timestamp(onchain_txn.version)
-                        .unwrap();
+                        .unwrap_or_else(|_| {
+                            panic!(
+                                "Could not get timestamp for version {}",
+                                onchain_txn.version
+                            )
+                        });
                     let txn = self
                         .resolver
                         .as_converter(self.context.db.clone())
                         .try_into_onchain_transaction(timestamp, onchain_txn)
-                        .unwrap();
+                        .unwrap_or_else(|e| {
+                            panic!(
+                                "Could not convert onchain transaction version {} into transaction: {:?}",
+                                txn_version, e
+                            )
+                        });
 
                     let txn_proto = self.convert_transaction(txn);
                     self.print_transaction(&txn_proto).await;
@@ -195,7 +215,12 @@ impl SfStreamer {
     }
 
     pub async fn print_transaction(&self, transaction: &extractor::Transaction) {
-        let pb_b64 = &base64::encode(transaction.write_to_bytes().unwrap());
+        let pb_b64 = &base64::encode(transaction.write_to_bytes().unwrap_or_else(|_| {
+            panic!(
+                "Could not convert protobuf transaction to bytes '{:?}'",
+                transaction
+            )
+        }));
         println!("DMLOG TRX {}", pb_b64);
         metrics::TRANSACTIONS_SENT.inc();
     }
