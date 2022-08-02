@@ -31,7 +31,7 @@ jobs:
         with:
           node-version-file: .node-version
 
-      - run: docker run --rm -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos node run-local-testnet --with-faucet 
+      - run: docker run -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos node run-local-testnet --with-faucet 
 
       # Run package install, test, build
       - run: cd ./ecosystem/typescript/sdk && yarn install
