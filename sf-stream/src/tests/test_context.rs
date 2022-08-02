@@ -25,17 +25,17 @@ use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
 use aptos_api::{context::Context, index};
-use aptos_api_types::{HexEncodedBytes};
+use aptos_api_types::HexEncodedBytes;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use bytes::Bytes;
 use hyper::Response;
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc};
+use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc, time::Duration};
 use vm_validator::vm_validator::VMValidator;
 
-pub fn new_test_context(fake_start_time: u64) -> TestContext {
+pub fn new_test_context(fake_start_time_usecs: u64) -> TestContext {
     let tmp_dir = TempPath::new();
     tmp_dir.create_as_dir().unwrap();
 
@@ -78,7 +78,7 @@ pub fn new_test_context(fake_start_time: u64) -> TestContext {
         Box::new(BlockExecutor::<AptosVM>::new(db_rw)),
         mempool,
         db,
-        fake_start_time,
+        fake_start_time_usecs,
     )
 }
 
@@ -92,7 +92,7 @@ pub struct TestContext {
     root_key: ConfigKey<Ed25519PrivateKey>,
     executor: Arc<dyn BlockExecutorTrait>,
     expect_status_code: u16,
-    fake_time: u64,
+    fake_time_usecs: u64,
 }
 
 impl TestContext {
@@ -104,7 +104,7 @@ impl TestContext {
         executor: Box<dyn BlockExecutorTrait>,
         mempool: MockSharedMempool,
         db: Arc<AptosDB>,
-        fake_time: u64,
+        fake_time_usecs: u64,
     ) -> Self {
         Self {
             context,
@@ -115,7 +115,7 @@ impl TestContext {
             mempool: Arc::new(mempool),
             expect_status_code: 200,
             db,
-            fake_time,
+            fake_time_usecs,
         }
     }
     pub fn rng(&mut self) -> &mut rand::rngs::StdRng {
@@ -217,8 +217,8 @@ impl TestContext {
     fn new_block_metadata(&mut self) -> BlockMetadata {
         let round = 1;
         let id = HashValue::random_with_rng(&mut self.rng);
-        self.fake_time += 1;
-        let timestamp = self.fake_time;
+        // incrementing half a second every time
+        self.fake_time_usecs += (Duration::from_secs(1).as_micros() / 2) as u64;
         BlockMetadata::new(
             id,
             0,
@@ -226,7 +226,7 @@ impl TestContext {
             vec![false],
             self.validator_owner,
             vec![],
-            timestamp,
+            self.fake_time_usecs,
         )
     }
 
