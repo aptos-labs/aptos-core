@@ -8,7 +8,7 @@ pub mod context;
 mod events;
 mod failpoint;
 mod health_check;
-mod index;
+pub mod index;
 pub mod log;
 pub mod metrics;
 mod page;
