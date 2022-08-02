@@ -280,7 +280,7 @@ impl LocalSwarm {
         Err(anyhow!("Launching Swarm timed out"))
     }
 
-    pub async fn add_validator_fullnode(
+    pub fn add_validator_fullnode(
         &mut self,
         version: &Version,
         template: NodeConfig,
@@ -467,6 +467,15 @@ impl Swarm for LocalSwarm {
 
     fn remove_validator(&mut self, _id: PeerId) -> Result<()> {
         todo!()
+    }
+
+    fn add_validator_full_node(
+        &mut self,
+        version: &Version,
+        template: NodeConfig,
+        id: PeerId,
+    ) -> Result<PeerId> {
+        self.add_validator_fullnode(version, template, id)
     }
 
     fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
