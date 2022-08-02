@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path_cache::AccessPathCache, move_vm_ext::MoveResolverExt,
+    access_path_cache::AccessPathCache,
+    delta_ext::{ChangeSetExt, DeltaChangeSet},
+    move_vm_ext::MoveResolverExt,
     transaction_metadata::TransactionMetadata,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -10,9 +12,8 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
     block_metadata::BlockMetadata,
     contract_event::ContractEvent,
-    delta_change_set::DeltaChangeSet,
     state_store::state_key::StateKey,
-    transaction::{ChangeSet, ChangeSetExt, SignatureCheckedTransaction},
+    transaction::{ChangeSet, SignatureCheckedTransaction},
     write_set::{WriteOp, WriteSetMut},
 };
 use move_deps::{

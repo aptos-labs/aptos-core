@@ -12,7 +12,6 @@ module aptos_framework::account {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
-    use aptos_framework::transaction_publishing_option;
 
     friend aptos_framework::coins;
     friend aptos_framework::genesis;
@@ -40,7 +39,6 @@ module aptos_framework::account {
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
         writeset_epilogue_name: vector<u8>,
-        currency_code_required: bool,
     }
 
     struct SignerCapability has drop, store { account: address }
@@ -106,7 +104,6 @@ module aptos_framework::account {
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
         writeset_epilogue_name: vector<u8>,
-        currency_code_required: bool,
     ) {
         system_addresses::assert_aptos_framework(account);
 
@@ -119,7 +116,6 @@ module aptos_framework::account {
             multi_agent_prologue_name,
             user_epilogue_name,
             writeset_epilogue_name,
-            currency_code_required,
         });
     }
 
@@ -262,7 +258,6 @@ module aptos_framework::account {
         txn_expiration_time: u64,
         chain_id: u8,
     ) acquires Account {
-        assert!(transaction_publishing_option::is_module_allowed(), error::invalid_state(PROLOGUE_EMODULE_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
@@ -274,9 +269,8 @@ module aptos_framework::account {
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
         chain_id: u8,
-        script_hash: vector<u8>,
+        _script_hash: vector<u8>,
     ) acquires Account {
-        assert!(transaction_publishing_option::is_script_allowed(&script_hash), error::invalid_state(PROLOGUE_ESCRIPT_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 

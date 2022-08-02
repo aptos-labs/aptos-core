@@ -2,12 +2,12 @@ import * as Nacl from "tweetnacl";
 import * as SHA3 from "js-sha3";
 import { Buffer } from "buffer/"; // the trailing slash is important!
 import { HexString, MaybeHexString } from "./hex_string";
-import { Types } from "./types";
+import * as Gen from "./generated/index";
 
 export interface AptosAccountObject {
-  address?: string;
-  publicKeyHex?: Types.HexEncodedBytes;
-  privateKeyHex: Types.HexEncodedBytes;
+  address?: Gen.HexEncodedBytes;
+  publicKeyHex?: Gen.HexEncodedBytes;
+  privateKeyHex: Gen.HexEncodedBytes;
 }
 
 /**

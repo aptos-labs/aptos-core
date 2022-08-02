@@ -122,10 +122,14 @@ proptest! {
 
     #[test]
     fn test_restore_with_interruption(
-        (all, batch1_size) in arb_btree_map(2)
+        (all, batch1_size, overlap_size) in arb_btree_map(2)
             .prop_flat_map(|btree| {
                 let len = btree.len();
                 (Just(btree), 1..len)
+            })
+            .prop_flat_map(|(btree, batch1_size)| {
+                // n.b. overlap needs to be at least 1, because the last leaf is not frozen
+                (Just(btree), Just(batch1_size), (1..=batch1_size))
             })
     ) {
         let (db, version) = init_mock_store(&all.clone().into_iter().map(|(_, kv)| kv).collect());
@@ -145,18 +149,7 @@ proptest! {
         }
 
         {
-            let rightmost_key = match restore_db.get_rightmost_leaf().unwrap() {
-                None => {
-                    // Sometimes the batch is too small so nothing is written to DB.
-                    return Ok(());
-                }
-                Some((_, node)) => node.account_key(),
-            };
-            let remaining_accounts: Vec<_> = all
-                .clone()
-                .into_iter()
-                .filter(|(k, _)| *k > rightmost_key)
-                .collect();
+            let remaining_accounts: Vec<_> = all.clone().into_iter().skip(batch1_size - overlap_size).collect();
 
             let mut restore =
                 StateSnapshotRestore::new(&restore_db, &restore_db,  version, expected_root_hash ).unwrap();

@@ -1,10 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::{
-    on_chain_config::VMPublishingOption,
-    transaction::{ExecutionStatus, TransactionStatus},
-};
+use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
 use language_e2e_tests::{
     account::Account, compile::compile_module, current_function_name, executor::FakeExecutor,
     transaction_status_eq,
@@ -14,7 +11,7 @@ use move_deps::move_core_types::vm_status::StatusCode;
 // A module with an address different from the sender's address should be rejected
 #[test]
 fn bad_module_address() {
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.
@@ -69,7 +66,7 @@ macro_rules! module_republish_test {
     ($name:ident, $prog1:literal, $prog2:literal) => {
         #[test]
         fn $name() {
-            let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+            let mut executor = FakeExecutor::from_genesis_file();
             executor.set_golden_file(current_function_name!());
 
             let sequence_number = 2;
@@ -263,7 +260,7 @@ module_republish_test!(
 #[test]
 pub fn test_publishing_modules_proper_sender() {
     // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::allowlist_genesis();
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.
@@ -293,7 +290,7 @@ pub fn test_publishing_modules_proper_sender() {
 #[test]
 pub fn test_publishing_modules_invalid_sender() {
     // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::allowlist_genesis();
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.
@@ -326,7 +323,7 @@ pub fn test_publishing_modules_invalid_sender() {
 #[test]
 pub fn test_publishing_allow_modules() {
     // create a FakeExecutor with a genesis from file
-    let mut executor = FakeExecutor::from_genesis_with_options(VMPublishingOption::open());
+    let mut executor = FakeExecutor::from_genesis_file();
     executor.set_golden_file(current_function_name!());
 
     // create a transaction trying to publish a new module.

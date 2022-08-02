@@ -1,6 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-
+#![allow(clippy::extra_unused_lifetimes)]
 use crate::{models::events::Event, schema::tokens};
 use aptos_rest_client::types;
 use std::{collections::HashMap, fmt, fmt::Formatter, str::FromStr};
@@ -110,6 +110,7 @@ pub struct DepositEventType {
 pub struct CreationEventType {
     pub id: TokenId,
     pub token_data: TokenData,
+    pub initial_balance: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

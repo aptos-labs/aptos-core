@@ -884,7 +884,7 @@ impl Transfer {
 
                 // Check that the currency is supported
                 // TODO: in future use currency, since there's more than just 1
-                let _ = is_native_coin(&withdraw_amount.currency)?;
+                is_native_coin(&withdraw_amount.currency)?;
 
                 let withdraw_value = i64::from_str(&withdraw_amount.value).map_err(|_| {
                     ApiError::InvalidTransferOperations(Some("Withdraw amount is invalid"))

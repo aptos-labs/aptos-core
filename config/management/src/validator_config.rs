@@ -5,22 +5,12 @@ use crate::{
     config::{Config, ConfigPath},
     error::Error,
     secure_backend::ValidatorBackend,
-    storage::to_x25519,
-    transaction::build_raw_transaction,
-};
-use aptos_config::config::HANDSHAKE_VERSION;
-use aptos_crypto::{bls12381, PrivateKey};
-use aptos_global_constants::{
-    CONSENSUS_KEY, FULLNODE_NETWORK_KEY, OPERATOR_ACCOUNT, OPERATOR_KEY, OWNER_ACCOUNT,
-    VALIDATOR_NETWORK_KEY,
 };
 use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
-use aptos_transaction_builder::aptos_stdlib as transaction_builder;
 use aptos_types::{
-    account_address::AccountAddress,
     chain_id::ChainId,
     network_address::{NetworkAddress, Protocol},
-    transaction::{SignedTransaction, Transaction},
+    transaction::Transaction,
 };
 use core::str::FromStr;
 use std::net::{Ipv4Addr, ToSocketAddrs};
@@ -82,81 +72,15 @@ impl ValidatorConfig {
 /// * OPERATOR_ACCOUNT
 /// * OPERATOR_KEY
 pub fn build_validator_config_transaction<S: KVStorage + CryptoStorage>(
-    validator_storage: S,
-    chain_id: ChainId,
-    sequence_number: u64,
-    fullnode_address: NetworkAddress,
-    validator_address: NetworkAddress,
-    reconfigure: bool,
-    disable_address_validation: bool,
+    _validator_storage: S,
+    _chain_id: ChainId,
+    _sequence_number: u64,
+    _fullnode_address: NetworkAddress,
+    _validator_address: NetworkAddress,
+    _reconfigure: bool,
+    _disable_address_validation: bool,
 ) -> anyhow::Result<Transaction> {
-    if !disable_address_validation {
-        // Verify addresses
-        validate_address("validator address", &validator_address)?;
-        validate_address("fullnode address", &fullnode_address)?;
-    }
-
-    let owner_account = validator_storage
-        .get::<AccountAddress>(OWNER_ACCOUNT)
-        .map(|v| v.value)?;
-    let operator_account = validator_storage
-        .get::<AccountAddress>(OPERATOR_ACCOUNT)
-        .map(|v| v.value)?;
-
-    let consensus_key = validator_storage
-        .get::<bls12381::PrivateKey>(CONSENSUS_KEY)
-        .map(|v| v.value)?
-        .public_key();
-    let fullnode_network_key = validator_storage
-        .get_public_key(FULLNODE_NETWORK_KEY)
-        .map(|v| v.public_key)
-        .map_err(|e| Error::UnexpectedError(e.to_string()))
-        .and_then(to_x25519)?;
-    let validator_network_key = validator_storage
-        .get_public_key(VALIDATOR_NETWORK_KEY)
-        .map(|v| v.public_key)
-        .map_err(|e| Error::UnexpectedError(e.to_string()))
-        .and_then(to_x25519)?;
-
-    // Build Validator address including protocols and encryption
-    // Append noise-ik and handshake protocols to base network addresses
-    // and encrypt the validator address.
-    let validator_address =
-        validator_address.append_prod_protos(validator_network_key, HANDSHAKE_VERSION);
-
-    // Build Fullnode address including protocols
-    let fullnode_address =
-        fullnode_address.append_prod_protos(fullnode_network_key, HANDSHAKE_VERSION);
-
-    // Generate the validator config script
-    let transaction_callback = if reconfigure {
-        transaction_builder::validator_set_script_set_validator_config_and_reconfigure
-    } else {
-        transaction_builder::validator_set_script_register_validator_config
-    };
-    let validator_config_script = transaction_callback(
-        owner_account,
-        consensus_key.to_bytes().to_vec(),
-        bcs::to_bytes(&vec![validator_address]).unwrap(),
-        bcs::to_bytes(&vec![fullnode_address]).unwrap(),
-    )
-    .into_script_function();
-
-    // Create and sign the validator-config transaction
-    let raw_txn = build_raw_transaction(
-        chain_id,
-        operator_account,
-        sequence_number,
-        validator_config_script,
-    );
-    let public_key = validator_storage
-        .get_public_key(OPERATOR_KEY)
-        .map(|v| v.public_key)?;
-    let signature = validator_storage.sign(OPERATOR_KEY, &raw_txn)?;
-    let signed_txn = SignedTransaction::new(raw_txn, public_key, signature);
-    let txn = Transaction::UserTransaction(signed_txn);
-
-    Ok(txn)
+    unimplemented!();
 }
 
 /// Validates an address to have a DNS/IP and a port, as well as to be resolvable

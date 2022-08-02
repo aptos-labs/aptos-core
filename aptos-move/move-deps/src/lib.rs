@@ -15,6 +15,7 @@ pub use move_ir_compiler;
 pub use move_model;
 pub use move_package;
 pub use move_prover;
+pub use move_prover_test_utils;
 pub use move_resource_viewer;
 pub use move_stackless_bytecode_interpreter;
 pub use move_stdlib;

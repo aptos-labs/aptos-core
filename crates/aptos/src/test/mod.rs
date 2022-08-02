@@ -1,10 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::init::InitTool;
-use crate::common::types::{
-    account_address_from_public_key, EncodingOptions, FaucetOptions, PromptOptions, RngArgs,
-};
+use crate::common::types::{account_address_from_public_key, FaucetOptions};
 use crate::node::{
     AddStake, IncreaseLockup, JoinValidatorSet, LeaveValidatorSet, OperatorArgs,
     RegisterValidatorCandidate, ShowValidatorConfig, ShowValidatorSet, ShowValidatorStake,
@@ -17,7 +14,13 @@ use crate::{
         list::{ListAccount, ListQuery},
         transfer::{TransferCoins, TransferSummary},
     },
-    common::types::{CliTypedResult, PrivateKeyInputOptions, RestOptions, TransactionOptions},
+    common::{
+        init::InitTool,
+        types::{
+            CliTypedResult, EncodingOptions, PrivateKeyInputOptions, PromptOptions, RestOptions,
+            RngArgs, TransactionOptions,
+        },
+    },
     CliCommand,
 };
 use aptos_crypto::ed25519::Ed25519PrivateKey;
@@ -49,21 +52,36 @@ impl CliTestFramework {
         };
         let mut keygen = KeyGen::from_seed([9; 32]);
 
-        for i in 0..num_accounts {
-            // Can't use the init command because the config causes flakiness multithreaded
-            let private_key = keygen.generate_ed25519_private_key();
-            framework.add_private_key(private_key);
+        // TODO: Make this allow a passed in random seed
+        for _ in 0..num_accounts {
             framework
-                .create_account_with_faucet(i)
+                .add_cli_account(keygen.generate_ed25519_private_key())
                 .await
-                .expect("Should create account");
+                .unwrap();
         }
 
         framework
     }
 
-    pub fn add_private_key(&mut self, private_key: Ed25519PrivateKey) {
+    pub async fn add_cli_account(
+        &mut self,
+        private_key: Ed25519PrivateKey,
+    ) -> CliTypedResult<usize> {
+        let index = self.add_private_key(private_key);
+
+        // Create account if it doesn't exist (and there's a faucet)
+        let client = aptos_rest_client::Client::new(self.endpoint.clone());
+        let address = self.account_id(index);
+        if client.get_account(address).await.is_err() {
+            self.fund_account(index).await?;
+        }
+
+        Ok(index)
+    }
+
+    pub fn add_private_key(&mut self, private_key: Ed25519PrivateKey) -> usize {
         self.account_keys.push(private_key);
+        self.account_keys.len() - 1
     }
 
     pub async fn create_account(
@@ -94,7 +112,7 @@ impl CliTestFramework {
             account: self.account_id(index),
             use_faucet: true,
             faucet_options: self.faucet_options(),
-            initial_coins: DEFAULT_FUNDED_COINS,
+            initial_coins: 0,
         }
         .execute()
         .await
@@ -128,22 +146,20 @@ impl CliTestFramework {
         receiver_index: usize,
         amount: u64,
     ) -> CliTypedResult<TransferSummary> {
-        let receiver_account = self.account_id(receiver_index);
-
         TransferCoins {
             txn_options: self.transaction_options(sender_index),
-            account: receiver_account,
+            account: self.account_id(receiver_index),
             amount,
         }
         .execute()
         .await
     }
 
-    pub async fn show_validator_config(&self) -> CliTypedResult<ValidatorConfig> {
+    pub async fn show_validator_config(&self, index: usize) -> CliTypedResult<ValidatorConfig> {
         ShowValidatorConfig {
             rest_options: self.rest_options(),
             profile_options: Default::default(),
-            operator_args: OperatorArgs { pool_address: None },
+            operator_args: self.operator_args(index),
         }
         .execute()
         .await
@@ -160,11 +176,11 @@ impl CliTestFramework {
         .map(|v| to_validator_set(&v))
     }
 
-    pub async fn show_validator_stake(&self) -> CliTypedResult<Value> {
+    pub async fn show_validator_stake(&self, index: usize) -> CliTypedResult<Value> {
         ShowValidatorStake {
             rest_options: self.rest_options(),
             profile_options: Default::default(),
-            operator_args: OperatorArgs { pool_address: None },
+            operator_args: self.operator_args(index),
         }
         .execute()
         .await
@@ -212,9 +228,10 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn withdraw_stake(&self, index: usize) -> CliTypedResult<Transaction> {
+    pub async fn withdraw_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
         WithdrawStake {
             node_op_options: self.transaction_options(index),
+            amount,
         }
         .execute()
         .await
@@ -236,7 +253,7 @@ impl CliTestFramework {
     pub async fn join_validator_set(&self, index: usize) -> CliTypedResult<Transaction> {
         JoinValidatorSet {
             txn_options: self.transaction_options(index),
-            operator_args: OperatorArgs { pool_address: None },
+            operator_args: self.operator_args(index),
         }
         .execute()
         .await
@@ -245,7 +262,7 @@ impl CliTestFramework {
     pub async fn leave_validator_set(&self, index: usize) -> CliTypedResult<Transaction> {
         LeaveValidatorSet {
             txn_options: self.transaction_options(index),
-            operator_args: OperatorArgs { pool_address: None },
+            operator_args: self.operator_args(index),
         }
         .execute()
         .await
@@ -259,7 +276,7 @@ impl CliTestFramework {
     ) -> CliTypedResult<Transaction> {
         UpdateValidatorNetworkAddresses {
             txn_options: self.transaction_options(index),
-            operator_args: OperatorArgs { pool_address: None },
+            operator_args: self.operator_args(index),
             validator_config_args: ValidatorConfigArgs {
                 validator_config_file: None,
                 consensus_public_key: None,
@@ -361,6 +378,12 @@ impl CliTestFramework {
                 .unwrap(),
             rest_options: self.rest_options(),
             ..Default::default()
+        }
+    }
+
+    fn operator_args(&self, index: usize) -> OperatorArgs {
+        OperatorArgs {
+            pool_address: Some(self.account_id(index)),
         }
     }
 

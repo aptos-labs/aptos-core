@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
-use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn};
+use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{
@@ -73,107 +73,74 @@ impl AsRef<Path> for SwarmDirectory {
     }
 }
 
-pub struct LocalSwarmBuilder {
+#[derive(Debug)]
+pub struct LocalSwarm {
+    node_name_counter: u64,
+    genesis: Transaction,
+    genesis_waypoint: Waypoint,
     versions: Arc<HashMap<Version, LocalVersion>>,
-    initial_version: Option<Version>,
-    template: NodeConfig,
-    init_config: Option<InitConfigFn>,
-    number_of_validators: NonZeroUsize,
-    dir: Option<PathBuf>,
-    genesis_modules: Option<Vec<Vec<u8>>>,
-    min_price_per_gas_unit: u64,
+    validators: HashMap<PeerId, LocalNode>,
+    fullnodes: HashMap<PeerId, LocalNode>,
+    dir: SwarmDirectory,
+    root_account: LocalAccount,
+    chain_id: ChainId,
+    root_key: ConfigKey<Ed25519PrivateKey>,
+
+    launched: bool,
 }
 
-impl LocalSwarmBuilder {
-    pub fn new(versions: Arc<HashMap<Version, LocalVersion>>) -> Self {
-        Self {
-            versions,
-            initial_version: None,
-            template: NodeConfig::default_for_validator(),
-            init_config: None,
-            number_of_validators: NonZeroUsize::new(1).unwrap(),
-            dir: None,
-            genesis_modules: None,
-            min_price_per_gas_unit: 1,
-        }
-    }
-
-    pub fn initial_version(mut self, initial_version: Version) -> Self {
-        self.initial_version = Some(initial_version);
-        self
-    }
-
-    pub fn template(mut self, template: NodeConfig) -> Self {
-        self.template = template;
-        self
-    }
-
-    pub fn with_init_config(mut self, init_config: Option<InitConfigFn>) -> Self {
-        self.init_config = init_config;
-        self
-    }
-
-    pub fn number_of_validators(mut self, number_of_validators: NonZeroUsize) -> Self {
-        self.number_of_validators = number_of_validators;
-        self
-    }
-
-    pub fn dir<T: AsRef<Path>>(mut self, dir: T) -> Self {
-        self.dir = Some(dir.as_ref().into());
-        self
-    }
-
-    pub fn genesis_modules(mut self, genesis_modules: Vec<Vec<u8>>) -> Self {
-        self.genesis_modules = Some(genesis_modules);
-        self
-    }
-
-    pub fn min_price_per_gas_unit(mut self, min_price_per_gas_unit: u64) -> Self {
-        self.min_price_per_gas_unit = min_price_per_gas_unit;
-        self
-    }
-
-    pub fn build<R>(mut self, rng: R) -> Result<LocalSwarm>
+impl LocalSwarm {
+    pub fn build<R>(
+        rng: R,
+        number_of_validators: NonZeroUsize,
+        versions: Arc<HashMap<Version, LocalVersion>>,
+        initial_version: Option<Version>,
+        init_config: Option<InitConfigFn>,
+        init_genesis_config: Option<InitGenesisConfigFn>,
+        dir: Option<PathBuf>,
+        genesis_modules: Option<Vec<Vec<u8>>>,
+    ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
         println!("Building a new swarm");
-        let dir = if let Some(dir) = self.dir {
-            if dir.exists() {
-                fs::remove_dir_all(&dir)?;
+        let dir_actual = if let Some(dir_) = dir {
+            if dir_.exists() {
+                fs::remove_dir_all(&dir_)?;
             }
-            fs::create_dir_all(&dir)?;
-            SwarmDirectory::Persistent(dir)
+            fs::create_dir_all(&dir_)?;
+            SwarmDirectory::Persistent(dir_)
         } else {
             SwarmDirectory::Temporary(TempDir::new()?)
         };
 
-        // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
-        // which cause flakiness in tests.
-        if self.number_of_validators.get() == 1 {
-            // this delays empty block by (30-1) * 30ms
-            self.template.consensus.quorum_store_poll_count = 30;
-        }
-
         let (root_key, genesis, genesis_waypoint, validators) =
             aptos_genesis::builder::Builder::new(
-                &dir,
-                self.genesis_modules
+                &dir_actual,
+                genesis_modules
                     .unwrap_or_else(|| cached_framework_packages::module_blobs().to_vec()),
             )?
-            .with_num_validators(self.number_of_validators)
-            .with_template(self.template)
-            .with_init_config(self.init_config)
-            .with_min_price_per_gas_unit(self.min_price_per_gas_unit)
-            .with_min_lockup_duration_secs(0)
-            .with_max_lockup_duration_secs(86400)
-            .with_initial_lockup_timestamp(0)
+            .with_num_validators(number_of_validators)
+            .with_init_config(Some(Arc::new(
+                move |index, config, genesis_stake_amount| {
+                    // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
+                    // which cause flakiness in tests.
+                    if number_of_validators.get() == 1 {
+                        // this delays empty block by (30-1) * 30ms
+                        config.consensus.quorum_store_poll_count = 30;
+                    }
+
+                    if let Some(init_config) = &init_config {
+                        (init_config)(index, config, genesis_stake_amount);
+                    }
+                },
+            )))
+            .with_init_genesis_config(init_genesis_config)
             .build(rng)?;
 
         // Get the initial version to start the nodes with, either the one provided or fallback to
         // using the the latest version
-        let versions = self.versions;
-        let initial_version = self.initial_version.unwrap_or_else(|| {
+        let initial_version_actual = initial_version.unwrap_or_else(|| {
             versions
                 .iter()
                 .max_by(|v1, v2| v1.0.cmp(v2.0))
@@ -181,7 +148,7 @@ impl LocalSwarmBuilder {
                 .0
                 .clone()
         });
-        let version = versions.get(&initial_version).unwrap();
+        let version = versions.get(&initial_version_actual).unwrap();
 
         let validators = validators
             .into_iter()
@@ -204,34 +171,12 @@ impl LocalSwarmBuilder {
             versions,
             validators,
             fullnodes: HashMap::new(),
-            dir,
+            dir: dir_actual,
             root_account,
             chain_id: ChainId::test(),
             root_key,
             launched: false,
         })
-    }
-}
-
-#[derive(Debug)]
-pub struct LocalSwarm {
-    node_name_counter: u64,
-    genesis: Transaction,
-    genesis_waypoint: Waypoint,
-    versions: Arc<HashMap<Version, LocalVersion>>,
-    validators: HashMap<PeerId, LocalNode>,
-    fullnodes: HashMap<PeerId, LocalNode>,
-    dir: SwarmDirectory,
-    root_account: LocalAccount,
-    chain_id: ChainId,
-    root_key: ConfigKey<Ed25519PrivateKey>,
-
-    launched: bool,
-}
-
-impl LocalSwarm {
-    pub fn builder(versions: Arc<HashMap<Version, LocalVersion>>) -> LocalSwarmBuilder {
-        LocalSwarmBuilder::new(versions)
     }
 
     pub async fn launch(&mut self) -> Result<()> {

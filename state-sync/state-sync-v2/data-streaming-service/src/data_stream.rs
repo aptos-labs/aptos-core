@@ -465,7 +465,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
             self.insert_notification_response_mapping(notification_id, response_context)?;
 
             // Send the notification along the stream
-            debug!(
+            trace!(
                 (LogSchema::new(LogEntry::StreamNotification)
                     .stream_id(self.data_stream_id)
                     .event(LogEvent::Success)

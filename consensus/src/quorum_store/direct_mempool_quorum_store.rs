@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::monitor;
 use crate::quorum_store::counters;
 use anyhow::Result;
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
-use aptos_metrics_core::monitor;
 use aptos_types::transaction::SignedTransaction;
 use consensus_types::{
     common::{Payload, PayloadFilter, TransactionSummary},

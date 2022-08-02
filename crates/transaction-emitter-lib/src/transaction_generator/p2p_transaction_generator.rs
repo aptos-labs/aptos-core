@@ -116,41 +116,44 @@ impl TransactionGenerator for P2PTransactionGenerator {
     fn generate_transactions(
         &mut self,
         accounts: Vec<&mut LocalAccount>,
+        transactions_per_account: usize,
         all_addresses: Arc<Vec<AccountAddress>>,
         invalid_transaction_ratio: usize,
         gas_price: u64,
     ) -> Vec<SignedTransaction> {
-        let mut requests = Vec::with_capacity(accounts.len());
+        let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
         let invalid_size = if invalid_transaction_ratio != 0 {
             // if enable mix invalid tx, at least 1 invalid tx per batch
             max(1, accounts.len() * invalid_transaction_ratio / 100)
         } else {
             0
         };
-        let mut num_valid_tx = accounts.len() - invalid_size;
+        let mut num_valid_tx = transactions_per_account * (accounts.len() - invalid_size);
         for sender in accounts {
-            let receiver = all_addresses
-                .choose(&mut self.rng)
-                .expect("all_addresses can't be empty");
-            let request = if num_valid_tx > 0 {
-                num_valid_tx -= 1;
-                self.gen_single_txn(
-                    sender,
-                    receiver,
-                    self.send_amount,
-                    &self.txn_factory,
-                    gas_price,
-                )
-            } else {
-                self.generate_invalid_transaction(
-                    &mut self.rng.clone(),
-                    sender,
-                    receiver,
-                    gas_price,
-                    &requests,
-                )
-            };
-            requests.push(request);
+            for _ in 0..transactions_per_account {
+                let receiver = all_addresses
+                    .choose(&mut self.rng)
+                    .expect("all_addresses can't be empty");
+                let request = if num_valid_tx > 0 {
+                    num_valid_tx -= 1;
+                    self.gen_single_txn(
+                        sender,
+                        receiver,
+                        self.send_amount,
+                        &self.txn_factory,
+                        gas_price,
+                    )
+                } else {
+                    self.generate_invalid_transaction(
+                        &mut self.rng.clone(),
+                        sender,
+                        receiver,
+                        gas_price,
+                        &requests,
+                    )
+                };
+                requests.push(request);
+            }
         }
         requests
     }

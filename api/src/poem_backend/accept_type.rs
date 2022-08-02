@@ -1,9 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use poem::web::Accept;
-
-use super::{AptosErrorCode, BadRequestError};
+use poem::{http::StatusCode, web::Accept, Error, FromRequest, Request, RequestBody, Result};
 
 #[derive(PartialEq)]
 pub enum AcceptType {
@@ -11,23 +9,29 @@ pub enum AcceptType {
     Bcs,
 }
 
-// TODO: Make this middleware instead, it could do the check and then add data.
+// This impl allows us to get the data straight from the arguments to the
+// endpoint handler.
+#[async_trait::async_trait]
+impl<'a> FromRequest<'a> for AcceptType {
+    async fn from_request(request: &'a Request, _body: &mut RequestBody) -> Result<Self> {
+        let accept = Accept::from_request_without_body(request).await?;
+        parse_accept(&accept)
+    }
+}
 
-// I can't use TryFrom here right now:
-// https://stackoverflow.com/questions/73072492/apply-trait-bounds-to-associated-type
-pub fn parse_accept<E: BadRequestError>(accept: &Accept) -> Result<AcceptType, E> {
+// Check that the accept type is one of the allowed variants. If there is no
+// accept type and nothing explicitly not allowed, default to JSON.
+fn parse_accept(accept: &Accept) -> Result<AcceptType> {
     for mime in &accept.0 {
         match mime.as_ref() {
             "application/json" => return Ok(AcceptType::Json),
             "application/x-bcs" => return Ok(AcceptType::Bcs),
             "*/*" => {}
             wildcard => {
-                // TODO: Consider using 406 instead.
-                return Err(E::bad_request_str(&format!(
-                    "Unsupported Accept type: {:?}",
-                    wildcard
-                ))
-                .error_code(AptosErrorCode::UnsupportedAcceptType));
+                return Err(Error::from_string(
+                    &format!("Unsupported Accept type: {:?}", wildcard),
+                    StatusCode::NOT_ACCEPTABLE,
+                ));
             }
         }
     }

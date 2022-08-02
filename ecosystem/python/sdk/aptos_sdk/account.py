@@ -7,8 +7,8 @@ import json
 import tempfile
 import unittest
 
-import ed25519
-from account_address import AccountAddress
+from . import ed25519
+from .account_address import AccountAddress
 
 
 class Account:

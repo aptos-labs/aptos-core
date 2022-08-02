@@ -320,7 +320,6 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
             io::stdout().flush()?;
             io::stderr().flush()?;
-
             if !summary.success() {
                 println!();
                 println!("Swarm logs can be found here: {}", swarm.logs_location());

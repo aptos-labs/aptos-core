@@ -1794,7 +1794,7 @@ components:
         uri:
           type: string
           description: URL for additional information / media
-    TokenId:
+    TokenDataId:
       type: object
       required:
         - creator
@@ -1810,14 +1810,25 @@ components:
         name:
           type: string
           description: Name of Token
+    TokenId:
+      type: object
+      required:
+        - token_data_id
+        - property_version
+      properties:
+        token_data_id:
+          $ref: '#/components/schemas/TokenDataId'
+        property_version:
+          type: string
+          description: version number of the property map
     Token:
       type: object
       required:
         - id
-        - value
+        - amount
       properties:
         id:
           $ref: '#/components/schemas/TokenId'
-        value:
+        amount:
           type: integer
       

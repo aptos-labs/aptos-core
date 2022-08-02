@@ -20,7 +20,7 @@
             "generic_type_params": []
           },
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "1",
             "new_block_events": {
               "counter": "2",

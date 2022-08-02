@@ -1022,3 +1022,49 @@ fn safety_rules_crash() {
         node.next_proposal().await;
     });
 }
+
+#[test]
+fn echo_timeout() {
+    let mut runtime = consensus_runtime();
+    let mut playground = NetworkPlayground::new(runtime.handle().clone());
+    let mut nodes = NodeSetup::create_nodes(&mut playground, runtime.handle().clone(), 4);
+    runtime.spawn(playground.start());
+    timed_block_on(&mut runtime, async {
+        // clear the message queue
+        for node in &mut nodes {
+            node.next_proposal().await;
+        }
+        // timeout 3 nodes
+        for node in &mut nodes[1..] {
+            node.round_manager
+                .process_local_timeout(1)
+                .await
+                .unwrap_err();
+        }
+        let node_0 = &mut nodes[0];
+        // node 0 doesn't timeout and should echo the timeout after 2 timeout message
+        for i in 0..3 {
+            let timeout_vote = node_0.next_vote().await;
+            let result = node_0.round_manager.process_vote_msg(timeout_vote).await;
+            // first and third message should not timeout
+            if i == 0 || i == 2 {
+                assert!(result.is_ok());
+            }
+            if i == 1 {
+                // timeout is an Error
+                assert!(result.is_err());
+            }
+        }
+
+        let node_1 = &mut nodes[1];
+        // it receives 4 timeout messages (1 from each) and doesn't echo since it already timeout
+        for _ in 0..4 {
+            let timeout_vote = node_1.next_vote().await;
+            node_1
+                .round_manager
+                .process_vote_msg(timeout_vote)
+                .await
+                .unwrap();
+        }
+    });
+}

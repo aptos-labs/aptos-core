@@ -15,7 +15,7 @@ enum FileType {
     Json(PathBuf),
 }
 
-impl<'a> TryFrom<PathBuf> for FileType {
+impl TryFrom<PathBuf> for FileType {
     type Error = anyhow::Error;
 
     fn try_from(path: PathBuf) -> Result<Self> {

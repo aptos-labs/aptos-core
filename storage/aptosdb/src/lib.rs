@@ -49,7 +49,8 @@ use crate::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
         OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, STATE_ITEM_COUNT,
     },
-    pruner::{utils, Pruner, PrunerIndex},
+    pruner::pruner_manager::PrunerManager,
+    pruner::utils,
     schema::*,
     state_store::StateStore,
     system_store::SystemStore,
@@ -104,6 +105,9 @@ use std::{
     thread::JoinHandle,
     time::{Duration, Instant},
 };
+
+use crate::pruner::ledger_pruner_manager::LedgerPrunerManager;
+use crate::pruner::state_pruner_manager::StatePrunerManager;
 use storage_interface::state_view::DbStateView;
 use storage_interface::{
     state_delta::StateDelta, DbReader, DbWriter, ExecutedTrees, Order, StartupInfo,
@@ -167,23 +171,18 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
 }
 
 fn error_if_version_is_pruned(
-    pruner: &Option<Pruner>,
-    pruner_index: PrunerIndex,
+    pruner: &(dyn PrunerManager),
     data_type: &str,
     version: Version,
 ) -> Result<()> {
-    if let Some(pruner) = pruner.as_ref() {
-        if let Some(min_readable_version) =
-            pruner.get_min_readable_version_by_pruner_index(pruner_index)
-        {
-            ensure!(
-                version >= min_readable_version,
-                "{} version {} is pruned, min available version is {}.",
-                data_type,
-                version,
-                min_readable_version
-            );
-        }
+    if let Some(min_readable_version) = pruner.get_min_readable_version() {
+        ensure!(
+            version >= min_readable_version,
+            "{} version {} is pruned, min available version is {}.",
+            data_type,
+            version,
+            min_readable_version
+        );
     }
     Ok(())
 }
@@ -265,7 +264,8 @@ pub struct AptosDB {
     system_store: Arc<SystemStore>,
     transaction_store: Arc<TransactionStore>,
     pruner_config: StoragePrunerConfig,
-    pruner: Option<Pruner>,
+    state_pruner: Option<StatePrunerManager>,
+    ledger_pruner: Option<LedgerPrunerManager>,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
     ledger_commit_lock: std::sync::Mutex<()>,
     indexer: Option<Indexer>,
@@ -282,14 +282,19 @@ impl AptosDB {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
         let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
         let pruner_config = storage_pruner_config;
-        let pruner = if pruner_config.ledger_prune_window.is_none()
-            && pruner_config.state_store_prune_window.is_none()
-        {
+        let state_pruner = if pruner_config.state_store_prune_window.is_none() {
             None
         } else {
-            Some(Pruner::new(
-                Arc::clone(&arc_ledger_rocksdb),
+            Some(StatePrunerManager::new(
                 Arc::clone(&arc_state_merkle_rocksdb),
+                pruner_config,
+            ))
+        };
+        let ledger_pruner = if pruner_config.ledger_prune_window.is_none() {
+            None
+        } else {
+            Some(LedgerPrunerManager::new(
+                Arc::clone(&arc_ledger_rocksdb),
                 pruner_config,
             ))
         };
@@ -308,7 +313,8 @@ impl AptosDB {
             system_store: Arc::new(SystemStore::new(Arc::clone(&arc_ledger_rocksdb))),
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&arc_ledger_rocksdb))),
             pruner_config,
-            pruner,
+            state_pruner,
+            ledger_pruner,
             _rocksdb_property_reporter: RocksdbPropertyReporter::new(
                 Arc::clone(&arc_ledger_rocksdb),
                 Arc::clone(&arc_state_merkle_rocksdb),
@@ -584,12 +590,9 @@ impl AptosDB {
         ledger_version: Version,
         fetch_events: bool,
     ) -> Result<TransactionWithProof> {
-        error_if_version_is_pruned(
-            &self.pruner,
-            PrunerIndex::LedgerPrunerIndex,
-            "Transaction",
-            version,
-        )?;
+        if let Some(ledger_pruner) = &self.ledger_pruner {
+            error_if_version_is_pruned(ledger_pruner, "Transaction", version)?;
+        }
         let proof = self
             .ledger_store
             .get_transaction_info_with_proof(version, ledger_version)?;
@@ -797,7 +800,10 @@ impl AptosDB {
     }
 
     fn wake_pruner(&self, latest_version: Version) {
-        if let Some(pruner) = self.pruner.as_ref() {
+        if let Some(pruner) = self.state_pruner.as_ref() {
+            pruner.maybe_wake_pruner(latest_version)
+        }
+        if let Some(pruner) = self.ledger_pruner.as_ref() {
             pruner.maybe_wake_pruner(latest_version)
         }
     }
@@ -947,13 +953,9 @@ impl DbReader for AptosDB {
             if start_version > ledger_version || limit == 0 {
                 return Ok(TransactionListWithProof::new_empty());
             }
-
-            error_if_version_is_pruned(
-                &self.pruner,
-                PrunerIndex::LedgerPrunerIndex,
-                "Transaction",
-                start_version,
-            )?;
+            if let Some(ledger_pruner) = &self.ledger_pruner {
+                error_if_version_is_pruned(ledger_pruner, "Transaction", start_version)?;
+            }
 
             let limit = std::cmp::min(limit, ledger_version - start_version + 1);
 
@@ -993,9 +995,9 @@ impl DbReader for AptosDB {
     /// Get the first version that txn starts existent.
     fn get_first_txn_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_txn_version", || {
-            if let Some(pruner) = self.pruner.as_ref() {
+            if let Some(pruner) = self.ledger_pruner.as_ref() {
                 // If pruning is enabled, we can get the min readable version from the pruner.
-                Ok(pruner.get_min_readable_ledger_version())
+                Ok(pruner.get_min_readable_version())
             } else {
                 self.transaction_store.get_first_txn_version()
             }
@@ -1005,9 +1007,9 @@ impl DbReader for AptosDB {
     /// Get the first version that write set starts existent.
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_write_set_version", || {
-            if let Some(pruner) = self.pruner.as_ref() {
+            if let Some(pruner) = self.ledger_pruner.as_ref() {
                 // If pruning is enabled, we can get the min readable version from the pruner.
-                Ok(pruner.get_min_readable_ledger_version())
+                Ok(pruner.get_min_readable_version())
             } else {
                 self.transaction_store.get_first_write_set_version()
             }
@@ -1033,12 +1035,9 @@ impl DbReader for AptosDB {
                 return Ok(TransactionOutputListWithProof::new_empty());
             }
 
-            error_if_version_is_pruned(
-                &self.pruner,
-                PrunerIndex::LedgerPrunerIndex,
-                "Transaction",
-                start_version,
-            )?;
+            if let Some(ledger_pruner) = &self.ledger_pruner {
+                error_if_version_is_pruned(ledger_pruner, "Transaction", start_version)?;
+            }
 
             let limit = std::cmp::min(limit, ledger_version - start_version + 1);
 
@@ -1086,12 +1085,9 @@ impl DbReader for AptosDB {
         end_version: Version,
     ) -> Result<Vec<WriteSet>> {
         gauged_api("get_write_sets", || {
-            error_if_version_is_pruned(
-                &self.pruner,
-                PrunerIndex::LedgerPrunerIndex,
-                "Write set",
-                begin_version,
-            )?;
+            if let Some(ledger_pruner) = &self.ledger_pruner {
+                error_if_version_is_pruned(ledger_pruner, "Write set", begin_version)?;
+            }
 
             self.transaction_store
                 .get_write_sets(begin_version, end_version)
@@ -1157,12 +1153,9 @@ impl DbReader for AptosDB {
         version: Version,
     ) -> Result<Option<StateValue>> {
         gauged_api("get_state_value_by_version", || {
-            error_if_version_is_pruned(
-                &self.pruner,
-                PrunerIndex::StateStorePrunerIndex,
-                "State",
-                version,
-            )?;
+            if let Some(state_pruner) = &self.state_pruner {
+                error_if_version_is_pruned(state_pruner, "State", version)?;
+            }
 
             self.state_store
                 .get_state_value_by_version(state_store_key, version)
@@ -1176,12 +1169,9 @@ impl DbReader for AptosDB {
         version: Version,
     ) -> Result<SparseMerkleProof> {
         gauged_api("get_proof_by_version", || {
-            error_if_version_is_pruned(
-                &self.pruner,
-                PrunerIndex::StateStorePrunerIndex,
-                "State",
-                version,
-            )?;
+            if let Some(state_pruner) = &self.state_pruner {
+                error_if_version_is_pruned(state_pruner, "State", version)?;
+            }
 
             self.state_store
                 .get_state_proof_by_version(state_key, version)
@@ -1244,12 +1234,9 @@ impl DbReader for AptosDB {
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         gauged_api("get_state_value_with_proof_by_version", || {
-            error_if_version_is_pruned(
-                &self.pruner,
-                PrunerIndex::StateStorePrunerIndex,
-                "State",
-                version,
-            )?;
+            if let Some(state_pruner) = &self.state_pruner {
+                error_if_version_is_pruned(state_pruner, "State", version)?;
+            }
 
             self.state_store
                 .get_state_value_with_proof_by_version(state_store_key, version)
@@ -1379,8 +1366,8 @@ impl DbReader for AptosDB {
     fn get_state_prune_window(&self) -> Result<Option<usize>> {
         gauged_api("get_state_prune_window", || {
             let mut pruner_window = None;
-            if let Some(pruner) = self.pruner.as_ref() {
-                if let Some(window) = pruner.get_state_store_pruner_window() {
+            if let Some(pruner) = self.state_pruner.as_ref() {
+                if let Some(window) = pruner.get_pruner_window() {
                     pruner_window = Some(window as usize);
                 }
             }
@@ -1391,8 +1378,8 @@ impl DbReader for AptosDB {
     fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
         gauged_api("get_ledger_prune_window", || {
             let mut pruner_window = None;
-            if let Some(pruner) = self.pruner.as_ref() {
-                if let Some(window) = pruner.get_ledger_pruner_window() {
+            if let Some(pruner) = self.ledger_pruner.as_ref() {
+                if let Some(window) = pruner.get_pruner_window() {
                     pruner_window = Some(window as usize);
                 }
             }

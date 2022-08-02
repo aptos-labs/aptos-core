@@ -18,16 +18,26 @@ Currently this is still in development and is unsuitable for directly interfacin
 
 ### Testing
 
+To run all unit tests:
 ```bash
 python3 -m unittest discover -s aptos_sdk/ -p '*.py'
 ```
 
+To run all end-to-end tests:
+```bash
+ln -s `pwd`/aptos_sdk examples/
+python3 aptos_sdk/coin.py
+python3 aptos_sdk/token.py
+```
+
+Note: end-to-end tests rely on [Aptos Devnet](https://aptos.dev/guides/getting-started#aptos-devnet).
+
 ### Autoformatting
 
 ```bash
-find aptos_sdk -type f -name "*.py" | xargs python -m black
-find aptos_sdk -type f -name "*.py" | xargs python -m autoflake -i -r --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports
-find aptos_sdk -type f -name "*.py" | xargs python -m isort
+find aptos_sdk -type f -name "*.py" | xargs python3 -m black
+find aptos_sdk -type f -name "*.py" | xargs python3 -m autoflake -i -r --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports
+find aptos_sdk -type f -name "*.py" | xargs python3 -m isort
 ```
 
 ### Generating types
@@ -42,7 +52,7 @@ Currently the team is moving forward with pure python, but leaves the following 
 ```bash
 npm install  -g @apidevtools/swagger-cli
 swagger-cli bundle --dereference ../../../api/doc/v0/openapi.yaml  -t yaml > openapi.yaml
-python -m openapi_python_client generate --path openapi.yaml
+python3 -m openapi_python_client generate --path openapi.yaml
 mv aptos-dev-api-specification-client/aptos_dev_api_specification_client/ aptos_sdk/openapi
 ```
 

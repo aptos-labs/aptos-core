@@ -1,83 +1,29 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use crate::smoke_test_environment::SwarmBuilder;
 use crate::test_utils::reconfig;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
-use aptos_config::{keys::ConfigKey, utils::get_available_port};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{bls12381, x25519};
-use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
-use aptos_types::{
-    account_config::aptos_root_address, chain_id::ChainId, network_address::DnsName,
-};
-use forge::{LocalSwarm, Node, NodeExt, Swarm};
+use aptos_rest_client::Transaction;
+use aptos_types::network_address::DnsName;
+use forge::{NodeExt, Swarm};
 use std::convert::TryFrom;
-use std::path::PathBuf;
-use tokio::task::JoinHandle;
-
-pub async fn setup_cli_test(
-    num_nodes: usize,
-    num_cli_accounts: usize,
-) -> (LocalSwarm, CliTestFramework, JoinHandle<()>) {
-    let swarm = new_local_swarm_with_aptos(num_nodes).await;
-    let chain_id = swarm.chain_id();
-    let validator = swarm.validators().next().unwrap();
-    let root_key = swarm.root_key();
-    let faucet_port = get_available_port();
-    let faucet = launch_faucet(
-        validator.rest_api_endpoint(),
-        root_key,
-        chain_id,
-        faucet_port,
-    );
-    let faucet_endpoint: reqwest::Url =
-        format!("http://localhost:{}", faucet_port).parse().unwrap();
-    // Connect the operator tool to the node's JSON RPC API
-    let tool = CliTestFramework::new(
-        validator.rest_api_endpoint(),
-        faucet_endpoint,
-        num_cli_accounts,
-    )
-    .await;
-
-    (swarm, tool, faucet)
-}
-
-pub fn launch_faucet(
-    endpoint: reqwest::Url,
-    mint_key: Ed25519PrivateKey,
-    chain_id: ChainId,
-    port: u16,
-) -> JoinHandle<()> {
-    let faucet = FaucetArgs {
-        address: "127.0.0.1".to_string(),
-        port,
-        server_url: endpoint,
-        mint_key_file_path: PathBuf::new(),
-        mint_key: Some(ConfigKey::new(mint_key)),
-        mint_account_address: Some(aptos_root_address()),
-        chain_id,
-        maximum_amount: None,
-        do_not_delegate: true,
-    };
-    tokio::spawn(faucet.run())
-}
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
 
 #[tokio::test]
 async fn test_account_flow() {
-    let (_swarm, cli, _faucet) = setup_cli_test(1, 2).await;
+    let (_swarm, cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .build_with_cli(2)
+        .await;
 
-    assert_eq!(
-        DEFAULT_FUNDED_COINS,
-        cli.wait_for_balance(0, DEFAULT_FUNDED_COINS).await.unwrap()
-    );
-    assert_eq!(
-        DEFAULT_FUNDED_COINS,
-        cli.wait_for_balance(1, DEFAULT_FUNDED_COINS).await.unwrap()
-    );
+    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(0).await.unwrap());
+    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(1).await.unwrap());
 
     // Transfer an amount between the accounts
     let transfer_amount = 100;
@@ -112,7 +58,10 @@ async fn test_account_flow() {
 
 #[tokio::test]
 async fn test_show_validator_set() {
-    let (swarm, cli, _faucet) = setup_cli_test(1, 1).await;
+    let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .build_with_cli(1)
+        .await;
     let validator_set = cli.show_validator_set().await.unwrap();
 
     assert_eq!(1, validator_set.active_validators.len());
@@ -130,13 +79,15 @@ async fn test_show_validator_set() {
 
 #[tokio::test]
 async fn test_register_and_update_validator() {
-    let (mut swarm, mut cli, _faucet) = setup_cli_test(1, 0).await;
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .build_with_cli(0)
+        .await;
     let transaction_factory = swarm.chain_info().transaction_factory();
     let rest_client = swarm.validators().next().unwrap().rest_client();
 
     let mut keygen = KeyGen::from_os_rng();
-    let validator_cli_index = 0;
-    let keys = init_validator_account(&mut cli, &mut keygen, validator_cli_index).await;
+    let (validator_cli_index, keys) = init_validator_account(&mut cli, &mut keygen).await;
     // faucet can make our root LocalAccount sequence number get out of sync.
     swarm
         .chain_info()
@@ -144,7 +95,10 @@ async fn test_register_and_update_validator() {
         .await
         .unwrap();
 
-    assert!(cli.show_validator_config().await.is_err()); // validator not registered yet
+    assert!(cli
+        .show_validator_config(validator_cli_index)
+        .await
+        .is_err()); // validator not registered yet
 
     let port = 1234;
     cli.register_validator_candidate(
@@ -160,7 +114,10 @@ async fn test_register_and_update_validator() {
     .await
     .unwrap();
 
-    let validator_config = cli.show_validator_config().await.unwrap();
+    let validator_config = cli
+        .show_validator_config(validator_cli_index)
+        .await
+        .unwrap();
     assert_eq!(
         validator_config.consensus_public_key,
         keys.consensus_public_key()
@@ -180,7 +137,10 @@ async fn test_register_and_update_validator() {
     .await
     .unwrap();
 
-    let validator_config = cli.show_validator_config().await.unwrap();
+    let validator_config = cli
+        .show_validator_config(validator_cli_index)
+        .await
+        .unwrap();
 
     let address_new = validator_config
         .validator_network_addresses()
@@ -206,6 +166,183 @@ async fn test_register_and_update_validator() {
     assert_eq!(1, validator_set.active_validators.len());
     assert_eq!(0, validator_set.pending_inactive.len());
     assert_eq!(0, validator_set.pending_active.len());
+}
+
+#[tokio::test]
+async fn test_join_and_leave_validator() {
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_i, conf, genesis_stake_amount| {
+            // reduce timeout, as we will have dead node during rounds
+            conf.consensus.round_initial_timeout_ms = 200;
+            conf.consensus.quorum_store_poll_count = 4;
+            *genesis_stake_amount = 100000;
+        }))
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            genesis_config.allow_new_validators = true;
+            genesis_config.epoch_duration_secs = 3600;
+            genesis_config.min_price_per_gas_unit = 0;
+        }))
+        .build_with_cli(0)
+        .await;
+
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    let mut keygen = KeyGen::from_os_rng();
+    let (validator_cli_index, keys) = init_validator_account(&mut cli, &mut keygen).await;
+    let mut gas_used = 0;
+
+    // faucet can make our root LocalAccount sequence number get out of sync.
+    swarm
+        .chain_info()
+        .resync_root_account_seq_num(&rest_client)
+        .await
+        .unwrap();
+
+    let port = 1234;
+    gas_used += get_gas(
+        cli.register_validator_candidate(
+            validator_cli_index,
+            keys.consensus_public_key(),
+            keys.consensus_proof_of_possession(),
+            HostAndPort {
+                host: dns_name("0.0.0.0"),
+                port,
+            },
+            keys.network_public_key(),
+        )
+        .await
+        .unwrap(),
+    );
+
+    assert_validator_set_sizes(&cli, 1, 0, 0).await;
+
+    assert_eq!(
+        DEFAULT_FUNDED_COINS - gas_used,
+        cli.account_balance(validator_cli_index).await.unwrap()
+    );
+
+    let stake_coins = 7;
+    gas_used += get_gas(
+        cli.add_stake(validator_cli_index, stake_coins)
+            .await
+            .unwrap(),
+    );
+
+    assert_eq!(
+        DEFAULT_FUNDED_COINS - stake_coins - gas_used,
+        cli.account_balance(validator_cli_index).await.unwrap()
+    );
+
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await;
+
+    assert_validator_set_sizes(&cli, 1, 0, 0).await;
+
+    let lockup_duration = Duration::from_secs(15);
+    gas_used += get_gas(
+        cli.increase_lockup(validator_cli_index, lockup_duration)
+            .await
+            .unwrap(),
+    );
+
+    let lockup_start = SystemTime::now();
+
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await;
+
+    assert_validator_set_sizes(&cli, 1, 0, 0).await;
+
+    gas_used += get_gas(cli.join_validator_set(validator_cli_index).await.unwrap());
+
+    assert_validator_set_sizes(&cli, 1, 1, 0).await;
+
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await;
+
+    assert_validator_set_sizes(&cli, 2, 0, 0).await;
+
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await;
+
+    gas_used += get_gas(cli.leave_validator_set(validator_cli_index).await.unwrap());
+
+    assert_validator_set_sizes(&cli, 1, 0, 1).await;
+
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await;
+
+    assert_validator_set_sizes(&cli, 1, 0, 0).await;
+
+    assert_eq!(
+        DEFAULT_FUNDED_COINS - stake_coins - gas_used,
+        cli.account_balance(validator_cli_index).await.unwrap()
+    );
+    let unlock_stake = 3;
+
+    // can only check if test was fast enough:
+    let lockup_left = lockup_duration
+        .as_secs()
+        .saturating_sub(lockup_start.elapsed().unwrap().as_secs());
+    // Conservatively expect less to make sure lockup didn't expire.
+    if lockup_left > 2 {
+        // cannot widthdraw before lockup expires.
+        assert!(cli
+            .unlock_stake(validator_cli_index, unlock_stake)
+            .await
+            .is_err());
+
+        // unknown gas used on failed transaction, need to check
+        gas_used = DEFAULT_FUNDED_COINS
+            - stake_coins
+            - cli.account_balance(validator_cli_index).await.unwrap();
+    }
+    // Conservatively wait more
+    let to_wait_for_lockup =
+        (2 + lockup_duration.as_secs()).saturating_sub(lockup_start.elapsed().unwrap().as_secs());
+    if to_wait_for_lockup > 0 {
+        tokio::time::sleep(Duration::from_secs(to_wait_for_lockup)).await;
+    }
+
+    gas_used += get_gas(
+        cli.unlock_stake(validator_cli_index, unlock_stake)
+            .await
+            .unwrap(),
+    );
+
+    let withdraw_stake = 2;
+
+    gas_used += get_gas(
+        cli.withdraw_stake(validator_cli_index, withdraw_stake)
+            .await
+            .unwrap(),
+    );
+
+    assert_eq!(
+        DEFAULT_FUNDED_COINS - stake_coins + withdraw_stake - gas_used,
+        cli.account_balance(validator_cli_index).await.unwrap()
+    );
 }
 
 fn dns_name(addr: &str) -> DnsName {
@@ -235,23 +372,50 @@ impl ValidatorNodeKeys {
 async fn init_validator_account(
     cli: &mut CliTestFramework,
     keygen: &mut KeyGen,
-    validator_cli_index: usize,
-) -> ValidatorNodeKeys {
+) -> (usize, ValidatorNodeKeys) {
     let validator_node_keys = ValidatorNodeKeys {
         account_private_key: keygen.generate_ed25519_private_key(),
         network_private_key: keygen.generate_x25519_private_key().unwrap(),
         consensus_private_key: keygen.generate_bls12381_private_key(),
     };
-    cli.init(&validator_node_keys.account_private_key)
+    let validator_cli_index = cli
+        .add_cli_account(validator_node_keys.account_private_key.clone())
         .await
         .unwrap();
-
-    // Push the private key into the system
-    cli.add_private_key(validator_node_keys.account_private_key.clone());
-
     assert_eq!(
         DEFAULT_FUNDED_COINS,
         cli.account_balance(validator_cli_index).await.unwrap()
     );
-    validator_node_keys
+    (validator_cli_index, validator_node_keys)
+}
+
+async fn assert_validator_set_sizes(
+    cli: &CliTestFramework,
+    active: usize,
+    joining: usize,
+    leaving: usize,
+) {
+    let validator_set = cli.show_validator_set().await.unwrap();
+    assert_eq!(
+        active,
+        validator_set.active_validators.len(),
+        "{:?}",
+        validator_set
+    );
+    assert_eq!(
+        joining,
+        validator_set.pending_active.len(),
+        "{:?}",
+        validator_set
+    );
+    assert_eq!(
+        leaving,
+        validator_set.pending_inactive.len(),
+        "{:?}",
+        validator_set
+    );
+}
+
+fn get_gas(transaction: Transaction) -> u64 {
+    *transaction.transaction_info().unwrap().gas_used.inner()
 }

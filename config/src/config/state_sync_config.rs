@@ -186,7 +186,7 @@ impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
             global_summary_refresh_interval_ms: 50,
-            max_concurrent_requests: 3,
+            max_concurrent_requests: 2,
             max_data_stream_channel_sizes: 1000,
             max_request_retry: 3,
             max_notification_id_mappings: 2000,
@@ -202,6 +202,7 @@ pub struct AptosDataClientConfig {
     pub max_num_in_flight_regular_polls: u64,  // Max num of in-flight polls for regular peers
     pub response_timeout_ms: u64, // Timeout (in milliseconds) when waiting for a response
     pub summary_poll_interval_ms: u64, // Interval (in milliseconds) between data summary polls
+    pub use_compression: bool,    // Whether or not to request compression for incoming data
 }
 
 impl Default for AptosDataClientConfig {
@@ -211,6 +212,7 @@ impl Default for AptosDataClientConfig {
             max_num_in_flight_regular_polls: 10,
             response_timeout_ms: 5000,
             summary_poll_interval_ms: 200,
+            use_compression: true,
         }
     }
 }

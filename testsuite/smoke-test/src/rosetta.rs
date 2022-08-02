@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::aptos_cli::setup_cli_test;
+use crate::smoke_test_environment::SwarmBuilder;
 use anyhow::anyhow;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::{config::ApiConfig, utils::get_available_port};
@@ -29,7 +29,10 @@ pub async fn setup_test(
     num_nodes: usize,
     num_accounts: usize,
 ) -> (LocalSwarm, CliTestFramework, JoinHandle<()>, RosettaClient) {
-    let (swarm, cli, faucet) = setup_cli_test(num_nodes, num_accounts).await;
+    let (swarm, cli, faucet) = SwarmBuilder::new_local(num_nodes)
+        .with_aptos()
+        .build_with_cli(num_accounts)
+        .await;
     let validator = swarm.validators().next().unwrap();
 
     // And the client
@@ -45,6 +48,7 @@ pub async fn setup_test(
         tls_cert_path: None,
         tls_key_path: None,
         content_length_limit: None,
+        failpoints_enabled: false,
     };
 
     // Start the server
@@ -161,6 +165,7 @@ async fn test_account_balance() {
     .await
     .unwrap();
 
+    // TODO: Receive money by faucet
     // TODO: Make a bad transaction, which will cause gas to be spent but no transfer
 }
 

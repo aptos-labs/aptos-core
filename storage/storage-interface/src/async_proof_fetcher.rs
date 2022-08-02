@@ -3,6 +3,7 @@
 
 use crate::{proof_fetcher::ProofFetcher, DbReader};
 
+use crate::metrics::TIMER;
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
@@ -57,6 +58,7 @@ impl AsyncProofFetcher {
     //
     // This is only expected to be called in a single thread, after all reads being scheduled.
     fn wait(&self) -> HashMap<HashValue, SparseMerkleProof> {
+        let _timer = TIMER.with_label_values(&["wait_async_proof"]).start_timer();
         // TODO(grao): Find a way to verify the proof.
         let mut proofs = HashMap::new();
         for _ in 0..self.num_proofs_to_read.load(Ordering::SeqCst) {
@@ -76,6 +78,9 @@ impl AsyncProofFetcher {
 
     // Schedules proof reading work in a background running thread pool.
     fn schedule_proof_read(&self, state_key: StateKey, version: Version) {
+        let _timer = TIMER
+            .with_label_values(&["schedule_async_proof_read"])
+            .start_timer();
         self.num_proofs_to_read.fetch_add(1, Ordering::SeqCst);
         let reader = self.reader.clone();
         let data_sender = self.data_sender.clone();
@@ -99,6 +104,9 @@ impl ProofFetcher for AsyncProofFetcher {
         state_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, Option<SparseMerkleProof>)> {
+        let _timer = TIMER
+            .with_label_values(&["async_proof_fetcher_fetch"])
+            .start_timer();
         self.schedule_proof_read(state_key.clone(), version);
         let value = self.reader.get_state_value_by_version(state_key, version)?;
         Ok((value, None))

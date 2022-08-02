@@ -14,9 +14,14 @@ pub mod responses;
 #[cfg(test)]
 mod tests;
 
+/// The suffix to append to data request and responses labels
+/// (if the request/response requires compression).
+const COMPRESSION_SUFFIX_LABEL: &str = "_compressed";
+
 /// A type alias for different epochs.
 pub type Epoch = u64;
 
+/// Shorthand error typing
 pub type Result<T, E = StorageServiceError> = ::std::result::Result<T, E>;
 
 /// A storage service error that can be returned to the client on a failure
@@ -31,7 +36,6 @@ pub enum StorageServiceError {
 
 /// A single storage service message sent or received over AptosNet.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-// TODO(philiphayes): do something about this without making it ugly :(
 #[allow(clippy::large_enum_variant)]
 pub enum StorageServiceMessage {
     /// A request to the storage service.

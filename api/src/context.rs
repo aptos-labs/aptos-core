@@ -87,6 +87,10 @@ impl Context {
         self.node_config.api.content_length_limit()
     }
 
+    pub fn failpoints_enabled(&self) -> bool {
+        self.node_config.api.failpoints_enabled
+    }
+
     pub fn filter(self) -> impl Filter<Extract = (Context,), Error = Infallible> + Clone {
         warp::any().map(move || self.clone())
     }
@@ -419,6 +423,6 @@ impl Context {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BlockMetadataState {
-    epoch_internal: U64,
+    epoch_interval: U64,
     height: U64,
 }

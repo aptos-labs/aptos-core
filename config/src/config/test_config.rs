@@ -4,9 +4,7 @@
 use crate::keys::ConfigKey;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_temppath::TempPath;
-use aptos_types::{
-    on_chain_config::VMPublishingOption, transaction::authenticator::AuthenticationKey,
-};
+use aptos_types::transaction::authenticator::AuthenticationKey;
 use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -22,8 +20,6 @@ pub struct TestConfig {
     // eventually be moved to be owned by something outside the config.
     #[serde(skip)]
     temp_dir: Option<TempPath>,
-
-    pub publishing_option: Option<VMPublishingOption>,
 }
 
 impl Clone for TestConfig {
@@ -34,7 +30,6 @@ impl Clone for TestConfig {
             owner_key: self.owner_key.clone(),
             execution_key: self.execution_key.clone(),
             temp_dir: None,
-            publishing_option: self.publishing_option.clone(),
         }
     }
 }
@@ -56,7 +51,6 @@ impl TestConfig {
             owner_key: None,
             execution_key: None,
             temp_dir: None,
-            publishing_option: Some(VMPublishingOption::open()),
         }
     }
 
@@ -72,7 +66,6 @@ impl TestConfig {
             owner_key: None,
             execution_key: None,
             temp_dir: Some(temp_dir),
-            publishing_option: None,
         }
     }
 

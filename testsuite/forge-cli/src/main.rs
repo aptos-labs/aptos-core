@@ -6,6 +6,7 @@ use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
 use forge::success_criteria::SuccessCriteria;
 use forge::{ForgeConfig, Options, Result, *};
+use std::convert::TryInto;
 use std::{env, num::NonZeroUsize, process, time::Duration};
 use structopt::StructOpt;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
@@ -15,20 +16,14 @@ use testcases::{
     network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
     reconfiguration_test::ReconfigurationTest, state_sync_performance::StateSyncPerformance,
 };
+
 use tokio::runtime::Runtime;
 use url::Url;
 
 #[derive(StructOpt, Debug)]
 struct Args {
-    // general options
-    #[structopt(long, default_value = "15")]
-    accounts_per_client: usize,
-    #[structopt(long)]
-    workers_per_ac: Option<usize>,
-    #[structopt(long, default_value = "0")]
-    wait_millis: u64,
-    #[structopt(long)]
-    burst: bool,
+    #[structopt(long, default_value = "30000")]
+    mempool_backlog: u64,
     #[structopt(long, default_value = "300")]
     duration_secs: usize,
     #[structopt(flatten)]
@@ -181,24 +176,15 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
-    let mut global_emit_job_request = EmitJobRequest::default()
-        .accounts_per_client(args.accounts_per_client)
+    let global_emit_job_request = EmitJobRequest::default()
         .duration(Duration::from_secs(args.duration_secs as u64))
-        .thread_params(EmitThreadParams {
-            wait_millis: args.wait_millis,
-            wait_committed: !args.burst,
-            txn_expiration_time_secs: 30,
-            check_stats_at_end: false,
-        });
+        .thread_params(EmitThreadParams::default())
+        .mempool_backlog(args.mempool_backlog.try_into().unwrap());
 
     let success_criteria = SuccessCriteria::new(
         args.success_criteria.avg_tps,
         args.success_criteria.max_latency_ms,
     );
-    if let Some(workers_per_endpoint) = args.workers_per_ac {
-        global_emit_job_request =
-            global_emit_job_request.workers_per_endpoint(workers_per_endpoint);
-    }
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
@@ -543,7 +529,7 @@ impl NetworkTest for EmitTransaction {
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        let stats = generate_traffic(ctx, &all_validators, duration, 1, None).unwrap();
+        let stats = generate_traffic(ctx, &all_validators, duration, 1).unwrap();
         ctx.report
             .report_txn_stats(self.name().to_string(), &stats, duration);
 

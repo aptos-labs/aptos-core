@@ -141,6 +141,9 @@ impl CliCommand<Transaction> for UnlockStake {
 pub struct WithdrawStake {
     #[clap(flatten)]
     pub(crate) node_op_options: TransactionOptions,
+    /// Amount of coins to withdraw
+    #[clap(long)]
+    pub amount: u64,
 }
 
 #[async_trait]
@@ -151,7 +154,13 @@ impl CliCommand<Transaction> for WithdrawStake {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         self.node_op_options
-            .submit_script_function(AccountAddress::ONE, "stake", "withdraw", vec![], vec![])
+            .submit_script_function(
+                AccountAddress::ONE,
+                "stake",
+                "withdraw",
+                vec![],
+                vec![bcs::to_bytes(&self.amount)?],
+            )
             .await
     }
 }
@@ -674,21 +683,20 @@ impl CliCommand<()> for RunLocalTestnet {
             }
 
             // Start the faucet
-            Some(
-                FaucetArgs {
-                    address: "0.0.0.0".to_string(),
-                    port: self.faucet_port,
-                    server_url: rest_url,
-                    mint_key_file_path: test_dir.join("mint.key"),
-                    mint_key: None,
-                    mint_account_address: None,
-                    chain_id: ChainId::test(),
-                    maximum_amount: None,
-                    do_not_delegate: false,
-                }
-                .run()
-                .await,
-            )
+            FaucetArgs {
+                address: "0.0.0.0".to_string(),
+                port: self.faucet_port,
+                server_url: rest_url,
+                mint_key_file_path: test_dir.join("mint.key"),
+                mint_key: None,
+                mint_account_address: None,
+                chain_id: ChainId::test(),
+                maximum_amount: None,
+                do_not_delegate: false,
+            }
+            .run()
+            .await;
+            Some(())
         } else {
             None
         };

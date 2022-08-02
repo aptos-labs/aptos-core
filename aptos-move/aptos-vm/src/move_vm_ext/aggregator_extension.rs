@@ -1,10 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::{
-    delta_change_set::{addition, deserialize, serialize, subtraction, DeltaOp},
-    vm_status::StatusCode,
-};
+use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
 use move_deps::{
     move_binary_format::errors::{PartialVMError, PartialVMResult},
@@ -28,6 +25,8 @@ use std::{
 };
 use tiny_keccak::{Hasher, Sha3};
 
+use crate::delta_ext::{addition, deserialize, serialize, subtraction, DeltaOp};
+
 /// State of an aggregator: `Data` means that aggregator stores an exact value,
 /// `PositiveDelta` means that actual value is not known but must be added later
 #[derive(Clone, Copy, PartialEq)]
@@ -48,59 +47,25 @@ struct Aggregator {
     limit: u128,
 }
 
-/// When `Aggregator` overflows the `limit`.
-const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
-
-/// When `Aggregator`'s underflows.
-const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
-
 impl Aggregator {
     /// Implements logic for adding to an aggregator.
     fn add(&mut self, value: u128) -> PartialVMResult<()> {
         // At this point, aggregator holds a positive delta or knows the value.
         // Hence, we can add, of course checking overflow condition.
-        match addition(self.value, value, self.limit) {
-            Some(result) => {
-                self.value = result;
-                Ok(())
-            }
-            None => Err(abort_error(
-                format!("aggregator's value overflowed when adding {}", value),
-                EAGGREGATOR_OVERFLOW,
-            )),
-        }
+        let result = addition(self.value, value, self.limit)?;
+        self.value = result;
+        Ok(())
     }
 
     /// Implements logic for subtracting from an aggregator.
     fn sub(&mut self, value: u128) -> PartialVMResult<()> {
-        // First, we check if the value can be subtracted in theory, that is
-        // if `value <= limit`. If not, we can immediately abort.
-        if value > self.limit {
-            return Err(abort_error(
-                format!("aggregator's value underflowed when subtracting more than aggregator can hold ({} > limit)", value),
-                EAGGREGATOR_UNDERFLOW,
-            ));
-        }
-
-        // We can subtract. Now consider each possible state of aggregator
-        // separately.
         match self.state {
             AggregatorState::Data => {
                 // Aggregator knows the value, therefore we can subtract
                 // checking we don't drop below zero.
-                match subtraction(self.value, value) {
-                    Some(result) => {
-                        self.value = result;
-                        Ok(())
-                    }
-                    None => Err(abort_error(
-                        format!(
-                            "aggregator's value underflowed when subtracting {} from {}",
-                            value, self.value
-                        ),
-                        EAGGREGATOR_UNDERFLOW,
-                    )),
-                }
+                let result = subtraction(self.value, value)?;
+                self.value = result;
+                Ok(())
             }
             // Since `sub` is a barrier, we never encounter delta during
             // subtraction. This will change in future.
@@ -136,17 +101,10 @@ impl Aggregator {
 
                         // At this point, we fetched the "true" value of the
                         // aggregator from the previously executed transaction.
-                        match addition(base, self.value, self.limit) {
-                            Some(result) => {
-                                self.value = result;
-                                self.state = AggregatorState::Data;
-                                Ok(())
-                            }
-                            None => Err(abort_error(
-                                "aggregator's value overflowed when materializing the delta",
-                                EAGGREGATOR_OVERFLOW,
-                            )),
-                        }
+                        let result = addition(base, self.value, self.limit)?;
+                        self.value = result;
+                        self.state = AggregatorState::Data;
+                        Ok(())
                     }
                     None => Err(extension_error("aggregator's value not found")),
                 }

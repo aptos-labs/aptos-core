@@ -162,7 +162,7 @@
         "data": {
           "type": "0x1::block::BlockMetadata",
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "13",
             "new_block_events": {
               "counter": "14",
@@ -393,7 +393,7 @@
         "data": {
           "type": "0x1::block::BlockMetadata",
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "14",
             "new_block_events": {
               "counter": "15",
@@ -624,7 +624,7 @@
         "data": {
           "type": "0x1::block::BlockMetadata",
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "15",
             "new_block_events": {
               "counter": "16",
@@ -855,7 +855,7 @@
         "data": {
           "type": "0x1::block::BlockMetadata",
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "16",
             "new_block_events": {
               "counter": "17",
@@ -1086,7 +1086,7 @@
         "data": {
           "type": "0x1::block::BlockMetadata",
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "17",
             "new_block_events": {
               "counter": "18",
@@ -1317,7 +1317,7 @@
         "data": {
           "type": "0x1::block::BlockMetadata",
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "18",
             "new_block_events": {
               "counter": "19",
@@ -1548,7 +1548,7 @@
         "data": {
           "type": "0x1::block::BlockMetadata",
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "19",
             "new_block_events": {
               "counter": "20",
@@ -1779,7 +1779,7 @@
         "data": {
           "type": "0x1::block::BlockMetadata",
           "data": {
-            "epoch_internal": "86400000000",
+            "epoch_interval": "86400000000",
             "height": "20",
             "new_block_events": {
               "counter": "21",

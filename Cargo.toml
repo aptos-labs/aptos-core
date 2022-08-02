@@ -3,8 +3,8 @@ resolver = "2"
 
 members = [
     "api",
+    "api/openapi-spec-generator",
     "api/types",
-    "aptos-move/af-cli",
     "aptos-move/aptos-module-verifier",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
@@ -12,6 +12,7 @@ members = [
     "aptos-move/aptos-transactional-test-harness",
     "aptos-move/aptos-validator-interface",
     "aptos-move/aptos-vm",
+    "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
@@ -128,7 +129,6 @@ members = [
 #
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
-    "aptos-move/af-cli",
     "aptos-move/genesis-viewer",
     "aptos-move/transaction-replay",
     "aptos-node",
@@ -162,3 +162,12 @@ codegen-units = 1
 
 [profile.bench]
 debug = true
+
+# This is a temporary workaround to avoid multiple library
+# definitions for LZ4 (caused by rust-rocksdb).
+# This will be removed once our pull requests land.
+# https://github.com/rust-rocksdb/rust-rocksdb/issues/666
+[patch.crates-io]
+lz4 = { git = 'https://github.com/aptos-labs/lz4-rs' }
+rocksdb = { git = 'https://github.com/aptos-labs/rust-rocksdb' }
+serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }

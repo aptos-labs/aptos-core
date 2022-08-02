@@ -17,8 +17,8 @@ create_account(1){
 
         // Find the "faucet" loaded account
         currency = {
-          "symbol": "TC",
-          "decimals": 6,
+          "symbol": "APTOS",
+          "decimals": 8,
           "metadata": {
             "move_type": "0x1::aptos_coin::AptosCoin"
           }
@@ -51,8 +51,8 @@ create_account(1){
 request_funds(1){
   find_account{
     currency = {
-      "symbol": "TC",
-      "decimals": 6,
+      "symbol": "APTOS",
+      "decimals": 8,
       "metadata": {
         "move_type": "0x1::aptos_coin::AptosCoin"
       }
@@ -83,8 +83,8 @@ transfer(50){
     transfer{
         transfer.network = {"network":"TESTING", "blockchain":"aptos"};
         currency = {
-          "symbol": "TC",
-          "decimals": 6,
+          "symbol": "APTOS",
+          "decimals": 8,
           "metadata": {
             "move_type": "0x1::aptos_coin::AptosCoin"
           }
