@@ -235,6 +235,22 @@ impl TestContext {
         self.golden_output.as_ref().unwrap().log(&msg);
     }
 
+    pub fn check_golden_output_bcs(&mut self, msg: Bytes) {
+        // Temporary while the old API still lives at /
+        let version_dir = self.api_specific_config.get_version_dir();
+        if self.golden_output.is_none() {
+            self.golden_output = Some(GoldenOutputs::new_bcs(
+                self.test_name.replace(':', "_"),
+                &version_dir,
+            ));
+        }
+
+        // TODO: Probably base64 instead
+        let msg = hex::encode(&msg);
+
+        self.golden_output.as_ref().unwrap().log(&msg);
+    }
+
     pub fn rng(&mut self) -> &mut rand::rngs::StdRng {
         &mut self.rng
     }

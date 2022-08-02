@@ -6,6 +6,7 @@ use super::new_test_context;
 use crate::current_function_name;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::account_config::AccountResource;
+use move_deps::move_core_types::language_storage::StructTag;
 use serde_json::json;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -218,17 +219,44 @@ async fn test_get_core_account_data_not_found() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_bcs_accept() {
-    let context = new_test_context(current_function_name!());
+async fn test_bcs_account() {
+    let mut context = new_test_context(current_function_name!());
     let resp = context.get_bcs("/accounts/0x1").await;
 
-    // TODO: Golden output checks
-    // context.check_golden_output(resp.clone());
+    context.check_golden_output_bcs(resp.clone());
 
     // Ensure we can deserialize the type
     let account: AccountResource =
-        bcs::from_bytes(&resp).expect("Can deserialize account resource");
+        bcs::from_bytes(&resp).expect("Can't deserialize account resource");
     assert_eq!(account.address(), AccountAddress::ONE)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_bcs_account_resources() {
+    let mut context = new_test_context(current_function_name!());
+    let resp = context.get_bcs(&account_resources("0x1")).await;
+
+    context.check_golden_output_bcs(resp.clone());
+
+    // Ensure we can deserialize the type
+    let resources: Vec<(StructTag, &[u8])> =
+        bcs::from_bytes(&resp).expect("Can't deserialize account resources");
+    assert!(resources.len() > 1);
+    let resource = resources.first().unwrap();
+    assert!(resource.1.len() > 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_bcs_account_modules() {
+    let mut context = new_test_context(current_function_name!());
+    let resp = context.get_bcs(&account_modules("0x1")).await;
+
+    context.check_golden_output_bcs(resp.clone());
+
+    // Ensure we can deserialize the type
+    let modules: Vec<Vec<u8>> = bcs::from_bytes(&resp).expect("Can't deserialize account modules");
+    assert!(modules.len() > 1);
+    assert!(modules.first().unwrap().len() > 1);
 }
 
 fn account_resources(address: &str) -> String {

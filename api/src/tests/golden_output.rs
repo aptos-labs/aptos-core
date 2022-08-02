@@ -12,6 +12,20 @@ use std::{
 
 pub const GOLDEN_DIR_PATH: &str = "goldens";
 
+enum GoldenFileType {
+    JSON,
+    BCS,
+}
+
+impl GoldenFileType {
+    fn as_str(&self) -> &'static str {
+        match self {
+            GoldenFileType::JSON => "json",
+            GoldenFileType::BCS => "bcs",
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct GoldenOutputs {
     #[allow(dead_code)]
@@ -29,11 +43,20 @@ fn golden_path(version_dir: &str) -> PathBuf {
 impl GoldenOutputs {
     // `version_dir` should be something like "v0"
     pub fn new(name: String, version_dir: &str) -> Self {
+        Self::new_inner(name, version_dir, GoldenFileType::JSON)
+    }
+
+    pub fn new_bcs(name: String, version_dir: &str) -> Self {
+        Self::new_inner(name, version_dir, GoldenFileType::BCS)
+    }
+
+    // `version_dir` should be something like "v0"
+    fn new_inner(name: String, version_dir: &str, file_type: GoldenFileType) -> Self {
         let mut mint = Mint::new(golden_path(version_dir));
         let mut file_path = PathBuf::new();
         file_path.push(name);
         let file = Arc::new(Mutex::new(
-            mint.new_goldenfile(file_path.with_extension("json"))
+            mint.new_goldenfile(file_path.with_extension(file_type.as_str()))
                 .unwrap(),
         ));
         Self {
