@@ -104,10 +104,10 @@ class RestClient:
         response = requests.post(f"{self.url}/transactions", headers=headers, json=txn)
         assert response.status_code == 202, f"{response.text} - {txn}"
         return response.json()
-    
+
     def execute_transaction_with_payload(self, account_from: Account, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a transaction for the given payload."""
-        
+
         txn_request = self.generate_transaction(account_from.address(), payload)
         signed_txn = self.sign_transaction(account_from, txn_request)
         return self.submit_transaction(signed_txn)
@@ -134,7 +134,7 @@ class RestClient:
 #:!:>section_5
     def account_balance(self, account_address: str) -> Optional[int]:
         """Returns the test coin balance associated with the account"""
-        return self.account_resource(account_address, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>")
+        return self.account_resource(account_address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>")
 
     def transfer(self, account_from: Account, recipient: str, amount: int) -> str:
         """Transfer a given coin amount from a given Account to the recipient's account address.
@@ -142,8 +142,8 @@ class RestClient:
 
         payload = {
             "type": "script_function_payload",
-            "function": "0x1::Coin::transfer",
-            "type_arguments": ["0x1::TestCoin::TestCoin"],
+            "function": "0x1::coin::transfer",
+            "type_arguments": ["0x1::aptos_coin::AptosCoin"],
             "arguments": [
                 f"0x{recipient}",
                 str(amount),
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     print(f"Alice: {alice.address()}")
     print(f"Bob: {bob.address()}")
 
-    faucet_client.fund_account(alice.address(), 1_000_000)
+    faucet_client.fund_account(alice.address(), 5_000)
     faucet_client.fund_account(bob.address(), 0)
 
     print("\n=== Initial Balances ===")

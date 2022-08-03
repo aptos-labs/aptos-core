@@ -6,6 +6,7 @@
 use crate::logging::{LogEntry, LogSchema};
 use anyhow::Result;
 use aptos_crypto::HashValue;
+use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_state_view::StateViewId;
 use aptos_types::{
@@ -13,10 +14,11 @@ use aptos_types::{
     transaction::Transaction,
 };
 use aptos_vm::VMExecutor;
-use executor_types::{BlockExecutorTrait, Error, StateComputeResult, StateSnapshotDelta};
+use executor_types::{BlockExecutorTrait, Error, StateComputeResult};
 use fail::fail_point;
 use scratchpad::SparseMerkleTree;
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
+use storage_interface::async_proof_fetcher::AsyncProofFetcher;
 
 use crate::{
     components::{block_tree::BlockTree, chunk_output::ChunkOutput},
@@ -26,15 +28,94 @@ use crate::{
         APTOS_EXECUTOR_VM_EXECUTE_BLOCK_SECONDS,
     },
 };
-use storage_interface::{jmt_updates, DbReaderWriter};
+use storage_interface::DbReaderWriter;
 
 pub struct BlockExecutor<V> {
     pub db: DbReaderWriter,
+    inner: RwLock<Option<BlockExecutorInner<V>>>,
+}
+
+impl<V> BlockExecutor<V>
+where
+    V: VMExecutor,
+{
+    pub fn new(db: DbReaderWriter) -> Self {
+        Self {
+            db,
+            inner: RwLock::new(None),
+        }
+    }
+
+    pub fn root_smt(&self) -> SparseMerkleTree<StateValue> {
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .root_smt()
+    }
+
+    fn maybe_initialize(&self) {
+        if self.inner.read().is_none() {
+            self.reset();
+        }
+    }
+}
+
+impl<V> BlockExecutorTrait for BlockExecutor<V>
+where
+    V: VMExecutor,
+{
+    fn committed_block_id(&self) -> HashValue {
+        self.maybe_initialize();
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .committed_block_id()
+    }
+
+    fn reset(&self) {
+        *self.inner.write() = Some(BlockExecutorInner::new(self.db.clone()));
+    }
+
+    fn execute_block(
+        &self,
+        block: (HashValue, Vec<Transaction>),
+        parent_block_id: HashValue,
+    ) -> Result<StateComputeResult, Error> {
+        self.maybe_initialize();
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .execute_block(block, parent_block_id)
+    }
+
+    fn commit_blocks_ext(
+        &self,
+        block_ids: Vec<HashValue>,
+        ledger_info_with_sigs: LedgerInfoWithSignatures,
+        save_state_snapshots: bool,
+    ) -> Result<(), Error> {
+        self.inner
+            .read()
+            .as_ref()
+            .expect("BlockExecutor is not reset")
+            .commit_blocks_ext(block_ids, ledger_info_with_sigs, save_state_snapshots)
+    }
+
+    fn finish(&self) {
+        *self.inner.write() = None;
+    }
+}
+
+struct BlockExecutorInner<V> {
+    db: DbReaderWriter,
     block_tree: BlockTree,
     phantom: PhantomData<V>,
 }
 
-impl<V> BlockExecutor<V>
+impl<V> BlockExecutorInner<V>
 where
     V: VMExecutor,
 {
@@ -47,7 +128,7 @@ where
         }
     }
 
-    pub fn root_smt(&self) -> SparseMerkleTree<StateValue> {
+    fn root_smt(&self) -> SparseMerkleTree<StateValue> {
         self.block_tree
             .root_block()
             .output
@@ -58,16 +139,12 @@ where
     }
 }
 
-impl<V> BlockExecutorTrait for BlockExecutor<V>
+impl<V> BlockExecutorInner<V>
 where
     V: VMExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
         self.block_tree.root_block().id
-    }
-
-    fn reset(&self) -> Result<(), Error> {
-        Ok(self.block_tree.reset(&self.db.reader)?)
     }
 
     fn execute_block(
@@ -108,7 +185,8 @@ where
             let _timer = APTOS_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
             let state_view = parent_view.verified_state_view(
                 StateViewId::BlockExecution { block_id },
-                self.db.reader.clone(),
+                Arc::clone(&self.db.reader),
+                Arc::new(AsyncProofFetcher::new(self.db.reader.clone())),
             )?;
 
             let chunk_output = {
@@ -137,15 +215,15 @@ where
         &self,
         block_ids: Vec<HashValue>,
         ledger_info_with_sigs: LedgerInfoWithSignatures,
-        save_state_snapshots: bool,
-    ) -> Result<Option<StateSnapshotDelta>, Error> {
+        sync_commit: bool,
+    ) -> Result<(), Error> {
         let _timer = APTOS_EXECUTOR_COMMIT_BLOCKS_SECONDS.start_timer();
         let committed_block = self.block_tree.root_block();
         if committed_block.num_persisted_transactions()
             == ledger_info_with_sigs.ledger_info().version() + 1
         {
             // a retry
-            return Ok(None);
+            return Ok(());
         }
 
         let block_id_to_commit = ledger_info_with_sigs.ledger_info().consensus_block_id();
@@ -177,40 +255,31 @@ where
             });
         }
 
-        let committed_smt = {
-            let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
-            APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
+        let _timer = APTOS_EXECUTOR_SAVE_TRANSACTIONS_SECONDS.start_timer();
+        APTOS_EXECUTOR_TRANSACTIONS_SAVED.observe(to_commit as f64);
 
-            fail_point!("executor::commit_blocks", |_| {
-                Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
-            });
-            let result_in_memory_state = self
-                .block_tree
-                .get_block(block_id_to_commit)?
-                .output
-                .result_view
-                .state()
-                .clone();
-            self.db.writer.save_transactions_ext(
-                &txns_to_commit,
-                first_version,
-                committed_block.output.result_view.state().base_version,
-                Some(&ledger_info_with_sigs),
-                save_state_snapshots,
-                result_in_memory_state,
-            )?;
-            self.block_tree
-                .prune(ledger_info_with_sigs.ledger_info())
-                .expect("Failure pruning block tree.")
-        };
-        let jmt_updates = txns_to_commit
-            .iter()
-            .flat_map(|t| jmt_updates(t.state_updates()))
-            .collect();
-        Ok(Some(StateSnapshotDelta {
-            version: ledger_info_with_sigs.ledger_info().version(),
-            smt: committed_smt,
-            jmt_updates,
-        }))
+        fail_point!("executor::commit_blocks", |_| {
+            Err(anyhow::anyhow!("Injected error in commit_blocks.").into())
+        });
+        let result_in_memory_state = self
+            .block_tree
+            .get_block(block_id_to_commit)?
+            .output
+            .result_view
+            .state()
+            .clone();
+        self.db.writer.save_transactions(
+            &txns_to_commit,
+            first_version,
+            committed_block.output.result_view.state().base_version,
+            Some(&ledger_info_with_sigs),
+            sync_commit,
+            result_in_memory_state,
+        )?;
+        self.block_tree
+            .prune(ledger_info_with_sigs.ledger_info())
+            .expect("Failure pruning block tree.");
+
+        Ok(())
     }
 }

@@ -202,7 +202,7 @@ impl<C: ChunkExecutorTrait> ExecutorProxyTrait for ExecutorProxy<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aptos_crypto::{ed25519::*, PrivateKey, Uniform};
+    use aptos_crypto::PrivateKey;
     use aptos_infallible::RwLock;
     use aptos_transaction_builder::aptos_stdlib;
     use aptos_types::{
@@ -293,10 +293,9 @@ mod tests {
 
         // Give the validator some money so it can send a rotation tx and rotate the validator's consensus key.
         let money_txn = create_transfer_to_validator_transaction(validator_account, 1);
-        let rotation_txn = create_consensus_key_rotation_transaction(&validators[0], 0);
 
         // Execute and commit the reconfig block
-        let block = vec![dummy_txn, reconfig_txn, money_txn, rotation_txn];
+        let block = vec![dummy_txn, reconfig_txn, money_txn];
         let (reconfig_events, _) = execute_and_commit_block(&mut block_executor, block, 1);
 
         // Publish the on chain config updates
@@ -365,7 +364,7 @@ mod tests {
             .unwrap();
 
         // Create an executor proxy
-        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw));
         let mut executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         // Publish a subscribed event
@@ -567,7 +566,7 @@ mod tests {
             .unwrap();
 
         // Create an executor
-        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
         let mut executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         // Verify that the initial configs returned to the subscriber don't contain the unknown on-chain config
@@ -650,7 +649,7 @@ mod tests {
 
         // Create the executors
         let block_executor = Box::new(BlockExecutor::<AptosVM>::new(db_rw.clone()));
-        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap());
+        let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw));
         let executor_proxy = ExecutorProxy::new(db, chunk_executor, event_subscription_service);
 
         (
@@ -662,6 +661,8 @@ mod tests {
     }
 
     /// Creates a transaction that rotates the consensus key of the given validator account.
+    /// Note this transaction has long since been unused and unvalidated, no point in bringing it
+    /// back at this point in time. It will perish with StateSyncV1...
     fn create_consensus_key_rotation_transaction(
         validator: &TestValidator,
         sequence_number: u64,
@@ -669,21 +670,13 @@ mod tests {
         let operator_key = validator.key.clone();
         let operator_public_key = operator_key.public_key();
         let operator_account = validator.data.operator_address;
-        let new_consensus_key = Ed25519PrivateKey::generate_for_testing().public_key();
 
         get_test_signed_transaction(
             operator_account,
             sequence_number,
             operator_key,
             operator_public_key,
-            Some(
-                aptos_stdlib::encode_validator_set_script_set_validator_config_and_reconfigure(
-                    validator.data.address,
-                    new_consensus_key.to_bytes().to_vec(),
-                    Vec::new(),
-                    Vec::new(),
-                ),
-            ),
+            None,
         )
     }
 
@@ -708,7 +701,7 @@ mod tests {
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
-            Some(aptos_stdlib::encode_version_set_version(
+            Some(aptos_stdlib::version_set_version(
                 7, // version
             )),
         )
@@ -723,7 +716,7 @@ mod tests {
         //     sequence_number,
         //     genesis_key.clone(),
         //     genesis_key.public_key(),
-        //     Some(aptos_stdlib::encode_update_aptos_consensus_config_script_function(
+        //     Some(aptos_stdlib::update_aptos_consensus_config_script_function(
         //         0,
         //         bcs::to_bytes(&OnChainConsensusConfig::V1(ConsensusConfigV1 {
         //             two_chain: false,
@@ -744,7 +737,7 @@ mod tests {
             sequence_number,
             genesis_key.clone(),
             genesis_key.public_key(),
-            Some(aptos_stdlib::encode_test_coin_transfer(
+            Some(aptos_stdlib::aptos_coin_transfer(
                 validator_account,
                 1_000_000,
             )),
@@ -791,6 +784,7 @@ mod tests {
     }
 
     impl OnChainConfig for TestOnChainConfig {
-        const IDENTIFIER: &'static str = "TestOnChainConfig";
+        const MODULE_IDENTIFIER: &'static str = "test_on_chain_config";
+        const TYPE_IDENTIFIER: &'static str = "TestOnChainConfig";
     }
 }

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::schema::*;
-use aptos_config::config::RocksdbConfig;
 use aptos_types::transaction::Version;
 use schemadb::{
     ColumnFamilyDescriptor, ColumnFamilyName, DBCompressionType, Options, SliceTransform,
@@ -38,18 +37,6 @@ pub(super) fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
         JELLYFISH_MERKLE_NODE_CF_NAME,
         STALE_NODE_INDEX_CF_NAME,
     ]
-}
-
-pub(super) fn gen_rocksdb_options(config: &RocksdbConfig, readonly: bool) -> Options {
-    let mut db_opts = Options::default();
-    db_opts.set_max_open_files(config.max_open_files);
-    db_opts.set_max_total_wal_size(config.max_total_wal_size);
-    if !readonly {
-        db_opts.create_if_missing(true);
-        db_opts.create_missing_column_families(true);
-    }
-
-    db_opts
 }
 
 pub(super) fn gen_ledger_cfds() -> Vec<ColumnFamilyDescriptor> {

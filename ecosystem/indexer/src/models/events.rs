@@ -1,6 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-
+#![allow(clippy::extra_unused_lifetimes)]
 use crate::{models::transactions::Transaction, schema::events};
 use aptos_rest_client::aptos_api_types::Event as APIEvent;
 use serde::Serialize;

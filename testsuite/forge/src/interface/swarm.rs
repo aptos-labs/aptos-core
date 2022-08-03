@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ChainInfo, FullNode, NodeExt, Result, Validator, Version};
+use crate::{ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version};
 use anyhow::{anyhow, bail};
 use aptos_config::config::NodeConfig;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
 use futures::future::try_join_all;
+use prometheus_http_query::response::PromqlResult;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 
@@ -63,6 +64,18 @@ pub trait Swarm: Sync {
     fn chain_info(&mut self) -> ChainInfo<'_>;
 
     fn logs_location(&mut self) -> String;
+
+    /// Injects all types of chaos
+    fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
+    fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
+
+    // Get prometheus metrics from the swarm
+    async fn query_metrics(
+        &self,
+        query: &str,
+        time: Option<i64>,
+        timeout: Option<i64>,
+    ) -> Result<PromqlResult>;
 }
 
 impl<T: ?Sized> SwarmExt for T where T: Swarm {}

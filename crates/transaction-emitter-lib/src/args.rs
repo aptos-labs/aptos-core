@@ -45,7 +45,7 @@ pub struct ClusterArgs {
 
     /// If set, try to use public peers instead of localhost.
     #[clap(long)]
-    pub vasp: bool,
+    pub reuse_accounts: bool,
 
     #[clap(long, default_value = "TESTING")]
     pub chain_id: ChainId,
@@ -69,13 +69,13 @@ impl Default for TransactionType {
 
 #[derive(Clone, Debug, Default, Deserialize, Parser, Serialize)]
 pub struct EmitArgs {
-    #[clap(long, default_value = "15")]
-    pub accounts_per_client: usize,
+    #[clap(long, default_value = "5000")]
+    /// Number of transactions outstanding in mempool - this is needed to ensure that the emitter
+    /// is producing enough load to get the highest TPS in the system. Typically this should be
+    /// configured to be ~4x of the max achievable TPS.
+    pub mempool_backlog: u64,
 
-    #[clap(long)]
-    pub workers_per_ac: Option<usize>,
-
-    #[clap(long, default_value = "0")]
+    #[clap(long, default_value = "0", requires = "burst")]
     pub wait_millis: u64,
 
     #[clap(long)]

@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Address, Bytecode};
-
+use crate::{Address, Bytecode, IdentifierWrapper};
 use anyhow::{bail, format_err};
 use aptos_types::{account_config::CORE_CODE_ADDRESS, event::EventKey, transaction::Module};
 use move_deps::{
@@ -23,6 +22,7 @@ use move_deps::{
     move_resource_viewer::{AnnotatedMoveStruct, AnnotatedMoveValue},
 };
 
+use poem_openapi::{Enum, Object, Union};
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::BTreeMap,
@@ -32,9 +32,10 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveResource {
     #[serde(rename = "type")]
+    #[oai(rename = "type")]
     pub typ: MoveStructTag,
     pub data: MoveStructValue,
 }
@@ -50,7 +51,7 @@ impl TryFrom<AnnotatedMoveStruct> for MoveResource {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Copy)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Copy)]
 pub struct U64(pub u64);
 
 impl U64 {
@@ -62,18 +63,6 @@ impl U64 {
 impl From<u64> for U64 {
     fn from(d: u64) -> Self {
         Self(d)
-    }
-}
-
-impl FromStr for U64 {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let data = s
-            .parse::<u64>()
-            .map_err(|e| format_err!("parse u64 string {:?} failed, caused by error: {}", s, e))?;
-
-        Ok(U64(data))
     }
 }
 
@@ -117,8 +106,20 @@ impl<'de> Deserialize<'de> for U64 {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Copy)]
-pub struct U128(u128);
+impl FromStr for U64 {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let data = s.parse::<u64>().map_err(|e| {
+            format_err!("Parsing u64 string {:?} failed, caused by error: {}", s, e)
+        })?;
+
+        Ok(U64(data))
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Copy)]
+pub struct U128(pub u128);
 
 impl U128 {
     pub fn inner(&self) -> &u128 {
@@ -162,8 +163,20 @@ impl<'de> Deserialize<'de> for U128 {
     }
 }
 
+impl FromStr for U128 {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let data = s.parse::<u128>().map_err(|e| {
+            format_err!("Parsing u128 string {:?} failed, caused by error: {}", s, e)
+        })?;
+
+        Ok(U128(data))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
-pub struct HexEncodedBytes(Vec<u8>);
+pub struct HexEncodedBytes(pub Vec<u8>);
 
 impl HexEncodedBytes {
     pub fn json(&self) -> anyhow::Result<serde_json::Value> {
@@ -249,20 +262,20 @@ impl HexEncodedBytes {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct MoveStructValue(pub BTreeMap<Identifier, serde_json::Value>);
+pub struct MoveStructValue(pub BTreeMap<IdentifierWrapper, serde_json::Value>);
 
 impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
     type Error = anyhow::Error;
     fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         let mut map = BTreeMap::new();
         for (id, val) in s.value {
-            map.insert(id, MoveValue::try_from(val)?.json()?);
+            map.insert(id.into(), MoveValue::try_from(val)?.json()?);
         }
         Ok(Self(map))
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Union)]
 pub enum MoveValue {
     U8(u8),
     U64(U64),
@@ -280,17 +293,17 @@ impl MoveValue {
         Ok(serde_json::to_value(self)?)
     }
 
-    pub fn is_ascii_string(st: &StructTag) -> bool {
+    pub fn is_utf8_string(st: &StructTag) -> bool {
         st.address == CORE_CODE_ADDRESS
             && st.name.to_string() == "String"
-            && st.module.to_string() == "ascii"
+            && st.module.to_string() == "string"
     }
 
-    pub fn convert_ascii_string(v: AnnotatedMoveStruct) -> anyhow::Result<MoveValue> {
+    pub fn convert_utf8_string(v: AnnotatedMoveStruct) -> anyhow::Result<MoveValue> {
         if let Some((_, AnnotatedMoveValue::Bytes(bytes))) = v.value.into_iter().next() {
             Ok(MoveValue::String(String::from_utf8(bytes)?))
         } else {
-            bail!("expect ascii::String, but failed to decode struct value");
+            bail!("expect string::String, but failed to decode struct value");
         }
     }
 }
@@ -312,8 +325,8 @@ impl TryFrom<AnnotatedMoveValue> for MoveValue {
             ),
             AnnotatedMoveValue::Bytes(v) => MoveValue::Bytes(HexEncodedBytes(v)),
             AnnotatedMoveValue::Struct(v) => {
-                if MoveValue::is_ascii_string(&v.type_) {
-                    MoveValue::convert_ascii_string(v)?
+                if MoveValue::is_utf8_string(&v.type_) {
+                    MoveValue::convert_utf8_string(v)?
                 } else {
                     MoveValue::Struct(v.try_into()?)
                 }
@@ -351,19 +364,19 @@ impl Serialize for MoveValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Object)]
 pub struct MoveStructTag {
     pub address: Address,
-    pub module: Identifier,
-    pub name: Identifier,
+    pub module: IdentifierWrapper,
+    pub name: IdentifierWrapper,
     pub generic_type_params: Vec<MoveType>,
 }
 
 impl MoveStructTag {
     pub fn new(
         address: Address,
-        module: Identifier,
-        name: Identifier,
+        module: IdentifierWrapper,
+        name: IdentifierWrapper,
         generic_type_params: Vec<MoveType>,
     ) -> Self {
         Self {
@@ -387,8 +400,8 @@ impl From<StructTag> for MoveStructTag {
     fn from(tag: StructTag) -> Self {
         Self {
             address: tag.address.into(),
-            module: tag.module,
-            name: tag.name,
+            module: tag.module.into(),
+            name: tag.name.into(),
             generic_type_params: tag.type_params.into_iter().map(MoveType::from).collect(),
         }
     }
@@ -430,8 +443,8 @@ impl TryFrom<MoveStructTag> for StructTag {
     fn try_from(tag: MoveStructTag) -> anyhow::Result<Self> {
         Ok(Self {
             address: tag.address.into(),
-            module: tag.module,
-            name: tag.name,
+            module: tag.module.into(),
+            name: tag.name.into(),
             type_params: tag
                 .generic_type_params
                 .into_iter()
@@ -453,6 +466,7 @@ pub enum MoveType {
     Struct(MoveStructTag),
     GenericTypeParam { index: u16 },
     Reference { mutable: bool, to: Box<MoveType> },
+    Unparsable(String),
 }
 
 impl MoveType {
@@ -475,6 +489,7 @@ impl MoveType {
                 "string<move_struct_tag_id>".to_owned()
             }
             MoveType::Reference { mutable: _, to } => to.json_type_name(),
+            MoveType::Unparsable(string) => string.to_string(),
         }
     }
 }
@@ -498,19 +513,46 @@ impl fmt::Display for MoveType {
                     write!(f, "&{}", to)
                 }
             }
+            MoveType::Unparsable(string) => write!(f, "unparsable<{}>", string),
         }
     }
 }
 
-// Implementation is imperfect, only parses type tags,
-// can't parse generic type params and references.
+// This function cannot handle the full range of types that MoveType can
+// represent. Internally, it uses parse_type_tag, which cannot handle references
+// or generic type parameters. This function adds nominal support for references
+// on top of parse_type_tag, but it still does not work for generic type params.
+// For that, we have the Unparsable variant of MoveType, so the deserialization
+// doesn't fail when dealing with these values.
 impl FromStr for MoveType {
     type Err = anyhow::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(parse_type_tag(s)
-            .map_err(|e| format_err!("parse Move type {:?} failed, caused by error: {}", s, e))?
-            .into())
+    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
+        let mut is_ref = false;
+        let mut is_mut = false;
+        if s.starts_with('&') {
+            s = &s[1..];
+            is_ref = true;
+        }
+        if is_ref && s.starts_with("mut ") {
+            s = &s[4..];
+            is_mut = true;
+        }
+        // Previously this would just crap out, but this meant the API could
+        // return a serialized version of an object and not be able to
+        // deserialize it using that same object.
+        let inner = match parse_type_tag(s) {
+            Ok(inner) => inner.into(),
+            Err(_e) => MoveType::Unparsable(s.to_string()),
+        };
+        if is_ref {
+            Ok(MoveType::Reference {
+                mutable: is_mut,
+                to: Box::new(inner),
+            })
+        } else {
+            Ok(inner)
+        }
     }
 }
 
@@ -520,8 +562,7 @@ impl Serialize for MoveType {
     }
 }
 
-// Implementation is imperfect, only parses type tags,
-// can't parse generic type params and references.
+// This deserialization has limitations, see the FromStr impl for MoveType.
 impl<'de> Deserialize<'de> for MoveType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -583,10 +624,10 @@ impl TryFrom<MoveType> for TypeTag {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveModule {
     pub address: Address,
-    pub name: Identifier,
+    pub name: IdentifierWrapper,
     pub friends: Vec<MoveModuleId>,
     pub exposed_functions: Vec<MoveFunction>,
     pub structs: Vec<MoveStruct>,
@@ -597,7 +638,7 @@ impl From<CompiledModule> for MoveModule {
         let (address, name) = <(AccountAddress, Identifier)>::from(m.self_id());
         Self {
             address: address.into(),
-            name,
+            name: name.into(),
             friends: m
                 .immediate_friends()
                 .into_iter()
@@ -621,10 +662,10 @@ impl From<CompiledModule> for MoveModule {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Object)]
 pub struct MoveModuleId {
     pub address: Address,
-    pub name: Identifier,
+    pub name: IdentifierWrapper,
 }
 
 impl From<ModuleId> for MoveModuleId {
@@ -632,14 +673,14 @@ impl From<ModuleId> for MoveModuleId {
         let (address, name) = <(AccountAddress, Identifier)>::from(id);
         Self {
             address: address.into(),
-            name,
+            name: name.into(),
         }
     }
 }
 
 impl From<MoveModuleId> for ModuleId {
     fn from(id: MoveModuleId) -> Self {
-        ModuleId::new(id.address.into(), id.name)
+        ModuleId::new(id.address.into(), id.name.into())
     }
 }
 
@@ -684,15 +725,18 @@ impl<'de> Deserialize<'de> for MoveModuleId {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveStruct {
-    pub name: Identifier,
+    pub name: IdentifierWrapper,
     pub is_native: bool,
     pub abilities: Vec<MoveAbility>,
     pub generic_type_params: Vec<MoveStructGenericTypeParam>,
     pub fields: Vec<MoveStructField>,
 }
 
+// TODO: Consider finding a way to derive NewType here instead of using the
+// custom macro, since some of the enum type information (such as the
+// variants) is currently being lost.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MoveAbility(Ability);
 
@@ -750,7 +794,7 @@ impl<'de> Deserialize<'de> for MoveAbility {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveStructGenericTypeParam {
     pub constraints: Vec<MoveAbility>,
     pub is_phantom: bool,
@@ -769,28 +813,30 @@ impl From<&StructTypeParameter> for MoveStructGenericTypeParam {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveStructField {
-    pub name: Identifier,
+    pub name: IdentifierWrapper,
     #[serde(rename = "type")]
+    #[oai(rename = "type")]
     pub typ: MoveType,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveFunction {
-    pub name: Identifier,
+    pub name: IdentifierWrapper,
     pub visibility: MoveFunctionVisibility,
     pub is_entry: bool,
     pub generic_type_params: Vec<MoveFunctionGenericTypeParam>,
     pub params: Vec<MoveType>,
     #[serde(rename = "return")]
+    #[oai(rename = "return")]
     pub return_: Vec<MoveType>,
 }
 
 impl From<&CompiledScript> for MoveFunction {
     fn from(script: &CompiledScript) -> Self {
         Self {
-            name: Identifier::new("main").unwrap(),
+            name: Identifier::new("main").unwrap().into(),
             visibility: MoveFunctionVisibility::Public,
             is_entry: true,
             generic_type_params: script
@@ -809,8 +855,9 @@ impl From<&CompiledScript> for MoveFunction {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Enum)]
 #[serde(rename_all = "snake_case")]
+#[oai(rename_all = "snake_case")]
 pub enum MoveFunctionVisibility {
     Private,
     Public,
@@ -837,7 +884,7 @@ impl From<MoveFunctionVisibility> for Visibility {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveFunctionGenericTypeParam {
     pub constraints: Vec<MoveAbility>,
 }
@@ -850,7 +897,7 @@ impl From<&AbilitySet> for MoveFunctionGenericTypeParam {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveModuleBytecode {
     pub bytecode: HexEncodedBytes,
     // We don't need deserialize MoveModule as it should be serialized
@@ -886,7 +933,7 @@ impl From<Module> for MoveModuleBytecode {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveScriptBytecode {
     pub bytecode: HexEncodedBytes,
     // We don't need deserialize MoveModule as it should be serialized
@@ -916,10 +963,10 @@ impl MoveScriptBytecode {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Object)]
 pub struct ScriptFunctionId {
     pub module: MoveModuleId,
-    pub name: Identifier,
+    pub name: IdentifierWrapper,
 }
 
 impl FromStr for ScriptFunctionId {
@@ -965,10 +1012,7 @@ impl fmt::Display for ScriptFunctionId {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        move_types::ScriptFunctionId, HexEncodedBytes, MoveModuleId, MoveResource, MoveType, U128,
-        U64,
-    };
+    use super::*;
 
     use aptos_types::account_address::AccountAddress;
     use move_deps::{
@@ -1002,7 +1046,7 @@ mod tests {
 
         assert_serialize(
             Struct(create_nested_struct()),
-            json!("0x1::Home::ABC<address, 0x1::Account::Base<u128, vector<u64>, vector<0x1::Type::String>, 0x1::Type::String>>"),
+            json!("0x1::Home::ABC<address, 0x1::account::Base<u128, vector<u64>, vector<0x1::type::String>, 0x1::type::String>>"),
         );
     }
 
@@ -1049,7 +1093,7 @@ mod tests {
         assert_json(
             value,
             json!({
-                "type": "0x1::Type::Values",
+                "type": "0x1::type::Values",
                 "data": {
                     "field_u8": 7,
                     "field_u64": "7",
@@ -1080,7 +1124,7 @@ mod tests {
         assert_json(
             value,
             json!({
-                "type": "0x1::Type::Values",
+                "type": "0x1::type::Values",
                 "data": {
                     "address_0x0": "0x0",
                 }
@@ -1249,7 +1293,7 @@ mod tests {
     fn create_generic_type_struct() -> StructTag {
         StructTag {
             address: address("0x1"),
-            module: identifier("Account"),
+            module: identifier("account"),
             name: identifier("Base"),
             type_params: vec![
                 TypeTag::U128,
@@ -1263,7 +1307,7 @@ mod tests {
     fn type_struct(t: &str) -> StructTag {
         StructTag {
             address: address("0x1"),
-            module: identifier("Type"),
+            module: identifier("type"),
             name: identifier(t),
             type_params: vec![],
         }

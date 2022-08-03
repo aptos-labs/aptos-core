@@ -110,12 +110,10 @@ impl BlockStore {
             if qc.ends_epoch() {
                 retriever
                     .network
-                    .broadcast(ConsensusMsg::EpochChangeProof(Box::new(
-                        EpochChangeProof::new(
-                            vec![qc.ledger_info().clone()],
-                            /* more = */ false,
-                        ),
-                    )))
+                    .broadcast_epoch_change(EpochChangeProof::new(
+                        vec![qc.ledger_info().clone()],
+                        /* more = */ false,
+                    ))
                     .await;
             }
         }
@@ -190,7 +188,7 @@ impl BlockStore {
         if highest_commit_cert.ledger_info().ledger_info().ends_epoch() {
             retriever
                 .network
-                .notify_epoch_change(EpochChangeProof::new(
+                .send_epoch_change(EpochChangeProof::new(
                     vec![highest_ordered_cert.ledger_info().clone()],
                     /* more = */ false,
                 ))
@@ -335,7 +333,7 @@ impl BlockStore {
             && self.block_exists(ledger_info.commit_info().id())
             && self.ordered_root().round() >= ledger_info.commit_info().round()
         {
-            network.notify_commit_proof(ledger_info.clone()).await
+            network.send_commit_proof(ledger_info.clone()).await
         }
     }
 

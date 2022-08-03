@@ -6,15 +6,18 @@ pub mod hash;
 pub mod signature;
 pub mod type_info;
 
+use move_deps::move_vm_runtime::native_functions;
 use move_deps::{
-    move_core_types::{account_address::AccountAddress, identifier::Identifier},
+    move_core_types::account_address::AccountAddress,
     move_vm_runtime::native_functions::{NativeFunction, NativeFunctionTable},
 };
 
 pub mod cost {
     pub const APTOS_CREATE_ADDRESS: u64 = 5;
     pub const APTOS_LIB_TYPE_OF: u64 = 10;
+    pub const APTOS_LIB_TYPE_NAME: u64 = 10;
     pub const APTOS_SIP_HASH: u64 = 10;
+    pub const APTOS_SECP256K1_RECOVER: u64 = 71;
 }
 
 pub mod status {
@@ -26,36 +29,46 @@ pub mod status {
 
 pub fn all_natives(framework_addr: AccountAddress) -> NativeFunctionTable {
     const NATIVES: &[(&str, &str, NativeFunction)] = &[
-        ("Account", "create_address", account::native_create_address),
-        ("Account", "create_signer", account::native_create_signer),
+        ("account", "create_address", account::native_create_address),
+        ("account", "create_signer", account::native_create_signer),
         (
-            "Signature",
+            "signature",
+            "bls12381_aggregate_pop_verified_pubkeys",
+            signature::native_bls12381_aggregate_pop_verified_pubkeys,
+        ),
+        (
+            "signature",
             "bls12381_validate_pubkey",
-            signature::native_bls12381_public_key_validation,
+            signature::native_bls12381_validate_pubkey,
         ),
         (
-            "Signature",
+            "signature",
+            "bls12381_verify_proof_of_possession",
+            signature::native_bls12381_verify_proof_of_possession,
+        ),
+        (
+            "signature",
+            "bls12381_verify_signature",
+            signature::native_bls12381_verify_signature,
+        ),
+        (
+            "signature",
             "ed25519_validate_pubkey",
-            signature::native_ed25519_publickey_validation,
+            signature::native_ed25519_validate_pubkey,
         ),
         (
-            "Signature",
+            "signature",
             "ed25519_verify",
-            signature::native_ed25519_signature_verification,
+            signature::native_ed25519_verify_signature,
         ),
-        ("TypeInfo", "type_of", type_info::type_of),
+        (
+            "signature",
+            "secp256k1_ecdsa_recover",
+            signature::native_secp256k1_ecdsa_recover,
+        ),
+        ("type_info", "type_of", type_info::type_of),
+        ("type_info", "type_name", type_info::type_name),
         ("hash", "sip_hash", hash::native_sip_hash),
     ];
-    NATIVES
-        .iter()
-        .cloned()
-        .map(|(module_name, func_name, func)| {
-            (
-                framework_addr,
-                Identifier::new(module_name).unwrap(),
-                Identifier::new(func_name).unwrap(),
-                func,
-            )
-        })
-        .collect()
+    native_functions::make_table(framework_addr, NATIVES)
 }

@@ -44,6 +44,7 @@ mod api_config;
 pub use api_config::*;
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519};
 use aptos_types::account_address::AccountAddress;
+use poem_openapi::Enum as PoemEnum;
 
 /// Represents a deprecated config that provides no field verification.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -189,8 +190,9 @@ impl IdentityBlob {
     }
 }
 
-#[derive(Clone, Copy, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Deserialize, Eq, PartialEq, PoemEnum, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[oai(rename_all = "snake_case")]
 pub enum RoleType {
     Validator,
     FullNode,
@@ -319,6 +321,7 @@ impl NodeConfig {
         self.api.randomize_ports();
         self.inspection_service.randomize_ports();
         self.storage.randomize_ports();
+        self.logger.disable_console();
 
         if let Some(network) = self.validator_network.as_mut() {
             network.listen_address = crate::utils::get_available_port_in_multiaddr(true);

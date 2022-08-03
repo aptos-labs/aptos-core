@@ -26,22 +26,19 @@ impl AptosTest for AccountCreation {
         // created by user account
         for account in &mut accounts {
             let new_account = ctx.random_account();
-            let txn =
-                account.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
-                    aptos_stdlib::encode_account_create_account(new_account.address()),
-                ));
+            let txn = account.sign_with_transaction_builder(
+                ctx.aptos_transaction_factory()
+                    .payload(aptos_stdlib::account_create_account(new_account.address())),
+            );
             ctx.client().submit_and_wait(&txn).await?;
         }
         // create and fund
         for mut account in accounts {
             let new_account = ctx.random_account();
-            let txn =
-                account.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
-                    aptos_stdlib::encode_account_utils_create_and_fund_account(
-                        new_account.address(),
-                        5000,
-                    ),
-                ));
+            let txn = account.sign_with_transaction_builder(
+                ctx.aptos_transaction_factory()
+                    .payload(aptos_stdlib::account_transfer(new_account.address(), 5000)),
+            );
             ctx.client().submit_and_wait(&txn).await?;
             assert_eq!(ctx.get_balance(new_account.address()).await.unwrap(), 5000);
         }

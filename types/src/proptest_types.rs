@@ -20,7 +20,7 @@ use crate::{
         ChangeSet, ExecutionStatus, Module, ModuleBundle, RawTransaction, Script,
         SignatureCheckedTransaction, SignedTransaction, Transaction, TransactionArgument,
         TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionStatus,
-        TransactionToCommit, VecBytes, Version, WriteSetPayload,
+        TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -686,6 +686,7 @@ impl AccountResourceGen {
             account_info.sequence_number,
             account_info.public_key.to_bytes().to_vec(),
             account_info.address,
+            EventHandle::random(0),
         )
     }
 }
@@ -832,6 +833,7 @@ impl TransactionToCommitGen {
             state_updates,
             WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
             events,
+            false, /* event_gen never generates reconfig events */
         )
     }
 
@@ -1144,6 +1146,7 @@ impl BlockGen {
             HashMap::new(),
             WriteSet::default(),
             Vec::new(),
+            false,
         ));
 
         // materialize ledger info
@@ -1209,16 +1212,4 @@ pub fn arb_json_value() -> impl Strategy<Value = Value> {
             ]
         },
     )
-}
-
-// this function generate arbitrary vec<vec<u8>> value
-impl Arbitrary for VecBytes {
-    type Parameters = ();
-    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        prop::collection::vec(any::<[u8; 32]>().prop_map(|e| e.to_vec()), 1..32)
-            .prop_map(VecBytes::from)
-            .boxed()
-    }
-
-    type Strategy = BoxedStrategy<Self>;
 }

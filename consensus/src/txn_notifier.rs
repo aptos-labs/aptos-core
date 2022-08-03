@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::MempoolError;
+use crate::monitor;
 use anyhow::{format_err, Result};
 use aptos_mempool::QuorumStoreRequest;
-use aptos_metrics_core::monitor;
 use aptos_types::transaction::TransactionStatus;
 use consensus_types::{block::Block, common::TransactionSummary};
 use executor_types::StateComputeResult;

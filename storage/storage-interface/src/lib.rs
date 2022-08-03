@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -35,11 +36,12 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
+pub mod async_proof_fetcher;
 pub mod cached_state_view;
 mod executed_trees;
-#[cfg(any(feature = "testing", feature = "fuzzing"))]
+mod metrics;
+#[cfg(any(feature = "fuzzing"))]
 pub mod mock;
-pub mod no_proof_fetcher;
 pub mod proof_fetcher;
 pub mod state_delta;
 pub mod state_view;
@@ -330,7 +332,7 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Returns the latest state checkpoint version if any.
-    fn get_latest_state_snapshot(&self) -> Result<Option<(Version, HashValue)>> {
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         unimplemented!()
     }
 
@@ -524,6 +526,16 @@ pub trait DbReader: Send + Sync {
     fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
         unimplemented!()
     }
+
+    /// Get table info from the internal indexer.
+    fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo> {
+        unimplemented!()
+    }
+
+    /// Returns whether the internal indexer DB has been enabled or not
+    fn indexer_enabled(&self) -> bool {
+        unimplemented!()
+    }
 }
 
 impl MoveStorage for &dyn DbReader {
@@ -536,8 +548,8 @@ impl MoveStorage for &dyn DbReader {
         access_path: AccessPath,
         version: Version,
     ) -> Result<Vec<u8>> {
-        let (state_value, _) = self
-            .get_state_value_with_proof_by_version(&StateKey::AccessPath(access_path), version)?;
+        let state_value =
+            self.get_state_value_by_version(&StateKey::AccessPath(access_path), version)?;
 
         state_value
             .ok_or_else(|| format_err!("no value found in DB"))?
@@ -546,15 +558,13 @@ impl MoveStorage for &dyn DbReader {
     }
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
-        let config_value_option = self
-            .get_state_value_with_proof_by_version(
-                &StateKey::AccessPath(AccessPath::new(
-                    CORE_CODE_ADDRESS,
-                    access_path_for_config(config_id).path,
-                )),
-                version,
-            )?
-            .0;
+        let config_value_option = self.get_state_value_by_version(
+            &StateKey::AccessPath(AccessPath::new(
+                CORE_CODE_ADDRESS,
+                access_path_for_config(config_id).path,
+            )),
+            version,
+        )?;
         config_value_option
             .and_then(|x| x.maybe_bytes)
             .ok_or_else(|| anyhow!("no config {} found in aptos root account state", config_id))
@@ -574,9 +584,8 @@ impl MoveStorage for &dyn DbReader {
     }
 
     fn fetch_latest_state_checkpoint_version(&self) -> Result<Version> {
-        self.get_latest_state_snapshot()?
+        self.get_latest_state_checkpoint_version()?
             .ok_or_else(|| format_err!("[MoveStorage] Latest state checkpoint not found."))
-            .map(|(v, _)| v)
     }
 }
 
@@ -621,34 +630,16 @@ pub trait DbWriter: Send + Sync {
     /// See [`AptosDB::save_transactions`].
     ///
     /// [`AptosDB::save_transactions`]: ../aptosdb/struct.AptosDB.html#method.save_transactions
-    fn save_transactions_ext(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        save_state_snapshots: bool,
-        latest_in_memory_state: StateDelta,
-    ) -> Result<()> {
-        unimplemented!()
-    }
-
     fn save_transactions(
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        sync_commit: bool,
         latest_in_memory_state: StateDelta,
     ) -> Result<()> {
-        self.save_transactions_ext(
-            txns_to_commit,
-            first_version,
-            base_state_version,
-            ledger_info_with_sigs,
-            true, /* save_state_snapshots */
-            latest_in_memory_state,
-        )
+        unimplemented!()
     }
 
     fn save_state_snapshot_for_bench(

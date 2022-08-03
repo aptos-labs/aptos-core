@@ -1,9 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account_config::constants::{
-    APTOS_ACCOUNT_MODULE_IDENTIFIER, CORE_ACCOUNT_MODULE_IDENTIFIER, CORE_CODE_ADDRESS,
-};
+use crate::account_config::constants::{APTOS_ACCOUNT_MODULE_IDENTIFIER, CORE_CODE_ADDRESS};
 use move_deps::move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -17,7 +15,7 @@ use once_cell::sync::Lazy;
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 
-pub static DPN_CHAIN_INFO: Lazy<ChainSpecificAccountInfo> =
+pub static APTOS_CHAIN_INFO: Lazy<ChainSpecificAccountInfo> =
     Lazy::new(|| ChainSpecificAccountInfo {
         module_addr: CORE_CODE_ADDRESS,
         module_name: APTOS_ACCOUNT_MODULE_IDENTIFIER.to_owned(),
@@ -27,7 +25,6 @@ pub static DPN_CHAIN_INFO: Lazy<ChainSpecificAccountInfo> =
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
         writeset_epilogue_name: Identifier::new("writeset_epilogue").unwrap(),
-        currency_code_required: true,
     });
 
 /// A Rust representation of chain-specific account information
@@ -42,7 +39,6 @@ pub struct ChainSpecificAccountInfo {
     pub multi_agent_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
     pub writeset_epilogue_name: Identifier,
-    pub currency_code_required: bool,
 }
 
 impl ChainSpecificAccountInfo {
@@ -57,7 +53,7 @@ impl ChainSpecificAccountInfo {
 }
 
 impl MoveStructType for ChainSpecificAccountInfo {
-    const MODULE_NAME: &'static IdentStr = CORE_ACCOUNT_MODULE_IDENTIFIER;
+    const MODULE_NAME: &'static IdentStr = ident_str!("account");
     const STRUCT_NAME: &'static IdentStr = ident_str!("ChainSpecificAccountInfo");
 }
 

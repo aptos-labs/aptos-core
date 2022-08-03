@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::Test;
+use crate::success_criteria::SuccessCriteria;
 use crate::{CoreContext, Result, Swarm, TestReport};
 use transaction_emitter_lib::EmitJobRequest;
 
@@ -18,6 +19,7 @@ pub struct NetworkContext<'t> {
     swarm: &'t mut dyn Swarm,
     pub report: &'t mut TestReport,
     pub global_job: EmitJobRequest,
+    success_criteria: SuccessCriteria,
 }
 
 impl<'t> NetworkContext<'t> {
@@ -26,12 +28,14 @@ impl<'t> NetworkContext<'t> {
         swarm: &'t mut dyn Swarm,
         report: &'t mut TestReport,
         global_job: EmitJobRequest,
+        success_criteria: SuccessCriteria,
     ) -> Self {
         Self {
             core,
             swarm,
             report,
             global_job,
+            success_criteria,
         }
     }
 
@@ -41,5 +45,8 @@ impl<'t> NetworkContext<'t> {
 
     pub fn core(&mut self) -> &mut CoreContext {
         &mut self.core
+    }
+    pub fn success_criteria(&self) -> &SuccessCriteria {
+        &self.success_criteria
     }
 }

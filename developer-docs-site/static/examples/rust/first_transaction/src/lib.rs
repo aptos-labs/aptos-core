@@ -8,7 +8,7 @@ use std::{
 
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 use hex::ToHex;
-use rand::{rngs::OsRng, Rng, SeedableRng};
+use rand::{rngs::OsRng, Rng, RngCore, SeedableRng};
 use reqwest;
 use tiny_keccak::{Hasher, Sha3};
 
@@ -25,7 +25,12 @@ impl Account {
     pub fn new(priv_key_bytes: Option<Vec<u8>>) -> Self {
         let signing_key = match priv_key_bytes {
             Some(key) => SecretKey::from_bytes(&key).unwrap(),
-            None => SecretKey::generate(&mut rand::rngs::StdRng::from_seed(OsRng.gen())),
+            None => {
+                let mut rng = rand::rngs::StdRng::from_seed(OsRng.gen());
+                let mut bytes = [0; 32];
+                rng.fill_bytes(&mut bytes);
+                SecretKey::from_bytes(&bytes).unwrap()
+            }
         };
 
         Account { signing_key }
@@ -260,8 +265,11 @@ impl RestClient {
     //:!:>section_5
     /// Returns the test coin balance associated with the account
     pub fn account_balance(&self, account_address: &str) -> Option<u64> {
-        self.account_resource(account_address, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>")
-            .unwrap()["data"]["coin"]["value"]
+        self.account_resource(
+            account_address,
+            "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+        )
+        .unwrap()["data"]["coin"]["value"]
             .as_str()
             .and_then(|s| s.parse::<u64>().ok())
     }
@@ -271,8 +279,8 @@ impl RestClient {
     pub fn transfer(&self, account_from: &mut Account, recipient: &str, amount: u64) -> String {
         let payload = serde_json::json!({
             "type": "script_function_payload",
-            "function": "0x1::Coin::transfer",
-            "type_arguments": ["0x1::TestCoin::TestCoin"],
+            "function": "0x1::coin::transfer",
+            "type_arguments": ["0x1::aptos_coin::AptosCoin"],
             "arguments": [format!("0x{}", recipient), amount.to_string()]
         });
         let txn_request = self.generate_transaction(&account_from.address(), payload);

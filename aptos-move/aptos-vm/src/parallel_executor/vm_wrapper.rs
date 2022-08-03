@@ -35,16 +35,16 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosVMWrapper<'a, S> {
     fn init(argument: &'a S) -> Self {
         let vm = AptosVM::new(argument);
 
-        // Loading `0x1::Account` and its transitive dependency into the code cache.
+        // Loading `0x1::account` and its transitive dependency into the code cache.
         //
         // This should give us a warm VM to avoid the overhead of VM cold start.
         // Result of this load could be omitted as this is a best effort approach and won't hurt if that fails.
         //
-        // Loading up `0x1::Account` should be sufficient as this is the most common module
+        // Loading up `0x1::account` should be sufficient as this is the most common module
         // used for prologue, epilogue and transfer functionality.
 
         let _ = vm.load_module(
-            &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("Account").to_owned()),
+            &ModuleId::new(CORE_CODE_ADDRESS, ident_str!("account").to_owned()),
             &RemoteStorage::new(argument),
         );
 
@@ -67,6 +67,9 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosVMWrapper<'a, S> {
             .execute_single_transaction(txn, &versioned_view, &log_context)
         {
             Ok((vm_status, output, sender)) => {
+                // TODO: pass deltas to `AptosTransactionOutput` once we support parallel execution.
+                let (_, output) = output.into();
+
                 if output.status().is_discarded() {
                     match sender {
                         Some(s) => trace!(

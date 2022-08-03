@@ -1,0 +1,27 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.2.0
+    hooks:
+      - id: trailing-whitespace
+        files: \.(rs|move)$
+      - id: end-of-file-fixer
+        files: \.(rs|move)$
+      - id: check-added-large-files
+        args:
+          - --maxkb=2000
+  - repo: https://github.com/doublify/pre-commit-rust
+    rev: v1.0
+    hooks:
+    -   id: fmt
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.3.0
+    hooks:
+      - id: insert-license
+        files: \.rs$
+        args:
+          - --license-filepath
+          - devtools/assets/license_header.txt
+          - --comment-style
+          - //

@@ -12,7 +12,7 @@ use aptos_data_client::{GlobalDataSummary, OptimalChunkSizes, ResponsePayload};
 use aptos_id_generator::U64IdGenerator;
 use claim::{assert_matches, assert_ok};
 use std::{cmp, sync::Arc};
-use storage_service_types::CompleteDataRange;
+use storage_service_types::responses::CompleteDataRange;
 
 #[test]
 fn test_create_epoch_ending_requests() {

@@ -40,7 +40,7 @@ pub fn transaction_context_natives(table_addr: AccountAddress) -> NativeFunction
     native_functions::make_table(
         table_addr,
         &[(
-            "TransactionContext",
+            "transaction_context",
             "get_script_hash",
             native_get_script_hash,
         )],
@@ -59,24 +59,4 @@ fn native_get_script_hash(
         cost,
         smallvec![Value::vector_u8(transaction_context.script_hash.clone())],
     ))
-}
-
-pub fn test_transaction_context_natives(table_addr: AccountAddress) -> NativeFunctionTable {
-    native_functions::make_table(
-        table_addr,
-        &[(
-            "TransactionContext",
-            "get_script_hash",
-            test_native_get_script_hash,
-        )],
-    )
-}
-
-fn test_native_get_script_hash(
-    context: &mut NativeContext,
-    mut _ty_args: Vec<Type>,
-    _args: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    let cost = native_gas(context.cost_table(), NativeCostIndex::SHA3_256, 0);
-    Ok(NativeResult::ok(cost, smallvec![Value::vector_u8(vec![])]))
 }

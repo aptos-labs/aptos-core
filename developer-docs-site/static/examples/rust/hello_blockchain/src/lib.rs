@@ -22,13 +22,14 @@ impl HelloBlockchainClient {
             "type": "module_bundle_payload",
             "modules": [{"bytecode": format!("0x{}", module_hex)}],
         });
-        self.rest_client.execution_transaction_with_payload(account_from, payload)
+        self.rest_client
+            .execution_transaction_with_payload(account_from, payload)
     }
     //<:!:section_1
     //:!:>section_2
     /// Retrieve the resource Message::MessageHolder::message
     pub fn get_message(&self, contract_address: &str, account_address: &str) -> Option<String> {
-        let module_type = format!("0x{}::Message::MessageHolder", contract_address);
+        let module_type = format!("0x{}::message::MessageHolder", contract_address);
         self.rest_client
             .account_resource(account_address, &module_type)
             .map(|value| value["data"]["message"].as_str().unwrap().to_string())
@@ -46,11 +47,12 @@ impl HelloBlockchainClient {
         let message_hex = hex::encode(message.as_bytes());
         let payload = serde_json::json!({
             "type": "script_function_payload",
-            "function": format!("0x{}::Message::set_message", contract_address),
+            "function": format!("0x{}::message::set_message", contract_address),
             "type_arguments": [],
             "arguments": [message_hex]
         });
-        self.rest_client.execution_transaction_with_payload(account_from, payload)
+        self.rest_client
+            .execution_transaction_with_payload(account_from, payload)
     }
     //<:!:section_3
 }

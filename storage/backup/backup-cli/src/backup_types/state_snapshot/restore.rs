@@ -143,7 +143,7 @@ impl StateSnapshotRestoreController {
         }
 
         receiver.finish()?;
-        self.run_mode.finish(self.version);
+        self.run_mode.finish();
         Ok(())
     }
 

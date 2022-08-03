@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, ensure, format_err, Result};
+use anyhow::{anyhow, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{AsConverter, BlockInfo, Error, LedgerInfo, TransactionOnChainData, U64};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
@@ -16,7 +16,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
-    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix},
+    state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{SignedTransaction, TransactionWithProof, Version},
     write_set::WriteOp,
 };
@@ -24,18 +24,20 @@ use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
 use move_deps::move_core_types::ident_str;
 use serde::{Deserialize, Serialize};
-use std::{convert::Infallible, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order,
 };
 use warp::{filters::BoxedFilter, Filter, Reply};
 
+use crate::poem_backend::{AptosErrorCode, InternalError};
+
 // Context holds application scope context
 #[derive(Clone)]
 pub struct Context {
     chain_id: ChainId,
-    db: Arc<dyn DbReader>,
+    pub db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
     node_config: NodeConfig,
 }
@@ -61,6 +63,14 @@ impl Context {
             .map(|state_view| state_view.into_move_resolver())
     }
 
+    pub fn move_resolver_poem<E: InternalError>(
+        &self,
+    ) -> Result<RemoteStorageOwned<DbStateView>, E> {
+        self.move_resolver()
+            .context("Failed to read latest state checkpoint from DB")
+            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))
+    }
+
     pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
         self.db.state_view_at_version(Some(version))
     }
@@ -75,6 +85,10 @@ impl Context {
 
     pub fn content_length_limit(&self) -> u64 {
         self.node_config.api.content_length_limit()
+    }
+
+    pub fn failpoints_enabled(&self) -> bool {
+        self.node_config.api.failpoints_enabled
     }
 
     pub fn filter(self) -> impl Filter<Extract = (Context,), Error = Infallible> + Clone {
@@ -103,6 +117,27 @@ impl Context {
         }
     }
 
+    // TODO: Add error codes to these errors.
+    pub fn get_latest_ledger_info_poem<E: InternalError>(&self) -> Result<LedgerInfo, E> {
+        if let Some(oldest_version) = self
+            .db
+            .get_first_txn_version()
+            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?
+        {
+            Ok(LedgerInfo::new(
+                &self.chain_id(),
+                &self
+                    .get_latest_ledger_info_with_signatures()
+                    .map_err(E::internal)?,
+                oldest_version,
+            ))
+        } else {
+            Err(E::internal(anyhow!(
+                "Failed to retrieve latest ledger info"
+            )))
+        }
+    }
+
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
         self.db.get_latest_ledger_info()
     }
@@ -113,16 +148,31 @@ impl Context {
             .get_state_value(state_key)
     }
 
+    pub fn get_state_value_poem<E: InternalError>(
+        &self,
+        state_key: &StateKey,
+        version: u64,
+    ) -> Result<Option<Vec<u8>>, E> {
+        self.get_state_value(state_key, version)
+            .context("Failed to retrieve state value")
+            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))
+    }
+
+    pub fn get_state_values(
+        &self,
+        address: AccountAddress,
+        version: u64,
+    ) -> Result<HashMap<StateKey, StateValue>> {
+        self.db
+            .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)
+    }
+
     pub fn get_account_state(
         &self,
         address: AccountAddress,
         version: u64,
     ) -> Result<Option<AccountState>> {
-        AccountState::from_access_paths_and_values(
-            &self
-                .db
-                .get_state_values_by_key_prefix(&StateKeyPrefix::from(address), version)?,
-        )
+        AccountState::from_access_paths_and_values(&self.get_state_values(address, version)?)
     }
 
     pub fn get_block_timestamp(&self, version: u64) -> Result<u64> {
@@ -180,13 +230,13 @@ impl Context {
         let height_id = ident_str!("height");
         let block_metadata_type = move_deps::move_core_types::language_storage::StructTag {
             address: CORE_CODE_ADDRESS,
-            module: ident_str!("Block").into(),
+            module: ident_str!("block").into(),
             name: ident_str!("BlockMetadata").into(),
             type_params: vec![],
         };
 
         let resolver = self.move_resolver()?;
-        let converter = resolver.as_converter();
+        let converter = resolver.as_converter(self.db.clone());
         let txn = self.get_transaction_by_version(start, ledger_version)?;
 
         // Parse the resources and find the block metadata resource update
@@ -198,7 +248,7 @@ impl Context {
                     if path.address == CORE_CODE_ADDRESS && typ == block_metadata_type {
                         if let WriteOp::Value(value) = op {
                             if let Ok(mut resource) = converter.try_into_resource(&typ, value) {
-                                if let Some(value) = resource.data.0.remove(height_id) {
+                                if let Some(value) = resource.data.0.remove(&height_id.into()) {
                                     if let Ok(height) = serde_json::from_value::<U64>(value) {
                                         return Some(height.0);
                                     }
@@ -373,6 +423,6 @@ impl Context {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BlockMetadataState {
-    epoch_internal: U64,
+    epoch_interval: U64,
     height: U64,
 }

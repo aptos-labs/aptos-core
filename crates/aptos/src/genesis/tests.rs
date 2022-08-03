@@ -75,7 +75,7 @@ async fn generate_genesis(git_options: GitOptions, output_dir: PathBuf) {
     let command = GenerateGenesis {
         prompt_options: PromptOptions::yes(),
         git_options,
-        output_dir,
+        output_dir: Some(output_dir),
     };
     let _ = command.execute().await.unwrap();
 }
@@ -137,10 +137,8 @@ fn create_layout_file(
         allow_new_validators: false,
         min_stake: 0,
         max_stake: u64::MAX,
-        min_lockup_duration_secs: 0,
-        max_lockup_duration_secs: 31536000, // One Year
-        epoch_duration_secs: 86400,         // One Day
-        initial_lockup_timestamp: 0,
+        recurring_lockup_duration_secs: 86400, // One day
+        epoch_duration_secs: 86400,            // One day
         min_price_per_gas_unit: 1,
     };
     let file = TempPath::new();
@@ -161,7 +159,7 @@ async fn generate_keys(dir: &Path, index: u8) -> PathBuf {
     let command = GenerateKeys {
         rng_args: RngArgs::from_seed([index; 32]),
         prompt_options: PromptOptions::yes(),
-        output_dir: output_dir.clone(),
+        output_dir: Some(output_dir.clone()),
     };
     let _ = command.execute().await.unwrap();
 
@@ -173,7 +171,7 @@ async fn add_public_keys(username: String, git_options: GitOptions, keys_dir: &P
     let command = SetValidatorConfiguration {
         username,
         git_options,
-        keys_dir: PathBuf::from(keys_dir),
+        keys_dir: Some(PathBuf::from(keys_dir)),
         validator_host: HostAndPort::from_str("localhost:6180").unwrap(),
         full_node_host: None,
         stake_amount: 1,

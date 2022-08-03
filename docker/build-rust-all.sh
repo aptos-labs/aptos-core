@@ -4,7 +4,7 @@
 set -e
 
 # Build all the rust release binaries
-cargo build --release \
+RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
         -p aptos \
         -p aptos-node \
         -p aptos-indexer \
@@ -40,3 +40,4 @@ done
 
 # Build the Aptos Move framework
 cargo run --package framework -- --package aptos-framework --output current
+cargo run --package framework -- --package aptos-token --output current

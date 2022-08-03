@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::new_local_swarm_with_aptos,
+    smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
     test_utils::{create_and_fund_account, transfer_and_reconfig, transfer_coins},
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
@@ -14,6 +14,7 @@ use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -63,6 +64,30 @@ async fn test_full_node_bootstrap_outputs() {
         .state_sync
         .state_sync_driver
         .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
+    vfn_config.state_sync.aptos_data_client.use_compression = true;
+
+    // Create the fullnode
+    let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
+
+    // Test the ability of the fullnode to sync
+    test_full_node_sync(vfn_peer_id, swarm, true).await;
+}
+
+#[tokio::test]
+async fn test_full_node_bootstrap_outputs_no_compression() {
+    // Create a validator swarm of 1 validator node
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+
+    // Create a fullnode config that uses transaction outputs to sync (without compression)
+    let mut vfn_config = NodeConfig::default_for_validator_full_node();
+    vfn_config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
+    vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
+        BootstrappingMode::ApplyTransactionOutputsFromGenesis;
+    vfn_config
+        .state_sync
+        .state_sync_driver
+        .continuous_syncing_mode = ContinuousSyncingMode::ApplyTransactionOutputs;
+    vfn_config.state_sync.aptos_data_client.use_compression = false;
 
     // Create the fullnode
     let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
@@ -85,6 +110,7 @@ async fn test_full_node_bootstrap_transactions() {
         .state_sync
         .state_sync_driver
         .continuous_syncing_mode = ContinuousSyncingMode::ExecuteTransactions;
+    vfn_config.state_sync.aptos_data_client.use_compression = true;
 
     // Create the fullnode
     let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
@@ -195,17 +221,17 @@ async fn test_full_node_sync(vfn_peer_id: PeerId, mut swarm: LocalSwarm, epoch_c
 #[tokio::test]
 async fn test_validator_bootstrap_outputs() {
     // Create a swarm of 4 validators with state sync v2 enabled (output syncing)
-    let mut swarm = new_local_swarm_with_aptos(4).await;
-    for validator in swarm.validators_mut() {
-        let mut config = validator.config().clone();
-        config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
-        config.state_sync.state_sync_driver.bootstrapping_mode =
-            BootstrappingMode::ApplyTransactionOutputsFromGenesis;
-        config.state_sync.state_sync_driver.continuous_syncing_mode =
-            ContinuousSyncingMode::ApplyTransactionOutputs;
-        config.save(validator.config_path()).unwrap();
-        validator.restart().await.unwrap();
-    }
+    let swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::ApplyTransactionOutputsFromGenesis;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ApplyTransactionOutputs;
+        }))
+        .build()
+        .await;
 
     // Test the ability of the validators to sync
     test_validator_sync(swarm).await;
@@ -214,17 +240,37 @@ async fn test_validator_bootstrap_outputs() {
 #[tokio::test]
 async fn test_validator_bootstrap_transactions() {
     // Create a swarm of 4 validators with state sync v2 enabled (transaction syncing)
-    let mut swarm = new_local_swarm_with_aptos(4).await;
-    for validator in swarm.validators_mut() {
-        let mut config = validator.config().clone();
-        config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
-        config.state_sync.state_sync_driver.bootstrapping_mode =
-            BootstrappingMode::ExecuteTransactionsFromGenesis;
-        config.state_sync.state_sync_driver.continuous_syncing_mode =
-            ContinuousSyncingMode::ExecuteTransactions;
-        config.save(validator.config_path()).unwrap();
-        validator.restart().await.unwrap();
-    }
+    let swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::ExecuteTransactionsFromGenesis;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ExecuteTransactions;
+        }))
+        .build()
+        .await;
+
+    // Test the ability of the validators to sync
+    test_validator_sync(swarm).await;
+}
+
+#[tokio::test]
+async fn test_validator_bootstrap_transactions_no_compression() {
+    // Create a swarm of 4 validators with state sync v2 enabled (transaction syncing, no compression)
+    let swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::ExecuteTransactionsFromGenesis;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ExecuteTransactions;
+            config.state_sync.aptos_data_client.use_compression = false;
+        }))
+        .build()
+        .await;
 
     // Test the ability of the validators to sync
     test_validator_sync(swarm).await;
@@ -233,9 +279,6 @@ async fn test_validator_bootstrap_transactions() {
 /// A helper method that tests that a validator can sync after a failure and
 /// continue to stay up-to-date.
 async fn test_validator_sync(mut swarm: LocalSwarm) {
-    // Launch the swarm and wait for it to be ready
-    swarm.launch().await.unwrap();
-
     // Execute multiple transactions through validator 0
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     let validator_client_0 = swarm
@@ -285,17 +328,17 @@ async fn test_validator_sync(mut swarm: LocalSwarm) {
 async fn test_validator_failure_bootstrap_outputs() {
     // Create a swarm of 4 validators with state sync v2 enabled (account
     // bootstrapping and transaction output application).
-    let mut swarm = new_local_swarm_with_aptos(4).await;
-    for validator in swarm.validators_mut() {
-        let mut config = validator.config().clone();
-        config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
-        config.state_sync.state_sync_driver.bootstrapping_mode =
-            BootstrappingMode::DownloadLatestStates;
-        config.state_sync.state_sync_driver.continuous_syncing_mode =
-            ContinuousSyncingMode::ApplyTransactionOutputs;
-        config.save(validator.config_path()).unwrap();
-        validator.restart().await.unwrap();
-    }
+    let swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::DownloadLatestStates;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ApplyTransactionOutputs;
+        }))
+        .build()
+        .await;
 
     // Test the ability of the validators to sync
     test_all_validator_failures(swarm).await;
@@ -305,17 +348,17 @@ async fn test_validator_failure_bootstrap_outputs() {
 async fn test_validator_failure_bootstrap_execution() {
     // Create a swarm of 4 validators with state sync v2 enabled (account
     // bootstrapping and transaction execution).
-    let mut swarm = new_local_swarm_with_aptos(4).await;
-    for validator in swarm.validators_mut() {
-        let mut config = validator.config().clone();
-        config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
-        config.state_sync.state_sync_driver.bootstrapping_mode =
-            BootstrappingMode::DownloadLatestStates;
-        config.state_sync.state_sync_driver.continuous_syncing_mode =
-            ContinuousSyncingMode::ExecuteTransactions;
-        config.save(validator.config_path()).unwrap();
-        validator.restart().await.unwrap();
-    }
+    let swarm = SwarmBuilder::new_local(4)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, config, _| {
+            config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
+            config.state_sync.state_sync_driver.bootstrapping_mode =
+                BootstrappingMode::DownloadLatestStates;
+            config.state_sync.state_sync_driver.continuous_syncing_mode =
+                ContinuousSyncingMode::ExecuteTransactions;
+        }))
+        .build()
+        .await;
 
     // Test the ability of the validators to sync
     test_all_validator_failures(swarm).await;
@@ -324,9 +367,6 @@ async fn test_validator_failure_bootstrap_execution() {
 /// A helper method that tests that all validators can sync after a failure and
 /// continue to stay up-to-date.
 async fn test_all_validator_failures(mut swarm: LocalSwarm) {
-    // Launch the swarm and wait for it to be ready
-    swarm.launch().await.unwrap();
-
     // Execute multiple transactions through validator 0
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
     let validator_0 = validator_peer_ids[0];
@@ -384,16 +424,13 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 #[ignore]
 async fn test_single_validator_failure() {
     // Create a swarm of 1 validator
-    let mut swarm = new_local_swarm_with_aptos(1).await;
-    swarm.launch().await.unwrap();
-
-    // Enable state sync v2 and reboot the node
-    let validator = swarm.validators_mut().next().unwrap();
-    let mut config = validator.config().clone();
-    config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
-    config.save(validator.config_path()).unwrap();
-    validator.stop();
-    swarm.launch().await.unwrap();
+    let mut swarm = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_, mut config, _| {
+            config.state_sync.state_sync_driver.enable_state_sync_v2 = true;
+        }))
+        .build()
+        .await;
 
     // Execute multiple transactions
     let validator = swarm.validators_mut().next().unwrap();
@@ -411,7 +448,8 @@ async fn test_single_validator_failure() {
     // Restart the validator
     let validator = swarm.validators_mut().next().unwrap();
     validator.stop();
-    swarm.launch().await.unwrap();
+    validator.start().unwrap();
+    swarm.wait_all_alive(Duration::from_secs(20)).await.unwrap();
 
     // Execute more transactions
     execute_transactions(

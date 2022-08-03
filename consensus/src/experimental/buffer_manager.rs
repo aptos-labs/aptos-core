@@ -23,6 +23,7 @@ use aptos_types::{
 use consensus_types::{common::Author, executed_block::ExecutedBlock};
 
 use crate::{
+    counters,
     experimental::{
         buffer::{Buffer, Cursor},
         buffer_item::BufferItem,
@@ -32,7 +33,6 @@ use crate::{
         signing_phase::{SigningRequest, SigningResponse},
     },
     network::NetworkSender,
-    network_interface::ConsensusMsg,
     round_manager::VerifiedEvent,
     state_replication::StateComputerCommitCallBackType,
 };
@@ -146,6 +146,21 @@ impl BufferManager {
         CountedRequest::new(req, self.ongoing_tasks.clone())
     }
 
+    fn spawn_retry_request<T: Send + 'static>(
+        mut sender: Sender<T>,
+        request: T,
+        duration: Duration,
+    ) {
+        counters::BUFFER_MANAGER_RETRY_COUNT.inc();
+        tokio::spawn(async move {
+            tokio::time::sleep(duration).await;
+            sender
+                .send(request)
+                .await
+                .expect("Failed to send retry request");
+        });
+    }
+
     /// process incoming ordered blocks
     /// push them into the buffer and update the roots if they are none.
     fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
@@ -163,28 +178,40 @@ impl BufferManager {
     /// Set the execution root to the first not executed item (Ordered) and send execution request
     /// Set to None if not exist
     async fn advance_execution_root(&mut self) {
-        let cursor = self.execution_root.or_else(|| *self.buffer.head_cursor());
-        self.execution_root = self.buffer.find_elem_from(cursor, |item| item.is_ordered());
+        let cursor = self.execution_root;
+        self.execution_root = self
+            .buffer
+            .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
+                item.is_ordered()
+            });
         debug!(
             "Advance execution root from {:?} to {:?}",
             cursor, self.execution_root
         );
         if self.execution_root.is_some() {
             let ordered_blocks = self.buffer.get(&self.execution_root).get_blocks().clone();
-            self.execution_phase_tx
-                .send(self.create_new_request(ExecutionRequest { ordered_blocks }))
-                .await
-                .expect("Failed to send execution request")
+            let request = self.create_new_request(ExecutionRequest { ordered_blocks });
+            if cursor == self.execution_root {
+                let sender = self.execution_phase_tx.clone();
+                Self::spawn_retry_request(sender, request, Duration::from_millis(100));
+            } else {
+                self.execution_phase_tx
+                    .send(request)
+                    .await
+                    .expect("Failed to send execution request")
+            }
         }
     }
 
     /// Set the signing root to the first not signed item (Executed) and send execution request
     /// Set to None if not exist
     async fn advance_signing_root(&mut self) {
-        let cursor = self.signing_root.or_else(|| *self.buffer.head_cursor());
+        let cursor = self.signing_root;
         self.signing_root = self
             .buffer
-            .find_elem_from(cursor, |item| item.is_executed());
+            .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
+                item.is_executed()
+            });
         debug!(
             "Advance signing root from {:?} to {:?}",
             cursor, self.signing_root
@@ -192,13 +219,19 @@ impl BufferManager {
         if self.signing_root.is_some() {
             let item = self.buffer.get(&self.signing_root);
             let executed_item = item.unwrap_executed_ref();
-            self.signing_phase_tx
-                .send(self.create_new_request(SigningRequest {
-                    ordered_ledger_info: executed_item.ordered_proof.clone(),
-                    commit_ledger_info: executed_item.commit_proof.ledger_info().clone(),
-                }))
-                .await
-                .expect("Failed to send signing request");
+            let request = self.create_new_request(SigningRequest {
+                ordered_ledger_info: executed_item.ordered_proof.clone(),
+                commit_ledger_info: executed_item.commit_proof.ledger_info().clone(),
+            });
+            if cursor == self.signing_root {
+                let sender = self.signing_phase_tx.clone();
+                Self::spawn_retry_request(sender, request, Duration::from_millis(100));
+            } else {
+                self.signing_phase_tx
+                    .send(request)
+                    .await
+                    .expect("Failed to send signing request");
+            }
         }
     }
 
@@ -224,7 +257,7 @@ impl BufferManager {
                 let aggregated_item = item.unwrap_aggregated();
                 if aggregated_item.commit_proof.ledger_info().ends_epoch() {
                     self.commit_msg_tx
-                        .notify_epoch_change(EpochChangeProof::new(
+                        .send_epoch_change(EpochChangeProof::new(
                             vec![aggregated_item.commit_proof.clone()],
                             false,
                         ))
@@ -254,6 +287,9 @@ impl BufferManager {
         unreachable!("Aggregated item not found in the list");
     }
 
+    /// Reset any request in buffer manager, this is important to avoid race condition with state sync.
+    /// Internal requests are managed with ongoing_tasks.
+    /// Incoming ordered blocks are pulled, it should only have existing blocks but no new blocks until reset finishes.
     async fn reset(&mut self) {
         self.buffer = Buffer::new();
         self.execution_root = None;
@@ -292,12 +328,6 @@ impl BufferManager {
                 return;
             }
         };
-        // if this batch of blocks are all suffix blocks (reconfiguration block is in one of previous batch)
-        // we pause the execution from here and wait for the reconfiguration to be committed.
-        if executed_blocks.first().unwrap().is_reconfiguration_suffix() {
-            debug!("Ignore reconfiguration suffix execution, waiting for epoch to be committed");
-            return;
-        }
         debug!(
             "Receive executed response {}",
             executed_blocks.last().unwrap().block_info()
@@ -343,9 +373,7 @@ impl BufferManager {
 
                 self.buffer.set(&current_cursor, signed_item);
 
-                self.commit_msg_tx
-                    .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(commit_vote)))
-                    .await;
+                self.commit_msg_tx.broadcast_commit_vote(commit_vote).await;
             } else {
                 self.buffer.set(&current_cursor, item);
             }
@@ -419,9 +447,7 @@ impl BufferManager {
                 }
                 let signed_item = item.unwrap_signed_ref();
                 self.commit_msg_tx
-                    .broadcast(ConsensusMsg::CommitVoteMsg(Box::new(
-                        signed_item.commit_vote.clone(),
-                    )))
+                    .broadcast_commit_vote(signed_item.commit_vote.clone())
                     .await;
             }
             cursor = self.buffer.get_next(&cursor);

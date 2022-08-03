@@ -164,6 +164,7 @@ pub fn state_sync_v1_network_config() -> AppConfig {
 #[cfg(any(test, feature = "fuzzing"))]
 mod tests {
     use crate::StateSyncMultiplexer;
+    use aptos_config::config::TARGET_SNAPSHOT_SIZE;
     use aptos_config::{
         config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG},
         utils::get_genesis_txn,
@@ -201,6 +202,8 @@ mod tests {
             false,
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfigs::default(),
+            false,
+            TARGET_SNAPSHOT_SIZE,
         )
         .unwrap();
         let (_, db_rw) = DbReaderWriter::wrap(db);
@@ -245,7 +248,7 @@ mod tests {
             mempool_notifier,
             consensus_listener,
             db_rw.clone(),
-            Arc::new(ChunkExecutor::<AptosVM>::new(db_rw).unwrap()),
+            Arc::new(ChunkExecutor::<AptosVM>::new(db_rw)),
             &node_config,
             Waypoint::new_any(&LedgerInfo::new(BlockInfo::empty(), HashValue::random())),
             event_subscription_service,

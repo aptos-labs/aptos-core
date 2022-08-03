@@ -3,6 +3,11 @@ variable "region" {
   type        = string
 }
 
+variable "kubernetes_version" {
+  description = "Version of Kubernetes to use for EKS cluster"
+  default     = "1.22"
+}
+
 variable "k8s_api_sources" {
   description = "List of CIDR subnets which can access the Kubernetes API endpoint"
   default     = ["0.0.0.0/0"]
@@ -77,11 +82,6 @@ variable "helm_values" {
 variable "helm_values_file" {
   description = "Path to file containing values for Helm chart"
   default     = ""
-}
-
-variable "helm_force_update" {
-  description = "Force Terraform to update the Helm deployment"
-  default     = true
 }
 
 variable "k8s_admins" {
@@ -194,6 +194,17 @@ variable "logger_helm_values" {
   description = "Map of values to pass to logger Helm"
   type        = any
   default     = {}
+}
+
+variable "enable_vector_daemonset_logger" {
+  description = "Enable vector daemonset logger helm chart"
+  default     = false
+}
+
+variable "vector_daemonset_helm_values" {
+  description = "Map of helm values to pass to vector-daemonset chart"
+  type        = list(string)
+  default     = []
 }
 
 variable "enable_monitoring" {

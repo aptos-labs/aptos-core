@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeMap, iter::once};
+use std::{collections::BTreeMap, iter::once, sync::Arc};
 
 use proptest::prelude::*;
 
@@ -24,7 +24,7 @@ use aptos_types::{
 };
 use aptosdb::AptosDB;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
-use storage_interface::{DbReaderWriter, ExecutedTrees};
+use storage_interface::{sync_proof_fetcher::SyncProofFetcher, DbReaderWriter, ExecutedTrees};
 
 use crate::{
     block_executor::BlockExecutor,
@@ -387,7 +387,11 @@ fn apply_transaction_by_writeset(
         .collect();
 
     let state_view = ledger_view
-        .verified_state_view(StateViewId::Miscellaneous, db.reader.clone())
+        .verified_state_view(
+            StateViewId::Miscellaneous,
+            Arc::clone(&db.reader),
+            Arc::new(SyncProofFetcher::new(db.reader.clone())),
+        )
         .unwrap();
 
     let chunk_output =
@@ -401,6 +405,7 @@ fn apply_transaction_by_writeset(
             ledger_view.txn_accumulator().num_leaves(),
             ledger_view.state().base_version,
             None,
+            true, /* sync_commit */
             executed.result_view.state().clone(),
         )
         .unwrap();
@@ -526,7 +531,11 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
             vec![txn],
             ledger_view
-                .verified_state_view(StateViewId::Miscellaneous, db.reader.clone())
+                .verified_state_view(
+                    StateViewId::Miscellaneous,
+                    Arc::clone(&db.reader),
+                    Arc::new(SyncProofFetcher::new(db.reader.clone())),
+                )
                 .unwrap(),
         )
         .unwrap();
@@ -537,6 +546,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
                 ledger_view.txn_accumulator().num_leaves(),
                 ledger_view.state().base_version,
                 None,
+                true, /* sync_commit */
                 executed.result_view.state().clone(),
             )
             .unwrap();
@@ -721,14 +731,14 @@ proptest! {
 
         // Commit the first chunk without committing the ledger info.
         let TestExecutor { _path, db, executor } = TestExecutor::new();
-        ChunkExecutor::<MockVM>::new(db).unwrap()
+        ChunkExecutor::<MockVM>::new(db)
             .execute_and_commit_chunk(txn_list_with_proof_to_commit, &ledger_info, None).unwrap();
 
         first_block_txns.extend(overlap_txn_list_with_proof.transactions);
         let second_block_txns = ((chunk_size + overlap_size + 1..=chunk_size + overlap_size + num_new_txns)
                              .map(|i| encode_mint_transaction(gen_address(i), 100))).collect::<Vec<_>>();
 
-        executor.reset().unwrap();
+        executor.reset();
         let parent_block_id = executor.committed_block_id();
         let first_block_id = gen_block_id(1);
         let _output1 = executor.execute_block(

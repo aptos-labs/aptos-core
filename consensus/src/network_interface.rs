@@ -170,15 +170,20 @@ impl ApplicationNetworkSender<ConsensusMsg> for ConsensusNetworkSender {
         message: ConsensusMsg,
     ) -> Result<(), NetworkError> {
         let mut peers_per_protocol = HashMap::new();
+        let mut not_available = vec![];
         for peer in recipients {
             match self.preferred_protocol_for_peer(peer, DIRECT_SEND) {
                 Ok(protocol) => peers_per_protocol
                     .entry(protocol)
                     .or_insert_with(Vec::new)
                     .push(peer),
-                Err(e) => error!("{}", e),
+                Err(_) => not_available.push(peer),
             }
         }
+        sample!(
+            SampleRate::Duration(Duration::from_secs(10)),
+            error!("Unavailable peers: {:?}", not_available)
+        );
         for (protocol, peers) in peers_per_protocol {
             self.network_sender
                 .send_to_many(peers.into_iter(), protocol, message.clone())?;

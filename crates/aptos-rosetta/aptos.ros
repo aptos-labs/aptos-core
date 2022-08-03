@@ -17,10 +17,10 @@ create_account(1){
 
         // Find the "faucet" loaded account
         currency = {
-          "symbol": "TC",
-          "decimals": 6,
+          "symbol": "APTOS",
+          "decimals": 8,
           "metadata": {
-            "move_type": "0x1::TestCoin::TestCoin"
+            "move_type": "0x1::aptos_coin::AptosCoin"
           }
         };
         print_message({"Find faucet with at least balance to create accounts": "10000000"});
@@ -51,10 +51,10 @@ create_account(1){
 request_funds(1){
   find_account{
     currency = {
-      "symbol": "TC",
-      "decimals": 6,
+      "symbol": "APTOS",
+      "decimals": 8,
       "metadata": {
-        "move_type": "0x1::TestCoin::TestCoin"
+        "move_type": "0x1::aptos_coin::AptosCoin"
       }
     };
     print_message({"Find faucet with at least balance": "0"});
@@ -83,10 +83,10 @@ transfer(50){
     transfer{
         transfer.network = {"network":"TESTING", "blockchain":"aptos"};
         currency = {
-          "symbol": "TC",
-          "decimals": 6,
+          "symbol": "APTOS",
+          "decimals": 8,
           "metadata": {
-            "move_type": "0x1::TestCoin::TestCoin"
+            "move_type": "0x1::aptos_coin::AptosCoin"
           }
         };
 

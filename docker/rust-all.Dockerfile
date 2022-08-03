@@ -2,13 +2,37 @@
 
 FROM debian:buster-20220228@sha256:fd510d85d7e0691ca551fe08e8a2516a86c7f24601a940a299b5fe5cdd22c03a AS debian-base
 
+# Add Tini to make sure the binaries receive proper SIGTERM signals when Docker is shut down
+ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
+RUN chmod +x /tini
+ENTRYPOINT ["/tini", "--"]
+
 FROM rust:1.61-buster AS rust-base
 WORKDIR /aptos
 RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-dev libpq-dev
 
 ### Build Rust code ###
 FROM rust-base as builder
+
+# Confirm that this Dockerfile is being invoked from an appropriate builder.
+# See https://github.com/aptos-labs/aptos-core/pull/2471
+# See https://github.com/aptos-labs/aptos-core/pull/2472
+ARG BUILT_VIA_BUILDKIT
+ENV BUILT_VIA_BUILDKIT $BUILT_VIA_BUILDKIT
+
+RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nFor more information, see https://github.com/aptos-labs/aptos-core/pull/2472\n\nThanks!" && false)
+
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
+
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+
 COPY --link . /aptos/
+
 RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOME/registry docker/build-rust-all.sh && rm -rf $CARGO_HOME/registry/index
 
 ### Validator Image ###
@@ -17,7 +41,7 @@ FROM debian-base AS validator
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && apt-get clean && rm -r /var/lib/apt/lists/*
 
 ### Needed to run debugging tools like perf
-RUN apt-get update && apt-get install -y linux-perf sudo procps
+RUN apt-get update && apt-get install -y linux-perf sudo procps gdb
 ### Because build machine perf might not match run machine perf, we have to symlink
 ### Even if version slightly off, still mostly works
 RUN ln -sf /usr/bin/perf_* /usr/bin/perf
@@ -41,7 +65,7 @@ EXPOSE 6186
 
 # Capture backtrace on error
 ENV RUST_BACKTRACE 1
-
+ENV RUST_LOG_FORMAT=json
 
 
 ### Indexer Image ###
@@ -54,6 +78,8 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcp
 RUN mkdir -p /opt/aptos/bin
 COPY --link --from=builder /aptos/dist/aptos-indexer /usr/local/bin/aptos-indexer
 
+ENV RUST_LOG_FORMAT=json
+
 ### Node Checker Image ###
 
 FROM debian-base AS node-checker
@@ -64,6 +90,7 @@ RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcp
 RUN mkdir -p /opt/aptos/bin
 COPY --link --from=builder /aptos/dist/aptos-node-checker /usr/local/bin/aptos-node-checker
 
+ENV RUST_LOG_FORMAT=json
 
 ### Tools Image ###
 FROM debian-base AS tools
@@ -93,8 +120,10 @@ COPY --link --from=builder /aptos/dist/transaction-emitter /usr/local/bin/transa
 RUN mkdir -p /aptos-framework/move/build
 RUN mkdir -p /aptos-framework/move/modules
 COPY --link --from=builder /aptos/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
+COPY --link --from=builder /aptos/aptos-token/releases/artifacts/current/build /aptos-framework/move/build
+
 RUN mv /aptos-framework/move/build/**/bytecode_modules/*.mv /aptos-framework/move/modules
-RUN mv /aptos-framework/move/build/**/bytecode_modules/dependencies/**/*.mv /aptos-framework/move/modules
+RUN mv /aptos-framework/move/build/AptosFramework/bytecode_modules/dependencies/**/*.mv /aptos-framework/move/modules
 RUN rm -rf /aptos-framework/move/build
 
 
@@ -113,6 +142,7 @@ RUN apt-get update && apt-get install -y procps
 
 # Mint proxy listening address
 EXPOSE 8000
+ENV RUST_LOG_FORMAT=json
 
 
 
@@ -133,6 +163,6 @@ ENV PATH "$PATH:/root/bin"
 
 WORKDIR /aptos
 COPY --link --from=builder /aptos/dist/forge /usr/local/bin/forge
+ENV RUST_LOG_FORMAT=json
 
-
-ENTRYPOINT ["forge"]
+ENTRYPOINT ["/tini", "--", "forge"]

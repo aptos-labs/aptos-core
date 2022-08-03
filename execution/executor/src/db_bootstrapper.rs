@@ -24,7 +24,8 @@ use executor_types::ExecutedChunk;
 use move_deps::move_core_types::move_resource::MoveResource;
 use std::{collections::btree_map::BTreeMap, sync::Arc};
 use storage_interface::{
-    cached_state_view::CachedStateView, DbReaderWriter, DbWriter, ExecutedTrees,
+    cached_state_view::CachedStateView, sync_proof_fetcher::SyncProofFetcher, DbReaderWriter,
+    DbWriter, ExecutedTrees,
 };
 
 pub fn generate_waypoint<V: VMExecutor>(
@@ -102,6 +103,7 @@ impl GenesisCommitter {
             self.output.result_view.txn_accumulator().version(),
             self.base_state_version,
             self.output.ledger_info.as_ref(),
+            true, /* sync_commit */
             self.output.result_view.state().clone(),
         )?;
         info!("Genesis commited.");
@@ -120,8 +122,11 @@ pub fn calculate_genesis<V: VMExecutor>(
     // In the very extreme and sad situation of losing quorum among validators, we refer to the
     // second use case said above.
     let genesis_version = executed_trees.version().map_or(0, |v| v + 1);
-    let base_state_view =
-        executed_trees.verified_state_view(StateViewId::Miscellaneous, db.reader.clone())?;
+    let base_state_view = executed_trees.verified_state_view(
+        StateViewId::Miscellaneous,
+        Arc::clone(&db.reader),
+        Arc::new(SyncProofFetcher::new(db.reader.clone())),
+    )?;
 
     let epoch = if genesis_version == 0 {
         GENESIS_EPOCH
@@ -141,9 +146,11 @@ pub fn calculate_genesis<V: VMExecutor>(
         // TODO(aldenhu): fix existing tests before using real timestamp and check on-chain epoch.
         GENESIS_TIMESTAMP_USECS
     } else {
-        let state_view = output
-            .result_view
-            .verified_state_view(StateViewId::Miscellaneous, db.reader.clone())?;
+        let state_view = output.result_view.verified_state_view(
+            StateViewId::Miscellaneous,
+            Arc::clone(&db.reader),
+            Arc::new(SyncProofFetcher::new(db.reader.clone())),
+        )?;
         let next_epoch = epoch
             .checked_add(1)
             .ok_or_else(|| format_err!("integer overflow occurred"))?;

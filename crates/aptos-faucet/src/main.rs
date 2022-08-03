@@ -194,7 +194,7 @@ mod tests {
                     let previous = writer.insert(address, AccountState::new(0));
                     assert!(previous.is_none(), "should not create account twice");
                 }
-                ScriptFunctionCall::TestCoinMint {
+                ScriptFunctionCall::AptosCoinMint {
                     dst_addr, amount, ..
                 } => {
                     // Sometimes we call CreateAccount and Mint at the same time (from our tests: this is a test method)
@@ -224,7 +224,7 @@ mod tests {
     fn response<T: Serialize>(body: &T) -> warp::reply::Response {
         let li = LedgerInfo {
             chain_id: ChainId::test().id(),
-            epoch: 1,
+            epoch: 1.into(),
             ledger_version: 5.into(),
             oldest_ledger_version: 0.into(),
             ledger_timestamp: 5.into(),

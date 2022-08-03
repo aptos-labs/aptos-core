@@ -1,0 +1,25 @@
+[package]
+name = "aptos-compression"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "A unified compression interface and implementation offered by Aptos"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[dependencies]
+lz4 = "1.23.1"
+once_cell = "1.10.0"
+thiserror = "1.0.31"
+
+aptos-logger = { path = "../aptos-logger" }
+aptos-metrics-core = { path = "../aptos-metrics-core" }
+
+[dev-dependencies]
+bcs = "0.1.3"
+serde = { version = "1.0.137", default-features = false }
+
+aptos-crypto = { path = "../aptos-crypto" }
+aptos-types = { path = "../../types" }

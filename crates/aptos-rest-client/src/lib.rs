@@ -14,7 +14,7 @@ use aptos_types::{
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
-use state::State;
+pub use state::State;
 use std::time::Duration;
 use url::Url;
 
@@ -50,7 +50,7 @@ impl Client {
     }
 
     pub async fn get_aptos_version(&self) -> Result<Response<AptosVersion>> {
-        self.get_resource::<AptosVersion>(CORE_CODE_ADDRESS, "0x1::Version::Version")
+        self.get_resource::<AptosVersion>(CORE_CODE_ADDRESS, "0x1::version::Version")
             .await
     }
 
@@ -61,7 +61,7 @@ impl Client {
 
     pub async fn get_account_balance(&self, address: AccountAddress) -> Result<Response<Balance>> {
         let resp = self
-            .get_account_resource(address, "0x1::Coin::CoinStore<0x1::TestCoin::TestCoin>")
+            .get_account_resource(address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>")
             .await?;
         resp.and_then(|resource| {
             if let Some(res) = resource {
@@ -80,6 +80,7 @@ impl Client {
         #[derive(Deserialize)]
         struct Response {
             chain_id: u8,
+            #[serde(deserialize_with = "types::deserialize_from_string")]
             epoch: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
             ledger_version: u64,
@@ -370,6 +371,26 @@ impl Client {
         let url = self.base_url.join(&format!("accounts/{}", address))?;
         let response = self.inner.get(url).send().await?;
         self.json(response).await
+    }
+
+    pub async fn set_failpoint(&self, name: String, actions: String) -> Result<String> {
+        let mut base = self.base_url.join("set_failpoint")?;
+        let url = base
+            .query_pairs_mut()
+            .append_pair("name", &name)
+            .append_pair("actions", &actions)
+            .finish();
+        let response = self.inner.get(url.clone()).send().await?;
+
+        if !response.status().is_success() {
+            let error_response = response.json::<RestError>().await?;
+            return Err(anyhow::anyhow!("Request failed: {:?}", error_response));
+        }
+
+        response
+            .text()
+            .await
+            .map_err(|e| anyhow::anyhow!("To text failed: {:?}", e))
     }
 
     async fn check_response(

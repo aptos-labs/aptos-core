@@ -16,7 +16,7 @@ use crate::{
     },
 };
 use accumulator::{HashReader, MerkleAccumulator};
-use anyhow::{ensure, format_err, Result};
+use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::{
     hash::{CryptoHash, EventAccumulatorHasher},
     HashValue,
@@ -167,12 +167,14 @@ impl EventStore {
             if path != *event_key || ver > ledger_version {
                 break;
             }
-            ensure!(
-                seq == cur_seq,
-                "DB corrupt: Sequence number not continuous, expected: {}, actual: {}.",
-                cur_seq,
-                seq
-            );
+            if seq != cur_seq {
+                let msg = if cur_seq == start_seq_num {
+                    "First requested event is probably pruned."
+                } else {
+                    "DB corruption: Sequence number not continous."
+                };
+                bail!("{} expected: {}, actual: {}", msg, cur_seq, seq);
+            }
             result.push((seq, ver, idx));
             cur_seq += 1;
         }

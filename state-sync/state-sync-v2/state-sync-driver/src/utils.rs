@@ -31,6 +31,8 @@ use tokio::time::timeout;
 const MAX_NUM_DATA_STREAM_TIMEOUTS: u64 = 3;
 pub const PENDING_DATA_LOG_FREQ_SECS: u64 = 3;
 
+// TODO(joshlind): add unit tests to the speculative stream state.
+
 /// The speculative state that tracks a data stream of transactions or outputs.
 /// This assumes all data is valid and allows the driver to speculatively verify
 /// payloads flowing along the stream without having to block on the executor or
@@ -75,8 +77,20 @@ impl SpeculativeStreamState {
         self.synced_version = synced_version;
     }
 
-    /// Verifies the given ledger info with signatures against the current epoch
-    /// state and updates the state if the validator set has changed.
+    /// Updates the epoch state if we've hit the specified target ledger
+    /// info version and the ledger info has a new epoch state.
+    pub fn maybe_update_epoch_state(
+        &mut self,
+        ledger_info_with_signatures: LedgerInfoWithSignatures,
+    ) {
+        if let Some(epoch_state) = ledger_info_with_signatures.ledger_info().next_epoch_state() {
+            if ledger_info_with_signatures.ledger_info().version() == self.synced_version {
+                self.epoch_state = epoch_state.clone();
+            }
+        }
+    }
+
+    /// Verifies the given ledger info with signatures against the current epoch state
     pub fn verify_ledger_info_with_signatures(
         &mut self,
         ledger_info_with_signatures: &LedgerInfoWithSignatures,
@@ -85,11 +99,7 @@ impl SpeculativeStreamState {
             .verify(ledger_info_with_signatures)
             .map_err(|error| {
                 Error::VerificationError(format!("Ledger info failed verification: {:?}", error))
-            })?;
-        if let Some(epoch_state) = ledger_info_with_signatures.ledger_info().next_epoch_state() {
-            self.epoch_state = epoch_state.clone();
-        }
-        Ok(())
+            })
     }
 }
 

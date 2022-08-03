@@ -8,6 +8,8 @@ use std::{
     path::PathBuf,
 };
 
+pub const TARGET_SNAPSHOT_SIZE: usize = 100_000;
+
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
@@ -15,6 +17,7 @@ use std::{
 pub struct RocksdbConfig {
     pub max_open_files: i32,
     pub max_total_wal_size: u64,
+    pub max_background_jobs: i32,
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -22,6 +25,7 @@ pub struct RocksdbConfig {
 pub struct RocksdbConfigs {
     pub ledger_db_config: RocksdbConfig,
     pub state_merkle_db_config: RocksdbConfig,
+    pub index_db_config: RocksdbConfig,
 }
 
 impl Default for RocksdbConfigs {
@@ -33,6 +37,9 @@ impl Default for RocksdbConfigs {
                 // For now we set the max total WAL size to be 1G. This config can be useful when column
                 // families are updated at non-uniform frequencies.
                 max_total_wal_size: 1u64 << 30,
+                // This includes threads for flashing and compaction. Rocksdb will decide the # of
+                // threads to use internally.
+                max_background_jobs: 16,
             },
             state_merkle_db_config: RocksdbConfig {
                 // Allow db to close old sst files, saving memory.
@@ -40,6 +47,19 @@ impl Default for RocksdbConfigs {
                 // For now we set the max total WAL size to be 1G. This config can be useful when column
                 // families are updated at non-uniform frequencies.
                 max_total_wal_size: 1u64 << 30,
+                // This includes threads for flashing and compaction. Rocksdb will decide the # of
+                // threads to use internally.
+                max_background_jobs: 16,
+            },
+            index_db_config: RocksdbConfig {
+                // Allow db to close old sst files, saving memory.
+                max_open_files: 1000,
+                // For now we set the max total WAL size to be 1G. This config can be useful when column
+                // families are updated at non-uniform frequencies.
+                max_total_wal_size: 1u64 << 30,
+                // This includes threads for flashing and compaction. Rocksdb will decide the # of
+                // threads to use internally.
+                max_background_jobs: 16,
             },
         }
     }
@@ -57,14 +77,21 @@ pub struct StorageConfig {
     data_dir: PathBuf,
     /// Read, Write, Connect timeout for network operations in milliseconds
     pub timeout_ms: u64,
+    /// The threshold that determine whether a snapshot should be committed to state merkle db.
+    pub target_snapshot_size: usize,
     /// Rocksdb-specific configurations
     pub rocksdb_configs: RocksdbConfigs,
+    /// Try to enable the internal indexer. The indexer expects to have seen all transactions
+    /// since genesis. To recover operation after data loss, or to bootstrap a node in fast sync
+    /// mode, the indexer db needs to be copied in from another node.
+    pub enable_indexer: bool,
 }
 
 pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig {
     state_store_prune_window: None,
     ledger_prune_window: None,
-    pruning_batch_size: 10_000,
+    ledger_pruning_batch_size: 10_000,
+    state_store_pruning_batch_size: 10_000,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -77,21 +104,27 @@ pub struct StoragePrunerConfig {
     /// being big in size, we might want to configure a smaller window for state store vs other
     /// store.
     pub ledger_prune_window: Option<u64>,
-    /// Batch size of the versions to be sent to the pruner - this is to avoid slowdown due to
-    /// issuing too many DB calls and batch prune instead.
-    pub pruning_batch_size: usize,
+    /// Batch size of the versions to be sent to the ledger pruner - this is to avoid slowdown due to
+    /// issuing too many DB calls and batch prune instead. For ledger pruner, this means the number
+    /// of versions to prune a time.
+    pub ledger_pruning_batch_size: usize,
+    /// Similar to the variable above but for state store pruner. It means the number of stale
+    /// nodes to prune a time.
+    pub state_store_pruning_batch_size: usize,
 }
 
 impl StoragePrunerConfig {
     pub fn new(
         state_store_prune_window: Option<u64>,
         ledger_store_prune_window: Option<u64>,
-        pruning_batch_size: usize,
+        ledger_pruning_batch_size: usize,
+        state_store_pruning_batch_size: usize,
     ) -> Self {
         StoragePrunerConfig {
             state_store_prune_window,
             ledger_prune_window: ledger_store_prune_window,
-            pruning_batch_size,
+            ledger_pruning_batch_size,
+            state_store_pruning_batch_size,
         }
     }
 }
@@ -112,12 +145,17 @@ impl Default for StorageConfig {
             storage_pruner_config: StoragePrunerConfig {
                 state_store_prune_window: Some(1_000_000),
                 ledger_prune_window: Some(10_000_000),
-                pruning_batch_size: 500,
+                ledger_pruning_batch_size: 500,
+                // A 10k transaction block (touching 60k state values, in the case of the account
+                // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
+                state_store_pruning_batch_size: 1_000,
             },
             data_dir: PathBuf::from("/opt/aptos/data"),
             // Default read/write/connection timeout, in milliseconds
             timeout_ms: 30_000,
             rocksdb_configs: RocksdbConfigs::default(),
+            enable_indexer: false,
+            target_snapshot_size: TARGET_SNAPSHOT_SIZE,
         }
     }
 }

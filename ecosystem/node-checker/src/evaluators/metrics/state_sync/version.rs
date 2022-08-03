@@ -198,10 +198,10 @@ impl Evaluator for StateSyncVersionEvaluator {
 #[cfg(test)]
 mod test {
     use super::{super::super::parse_metrics, *};
-
+    use std::fmt::Write;
     fn get_metric_string(value: u64) -> String {
         let mut metric_string = r#"aptos_state_sync_version{type="synced"} "#.to_string();
-        metric_string.push_str(&format!("{}", value));
+        write!(metric_string, "{}", value).unwrap();
         metric_string
     }
 

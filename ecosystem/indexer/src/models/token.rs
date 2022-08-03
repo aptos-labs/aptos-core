@@ -1,6 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
-
+#![allow(clippy::extra_unused_lifetimes)]
 use crate::{models::events::Event, schema::tokens};
 use aptos_rest_client::types;
 use std::{collections::HashMap, fmt, fmt::Formatter, str::FromStr};
@@ -110,6 +110,7 @@ pub struct DepositEventType {
 pub struct CreationEventType {
     pub id: TokenId,
     pub token_data: TokenData,
+    pub initial_balance: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -143,19 +144,19 @@ impl TokenEvent {
     pub fn from_event(event: &Event) -> Option<TokenEvent> {
         let data = event.data.clone();
         match event.type_.as_str() {
-            "0x1::Token::WithdrawEvent" => {
+            "0x1::token::WithdrawEvent" => {
                 let event = serde_json::from_value::<WithdrawEventType>(data).unwrap();
                 Some(TokenEvent::WithdrawEvent(event))
             }
-            "0x1::Token::DepositEvent" => {
+            "0x1::token::DepositEvent" => {
                 let event = serde_json::from_value::<DepositEventType>(data).unwrap();
                 Some(TokenEvent::DepositEvent(event))
             }
-            "0x1::Token::CreateTokenEvent" => {
+            "0x1::token::CreateTokenEvent" => {
                 let event = serde_json::from_value::<CreationEventType>(data).unwrap();
                 Some(TokenEvent::CreationEvent(event))
             }
-            "0x1::Token::CreateCollectionEvent" => {
+            "0x1::token::CreateCollectionEvent" => {
                 let event = serde_json::from_value::<CreateCollectionEventType>(data).unwrap();
                 Some(TokenEvent::CollectionCreationEvent(event))
             }

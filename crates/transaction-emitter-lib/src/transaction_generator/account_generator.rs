@@ -38,7 +38,7 @@ impl AccountGenerator {
         let auth_key = AuthenticationKey::from_preimage(&preimage);
         from.sign_with_transaction_builder(
             txn_factory
-                .payload(aptos_stdlib::encode_account_create_account(
+                .payload(aptos_stdlib::account_create_account(
                     auth_key.derived_address(),
                 ))
                 .gas_unit_price(gas_price),
@@ -50,17 +50,21 @@ impl TransactionGenerator for AccountGenerator {
     fn generate_transactions(
         &mut self,
         accounts: Vec<&mut LocalAccount>,
+        transactions_per_account: usize,
         all_addresses: Arc<Vec<AccountAddress>>,
         _invalid_transaction_ratio: usize,
         gas_price: u64,
     ) -> Vec<SignedTransaction> {
-        let mut requests = Vec::with_capacity(accounts.len());
+        let mut requests = Vec::with_capacity(accounts.len() * transactions_per_account);
         for account in accounts {
-            let receiver = all_addresses
-                .choose(&mut self.rng)
-                .expect("all_addresses can't be empty");
-            let request = self.gen_single_txn(account, receiver, 0, &self.txn_factory, gas_price);
-            requests.push(request);
+            for _ in 0..transactions_per_account {
+                let receiver = all_addresses
+                    .choose(&mut self.rng)
+                    .expect("all_addresses can't be empty");
+                let request =
+                    self.gen_single_txn(account, receiver, 0, &self.txn_factory, gas_price);
+                requests.push(request);
+            }
         }
         requests
     }

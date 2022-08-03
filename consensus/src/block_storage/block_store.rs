@@ -370,7 +370,7 @@ impl BlockStore {
                     executed_block.block()
                 );
             }
-            self.time_service.wait_until(block_time);
+            self.time_service.wait_until(block_time).await;
         }
         self.storage
             .save_tree(vec![executed_block.block().clone()], vec![])

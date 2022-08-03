@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::test_coin_identifier_lower;
+use crate::types::{aptos_coin_module_identifier, aptos_coin_resource_identifier};
 use crate::{
     error::{ApiError, ApiResult},
     types::{
-        test_coin_identifier, Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier,
-        PartialBlockIdentifier,
+        Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier, PartialBlockIdentifier,
     },
     RosettaContext,
 };
@@ -20,8 +19,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
 use warp::Filter;
 
-/// The year 2000 in seconds, as this is the lower limit for Rosetta API implementations
-const Y2K_SECS: u64 = 946713600000;
+/// The year 2000 in milliseconds, as this is the lower limit for Rosetta API implementations
+pub const Y2K_MS: u64 = 946713600000;
 pub const BLOCKCHAIN: &str = "aptos";
 
 /// Checks the request network matches the server network
@@ -109,8 +108,8 @@ pub fn get_timestamp(block_info: BlockInfo) -> u64 {
     let mut timestamp = block_info.block_timestamp / 1000;
 
     // Rosetta doesn't like timestamps before 2000
-    if timestamp < Y2K_SECS {
-        timestamp = Y2K_SECS;
+    if timestamp < Y2K_MS {
+        timestamp = Y2K_MS;
     }
     timestamp
 }
@@ -137,15 +136,15 @@ pub fn decode_key<T: DeserializeOwned + ValidCryptoMaterial>(
     T::from_encoded_string(str).map_err(|_| ApiError::deserialization_failed(type_name))
 }
 
-const DEFAULT_COIN: &str = "TC";
-const DEFAULT_DECIMALS: u64 = 6;
+const DEFAULT_COIN: &str = "APTOS";
+const DEFAULT_DECIMALS: u64 = 8;
 
 pub fn native_coin() -> Currency {
     Currency {
         symbol: DEFAULT_COIN.to_string(),
         decimals: DEFAULT_DECIMALS,
         metadata: Some(CurrencyMetadata {
-            move_type: native_coin_tag_lower().to_string(),
+            move_type: native_coin_tag().to_string(),
         }),
     }
 }
@@ -153,17 +152,8 @@ pub fn native_coin() -> Currency {
 pub fn native_coin_tag() -> TypeTag {
     TypeTag::Struct(StructTag {
         address: AccountAddress::ONE,
-        module: test_coin_identifier(),
-        name: test_coin_identifier(),
-        type_params: vec![],
-    })
-}
-
-pub fn native_coin_tag_lower() -> TypeTag {
-    TypeTag::Struct(StructTag {
-        address: AccountAddress::ONE,
-        module: test_coin_identifier_lower(),
-        name: test_coin_identifier(),
+        module: aptos_coin_module_identifier(),
+        name: aptos_coin_resource_identifier(),
         type_params: vec![],
     })
 }

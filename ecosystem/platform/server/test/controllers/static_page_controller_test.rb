@@ -5,7 +5,7 @@
 
 require 'test_helper'
 
-class SettingsControllerTest < ActionDispatch::IntegrationTest
+class StaticPageControllerTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
 
   ROUTES = Rails.application.routes.routes.collect do |route|
@@ -15,12 +15,12 @@ class SettingsControllerTest < ActionDispatch::IntegrationTest
   ROUTES.select { |route| route.controller == 'static_page' }.each do |route|
     test "static_page##{route.action} renders ok" do
       sign_out @controller.current_user if @controller&.current_user
-      get route.path
+      get route.format({})
       assert_response :success
 
       user = FactoryBot.create(:user)
       sign_in user
-      get route.path
+      get route.format({})
       assert_response :success
     end
   end

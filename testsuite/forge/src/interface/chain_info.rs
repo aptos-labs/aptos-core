@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::AptosPublicInfo;
+use anyhow::Result;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
@@ -31,6 +32,15 @@ impl<'t> ChainInfo<'t> {
 
     pub fn root_account(&mut self) -> &mut LocalAccount {
         self.root_account
+    }
+
+    pub async fn resync_root_account_seq_num(&mut self, client: &RestClient) -> Result<()> {
+        let account = client
+            .get_account(self.root_account.address())
+            .await?
+            .into_inner();
+        *self.root_account.sequence_number_mut() = account.sequence_number;
+        Ok(())
     }
 
     pub fn rest_api(&self) -> &str {

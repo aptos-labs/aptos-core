@@ -10,7 +10,7 @@ pub fn set_aptos_version(executor: &mut FakeExecutor, version: Version) {
     let account = Account::new_genesis_account(aptos_root_address());
     let txn = account
         .transaction()
-        .payload(aptos_stdlib::encode_version_set_version(version.major))
+        .payload(aptos_stdlib::version_set_version(version.major))
         .sequence_number(0)
         .sign();
     executor.new_block();

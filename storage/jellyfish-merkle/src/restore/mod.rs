@@ -19,6 +19,7 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_logger::info;
 use aptos_types::{
     nibble::{
         nibble_path::{NibbleIterator, NibblePath},
@@ -27,6 +28,7 @@ use aptos_types::{
     proof::{SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleRangeProof},
     transaction::Version,
 };
+use itertools::Itertools;
 use mirai_annotations::*;
 use std::{cmp::Eq, collections::HashMap, hash::Hash, sync::Arc};
 use storage_interface::StateSnapshotReceiver;
@@ -292,10 +294,32 @@ where
     /// error will be returned and nothing will be written to storage.
     fn add_chunk_impl(
         &mut self,
-        chunk: Vec<(&K, HashValue)>,
+        mut chunk: Vec<(&K, HashValue)>,
         proof: SparseMerkleRangeProof,
     ) -> Result<()> {
-        ensure!(!chunk.is_empty(), "Should not add empty chunks.");
+        if let Some(prev_leaf) = &self.previous_leaf {
+            let skip_until = chunk
+                .iter()
+                .find_position(|(key, _hash)| key.hash() > prev_leaf.account_key());
+            chunk = match skip_until {
+                None => {
+                    info!("Skipping entire chunk.");
+                    return Ok(());
+                }
+                Some((0, _)) => chunk,
+                Some((num_to_skip, next_leaf)) => {
+                    info!(
+                        num_to_skip = num_to_skip,
+                        next_leaf = next_leaf,
+                        "Skipping leaves."
+                    );
+                    chunk.split_off(num_to_skip)
+                }
+            }
+        };
+        if chunk.is_empty() {
+            return Ok(());
+        }
 
         for (key, value_hash) in chunk {
             let hashed_key = key.hash();
@@ -745,9 +769,11 @@ impl<K: crate::Key + CryptoHash + Hash + Eq, V: crate::Value> StateSnapshotRecei
     for StateSnapshotRestore<K, V>
 {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()> {
+        // Write KV out first because we are likely to resume according to the rightmost key in the
+        // tree after crashing.
+        self.kv_restore.add_chunk(chunk.clone())?;
         self.tree_restore
             .add_chunk_impl(chunk.iter().map(|(k, v)| (k, v.hash())).collect(), proof)?;
-        self.kv_restore.add_chunk(chunk)?;
         Ok(())
     }
 

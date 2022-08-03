@@ -34,7 +34,8 @@ use std::{
     thread,
     time::Duration,
 };
-use storage_service_types::{CompleteDataRange, Epoch};
+use storage_service_types::responses::CompleteDataRange;
+use storage_service_types::Epoch;
 use tokio::time::timeout;
 
 /// The number of state values held at any version
@@ -55,7 +56,7 @@ pub const MAX_REAL_TRANSACTION_OUTPUT: u64 = MAX_REAL_TRANSACTION;
 pub const MAX_RESPONSE_ID: u64 = 100000;
 
 /// Test timeout constant
-pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 10;
+pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 20;
 
 /// A simple mock of the Aptos Data Client
 #[derive(Clone, Debug)]

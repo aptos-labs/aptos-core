@@ -1,0 +1,32 @@
+name: Run continuous pre release testing
+
+permissions:
+  issues: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - pre-release-continuous-test
+  schedule:
+    # Run every 6 hours
+    - cron: "0 */6 * * *"
+
+jobs:
+  # run two concurrent forge test jobs on the same cluster
+  # they must use different namespaces, or they will preempt each other
+  run-forge-0:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-continuous-0
+      FORGE_CLUSTER_NAME: aptos-forge-1
+      FORGE_RUNNER_DURATION_SECS: 14400  # 4 hours
+  run-forge-1:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-continuous-1
+      FORGE_CLUSTER_NAME: aptos-forge-1
+      FORGE_RUNNER_DURATION_SECS: 14400  # 4 hours

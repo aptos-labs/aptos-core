@@ -42,6 +42,12 @@ table! {
 }
 
 table! {
+    ledger_infos (chain_id) {
+        chain_id -> Int8,
+    }
+}
+
+table! {
     metadatas (token_id) {
         token_id -> Varchar,
         name -> Nullable<Varchar>,
@@ -158,6 +164,7 @@ allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
     collections,
     events,
+    ledger_infos,
     metadatas,
     ownerships,
     processor_statuses,

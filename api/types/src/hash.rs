@@ -63,6 +63,12 @@ impl LowerHex for HashValue {
     }
 }
 
+impl HashValue {
+    pub fn zero() -> Self {
+        Self(aptos_crypto::hash::HashValue::zero())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::hash::HashValue;

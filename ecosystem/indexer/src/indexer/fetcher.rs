@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::counters::{FETCHED_TRANSACTION, UNABLE_TO_FETCH_TRANSACTION};
-use aptos_rest_client::{Client as RestClient, Transaction};
+use aptos_rest_client::{Client as RestClient, State, Transaction};
 use std::time::Duration;
 use tokio::sync::Mutex;
 use url::Url;
@@ -28,15 +28,26 @@ impl TransactionFetcher {
             transactions_buffer: Default::default(),
         }
     }
+}
 
-    pub fn set_version(&mut self, version: u64) {
+#[async_trait::async_trait]
+impl TransactionFetcherTrait for TransactionFetcher {
+    fn set_version(&mut self, version: u64) {
         self.version = version;
+    }
+
+    async fn fetch_ledger_info(&mut self) -> State {
+        self.client
+            .get_ledger_information()
+            .await
+            .expect("ledger info must be present")
+            .into_inner()
     }
 
     /// Fetches the next version based on its internal version counter
     /// Under the hood, it fetches TRANSACTION_FETCH_BATCH_SIZE versions in bulk (when needed), and uses that buffer to feed out
     /// In the event it can't fetch, it will keep retrying every RETRY_TIME_MILLIS ms
-    pub async fn fetch_next(&mut self) -> Transaction {
+    async fn fetch_next(&mut self) -> Transaction {
         let mut transactions_buffer = self.transactions_buffer.lock().await;
         if transactions_buffer.is_empty() {
             // Fill it up!
@@ -87,7 +98,7 @@ impl TransactionFetcher {
 
     /// fetches one version; this used for error checking/repair/etc
     /// In the event it can't, it will keep retrying every RETRY_TIME_MILLIS ms
-    pub async fn fetch_version(&self, version: u64) -> Transaction {
+    async fn fetch_version(&self, version: u64) -> Transaction {
         loop {
             let res = self.client.get_transaction_by_version(version).await;
             match res {
@@ -108,4 +119,16 @@ impl TransactionFetcher {
             };
         }
     }
+}
+
+/// For mocking TransactionFetcher in tests
+#[async_trait::async_trait]
+pub trait TransactionFetcherTrait: Send + Sync {
+    fn set_version(&mut self, version: u64);
+
+    async fn fetch_ledger_info(&mut self) -> State;
+
+    async fn fetch_next(&mut self) -> Transaction;
+
+    async fn fetch_version(&self, _version: u64) -> Transaction;
 }

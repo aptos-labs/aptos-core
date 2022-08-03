@@ -420,7 +420,8 @@ pub struct TestOnChainConfig {
 }
 
 impl OnChainConfig for TestOnChainConfig {
-    const IDENTIFIER: &'static str = "TestOnChainConfig";
+    const MODULE_IDENTIFIER: &'static str = "test_on_chain_config";
+    const TYPE_IDENTIFIER: &'static str = "TestOnChainConfig";
 }
 
 // Counts the number of event notifications received by the listener. Also ensures that

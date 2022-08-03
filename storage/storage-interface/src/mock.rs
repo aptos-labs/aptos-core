@@ -5,11 +5,12 @@
 
 use crate::{DbReader, DbWriter};
 use anyhow::{anyhow, Result};
-use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
     account_state::AccountState,
+    event::EventHandle,
+    proof::SparseMerkleProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
@@ -28,6 +29,7 @@ impl DbReader for MockDbReaderWriter {
                     .cloned()
                     .map(StateValue::from))
             }
+            StateKey::Raw(raw_key) => Ok(Some(StateValue::from(raw_key))),
             _ => Err(anyhow!("Not supported state key type {:?}", state_key)),
         }
     }
@@ -37,9 +39,9 @@ impl DbReader for MockDbReaderWriter {
         Ok(Some(1))
     }
 
-    fn get_latest_state_snapshot(&self) -> Result<Option<(Version, HashValue)>> {
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         // return a dummy version for tests
-        Ok(Some((1, HashValue::zero())))
+        Ok(Some(1))
     }
 
     fn get_state_value_by_version(
@@ -50,10 +52,19 @@ impl DbReader for MockDbReaderWriter {
         // dummy proof which is not used
         Ok(self.get_latest_state_value(state_key.clone()).unwrap())
     }
+
+    fn get_state_proof_by_version(
+        &self,
+        _state_key: &StateKey,
+        _version: Version,
+    ) -> Result<SparseMerkleProof> {
+        Ok(SparseMerkleProof::new(None, vec![]))
+    }
 }
 
 fn get_mock_account_state() -> AccountState {
-    let account_resource = AccountResource::new(0, vec![], AccountAddress::random());
+    let account_resource =
+        AccountResource::new(0, vec![], AccountAddress::random(), EventHandle::random(0));
 
     let mut account_state = AccountState::default();
     account_state.insert(

@@ -16,8 +16,8 @@ class FirstCoin(RestClient):
         """ Initialize a new coin with the given coin type. """
         payload = {
             "type": "script_function_payload",
-            "function": "0x1::ManagedCoin::initialize",
-            "type_arguments": [f"0x{account_from.address()}::MoonCoin::MoonCoin"],
+            "function": "0x1::managed_coin::initialize",
+            "type_arguments": [f"0x{account_from.address()}::moon_coin::MoonCoin"],
             "arguments": [
                 "Moon Coin".encode("utf-8").hex(),
                 "MOON".encode("utf-8").hex(),
@@ -35,8 +35,8 @@ class FirstCoin(RestClient):
 
         payload = {
             "type": "script_function_payload",
-            "function": "0x1::Coin::register",
-            "type_arguments": [f"0x{coin_type_address}::MoonCoin::MoonCoin"],
+            "function": "0x1::coin::register",
+            "type_arguments": [f"0x{coin_type_address}::moon_coin::MoonCoin"],
             "arguments": []
         }
         res = self.execute_transaction_with_payload(account_receiver, payload)
@@ -54,8 +54,8 @@ class FirstCoin(RestClient):
 
         payload = {
             "type": "script_function_payload",
-            "function": "0x1::ManagedCoin::mint",
-            "type_arguments": [f"0x{account_coin_owner.address()}::MoonCoin::MoonCoin"],
+            "function": "0x1::managed_coin::mint",
+            "type_arguments": [f"0x{account_coin_owner.address()}::moon_coin::MoonCoin"],
             "arguments": [
                 receiver_address,
                 f"{amount}"
@@ -73,7 +73,8 @@ class FirstCoin(RestClient):
     ) -> str:
         """ Returns the coin balance of the given account """
 
-        return self.account_resource(account_address, f"0x1::Coin::CoinStore<0x{coin_type_address}::MoonCoin::MoonCoin>")
+        balance = self.account_resource(account_address, f"0x1::coin::CoinStore<0x{coin_type_address}::moon_coin::MoonCoin>")
+        return balance["data"]["coin"]["value"]
 #<:!:section_4
 
 if __name__ == "__main__":
@@ -89,8 +90,8 @@ if __name__ == "__main__":
     print(f"Alice: {alice.address()}")
     print(f"Bob: {bob.address()}")
 
-    faucet_client.fund_account(alice.address(), 10_000_000)
-    faucet_client.fund_account(bob.address(), 10_000_000)
+    faucet_client.fund_account(alice.address(), 5_000)
+    faucet_client.fund_account(bob.address(), 5_000)
 
     input("\nUpdate the module with Alice's address, build, copy to the provided path, and press enter.")
     module_path = sys.argv[1]
@@ -105,12 +106,12 @@ if __name__ == "__main__":
     print("Alice will initialize the new coin")
     tx_hash = client.initialize_coin(alice)
     client.wait_for_transaction(tx_hash)
-    
+
     print("Bob registers the newly created coin so he can receive it from Alice")
     tx_hash = client.register_coin(bob, alice.address())
     client.wait_for_transaction(tx_hash)
     print(f"Bob's initial MoonCoinType balance: {client.get_balance(bob.address(), alice.address())}")
-    
+
     print("Alice mints Bob some of the new coin")
     tx_hash = client.mint_coin(alice, bob.address(), 100)
     client.wait_for_transaction(tx_hash)

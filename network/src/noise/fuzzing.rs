@@ -179,7 +179,7 @@ pub fn fuzz_post_handshake(data: &[u8]) {
     let mut peer = NoiseStream::new(fake_socket, noise_session);
 
     // read fuzz data
-    let _ = block_on(async move {
+    block_on(async move {
         let mut buffer = [0u8; 1024];
         let _ = peer.read(&mut buffer).await;
     });

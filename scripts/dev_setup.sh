@@ -16,7 +16,6 @@ set -eo pipefail
 
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
-GUPPY_GIT='https://github.com/facebookincubator/cargo-guppy@39ec940f36b0a0df96a330243d127cbe2db9f919'
 KUBECTL_VERSION=1.18.6
 TERRAFORM_VERSION=0.12.26
 HELM_VERSION=3.2.4
@@ -371,17 +370,15 @@ function install_toolchain {
   fi
 }
 
-function install_cargo_guppy {
-  if ! command -v cargo-guppy &> /dev/null; then
-    git_repo=$( echo "$GUPPY_GIT" | cut -d "@" -f 1 );
-    git_hash=$( echo "$GUPPY_GIT" | cut -d "@" -f 2 );
-    cargo install cargo-guppy --git "$git_repo" --rev "$git_hash" --locked
+function install_cargo_sort {
+  if ! command -v cargo-sort &> /dev/null; then
+    cargo install cargo-sort --locked
   fi
 }
 
-function install_cargo_sort {
-  if ! command -v cargo-sort &> /dev/null; then
-    cargo install cargo-sort
+function install_cargo_nextest {
+  if ! command -v cargo-nextext &> /dev/null; then
+    cargo install cargo-nextest --locked
   fi
 }
 
@@ -844,8 +841,8 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   rustup component add rustfmt
   rustup component add clippy
 
-  install_cargo_guppy
   install_cargo_sort
+  install_cargo_nextest
   install_grcov
   install_postgres
   install_pkg git "$PACKAGE_MANAGER"
@@ -925,6 +922,10 @@ if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
   install_python3
   "${PRE_COMMAND[@]}" python3 -m pip install schemathesis
 fi
+
+install_python3
+pip3 install pre-commit
+pre-commit install
 
 if [[ "${BATCH_MODE}" == "false" ]]; then
 cat <<EOF

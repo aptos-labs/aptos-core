@@ -1,7 +1,7 @@
 <%= form_with(model: it2_survey, builder: AptosFormBuilder) do |form| %>
   <% if it2_survey.errors.any? %>
-    <div class="flex p-4 mb-4 bg-red-100 rounded-lg dark:bg-red-200 lg:w-96" role="alert">
-      <div class="ml-3 text-sm font-medium text-red-700 dark:text-red-800">
+    <div class="flex p-4 mb-4 bg-red-100 rounded-lg lg:w-96" role="alert">
+      <div class="ml-3 text-sm font-medium text-red-700">
         <h2><%= pluralize(it2_survey.errors.count, 'error') %> prohibited this from being saved:</h2>
 
         <ul>

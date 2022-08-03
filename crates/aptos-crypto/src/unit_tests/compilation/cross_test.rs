@@ -7,7 +7,7 @@ use aptos_crypto::{
     test_utils::KeyPair,
     traits::*,
 };
-use aptos_crypto_derive::{CryptoHasher, BCSCryptoHash};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use rand::{prelude::ThreadRng, thread_rng};
 use serde::{Deserialize, Serialize};
 
