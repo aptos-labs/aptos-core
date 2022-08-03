@@ -50,7 +50,7 @@ const GENESIS_HELM_RELEASE_NAME: &str = "genesis";
 const APTOS_NODE_HELM_CHART_PATH: &str = "terraform/helm/aptos-node";
 const GENESIS_HELM_CHART_PATH: &str = "terraform/helm/genesis";
 
-// cleanup namespaces after 1 hour 30 minutes unless "keep = true"
+// cleanup namespaces after 30 minutes unless "keep = true"
 const NAMESPACE_CLEANUP_THRESHOLD_SECS: u64 = 1800;
 pub const NAMESPACE_CLEANUP_DURATION_BUFFER_SECS: u64 = 1200;
 const POD_CLEANUP_THRESHOLD_SECS: u64 = 86400;
