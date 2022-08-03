@@ -3,9 +3,14 @@ title: "Aptos Node API"
 slug: "api-index"
 ---
 
-# Aptos API
+# Aptos Node API
 
-This is an index to pages that allow you to explore the API of the Aptos node. There are many different versions of the Aptos node active at any given time, e.g. devnet, AITs, etc. Each of those might have a different spec, as we land improvements to the API over time. Here you can explore the API for a particular Aptos deployment.
+## Latest API
 
-- [Latest](pathname:///api/spec.html?spec=https://raw.githubusercontent.com/aptos-labs/aptos-core/main/api/doc/v1/spec.yaml&hideTryIt=true)
-- [Devnet](pathname:///api/spec.html?spec=https://raw.githubusercontent.com/aptos-labs/aptos-core/devnet/api/doc/openapi.yaml&hideTryIt=true)
+- **Latest API URL**: Use the URL corresponding to your local Aptos node.
+- **Latest API specification**: [REST API latest specification](pathname:///api/latest-api.html?spec=https://raw.githubusercontent.com/aptos-labs/aptos-core/main/api/doc/v1/spec.yaml&hideTryIt=true).
+
+## Devnet API
+
+- **REST API Devnet URL**: Replace the example URL `http://localhost:3000/` you see in the API spec with this devnet URL: `https://fullnode.devnet.aptoslabs.com`.
+- **REST API devnet specification**: [REST API spec for devnet](pathname:///api/devnet-api.html?spec=https://raw.githubusercontent.com/aptos-labs/aptos-core/devnet/api/doc/openapi.yaml&hideTryIt=false). 

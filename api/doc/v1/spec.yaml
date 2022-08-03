@@ -2,7 +2,7 @@
 openapi: 3.0.0
 info:
   title: Aptos Node API
-  description: The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.
+  description: The Aptos Node API is a RESTful API for client applicationsxxxxa to interact with the Aptos blockchain.
   version: 0.1.0
   contact:
     name: Aptos Labs
@@ -10,7 +10,8 @@ info:
   license:
     name: Apache 2.0
     url: "https://www.apache.org/licenses/LICENSE-2.0.html"
-servers: []
+servers: 
+- url: https://fullnode.devnet.aptoslabs.com/
 tags:
   - name: Accounts
     description: Access to account resources and modules
