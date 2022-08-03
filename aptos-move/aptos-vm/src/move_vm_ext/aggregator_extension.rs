@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::delta_ext::{addition, deserialize, serialize, subtraction, DeltaOp};
+use aptos_crypto::hash::DefaultHasher;
 use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
 use move_deps::{
@@ -23,8 +24,8 @@ use smallvec::smallvec;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
+    convert::TryInto,
 };
-use tiny_keccak::{Hasher, Sha3};
 
 /// Describes the state of each aggregator instance.
 #[derive(Clone, Copy, PartialEq)]
@@ -81,9 +82,8 @@ impl Aggregator {
                 self.value = subtraction(self.value, value)?;
                 Ok(())
             }
-            // Since `sub` is a barrier, we never encounter delta during
-            // subtraction. This will change in future.
-            // TODO: implement this properly once `sub` stops being a barrier.
+            // For now, `aggregator::sub` always materializes the value, so
+            // this should be unreachable.
             AggregatorState::PositiveDelta => {
                 unreachable!("subtraction always materializes the value")
             }
@@ -103,29 +103,25 @@ impl Aggregator {
 
         // Otherwise, we have a delta and have to go to storage.
         let key_bytes = serialize(&id.key);
-        match context
+        context
             .resolver
             .resolve_table_entry(&TableHandle(id.handle), &key_bytes)
-        {
-            Err(_) => Err(extension_error("error resolving aggregator's value")),
-            Ok(maybe_bytes) => {
-                match maybe_bytes {
-                    Some(bytes) => {
-                        let base = deserialize(&bytes);
+            .map_err(|_| extension_error("error resolving aggregator's value"))?
+            .map_or(
+                Err(extension_error("aggregator's value not found")),
+                |bytes| {
+                    let base = deserialize(&bytes);
 
-                        // The only remaining case is PositiveDelta. But assert just in case.
-                        assert!(self.state == AggregatorState::PositiveDelta);
+                    // The only remaining case is PositiveDelta. But assert just in case.
+                    debug_assert!(self.state == AggregatorState::PositiveDelta);
 
-                        // At this point, we fetched the "true" value of the
-                        // aggregator from the previously executed transaction.
-                        self.value = addition(base, self.value, self.limit)?;
-                        self.state = AggregatorState::Data;
-                        Ok(())
-                    }
-                    None => Err(extension_error("aggregator's value not found")),
-                }
-            }
-        }
+                    // At this point, we fetched the "true" value of the
+                    // aggregator from the previously executed transaction.
+                    self.value = addition(base, self.value, self.limit)?;
+                    self.state = AggregatorState::Data;
+                    Ok(())
+                },
+            )
     }
 }
 
@@ -320,13 +316,15 @@ fn native_new_aggregator(
     let txn_hash_buffer = u128::to_be_bytes(aggregator_context.txn_hash);
     let num_aggregators_buffer = u128::to_be_bytes(aggregator_data.num_aggregators());
 
-    let mut sha3 = Sha3::v256();
-    sha3.update(&txn_hash_buffer);
-    sha3.update(&num_aggregators_buffer);
+    let mut hasher = DefaultHasher::new(&[0_u8; 0]);
+    hasher.update(&txn_hash_buffer);
+    hasher.update(&num_aggregators_buffer);
+    let hash = hasher.finish();
 
-    let mut key_bytes = [0_u8; 16];
-    sha3.finalize(&mut key_bytes);
-    let key = u128::from_be_bytes(key_bytes);
+    // TODO: Using u128 is not enough, and it should be u256 instead. For now,
+    // just take first 16 bytes of the hash.
+    let bytes = &hash.to_vec()[..16];
+    let key = u128::from_be_bytes(bytes.try_into().expect("not enough bytes"));
 
     let id = AggregatorID::new(handle, key);
     aggregator_data.create_new_aggregator(id, limit);

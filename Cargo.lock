@@ -1292,7 +1292,6 @@ dependencies = [
  "serde 1.0.141",
  "serde_json",
  "smallvec",
- "tiny-keccak",
  "tracing",
 ]
 
