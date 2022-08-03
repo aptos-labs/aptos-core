@@ -466,7 +466,7 @@ module aptos_token::token {
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
-    public fun transfer(
+    fun transfer(
         from: &signer,
         id: TokenId,
         to: address,
