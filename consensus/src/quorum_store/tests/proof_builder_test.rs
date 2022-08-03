@@ -43,7 +43,7 @@ async fn test_proof_builder_basic() {
     assert!(proof.verify(&verifier).is_ok());
 
 
-    // let (proof_tx, proof_rx) = oneshot::channel();
-    // assert!(proof_builder_tx.send(ProofBuilderCommand::InitProof(signed_digest, 4, proof_tx)).await.is_ok());
-    // assert!(proof_rx.await.expect("channel dropped").is_err());
+    let (proof_tx, proof_rx) = oneshot::channel();
+    assert!(proof_builder_tx.send(ProofBuilderCommand::InitProof(signed_digest, 4, proof_tx)).await.is_ok());
+    assert!(proof_rx.await.expect("channel dropped").is_err());
 }

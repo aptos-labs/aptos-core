@@ -8,7 +8,9 @@ use aptos_types::validator_verifier::ValidatorVerifier;
 use consensus_types::proof_of_store::{ProofOfStore, SignedDigest, SignedDigestError};
 use futures::channel::oneshot;
 use std::collections::HashMap;
+use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
+use tokio::time;
 
 #[derive(Debug)]
 pub(crate) enum ProofBuilderCommand {
@@ -17,7 +19,7 @@ pub(crate) enum ProofBuilderCommand {
 }
 
 pub(crate) type ProofReturnChannel =
-    oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
+oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
 pub(crate) struct ProofBuilder {
     // peer_id: PeerId,
@@ -52,8 +54,6 @@ impl ProofBuilder {
 
         self.add_signature(signed_digest, &validator_verifier)?;
 
-        // TODO: should we do regular pull to check timeouts or is this Ok?
-        self.expire();
         Ok(())
     }
 
@@ -101,20 +101,29 @@ impl ProofBuilder {
         mut network_rx: Receiver<ProofBuilderCommand>,
         validator_verifier: ValidatorVerifier,
     ) {
-        while let Some(command) = network_rx.recv().await {
-            match command {
-                ProofBuilderCommand::InitProof(signed_digest, batch_id, tx) => {
-                    self.init_proof(signed_digest, batch_id, &validator_verifier, tx)
-                        .expect("Error initializing proof of store");
-                }
-                ProofBuilderCommand::AppendSignature(signed_digest) => {
-                    if let Err(e) = self.add_signature(signed_digest, &validator_verifier) {
-                        // Can happen if we already garbage collected
-                        debug!("QS: could not add signature {:?}", e);
-                        //TODO: do something
-                    } else {
-                        debug!("QS: added signature to proof");
+        let mut interval = time::interval(Duration::from_millis(100));
+        loop {
+            tokio::select! {
+             Some(command) = network_rx.recv() => {
+                match command {
+                    ProofBuilderCommand::InitProof(signed_digest, batch_id, tx) => {
+                        self.init_proof(signed_digest, batch_id, &validator_verifier, tx)
+                            .expect("Error initializing proof of store");
                     }
+                    ProofBuilderCommand::AppendSignature(signed_digest) => {
+                        if let Err(e) = self.add_signature(signed_digest, &validator_verifier) {
+                            // Can happen if we already garbage collected
+                            debug!("QS: could not add signature {:?}", e);
+                            //TODO: do something
+                        } else {
+                            debug!("QS: added signature to proof");
+                        }
+                    }
+                }
+
+                }
+                _ = interval.tick() => {
+                    self.expire();
                 }
             }
         }
