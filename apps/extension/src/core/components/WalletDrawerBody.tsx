@@ -64,7 +64,7 @@ function WalletDrawerBodyListItem(
     refetchInterval: 4000,
   });
 
-  const { data: coinBalance } = useAccountCoinBalance({ refetchInterval: 4000 });
+  const { data: coinBalance } = useAccountCoinBalance({ address, refetchInterval: 4000 });
   const coinBalanceString = numeral(coinBalance).format('0,0');
 
   const walletAddressFormatted = `Wallet: ${address.substring(0, 15)}...`;

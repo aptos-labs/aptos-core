@@ -60,6 +60,7 @@ export const useAccountExists = ({
 };
 
 interface UseAccountCoinBalanceParams {
+  address?: string,
   refetchInterval?: number | false,
 }
 
@@ -68,11 +69,13 @@ interface UseAccountCoinBalanceParams {
  * @param refetchInterval automatic refetch interval in milliseconds
  */
 export function useAccountCoinBalance({
+  address,
   refetchInterval,
 }: UseAccountCoinBalanceParams = {}) {
   const { aptosAccount, nodeUrl } = useWalletState();
 
-  const accountAddress = aptosAccount?.address()?.hex();
+  const accountAddress = address || aptosAccount?.address()?.hex();
+
   return useQuery([accountQueryKeys.getAccountCoinBalance, accountAddress], async () => {
     const client = new AptosClient(nodeUrl);
     const resource: any = await client.getAccountResource(accountAddress!, aptosCoinStoreStructTag);
