@@ -116,18 +116,7 @@ pub fn convert_move_module(move_module: &MoveModule) -> extractor::MoveModule {
 
 pub fn convert_move_resource(move_resource: &MoveResource) -> extractor::MoveResource {
     extractor::MoveResource {
-        type_: MessageField::some(extractor::MoveStructTag {
-            address: move_resource.typ.address.to_string(),
-            module: move_resource.typ.module.to_string(),
-            name: move_resource.typ.name.to_string(),
-            generic_type_params: move_resource
-                .typ
-                .generic_type_params
-                .iter()
-                .map(|move_type| convert_move_type(move_type))
-                .collect(),
-            special_fields: Default::default(),
-        }),
+        type_: MessageField::some(convert_move_struct_tag(&move_resource.typ)),
         data: serde_json::to_string(&move_resource.data).unwrap_or_else(|_| {
             panic!(
                 "Could not convert move_resource data to json '{:?}'",
@@ -367,21 +356,11 @@ pub fn convert_delete_resource(delete_resource: &DeleteResource) -> extractor::D
     extractor::DeleteResource {
         address: delete_resource.address.to_string(),
         state_key_hash: convert_hex_string_to_bytes(&delete_resource.state_key_hash),
-        resource: MessageField::some(extractor::MoveStructTag {
-            address: delete_resource.address.to_string(),
-            module: delete_resource.resource.module.to_string(),
-            name: delete_resource.resource.name.to_string(),
-            generic_type_params: delete_resource
-                .resource
-                .generic_type_params
-                .iter()
-                .map(|move_type| convert_move_type(move_type))
-                .collect(),
-            special_fields: Default::default(),
-        }),
+        resource: MessageField::some(convert_move_struct_tag(&delete_resource.resource)),
         special_fields: Default::default(),
     }
 }
+
 pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetChange {
     match change {
         WriteSetChange::DeleteModule(delete_module) => extractor::WriteSetChange {
@@ -519,7 +498,7 @@ pub fn convert_event(event: &Event) -> extractor::Event {
             special_fields: Default::default(),
         }),
         sequence_number: event.sequence_number.0,
-        type_: event.typ.to_string(),
+        type_: MessageField::some(convert_move_type(&event.typ)),
         data: event.data.to_string(),
         special_fields: Default::default(),
     }
