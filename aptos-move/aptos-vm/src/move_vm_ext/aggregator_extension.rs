@@ -537,8 +537,7 @@ fn extension_error(message: impl ToString) -> PartialVMError {
 }
 
 /// When aggregator feature is not supported.
-#[allow(clippy::unusual_byte_groupings)]
-const ENOT_SUPPORTED: u64 = 0xC_003;
+const ENOT_SUPPORTED: u64 = 0x0C_0003;
 
 /// Returns partial VM error when experimental feature is not supported.
 fn not_supported_error() -> PartialVMError {
