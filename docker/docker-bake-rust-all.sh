@@ -2,12 +2,19 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-# This script docker bake to build all the rust-based docker images
-# You need to execute this from the repository root as working directory
-# E.g. docker/docker-bake-rust-all.sh
+# This script uses docker bake to build all the rust-based docker images.
+
+# You need to execute this from the repository root as working directory, e.g.
+#   docker/docker-bake-rust-all.sh
+
 # If you want to build a specific target only, run:
-#  docker/docker-bake-rust-all.sh <target>
-# E.g. docker/docker-bake-rust-all.sh indexer
+#   docker/docker-bake-rust-all.sh <target>
+# e.g.
+#   docker/docker-bake-rust-all.sh indexer
+
+# This script attempts to detect if you're on ARM and configure the build to
+# build for arm. If you want to opt out of this, set the NO_ARM_DETECTION env var.
+#   export NO_ARM_DETECTION=true
 
 set -ex
 
@@ -28,5 +35,12 @@ if [ "$CI" == "true" ]; then
   TARGET_REGISTRY=aws docker buildx bake --progress=plain --file docker/docker-bake-rust-all.hcl all --push
 else
   BUILD_TARGET="${1:-all}"
-  TARGET_REGISTRY=local docker buildx bake --file docker/docker-bake-rust-all.hcl $BUILD_TARGET
+  EXTRA_FLAGS=''
+  if [ -z "$NO_ARM_DETECTION" ]; then
+    if [ `arch` == "arm64" ]; then
+      echo "Detected ARM, building for ARM"
+      EXTRA_FLAGS='--set *.platform=linux/arm64'
+    fi
+  fi
+  TARGET_REGISTRY=local docker buildx bake --push --file docker/docker-bake-rust-all.hcl $BUILD_TARGET $EXTRA_FLAGS
 fi
