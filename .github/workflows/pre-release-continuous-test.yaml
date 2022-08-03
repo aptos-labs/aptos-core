@@ -10,8 +10,8 @@ on:
     branches:
       - pre-release-continuous-test
   schedule:
-    # Run every 6 hours
-    - cron: "0 */6 * * *"
+    # Run every 2 hours - TODO: Decrease the frequency once things stabilizes
+    - cron: "0 */2 * * *"
 
 jobs:
   # run two concurrent forge test jobs on the same cluster
@@ -22,11 +22,11 @@ jobs:
     with:
       FORGE_NAMESPACE: forge-continuous-0
       FORGE_CLUSTER_NAME: aptos-forge-1
-      FORGE_RUNNER_DURATION_SECS: 14400  # 4 hours
+      FORGE_RUNNER_DURATION_SECS: 2700  # Run for 45 minutes for now
   run-forge-1:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-continuous-1
       FORGE_CLUSTER_NAME: aptos-forge-1
-      FORGE_RUNNER_DURATION_SECS: 14400  # 4 hours
+      FORGE_RUNNER_DURATION_SECS: 2700  # Run for 45 minutes for now
