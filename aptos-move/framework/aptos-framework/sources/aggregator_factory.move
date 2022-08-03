@@ -1,4 +1,31 @@
 /// This module provides foundations to create aggregators in the system.
+///
+/// Design rationale (V1)
+/// =====================
+/// First, we encourage the reader to see rationale of `Aggregator` in
+/// `aggregator.move`.
+///
+/// Recall that the value of any aggregator can be identified in storage by
+/// (handle, key) pair. How this pair can be generated? Short answer: with
+/// `AggregatorFactory`!
+///
+/// `AggregatorFactory` is a struct that can be stored as a resource on some
+/// account and which contains a `phantom_table` field. When the factory is
+/// initialized, we initialize this table. Importantly, table initialization
+/// only generates a uniue table `handle` - something we can reuse.
+///
+/// When the user wants to create a new aggregator, he/she calls a constructor
+/// provided by the factory (`new_aggregator(..)`). This constructor generates
+/// a unique key, which with the handle is used to initialize `Aggregator` struct.
+///
+/// Use cases
+/// =========
+/// We limit the usage of `AggregatorFactory` by only storing it on the core
+/// account.
+///
+/// When something whants to use an aggregator, the factory is queried and an
+/// aggregator instance is created. Once aggregator is no longer in use, it
+/// should be destroyed by the user.
 module aptos_framework::aggregator_factory {
     use std::error;
     use std::signer;
