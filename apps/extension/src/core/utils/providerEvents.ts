@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosAccount } from 'aptos';
+import Browser from './browser';
 import Permissions from './permissions';
 
 export const ProviderEvent = Object.freeze({
@@ -13,16 +14,18 @@ async function sendToTabs(
   permissionlessMessage: {},
   permissionedMessage: {},
 ) {
-  const tabs = await chrome.tabs.query({});
-  const allowedDomains = address ? await Permissions.getDomains(address) : new Set();
-  for (let i: number = 0; i < tabs.length; i += 1) {
-    const tab = tabs[i];
-    if (tab.id && tab.url) {
-      const url = new URL(tab.url);
-      const message = (allowedDomains.has(url.hostname)
-        ? permissionedMessage
-        : permissionlessMessage);
-      chrome.tabs.sendMessage(tab.id, message);
+  const tabs = await Browser.tabs()?.query({});
+  if (tabs) {
+    const allowedDomains = address ? await Permissions.getDomains(address) : new Set();
+    for (let i: number = 0; i < tabs.length; i += 1) {
+      const tab = tabs[i];
+      if (tab.id && tab.url) {
+        const url = new URL(tab.url);
+        const message = (allowedDomains.has(url.hostname)
+          ? permissionedMessage
+          : permissionlessMessage);
+        Browser.tabs()?.sendMessage(tab.id, message);
+      }
     }
   }
 }
