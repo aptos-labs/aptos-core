@@ -41,8 +41,12 @@ haproxy:
   affinity: {}
   limits:
     validator:
-      # -- Limit the number of connections per IP address per minute
-      connectionsPerIPPerMin: 2
+      # -- Limit the number of connections per IP address per sec
+      connectionsPerIPPerSec: 1
+      maxBytesOutRate10sec: 134217728 # Sustained 100mb/s for 10 sec.
+      rateLimitSession: 128
+      tcpBufSize: 4194304
+
   config:
     # -- Whether to send Proxy Protocol v2
     send_proxy_protocol: &send_proxy_protocol false
