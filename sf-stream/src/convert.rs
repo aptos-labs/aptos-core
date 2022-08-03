@@ -255,7 +255,7 @@ pub fn convert_write_set(write_set: &WriteSet) -> MessageField<extractor::WriteS
     })
 }
 
-pub fn empty_move_type(type_: extractor::move_type::Type) -> extractor::MoveType {
+pub fn empty_move_type(type_: extractor::MoveTypes) -> extractor::MoveType {
     extractor::MoveType {
         type_: EnumOrUnknown::new(type_),
         content: None,
@@ -265,17 +265,17 @@ pub fn empty_move_type(type_: extractor::move_type::Type) -> extractor::MoveType
 
 pub fn convert_move_type(move_type: &MoveType) -> extractor::MoveType {
     let type_ = match move_type {
-        MoveType::Bool => extractor::move_type::Type::Bool,
-        MoveType::U8 => extractor::move_type::Type::U8,
-        MoveType::U64 => extractor::move_type::Type::U64,
-        MoveType::U128 => extractor::move_type::Type::U128,
-        MoveType::Address => extractor::move_type::Type::Address,
-        MoveType::Signer => extractor::move_type::Type::Signer,
-        MoveType::Vector { .. } => extractor::move_type::Type::Vector,
-        MoveType::Struct(_) => extractor::move_type::Type::Struct,
-        MoveType::GenericTypeParam { .. } => extractor::move_type::Type::GenericTypeParam,
-        MoveType::Reference { .. } => extractor::move_type::Type::Reference,
-        MoveType::Unparsable(_) => extractor::move_type::Type::Unparsable,
+        MoveType::Bool => extractor::MoveTypes::Bool,
+        MoveType::U8 => extractor::MoveTypes::U8,
+        MoveType::U64 => extractor::MoveTypes::U64,
+        MoveType::U128 => extractor::MoveTypes::U128,
+        MoveType::Address => extractor::MoveTypes::Address,
+        MoveType::Signer => extractor::MoveTypes::Signer,
+        MoveType::Vector { .. } => extractor::MoveTypes::Vector,
+        MoveType::Struct(_) => extractor::MoveTypes::Struct,
+        MoveType::GenericTypeParam { .. } => extractor::MoveTypes::GenericTypeParam,
+        MoveType::Reference { .. } => extractor::MoveTypes::Reference,
+        MoveType::Unparsable(_) => extractor::MoveTypes::Unparsable,
     };
     let content = match move_type {
         MoveType::Bool => None,
