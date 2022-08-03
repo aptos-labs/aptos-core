@@ -1,18 +1,20 @@
 ---
 title: "Your First NFT"
 slug: "your-first-nft"
-sidebar_position: 3
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Note: The following tutorial is a work in progress. Furthermore, the Aptos' (Non-Fungible) Token specification has not been formalized.
+:::caution
 
-# Tokens and NFTs
+The following tutorial is a work in progress. Furthermore, the Aptos' (Non-Fungible) Token specification has not been formalized.
 
-An [NFT](https://en.wikipedia.org/wiki/Non-fungible_token) is a non-fungible token or data stored on a blockchain that uniquely defines ownership of an asset. 
-NFTs were first defined in [EIP-721](https://eips.ethereum.org/EIPS/eip-721) and later expanded upon in [EIP-1155](https://eips.ethereum.org/EIPS/eip-1155). NFTs typically comprise of the following aspects:
+:::
+
+# Your First NFT
+
+An [NFT](https://en.wikipedia.org/wiki/Non-fungible_token) is a non-fungible token or data stored on a blockchain that uniquely defines ownership of an asset. NFTs were first defined in [EIP-721](https://eips.ethereum.org/EIPS/eip-721) and later expanded upon in [EIP-1155](https://eips.ethereum.org/EIPS/eip-1155). NFTs typically comprise of the following aspects:
 
 - A name, the name of the asset, which must be unique within a collection
 - A description, the description of the asset
@@ -25,7 +27,7 @@ Additionally, most NFTs are part of a collection or a set of NFTs with a common 
 - A description, the description of the asset
 - A URL, a non-descript pointer off-chain to more information about the asset could be media such as an image or video or more metadata
 
-# Aptos Digital Asset Token  Standard
+## Aptos digital asset token standard
 
 When we work on Aptos token standard, we hold the following principles:
 
@@ -39,11 +41,11 @@ When we work on Aptos token standard, we hold the following principles:
 
 The Aptos implementation for core NFTs or Tokens can be found in [Token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move).
 
-## Aptos Token Definitions
+## Aptos token definitions
 
-### The Token  Data Model
+### The Token Data Model
 
-![TokenDataModel](../../static/img/token_data.png)
+![TokenDataModel](/img/token_data.png)
 
 The token related data are stored at both creator’s account and owner’s account.
 
@@ -68,7 +70,8 @@ The token related data are stored at both creator’s account and owner’s acco
 |Token| `amount` is the number of tokens.                                                                                                                                |
 |TokenId| `TokenDataId` points to the metadata of this token. The `property_version` represents a token with mutated PropertyMap from `default_properties` in the TokenData. |
 
-## Introducing Tokens
+## Tokens
+
 This tutorial will walk you through the process of
 
 - creating your own Token collection,
@@ -81,28 +84,26 @@ This tutorial builds on [Your first transaction](/tutorials/your-first-transacti
 <Tabs>
   <TabItem value="python" label="Python" default>
 
-For this tutorial, will be focusing on `first_nft.ts` and re-using the `first_transaction.ts` library from the previous tutorial.
+  For this tutorial, will be focusing on `first_nft.ts` and re-using the `first_transaction.ts` library from the previous tutorial.
 
-You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
+  You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
 
   </TabItem>
   <TabItem value="rust" label="Rust" default>
 
-For this tutorial, will be focusing on `first_nft.py` and re-using the `first_transaction.py` library from the previous tutorial.
+  For this tutorial, will be focusing on `first_nft.py` and re-using the `first_transaction.py` library from the previous tutorial.
 
   </TabItem>
   <TabItem value="typescript" label="Typescript" default>
-
+  TODO
   </TabItem>
-  <TabItem value="rust" label="Rust">
-
-TODO
-
-  </TabItem>
+  
 </Tabs>
 
 ### Creating a Collection
+
 The Aptos Token enables creators to create collections.  The maximum is the total number of tokens that can be created for this collection.
+
 ```rust  
 public(script) fun create_collection_script (
 	creator: &signer,  
@@ -119,21 +120,20 @@ These script functions can be called via the REST API. The following demonstrate
 <Tabs>
   <TabItem value="python" label="Python" default>
 
-```python  
-:!: static/examples/python/first_nft.py section_1  
-```  
+  ```python  
+  ":!: static/examples/python/first_nft.py section_1"  
+  ```  
   </TabItem>
   <TabItem value="rust" label="Rust" default>
 
-TODO  
+  TODO  
 </TabItem>
 <TabItem value="typescript" label="Typescript" default>
 
 ```typescript  
-:!: static/examples/typescript/first_nft.ts section_1  
+  ":!: static/examples/typescript/first_nft.ts section_1"  
 ```  
-
-  </TabItem>
+</TabItem>
 </Tabs>
 
 ### Creating a Token
@@ -158,6 +158,7 @@ public entry fun create_token_script(
 	property_types: vector<String>,  
 )
 ```  
+
 The `balance` field is the initial amount to be created for this token. `maximum` dictates the maximal number of tokens to be minted for this created `TokenData`. 
 `royalty_payee_address` is address that royalty is paid to.  `royalty_points_numerator` / `royalty_points_denominator` is the percentage of sale price (`Royalty`) should be paid to the payee address.
 It can be a single owner's account address or an address of a shared account owned by a group of creators. 
@@ -171,7 +172,7 @@ These script functions can be called via the REST API. The following demonstrate
   <TabItem value="python" label="Python" default>
 
 ```python  
-:!: static/examples/python/first_nft.py section_2  
+":!: static/examples/python/first_nft.py section_2"
 ```  
   </TabItem>
   <TabItem value="rust" label="Rust" default>
@@ -181,7 +182,7 @@ TODO
 <TabItem value="typescript" label="Typescript" default>
 
 ```typescript  
-:!: static/examples/typescript/first_nft.ts section_2  
+":!: static/examples/typescript/first_nft.ts section_2"  
 ```  
   </TabItem>
 </Tabs>
@@ -198,7 +199,7 @@ In order to transfer the token, the sender must first identify the token id base
   <TabItem value="python" label="Python" default>
 
 ```python  
-:!: static/examples/python/first_nft.py section_3  
+":!: static/examples/python/first_nft.py section_3"  
 ```  
   </TabItem>
   <TabItem value="rust" label="Rust" default>
@@ -208,7 +209,7 @@ TODO
 <TabItem value="typescript" label="Typescript" default>
 
 ```typescript  
-:!: static/examples/typescript/first_nft.ts section_3  
+":!: static/examples/typescript/first_nft.ts section_3"  
 ```  
   </TabItem>
 </Tabs>
@@ -233,7 +234,7 @@ public entry fun offer_script(
   <TabItem value="python" label="Python" default>
 
 ```python  
-:!: static/examples/python/first_nft.py section_4  
+":!: static/examples/python/first_nft.py section_4"  
 ```  
   </TabItem>
   <TabItem value="rust" label="Rust" default>
@@ -243,7 +244,7 @@ TODO
 <TabItem value="typescript" label="Typescript" default>
 
 ```typescript  
-:!: static/examples/typescript/first_nft.ts section_4  
+":!: static/examples/typescript/first_nft.ts section_4"  
 ```  
   </TabItem>
 </Tabs>
@@ -267,7 +268,7 @@ public entry fun claim_script(
   <TabItem value="python" label="Python" default>
 
 ```python  
-:!: static/examples/python/first_nft.py section_5  
+":!: static/examples/python/first_nft.py section_5"
 ```  
   </TabItem>
   <TabItem value="rust" label="Rust" default>
@@ -276,19 +277,21 @@ TODO
   <TabItem value="typescript" label="Typescript" default>
 
 ```typescript  
-:!: static/examples/typescript/first_nft.ts section_5  
+":!: static/examples/typescript/first_nft.ts section_5"  
 ```  
   </TabItem>
 </Tabs>
 
 #### On-chain Lazy Mint
+
 When Alice becomes a celebrity in her community. Her cat NFTs are in high demand. However, Alice doesn't want to pay the cost
 of minting 10 million NFTs initially. She wants to only pay the cost when someone wants the NFT.
 
 She can mint 10 million uninitialized fungible cat token in one transaction.
 
 When Jack wants to buy an NFT from Alice, she can mutate one fungible token. 
-```RUST
+
+```rust
     public entry fun mutate_token_properties(
         account: &signer,
         token_owner: address,
@@ -307,10 +310,10 @@ This will create a new property_version and create a new `TokenId` for the previ
 Alice can then transfer the NFT to Jack. Alice only pay the cost for creating NFT from the fungbile token when someone wants to buy.
 
 
-```python  
-:!: static/examples/python/first_nft.py section_6  
+```python
+":!: static/examples/python/first_nft.py section_6"  
 ```  
-  </TabItem> 
+<Tabs>  
   <TabItem value="rust" label="Rust" default>  
 TODO  
   </TabItem>
