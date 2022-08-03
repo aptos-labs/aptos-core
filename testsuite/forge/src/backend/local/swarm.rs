@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, NodeExt, Swarm,
-    SwarmChaos, SwarmExt, Validator, Version,
+    ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, Swarm, SwarmChaos,
+    SwarmExt, Validator, Version,
 };
 use anyhow::{anyhow, bail, Result};
+use aptos_config::config::NetworkConfig;
+use aptos_config::network_id::NetworkId;
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
 use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
 use aptos_sdk::{
@@ -81,6 +83,7 @@ pub struct LocalSwarm {
     versions: Arc<HashMap<Version, LocalVersion>>,
     validators: HashMap<PeerId, LocalNode>,
     fullnodes: HashMap<PeerId, LocalNode>,
+    public_networks: HashMap<PeerId, NetworkConfig>,
     dir: SwarmDirectory,
     root_account: LocalAccount,
     chain_id: ChainId,
@@ -150,11 +153,38 @@ impl LocalSwarm {
         });
         let version = versions.get(&initial_version_actual).unwrap();
 
-        let validators = validators
+        let mut validators = validators
             .into_iter()
             .map(|v| {
                 let node = LocalNode::new(version.to_owned(), v.name, v.dir)?;
                 Ok((node.peer_id(), node))
+            })
+            .collect::<Result<HashMap<_, _>>>()?;
+
+        // After genesis, remove public network from validator and add to public_networks
+        let public_networks = validators
+            .values_mut()
+            .map(|validator| {
+                let mut validator_config = validator.config().clone();
+
+                // Grab the public network config from the validator and insert it into the VFN's config
+                // The validator's public network identity is the same as the VFN's public network identity
+                // We remove it from the validator so the VFN can hold it
+                let public_network = {
+                    let (i, _) = validator_config
+                        .full_node_networks
+                        .iter()
+                        .enumerate()
+                        .find(|(_i, config)| config.network_id == NetworkId::Public)
+                        .expect("Validator should have a public network");
+                    validator_config.full_node_networks.remove(i)
+                };
+
+                // Since the validator's config has changed we need to save it
+                validator_config.save(validator.config_path())?;
+                *validator.config_mut() = validator_config;
+
+                Ok((validator.peer_id(), public_network))
             })
             .collect::<Result<HashMap<_, _>>>()?;
         let root_key = ConfigKey::new(root_key);
@@ -171,6 +201,7 @@ impl LocalSwarm {
             versions,
             validators,
             fullnodes: HashMap::new(),
+            public_networks,
             dir: dir_actual,
             root_account,
             chain_id: ChainId::test(),
@@ -249,7 +280,7 @@ impl LocalSwarm {
         Err(anyhow!("Launching Swarm timed out"))
     }
 
-    pub async fn add_validator_fullnode(
+    pub fn add_validator_fullnode(
         &mut self,
         version: &Version,
         template: NodeConfig,
@@ -257,29 +288,29 @@ impl LocalSwarm {
     ) -> Result<PeerId> {
         let validator = self
             .validators
-            .get_mut(&validator_peer_id)
+            .get(&validator_peer_id)
             .ok_or_else(|| anyhow!("no validator with peer_id: {}", validator_peer_id))?;
+
+        let public_network = self
+            .public_networks
+            .get(&validator_peer_id)
+            .ok_or_else(|| anyhow!("no public network with peer_id: {}", validator_peer_id))?;
 
         if self.fullnodes.contains_key(&validator_peer_id) {
             bail!("VFN for validator {} already configured", validator_peer_id);
         }
 
-        let mut validator_config = validator.config().clone();
         let name = self.node_name_counter.to_string();
         self.node_name_counter += 1;
         let fullnode_config = FullnodeNodeConfig::validator_fullnode(
             name,
             self.dir.as_ref(),
             template,
-            &mut validator_config,
+            validator.config(),
             &self.genesis_waypoint,
             &self.genesis,
+            public_network,
         )?;
-
-        // Since the validator's config has changed we need to save it
-        validator_config.save(validator.config_path())?;
-        *validator.config_mut() = validator_config;
-        validator.restart().await?;
 
         let version = self.versions.get(version).unwrap();
         let mut fullnode = LocalNode::new(
@@ -436,6 +467,15 @@ impl Swarm for LocalSwarm {
 
     fn remove_validator(&mut self, _id: PeerId) -> Result<()> {
         todo!()
+    }
+
+    fn add_validator_full_node(
+        &mut self,
+        version: &Version,
+        template: NodeConfig,
+        id: PeerId,
+    ) -> Result<PeerId> {
+        self.add_validator_fullnode(version, template, id)
     }
 
     fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
