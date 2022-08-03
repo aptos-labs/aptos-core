@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import { HexString, TxnBuilderTypes, BCS } from 'aptos';
 import { MessageMethod } from '../core/types/dappTypes';
+import { createRawTransaction, getSigningMessage } from '../core/utils/transaction';
 
 class Web3 {
   requestId;
@@ -41,16 +43,51 @@ class Web3 {
     return this.message(MessageMethod.GET_ACCOUNT_ADDRESS, {});
   }
 
+  chainId() {
+    return this.message(MessageMethod.GET_CHAIN_ID, {});
+  }
+
+  sequenceNumber() {
+    return this.message(MessageMethod.GET_SEQUENCE_NUMBER, {});
+  }
+
   signMessage(message) {
     return this.message(MessageMethod.SIGN_MESSAGE, { message });
   }
 
-  signAndSubmitTransaction(transaction) {
-    return this.message(MessageMethod.SIGN_AND_SUBMIT_TRANSACTION, { transaction });
+  async signAndSubmitTransaction(transaction) {
+    const signedTransaction = await this.signTransaction(transaction);
+    return this.message(
+      MessageMethod.SUBMIT_TRANSACTION,
+      { signedTransaction: HexString.fromUint8Array(signedTransaction).hex() },
+    );
   }
 
-  signTransaction(transaction) {
-    return this.message(MessageMethod.SIGN_TRANSACTION, { transaction });
+  async signTransaction(transaction) {
+    const [{ chainId }, { sequenceNumber }, { address, publicKey }] = await Promise.all(
+      [this.chainId(), this.sequenceNumber(), this.account()],
+    );
+
+    const rawTransaction = createRawTransaction(transaction, {
+      address,
+      chainId,
+      sequenceNumber,
+    });
+
+    const { signature: sigHexStr } = await this.message(
+      MessageMethod.SIGN_TRANSACTION,
+      { signingMessage: getSigningMessage(rawTransaction) },
+    );
+    const signature = new TxnBuilderTypes.Ed25519Signature(
+      new HexString(sigHexStr).toUint8Array(),
+    );
+
+    const authenticator = new TxnBuilderTypes.TransactionAuthenticatorEd25519(
+      new TxnBuilderTypes.Ed25519PublicKey(new HexString(publicKey).toUint8Array()),
+      signature,
+    );
+
+    return BCS.bcsToBytes(new TxnBuilderTypes.SignedTransaction(rawTransaction, authenticator));
   }
 
   message(method, args) {

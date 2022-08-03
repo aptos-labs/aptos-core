@@ -7,12 +7,12 @@ slug: "sending-a-transaction"
 
 After the web app is connected to Wallet, the web app can prompt the user to sign and send transactions to the Aptos blockchain.
 
-Wallet API handles the transactions in the following two ways: 
+Wallet API handles the transactions in the following two ways:
 
-1. Sign a transaction and submit it to the Aptos blockchain. Return a pending transaction to the web app. 
-2. Sign a transaction but do not submit the transaction to the Aptos blockchain. Return the signed transaction to the web app, for the web app to submit the transaction. 
+1. Sign a transaction and submit it to the Aptos blockchain. Return a pending transaction to the web app.
+2. Sign a transaction but do not submit the transaction to the Aptos blockchain. Return the signed transaction to the web app, for the web app to submit the transaction.
 
-See the below examples for both the options. 
+See the below examples for both the options.
 
 <Info>For more on Aptos transactions, see the&nbsp;[Aptos Typescript SDK](https://aptos-labs.github.io/ts-sdk-doc/)&nbsp;and&nbsp;[Transactions with Typescript SDK](https://aptos.dev/sdks/transactions-with-ts-sdk). </Info>
 
@@ -22,15 +22,21 @@ See the below examples for both the options.
 The below code example shows how to use the `signAndSubmitTransaction()` API to sign the transaction and send it to the Aptos blockchain.
 
 ```typescript
+import { BCS, TxnBuilderTypes } from 'aptos';
 const wallet = getAptosWallet(); // see "Connecting"
 
-// Example transaction
-const transaction = {
-    type: 'script_function_payload',
-    function: '0x1::coin::transfer',
-    type_arguments: ['0x1::test_coin::TestCoin'],
-    arguments: ['<receiverAddress>', amount]
-}
+// Transaction format
+https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html
+const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
+const transaction = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+    TxnBuilderTypes.ScriptFunction.natural(
+    "0x1::coin",
+    "transfer",
+    [token],
+    [BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex('0xabab')), BCS.bcsSerializeUint64(717)],
+    ),
+);
+
 
 try {
     const pendingTransaction = await (window as any).aptos.signAndSubmitTransaction(transaction)
@@ -45,15 +51,20 @@ The below code example shows how to use the `signTransaction()` API to only sign
 
 
 ```typescript
+import { BCS, TxnBuilderTypes } from 'aptos';
 const wallet = getAptosWallet(); // see "Connecting"
 
-// Example transaction
-const transaction = {
-    type: 'script_function_payload',
-    function: '0x1::coin::transfer',
-    type_arguments: ['0x1::test_coin::TestCoin'],
-    arguments: ['<receiverAddress>', amount]
-}
+// Transaction format
+https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html
+const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
+const transaction = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+    TxnBuilderTypes.ScriptFunction.natural(
+    "0x1::coin",
+    "transfer",
+    [token],
+    [BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex('0xabab')), BCS.bcsSerializeUint64(717)],
+    ),
+);
 
 try {
     const signTransaction = await (window as any).aptos.signTransaction(transaction)
