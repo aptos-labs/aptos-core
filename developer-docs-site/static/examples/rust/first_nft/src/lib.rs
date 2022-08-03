@@ -9,7 +9,7 @@ pub struct NftClient {
     url: String,
     pub rest_client: RestClient,
 }
-const NUMBER_MAX: u64 = 9007199254740991;
+const NUMBER_MAX: u64 = 18446744073709551615;
 impl NftClient {
     /// Represents an account as well as the private, public key-pair for the Aptos blockchain.
     pub fn new(url: &str) -> Self {
