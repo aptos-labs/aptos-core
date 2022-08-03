@@ -28,7 +28,7 @@ use std::{
 };
 
 /// Describes the state of each aggregator instance.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum AggregatorState {
     // If aggregator stores a known value.
     Data,
@@ -551,14 +551,69 @@ fn not_supported_error() -> PartialVMError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use claim::assert_matches;
-    use move_deps::move_vm_test_utils::BlankStorage;
+    use aptos_state_view::StateView;
+    use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
+    use claim::{assert_err, assert_matches, assert_ok};
+    use move_deps::{
+        move_core_types::gas_schedule::{GasAlgebra, GasCarrier, InternalGasUnits},
+        move_table_extension::TableOperation,
+    };
     use once_cell::sync::Lazy;
+    use std::collections::HashMap;
 
-    static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
+    #[derive(Default)]
+    pub struct FakeTestStorage {
+        data: HashMap<StateKey, Vec<u8>>,
+    }
+
+    impl FakeTestStorage {
+        fn new() -> Self {
+            let mut data = HashMap::new();
+
+            // Initialize storage with some test data.
+            data.insert(id_to_state_key(test_id(4)), serialize(&900));
+            data.insert(id_to_state_key(test_id(5)), serialize(&5));
+            FakeTestStorage { data }
+        }
+    }
+
+    impl StateView for FakeTestStorage {
+        fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
+            Ok(self.data.get(state_key).cloned())
+        }
+
+        fn is_genesis(&self) -> bool {
+            self.data.is_empty()
+        }
+    }
+
+    impl TableResolver for FakeTestStorage {
+        fn resolve_table_entry(
+            &self,
+            handle: &TableHandle,
+            key: &[u8],
+        ) -> Result<Option<Vec<u8>>, anyhow::Error> {
+            let state_key = StateKey::table_item(AptosTableHandle::from(*handle), key.to_vec());
+            self.get_state_value(&state_key)
+        }
+
+        fn operation_cost(
+            &self,
+            _op: TableOperation,
+            _key_size: usize,
+            _val_size: usize,
+        ) -> InternalGasUnits<GasCarrier> {
+            InternalGasUnits::new(1)
+        }
+    }
 
     fn test_id(key: u128) -> AggregatorID {
         AggregatorID::new(0, key)
+    }
+
+    fn id_to_state_key(id: AggregatorID) -> StateKey {
+        let key_bytes = serialize(&id.key);
+        StateKey::table_item(AptosTableHandle(id.handle), key_bytes)
     }
 
     fn test_set_up(context: &NativeAggregatorContext) {
@@ -580,9 +635,11 @@ mod test {
         aggregator_data.remove_aggregator(test_id(6));
     }
 
+    static TEST_RESOLVER: Lazy<FakeTestStorage> = Lazy::new(|| FakeTestStorage::new());
+
     #[test]
     fn test_into_change_set() {
-        let context = NativeAggregatorContext::new(0, &*DUMMY_RESOLVER);
+        let context = NativeAggregatorContext::new(0, &*TEST_RESOLVER);
         test_set_up(&context);
 
         let AggregatorChangeSet { changes } = context.into_change_set();
@@ -616,5 +673,59 @@ mod test {
         );
 
         assert_matches!(changes.get(&test_id(6)).unwrap(), AggregatorChange::Delete);
+    }
+
+    #[test]
+    fn test_aggregator_natives() {
+        let context = NativeAggregatorContext::new(0, &*TEST_RESOLVER);
+        test_set_up(&context);
+
+        let mut aggregator_data = context.aggregator_data.borrow_mut();
+
+        // This aggregator has been created during this context, hence the
+        // value is known.
+        let aggregator = aggregator_data.get_aggregator(test_id(1), 1000);
+        assert_matches!(aggregator.state, AggregatorState::Data);
+        assert_eq!(aggregator.value, 0);
+
+        assert_ok!(aggregator.add(100));
+        assert_ok!(aggregator.add(900));
+        assert_matches!(aggregator.state, AggregatorState::Data);
+        assert_eq!(aggregator.value, 1000);
+
+        // Overflow!
+        assert_err!(aggregator.add(1));
+
+        // This aggregator has not been created during this context, and contains
+        // an unknown value.
+        let aggregator = aggregator_data.get_aggregator(test_id(4), 1000);
+        assert_matches!(aggregator.state, AggregatorState::PositiveDelta);
+        assert_eq!(aggregator.value, 0);
+
+        assert_ok!(aggregator.add(100));
+        assert_ok!(aggregator.add(100));
+        assert_matches!(aggregator.state, AggregatorState::PositiveDelta);
+        assert_eq!(aggregator.value, 200);
+
+        // 900 + 200 > 1000!
+        assert_err!(aggregator.materialize(&context, &test_id(4)));
+
+        // This aggregator also has not been created during this context, and
+        // contains an unknown value.
+        let aggregator = aggregator_data.get_aggregator(test_id(5), 10);
+        assert_matches!(aggregator.state, AggregatorState::PositiveDelta);
+        assert_eq!(aggregator.value, 0);
+
+        assert_ok!(aggregator.add(2));
+        assert_matches!(aggregator.state, AggregatorState::PositiveDelta);
+        assert_eq!(aggregator.value, 2);
+
+        assert_ok!(aggregator.materialize(&context, &test_id(5)));
+        assert_matches!(aggregator.state, AggregatorState::Data);
+        assert_eq!(aggregator.value, 7);
+
+        assert_ok!(aggregator.sub(7));
+        assert_matches!(aggregator.state, AggregatorState::Data);
+        assert_eq!(aggregator.value, 0);
     }
 }
