@@ -3,15 +3,18 @@
 
 use crate::protos::extractor;
 use aptos_api_types::{
-    DeleteModule, DeleteResource, Event, GenesisPayload, HashValue, MoveAbility, MoveFunction,
-    MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode,
-    MoveModuleId, MoveResource, MoveStruct, MoveStructField, MoveStructTag, MoveType,
-    ScriptPayload, Transaction, TransactionInfo, TransactionPayload, WriteSet, WriteSetChange,
+    AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, Event, GenesisPayload,
+    MoveAbility, MoveFunction, MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule,
+    MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStruct,
+    MoveStructField, MoveStructTag, MoveType, MultiEd25519Signature, ScriptFunctionId,
+    ScriptPayload, Transaction, TransactionInfo, TransactionPayload, TransactionSignature,
+    WriteSet, WriteSetChange,
 };
 use aptos_logger::warn;
-pub use move_deps::move_binary_format::file_format::Ability;
+use hex;
+use move_deps::move_binary_format::file_format::Ability;
 use protobuf::{EnumOrUnknown, MessageField};
-use std::{str::FromStr, time::Duration};
+use std::time::Duration;
 
 pub fn convert_move_module_id(move_module_id: &MoveModuleId) -> extractor::MoveModuleId {
     extractor::MoveModuleId {
@@ -145,27 +148,27 @@ pub fn convert_move_module_bytecode(mmb: &MoveModuleBytecode) -> extractor::Move
     }
 }
 
+pub fn convert_script_function_id(
+    script_function_id: &ScriptFunctionId,
+) -> extractor::ScriptFunctionId {
+    extractor::ScriptFunctionId {
+        module: MessageField::some(convert_move_module_id(&script_function_id.module)),
+        name: script_function_id.name.to_string(),
+        special_fields: Default::default(),
+    }
+}
+
 pub fn convert_transaction_payload(payload: &TransactionPayload) -> extractor::TransactionPayload {
     match payload {
         TransactionPayload::ScriptFunctionPayload(sfp) => extractor::TransactionPayload {
             type_: EnumOrUnknown::new(
-                extractor::transaction_payload::PayloadType::SCRIPT_FUNCTION_PAYLOAD,
+                extractor::transaction_payload::Type::SCRIPT_FUNCTION_PAYLOAD,
             ),
             payload: Some(
                 extractor::transaction_payload::Payload::ScriptFunctionPayload(
                     extractor::ScriptFunctionPayload {
-                        function: MessageField::some(extractor::ScriptFunctionId {
-                            module: MessageField::some(convert_move_module_id(
-                                &sfp.function.module,
-                            )),
-                            name: sfp.function.name.to_string(),
-                            special_fields: Default::default(),
-                        }),
-                        type_arguments: sfp
-                            .type_arguments
-                            .iter()
-                            .map(|move_type| move_type.to_string())
-                            .collect(),
+                        function: MessageField::some(convert_script_function_id(&sfp.function)),
+                        type_arguments: sfp.type_arguments.iter().map(convert_move_type).collect(),
                         arguments: sfp
                             .arguments
                             .iter()
@@ -178,16 +181,14 @@ pub fn convert_transaction_payload(payload: &TransactionPayload) -> extractor::T
             special_fields: Default::default(),
         },
         TransactionPayload::ScriptPayload(sp) => extractor::TransactionPayload {
-            type_: EnumOrUnknown::new(extractor::transaction_payload::PayloadType::SCRIPT_PAYLOAD),
+            type_: EnumOrUnknown::new(extractor::transaction_payload::Type::SCRIPT_PAYLOAD),
             payload: Some(extractor::transaction_payload::Payload::ScriptPayload(
                 convert_script_payload(sp),
             )),
             special_fields: Default::default(),
         },
         TransactionPayload::ModuleBundlePayload(mbp) => extractor::TransactionPayload {
-            type_: EnumOrUnknown::new(
-                extractor::transaction_payload::PayloadType::MODULE_BUNDLE_PAYLOAD,
-            ),
+            type_: EnumOrUnknown::new(extractor::transaction_payload::Type::MODULE_BUNDLE_PAYLOAD),
             payload: Some(
                 extractor::transaction_payload::Payload::ModuleBundlePayload(
                     extractor::ModuleBundlePayload {
@@ -203,9 +204,7 @@ pub fn convert_transaction_payload(payload: &TransactionPayload) -> extractor::T
             special_fields: Default::default(),
         },
         TransactionPayload::WriteSetPayload(wsp) => extractor::TransactionPayload {
-            type_: EnumOrUnknown::new(
-                extractor::transaction_payload::PayloadType::WRITE_SET_PAYLOAD,
-            ),
+            type_: EnumOrUnknown::new(extractor::transaction_payload::Type::WRITE_SET_PAYLOAD),
             payload: Some(extractor::transaction_payload::Payload::WriteSetPayload(
                 extractor::WriteSetPayload {
                     write_set: convert_write_set(&wsp.write_set),
@@ -296,8 +295,8 @@ pub fn convert_move_type(move_type: &MoveType) -> extractor::MoveType {
         ),
         MoveType::Reference { mutable, to } => Some(extractor::move_type::Content::Reference(
             extractor::move_type::ReferenceType {
-                mutable: mutable.clone(),
-                to: MessageField::some(convert_move_type(&to)),
+                mutable: *mutable,
+                to: MessageField::some(convert_move_type(to)),
                 special_fields: Default::default(),
             },
         )),
@@ -319,10 +318,8 @@ pub fn convert_write_set_changes(changes: &[WriteSetChange]) -> Vec<extractor::W
 
 #[inline]
 pub fn convert_hex_string_to_bytes(hex_string: &str) -> Vec<u8> {
-    HashValue::from_str(hex_string)
-        .unwrap_or_else(|_| panic!("Could not convert '{}' to HashValue", hex_string))
-        .0
-        .to_vec()
+    hex::decode(hex_string.strip_prefix("0x").unwrap_or(hex_string))
+        .unwrap_or_else(|_| panic!("Could not convert '{}' to bytes", hex_string))
 }
 
 pub fn convert_move_struct_tag(struct_tag: &MoveStructTag) -> extractor::MoveStructTag {
@@ -333,7 +330,7 @@ pub fn convert_move_struct_tag(struct_tag: &MoveStructTag) -> extractor::MoveStr
         generic_type_params: struct_tag
             .generic_type_params
             .iter()
-            .map(|move_type| convert_move_type(move_type))
+            .map(convert_move_type)
             .collect(),
         special_fields: Default::default(),
     }
@@ -364,18 +361,14 @@ pub fn convert_delete_resource(delete_resource: &DeleteResource) -> extractor::D
 pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetChange {
     match change {
         WriteSetChange::DeleteModule(delete_module) => extractor::WriteSetChange {
-            type_: EnumOrUnknown::new(
-                extractor::write_set_change::WriteSetChangeType::DELETE_MODULE,
-            ),
+            type_: EnumOrUnknown::new(extractor::write_set_change::Type::DELETE_MODULE),
             change: Some(extractor::write_set_change::Change::DeleteModule(
                 convert_delete_module(delete_module),
             )),
             special_fields: Default::default(),
         },
         WriteSetChange::DeleteResource(delete_resource) => extractor::WriteSetChange {
-            type_: EnumOrUnknown::new(
-                extractor::write_set_change::WriteSetChangeType::DELETE_RESOURCE,
-            ),
+            type_: EnumOrUnknown::new(extractor::write_set_change::Type::DELETE_RESOURCE),
             change: Some(extractor::write_set_change::Change::DeleteResource(
                 convert_delete_resource(delete_resource),
             )),
@@ -390,9 +383,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             });
 
             extractor::WriteSetChange {
-                type_: EnumOrUnknown::new(
-                    extractor::write_set_change::WriteSetChangeType::DELETE_TABLE_ITEM,
-                ),
+                type_: EnumOrUnknown::new(extractor::write_set_change::Type::DELETE_TABLE_ITEM),
                 change: Some(extractor::write_set_change::Change::DeleteTableItem(
                     extractor::DeleteTableItem {
                         state_key_hash: convert_hex_string_to_bytes(
@@ -412,9 +403,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             }
         }
         WriteSetChange::WriteModule(write_module) => extractor::WriteSetChange {
-            type_: EnumOrUnknown::new(
-                extractor::write_set_change::WriteSetChangeType::DELETE_MODULE,
-            ),
+            type_: EnumOrUnknown::new(extractor::write_set_change::Type::DELETE_MODULE),
             change: Some(extractor::write_set_change::Change::WriteModule(
                 extractor::WriteModule {
                     address: write_module.address.to_string(),
@@ -426,9 +415,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             special_fields: Default::default(),
         },
         WriteSetChange::WriteResource(write_resource) => extractor::WriteSetChange {
-            type_: EnumOrUnknown::new(
-                extractor::write_set_change::WriteSetChangeType::WRITE_RESOURCE,
-            ),
+            type_: EnumOrUnknown::new(extractor::write_set_change::Type::WRITE_RESOURCE),
             change: Some(extractor::write_set_change::Change::WriteResource(
                 extractor::WriteResource {
                     address: write_resource.address.to_string(),
@@ -447,9 +434,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
                 )
             });
             extractor::WriteSetChange {
-                type_: EnumOrUnknown::new(
-                    extractor::write_set_change::WriteSetChangeType::WRITE_TABLE_ITEM,
-                ),
+                type_: EnumOrUnknown::new(extractor::write_set_change::Type::WRITE_TABLE_ITEM),
                 change: Some(extractor::write_set_change::Change::WriteTableItem(
                     extractor::WriteTableItem {
                         state_key_hash: convert_hex_string_to_bytes(
@@ -473,13 +458,26 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
     }
 }
 
+pub fn convert_move_script_bytecode(msb: &MoveScriptBytecode) -> extractor::MoveScriptBytecode {
+    let abi = match msb.clone().try_parse_abi().abi {
+        None => MessageField::none(),
+        Some(move_func) => MessageField::some(convert_move_function(&move_func)),
+    };
+
+    extractor::MoveScriptBytecode {
+        bytecode: msb.bytecode.0.clone(),
+        abi,
+        special_fields: Default::default(),
+    }
+}
+
 pub fn convert_script_payload(script_payload: &ScriptPayload) -> extractor::ScriptPayload {
     extractor::ScriptPayload {
-        code: script_payload.code.bytecode.to_string(),
+        code: MessageField::some(convert_move_script_bytecode(&script_payload.code)),
         type_arguments: script_payload
             .type_arguments
             .iter()
-            .map(|move_type| move_type.to_string())
+            .map(convert_move_type)
             .collect(),
         arguments: script_payload
             .arguments
@@ -539,6 +537,99 @@ pub fn convert_transaction_info(transaction_info: &TransactionInfo) -> extractor
     }
 }
 
+pub fn convert_ed255198_signature(sig: &Ed25519Signature) -> extractor::Ed25519Signature {
+    extractor::Ed25519Signature {
+        public_key: sig.public_key.0.clone(),
+        signature: sig.signature.0.clone(),
+        special_fields: Default::default(),
+    }
+}
+
+pub fn convert_multi_ed255198_signature(
+    sig: &MultiEd25519Signature,
+) -> extractor::MultiEd25519Signature {
+    extractor::MultiEd25519Signature {
+        public_keys: sig.public_keys.iter().map(|pk| pk.0.clone()).collect(),
+        signatures: sig.signatures.iter().map(|sig| sig.0.clone()).collect(),
+        threshold: sig.threshold as u32,
+        bitmap: sig.bitmap.0.clone(),
+        special_fields: Default::default(),
+    }
+}
+
+pub fn convert_account_signature(
+    account_signature: &AccountSignature,
+) -> extractor::AccountSignature {
+    let type_ = match account_signature {
+        AccountSignature::Ed25519Signature(_) => extractor::account_signature::Type::ED255198,
+        AccountSignature::MultiEd25519Signature(_) => {
+            extractor::account_signature::Type::MULTI_ED255198
+        }
+    };
+    let signature = match account_signature {
+        AccountSignature::Ed25519Signature(s) => {
+            extractor::account_signature::Signature::Ed255198(convert_ed255198_signature(s))
+        }
+        AccountSignature::MultiEd25519Signature(s) => {
+            extractor::account_signature::Signature::MultiEd255198(
+                convert_multi_ed255198_signature(s),
+            )
+        }
+    };
+    extractor::AccountSignature {
+        type_: EnumOrUnknown::new(type_),
+        signature: Some(signature),
+        special_fields: Default::default(),
+    }
+}
+
+pub fn convert_transaction_signature(
+    signature: &Option<TransactionSignature>,
+) -> MessageField<extractor::Signature> {
+    let signature = match signature {
+        None => return MessageField::none(),
+        Some(s) => s,
+    };
+    let type_ = match signature {
+        TransactionSignature::Ed25519Signature(_) => extractor::signature::Type::ED255198,
+        TransactionSignature::MultiEd25519Signature(_) => {
+            extractor::signature::Type::MULTI_ED255198
+        }
+        TransactionSignature::MultiAgentSignature(_) => extractor::signature::Type::MULTI_AGENT,
+    };
+
+    let signature = match signature {
+        TransactionSignature::Ed25519Signature(s) => {
+            extractor::signature::Signature::Ed255198(convert_ed255198_signature(s))
+        }
+        TransactionSignature::MultiEd25519Signature(s) => {
+            extractor::signature::Signature::MultiEd255198(convert_multi_ed255198_signature(s))
+        }
+        TransactionSignature::MultiAgentSignature(s) => {
+            extractor::signature::Signature::MultiAgent(extractor::MultiAgentSignature {
+                sender: MessageField::some(convert_account_signature(&s.sender)),
+                secondary_signer_addresses: s
+                    .secondary_signer_addresses
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect(),
+                secondary_signers: s
+                    .secondary_signers
+                    .iter()
+                    .map(convert_account_signature)
+                    .collect(),
+                special_fields: Default::default(),
+            })
+        }
+    };
+
+    MessageField::some(extractor::Signature {
+        type_: EnumOrUnknown::new(type_),
+        signature: Some(signature),
+        special_fields: Default::default(),
+    })
+}
+
 pub fn convert_transaction(
     transaction: &Transaction,
     block_height: u64,
@@ -572,7 +663,7 @@ pub fn convert_transaction(
                         ut.request.expiration_timestamp_secs.0,
                     ),
                     payload: MessageField::some(convert_transaction_payload(&ut.request.payload)),
-                    signature: Default::default(),
+                    signature: convert_transaction_signature(&ut.request.signature),
                     special_fields: Default::default(),
                 }),
                 events: convert_events(&ut.events),
