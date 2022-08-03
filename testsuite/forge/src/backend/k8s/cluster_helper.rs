@@ -29,6 +29,7 @@ use std::{
     convert::TryFrom,
     fs::File,
     io::Write,
+    net::TcpListener,
     path::Path,
     process::{Command, Stdio},
     str,
@@ -42,7 +43,6 @@ use tokio::time::Duration;
 // binaries expected to be present on test runner
 const HELM_BIN: &str = "helm";
 pub const KUBECTL_BIN: &str = "kubectl";
-const MAX_NUM_VALIDATORS: usize = 30;
 
 // helm release names and helm chart paths
 const APTOS_NODE_HELM_RELEASE_NAME: &str = "aptos-node";
@@ -69,6 +69,12 @@ macro_rules! GENESIS_FORGE_HELM_VALUES {
     () => {
         "helm-values/genesis-values.yaml"
     };
+}
+
+/// Gets a free port
+pub fn get_free_port() -> u32 {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.local_addr().unwrap().port() as u32
 }
 
 async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &str) -> Result<()> {
@@ -159,7 +165,7 @@ async fn wait_node_stateful_set(
         Box::pin(async move {
             // wait for all validators healthy
             for node in nodes.values() {
-                match sts.get_status(node.sts_name()).await {
+                match sts.get_status(node.stateful_set_name()).await {
                     Ok(s) => {
                         let sts_name = &s.name();
                         if let Some(sts_status) = s.status {
@@ -189,19 +195,13 @@ async fn wait_node_stateful_set(
     .await
 }
 
+// TODO: set validator image tag by kube api rather than helm
 pub fn set_validator_image_tag(
-    validator_name: String,
-    image_tag: String,
-    kube_namespace: String,
+    _validator_name: String,
+    _image_tag: String,
+    _kube_namespace: String,
 ) -> Result<()> {
-    let validator_upgrade_options = vec![
-        "--reuse-values".to_string(),
-        "--history-max".to_string(),
-        "2".to_string(),
-        "--set".to_string(),
-        format!("imageTag={}", image_tag),
-    ];
-    upgrade_validator(validator_name, &validator_upgrade_options, kube_namespace)
+    todo!()
 }
 
 /// Deletes a collection of resources in k8s as part of aptos-node
@@ -229,7 +229,23 @@ async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
     Ok(())
 }
 
-pub(crate) async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
+/// Delete existing k8s resources in the namespace. This is essentially helm uninstall but lighter weight
+pub(crate) async fn delete_k8s_resources(client: K8sClient, kube_namespace: &str) -> Result<()> {
+    // selector for the helm chart
+    let aptos_node_helm_selector = "app.kubernetes.io/part-of=aptos-node";
+
+    // delete all deployments and statefulsets
+    // cross this with all the compute resources created by aptos-node helm chart
+    let deployments: Api<Deployment> = Api::namespaced(client.clone(), kube_namespace);
+    let stateful_sets: Api<StatefulSet> = Api::namespaced(client.clone(), kube_namespace);
+    let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), kube_namespace);
+    delete_k8s_collection(deployments, "deployments", aptos_node_helm_selector).await?;
+    delete_k8s_collection(stateful_sets, "stateful_sets", aptos_node_helm_selector).await?;
+    delete_k8s_collection(pvcs, "pvcs", aptos_node_helm_selector).await?;
+    Ok(())
+}
+
+async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
     let client: K8sClient = create_k8s_client().await;
 
     // if operating on the default namespace,
@@ -260,16 +276,7 @@ pub(crate) async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
                 }
                 Err(e) => bail!(e),
             };
-
-            // delete all deployments and statefulsets
-            // cross this with all the compute resources created by aptos-node helm chart
-            let deployments: Api<Deployment> = Api::namespaced(client.clone(), "default");
-            let stateful_sets: Api<StatefulSet> = Api::namespaced(client.clone(), "default");
-            let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), "default");
-            let aptos_node_helm_selector = "app.kubernetes.io/part-of=aptos-node";
-            delete_k8s_collection(deployments, "deployments", aptos_node_helm_selector).await?;
-            delete_k8s_collection(stateful_sets, "stateful_sets", aptos_node_helm_selector).await?;
-            delete_k8s_collection(pvcs, "pvcs", aptos_node_helm_selector).await?;
+            delete_k8s_resources(client, "default").await?;
         }
         s if s.starts_with("forge") => {
             let namespaces: Api<Namespace> = Api::all(client);
@@ -351,17 +358,14 @@ fn upgrade_helm_release(
     Ok(())
 }
 
+// TODO: upgrade via kube api
+#[allow(dead_code)]
 fn upgrade_validator(
-    validator_name: String,
-    options: &[String],
-    kube_namespace: String,
+    _validator_name: String,
+    _options: &[String],
+    _kube_namespace: String,
 ) -> Result<()> {
-    upgrade_helm_release(
-        validator_name,
-        APTOS_NODE_HELM_CHART_PATH.to_string(),
-        options,
-        kube_namespace,
-    )
+    todo!()
 }
 
 fn upgrade_aptos_node_helm(options: &[String], kube_namespace: String) -> Result<()> {
@@ -403,15 +407,14 @@ fn generate_new_era() -> String {
 
 pub async fn install_testnet_resources(
     kube_namespace: String,
-    base_num_validators: usize,
-    base_validator_image_tag: String,
-    base_genesis_image_tag: String,
+    num_validators: usize,
+    num_fullnodes: usize,
+    node_image_tag: String,
+    genesis_image_tag: String,
     genesis_modules_path: Option<String>,
     use_port_forward: bool,
     enable_haproxy: bool,
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
-    assert!(base_num_validators <= MAX_NUM_VALIDATORS);
-
     let kube_client = create_k8s_client().await;
 
     // get deployment-specific helm values and cache it
@@ -425,9 +428,10 @@ pub async fn install_testnet_resources(
     // get forge override helm values and cache it
     let aptos_node_forge_helm_values_yaml = format!(
         include_str!(APTOS_NODE_FORGE_HELM_VALUES!()),
-        num_validators = base_num_validators,
+        num_validators = num_validators,
+        num_fullnodes = num_fullnodes,
         era = &new_era,
-        image_tag = &base_genesis_image_tag,
+        image_tag = &node_image_tag,
         enable_haproxy = enable_haproxy,
         namespace = &kube_namespace,
     );
@@ -449,8 +453,8 @@ pub async fn install_testnet_resources(
 
     let genesis_forge_helm_values_yaml = format!(
         include_str!(GENESIS_FORGE_HELM_VALUES!()),
-        num_validators = base_num_validators,
-        image_tag = &base_genesis_image_tag,
+        num_validators = num_validators,
+        image_tag = &genesis_image_tag,
         era = &new_era,
         root_key = DEFAULT_ROOT_KEY,
         validator_internal_host_suffix = validator_internal_host_suffix,
@@ -503,7 +507,6 @@ pub async fn install_testnet_resources(
     let (validators, fullnodes) = collect_running_nodes(
         &kube_client,
         kube_namespace,
-        base_validator_image_tag,
         use_port_forward,
         enable_haproxy,
     )
@@ -516,14 +519,12 @@ pub async fn install_testnet_resources(
 pub async fn collect_running_nodes(
     kube_client: &K8sClient,
     kube_namespace: String,
-    base_validator_image_tag: String,
     use_port_forward: bool,
     enable_haproxy: bool,
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     // get all validators
     let validators = get_validators(
         kube_client.clone(),
-        &base_validator_image_tag,
         &kube_namespace,
         use_port_forward,
         enable_haproxy,
@@ -541,7 +542,6 @@ pub async fn collect_running_nodes(
     // get all fullnodes
     let fullnodes = get_fullnodes(
         kube_client.clone(),
-        &base_validator_image_tag,
         &kube_namespace,
         use_port_forward,
         enable_haproxy,
@@ -553,10 +553,10 @@ pub async fn collect_running_nodes(
 
     let nodes = validators
         .values()
-        // .chain(fullnodes.values())
+        .chain(fullnodes.values())
         .collect::<Vec<&K8sNode>>();
 
-    // start port-forward for each of the validators
+    // start port-forward for each of the nodes
     if use_port_forward {
         for node in nodes.iter() {
             node.spawn_port_forward()?;
@@ -575,6 +575,7 @@ pub async fn create_k8s_client() -> K8sClient {
     K8sClient::try_from(config_infer).unwrap()
 }
 
+// TODO: replace this with rust kube api call
 pub fn scale_stateful_set_replicas(sts_name: &str, replica_num: u64) -> Result<()> {
     let scale_sts_args = [
         "scale",
