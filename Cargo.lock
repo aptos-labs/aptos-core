@@ -1095,12 +1095,14 @@ dependencies = [
  "executor-types",
  "fail 0.5.0",
  "futures",
+ "goldenfile",
  "hex",
  "hyper",
  "mempool-notifications",
  "move-deps",
  "once_cell",
  "protobuf",
+ "protobuf-json-mapping",
  "rand 0.7.3",
  "regex",
  "serde 1.0.141",
@@ -6712,6 +6714,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee4a7d8b91800c8f167a6268d1a1026607368e1adc84e98fe044aeb905302f7"
 dependencies = [
  "once_cell",
+ "protobuf-support",
+ "thiserror",
+]
+
+[[package]]
+name = "protobuf-json-mapping"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be57102eab3e96da74543c6d4cb44b375d87497b4e8959c2fbdc637f2c92ea1a"
+dependencies = [
+ "protobuf",
  "protobuf-support",
  "thiserror",
 ]
