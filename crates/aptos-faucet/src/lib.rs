@@ -267,7 +267,7 @@ pub async fn delegate_mint_account(
                     .authentication_key()
                     .clone()
                     .derived_address()
-                    .to_hex_literal(),
+                    .to_string(),
             ),
             pub_key: None,
             return_txns: Some(true),

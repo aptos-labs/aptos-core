@@ -106,7 +106,7 @@ async fn test_get_table_item() {
     let tt = ctx
         .api_get_account_resource(
             acc,
-            &acc.address().to_hex_literal(),
+            &acc.address().to_string(),
             "TableTestData",
             "TestTables",
         )

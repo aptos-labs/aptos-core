@@ -118,7 +118,7 @@ impl CliCommand<()> for InitPackage {
             .named_addresses
             .clone()
             .into_iter()
-            .map(|(key, value)| (key, value.account_address.to_hex_literal()))
+            .map(|(key, value)| (key, value.account_address.to_string()))
             .collect();
 
         // TODO: Support Git as default when Github credentials are properly handled from GH CLI

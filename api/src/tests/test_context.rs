@@ -365,10 +365,7 @@ impl TestContext {
         name: &str,
     ) -> serde_json::Value {
         let resources = self
-            .get(&format!(
-                "/accounts/{}/resources",
-                account.address().to_hex_literal()
-            ))
+            .get(&format!("/accounts/{}/resources", account.address()))
             .await;
         let vals: Vec<serde_json::Value> = serde_json::from_value(resources).unwrap();
         match self.api_specific_config {
@@ -404,12 +401,7 @@ impl TestContext {
         let (typ, function) = match self.api_specific_config {
             ApiSpecificConfig::V0 => (
                 "script_function_payload",
-                json!(format!(
-                    "{}::{}::{}",
-                    account.address().to_hex_literal(),
-                    module,
-                    func
-                )),
+                json!(format!("{}::{}::{}", account.address(), module, func)),
             ),
             ApiSpecificConfig::V1(_) => (
                 "script_function_payload",

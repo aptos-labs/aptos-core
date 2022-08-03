@@ -94,23 +94,15 @@ impl FaucetCliArgs {
                 MintParams {
                     amount: self.amount,
                     auth_key: None,
-                    address: Some(account.to_hex_literal()),
+                    address: Some(account.to_string()),
                     pub_key: None,
                     return_txns: None,
                 },
             )
             .await;
             match response {
-                Ok(response) => println!(
-                    "SUCCESS: Account: {} Response: {:?}",
-                    account.to_hex_literal(),
-                    response
-                ),
-                Err(response) => println!(
-                    "FAILURE: Account: {} Response: {:?}",
-                    account.to_hex_literal(),
-                    response
-                ),
+                Ok(response) => println!("SUCCESS: Account: {} Response: {:?}", account, response),
+                Err(response) => println!("FAILURE: Account: {} Response: {:?}", account, response),
             }
         }
     }

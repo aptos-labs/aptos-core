@@ -305,7 +305,7 @@ impl UserTransaction {
         Self {
             hash: tx.info.hash.to_string(),
             signature: serde_json::to_value(&tx.request.signature).unwrap(),
-            sender: tx.request.sender.inner().to_hex_literal(),
+            sender: tx.request.sender.inner().to_string(),
             sequence_number: *tx.request.sequence_number.inner() as i64,
             max_gas_amount: *tx.request.max_gas_amount.inner() as i64,
             expiration_timestamp_secs: parse_timestamp_secs(
@@ -346,7 +346,7 @@ impl BlockMetadataTransaction {
             round: *tx.round.inner() as i64,
             // TODO: Deprecated, use previous_block_votes_bitmap instead. Column kept to not break indexer users (e.g., explorer), writing an empty vector.
             previous_block_votes: serde_json::to_value(vec![] as Vec<Address>).unwrap(),
-            proposer: tx.proposer.inner().to_hex_literal(),
+            proposer: tx.proposer.inner().to_string(),
             // time is in milliseconds, but chronos wants seconds
             timestamp: parse_timestamp(tx.timestamp, tx.info.version),
             inserted_at: chrono::Utc::now().naive_utc(),

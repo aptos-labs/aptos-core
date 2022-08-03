@@ -113,7 +113,7 @@ async fn test_get_account_resources_by_ledger_version() {
 
     let ledger_version_1_resources = context
         .get(&account_resources(
-            &context.root_account().address().to_hex_literal(),
+            &context.root_account().address().to_string(),
         ))
         .await;
     let root_account = find_value(&ledger_version_1_resources, |f| {
@@ -129,7 +129,7 @@ async fn test_get_account_resources_by_ledger_version() {
 
     let ledger_version_0_resources = context
         .get(&account_resources_with_ledger_version(
-            &context.root_account().address().to_hex_literal(),
+            &context.root_account().address().to_string(),
             0,
         ))
         .await;
@@ -151,7 +151,7 @@ async fn test_get_account_resources_by_ledger_version_is_too_large() {
     let resp = context
         .expect_status_code(404)
         .get(&account_resources_with_ledger_version(
-            &context.root_account().address().to_hex_literal(),
+            &context.root_account().address().to_string(),
             1000000000000000000,
         ))
         .await;
@@ -164,7 +164,7 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
     let resp = context
         .expect_status_code(400)
         .get(&account_resources_with_ledger_version(
-            &context.root_account().address().to_hex_literal(),
+            &context.root_account().address().to_string(),
             -1,
         ))
         .await;
@@ -186,7 +186,7 @@ async fn test_get_account_modules_by_ledger_version() {
     context.commit_block(&vec![txn.clone()]).await;
     let modules = context
         .get(&account_modules(
-            &context.root_account().address().to_hex_literal(),
+            &context.root_account().address().to_string(),
         ))
         .await;
 
@@ -194,7 +194,7 @@ async fn test_get_account_modules_by_ledger_version() {
 
     let modules = context
         .get(&account_modules_with_ledger_version(
-            &context.root_account().address().to_hex_literal(),
+            &context.root_account().address().to_string(),
             0,
         ))
         .await;

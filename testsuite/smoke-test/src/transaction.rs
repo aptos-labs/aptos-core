@@ -99,7 +99,7 @@ impl AptosTest for ExternalTransactionSigner {
                             .into_iter()
                             .map(|arg| arg.as_str().unwrap().to_owned())
                             .collect::<Vec<String>>(),
-                        vec![receiver.address().to_hex_literal(), amount.to_string(),]
+                        vec![receiver.address().to_string(), amount.to_string(),]
                     );
                 } else {
                     bail!("unexpected transaction playload")

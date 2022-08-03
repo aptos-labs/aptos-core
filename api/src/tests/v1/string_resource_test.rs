@@ -49,7 +49,7 @@ async fn test_renders_move_acsii_string_into_utf8_string() {
     let message = context
         .api_get_account_resource(
             &account,
-            &account.address().to_hex_literal(),
+            &account.address().to_string(),
             "Message",
             "MessageHolder",
         )
