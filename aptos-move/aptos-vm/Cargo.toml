@@ -44,6 +44,7 @@ aptos-types = { path = "../../types", features = ["fuzzing"] }
 
 [features]
 default = []
+aggregator-extension = []
 mirai-contracts = []
 fuzzing = ["move-deps/fuzzing", "move-deps/fuzzing"]
 failpoints = ["fail/failpoints", "move-deps/failpoints"]

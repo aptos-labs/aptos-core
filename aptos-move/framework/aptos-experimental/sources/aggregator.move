@@ -62,13 +62,16 @@
 /// parallelism in execution.
 module aptos_framework::aggregator {
 
-    /// When aggregator's value (actual or accumulated) overflows (raised by
-    /// native code).
+    /// When the value of aggregator (actual or accumulated) overflows (raised
+    /// by native code).
     const EAGGREGATOR_OVERFLOW: u64 = 1;
 
-    /// When aggregator's value (actual or accumulated) underflows (raised by
-    /// native code).
+    /// When the value of aggregator (actual or accumulated) underflows, i.e goes
+    /// below zero (raised by native code).
     const EAGGREGATOR_UNDERFLOW: u64 = 2;
+
+    /// When aggregator feature is not supported (raised by native code).
+    const ENOT_SUPPORTED: u64 = 3;
 
     struct Aggregator has store {
         handle: u128,

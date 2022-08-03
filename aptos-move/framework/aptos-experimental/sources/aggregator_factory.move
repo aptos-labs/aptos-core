@@ -39,6 +39,9 @@ module aptos_framework::aggregator_factory {
     /// When aggregator factory is published to not core framework address.
     const ENOT_CORE_FRAMEWORK_ADDRESS: u64 = 2;
 
+    /// When aggregator feature is not supported (raised by native code).
+    const ENOT_SUPPORTED: u64 = 3;
+
     /// Struct that creates aggregators.
     struct AggregatorFactory has key {
         phantom_table: Table<u128, u128>,

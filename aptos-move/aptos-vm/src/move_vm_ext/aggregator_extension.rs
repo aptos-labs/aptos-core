@@ -314,6 +314,9 @@ fn native_new_aggregator(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
+    if !cfg!(any(test, feature = "aggregator-extension")) {
+        return Err(not_supported_error());
+    }
     assert!(args.len() == 2);
 
     // Extract fields: `limit` of the new aggregator and a `phantom_handle` of
@@ -366,6 +369,9 @@ fn native_add(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
+    if !cfg!(any(test, feature = "aggregator-extension")) {
+        return Err(not_supported_error());
+    }
     assert!(args.len() == 2);
 
     // Get aggregator fields and a value to add.
@@ -393,6 +399,9 @@ fn native_read(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
+    if !cfg!(any(test, feature = "aggregator-extension")) {
+        return Err(not_supported_error());
+    }
     assert!(args.len() == 1);
     let aggregator_ref = pop_arg!(args, StructRef);
 
@@ -423,6 +432,9 @@ fn native_sub(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
+    if !cfg!(any(test, feature = "aggregator-extension")) {
+        return Err(not_supported_error());
+    }
     assert!(args.len() == 2);
 
     // Get aggregator fields and a value to subtract.
@@ -455,6 +467,9 @@ fn native_remove_aggregator(
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
+    if !cfg!(any(test, feature = "aggregator-extension")) {
+        return Err(not_supported_error());
+    }
     assert!(args.len() == 2);
 
     // Get aggregator id for removal.
@@ -519,6 +534,16 @@ fn get_aggregator_fields(aggregator: &StructRef) -> PartialVMResult<(u128, u128,
 /// Returns partial VM error on extension failure.
 fn extension_error(message: impl ToString) -> PartialVMError {
     PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(message.to_string())
+}
+
+/// When aggregator feature is not supported.
+const ENOT_SUPPORTED: u64 = 0x0C_003;
+
+/// Returns partial VM error when experimental feature is not supported.
+fn not_supported_error() -> PartialVMError {
+    PartialVMError::new(StatusCode::ABORTED)
+        .with_message("this experimental feature is not supported".to_string())
+        .with_sub_status(ENOT_SUPPORTED)
 }
 
 // ================================= Tests =================================
