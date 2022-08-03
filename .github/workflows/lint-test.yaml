@@ -1,0 +1,192 @@
+name: "Lint+Test"
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - devnet
+      - testnet
+      - auto
+      - canary
+
+env:
+  HAS_BUILDPULSE_SECRETS: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID != '' && secrets.BUILDPULSE_SECRET_ACCESS_KEY != '' }}
+  HAS_DATADOG_SECRETS: ${{ secrets.DD_API_KEY != '' }}
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+# cancel redundant builds
+concurrency:
+  # cancel redundant builds on PRs (only on PR, not on branches)
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  scripts-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: sudo apt-get install shellcheck --assume-yes --no-install-recommends
+      - run: shellcheck scripts/dev_setup.sh
+
+  ecosystem-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+      # install packages for examples
+      - run: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install
+      - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install
+      # Run package build+lint + tests
+      - run: cd ./ecosystem/typescript/sdk && yarn install
+      - run: cd ./ecosystem/typescript/sdk && yarn lint
+      - run: cd ./ecosystem/typescript/sdk && yarn fmt:check
+      # Run typescript indexer server linting
+      - run: cd ./ecosystem/indexer-server/typescript && yarn install
+      - run: cd ./ecosystem/indexer-server/typescript && yarn lint
+
+  community-platform-lint:
+    runs-on: ubuntu-latest
+    env:
+      RAILS_ENV: test
+      NODE_ENV: test
+    defaults:
+      run:
+        working-directory: ecosystem/platform/server
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: ecosystem/platform/server
+          bundler-cache: true
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+      - run: bundle exec bundler-audit --update
+      - run: bundle exec brakeman -q -w2
+      - run: bundle exec rubocop
+      - run: bundle exec erblint --lint-all
+      - run: yarn install --frozen-lockfile
+      - run: yarn run tsc
+
+  community-platform-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:11-alpine
+        ports:
+          - "5432:5432"
+        env:
+          POSTGRES_USER: complat
+          POSTGRES_PASSWORD: password
+    env:
+      RAILS_ENV: test
+      NODE_ENV: test
+      CI: true
+      COMMUNITY_DB_USER: complat
+      COMMUNITY_DB_PASS: password
+      COMMUNITY_DB_HOST: localhost
+      COMMUNITY_DB_PORT: 5432
+    defaults:
+      run:
+        working-directory: ecosystem/platform/server
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: ecosystem/platform/server
+          bundler-cache: true
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+      - run: bin/setup
+      - run: yarn build
+      - run: yarn build:css
+      - run: bin/rails test
+
+  docs-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+      - run: yarn lint
+        working-directory: developer-docs-site
+
+  rust-lint:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust-setup
+      - uses: pre-commit/action@v3.0.0
+      - run: cargo xclippy
+      - run: cargo fmt --check
+      - run: cargo install cargo-sort
+      - run: cargo sort --grouped --check --workspace
+
+  rust-doc-test:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+      - uses: ./.github/actions/rust-setup
+      - run: cargo test --doc --workspace --exclude aptos-node-checker
+
+  rust-unit-test:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+      - uses: ./.github/actions/rust-setup
+      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - uses: taiki-e/install-action@v1.5.6
+        with:
+          tool: nextest
+      - run: cargo nextest run --profile ci --workspace --exclude smoke-test --exclude backup-cli --exclude testcases
+        env:
+          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+
+      - uses: ./.github/actions/upload-test-results
+        with:
+          BUILDPULSE_ACCESS_KEY_ID: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
+          BUILDPULSE_SECRET_ACCESS_KEY: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          SUITE: rust-unit
+
+  rust-smoke-test:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust-setup
+      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - uses: taiki-e/install-action@v1.5.6
+        with:
+          tool: nextest
+      # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
+      - run: cargo nextest run --profile ci --package smoke-test --test-threads 6 --retries 3
+        env:
+          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+
+      - uses: ./.github/actions/upload-test-results
+        with:
+          BUILDPULSE_ACCESS_KEY_ID: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
+          BUILDPULSE_SECRET_ACCESS_KEY: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          SUITE: rust-smoke
+
+      - name: Upload smoke test logs for failures
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: failed-smoke-test-logs
+          # Retain all smoke test data except for the db (which may be large).
+          path: |
+            /tmp/.tmp*
+            !/tmp/.tmp*/**/db/
+          retention-days: 1
+
