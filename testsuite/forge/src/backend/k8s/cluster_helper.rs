@@ -51,7 +51,7 @@ const APTOS_NODE_HELM_CHART_PATH: &str = "terraform/helm/aptos-node";
 const GENESIS_HELM_CHART_PATH: &str = "terraform/helm/genesis";
 
 // cleanup namespaces after 1 hour 30 minutes unless "keep = true"
-const NAMESPACE_CLEANUP_THRESHOLD_SECS: u64 = 5400;
+const NAMESPACE_CLEANUP_THRESHOLD_SECS: u64 = 1800;
 pub const NAMESPACE_CLEANUP_DURATION_BUFFER_SECS: u64 = 1200;
 const POD_CLEANUP_THRESHOLD_SECS: u64 = 86400;
 pub const MANAGEMENT_CONFIGMAP_PREFIX: &str = "forge-management";
@@ -866,13 +866,13 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
                     // TODO(rustielin): come up with some sane values for namespaces
                     let cleanup_time_since_epoch: u64 =
                         data.get("cleanup").unwrap().parse().unwrap();
-                    let time_to_cleanup = cleanup_time_since_epoch - time_since_the_epoch;
                     info!(
                         "Namespace {} has remaining {} seconds before cleanup",
-                        configmap_namespace, time_to_cleanup
+                        configmap_namespace,
+                        cleanup_time_since_epoch - time_since_the_epoch
                     );
 
-                    if time_to_cleanup <= 0 {
+                    if cleanup_time_since_epoch <= time_since_the_epoch {
                         return true;
                     }
                 }
