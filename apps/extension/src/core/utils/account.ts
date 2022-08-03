@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
@@ -17,15 +18,27 @@ import {
 } from 'core/types/stateTypes';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-
+import { randomBytes, secretbox } from 'tweetnacl';
+import pbkdf2 from 'pbkdf2';
 import Browser from 'core/utils/browser';
+import bs58 from 'bs58';
 import {
   defaultNetworkType, NodeUrl, nodeUrlMap, nodeUrlReverseMap,
 } from './network';
 
+const pbkdf2Iterations = 10000;
+const pbkdf2Digest = 'sha256';
+const pbkdf2SaltSize = 16;
+
 export function generateMnemonic() {
   const mnemonic = bip39.generateMnemonic(wordlist);
   return mnemonic;
+}
+
+interface EncryptedAccounts {
+  encrypted: string,
+  nonce: string,
+  salt: string
 }
 
 export async function generateMnemonicObject(mnemonicString: string): Promise<Mnemonic> {
@@ -52,10 +65,10 @@ export function getCurrAccountAddress(): string | null {
   return address ?? null;
 }
 
-export function getEncryptedAccounts(): AccountsState | null {
+export function getEncryptedAccounts(): EncryptedAccounts | null {
   const item = window.localStorage.getItem(WALLET_ENCRYPTED_ACCOUNTS_KEY);
   if (item) {
-    const accounts: AccountsState = JSON.parse(item);
+    const accounts: EncryptedAccounts = JSON.parse(item);
     return accounts;
   }
   return null;
@@ -70,57 +83,104 @@ export function getDecryptedAccounts(): AccountsState | null {
   return null;
 }
 
+export function getDecryptionKeyFromSession(): Uint8Array | null {
+  const item = window.sessionStorage.getItem(WALLET_SESSION_ACCOUNTS_KEY);
+  if (item) {
+    const decryptedState: DecryptedState = JSON.parse(item);
+    return decryptedState?.decryptionKey ?? null;
+  }
+  return null;
+}
+
 export function isWalletLocked(): boolean {
   const localStorageState = getEncryptedAccounts();
   const currAccountAddress = getCurrAccountAddress();
-  return (localStorageState?.encrypted_accounts !== null
+  return (localStorageState?.encrypted !== null
           && currAccountAddress !== null
           && getDecryptedAccounts() === null);
+}
+
+async function deriveEncryptionKey(
+  password: string,
+  salt: Uint8Array,
+): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    pbkdf2.pbkdf2(
+      password,
+      salt,
+      pbkdf2Iterations,
+      secretbox.keyLength,
+      pbkdf2Digest,
+      (error: Error, key: Uint8Array) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(key);
+        }
+      },
+    );
+  });
 }
 
 export async function storeEncryptedAccounts(
   accounts: AccountsState,
   password: string | undefined,
 ) {
-  // todo: encrypt/decrypt encrypted_accounts
-  // eslint-disable-next-line no-console
-  console.log(password);
+  const plaintext = JSON.stringify(accounts);
+  let decryptionKey; let nonce; let salt;
+  // if password is provided we need to make a new encryption key
+  // else we should already have it in the session
+  if (password) {
+    salt = randomBytes(pbkdf2SaltSize);
+    nonce = randomBytes(secretbox.nonceLength);
+    decryptionKey = await deriveEncryptionKey(password, salt);
+  } else {
+    // todo: add error handling here for nulls
+    decryptionKey = getDecryptionKeyFromSession()!;
+    const encryptedAccounts = getEncryptedAccounts()!;
+    nonce = bs58.decode(encryptedAccounts.nonce);
+    salt = bs58.decode(encryptedAccounts.salt);
+  }
 
-  const decryptedState: DecryptedState = {
-    accounts,
-    decryptionKey: password ?? '',
+  const encrypted = secretbox(Buffer.from(plaintext), nonce, decryptionKey);
+  const encryptedAccounts: EncryptedAccounts = {
+    encrypted: bs58.encode(encrypted),
+    nonce: bs58.encode(nonce),
+    salt: bs58.encode(salt),
   };
-  const decryptedStateString = JSON.stringify(decryptedState);
-  const accountsString = JSON.stringify(accounts);
-  localStorage.setItem(
-    WALLET_ENCRYPTED_ACCOUNTS_KEY,
-    accountsString,
-  );
-  window.sessionStorage.setItem(
-    WALLET_SESSION_ACCOUNTS_KEY,
-    decryptedStateString,
-  );
-  Browser.sessionStorage()?.set({ [WALLET_SESSION_ACCOUNTS_KEY]: decryptedStateString });
+  const decryptedState: DecryptedState = { accounts, decryptionKey };
+  const decryptedString = JSON.stringify(decryptedState);
+  localStorage.setItem(WALLET_ENCRYPTED_ACCOUNTS_KEY, JSON.stringify(encryptedAccounts));
+  window.sessionStorage.setItem(WALLET_SESSION_ACCOUNTS_KEY, decryptedString);
+  Browser.sessionStorage()?.set({ [WALLET_SESSION_ACCOUNTS_KEY]: decryptedString });
 }
 
-export function unlockAccounts(password: string): AccountsState | null {
+export async function unlockAccounts(password: string): Promise<AccountsState | null> {
   const encryptedAccounts = getEncryptedAccounts();
-
-  // todo: encrypt/decrypt encrypted_accounts
-  // eslint-disable-next-line no-console
-  console.log(password);
-
-  const decryptedState: DecryptedState = encryptedAccounts ? {
-    accounts: encryptedAccounts,
-    decryptionKey: password,
-  } : null;
-  const decryptedString = JSON.stringify(decryptedState);
-  window.sessionStorage.setItem(
-    WALLET_SESSION_ACCOUNTS_KEY,
-    decryptedString,
-  );
-  Browser.sessionStorage()?.set([WALLET_SESSION_ACCOUNTS_KEY], decryptedString);
-  return encryptedAccounts ?? null;
+  if (encryptedAccounts) {
+    try {
+      const encrypted = bs58.decode(encryptedAccounts.encrypted);
+      const nonce = bs58.decode(encryptedAccounts.nonce);
+      const salt = bs58.decode(encryptedAccounts.salt);
+      const key = await deriveEncryptionKey(password, salt);
+      const result = secretbox.open(encrypted, nonce, key);
+      if (!result) {
+        throw Error('Something went wrong');
+      }
+      const decodedPlaintext = Buffer.from(result).toString();
+      const accounts: AccountsState = JSON.parse(decodedPlaintext);
+      const decryptedState: DecryptedState = { accounts, decryptionKey: key };
+      const decryptedString = JSON.stringify(decryptedState);
+      window.sessionStorage.setItem(WALLET_SESSION_ACCOUNTS_KEY, decryptedString);
+      Browser.sessionStorage()?.set({ [WALLET_SESSION_ACCOUNTS_KEY]: decryptedString });
+      return accounts;
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn(error);
+      return null;
+    }
+  }
+  return null;
 }
 
 export function getAptosAccountState(accounts: AccountsState, address: string): AptosAccountState {

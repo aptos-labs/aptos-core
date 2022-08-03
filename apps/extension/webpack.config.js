@@ -5,7 +5,7 @@ module.exports = {
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
     fallback: {
-      buffer: require.resolve('buffer')
+      buffer: require.resolve('buffer'),
     },
     plugins: [new TsconfigPathsPlugin({
       configFile: 'tsconfig.json'
