@@ -83,7 +83,7 @@ const sidebars = {
         "nodes/aptos-deployments",
         {
           type: "category",
-          label: "AIT-2",
+          label: "AIT-3",
           link: { type: "doc", id: "nodes/ait/index" },
           collapsible: true,
           collapsed: true,
