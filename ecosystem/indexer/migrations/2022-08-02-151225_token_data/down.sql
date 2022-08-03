@@ -1,2 +1,2 @@
 -- This file should undo anything in `up.sql`
-drop table if exists tokens;
+drop table if exists token_datas

@@ -201,6 +201,15 @@ impl Swarm for K8sSwarm {
         todo!()
     }
 
+    fn add_validator_full_node(
+        &mut self,
+        _version: &Version,
+        _template: NodeConfig,
+        _id: PeerId,
+    ) -> Result<PeerId> {
+        todo!()
+    }
+
     fn add_full_node(&mut self, _version: &Version, _template: NodeConfig) -> Result<PeerId> {
         todo!()
     }

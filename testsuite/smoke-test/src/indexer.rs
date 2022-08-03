@@ -8,6 +8,9 @@ use aptos_indexer::{
     models::transactions::TransactionModel,
     token_processor::TokenTransactionProcessor,
 };
+use aptos_rest_client::Client;
+use aptos_sdk::types::LocalAccount;
+use cached_framework_packages::aptos_stdlib::aptos_token_stdlib;
 use diesel::connection::Connection;
 use forge::{AptosContext, AptosTest, Result, Test};
 use std::sync::Arc;
@@ -23,8 +26,9 @@ impl Test for Indexer {
 pub fn wipe_database(conn: &PgPoolConnection) {
     for table in [
         "metadatas",
-        "tokens",
         "token_activities",
+        "token_datas",
+        "token_propertys",
         "collections",
         "ownerships",
         "write_set_changes",
@@ -33,6 +37,7 @@ pub fn wipe_database(conn: &PgPoolConnection) {
         "block_metadata_transactions",
         "transactions",
         "processor_statuses",
+        "ledger_infos",
         "__diesel_schema_migrations",
     ] {
         conn.execute(&format!("DROP TABLE IF EXISTS {}", table))
@@ -60,15 +65,73 @@ pub fn setup_indexer(ctx: &mut AptosContext) -> anyhow::Result<(PgDbPool, Tailer
 
     let conn_pool = new_db_pool(database_url.as_str())?;
     wipe_database(&conn_pool.get()?);
-
     let mut tailer = Tailer::new(ctx.url(), conn_pool.clone())?;
     tailer.run_migrations();
 
     let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
-    let token_processor = TokenTransactionProcessor::new(conn_pool.clone());
+    let token_processor = TokenTransactionProcessor::new(conn_pool.clone(), false);
     tailer.add_processor(Arc::new(pg_transaction_processor));
     tailer.add_processor(Arc::new(token_processor));
     Ok((conn_pool, tailer))
+}
+
+pub async fn execute_nft_txns<'t>(
+    mut creator: LocalAccount,
+    ctx: &mut AptosContext<'t>,
+    client: &Client,
+) -> Result<()> {
+    let collection_name = "collection name".to_owned().into_bytes();
+    let token_name = "token name".to_owned().into_bytes();
+    let collection_builder =
+        ctx.transaction_factory()
+            .payload(aptos_token_stdlib::token_create_collection_script(
+                collection_name.clone(),
+                "description".to_owned().into_bytes(),
+                "uri".to_owned().into_bytes(),
+                20_000_000,
+                vec![false, false, false],
+            ));
+
+    let collection_txn = creator.sign_with_transaction_builder(collection_builder);
+    client.submit_and_wait(&collection_txn).await?;
+
+    let token_builder =
+        ctx.transaction_factory()
+            .payload(aptos_token_stdlib::token_create_token_script(
+                collection_name.clone(),
+                token_name.clone(),
+                "collection description".to_owned().into_bytes(),
+                3,
+                4,
+                "uri".to_owned().into_bytes(),
+                creator.address(),
+                0,
+                0,
+                vec![false, false, false, false, true],
+                vec![Vec::new()],
+                vec![Vec::new()],
+                vec![Vec::new()],
+            ));
+
+    let token_txn = creator.sign_with_transaction_builder(token_builder);
+    client.submit_and_wait(&token_txn).await?;
+
+    let token_mutator =
+        ctx.transaction_factory()
+            .payload(aptos_token_stdlib::token_mutate_token_properties(
+                creator.address(),
+                creator.address(),
+                collection_name.clone(),
+                token_name.clone(),
+                0,
+                2,
+                vec!["age".as_bytes().to_vec()],
+                vec!["2".as_bytes().to_vec()],
+                vec!["int".as_bytes().to_vec()],
+            ));
+    let mutate_txn = creator.sign_with_transaction_builder(token_mutator);
+    client.submit_and_wait(&mutate_txn).await?;
+    Ok(())
 }
 
 #[async_trait::async_trait]
@@ -83,10 +146,12 @@ impl AptosTest for Indexer {
         client.get_ledger_information().await.unwrap();
 
         // Set up accounts, generate some traffic
-        let mut account1 = ctx.create_and_fund_user_account(1000).await.unwrap();
-        let account2 = ctx.create_and_fund_user_account(1000).await.unwrap();
+        let mut account1 = ctx.create_and_fund_user_account(50000).await.unwrap();
+        let account2 = ctx.create_and_fund_user_account(50000).await.unwrap();
         // This transfer should emit events
         let t_tx = ctx.transfer(&mut account1, &account2, 717).await.unwrap();
+        // test NFT creation event indexing
+        execute_nft_txns(account1, ctx, &client).await.unwrap();
 
         // Why do this twice? To ensure the idempotency of the tailer :-)
         let mut version: u64 = 0;
@@ -98,7 +163,6 @@ impl AptosTest for Indexer {
                 .unwrap()
                 .into_inner()
                 .version;
-
             tailer.process_next_batch((version + 1) as u8).await;
 
             // Get them into the array and sort by type in order to prevent ordering from breaking tests
