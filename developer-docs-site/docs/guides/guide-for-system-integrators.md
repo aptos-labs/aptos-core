@@ -1,43 +1,44 @@
 ---
-title: "Guide for System Integrators"
+title: "System Integrators' Guide"
 slug: "guide-for-system-integrators"
 ---
 
-# Guide for System Integrators
-
-If you provide blockchain services to your customers and wish to add the Aptos blockchain to your platform, then this guide is for you. 
-
-This system integrators guide will walk you through all you need to integrate the Aptos blockchain into your platform. After integrating the Aptos blockchain, you can create accounts, create and submit and view the transactions, deploy and operator validator nodes and participate in staking in the Aptos blockchain.
-
 :::tip 
-This is an ongoing documentation. We will add more sections on a daily basis.
+This is documentation is currently under construction with more being added on a regular basis.
 :::
 
-## Prerequisites
+# System Integrators' Guide
 
-This guide assumes that you are familiar with the blockchains in general,  and in specific the command-line interfaces and other concepts discussed throughout this Aptos developer documentation site. 
+If you provide blockchain services to your customers and wish to add the Aptos blockchain to your platform, then this guide is for you. This system integrators guide will walk you through all you need to integrate the Aptos blockchain into your platform. This guide assumes that you are familiar with the blockchains.
 
 ## Overview
 
-As a system integrator you will perform some or all of these below tasks on behalf of your users: 
-
+This guide will overview the following core concepts for integrating with Aptos:
 - Create an account on the blockchain.
 - Exchange account identifiers with another entity on the blockchain, for example, to perform swaps.
 - Create a transaction.
 - Obtain a gas estimate and validate the transaction for correctness.
-- Ask the user to verify the intent and cost of the transaction.
 - Submit the transaction to the blockchain.
 - Wait for the outcome of the transaction.
-- Show the completed transaction to the user.
-- View all the interactions for a given account with a specific account, i.e., withdraws and deposits.
+- Query historical transactions and interactions for a given account with a specific account, i.e., withdraws and deposits.
 
 ## Accounts on Aptos
 
-An [account](https://aptos.dev/concepts/basics-accounts) represents a resource on the Aptos blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources. On Aptos, accounts must be created on-chain prior to any operations involving that account. The Aptos framework supports implicitly creating accounts when transferring Aptos coin via `account::transfer`.
+An [account](https://aptos.dev/concepts/basics-accounts) represents a resource on the Aptos blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources. On Aptos, accounts must be created on-chain prior to any blockchain operations involving that account. The Aptos framework supports implicitly creating accounts when transferring Aptos coin via `account::transfer` or explicitly via `account::create_account`.
+
+At creation, an [Aptos account]() contains:
+* A [resource containing Aptos Coin]() and deposit and withdrawal of coins from that resource.
+* An authentication key associated with their current public, private key(s).
+* A strictly increasing sequence number that represents the account's next transaction's sequence number to prevent replay attacks.
+* An event stream for all new types of coins added to the account.
+
+### Account identifiers
+
+Currently, Aptos only supports a single, unified identifier for an account. Accounts on Aptos are universally represented as a 32-byte hex string. A hex string shorter than 32-bytes should is also valid, in those scenarios, the the hex string is padded with leading zeroes, e.g., `0x1` => `0x0000000000000...01`.
 
 ### Creating an account address
 
-Account addresses are defined at creation time as a one way function from the public key(s) and signature algorithm used for authentication for the account. An account address can be created either as a single signer or a multisig type. 
+Account addresses are defined at creation time as a one-way function from the public key(s) and signature algorithm used for authentication for the account.
 
 :::tip Read more
 This is covered in depth in the [Accounts](https://aptos.dev/concepts/basics-accounts/) documentation and demonstrated in the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_account.ts#L66) and [Python SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/account_address.py#L43). Note that currently these SDKs only demonstrate how to generate an address from an Ed25519 single signer.
@@ -53,13 +54,7 @@ See more in [Account address](http://aptos.dev/concepts/basics-accounts#account-
 
 Refreshing the keys is generally regarded as good hygiene in the security field. However, this presents a challenge for system integrators who are used to using a mnemonic to represent both a private key and its associated account. To simplify this for the system integrators, Aptos will provide an on-chain mapping, before the launch of the mainnet. The on-chain data maps an effective account address as defined by the current mnemonic to the actual account address. 
 
-Currently, Aptos only supports a single, unified identifier for an account. Accounts on Aptos are universally regarded as a 32-byte hex string. A hex string shorter than 32-bytes should be considered as padded with leading zeroes, e.g., `0x1` => `0x0000000000000...01`.
-
-### Account sequence number
-
-All Aptos accounts contain a strictly increasing sequence number that prevents replay attacks. Every transaction submitted to the Aptos blockchain must contain the current sequence number for the sender account. 
-
-#### Preventing replay attacks
+### Preventing replay attacks
 
 When the Aptos blockchain processes the transaction, it looks at the sequence number in the transaction and compares it with the sequence number in the sender’s account (as stored on the blockchain at the current ledger version). The transaction is executed only if the sequence number in the transaction is the same as the sequence number for the sender account, and rejects if they do not match. In this way past transactions, which necessarily contain older sequence numbers, cannot be replayed, hence preventing replay attacks.
 
