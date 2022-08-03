@@ -85,7 +85,10 @@ haproxy:
   affinity: {}
   limits:
     validator:
-      connectionsPerIPPerMin: 2
+      connectionsPerIPPerSec: 1
+      maxBytesOutRate10sec: 16777216
+      rateLimitSession: 128
+      tcpBufSize: 1048576
   config:
     send_proxy_protocol: false
   tls_secret:
@@ -93,7 +96,7 @@ haproxy:
 service:
   domain:
   validator:
-    external: 
+    external:
       type: LoadBalancer
     externalTrafficPolicy: Local
     loadBalancerSourceRanges:
@@ -101,7 +104,7 @@ service:
     enableMetricsPort: true
   # NOTE: these values apply for all fullnode groups
   fullnode:
-    external: 
+    external:
       type: LoadBalancer
     externalTrafficPolicy: Local
     loadBalancerSourceRanges:
