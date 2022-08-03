@@ -52,6 +52,7 @@ const GENESIS_HELM_CHART_PATH: &str = "terraform/helm/genesis";
 
 // cleanup namespaces after 1 hour 30 minutes unless "keep = true"
 const NAMESPACE_CLEANUP_THRESHOLD_SECS: u64 = 5400;
+pub const NAMESPACE_CLEANUP_DURATION_BUFFER_SECS: u64 = 1200;
 const POD_CLEANUP_THRESHOLD_SECS: u64 = 86400;
 pub const MANAGEMENT_CONFIGMAP_PREFIX: &str = "forge-management";
 
@@ -718,7 +719,11 @@ async fn create_namespace(
     Ok(())
 }
 
-pub async fn create_management_configmap(kube_namespace: String, keep: bool) -> Result<()> {
+pub async fn create_management_configmap(
+    kube_namespace: String,
+    keep: bool,
+    cleanup_duration: Duration,
+) -> Result<()> {
     let kube_client = create_k8s_client().await;
     let namespaces_api = Arc::new(K8sNamespacesApi::from_client(kube_client.clone()));
     let other_kube_namespace = kube_namespace.clone();
@@ -739,12 +744,13 @@ pub async fn create_management_configmap(kube_namespace: String, keep: bool) -> 
     let management_configmap_name = format!("{}-{}", MANAGEMENT_CONFIGMAP_PREFIX, &kube_namespace);
     let mut data: BTreeMap<String, String> = BTreeMap::new();
     let start = SystemTime::now();
-    let since_the_epoch = start
+    let cleanup_time = (start
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
+        + cleanup_duration)
         .as_secs();
     data.insert("keep".to_string(), keep.to_string());
-    data.insert("start".to_string(), since_the_epoch.to_string());
+    data.insert("cleanup".to_string(), cleanup_time.to_string());
 
     let config = ConfigMap {
         binary_data: None,
@@ -780,7 +786,7 @@ pub async fn create_management_configmap(kube_namespace: String, keep: bool) -> 
 pub async fn cleanup_cluster_with_management() -> Result<()> {
     let kube_client = create_k8s_client().await;
     let start = SystemTime::now();
-    let since_the_epoch = start
+    let time_since_the_epoch = start
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
         .as_secs();
@@ -799,7 +805,7 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
             info!("Got pod {}", pod_name);
             if let Some(time) = &pod.metadata.creation_timestamp {
                 let pod_creation_time = time.0.timestamp() as u64;
-                let pod_uptime = since_the_epoch - pod_creation_time;
+                let pod_uptime = time_since_the_epoch - pod_creation_time;
                 info!(
                     "Pod {} has lived for {}/{} seconds",
                     pod_name, pod_uptime, POD_CLEANUP_THRESHOLD_SECS
@@ -833,23 +839,42 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
                 return false;
             }
             if let Some(data) = &configmap.data {
-                let keep = data.get("keep").unwrap();
-                let start = data.get("start").unwrap();
                 info!("Got configmap {} with data: {:?}", &configmap_name, data);
-                // TODO(rustielin): come up with some sane values for namespaces
-                let start: u64 = start.parse().unwrap();
-                let keep: bool = keep.parse().unwrap();
-                let namespace_uptime = since_the_epoch - start;
-                info!(
-                    "Namespace {} has lived for {}/{} seconds",
-                    configmap_namespace, namespace_uptime, NAMESPACE_CLEANUP_THRESHOLD_SECS
-                );
+                let keep: bool = data.get("keep").unwrap().parse().unwrap();
                 if keep {
                     info!("Explicitly keeping namespace {}", configmap_namespace);
                     return false;
                 }
-                if namespace_uptime > NAMESPACE_CLEANUP_THRESHOLD_SECS {
-                    return true;
+                if data.get("cleanup").is_none() {
+                    // This is needed for backward compatibility where older namespaces created
+                    // don't have "cleanup" time set. Delete this code once we roll out the cleanup
+                    // feature fully
+                    let start: u64 = data.get("start").unwrap().parse().unwrap();
+                    let namespace_uptime = time_since_the_epoch - start;
+                    info!(
+                        "Namespace {} has lived for {}/{} seconds",
+                        configmap_namespace, namespace_uptime, NAMESPACE_CLEANUP_THRESHOLD_SECS
+                    );
+                    if keep {
+                        info!("Explicitly keeping namespace {}", configmap_namespace);
+                        return false;
+                    }
+                    if namespace_uptime > NAMESPACE_CLEANUP_THRESHOLD_SECS {
+                        return true;
+                    }
+                } else {
+                    // TODO(rustielin): come up with some sane values for namespaces
+                    let cleanup_time_since_epoch: u64 =
+                        data.get("cleanup").unwrap().parse().unwrap();
+                    let time_to_cleanup = cleanup_time_since_epoch - time_since_the_epoch;
+                    info!(
+                        "Namespace {} has remaining {} seconds before cleanup",
+                        configmap_namespace, time_to_cleanup
+                    );
+
+                    if time_to_cleanup <= 0 {
+                        return true;
+                    }
                 }
             }
             false

@@ -21,7 +21,6 @@ on:
         required: false
         type: string
         default: 300
-        
         description: Duration of the forge test run
 
 env:
