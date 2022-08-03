@@ -37,7 +37,7 @@ docker buildx build --file docker/rosetta/rosetta.Dockerfile --build-arg=GIT_REF
 The rosetta docker image contains a single binary `aptos-rosetta` which is meant to run a fullnode and rosetta API:
 
 In order to run it, create a `data` directory and put a `fullnode.yaml`, `genesis.blob` and `waypoint.txt` into it.
-Since aptos-rosetta is essentially just a special fullnode with a rosetta API, you can follow these instructions to fetch or create these config files: https://aptos.dev/nodes/full-node/fullnode-source-code-and-docker.
+Since aptos-rosetta is essentially just a special fullnode with a rosetta API, you can follow these instructions to fetch or create these config files: https://aptos.dev/nodes/full-node/fullnode-source-code-or-docker.
 
 Once you've built the image and put all the config data in the `data` directory you can run aptos-rosetta via:
 

@@ -159,7 +159,9 @@ impl Factory for LocalFactory {
     async fn launch_swarm(
         &self,
         rng: &mut StdRng,
-        node_num: NonZeroUsize,
+        num_validators: NonZeroUsize,
+        // TODO: support fullnodes in local forge
+        _num_fullnodes: usize,
         version: &Version,
         _genesis_version: &Version,
         genesis_config: Option<&GenesisConfig>,
@@ -174,7 +176,7 @@ impl Factory for LocalFactory {
             None => None,
         };
         let swarm = self
-            .new_swarm_with_version(rng, node_num, version, genesis_modules, None, None)
+            .new_swarm_with_version(rng, num_validators, version, genesis_modules, None, None)
             .await?;
 
         Ok(Box::new(swarm))

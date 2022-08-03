@@ -8,18 +8,17 @@ sidebar_position: 11
 
 When `devnet` is wiped and updated with newer versions, you will need to update your FullNode as well. If you do not, your FullNode will not continue to synchronize with the network. To update your FullNode, follow these steps:
 
+## If you built the FullNode from aptos-core source code
+
 1. Shutdown your FullNode.
 
 2. Delete the data folder (the directory path is what you specified in the configuration file, e.g., `fullnode.yaml`).
 
-    - The default data folder is `/opt/aptos/data` if you run the binary, and `DIRECTORY_WITH_YOUR_DOCKER_COMPOSE_db` if you run the Docker.
-    - Use `docker volume rm DIRECTORY_WITH_YOUR_DOCKER_COMPOSE_db -f` and replace `DIRECTORY_WITH_YOUR_DOCKER_COMPOSE` with the directory name from which you started the Docker.
+    - The default data folder is `/opt/aptos/data`.
 
 3. Delete the `genesis.blob` file and `waypoint.txt` file (depending on how you configured it, you might not have this file and may instead have a `waypoint` directly in your configuration file).
 
-4. If you use the Rust binary, pull the latest of `devnet` branch, and build the binary again.
-
-5. Download the latest Docker images with: `docker pull docker.io/aptoslabs/validator:devnet`.
+4. If you use the Rust binary, pull the latest of `devnet` via `git checkout devnet && git pull`, and build the binary again.
 
 5. Download the new [genesis.blob][devnet_genesis] file and the new [waypoint][devnet_waypoint].
 
@@ -27,11 +26,14 @@ When `devnet` is wiped and updated with newer versions, you will need to update 
 
 7. Restart the FullNode.
 
-8. See the [Verify initial synchronization](/nodes/full-node/fullnode-source-code-and-docker#verify-initial-synchronization) section for checking if the FullNode is syncing again.
+8. See the [Verify initial synchronization](/nodes/full-node/fullnode-source-code-or-docker#verify-initial-synchronization) section for checking if the FullNode is syncing again.
 
+## If you run a FullNode via Docker
 
-[pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
-[pfn_docker_compose]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/docker-compose.yaml
+1. Shutdown your FullNode
+2. Delete the entire directory which holds your FullNode config and data directory.
+3. Rerun the instructions on [Approach #2: Using Docker](fullnode-source-code-or-docker.md#Approach-#2:-Using-Docker)
+
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob
 [devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt

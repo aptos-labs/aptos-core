@@ -1,0 +1,103 @@
+name: "API + TS SDK CI"
+on:
+  # This is called from within the build-images.yaml workflow since we depend
+  # on the images having been built before this workflow runs.
+  workflow_call:
+    inputs:
+      GIT_SHA:
+        required: true
+        type: string
+        description:
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+# Cancel redundant builds.
+concurrency:
+  # Cancel redundant builds on PRs (only on PR, not on branches).
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) }}
+  cancel-in-progress: true
+
+jobs:
+  # Confirm that any changes to the API specs resulting from the changes in the
+  # PR / commit have been checked in.
+  confirm_api_spec_generated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: mkdir -p /tmp/api_specs
+      - run: docker run --rm ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -- -f yaml -o /tmp/api_specs/spec.yaml
+      - run: docker run --rm ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -- -f json -o /tmp/api_specs/spec.json
+      - run: echo "If this lint fails, run the following commands locally to fix it:"
+      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/v1/spec.yaml"
+      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/v1/spec.json"
+      - run: diff -u /tmp/api_specs/spec.yaml api/doc/v1/spec.yaml
+      - run: diff -u /tmp/api_specs/spec.json api/doc/v1/spec.json
+
+  # Confirm that the generated client within the TS SDK has been re-generated
+  # if there are any changes that would affect it within the PR / commit. If
+  # everything is checked in, run tests, build the SDK, and upload it to npm.js.
+  test-sdk-confirm-client-generated-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    needs: [confirm_api_spec_generated]
+    if: needs.confirm_api_spec_generated.result == 'success'
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ inputs.GIT_SHA }}
+
+      - uses: ./.github/actions/gar-auth
+        with:
+          GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version-file: .node-version
+          registry-url: 'https://registry.npmjs.org'
+
+      # Set up dotenv file for tests.
+      - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
+      - run: echo 'APTOS_FAUCET_URL="http://127.0.0.1:8081"' >> ./ecosystem/typescript/sdk/.env
+
+      # Run package install. If install fails, it could mean the lockfile was
+      # not included in the commit.
+      - run: cd ./ecosystem/typescript/sdk && yarn install --frozen-lockfile
+
+      # Ensure any changes to the generated client were checked in.
+      - run: cd ./ecosystem/typescript/sdk && yarn generate-client -o /tmp/generated_client
+      - run: diff -bur ./ecosystem/typescript/sdk/src/generated/ /tmp/generated_client/
+
+      # Run a local testnet built from the same commit.
+      - run: docker run --rm -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos node run-local-testnet --with-faucet
+
+      # Run package install, test, build. If install fails, it is probably
+      # because the lockfile was included in the commit.
+      - run: cd ./ecosystem/typescript/sdk && yarn install --frozen-lockfile
+      - run: cd ./ecosystem/typescript/sdk && yarn test
+      - run: cd ./ecosystem/typescript/sdk && yarn build
+
+      # Run example code in typescript.
+      - run: cd ./ecosystem/typescript/sdk/examples/typescript && yarn install && yarn test
+      # Run example code in javascript.
+      - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install && yarn test
+
+      # Ensure the version, changelog, etc. are valid.
+      - run: cd ./ecosystem/typescript/sdk && ./check.sh
+
+      # Finally, if this is a push and the version in package.json is different,
+      # publish a new version of the package to npm.js. For more details on how
+      # this works, see ecosystem/typescript/sdk/checked_publish.sh.
+      - run: cd ./ecosystem/typescript/sdk && yarn checked-publish
+        if: github.event_name == 'push'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}
+
+      - name: print docker-compose testnet logs when previous steps failed
+        if: ${{ failure() }}
+        working-directory: docker/compose/validator-testnet
+        run: docker logs local-testnet

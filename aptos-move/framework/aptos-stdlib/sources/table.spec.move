@@ -11,7 +11,7 @@ spec aptos_std::table {
         pragma intrinsic;
     }
 
-    spec destroy_empty {
+    spec destroy {
         pragma intrinsic;
     }
 
@@ -24,14 +24,6 @@ spec aptos_std::table {
     }
 
     spec borrow_mut {
-        pragma intrinsic;
-    }
-
-    spec length {
-        pragma intrinsic;
-    }
-
-    spec empty {
         pragma intrinsic;
     }
 

@@ -8,9 +8,9 @@ hidden: false
 
 This section explains how to install a public FullNode to connect to the Aptos devnet.
 
-## [Using Aptos source and Docker](fullnode-source-code-and-docker.md)
+## [Using Aptos source and Docker](fullnode-source-code-or-docker.md)
 
-- [FullNode Using Aptos Source and Docker](fullnode-source-code-and-docker.md)
+- [FullNode Using Aptos Source or Docker](fullnode-source-code-or-docker.md)
 
 - [Update FullNode With New Releases](update-fullnode-with-new-releases.md)
 

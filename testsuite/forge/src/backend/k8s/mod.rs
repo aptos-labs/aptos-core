@@ -90,7 +90,8 @@ impl Factory for K8sFactory {
     async fn launch_swarm(
         &self,
         _rng: &mut StdRng,
-        node_num: NonZeroUsize,
+        num_validators: NonZeroUsize,
+        num_fullnodes: usize,
         init_version: &Version,
         genesis_version: &Version,
         genesis_config: Option<&GenesisConfig>,
@@ -105,12 +106,11 @@ impl Factory for K8sFactory {
             None => None,
         };
 
+        let kube_client = create_k8s_client().await;
         let (validators, fullnodes) = if self.reuse {
-            let kube_client = create_k8s_client().await;
             match collect_running_nodes(
                 &kube_client,
                 self.kube_namespace.clone(),
-                format!("{}", init_version),
                 self.use_port_forward,
                 self.enable_haproxy,
             )
@@ -122,12 +122,15 @@ impl Factory for K8sFactory {
                 }
             }
         } else {
+            // clear the cluster of resources
+            delete_k8s_resources(kube_client, &self.kube_namespace).await?;
             // create the forge-management configmap before installing anything
             create_management_configmap(self.kube_namespace.clone(), self.keep).await?;
             // try installing testnet resources, but clean up if it fails
             match install_testnet_resources(
                 self.kube_namespace.clone(),
-                node_num.get(),
+                num_validators.get(),
+                num_fullnodes,
                 format!("{}", init_version),
                 format!("{}", genesis_version),
                 genesis_modules_path,
