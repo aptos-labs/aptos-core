@@ -80,18 +80,18 @@ impl SfStreamer {
                     starting_version, latest.ledger_version.0
                 )
             });
-        let starting_tnx = context
+        let starting_txn = context
             .get_transaction_by_version(block_info.start_version, latest.ledger_version.0)
             .unwrap_or_else(|_| {
                 panic!(
-                    "Could not get starting_tnx for starting version {} and ledger_version {}",
+                    "Could not get starting_txn for starting version {} and ledger_version {}",
                     starting_version, latest.ledger_version.0
                 )
             });
 
-        let (version, epoch) = match starting_tnx.transaction {
+        let (version, epoch) = match starting_txn.transaction {
             aptos_types::transaction::Transaction::BlockMetadata(bmt) => {
-                (starting_tnx.version, bmt.epoch())
+                (starting_txn.version, bmt.epoch())
             }
             aptos_types::transaction::Transaction::GenesisTransaction(_gt) => (0, 0),
             _ => panic!(
@@ -117,31 +117,34 @@ impl SfStreamer {
 
     pub async fn start(&mut self) {
         loop {
-            self.batch_convert_once(100).await;
+            self.batch_convert(100).await;
         }
     }
 
-    pub async fn batch_convert_once(&mut self, batch_size: u16) -> Vec<extractor::Transaction> {
+    pub async fn batch_convert(&mut self, batch_size: u16) -> Vec<extractor::Transaction> {
         let mut result: Vec<extractor::Transaction> = vec![];
         match &self.context.db.get_first_txn_version() {
-            Ok(version_result) => {
-                if let Some(oldest_version) = version_result {
+            Ok(version_result) => match version_result {
+                Some(oldest_version) => {
                     if oldest_version > &self.current_version {
                         warn!(
                             "[sf-stream] oldest txn version is {} but requested version is {}",
                             oldest_version, &self.current_version
                         );
                         sleep(Duration::from_millis(300)).await;
-                        return result;
+                        return vec![];
                     }
                 }
-            }
+                None => {
+                    return vec![];
+                }
+            },
             Err(err) => {
                 warn!("[sf-stream] failed to get first txn version: {}", err);
                 sleep(Duration::from_millis(300)).await;
-                return result;
+                return vec![];
             }
-        }
+        };
 
         let ledger_info = self.context.get_latest_ledger_info().unwrap();
         match self
@@ -197,7 +200,7 @@ impl SfStreamer {
             Err(err) => {
                 error!("[sf-stream] failed to get transactions: {}", err);
                 sleep(Duration::from_millis(100)).await;
-                return result;
+                return vec![];
             }
         }
         result

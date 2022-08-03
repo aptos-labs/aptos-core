@@ -25,19 +25,17 @@ use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
 use aptos_api::{context::Context, index};
-use aptos_api_types::{HexEncodedBytes, TransactionOnChainData};
+use aptos_api_types::HexEncodedBytes;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use bytes::Bytes;
 use hyper::Response;
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc};
-use storage_interface::state_view::DbStateView;
+use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc, time::Duration};
 use vm_validator::vm_validator::VMValidator;
 
-#[allow(dead_code)]
-pub fn new_test_context(test_name: &'static str, fake_start_time: u64) -> TestContext {
+pub fn new_test_context(fake_start_time_usecs: u64) -> TestContext {
     let tmp_dir = TempPath::new();
     tmp_dir.create_as_dir().unwrap();
 
@@ -80,12 +78,10 @@ pub fn new_test_context(test_name: &'static str, fake_start_time: u64) -> TestCo
         Box::new(BlockExecutor::<AptosVM>::new(db_rw)),
         mempool,
         db,
-        test_name,
-        fake_start_time,
+        fake_start_time_usecs,
     )
 }
 
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct TestContext {
     pub context: Context,
@@ -96,11 +92,9 @@ pub struct TestContext {
     root_key: ConfigKey<Ed25519PrivateKey>,
     executor: Arc<dyn BlockExecutorTrait>,
     expect_status_code: u16,
-    test_name: &'static str,
-    fake_time: u64,
+    fake_time_usecs: u64,
 }
 
-#[allow(dead_code)]
 impl TestContext {
     pub fn new(
         context: Context,
@@ -110,8 +104,7 @@ impl TestContext {
         executor: Box<dyn BlockExecutorTrait>,
         mempool: MockSharedMempool,
         db: Arc<AptosDB>,
-        test_name: &'static str,
-        fake_time: u64,
+        fake_time_usecs: u64,
     ) -> Self {
         Self {
             context,
@@ -122,8 +115,7 @@ impl TestContext {
             mempool: Arc::new(mempool),
             expect_status_code: 200,
             db,
-            test_name,
-            fake_time,
+            fake_time_usecs,
         }
     }
     pub fn rng(&mut self) -> &mut rand::rngs::StdRng {
@@ -136,12 +128,6 @@ impl TestContext {
 
     pub fn root_account(&self) -> LocalAccount {
         LocalAccount::new(aptos_root_address(), self.root_key.private_key(), 0)
-    }
-
-    pub fn latest_state_view(&self) -> DbStateView {
-        self.context
-            .state_view_at_version(self.get_latest_ledger_info().version())
-            .unwrap()
     }
 
     pub fn gen_account(&mut self) -> LocalAccount {
@@ -164,16 +150,6 @@ impl TestContext {
                 .create_user_account(account.public_key())
                 .expiration_timestamp_secs(u64::MAX),
         )
-    }
-
-    pub fn get_latest_ledger_info(&self) -> aptos_api_types::LedgerInfo {
-        self.context.get_latest_ledger_info().unwrap()
-    }
-
-    pub fn get_transactions(&self, start: u64, limit: u16) -> Vec<TransactionOnChainData> {
-        self.context
-            .get_transactions(start, limit, self.get_latest_ledger_info().version())
-            .unwrap()
     }
 
     pub fn expect_status_code(&self, status_code: u16) -> TestContext {
@@ -241,8 +217,8 @@ impl TestContext {
     fn new_block_metadata(&mut self) -> BlockMetadata {
         let round = 1;
         let id = HashValue::random_with_rng(&mut self.rng);
-        self.fake_time += 1;
-        let timestamp = self.fake_time;
+        // incrementing half a second every time
+        self.fake_time_usecs += (Duration::from_secs(1).as_micros() / 2) as u64;
         BlockMetadata::new(
             id,
             0,
@@ -250,7 +226,7 @@ impl TestContext {
             vec![false],
             self.validator_owner,
             vec![],
-            timestamp,
+            self.fake_time_usecs,
         )
     }
 

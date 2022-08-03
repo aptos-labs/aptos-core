@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    current_function_name,
     protos::extractor::{
         transaction::{TransactionType, Txn_data},
         transaction_payload::{Payload, PayloadType},
@@ -15,20 +14,16 @@ use aptos_sdk::types::{account_config::aptos_root_address, LocalAccount};
 use move_deps::move_core_types::value::MoveValue;
 use move_deps::{move_core_types::account_address::AccountAddress, move_package::BuildConfig};
 use serde_json::{json, Value};
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use std::{convert::TryInto, path::PathBuf};
 
 #[tokio::test]
 async fn test_genesis_works() {
-    let test_context = new_test_context(current_function_name!(), 0);
+    let test_context = new_test_context(0);
 
     let context = Arc::new(test_context.context);
     let mut streamer = SfStreamer::new(context, 0, None);
-    let converted = streamer.batch_convert_once(10).await;
+    let converted = streamer.batch_convert(10).await;
 
     // position 0 should be genesis
     let txn = converted.first().unwrap().clone();
@@ -45,7 +40,7 @@ async fn test_genesis_works() {
 
 #[tokio::test]
 async fn test_block_transactions_work() {
-    let mut test_context = new_test_context(current_function_name!(), 0);
+    let mut test_context = new_test_context(0);
 
     // create user transactions
     let account = test_context.gen_account();
@@ -56,13 +51,13 @@ async fn test_block_transactions_work() {
     let mut streamer = SfStreamer::new(context, 0, None);
 
     // emulating real stream, getting first block
-    let converted_0 = streamer.batch_convert_once(1).await;
+    let converted_0 = streamer.batch_convert(1).await;
     let txn = converted_0.first().unwrap().clone();
     assert_eq!(txn.version, 0);
     assert_eq!(txn.type_.unwrap(), TransactionType::GENESIS);
 
     // getting second block
-    let converted_1 = streamer.batch_convert_once(3).await;
+    let converted_1 = streamer.batch_convert(3).await;
     // block metadata expected
     let txn = converted_1[0].clone();
     assert_eq!(txn.version, 1);
@@ -95,11 +90,8 @@ async fn test_block_transactions_work() {
 
 #[tokio::test]
 async fn test_block_height_and_ts_work() {
-    let start_ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let mut test_context = new_test_context(current_function_name!(), start_ts);
+    let start_ts_usecs = 1000 * 1000000;
+    let mut test_context = new_test_context(start_ts_usecs as u64);
 
     // Creating 2 blocks w/ user transactions and 1 empty block
     let mut root_account = test_context.root_account();
@@ -127,7 +119,7 @@ async fn test_block_height_and_ts_work() {
     let context = Arc::new(test_context.clone().context);
     let mut streamer = SfStreamer::new(context, 0, None);
 
-    let converted = streamer.batch_convert_once(100).await;
+    let converted = streamer.batch_convert(100).await;
     // Making sure that version - block height mapping is correct and that version is in order
     for (i, txn) in converted.iter().enumerate() {
         assert_eq!(txn.version as usize, i);
@@ -135,19 +127,27 @@ async fn test_block_height_and_ts_work() {
             txn.block_height as usize,
             *block_mapping.get(&i).unwrap() as usize
         );
-        let ts = (txn.timestamp.seconds * 1000000) as u64 + txn.timestamp.nanos as u64;
         if txn.block_height == 0 {
             // Genesis timestamp is 0
-            assert_eq!(ts, 0);
+            assert_eq!(txn.timestamp.seconds as u64, 0);
         } else {
-            assert_eq!(ts, start_ts + txn.block_height);
+            // Seconds should be going up once every 2 blocks because we increment twice
+            let expected_secs =
+                Duration::from_micros(start_ts_usecs).as_secs() + txn.block_height / 2;
+            assert_eq!(txn.timestamp.seconds as u64, expected_secs);
+            // Converting to nanos
+            let expected_nanos = Duration::from_micros(
+                start_ts_usecs + txn.block_height * Duration::from_secs(1).as_micros() as u64 / 2,
+            )
+            .subsec_nanos();
+            assert_eq!(txn.timestamp.nanos as u32, expected_nanos);
         }
     }
 }
 
 #[tokio::test]
 async fn test_table_item_parsing_works() {
-    let mut test_context = new_test_context(current_function_name!(), 0);
+    let mut test_context = new_test_context(0);
     let ctx = &mut test_context;
     let mut account = ctx.gen_account();
     let acc = &mut account;
@@ -169,7 +169,7 @@ async fn test_table_item_parsing_works() {
     let context = Arc::new(test_context.clone().context);
     let mut streamer = SfStreamer::new(context, 0, None);
 
-    let converted = streamer.batch_convert_once(100).await;
+    let converted = streamer.batch_convert(100).await;
     let mut table_kv: HashMap<String, String> = HashMap::new();
     for parsed_txn in converted {
         if parsed_txn.type_.unwrap() != TransactionType::USER {
