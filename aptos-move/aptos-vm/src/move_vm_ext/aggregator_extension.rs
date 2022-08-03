@@ -143,7 +143,7 @@ impl AggregatorData {
     /// If it does not exist in the curretn context (i.e. transaction that is
     /// currently executing did not initilize it), a new aggregator instance is
     /// created, with a zero-initialized value and in a delta state.
-    fn get_or_create_aggregator(&mut self, id: AggregatorID, limit: u128) -> &mut Aggregator {
+    fn get_aggregator(&mut self, id: AggregatorID, limit: u128) -> &mut Aggregator {
         self.aggregators.entry(id).or_insert_with(|| Aggregator {
             value: 0,
             state: AggregatorState::PositiveDelta,
@@ -361,7 +361,7 @@ fn native_add(
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_or_create_aggregator(id, limit);
+    let aggregator = aggregator_data.get_aggregator(id, limit);
 
     aggregator.add(value).map(|_| {
         // TODO: charge gas properly.
@@ -387,7 +387,7 @@ fn native_read(
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
-    let aggregator = aggregator_data.get_or_create_aggregator(id, limit);
+    let aggregator = aggregator_data.get_aggregator(id, limit);
 
     // First, materialize the value.
     aggregator.materialize(aggregator_context, &id).map(|_| {
@@ -418,7 +418,7 @@ fn native_sub(
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
 
-    let aggregator = aggregator_data.get_or_create_aggregator(id, limit);
+    let aggregator = aggregator_data.get_aggregator(id, limit);
 
     // For V1 Aggregator, subtraction is a barrier, and materializes the value
     // first.
@@ -531,9 +531,9 @@ mod test {
         aggregator_data.create_new_aggregator(test_id(2), 1000);
 
         // Aggregators with delta.
-        aggregator_data.get_or_create_aggregator(test_id(3), 1000);
-        aggregator_data.get_or_create_aggregator(test_id(4), 1000);
-        aggregator_data.get_or_create_aggregator(test_id(5), 10);
+        aggregator_data.get_aggregator(test_id(3), 1000);
+        aggregator_data.get_aggregator(test_id(4), 1000);
+        aggregator_data.get_aggregator(test_id(5), 10);
 
         // Different cases of aggregator removal.
         aggregator_data.remove_aggregator(test_id(0));
