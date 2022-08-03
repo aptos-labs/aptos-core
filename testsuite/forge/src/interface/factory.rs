@@ -5,6 +5,7 @@ use super::{GenesisConfig, Swarm, Version};
 use crate::Result;
 use rand::rngs::StdRng;
 use std::num::NonZeroUsize;
+use std::time::Duration;
 
 /// Trait used to represent a interface for constructing a launching new networks
 #[async_trait::async_trait]
@@ -19,5 +20,6 @@ pub trait Factory {
         version: &Version,
         genesis_version: &Version,
         genesis_modules: Option<&GenesisConfig>,
+        cleanup_duration: Duration,
     ) -> Result<Box<dyn Swarm>>;
 }
