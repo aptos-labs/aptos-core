@@ -269,27 +269,29 @@ message MoveFunctionGenericTypeParam {
   repeated MoveAbility constraints = 1;
 }
 
+enum MoveTypes {
+  Bool = 0;
+  U8 = 1;
+  U64 = 2;
+  U128 = 3;
+  Address = 4;
+  Signer = 5;
+  Vector = 6; // { items: Box<MoveType> },
+  Struct = 7; //(MoveStructTag),
+  GenericTypeParam = 8; // { index: u16 },
+  Reference = 9; // { mutable: bool, to: Box<MoveType> },
+  Unparsable = 10; //(String),
+}
+
 message MoveType{
-  enum Type {
-    Bool = 0;
-    U8 = 1;
-    U64 = 2;
-    U128 = 3;
-    Address = 4;
-    Signer = 5;
-    Vector = 6; // { items: Box<MoveType> },
-    Struct = 7; //(MoveStructTag),
-    GenericTypeParam = 8; // { index: u16 },
-    Reference = 9; // { mutable: bool, to: Box<MoveType> },
-    Unparsable = 10; //(String),
-  }
+
   message ReferenceType {
     bool mutable = 1;
     MoveType to = 2;
   }
 
-  MoveType.Type type = 1;
-  oneof content{
+  MoveTypes type = 1;
+  oneof content {
     MoveType vector = 3;
     MoveStructTag struct = 4;
     uint32 generic_type_param_index = 5;

@@ -44,11 +44,13 @@ pub fn bootstrap(
     runtime.spawn(async move {
         let context = Context::new(chain_id, db, mp_sender.clone(), node_config.clone());
         let context_arc = Arc::new(context);
-        let mut streamer = SfStreamer::new(
-            context_arc,
-            node_config.sf_stream.starting_version,
-            Some(mp_sender),
-        );
+        // Let the env variable take precedence over the config file
+        let config_starting_version = node_config.sf_stream.starting_version.unwrap_or(0);
+        let starting_version = std::env::var("STARTING_VERSION")
+            .map(|v| v.parse::<u64>().unwrap_or(config_starting_version))
+            .unwrap_or(config_starting_version);
+
+        let mut streamer = SfStreamer::new(context_arc, starting_version, Some(mp_sender));
         streamer.start().await;
     });
     Some(Ok(runtime))
