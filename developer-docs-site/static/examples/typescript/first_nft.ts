@@ -321,8 +321,8 @@ async function main() {
 
   console.log("\n=== Creating Collection and Token ===");
 
-  await client.createCollection(alice, collection_name, "Alice's simple collection", "https://aptos.dev");
-  await client.createToken(
+  await createCollection(alice, collection_name, "Alice's simple collection", "https://aptos.dev");
+  await createToken(
     alice,
     collection_name,
     token_name,
