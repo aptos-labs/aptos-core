@@ -31,12 +31,13 @@ module aptos_framework::aggregator_factory {
     use std::signer;
 
     use aptos_framework::aggregator::{Self, Aggregator};
-    use aptos_framework::system_addresses;
     use aptos_framework::table::{Self, Table};
-    use aptos_framework::timestamp;
 
     /// When aggregator factory has already been published.
     const EAGGREGATOR_FACTORY_EXISTS: u64 = 1;
+
+    /// When aggregator factory is published to not core framework address.
+    const ENOT_CORE_FRAMEWORK_ADDRESS: u64 = 2;
 
     /// Struct that creates aggregators.
     struct AggregatorFactory has key {
@@ -45,10 +46,10 @@ module aptos_framework::aggregator_factory {
 
     /// Creates a new factory for aggregators.
     public fun initialize_aggregator_factory(account: &signer) {
-        // Currently `AggregatorFactory` can live only on aptos framework and
-        // should be created during genesis.
-        timestamp::assert_genesis();
-        system_addresses::assert_aptos_framework(account);
+        assert!(
+            signer::address_of(account) == @aptos_framework,
+            error::permission_denied(ENOT_CORE_FRAMEWORK_ADDRESS)
+        );
 
         assert!(
             !exists<AggregatorFactory>(signer::address_of(account)),
