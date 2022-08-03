@@ -24,6 +24,8 @@ use executor_types::BlockExecutorTrait;
 use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
+use crate::tests::golden_output::GoldenOutputs;
+use crate::tests::pretty;
 use aptos_api::{context::Context, index};
 use aptos_api_types::HexEncodedBytes;
 use aptos_config::keys::ConfigKey;
@@ -35,7 +37,7 @@ use serde_json::{json, Value};
 use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc, time::Duration};
 use vm_validator::vm_validator::VMValidator;
 
-pub fn new_test_context(fake_start_time_usecs: u64) -> TestContext {
+pub fn new_test_context(test_name: &str, fake_start_time_usecs: u64) -> TestContext {
     let tmp_dir = TempPath::new();
     tmp_dir.create_as_dir().unwrap();
 
@@ -75,6 +77,7 @@ pub fn new_test_context(fake_start_time_usecs: u64) -> TestContext {
         Box::new(BlockExecutor::<AptosVM>::new(db_rw)),
         mempool,
         db,
+        test_name.to_string(),
         fake_start_time_usecs,
     )
 }
@@ -89,6 +92,8 @@ pub struct TestContext {
     root_key: ConfigKey<Ed25519PrivateKey>,
     executor: Arc<dyn BlockExecutorTrait>,
     expect_status_code: u16,
+    test_name: String,
+    golden_output: Option<GoldenOutputs>,
     fake_time_usecs: u64,
 }
 
@@ -101,6 +106,7 @@ impl TestContext {
         executor: Box<dyn BlockExecutorTrait>,
         mempool: MockSharedMempool,
         db: Arc<AptosDB>,
+        test_name: String,
         fake_time_usecs: u64,
     ) -> Self {
         Self {
@@ -112,6 +118,8 @@ impl TestContext {
             mempool: Arc::new(mempool),
             expect_status_code: 200,
             db,
+            test_name,
+            golden_output: None,
             fake_time_usecs,
         }
     }
@@ -342,5 +350,20 @@ impl TestContext {
         let body = serde_json::from_slice(resp.body()).expect("response body is JSON");
 
         body
+    }
+
+    pub fn check_golden_output(&mut self, msg: Value) {
+        if self.golden_output.is_none() {
+            self.golden_output = Some(GoldenOutputs::new(
+                self.test_name.replace(':', "_"),
+                &"sf_v1",
+            ));
+        }
+
+        let msg = pretty(&msg);
+        let re = regex::Regex::new("hash\": \".*\"").unwrap();
+        let msg = re.replace_all(&msg, "hash\": \"\"");
+
+        self.golden_output.as_ref().unwrap().log(&msg);
     }
 }
