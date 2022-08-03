@@ -28,6 +28,8 @@ mod state_sync;
 mod state_sync_v2;
 #[cfg(test)]
 mod storage;
+#[cfg(test)]
+mod txn_broadcast;
 
 #[cfg(test)]
 mod smoke_test_environment;
