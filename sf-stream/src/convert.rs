@@ -3,9 +3,14 @@
 
 use crate::protos::extractor;
 use aptos_api_types::{
-    Event, GenesisPayload, HashValue, MoveModuleId, ScriptPayload, Transaction, TransactionInfo,
-    TransactionPayload, WriteSet, WriteSetChange,
+    DeleteModule, DeleteResource, Event, GenesisPayload, HashValue, MoveAbility, MoveFunction,
+    MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode,
+    MoveModuleId, MoveStruct, MoveStructField, MoveStructTag, MoveType, ScriptPayload, Transaction,
+    TransactionInfo, TransactionPayload, WriteSet, WriteSetChange,
 };
+use aptos_logger::warn;
+pub use move_deps::move_binary_format::file_format::Ability;
+use protobuf::EnumOrUnknown;
 use std::str::FromStr;
 
 pub fn convert_move_module_id(move_module_id: &MoveModuleId) -> extractor::MoveModuleId {
@@ -16,10 +21,121 @@ pub fn convert_move_module_id(move_module_id: &MoveModuleId) -> extractor::MoveM
     }
 }
 
+pub fn convert_move_ability(move_ability: &MoveAbility) -> EnumOrUnknown<extractor::MoveAbility> {
+    EnumOrUnknown::new(match move_ability.0 {
+        Ability::Copy => extractor::MoveAbility::COPY,
+        Ability::Drop => extractor::MoveAbility::DROP,
+        Ability::Store => extractor::MoveAbility::STORE,
+        Ability::Key => extractor::MoveAbility::KEY,
+    })
+}
+pub fn convert_move_struct_field(msf: &MoveStructField) -> extractor::MoveStructField {
+    extractor::MoveStructField {
+        name: msf.name.0.to_string(),
+        type_: protobuf::MessageField::some(convert_move_type(&msf.typ)),
+        special_fields: Default::default(),
+    }
+}
+
+pub fn convert_move_struct(move_struct: &MoveStruct) -> extractor::MoveStruct {
+    extractor::MoveStruct {
+        name: move_struct.name.0.to_string(),
+        is_native: move_struct.is_native,
+        abilities: move_struct
+            .abilities
+            .iter()
+            .map(convert_move_ability)
+            .collect(),
+        generic_type_params: vec![],
+        fields: move_struct
+            .fields
+            .iter()
+            .map(convert_move_struct_field)
+            .collect(),
+        special_fields: Default::default(),
+    }
+}
+
+pub fn convert_move_function_visibility(
+    visibility: &MoveFunctionVisibility,
+) -> EnumOrUnknown<extractor::move_function::Visibility> {
+    EnumOrUnknown::new(match visibility {
+        MoveFunctionVisibility::Public => extractor::move_function::Visibility::PUBLIC,
+        MoveFunctionVisibility::Private => extractor::move_function::Visibility::PRIVATE,
+        MoveFunctionVisibility::Friend => extractor::move_function::Visibility::FRIEND,
+    })
+}
+
+pub fn convert_move_function_generic_type_params(
+    mfgtp: &MoveFunctionGenericTypeParam,
+) -> extractor::MoveFunctionGenericTypeParam {
+    extractor::MoveFunctionGenericTypeParam {
+        constraints: mfgtp.constraints.iter().map(convert_move_ability).collect(),
+        special_fields: Default::default(),
+    }
+}
+
+pub fn convert_move_function(move_func: &MoveFunction) -> extractor::MoveFunction {
+    extractor::MoveFunction {
+        name: move_func.name.0.to_string(),
+        visibility: convert_move_function_visibility(&move_func.visibility),
+        is_entry: move_func.is_entry,
+        generic_type_params: move_func
+            .generic_type_params
+            .iter()
+            .map(convert_move_function_generic_type_params)
+            .collect(),
+        params: move_func.params.iter().map(convert_move_type).collect(),
+        return_: move_func.return_.iter().map(convert_move_type).collect(),
+        special_fields: Default::default(),
+    }
+}
+
+pub fn convert_move_module(move_module: &MoveModule) -> extractor::MoveModule {
+    extractor::MoveModule {
+        address: move_module.address.to_string(),
+        name: move_module.name.0.to_string(),
+        friends: move_module
+            .friends
+            .iter()
+            .map(convert_move_module_id)
+            .collect(),
+        exposed_functions: move_module
+            .exposed_functions
+            .iter()
+            .map(convert_move_function)
+            .collect(),
+        structs: move_module
+            .structs
+            .iter()
+            .map(convert_move_struct)
+            .collect(),
+        special_fields: Default::default(),
+    }
+}
+
+pub fn convert_move_module_bytecode(mmb: &MoveModuleBytecode) -> extractor::MoveModuleBytecode {
+    let abi = mmb.clone().try_parse_abi().map_or_else(
+        |e| {
+            warn!("[sf-stream] Could not decode MoveModuleBytecode ABI: {}", e);
+            protobuf::MessageField::none()
+        },
+        |mmb| match mmb.abi {
+            None => protobuf::MessageField::none(),
+            Some(move_module) => protobuf::MessageField::some(convert_move_module(&move_module)),
+        },
+    );
+    extractor::MoveModuleBytecode {
+        bytecode: mmb.bytecode.0.clone(),
+        abi,
+        special_fields: Default::default(),
+    }
+}
+
 pub fn convert_transaction_payload(payload: &TransactionPayload) -> extractor::TransactionPayload {
     match payload {
         TransactionPayload::ScriptFunctionPayload(sfp) => extractor::TransactionPayload {
-            type_: protobuf::EnumOrUnknown::new(
+            type_: EnumOrUnknown::new(
                 extractor::transaction_payload::PayloadType::SCRIPT_FUNCTION_PAYLOAD,
             ),
             payload: Some(
@@ -49,29 +165,14 @@ pub fn convert_transaction_payload(payload: &TransactionPayload) -> extractor::T
             special_fields: Default::default(),
         },
         TransactionPayload::ScriptPayload(sp) => extractor::TransactionPayload {
-            type_: protobuf::EnumOrUnknown::new(
-                extractor::transaction_payload::PayloadType::SCRIPT_PAYLOAD,
-            ),
+            type_: EnumOrUnknown::new(extractor::transaction_payload::PayloadType::SCRIPT_PAYLOAD),
             payload: Some(extractor::transaction_payload::Payload::ScriptPayload(
-                extractor::ScriptPayload {
-                    code: sp.code.bytecode.to_string(),
-                    type_arguments: sp
-                        .type_arguments
-                        .iter()
-                        .map(|move_type| move_type.to_string())
-                        .collect(),
-                    arguments: sp
-                        .arguments
-                        .iter()
-                        .map(|move_value| move_value.to_string())
-                        .collect(),
-                    special_fields: Default::default(),
-                },
+                convert_script_payload(sp),
             )),
             special_fields: Default::default(),
         },
         TransactionPayload::ModuleBundlePayload(mbp) => extractor::TransactionPayload {
-            type_: protobuf::EnumOrUnknown::new(
+            type_: EnumOrUnknown::new(
                 extractor::transaction_payload::PayloadType::MODULE_BUNDLE_PAYLOAD,
             ),
             payload: Some(
@@ -80,7 +181,7 @@ pub fn convert_transaction_payload(payload: &TransactionPayload) -> extractor::T
                         modules: mbp
                             .modules
                             .iter()
-                            .map(|module| module.bytecode.to_string())
+                            .map(convert_move_module_bytecode)
                             .collect(),
                         special_fields: Default::default(),
                     },
@@ -89,7 +190,7 @@ pub fn convert_transaction_payload(payload: &TransactionPayload) -> extractor::T
             special_fields: Default::default(),
         },
         TransactionPayload::WriteSetPayload(wsp) => extractor::TransactionPayload {
-            type_: protobuf::EnumOrUnknown::new(
+            type_: EnumOrUnknown::new(
                 extractor::transaction_payload::PayloadType::WRITE_SET_PAYLOAD,
             ),
             payload: Some(extractor::transaction_payload::Payload::WriteSetPayload(
@@ -112,7 +213,7 @@ pub fn convert_write_set(write_set: &WriteSet) -> protobuf::MessageField<extract
     let (write_set_type, write_set) = match write_set {
         WriteSet::ScriptWriteSet(sws) => {
             let write_set_type =
-                protobuf::EnumOrUnknown::new(extractor::write_set::WriteSetType::SCRIPT_WRITE_SET);
+                EnumOrUnknown::new(extractor::write_set::WriteSetType::SCRIPT_WRITE_SET);
 
             let write_set =
                 extractor::write_set::Write_set::ScriptWriteSet(extractor::ScriptWriteSet {
@@ -124,7 +225,7 @@ pub fn convert_write_set(write_set: &WriteSet) -> protobuf::MessageField<extract
         }
         WriteSet::DirectWriteSet(dws) => {
             let write_set_type =
-                protobuf::EnumOrUnknown::new(extractor::write_set::WriteSetType::DIRECT_WRITE_SET);
+                EnumOrUnknown::new(extractor::write_set::WriteSetType::DIRECT_WRITE_SET);
 
             let write_set =
                 extractor::write_set::Write_set::DirectWriteSet(extractor::DirectWriteSet {
@@ -142,6 +243,62 @@ pub fn convert_write_set(write_set: &WriteSet) -> protobuf::MessageField<extract
     })
 }
 
+pub fn empty_move_type(type_: extractor::move_type::Type) -> extractor::MoveType {
+    extractor::MoveType {
+        type_: EnumOrUnknown::new(type_),
+        content: None,
+        special_fields: Default::default(),
+    }
+}
+
+pub fn convert_move_type(move_type: &MoveType) -> extractor::MoveType {
+    let type_ = match move_type {
+        MoveType::Bool => extractor::move_type::Type::Bool,
+        MoveType::U8 => extractor::move_type::Type::U8,
+        MoveType::U64 => extractor::move_type::Type::U64,
+        MoveType::U128 => extractor::move_type::Type::U128,
+        MoveType::Address => extractor::move_type::Type::Address,
+        MoveType::Signer => extractor::move_type::Type::Signer,
+        MoveType::Vector { .. } => extractor::move_type::Type::Vector,
+        MoveType::Struct(_) => extractor::move_type::Type::Struct,
+        MoveType::GenericTypeParam { .. } => extractor::move_type::Type::GenericTypeParam,
+        MoveType::Reference { .. } => extractor::move_type::Type::Reference,
+        MoveType::Unparsable(_) => extractor::move_type::Type::Unparsable,
+    };
+    let content = match move_type {
+        MoveType::Bool => None,
+        MoveType::U8 => None,
+        MoveType::U64 => None,
+        MoveType::U128 => None,
+        MoveType::Address => None,
+        MoveType::Signer => None,
+        MoveType::Vector { items } => Some(extractor::move_type::Content::Vector(Box::from(
+            convert_move_type(items),
+        ))),
+        MoveType::Struct(struct_tag) => Some(extractor::move_type::Content::Struct(
+            convert_move_struct_tag(struct_tag),
+        )),
+        MoveType::GenericTypeParam { index } => Some(
+            extractor::move_type::Content::GenericTypeParamIndex((*index) as u32),
+        ),
+        MoveType::Reference { mutable, to } => Some(extractor::move_type::Content::Reference(
+            extractor::move_type::ReferenceType {
+                mutable: mutable.clone(),
+                to: protobuf::MessageField::some(convert_move_type(&to)),
+                special_fields: Default::default(),
+            },
+        )),
+        MoveType::Unparsable(string) => {
+            Some(extractor::move_type::Content::Unparsable(string.clone()))
+        }
+    };
+    extractor::MoveType {
+        type_: EnumOrUnknown::new(type_),
+        content,
+        special_fields: Default::default(),
+    }
+}
+
 #[inline]
 pub fn convert_write_set_changes(changes: &[WriteSetChange]) -> Vec<extractor::WriteSetChange> {
     changes.iter().map(convert_write_set_change).collect()
@@ -155,48 +312,69 @@ pub fn convert_hex_string_to_bytes(hex_string: &str) -> Vec<u8> {
         .to_vec()
 }
 
+pub fn convert_move_struct_tag(struct_tag: &MoveStructTag) -> extractor::MoveStructTag {
+    extractor::MoveStructTag {
+        address: struct_tag.address.to_string(),
+        module: struct_tag.module.to_string(),
+        name: struct_tag.name.to_string(),
+        generic_type_params: struct_tag
+            .generic_type_params
+            .iter()
+            .map(|move_type| convert_move_type(move_type))
+            .collect(),
+        special_fields: Default::default(),
+    }
+}
+
+pub fn convert_delete_module(delete_module: &DeleteModule) -> extractor::DeleteModule {
+    extractor::DeleteModule {
+        address: delete_module.address.to_string(),
+        state_key_hash: convert_hex_string_to_bytes(&delete_module.state_key_hash),
+        module: protobuf::MessageField::some(extractor::MoveModuleId {
+            address: delete_module.module.address.to_string(),
+            name: delete_module.module.name.to_string(),
+            special_fields: Default::default(),
+        }),
+        special_fields: Default::default(),
+    }
+}
+
+pub fn convert_delete_resource(delete_resource: &DeleteResource) -> extractor::DeleteResource {
+    extractor::DeleteResource {
+        address: delete_resource.address.to_string(),
+        state_key_hash: convert_hex_string_to_bytes(&delete_resource.state_key_hash),
+        resource: protobuf::MessageField::some(extractor::MoveStructTag {
+            address: delete_resource.address.to_string(),
+            module: delete_resource.resource.module.to_string(),
+            name: delete_resource.resource.name.to_string(),
+            generic_type_params: delete_resource
+                .resource
+                .generic_type_params
+                .iter()
+                .map(|move_type| convert_move_type(move_type))
+                .collect(),
+            special_fields: Default::default(),
+        }),
+        special_fields: Default::default(),
+    }
+}
 pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetChange {
     match change {
         WriteSetChange::DeleteModule(delete_module) => extractor::WriteSetChange {
-            type_: protobuf::EnumOrUnknown::new(
+            type_: EnumOrUnknown::new(
                 extractor::write_set_change::WriteSetChangeType::DELETE_MODULE,
             ),
             change: Some(extractor::write_set_change::Change::DeleteModule(
-                extractor::DeleteModule {
-                    address: delete_module.address.to_string(),
-                    state_key_hash: convert_hex_string_to_bytes(&delete_module.state_key_hash),
-                    module: protobuf::MessageField::some(extractor::MoveModuleId {
-                        address: delete_module.module.address.to_string(),
-                        name: delete_module.module.name.to_string(),
-                        special_fields: Default::default(),
-                    }),
-                    special_fields: Default::default(),
-                },
+                convert_delete_module(delete_module),
             )),
             special_fields: Default::default(),
         },
         WriteSetChange::DeleteResource(delete_resource) => extractor::WriteSetChange {
-            type_: protobuf::EnumOrUnknown::new(
+            type_: EnumOrUnknown::new(
                 extractor::write_set_change::WriteSetChangeType::DELETE_RESOURCE,
             ),
             change: Some(extractor::write_set_change::Change::DeleteResource(
-                extractor::DeleteResource {
-                    address: delete_resource.address.to_string(),
-                    state_key_hash: convert_hex_string_to_bytes(&delete_resource.state_key_hash),
-                    resource: protobuf::MessageField::some(extractor::MoveStructTag {
-                        address: delete_resource.address.to_string(),
-                        module: delete_resource.resource.module.to_string(),
-                        name: delete_resource.resource.name.to_string(),
-                        generic_type_params: delete_resource
-                            .resource
-                            .generic_type_params
-                            .iter()
-                            .map(|move_type| move_type.to_string())
-                            .collect(),
-                        special_fields: Default::default(),
-                    }),
-                    special_fields: Default::default(),
-                },
+                convert_delete_resource(delete_resource),
             )),
             special_fields: Default::default(),
         },
@@ -209,7 +387,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             });
 
             extractor::WriteSetChange {
-                type_: protobuf::EnumOrUnknown::new(
+                type_: EnumOrUnknown::new(
                     extractor::write_set_change::WriteSetChangeType::DELETE_TABLE_ITEM,
                 ),
                 change: Some(extractor::write_set_change::Change::DeleteTableItem(
@@ -231,7 +409,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             }
         }
         WriteSetChange::WriteModule(write_module) => extractor::WriteSetChange {
-            type_: protobuf::EnumOrUnknown::new(
+            type_: EnumOrUnknown::new(
                 extractor::write_set_change::WriteSetChangeType::DELETE_MODULE,
             ),
             change: Some(extractor::write_set_change::Change::WriteModule(
@@ -245,7 +423,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             special_fields: Default::default(),
         },
         WriteSetChange::WriteResource(write_resource) => extractor::WriteSetChange {
-            type_: protobuf::EnumOrUnknown::new(
+            type_: EnumOrUnknown::new(
                 extractor::write_set_change::WriteSetChangeType::WRITE_RESOURCE,
             ),
             change: Some(extractor::write_set_change::Change::WriteResource(
@@ -262,7 +440,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
                                 .typ
                                 .generic_type_params
                                 .iter()
-                                .map(|move_type| move_type.to_string())
+                                .map(|move_type| convert_move_type(move_type))
                                 .collect(),
                             special_fields: Default::default(),
                         }),
@@ -289,7 +467,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
                 )
             });
             extractor::WriteSetChange {
-                type_: protobuf::EnumOrUnknown::new(
+                type_: EnumOrUnknown::new(
                     extractor::write_set_change::WriteSetChangeType::WRITE_TABLE_ITEM,
                 ),
                 change: Some(extractor::write_set_change::Change::WriteTableItem(
@@ -474,7 +652,7 @@ pub fn convert_transaction(
         // TODO: keep track of the epoch as we iterate through BlockMetadata
         epoch: current_epoch,
         block_height,
-        type_: protobuf::EnumOrUnknown::new(txn_type),
+        type_: EnumOrUnknown::new(txn_type),
         txn_data: Some(txn_data),
         special_fields: Default::default(),
     }

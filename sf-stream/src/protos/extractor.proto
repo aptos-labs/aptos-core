@@ -212,7 +212,91 @@ message ScriptPayload {
 }
 
 message ModuleBundlePayload {
-  repeated string modules = 1;
+  repeated MoveModuleBytecode modules = 1;
+}
+
+message MoveModuleBytecode {
+  bytes bytecode = 1;
+  MoveModule abi = 2;
+}
+
+message MoveModule {
+  string address = 1;
+  string name = 2;
+  repeated MoveModuleId friends = 3;
+  repeated MoveFunction exposed_functions = 4;
+  repeated MoveStruct structs = 5;
+}
+message MoveFunction {
+  enum Visibility {
+    PRIVATE = 0;
+    PUBLIC = 1;
+    FRIEND = 2;
+  }
+  string name = 1;
+  MoveFunction.Visibility visibility = 2;
+  bool is_entry = 3;
+  repeated MoveFunctionGenericTypeParam generic_type_params = 4;
+  repeated MoveType params = 5;
+  repeated MoveType return = 6;
+}
+
+message MoveStruct {
+  string name = 1;
+  bool is_native = 2;
+  repeated MoveAbility abilities = 3;
+  repeated MoveStructGenericTypeParam generic_type_params = 4;
+  repeated MoveStructField fields = 5;
+}
+
+message MoveStructGenericTypeParam{
+  repeated MoveAbility constraints = 1;
+  bool is_phantom = 2;
+}
+
+message MoveStructField {
+  string name = 1;
+  MoveType type = 2;
+}
+
+message MoveFunctionGenericTypeParam {
+  repeated MoveAbility constraints = 1;
+}
+
+message MoveType{
+  enum Type {
+    Bool = 0;
+    U8 = 1;
+    U64 = 2;
+    U128 = 3;
+    Address = 4;
+    Signer = 5;
+    Vector = 6; // { items: Box<MoveType> },
+    Struct = 7; //(MoveStructTag),
+    GenericTypeParam = 8; // { index: u16 },
+    Reference = 9; // { mutable: bool, to: Box<MoveType> },
+    Unparsable = 10; //(String),
+  }
+  message ReferenceType {
+    bool mutable = 1;
+    MoveType to = 2;
+  }
+
+  MoveType.Type type = 1;
+  oneof content{
+    MoveType vector = 3;
+    MoveStructTag struct = 4;
+    uint32 generic_type_param_index = 5;
+    ReferenceType reference = 6;
+    string unparsable = 7;
+  }
+}
+
+enum MoveAbility {
+  COPY = 0;
+  DROP = 1;
+  STORE = 2;
+  KEY = 3;
 }
 
 message WriteSetPayload {
@@ -238,7 +322,7 @@ message MoveStructTag {
   string address = 1;
   string module = 2;
   string name = 3;
-  repeated string generic_type_params = 4;
+  repeated MoveType generic_type_params = 4;
 }
 
 message Signature {

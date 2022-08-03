@@ -5421,7 +5421,7 @@ impl ::protobuf::reflect::ProtobufValue for ScriptPayload {
 pub struct ModuleBundlePayload {
     // message fields
     // @@protoc_insertion_point(field:ModuleBundlePayload.modules)
-    pub modules: ::std::vec::Vec<::std::string::String>,
+    pub modules: ::std::vec::Vec<MoveModuleBytecode>,
     // special fields
     // @@protoc_insertion_point(special_field:ModuleBundlePayload.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
@@ -5465,7 +5465,7 @@ impl ::protobuf::Message for ModuleBundlePayload {
         while let Some(tag) = is.read_raw_tag_or_eof()? {
             match tag {
                 10 => {
-                    self.modules.push(is.read_string()?);
+                    self.modules.push(is.read_message()?);
                 },
                 tag => {
                     ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
@@ -5480,7 +5480,8 @@ impl ::protobuf::Message for ModuleBundlePayload {
     fn compute_size(&self) -> u64 {
         let mut my_size = 0;
         for value in &self.modules {
-            my_size += ::protobuf::rt::string_size(1, &value);
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
         self.special_fields.cached_size().set(my_size as u32);
@@ -5489,7 +5490,7 @@ impl ::protobuf::Message for ModuleBundlePayload {
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
         for v in &self.modules {
-            os.write_string(1, &v)?;
+            ::protobuf::rt::write_message_field_with_cached_size(1, v, os)?;
         };
         os.write_unknown_fields(self.special_fields.unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -5536,6 +5537,1935 @@ impl ::std::fmt::Display for ModuleBundlePayload {
 
 impl ::protobuf::reflect::ProtobufValue for ModuleBundlePayload {
     type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+#[derive(PartialEq,Clone,Default,Debug)]
+// @@protoc_insertion_point(message:MoveModuleBytecode)
+pub struct MoveModuleBytecode {
+    // message fields
+    // @@protoc_insertion_point(field:MoveModuleBytecode.bytecode)
+    pub bytecode: ::std::vec::Vec<u8>,
+    // @@protoc_insertion_point(field:MoveModuleBytecode.abi)
+    pub abi: ::protobuf::MessageField<MoveModule>,
+    // special fields
+    // @@protoc_insertion_point(special_field:MoveModuleBytecode.special_fields)
+    pub special_fields: ::protobuf::SpecialFields,
+}
+
+impl<'a> ::std::default::Default for &'a MoveModuleBytecode {
+    fn default() -> &'a MoveModuleBytecode {
+        <MoveModuleBytecode as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl MoveModuleBytecode {
+    pub fn new() -> MoveModuleBytecode {
+        ::std::default::Default::default()
+    }
+
+    fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+        let mut fields = ::std::vec::Vec::with_capacity(2);
+        let mut oneofs = ::std::vec::Vec::with_capacity(0);
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "bytecode",
+            |m: &MoveModuleBytecode| { &m.bytecode },
+            |m: &mut MoveModuleBytecode| { &mut m.bytecode },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_message_field_accessor::<_, MoveModule>(
+            "abi",
+            |m: &MoveModuleBytecode| { &m.abi },
+            |m: &mut MoveModuleBytecode| { &mut m.abi },
+        ));
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<MoveModuleBytecode>(
+            "MoveModuleBytecode",
+            fields,
+            oneofs,
+        )
+    }
+}
+
+impl ::protobuf::Message for MoveModuleBytecode {
+    const NAME: &'static str = "MoveModuleBytecode";
+
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+        while let Some(tag) = is.read_raw_tag_or_eof()? {
+            match tag {
+                10 => {
+                    self.bytecode = is.read_bytes()?;
+                },
+                18 => {
+                    ::protobuf::rt::read_singular_message_into_field(is, &mut self.abi)?;
+                },
+                tag => {
+                    ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u64 {
+        let mut my_size = 0;
+        if !self.bytecode.is_empty() {
+            my_size += ::protobuf::rt::bytes_size(1, &self.bytecode);
+        }
+        if let Some(v) = self.abi.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+        self.special_fields.cached_size().set(my_size as u32);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+        if !self.bytecode.is_empty() {
+            os.write_bytes(1, &self.bytecode)?;
+        }
+        if let Some(v) = self.abi.as_ref() {
+            ::protobuf::rt::write_message_field_with_cached_size(2, v, os)?;
+        }
+        os.write_unknown_fields(self.special_fields.unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn special_fields(&self) -> &::protobuf::SpecialFields {
+        &self.special_fields
+    }
+
+    fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+        &mut self.special_fields
+    }
+
+    fn new() -> MoveModuleBytecode {
+        MoveModuleBytecode::new()
+    }
+
+    fn clear(&mut self) {
+        self.bytecode.clear();
+        self.abi.clear();
+        self.special_fields.clear();
+    }
+
+    fn default_instance() -> &'static MoveModuleBytecode {
+        static instance: MoveModuleBytecode = MoveModuleBytecode {
+            bytecode: ::std::vec::Vec::new(),
+            abi: ::protobuf::MessageField::none(),
+            special_fields: ::protobuf::SpecialFields::new(),
+        };
+        &instance
+    }
+}
+
+impl ::protobuf::MessageFull for MoveModuleBytecode {
+    fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("MoveModuleBytecode").unwrap()).clone()
+    }
+}
+
+impl ::std::fmt::Display for MoveModuleBytecode {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for MoveModuleBytecode {
+    type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+#[derive(PartialEq,Clone,Default,Debug)]
+// @@protoc_insertion_point(message:MoveModule)
+pub struct MoveModule {
+    // message fields
+    // @@protoc_insertion_point(field:MoveModule.address)
+    pub address: ::std::string::String,
+    // @@protoc_insertion_point(field:MoveModule.name)
+    pub name: ::std::string::String,
+    // @@protoc_insertion_point(field:MoveModule.friends)
+    pub friends: ::std::vec::Vec<MoveModuleId>,
+    // @@protoc_insertion_point(field:MoveModule.exposed_functions)
+    pub exposed_functions: ::std::vec::Vec<MoveFunction>,
+    // @@protoc_insertion_point(field:MoveModule.structs)
+    pub structs: ::std::vec::Vec<MoveStruct>,
+    // special fields
+    // @@protoc_insertion_point(special_field:MoveModule.special_fields)
+    pub special_fields: ::protobuf::SpecialFields,
+}
+
+impl<'a> ::std::default::Default for &'a MoveModule {
+    fn default() -> &'a MoveModule {
+        <MoveModule as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl MoveModule {
+    pub fn new() -> MoveModule {
+        ::std::default::Default::default()
+    }
+
+    fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+        let mut fields = ::std::vec::Vec::with_capacity(5);
+        let mut oneofs = ::std::vec::Vec::with_capacity(0);
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "address",
+            |m: &MoveModule| { &m.address },
+            |m: &mut MoveModule| { &mut m.address },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "name",
+            |m: &MoveModule| { &m.name },
+            |m: &mut MoveModule| { &mut m.name },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "friends",
+            |m: &MoveModule| { &m.friends },
+            |m: &mut MoveModule| { &mut m.friends },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "exposed_functions",
+            |m: &MoveModule| { &m.exposed_functions },
+            |m: &mut MoveModule| { &mut m.exposed_functions },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "structs",
+            |m: &MoveModule| { &m.structs },
+            |m: &mut MoveModule| { &mut m.structs },
+        ));
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<MoveModule>(
+            "MoveModule",
+            fields,
+            oneofs,
+        )
+    }
+}
+
+impl ::protobuf::Message for MoveModule {
+    const NAME: &'static str = "MoveModule";
+
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+        while let Some(tag) = is.read_raw_tag_or_eof()? {
+            match tag {
+                10 => {
+                    self.address = is.read_string()?;
+                },
+                18 => {
+                    self.name = is.read_string()?;
+                },
+                26 => {
+                    self.friends.push(is.read_message()?);
+                },
+                34 => {
+                    self.exposed_functions.push(is.read_message()?);
+                },
+                42 => {
+                    self.structs.push(is.read_message()?);
+                },
+                tag => {
+                    ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u64 {
+        let mut my_size = 0;
+        if !self.address.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.address);
+        }
+        if !self.name.is_empty() {
+            my_size += ::protobuf::rt::string_size(2, &self.name);
+        }
+        for value in &self.friends {
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+        };
+        for value in &self.exposed_functions {
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+        };
+        for value in &self.structs {
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+        };
+        my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+        self.special_fields.cached_size().set(my_size as u32);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+        if !self.address.is_empty() {
+            os.write_string(1, &self.address)?;
+        }
+        if !self.name.is_empty() {
+            os.write_string(2, &self.name)?;
+        }
+        for v in &self.friends {
+            ::protobuf::rt::write_message_field_with_cached_size(3, v, os)?;
+        };
+        for v in &self.exposed_functions {
+            ::protobuf::rt::write_message_field_with_cached_size(4, v, os)?;
+        };
+        for v in &self.structs {
+            ::protobuf::rt::write_message_field_with_cached_size(5, v, os)?;
+        };
+        os.write_unknown_fields(self.special_fields.unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn special_fields(&self) -> &::protobuf::SpecialFields {
+        &self.special_fields
+    }
+
+    fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+        &mut self.special_fields
+    }
+
+    fn new() -> MoveModule {
+        MoveModule::new()
+    }
+
+    fn clear(&mut self) {
+        self.address.clear();
+        self.name.clear();
+        self.friends.clear();
+        self.exposed_functions.clear();
+        self.structs.clear();
+        self.special_fields.clear();
+    }
+
+    fn default_instance() -> &'static MoveModule {
+        static instance: MoveModule = MoveModule {
+            address: ::std::string::String::new(),
+            name: ::std::string::String::new(),
+            friends: ::std::vec::Vec::new(),
+            exposed_functions: ::std::vec::Vec::new(),
+            structs: ::std::vec::Vec::new(),
+            special_fields: ::protobuf::SpecialFields::new(),
+        };
+        &instance
+    }
+}
+
+impl ::protobuf::MessageFull for MoveModule {
+    fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("MoveModule").unwrap()).clone()
+    }
+}
+
+impl ::std::fmt::Display for MoveModule {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for MoveModule {
+    type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+#[derive(PartialEq,Clone,Default,Debug)]
+// @@protoc_insertion_point(message:MoveFunction)
+pub struct MoveFunction {
+    // message fields
+    // @@protoc_insertion_point(field:MoveFunction.name)
+    pub name: ::std::string::String,
+    // @@protoc_insertion_point(field:MoveFunction.visibility)
+    pub visibility: ::protobuf::EnumOrUnknown<move_function::Visibility>,
+    // @@protoc_insertion_point(field:MoveFunction.is_entry)
+    pub is_entry: bool,
+    // @@protoc_insertion_point(field:MoveFunction.generic_type_params)
+    pub generic_type_params: ::std::vec::Vec<MoveFunctionGenericTypeParam>,
+    // @@protoc_insertion_point(field:MoveFunction.params)
+    pub params: ::std::vec::Vec<MoveType>,
+    // @@protoc_insertion_point(field:MoveFunction.return)
+    pub return_: ::std::vec::Vec<MoveType>,
+    // special fields
+    // @@protoc_insertion_point(special_field:MoveFunction.special_fields)
+    pub special_fields: ::protobuf::SpecialFields,
+}
+
+impl<'a> ::std::default::Default for &'a MoveFunction {
+    fn default() -> &'a MoveFunction {
+        <MoveFunction as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl MoveFunction {
+    pub fn new() -> MoveFunction {
+        ::std::default::Default::default()
+    }
+
+    fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+        let mut fields = ::std::vec::Vec::with_capacity(6);
+        let mut oneofs = ::std::vec::Vec::with_capacity(0);
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "name",
+            |m: &MoveFunction| { &m.name },
+            |m: &mut MoveFunction| { &mut m.name },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "visibility",
+            |m: &MoveFunction| { &m.visibility },
+            |m: &mut MoveFunction| { &mut m.visibility },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "is_entry",
+            |m: &MoveFunction| { &m.is_entry },
+            |m: &mut MoveFunction| { &mut m.is_entry },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "generic_type_params",
+            |m: &MoveFunction| { &m.generic_type_params },
+            |m: &mut MoveFunction| { &mut m.generic_type_params },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "params",
+            |m: &MoveFunction| { &m.params },
+            |m: &mut MoveFunction| { &mut m.params },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "return",
+            |m: &MoveFunction| { &m.return_ },
+            |m: &mut MoveFunction| { &mut m.return_ },
+        ));
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<MoveFunction>(
+            "MoveFunction",
+            fields,
+            oneofs,
+        )
+    }
+}
+
+impl ::protobuf::Message for MoveFunction {
+    const NAME: &'static str = "MoveFunction";
+
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+        while let Some(tag) = is.read_raw_tag_or_eof()? {
+            match tag {
+                10 => {
+                    self.name = is.read_string()?;
+                },
+                16 => {
+                    self.visibility = is.read_enum_or_unknown()?;
+                },
+                24 => {
+                    self.is_entry = is.read_bool()?;
+                },
+                34 => {
+                    self.generic_type_params.push(is.read_message()?);
+                },
+                42 => {
+                    self.params.push(is.read_message()?);
+                },
+                50 => {
+                    self.return_.push(is.read_message()?);
+                },
+                tag => {
+                    ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u64 {
+        let mut my_size = 0;
+        if !self.name.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.name);
+        }
+        if self.visibility != ::protobuf::EnumOrUnknown::new(move_function::Visibility::PRIVATE) {
+            my_size += ::protobuf::rt::int32_size(2, self.visibility.value());
+        }
+        if self.is_entry != false {
+            my_size += 1 + 1;
+        }
+        for value in &self.generic_type_params {
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+        };
+        for value in &self.params {
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+        };
+        for value in &self.return_ {
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+        };
+        my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+        self.special_fields.cached_size().set(my_size as u32);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+        if !self.name.is_empty() {
+            os.write_string(1, &self.name)?;
+        }
+        if self.visibility != ::protobuf::EnumOrUnknown::new(move_function::Visibility::PRIVATE) {
+            os.write_enum(2, ::protobuf::EnumOrUnknown::value(&self.visibility))?;
+        }
+        if self.is_entry != false {
+            os.write_bool(3, self.is_entry)?;
+        }
+        for v in &self.generic_type_params {
+            ::protobuf::rt::write_message_field_with_cached_size(4, v, os)?;
+        };
+        for v in &self.params {
+            ::protobuf::rt::write_message_field_with_cached_size(5, v, os)?;
+        };
+        for v in &self.return_ {
+            ::protobuf::rt::write_message_field_with_cached_size(6, v, os)?;
+        };
+        os.write_unknown_fields(self.special_fields.unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn special_fields(&self) -> &::protobuf::SpecialFields {
+        &self.special_fields
+    }
+
+    fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+        &mut self.special_fields
+    }
+
+    fn new() -> MoveFunction {
+        MoveFunction::new()
+    }
+
+    fn clear(&mut self) {
+        self.name.clear();
+        self.visibility = ::protobuf::EnumOrUnknown::new(move_function::Visibility::PRIVATE);
+        self.is_entry = false;
+        self.generic_type_params.clear();
+        self.params.clear();
+        self.return_.clear();
+        self.special_fields.clear();
+    }
+
+    fn default_instance() -> &'static MoveFunction {
+        static instance: MoveFunction = MoveFunction {
+            name: ::std::string::String::new(),
+            visibility: ::protobuf::EnumOrUnknown::from_i32(0),
+            is_entry: false,
+            generic_type_params: ::std::vec::Vec::new(),
+            params: ::std::vec::Vec::new(),
+            return_: ::std::vec::Vec::new(),
+            special_fields: ::protobuf::SpecialFields::new(),
+        };
+        &instance
+    }
+}
+
+impl ::protobuf::MessageFull for MoveFunction {
+    fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("MoveFunction").unwrap()).clone()
+    }
+}
+
+impl ::std::fmt::Display for MoveFunction {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for MoveFunction {
+    type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+/// Nested message and enums of message `MoveFunction`
+pub mod move_function {
+    #[derive(Clone,Copy,PartialEq,Eq,Debug,Hash)]
+    // @@protoc_insertion_point(enum:MoveFunction.Visibility)
+    pub enum Visibility {
+        // @@protoc_insertion_point(enum_value:MoveFunction.Visibility.PRIVATE)
+        PRIVATE = 0,
+        // @@protoc_insertion_point(enum_value:MoveFunction.Visibility.PUBLIC)
+        PUBLIC = 1,
+        // @@protoc_insertion_point(enum_value:MoveFunction.Visibility.FRIEND)
+        FRIEND = 2,
+    }
+
+    impl ::protobuf::Enum for Visibility {
+        const NAME: &'static str = "Visibility";
+
+        fn value(&self) -> i32 {
+            *self as i32
+        }
+
+        fn from_i32(value: i32) -> ::std::option::Option<Visibility> {
+            match value {
+                0 => ::std::option::Option::Some(Visibility::PRIVATE),
+                1 => ::std::option::Option::Some(Visibility::PUBLIC),
+                2 => ::std::option::Option::Some(Visibility::FRIEND),
+                _ => ::std::option::Option::None
+            }
+        }
+
+        const VALUES: &'static [Visibility] = &[
+            Visibility::PRIVATE,
+            Visibility::PUBLIC,
+            Visibility::FRIEND,
+        ];
+    }
+
+    impl ::protobuf::EnumFull for Visibility {
+        fn enum_descriptor() -> ::protobuf::reflect::EnumDescriptor {
+            static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::rt::Lazy::new();
+            descriptor.get(|| super::file_descriptor().enum_by_package_relative_name("MoveFunction.Visibility").unwrap()).clone()
+        }
+
+        fn descriptor(&self) -> ::protobuf::reflect::EnumValueDescriptor {
+            let index = *self as usize;
+            Self::enum_descriptor().value_by_index(index)
+        }
+    }
+
+    impl ::std::default::Default for Visibility {
+        fn default() -> Self {
+            Visibility::PRIVATE
+        }
+    }
+
+    impl Visibility {
+        pub(in super) fn generated_enum_descriptor_data() -> ::protobuf::reflect::GeneratedEnumDescriptorData {
+            ::protobuf::reflect::GeneratedEnumDescriptorData::new::<Visibility>("MoveFunction.Visibility")
+        }
+    }
+}
+
+#[derive(PartialEq,Clone,Default,Debug)]
+// @@protoc_insertion_point(message:MoveStruct)
+pub struct MoveStruct {
+    // message fields
+    // @@protoc_insertion_point(field:MoveStruct.name)
+    pub name: ::std::string::String,
+    // @@protoc_insertion_point(field:MoveStruct.is_native)
+    pub is_native: bool,
+    // @@protoc_insertion_point(field:MoveStruct.abilities)
+    pub abilities: ::std::vec::Vec<::protobuf::EnumOrUnknown<MoveAbility>>,
+    // @@protoc_insertion_point(field:MoveStruct.generic_type_params)
+    pub generic_type_params: ::std::vec::Vec<MoveStructGenericTypeParam>,
+    // @@protoc_insertion_point(field:MoveStruct.fields)
+    pub fields: ::std::vec::Vec<MoveStructField>,
+    // special fields
+    // @@protoc_insertion_point(special_field:MoveStruct.special_fields)
+    pub special_fields: ::protobuf::SpecialFields,
+}
+
+impl<'a> ::std::default::Default for &'a MoveStruct {
+    fn default() -> &'a MoveStruct {
+        <MoveStruct as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl MoveStruct {
+    pub fn new() -> MoveStruct {
+        ::std::default::Default::default()
+    }
+
+    fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+        let mut fields = ::std::vec::Vec::with_capacity(5);
+        let mut oneofs = ::std::vec::Vec::with_capacity(0);
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "name",
+            |m: &MoveStruct| { &m.name },
+            |m: &mut MoveStruct| { &mut m.name },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "is_native",
+            |m: &MoveStruct| { &m.is_native },
+            |m: &mut MoveStruct| { &mut m.is_native },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "abilities",
+            |m: &MoveStruct| { &m.abilities },
+            |m: &mut MoveStruct| { &mut m.abilities },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "generic_type_params",
+            |m: &MoveStruct| { &m.generic_type_params },
+            |m: &mut MoveStruct| { &mut m.generic_type_params },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "fields",
+            |m: &MoveStruct| { &m.fields },
+            |m: &mut MoveStruct| { &mut m.fields },
+        ));
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<MoveStruct>(
+            "MoveStruct",
+            fields,
+            oneofs,
+        )
+    }
+}
+
+impl ::protobuf::Message for MoveStruct {
+    const NAME: &'static str = "MoveStruct";
+
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+        while let Some(tag) = is.read_raw_tag_or_eof()? {
+            match tag {
+                10 => {
+                    self.name = is.read_string()?;
+                },
+                16 => {
+                    self.is_native = is.read_bool()?;
+                },
+                24 => {
+                    self.abilities.push(is.read_enum_or_unknown()?);
+                },
+                26 => {
+                    ::protobuf::rt::read_repeated_packed_enum_or_unknown_into(is, &mut self.abilities)?
+                },
+                34 => {
+                    self.generic_type_params.push(is.read_message()?);
+                },
+                42 => {
+                    self.fields.push(is.read_message()?);
+                },
+                tag => {
+                    ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u64 {
+        let mut my_size = 0;
+        if !self.name.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.name);
+        }
+        if self.is_native != false {
+            my_size += 1 + 1;
+        }
+        for value in &self.abilities {
+            my_size += ::protobuf::rt::int32_size(3, value.value());
+        };
+        for value in &self.generic_type_params {
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+        };
+        for value in &self.fields {
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+        };
+        my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+        self.special_fields.cached_size().set(my_size as u32);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+        if !self.name.is_empty() {
+            os.write_string(1, &self.name)?;
+        }
+        if self.is_native != false {
+            os.write_bool(2, self.is_native)?;
+        }
+        for v in &self.abilities {
+            os.write_enum(3, ::protobuf::EnumOrUnknown::value(v))?;
+        };
+        for v in &self.generic_type_params {
+            ::protobuf::rt::write_message_field_with_cached_size(4, v, os)?;
+        };
+        for v in &self.fields {
+            ::protobuf::rt::write_message_field_with_cached_size(5, v, os)?;
+        };
+        os.write_unknown_fields(self.special_fields.unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn special_fields(&self) -> &::protobuf::SpecialFields {
+        &self.special_fields
+    }
+
+    fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+        &mut self.special_fields
+    }
+
+    fn new() -> MoveStruct {
+        MoveStruct::new()
+    }
+
+    fn clear(&mut self) {
+        self.name.clear();
+        self.is_native = false;
+        self.abilities.clear();
+        self.generic_type_params.clear();
+        self.fields.clear();
+        self.special_fields.clear();
+    }
+
+    fn default_instance() -> &'static MoveStruct {
+        static instance: MoveStruct = MoveStruct {
+            name: ::std::string::String::new(),
+            is_native: false,
+            abilities: ::std::vec::Vec::new(),
+            generic_type_params: ::std::vec::Vec::new(),
+            fields: ::std::vec::Vec::new(),
+            special_fields: ::protobuf::SpecialFields::new(),
+        };
+        &instance
+    }
+}
+
+impl ::protobuf::MessageFull for MoveStruct {
+    fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("MoveStruct").unwrap()).clone()
+    }
+}
+
+impl ::std::fmt::Display for MoveStruct {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for MoveStruct {
+    type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+#[derive(PartialEq,Clone,Default,Debug)]
+// @@protoc_insertion_point(message:MoveStructGenericTypeParam)
+pub struct MoveStructGenericTypeParam {
+    // message fields
+    // @@protoc_insertion_point(field:MoveStructGenericTypeParam.constraints)
+    pub constraints: ::std::vec::Vec<::protobuf::EnumOrUnknown<MoveAbility>>,
+    // @@protoc_insertion_point(field:MoveStructGenericTypeParam.is_phantom)
+    pub is_phantom: bool,
+    // special fields
+    // @@protoc_insertion_point(special_field:MoveStructGenericTypeParam.special_fields)
+    pub special_fields: ::protobuf::SpecialFields,
+}
+
+impl<'a> ::std::default::Default for &'a MoveStructGenericTypeParam {
+    fn default() -> &'a MoveStructGenericTypeParam {
+        <MoveStructGenericTypeParam as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl MoveStructGenericTypeParam {
+    pub fn new() -> MoveStructGenericTypeParam {
+        ::std::default::Default::default()
+    }
+
+    fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+        let mut fields = ::std::vec::Vec::with_capacity(2);
+        let mut oneofs = ::std::vec::Vec::with_capacity(0);
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "constraints",
+            |m: &MoveStructGenericTypeParam| { &m.constraints },
+            |m: &mut MoveStructGenericTypeParam| { &mut m.constraints },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "is_phantom",
+            |m: &MoveStructGenericTypeParam| { &m.is_phantom },
+            |m: &mut MoveStructGenericTypeParam| { &mut m.is_phantom },
+        ));
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<MoveStructGenericTypeParam>(
+            "MoveStructGenericTypeParam",
+            fields,
+            oneofs,
+        )
+    }
+}
+
+impl ::protobuf::Message for MoveStructGenericTypeParam {
+    const NAME: &'static str = "MoveStructGenericTypeParam";
+
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+        while let Some(tag) = is.read_raw_tag_or_eof()? {
+            match tag {
+                8 => {
+                    self.constraints.push(is.read_enum_or_unknown()?);
+                },
+                10 => {
+                    ::protobuf::rt::read_repeated_packed_enum_or_unknown_into(is, &mut self.constraints)?
+                },
+                16 => {
+                    self.is_phantom = is.read_bool()?;
+                },
+                tag => {
+                    ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u64 {
+        let mut my_size = 0;
+        for value in &self.constraints {
+            my_size += ::protobuf::rt::int32_size(1, value.value());
+        };
+        if self.is_phantom != false {
+            my_size += 1 + 1;
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+        self.special_fields.cached_size().set(my_size as u32);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+        for v in &self.constraints {
+            os.write_enum(1, ::protobuf::EnumOrUnknown::value(v))?;
+        };
+        if self.is_phantom != false {
+            os.write_bool(2, self.is_phantom)?;
+        }
+        os.write_unknown_fields(self.special_fields.unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn special_fields(&self) -> &::protobuf::SpecialFields {
+        &self.special_fields
+    }
+
+    fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+        &mut self.special_fields
+    }
+
+    fn new() -> MoveStructGenericTypeParam {
+        MoveStructGenericTypeParam::new()
+    }
+
+    fn clear(&mut self) {
+        self.constraints.clear();
+        self.is_phantom = false;
+        self.special_fields.clear();
+    }
+
+    fn default_instance() -> &'static MoveStructGenericTypeParam {
+        static instance: MoveStructGenericTypeParam = MoveStructGenericTypeParam {
+            constraints: ::std::vec::Vec::new(),
+            is_phantom: false,
+            special_fields: ::protobuf::SpecialFields::new(),
+        };
+        &instance
+    }
+}
+
+impl ::protobuf::MessageFull for MoveStructGenericTypeParam {
+    fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("MoveStructGenericTypeParam").unwrap()).clone()
+    }
+}
+
+impl ::std::fmt::Display for MoveStructGenericTypeParam {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for MoveStructGenericTypeParam {
+    type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+#[derive(PartialEq,Clone,Default,Debug)]
+// @@protoc_insertion_point(message:MoveStructField)
+pub struct MoveStructField {
+    // message fields
+    // @@protoc_insertion_point(field:MoveStructField.name)
+    pub name: ::std::string::String,
+    // @@protoc_insertion_point(field:MoveStructField.type)
+    pub type_: ::protobuf::MessageField<MoveType>,
+    // special fields
+    // @@protoc_insertion_point(special_field:MoveStructField.special_fields)
+    pub special_fields: ::protobuf::SpecialFields,
+}
+
+impl<'a> ::std::default::Default for &'a MoveStructField {
+    fn default() -> &'a MoveStructField {
+        <MoveStructField as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl MoveStructField {
+    pub fn new() -> MoveStructField {
+        ::std::default::Default::default()
+    }
+
+    fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+        let mut fields = ::std::vec::Vec::with_capacity(2);
+        let mut oneofs = ::std::vec::Vec::with_capacity(0);
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "name",
+            |m: &MoveStructField| { &m.name },
+            |m: &mut MoveStructField| { &mut m.name },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_message_field_accessor::<_, MoveType>(
+            "type",
+            |m: &MoveStructField| { &m.type_ },
+            |m: &mut MoveStructField| { &mut m.type_ },
+        ));
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<MoveStructField>(
+            "MoveStructField",
+            fields,
+            oneofs,
+        )
+    }
+}
+
+impl ::protobuf::Message for MoveStructField {
+    const NAME: &'static str = "MoveStructField";
+
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+        while let Some(tag) = is.read_raw_tag_or_eof()? {
+            match tag {
+                10 => {
+                    self.name = is.read_string()?;
+                },
+                18 => {
+                    ::protobuf::rt::read_singular_message_into_field(is, &mut self.type_)?;
+                },
+                tag => {
+                    ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u64 {
+        let mut my_size = 0;
+        if !self.name.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.name);
+        }
+        if let Some(v) = self.type_.as_ref() {
+            let len = v.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+        self.special_fields.cached_size().set(my_size as u32);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+        if !self.name.is_empty() {
+            os.write_string(1, &self.name)?;
+        }
+        if let Some(v) = self.type_.as_ref() {
+            ::protobuf::rt::write_message_field_with_cached_size(2, v, os)?;
+        }
+        os.write_unknown_fields(self.special_fields.unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn special_fields(&self) -> &::protobuf::SpecialFields {
+        &self.special_fields
+    }
+
+    fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+        &mut self.special_fields
+    }
+
+    fn new() -> MoveStructField {
+        MoveStructField::new()
+    }
+
+    fn clear(&mut self) {
+        self.name.clear();
+        self.type_.clear();
+        self.special_fields.clear();
+    }
+
+    fn default_instance() -> &'static MoveStructField {
+        static instance: MoveStructField = MoveStructField {
+            name: ::std::string::String::new(),
+            type_: ::protobuf::MessageField::none(),
+            special_fields: ::protobuf::SpecialFields::new(),
+        };
+        &instance
+    }
+}
+
+impl ::protobuf::MessageFull for MoveStructField {
+    fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("MoveStructField").unwrap()).clone()
+    }
+}
+
+impl ::std::fmt::Display for MoveStructField {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for MoveStructField {
+    type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+#[derive(PartialEq,Clone,Default,Debug)]
+// @@protoc_insertion_point(message:MoveFunctionGenericTypeParam)
+pub struct MoveFunctionGenericTypeParam {
+    // message fields
+    // @@protoc_insertion_point(field:MoveFunctionGenericTypeParam.constraints)
+    pub constraints: ::std::vec::Vec<::protobuf::EnumOrUnknown<MoveAbility>>,
+    // special fields
+    // @@protoc_insertion_point(special_field:MoveFunctionGenericTypeParam.special_fields)
+    pub special_fields: ::protobuf::SpecialFields,
+}
+
+impl<'a> ::std::default::Default for &'a MoveFunctionGenericTypeParam {
+    fn default() -> &'a MoveFunctionGenericTypeParam {
+        <MoveFunctionGenericTypeParam as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl MoveFunctionGenericTypeParam {
+    pub fn new() -> MoveFunctionGenericTypeParam {
+        ::std::default::Default::default()
+    }
+
+    fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+        let mut fields = ::std::vec::Vec::with_capacity(1);
+        let mut oneofs = ::std::vec::Vec::with_capacity(0);
+        fields.push(::protobuf::reflect::rt::v2::make_vec_simpler_accessor::<_, _>(
+            "constraints",
+            |m: &MoveFunctionGenericTypeParam| { &m.constraints },
+            |m: &mut MoveFunctionGenericTypeParam| { &mut m.constraints },
+        ));
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<MoveFunctionGenericTypeParam>(
+            "MoveFunctionGenericTypeParam",
+            fields,
+            oneofs,
+        )
+    }
+}
+
+impl ::protobuf::Message for MoveFunctionGenericTypeParam {
+    const NAME: &'static str = "MoveFunctionGenericTypeParam";
+
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+        while let Some(tag) = is.read_raw_tag_or_eof()? {
+            match tag {
+                8 => {
+                    self.constraints.push(is.read_enum_or_unknown()?);
+                },
+                10 => {
+                    ::protobuf::rt::read_repeated_packed_enum_or_unknown_into(is, &mut self.constraints)?
+                },
+                tag => {
+                    ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u64 {
+        let mut my_size = 0;
+        for value in &self.constraints {
+            my_size += ::protobuf::rt::int32_size(1, value.value());
+        };
+        my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+        self.special_fields.cached_size().set(my_size as u32);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+        for v in &self.constraints {
+            os.write_enum(1, ::protobuf::EnumOrUnknown::value(v))?;
+        };
+        os.write_unknown_fields(self.special_fields.unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn special_fields(&self) -> &::protobuf::SpecialFields {
+        &self.special_fields
+    }
+
+    fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+        &mut self.special_fields
+    }
+
+    fn new() -> MoveFunctionGenericTypeParam {
+        MoveFunctionGenericTypeParam::new()
+    }
+
+    fn clear(&mut self) {
+        self.constraints.clear();
+        self.special_fields.clear();
+    }
+
+    fn default_instance() -> &'static MoveFunctionGenericTypeParam {
+        static instance: MoveFunctionGenericTypeParam = MoveFunctionGenericTypeParam {
+            constraints: ::std::vec::Vec::new(),
+            special_fields: ::protobuf::SpecialFields::new(),
+        };
+        &instance
+    }
+}
+
+impl ::protobuf::MessageFull for MoveFunctionGenericTypeParam {
+    fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("MoveFunctionGenericTypeParam").unwrap()).clone()
+    }
+}
+
+impl ::std::fmt::Display for MoveFunctionGenericTypeParam {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for MoveFunctionGenericTypeParam {
+    type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+#[derive(PartialEq,Clone,Default,Debug)]
+// @@protoc_insertion_point(message:MoveType)
+pub struct MoveType {
+    // message fields
+    // @@protoc_insertion_point(field:MoveType.type)
+    pub type_: ::protobuf::EnumOrUnknown<move_type::Type>,
+    // message oneof groups
+    pub content: ::std::option::Option<move_type::Content>,
+    // special fields
+    // @@protoc_insertion_point(special_field:MoveType.special_fields)
+    pub special_fields: ::protobuf::SpecialFields,
+}
+
+impl<'a> ::std::default::Default for &'a MoveType {
+    fn default() -> &'a MoveType {
+        <MoveType as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl MoveType {
+    pub fn new() -> MoveType {
+        ::std::default::Default::default()
+    }
+
+    // .MoveType vector = 3;
+
+    pub fn vector(&self) -> &MoveType {
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::Vector(ref v)) => v,
+            _ => <MoveType as ::protobuf::Message>::default_instance(),
+        }
+    }
+
+    pub fn clear_vector(&mut self) {
+        self.content = ::std::option::Option::None;
+    }
+
+    pub fn has_vector(&self) -> bool {
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::Vector(..)) => true,
+            _ => false,
+        }
+    }
+
+    // Param is passed by value, moved
+    pub fn set_vector(&mut self, v: MoveType) {
+        self.content = ::std::option::Option::Some(move_type::Content::Vector(::std::boxed::Box::new(v)))
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_vector(&mut self) -> &mut MoveType {
+        if let ::std::option::Option::Some(move_type::Content::Vector(_)) = self.content {
+        } else {
+            self.content = ::std::option::Option::Some(move_type::Content::Vector(::std::boxed::Box::new(MoveType::new())));
+        }
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::Vector(ref mut v)) => v,
+            _ => panic!(),
+        }
+    }
+
+    // Take field
+    pub fn take_vector(&mut self) -> MoveType {
+        if self.has_vector() {
+            match self.content.take() {
+                ::std::option::Option::Some(move_type::Content::Vector(v)) => *v,
+                _ => panic!(),
+            }
+        } else {
+            MoveType::new()
+        }
+    }
+
+    // .MoveStructTag struct = 4;
+
+    pub fn struct_(&self) -> &MoveStructTag {
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::Struct(ref v)) => v,
+            _ => <MoveStructTag as ::protobuf::Message>::default_instance(),
+        }
+    }
+
+    pub fn clear_struct_(&mut self) {
+        self.content = ::std::option::Option::None;
+    }
+
+    pub fn has_struct(&self) -> bool {
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::Struct(..)) => true,
+            _ => false,
+        }
+    }
+
+    // Param is passed by value, moved
+    pub fn set_struct(&mut self, v: MoveStructTag) {
+        self.content = ::std::option::Option::Some(move_type::Content::Struct(v))
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_struct(&mut self) -> &mut MoveStructTag {
+        if let ::std::option::Option::Some(move_type::Content::Struct(_)) = self.content {
+        } else {
+            self.content = ::std::option::Option::Some(move_type::Content::Struct(MoveStructTag::new()));
+        }
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::Struct(ref mut v)) => v,
+            _ => panic!(),
+        }
+    }
+
+    // Take field
+    pub fn take_struct_(&mut self) -> MoveStructTag {
+        if self.has_struct() {
+            match self.content.take() {
+                ::std::option::Option::Some(move_type::Content::Struct(v)) => v,
+                _ => panic!(),
+            }
+        } else {
+            MoveStructTag::new()
+        }
+    }
+
+    // uint32 generic_type_param_index = 5;
+
+    pub fn generic_type_param_index(&self) -> u32 {
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::GenericTypeParamIndex(v)) => v,
+            _ => 0,
+        }
+    }
+
+    pub fn clear_generic_type_param_index(&mut self) {
+        self.content = ::std::option::Option::None;
+    }
+
+    pub fn has_generic_type_param_index(&self) -> bool {
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::GenericTypeParamIndex(..)) => true,
+            _ => false,
+        }
+    }
+
+    // Param is passed by value, moved
+    pub fn set_generic_type_param_index(&mut self, v: u32) {
+        self.content = ::std::option::Option::Some(move_type::Content::GenericTypeParamIndex(v))
+    }
+
+    // .MoveType.ReferenceType reference = 6;
+
+    pub fn reference(&self) -> &move_type::ReferenceType {
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::Reference(ref v)) => v,
+            _ => <move_type::ReferenceType as ::protobuf::Message>::default_instance(),
+        }
+    }
+
+    pub fn clear_reference(&mut self) {
+        self.content = ::std::option::Option::None;
+    }
+
+    pub fn has_reference(&self) -> bool {
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::Reference(..)) => true,
+            _ => false,
+        }
+    }
+
+    // Param is passed by value, moved
+    pub fn set_reference(&mut self, v: move_type::ReferenceType) {
+        self.content = ::std::option::Option::Some(move_type::Content::Reference(v))
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_reference(&mut self) -> &mut move_type::ReferenceType {
+        if let ::std::option::Option::Some(move_type::Content::Reference(_)) = self.content {
+        } else {
+            self.content = ::std::option::Option::Some(move_type::Content::Reference(move_type::ReferenceType::new()));
+        }
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::Reference(ref mut v)) => v,
+            _ => panic!(),
+        }
+    }
+
+    // Take field
+    pub fn take_reference(&mut self) -> move_type::ReferenceType {
+        if self.has_reference() {
+            match self.content.take() {
+                ::std::option::Option::Some(move_type::Content::Reference(v)) => v,
+                _ => panic!(),
+            }
+        } else {
+            move_type::ReferenceType::new()
+        }
+    }
+
+    // string unparsable = 7;
+
+    pub fn unparsable(&self) -> &str {
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::Unparsable(ref v)) => v,
+            _ => "",
+        }
+    }
+
+    pub fn clear_unparsable(&mut self) {
+        self.content = ::std::option::Option::None;
+    }
+
+    pub fn has_unparsable(&self) -> bool {
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::Unparsable(..)) => true,
+            _ => false,
+        }
+    }
+
+    // Param is passed by value, moved
+    pub fn set_unparsable(&mut self, v: ::std::string::String) {
+        self.content = ::std::option::Option::Some(move_type::Content::Unparsable(v))
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_unparsable(&mut self) -> &mut ::std::string::String {
+        if let ::std::option::Option::Some(move_type::Content::Unparsable(_)) = self.content {
+        } else {
+            self.content = ::std::option::Option::Some(move_type::Content::Unparsable(::std::string::String::new()));
+        }
+        match self.content {
+            ::std::option::Option::Some(move_type::Content::Unparsable(ref mut v)) => v,
+            _ => panic!(),
+        }
+    }
+
+    // Take field
+    pub fn take_unparsable(&mut self) -> ::std::string::String {
+        if self.has_unparsable() {
+            match self.content.take() {
+                ::std::option::Option::Some(move_type::Content::Unparsable(v)) => v,
+                _ => panic!(),
+            }
+        } else {
+            ::std::string::String::new()
+        }
+    }
+
+    fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+        let mut fields = ::std::vec::Vec::with_capacity(6);
+        let mut oneofs = ::std::vec::Vec::with_capacity(1);
+        fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+            "type",
+            |m: &MoveType| { &m.type_ },
+            |m: &mut MoveType| { &mut m.type_ },
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_oneof_message_has_get_mut_set_accessor::<_, MoveType>(
+            "vector",
+            MoveType::has_vector,
+            MoveType::vector,
+            MoveType::mut_vector,
+            MoveType::set_vector,
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_oneof_message_has_get_mut_set_accessor::<_, MoveStructTag>(
+            "struct",
+            MoveType::has_struct,
+            MoveType::struct_,
+            MoveType::mut_struct,
+            MoveType::set_struct,
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_oneof_copy_has_get_set_simpler_accessors::<_, _>(
+            "generic_type_param_index",
+            MoveType::has_generic_type_param_index,
+            MoveType::generic_type_param_index,
+            MoveType::set_generic_type_param_index,
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_oneof_message_has_get_mut_set_accessor::<_, move_type::ReferenceType>(
+            "reference",
+            MoveType::has_reference,
+            MoveType::reference,
+            MoveType::mut_reference,
+            MoveType::set_reference,
+        ));
+        fields.push(::protobuf::reflect::rt::v2::make_oneof_deref_has_get_set_simpler_accessor::<_, _>(
+            "unparsable",
+            MoveType::has_unparsable,
+            MoveType::unparsable,
+            MoveType::set_unparsable,
+        ));
+        oneofs.push(move_type::Content::generated_oneof_descriptor_data());
+        ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<MoveType>(
+            "MoveType",
+            fields,
+            oneofs,
+        )
+    }
+}
+
+impl ::protobuf::Message for MoveType {
+    const NAME: &'static str = "MoveType";
+
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+        while let Some(tag) = is.read_raw_tag_or_eof()? {
+            match tag {
+                8 => {
+                    self.type_ = is.read_enum_or_unknown()?;
+                },
+                26 => {
+                    self.content = ::std::option::Option::Some(move_type::Content::Vector(::std::boxed::Box::new(is.read_message()?)));
+                },
+                34 => {
+                    self.content = ::std::option::Option::Some(move_type::Content::Struct(is.read_message()?));
+                },
+                40 => {
+                    self.content = ::std::option::Option::Some(move_type::Content::GenericTypeParamIndex(is.read_uint32()?));
+                },
+                50 => {
+                    self.content = ::std::option::Option::Some(move_type::Content::Reference(is.read_message()?));
+                },
+                58 => {
+                    self.content = ::std::option::Option::Some(move_type::Content::Unparsable(is.read_string()?));
+                },
+                tag => {
+                    ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u64 {
+        let mut my_size = 0;
+        if self.type_ != ::protobuf::EnumOrUnknown::new(move_type::Type::Bool) {
+            my_size += ::protobuf::rt::int32_size(1, self.type_.value());
+        }
+        if let ::std::option::Option::Some(ref v) = self.content {
+            match v {
+                &move_type::Content::Vector(ref v) => {
+                    let len = v.compute_size();
+                    my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+                },
+                &move_type::Content::Struct(ref v) => {
+                    let len = v.compute_size();
+                    my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+                },
+                &move_type::Content::GenericTypeParamIndex(v) => {
+                    my_size += ::protobuf::rt::uint32_size(5, v);
+                },
+                &move_type::Content::Reference(ref v) => {
+                    let len = v.compute_size();
+                    my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+                },
+                &move_type::Content::Unparsable(ref v) => {
+                    my_size += ::protobuf::rt::string_size(7, &v);
+                },
+            };
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+        self.special_fields.cached_size().set(my_size as u32);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+        if self.type_ != ::protobuf::EnumOrUnknown::new(move_type::Type::Bool) {
+            os.write_enum(1, ::protobuf::EnumOrUnknown::value(&self.type_))?;
+        }
+        if let ::std::option::Option::Some(ref v) = self.content {
+            match v {
+                &move_type::Content::Vector(ref v) => {
+                    ::protobuf::rt::write_message_field_with_cached_size(3, &**v, os)?;
+                },
+                &move_type::Content::Struct(ref v) => {
+                    ::protobuf::rt::write_message_field_with_cached_size(4, v, os)?;
+                },
+                &move_type::Content::GenericTypeParamIndex(v) => {
+                    os.write_uint32(5, v)?;
+                },
+                &move_type::Content::Reference(ref v) => {
+                    ::protobuf::rt::write_message_field_with_cached_size(6, v, os)?;
+                },
+                &move_type::Content::Unparsable(ref v) => {
+                    os.write_string(7, v)?;
+                },
+            };
+        }
+        os.write_unknown_fields(self.special_fields.unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn special_fields(&self) -> &::protobuf::SpecialFields {
+        &self.special_fields
+    }
+
+    fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+        &mut self.special_fields
+    }
+
+    fn new() -> MoveType {
+        MoveType::new()
+    }
+
+    fn clear(&mut self) {
+        self.type_ = ::protobuf::EnumOrUnknown::new(move_type::Type::Bool);
+        self.content = ::std::option::Option::None;
+        self.content = ::std::option::Option::None;
+        self.content = ::std::option::Option::None;
+        self.content = ::std::option::Option::None;
+        self.content = ::std::option::Option::None;
+        self.special_fields.clear();
+    }
+
+    fn default_instance() -> &'static MoveType {
+        static instance: MoveType = MoveType {
+            type_: ::protobuf::EnumOrUnknown::from_i32(0),
+            content: ::std::option::Option::None,
+            special_fields: ::protobuf::SpecialFields::new(),
+        };
+        &instance
+    }
+}
+
+impl ::protobuf::MessageFull for MoveType {
+    fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().message_by_package_relative_name("MoveType").unwrap()).clone()
+    }
+}
+
+impl ::std::fmt::Display for MoveType {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for MoveType {
+    type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+}
+
+/// Nested message and enums of message `MoveType`
+pub mod move_type {
+
+    #[derive(Clone,PartialEq,Debug)]
+    #[non_exhaustive]
+    // @@protoc_insertion_point(oneof:MoveType.content)
+    pub enum Content {
+        // @@protoc_insertion_point(oneof_field:MoveType.vector)
+        Vector(::std::boxed::Box<super::MoveType>),
+        // @@protoc_insertion_point(oneof_field:MoveType.struct)
+        Struct(super::MoveStructTag),
+        // @@protoc_insertion_point(oneof_field:MoveType.generic_type_param_index)
+        GenericTypeParamIndex(u32),
+        // @@protoc_insertion_point(oneof_field:MoveType.reference)
+        Reference(ReferenceType),
+        // @@protoc_insertion_point(oneof_field:MoveType.unparsable)
+        Unparsable(::std::string::String),
+    }
+
+    impl ::protobuf::Oneof for Content {
+    }
+
+    impl ::protobuf::OneofFull for Content {
+        fn descriptor() -> ::protobuf::reflect::OneofDescriptor {
+            static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::OneofDescriptor> = ::protobuf::rt::Lazy::new();
+            descriptor.get(|| <super::MoveType as ::protobuf::MessageFull>::descriptor().oneof_by_name("content").unwrap()).clone()
+        }
+    }
+
+    impl Content {
+        pub(in super) fn generated_oneof_descriptor_data() -> ::protobuf::reflect::GeneratedOneofDescriptorData {
+            ::protobuf::reflect::GeneratedOneofDescriptorData::new::<Content>("content")
+        }
+    }
+    #[derive(PartialEq,Clone,Default,Debug)]
+    // @@protoc_insertion_point(message:MoveType.ReferenceType)
+    pub struct ReferenceType {
+        // message fields
+        // @@protoc_insertion_point(field:MoveType.ReferenceType.mutable)
+        pub mutable: bool,
+        // @@protoc_insertion_point(field:MoveType.ReferenceType.to)
+        pub to: ::protobuf::MessageField<super::MoveType>,
+        // special fields
+        // @@protoc_insertion_point(special_field:MoveType.ReferenceType.special_fields)
+        pub special_fields: ::protobuf::SpecialFields,
+    }
+
+    impl<'a> ::std::default::Default for &'a ReferenceType {
+        fn default() -> &'a ReferenceType {
+            <ReferenceType as ::protobuf::Message>::default_instance()
+        }
+    }
+
+    impl ReferenceType {
+        pub fn new() -> ReferenceType {
+            ::std::default::Default::default()
+        }
+
+        pub(in super) fn generated_message_descriptor_data() -> ::protobuf::reflect::GeneratedMessageDescriptorData {
+            let mut fields = ::std::vec::Vec::with_capacity(2);
+            let mut oneofs = ::std::vec::Vec::with_capacity(0);
+            fields.push(::protobuf::reflect::rt::v2::make_simpler_field_accessor::<_, _>(
+                "mutable",
+                |m: &ReferenceType| { &m.mutable },
+                |m: &mut ReferenceType| { &mut m.mutable },
+            ));
+            fields.push(::protobuf::reflect::rt::v2::make_message_field_accessor::<_, super::MoveType>(
+                "to",
+                |m: &ReferenceType| { &m.to },
+                |m: &mut ReferenceType| { &mut m.to },
+            ));
+            ::protobuf::reflect::GeneratedMessageDescriptorData::new_2::<ReferenceType>(
+                "MoveType.ReferenceType",
+                fields,
+                oneofs,
+            )
+        }
+    }
+
+    impl ::protobuf::Message for ReferenceType {
+        const NAME: &'static str = "ReferenceType";
+
+        fn is_initialized(&self) -> bool {
+            true
+        }
+
+        fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream<'_>) -> ::protobuf::Result<()> {
+            while let Some(tag) = is.read_raw_tag_or_eof()? {
+                match tag {
+                    8 => {
+                        self.mutable = is.read_bool()?;
+                    },
+                    18 => {
+                        ::protobuf::rt::read_singular_message_into_field(is, &mut self.to)?;
+                    },
+                    tag => {
+                        ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
+                    },
+                };
+            }
+            ::std::result::Result::Ok(())
+        }
+
+        // Compute sizes of nested messages
+        #[allow(unused_variables)]
+        fn compute_size(&self) -> u64 {
+            let mut my_size = 0;
+            if self.mutable != false {
+                my_size += 1 + 1;
+            }
+            if let Some(v) = self.to.as_ref() {
+                let len = v.compute_size();
+                my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
+            }
+            my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
+            self.special_fields.cached_size().set(my_size as u32);
+            my_size
+        }
+
+        fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream<'_>) -> ::protobuf::Result<()> {
+            if self.mutable != false {
+                os.write_bool(1, self.mutable)?;
+            }
+            if let Some(v) = self.to.as_ref() {
+                ::protobuf::rt::write_message_field_with_cached_size(2, v, os)?;
+            }
+            os.write_unknown_fields(self.special_fields.unknown_fields())?;
+            ::std::result::Result::Ok(())
+        }
+
+        fn special_fields(&self) -> &::protobuf::SpecialFields {
+            &self.special_fields
+        }
+
+        fn mut_special_fields(&mut self) -> &mut ::protobuf::SpecialFields {
+            &mut self.special_fields
+        }
+
+        fn new() -> ReferenceType {
+            ReferenceType::new()
+        }
+
+        fn clear(&mut self) {
+            self.mutable = false;
+            self.to.clear();
+            self.special_fields.clear();
+        }
+
+        fn default_instance() -> &'static ReferenceType {
+            static instance: ReferenceType = ReferenceType {
+                mutable: false,
+                to: ::protobuf::MessageField::none(),
+                special_fields: ::protobuf::SpecialFields::new(),
+            };
+            &instance
+        }
+    }
+
+    impl ::protobuf::MessageFull for ReferenceType {
+        fn descriptor() -> ::protobuf::reflect::MessageDescriptor {
+            static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::rt::Lazy::new();
+            descriptor.get(|| super::file_descriptor().message_by_package_relative_name("MoveType.ReferenceType").unwrap()).clone()
+        }
+    }
+
+    impl ::std::fmt::Display for ReferenceType {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            ::protobuf::text_format::fmt(self, f)
+        }
+    }
+
+    impl ::protobuf::reflect::ProtobufValue for ReferenceType {
+        type RuntimeType = ::protobuf::reflect::rt::RuntimeTypeMessage<Self>;
+    }
+
+    #[derive(Clone,Copy,PartialEq,Eq,Debug,Hash)]
+    // @@protoc_insertion_point(enum:MoveType.Type)
+    pub enum Type {
+        // @@protoc_insertion_point(enum_value:MoveType.Type.Bool)
+        Bool = 0,
+        // @@protoc_insertion_point(enum_value:MoveType.Type.U8)
+        U8 = 1,
+        // @@protoc_insertion_point(enum_value:MoveType.Type.U64)
+        U64 = 2,
+        // @@protoc_insertion_point(enum_value:MoveType.Type.U128)
+        U128 = 3,
+        // @@protoc_insertion_point(enum_value:MoveType.Type.Address)
+        Address = 4,
+        // @@protoc_insertion_point(enum_value:MoveType.Type.Signer)
+        Signer = 5,
+        // @@protoc_insertion_point(enum_value:MoveType.Type.Vector)
+        Vector = 6,
+        // @@protoc_insertion_point(enum_value:MoveType.Type.Struct)
+        Struct = 7,
+        // @@protoc_insertion_point(enum_value:MoveType.Type.GenericTypeParam)
+        GenericTypeParam = 8,
+        // @@protoc_insertion_point(enum_value:MoveType.Type.Reference)
+        Reference = 9,
+        // @@protoc_insertion_point(enum_value:MoveType.Type.Unparsable)
+        Unparsable = 10,
+    }
+
+    impl ::protobuf::Enum for Type {
+        const NAME: &'static str = "Type";
+
+        fn value(&self) -> i32 {
+            *self as i32
+        }
+
+        fn from_i32(value: i32) -> ::std::option::Option<Type> {
+            match value {
+                0 => ::std::option::Option::Some(Type::Bool),
+                1 => ::std::option::Option::Some(Type::U8),
+                2 => ::std::option::Option::Some(Type::U64),
+                3 => ::std::option::Option::Some(Type::U128),
+                4 => ::std::option::Option::Some(Type::Address),
+                5 => ::std::option::Option::Some(Type::Signer),
+                6 => ::std::option::Option::Some(Type::Vector),
+                7 => ::std::option::Option::Some(Type::Struct),
+                8 => ::std::option::Option::Some(Type::GenericTypeParam),
+                9 => ::std::option::Option::Some(Type::Reference),
+                10 => ::std::option::Option::Some(Type::Unparsable),
+                _ => ::std::option::Option::None
+            }
+        }
+
+        const VALUES: &'static [Type] = &[
+            Type::Bool,
+            Type::U8,
+            Type::U64,
+            Type::U128,
+            Type::Address,
+            Type::Signer,
+            Type::Vector,
+            Type::Struct,
+            Type::GenericTypeParam,
+            Type::Reference,
+            Type::Unparsable,
+        ];
+    }
+
+    impl ::protobuf::EnumFull for Type {
+        fn enum_descriptor() -> ::protobuf::reflect::EnumDescriptor {
+            static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::rt::Lazy::new();
+            descriptor.get(|| super::file_descriptor().enum_by_package_relative_name("MoveType.Type").unwrap()).clone()
+        }
+
+        fn descriptor(&self) -> ::protobuf::reflect::EnumValueDescriptor {
+            let index = *self as usize;
+            Self::enum_descriptor().value_by_index(index)
+        }
+    }
+
+    impl ::std::default::Default for Type {
+        fn default() -> Self {
+            Type::Bool
+        }
+    }
+
+    impl Type {
+        pub(in super) fn generated_enum_descriptor_data() -> ::protobuf::reflect::GeneratedEnumDescriptorData {
+            ::protobuf::reflect::GeneratedEnumDescriptorData::new::<Type>("MoveType.Type")
+        }
+    }
 }
 
 #[derive(PartialEq,Clone,Default,Debug)]
@@ -6094,7 +8024,7 @@ pub struct MoveStructTag {
     // @@protoc_insertion_point(field:MoveStructTag.name)
     pub name: ::std::string::String,
     // @@protoc_insertion_point(field:MoveStructTag.generic_type_params)
-    pub generic_type_params: ::std::vec::Vec<::std::string::String>,
+    pub generic_type_params: ::std::vec::Vec<MoveType>,
     // special fields
     // @@protoc_insertion_point(special_field:MoveStructTag.special_fields)
     pub special_fields: ::protobuf::SpecialFields,
@@ -6162,7 +8092,7 @@ impl ::protobuf::Message for MoveStructTag {
                     self.name = is.read_string()?;
                 },
                 34 => {
-                    self.generic_type_params.push(is.read_string()?);
+                    self.generic_type_params.push(is.read_message()?);
                 },
                 tag => {
                     ::protobuf::rt::read_unknown_or_skip_group(tag, is, self.special_fields.mut_unknown_fields())?;
@@ -6186,7 +8116,8 @@ impl ::protobuf::Message for MoveStructTag {
             my_size += ::protobuf::rt::string_size(3, &self.name);
         }
         for value in &self.generic_type_params {
-            my_size += ::protobuf::rt::string_size(4, &value);
+            let len = value.compute_size();
+            my_size += 1 + ::protobuf::rt::compute_raw_varint64_size(len) + len;
         };
         my_size += ::protobuf::rt::unknown_fields_size(self.special_fields.unknown_fields());
         self.special_fields.cached_size().set(my_size as u32);
@@ -6204,7 +8135,7 @@ impl ::protobuf::Message for MoveStructTag {
             os.write_string(3, &self.name)?;
         }
         for v in &self.generic_type_params {
-            os.write_string(4, &v)?;
+            ::protobuf::rt::write_message_field_with_cached_size(4, v, os)?;
         };
         os.write_unknown_fields(self.special_fields.unknown_fields())?;
         ::std::result::Result::Ok(())
@@ -7510,6 +9441,68 @@ pub mod account_signature {
     }
 }
 
+#[derive(Clone,Copy,PartialEq,Eq,Debug,Hash)]
+// @@protoc_insertion_point(enum:MoveAbility)
+pub enum MoveAbility {
+    // @@protoc_insertion_point(enum_value:MoveAbility.COPY)
+    COPY = 0,
+    // @@protoc_insertion_point(enum_value:MoveAbility.DROP)
+    DROP = 1,
+    // @@protoc_insertion_point(enum_value:MoveAbility.STORE)
+    STORE = 2,
+    // @@protoc_insertion_point(enum_value:MoveAbility.KEY)
+    KEY = 3,
+}
+
+impl ::protobuf::Enum for MoveAbility {
+    const NAME: &'static str = "MoveAbility";
+
+    fn value(&self) -> i32 {
+        *self as i32
+    }
+
+    fn from_i32(value: i32) -> ::std::option::Option<MoveAbility> {
+        match value {
+            0 => ::std::option::Option::Some(MoveAbility::COPY),
+            1 => ::std::option::Option::Some(MoveAbility::DROP),
+            2 => ::std::option::Option::Some(MoveAbility::STORE),
+            3 => ::std::option::Option::Some(MoveAbility::KEY),
+            _ => ::std::option::Option::None
+        }
+    }
+
+    const VALUES: &'static [MoveAbility] = &[
+        MoveAbility::COPY,
+        MoveAbility::DROP,
+        MoveAbility::STORE,
+        MoveAbility::KEY,
+    ];
+}
+
+impl ::protobuf::EnumFull for MoveAbility {
+    fn enum_descriptor() -> ::protobuf::reflect::EnumDescriptor {
+        static descriptor: ::protobuf::rt::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::rt::Lazy::new();
+        descriptor.get(|| file_descriptor().enum_by_package_relative_name("MoveAbility").unwrap()).clone()
+    }
+
+    fn descriptor(&self) -> ::protobuf::reflect::EnumValueDescriptor {
+        let index = *self as usize;
+        Self::enum_descriptor().value_by_index(index)
+    }
+}
+
+impl ::std::default::Default for MoveAbility {
+    fn default() -> Self {
+        MoveAbility::COPY
+    }
+}
+
+impl MoveAbility {
+    fn generated_enum_descriptor_data() -> ::protobuf::reflect::GeneratedEnumDescriptorData {
+        ::protobuf::reflect::GeneratedEnumDescriptorData::new::<MoveAbility>("MoveAbility")
+    }
+}
+
 static file_descriptor_proto_data: &'static [u8] = b"\
     \n\x1asrc/protos/extractor.proto\x1a\x1fgoogle/protobuf/timestamp.proto\
     \"\xb9\x04\n\x0bTransaction\x128\n\ttimestamp\x18\x01\x20\x01(\x0b2\x1a.\
@@ -7616,175 +9609,215 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     ype_arguments\x18\x02\x20\x03(\tR\rtypeArguments\x12\x1c\n\targuments\
     \x18\x03\x20\x03(\tR\targuments\"h\n\rScriptPayload\x12\x12\n\x04code\
     \x18\x01\x20\x01(\tR\x04code\x12%\n\x0etype_arguments\x18\x02\x20\x03(\t\
-    R\rtypeArguments\x12\x1c\n\targuments\x18\x03\x20\x03(\tR\targuments\"/\
-    \n\x13ModuleBundlePayload\x12\x18\n\x07modules\x18\x01\x20\x03(\tR\x07mo\
-    dules\"9\n\x0fWriteSetPayload\x12&\n\twrite_set\x18\x01\x20\x01(\x0b2\t.\
-    WriteSetR\x08writeSet\"M\n\x10ScriptFunctionId\x12%\n\x06module\x18\x01\
-    \x20\x01(\x0b2\r.MoveModuleIdR\x06module\x12\x12\n\x04name\x18\x02\x20\
-    \x01(\tR\x04name\"F\n\x0cMoveResource\x12\"\n\x04type\x18\x01\x20\x01(\
-    \x0b2\x0e.MoveStructTagR\x04type\x12\x12\n\x04data\x18\x02\x20\x01(\tR\
-    \x04data\"<\n\x0cMoveModuleId\x12\x18\n\x07address\x18\x01\x20\x01(\tR\
-    \x07address\x12\x12\n\x04name\x18\x02\x20\x01(\tR\x04name\"\x85\x01\n\rM\
-    oveStructTag\x12\x18\n\x07address\x18\x01\x20\x01(\tR\x07address\x12\x16\
-    \n\x06module\x18\x02\x20\x01(\tR\x06module\x12\x12\n\x04name\x18\x03\x20\
-    \x01(\tR\x04name\x12.\n\x13generic_type_params\x18\x04\x20\x03(\tR\x11ge\
-    nericTypeParams\"\x91\x02\n\tSignature\x12,\n\x04type\x18\x01\x20\x01(\
-    \x0e2\x18.Signature.SignatureTypeR\x04type\x12#\n\x02ed\x18\x02\x20\x01(\
-    \x0b2\x11.Ed25519SignatureH\0R\x02ed\x123\n\x08multi_ed\x18\x03\x20\x01(\
-    \x0b2\x16.MultiEd25519SignatureH\0R\x07multiEd\x127\n\x0bmulti_agent\x18\
-    \x04\x20\x01(\x0b2\x14.MultiAgentSignatureH\0R\nmultiAgent\"6\n\rSignatu\
-    reType\x12\x06\n\x02ED\x10\0\x12\x0c\n\x08MULTI_ED\x10\x01\x12\x0f\n\x0b\
-    MULTI_AGENT\x10\x02B\x0b\n\tsignature\"O\n\x10Ed25519Signature\x12\x1d\n\
-    \npublic_key\x18\x01\x20\x01(\tR\tpublicKey\x12\x1c\n\tsignature\x18\x02\
-    \x20\x01(\tR\tsignature\"\x8e\x01\n\x15MultiEd25519Signature\x12\x1f\n\
-    \x0bpublic_keys\x18\x01\x20\x03(\tR\npublicKeys\x12\x1e\n\nsignatures\
-    \x18\x02\x20\x03(\tR\nsignatures\x12\x1c\n\tthreshold\x18\x03\x20\x01(\r\
-    R\tthreshold\x12\x16\n\x06bitmap\x18\x04\x20\x01(\tR\x06bitmap\"\xbe\x01\
-    \n\x13MultiAgentSignature\x12)\n\x06sender\x18\x01\x20\x01(\x0b2\x11.Acc\
-    ountSignatureR\x06sender\x12<\n\x1asecondary_signer_addresses\x18\x02\
-    \x20\x03(\tR\x18secondarySignerAddresses\x12>\n\x11secondary_signers\x18\
-    \x03\x20\x03(\x0b2\x11.AccountSignatureR\x10secondarySigners\"\xe3\x01\n\
-    \x10AccountSignature\x12:\n\x04type\x18\x01\x20\x01(\x0e2&.AccountSignat\
-    ure.AccountSignatureTypeR\x04type\x12#\n\x02ed\x18\x02\x20\x01(\x0b2\x11\
-    .Ed25519SignatureH\0R\x02ed\x123\n\x08multi_ed\x18\x03\x20\x01(\x0b2\x16\
-    .MultiEd25519SignatureH\0R\x07multiEd\",\n\x14AccountSignatureType\x12\
-    \x06\n\x02ED\x10\0\x12\x0c\n\x08MULTI_ED\x10\x01B\x0b\n\tsignatureJ\x98J\
-    \n\x07\x12\x05\x03\0\xa1\x02\x01\nD\n\x01\x0c\x12\x03\x03\0\x122:\x20Cop\
-    yright\x20(c)\x20Aptos\n\x20SPDX-License-Identifier:\x20Apache-2.0\n\n\t\
-    \n\x02\x03\0\x12\x03\x05\0)\n\n\n\x02\x04\0\x12\x04\x07\0\x1e\x01\n\n\n\
-    \x03\x04\0\x01\x12\x03\x07\x08\x13\n\x0b\n\x04\x04\0\x02\0\x12\x03\x08\
-    \x02*\n\x0c\n\x05\x04\0\x02\0\x06\x12\x03\x08\x02\x1b\n\x0c\n\x05\x04\0\
-    \x02\0\x01\x12\x03\x08\x1c%\n\x0c\n\x05\x04\0\x02\0\x03\x12\x03\x08()\n\
-    \x0b\n\x04\x04\0\x02\x01\x12\x03\t\x02\x15\n\x0c\n\x05\x04\0\x02\x01\x05\
-    \x12\x03\t\x02\x08\n\x0c\n\x05\x04\0\x02\x01\x01\x12\x03\t\t\x10\n\x0c\n\
-    \x05\x04\0\x02\x01\x03\x12\x03\t\x13\x14\n\x0b\n\x04\x04\0\x02\x02\x12\
-    \x03\n\x02\x1b\n\x0c\n\x05\x04\0\x02\x02\x06\x12\x03\n\x02\x11\n\x0c\n\
-    \x05\x04\0\x02\x02\x01\x12\x03\n\x12\x16\n\x0c\n\x05\x04\0\x02\x02\x03\
-    \x12\x03\n\x19\x1a\n\x0b\n\x04\x04\0\x02\x03\x12\x03\x0b\x02\x13\n\x0c\n\
-    \x05\x04\0\x02\x03\x05\x12\x03\x0b\x02\x08\n\x0c\n\x05\x04\0\x02\x03\x01\
-    \x12\x03\x0b\t\x0e\n\x0c\n\x05\x04\0\x02\x03\x03\x12\x03\x0b\x11\x12\n\
-    \x0b\n\x04\x04\0\x02\x04\x12\x03\x0c\x02\x1a\n\x0c\n\x05\x04\0\x02\x04\
-    \x05\x12\x03\x0c\x02\x08\n\x0c\n\x05\x04\0\x02\x04\x01\x12\x03\x0c\t\x15\
-    \n\x0c\n\x05\x04\0\x02\x04\x03\x12\x03\x0c\x18\x19\n\x0c\n\x04\x04\0\x04\
-    \0\x12\x04\x0e\x02\x13\x03\n\x0c\n\x05\x04\0\x04\0\x01\x12\x03\x0e\x07\
-    \x16\n\r\n\x06\x04\0\x04\0\x02\0\x12\x03\x0f\x04\x10\n\x0e\n\x07\x04\0\
-    \x04\0\x02\0\x01\x12\x03\x0f\x04\x0b\n\x0e\n\x07\x04\0\x04\0\x02\0\x02\
-    \x12\x03\x0f\x0e\x0f\n\r\n\x06\x04\0\x04\0\x02\x01\x12\x03\x10\x04\x17\n\
-    \x0e\n\x07\x04\0\x04\0\x02\x01\x01\x12\x03\x10\x04\x12\n\x0e\n\x07\x04\0\
-    \x04\0\x02\x01\x02\x12\x03\x10\x15\x16\n\r\n\x06\x04\0\x04\0\x02\x02\x12\
-    \x03\x11\x04\x19\n\x0e\n\x07\x04\0\x04\0\x02\x02\x01\x12\x03\x11\x04\x14\
-    \n\x0e\n\x07\x04\0\x04\0\x02\x02\x02\x12\x03\x11\x17\x18\n\r\n\x06\x04\0\
-    \x04\0\x02\x03\x12\x03\x12\x04\r\n\x0e\n\x07\x04\0\x04\0\x02\x03\x01\x12\
-    \x03\x12\x04\x08\n\x0e\n\x07\x04\0\x04\0\x02\x03\x02\x12\x03\x12\x0b\x0c\
-    \n\x0b\n\x04\x04\0\x02\x05\x12\x03\x15\x02\x1b\n\x0c\n\x05\x04\0\x02\x05\
-    \x06\x12\x03\x15\x02\x11\n\x0c\n\x05\x04\0\x02\x05\x01\x12\x03\x15\x12\
-    \x16\n\x0c\n\x05\x04\0\x02\x05\x03\x12\x03\x15\x19\x1a\n\x0c\n\x04\x04\0\
-    \x08\0\x12\x04\x17\x02\x1c\x03\n\x0c\n\x05\x04\0\x08\0\x01\x12\x03\x17\
-    \x08\x10\n\x0b\n\x04\x04\0\x02\x06\x12\x03\x18\x040\n\x0c\n\x05\x04\0\
-    \x02\x06\x06\x12\x03\x18\x04\x1c\n\x0c\n\x05\x04\0\x02\x06\x01\x12\x03\
-    \x18\x1d+\n\x0c\n\x05\x04\0\x02\x06\x03\x12\x03\x18./\n\x0b\n\x04\x04\0\
-    \x02\x07\x12\x03\x19\x04#\n\x0c\n\x05\x04\0\x02\x07\x06\x12\x03\x19\x04\
-    \x16\n\x0c\n\x05\x04\0\x02\x07\x01\x12\x03\x19\x17\x1e\n\x0c\n\x05\x04\0\
-    \x02\x07\x03\x12\x03\x19!\"\n\x0b\n\x04\x04\0\x02\x08\x12\x03\x1a\x044\n\
-    \x0c\n\x05\x04\0\x02\x08\x06\x12\x03\x1a\x04\x1e\n\x0c\n\x05\x04\0\x02\
-    \x08\x01\x12\x03\x1a\x1f/\n\x0c\n\x05\x04\0\x02\x08\x03\x12\x03\x1a23\n\
-    \x0b\n\x04\x04\0\x02\t\x12\x03\x1b\x04\x1e\n\x0c\n\x05\x04\0\x02\t\x06\
-    \x12\x03\x1b\x04\x13\n\x0c\n\x05\x04\0\x02\t\x01\x12\x03\x1b\x14\x18\n\
-    \x0c\n\x05\x04\0\x02\t\x03\x12\x03\x1b\x1b\x1d\n\n\n\x02\x04\x01\x12\x04\
-    \x20\0'\x01\n\n\n\x03\x04\x01\x01\x12\x03\x20\x08\x20\n\x0b\n\x04\x04\
-    \x01\x02\0\x12\x03!\x02\x10\n\x0c\n\x05\x04\x01\x02\0\x05\x12\x03!\x02\
-    \x08\n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03!\t\x0b\n\x0c\n\x05\x04\x01\
-    \x02\0\x03\x12\x03!\x0e\x0f\n\x0b\n\x04\x04\x01\x02\x01\x12\x03\"\x02\
-    \x13\n\x0c\n\x05\x04\x01\x02\x01\x05\x12\x03\"\x02\x08\n\x0c\n\x05\x04\
-    \x01\x02\x01\x01\x12\x03\"\t\x0e\n\x0c\n\x05\x04\x01\x02\x01\x03\x12\x03\
-    \"\x11\x12\n\x0b\n\x04\x04\x01\x02\x02\x12\x03#\x02\x1c\n\x0c\n\x05\x04\
-    \x01\x02\x02\x04\x12\x03#\x02\n\n\x0c\n\x05\x04\x01\x02\x02\x06\x12\x03#\
-    \x0b\x10\n\x0c\n\x05\x04\x01\x02\x02\x01\x12\x03#\x11\x17\n\x0c\n\x05\
-    \x04\x01\x02\x02\x03\x12\x03#\x1a\x1b\n\x0b\n\x04\x04\x01\x02\x03\x12\
-    \x03$\x02)\n\x0c\n\x05\x04\x01\x02\x03\x04\x12\x03$\x02\n\n\x0c\n\x05\
-    \x04\x01\x02\x03\x05\x12\x03$\x0b\x0f\n\x0c\n\x05\x04\x01\x02\x03\x01\
-    \x12\x03$\x10$\n\x0c\n\x05\x04\x01\x02\x03\x03\x12\x03$'(\n\x0b\n\x04\
-    \x04\x01\x02\x04\x12\x03%\x02\x16\n\x0c\n\x05\x04\x01\x02\x04\x05\x12\
-    \x03%\x02\x08\n\x0c\n\x05\x04\x01\x02\x04\x01\x12\x03%\t\x11\n\x0c\n\x05\
-    \x04\x01\x02\x04\x03\x12\x03%\x14\x15\n\x0b\n\x04\x04\x01\x02\x05\x12\
-    \x03&\x02.\n\x0c\n\x05\x04\x01\x02\x05\x04\x12\x03&\x02\n\n\x0c\n\x05\
-    \x04\x01\x02\x05\x05\x12\x03&\x0b\x11\n\x0c\n\x05\x04\x01\x02\x05\x01\
-    \x12\x03&\x12)\n\x0c\n\x05\x04\x01\x02\x05\x03\x12\x03&,-\n\n\n\x02\x04\
-    \x02\x12\x04)\0,\x01\n\n\n\x03\x04\x02\x01\x12\x03)\x08\x1a\n\x0b\n\x04\
-    \x04\x02\x02\0\x12\x03*\x02\x17\n\x0c\n\x05\x04\x02\x02\0\x06\x12\x03*\
-    \x02\n\n\x0c\n\x05\x04\x02\x02\0\x01\x12\x03*\x0b\x12\n\x0c\n\x05\x04\
-    \x02\x02\0\x03\x12\x03*\x15\x16\n\x0b\n\x04\x04\x02\x02\x01\x12\x03+\x02\
-    \x1c\n\x0c\n\x05\x04\x02\x02\x01\x04\x12\x03+\x02\n\n\x0c\n\x05\x04\x02\
-    \x02\x01\x06\x12\x03+\x0b\x10\n\x0c\n\x05\x04\x02\x02\x01\x01\x12\x03+\
-    \x11\x17\n\x0c\n\x05\x04\x02\x02\x01\x03\x12\x03+\x1a\x1b\n\n\n\x02\x04\
-    \x03\x12\x04.\0/\x01\n\n\n\x03\x04\x03\x01\x12\x03.\x08\"\n\n\n\x02\x04\
-    \x04\x12\x041\04\x01\n\n\n\x03\x04\x04\x01\x12\x031\x08\x17\n\x0b\n\x04\
-    \x04\x04\x02\0\x12\x032\x02%\n\x0c\n\x05\x04\x04\x02\0\x06\x12\x032\x02\
-    \x18\n\x0c\n\x05\x04\x04\x02\0\x01\x12\x032\x19\x20\n\x0c\n\x05\x04\x04\
-    \x02\0\x03\x12\x032#$\n\x0b\n\x04\x04\x04\x02\x01\x12\x033\x02\x1c\n\x0c\
-    \n\x05\x04\x04\x02\x01\x04\x12\x033\x02\n\n\x0c\n\x05\x04\x04\x02\x01\
-    \x06\x12\x033\x0b\x10\n\x0c\n\x05\x04\x04\x02\x01\x01\x12\x033\x11\x17\n\
-    \x0c\n\x05\x04\x04\x02\x01\x03\x12\x033\x1a\x1b\n\n\n\x02\x04\x05\x12\
-    \x046\0;\x01\n\n\n\x03\x04\x05\x01\x12\x036\x08\r\n\x0b\n\x04\x04\x05\
-    \x02\0\x12\x037\x02\x13\n\x0c\n\x05\x04\x05\x02\0\x06\x12\x037\x02\n\n\
-    \x0c\n\x05\x04\x05\x02\0\x01\x12\x037\x0b\x0e\n\x0c\n\x05\x04\x05\x02\0\
-    \x03\x12\x037\x11\x12\n\x0b\n\x04\x04\x05\x02\x01\x12\x038\x02\x1d\n\x0c\
-    \n\x05\x04\x05\x02\x01\x05\x12\x038\x02\x08\n\x0c\n\x05\x04\x05\x02\x01\
-    \x01\x12\x038\t\x18\n\x0c\n\x05\x04\x05\x02\x01\x03\x12\x038\x1b\x1c\n\
-    \x0b\n\x04\x04\x05\x02\x02\x12\x039\x02\x12\n\x0c\n\x05\x04\x05\x02\x02\
-    \x05\x12\x039\x02\x08\n\x0c\n\x05\x04\x05\x02\x02\x01\x12\x039\t\r\n\x0c\
-    \n\x05\x04\x05\x02\x02\x03\x12\x039\x10\x11\n\x0b\n\x04\x04\x05\x02\x03\
-    \x12\x03:\x02\x12\n\x0c\n\x05\x04\x05\x02\x03\x05\x12\x03:\x02\x08\n\x0c\
-    \n\x05\x04\x05\x02\x03\x01\x12\x03:\t\r\n\x0c\n\x05\x04\x05\x02\x03\x03\
-    \x12\x03:\x10\x11\n\n\n\x02\x04\x06\x12\x04=\0F\x01\n\n\n\x03\x04\x06\
-    \x01\x12\x03=\x08\x17\n\x0b\n\x04\x04\x06\x02\0\x12\x03>\x02\x11\n\x0c\n\
-    \x05\x04\x06\x02\0\x05\x12\x03>\x02\x07\n\x0c\n\x05\x04\x06\x02\0\x01\
-    \x12\x03>\x08\x0c\n\x0c\n\x05\x04\x06\x02\0\x03\x12\x03>\x0f\x10\n\x0b\n\
-    \x04\x04\x06\x02\x01\x12\x03?\x02\x1c\n\x0c\n\x05\x04\x06\x02\x01\x05\
-    \x12\x03?\x02\x07\n\x0c\n\x05\x04\x06\x02\x01\x01\x12\x03?\x08\x17\n\x0c\
-    \n\x05\x04\x06\x02\x01\x03\x12\x03?\x1a\x1b\n\x0b\n\x04\x04\x06\x02\x02\
-    \x12\x03@\x02\x1c\n\x0c\n\x05\x04\x06\x02\x02\x05\x12\x03@\x02\x07\n\x0c\
-    \n\x05\x04\x06\x02\x02\x01\x12\x03@\x08\x17\n\x0c\n\x05\x04\x06\x02\x02\
-    \x03\x12\x03@\x1a\x1b\n\x0b\n\x04\x04\x06\x02\x03\x12\x03A\x02\x16\n\x0c\
-    \n\x05\x04\x06\x02\x03\x05\x12\x03A\x02\x08\n\x0c\n\x05\x04\x06\x02\x03\
-    \x01\x12\x03A\t\x11\n\x0c\n\x05\x04\x06\x02\x03\x03\x12\x03A\x14\x15\n\
-    \x0b\n\x04\x04\x06\x02\x04\x12\x03B\x02\x13\n\x0c\n\x05\x04\x06\x02\x04\
-    \x05\x12\x03B\x02\x06\n\x0c\n\x05\x04\x06\x02\x04\x01\x12\x03B\x07\x0e\n\
-    \x0c\n\x05\x04\x06\x02\x04\x03\x12\x03B\x11\x12\n\x0b\n\x04\x04\x06\x02\
-    \x05\x12\x03C\x02\x17\n\x0c\n\x05\x04\x06\x02\x05\x05\x12\x03C\x02\x08\n\
-    \x0c\n\x05\x04\x06\x02\x05\x01\x12\x03C\t\x12\n\x0c\n\x05\x04\x06\x02\
-    \x05\x03\x12\x03C\x15\x16\n\x0b\n\x04\x04\x06\x02\x06\x12\x03D\x02\"\n\
-    \x0c\n\x05\x04\x06\x02\x06\x05\x12\x03D\x02\x07\n\x0c\n\x05\x04\x06\x02\
-    \x06\x01\x12\x03D\x08\x1d\n\x0c\n\x05\x04\x06\x02\x06\x03\x12\x03D\x20!\
-    \n\x0b\n\x04\x04\x06\x02\x07\x12\x03E\x02&\n\x0c\n\x05\x04\x06\x02\x07\
-    \x04\x12\x03E\x02\n\n\x0c\n\x05\x04\x06\x02\x07\x06\x12\x03E\x0b\x19\n\
-    \x0c\n\x05\x04\x06\x02\x07\x01\x12\x03E\x1a!\n\x0c\n\x05\x04\x06\x02\x07\
-    \x03\x12\x03E$%\n\n\n\x02\x04\x07\x12\x04H\0K\x01\n\n\n\x03\x04\x07\x01\
-    \x12\x03H\x08\x10\n\x0b\n\x04\x04\x07\x02\0\x12\x03I\x02\x1d\n\x0c\n\x05\
-    \x04\x07\x02\0\x05\x12\x03I\x02\x08\n\x0c\n\x05\x04\x07\x02\0\x01\x12\
-    \x03I\t\x18\n\x0c\n\x05\x04\x07\x02\0\x03\x12\x03I\x1b\x1c\n\x0b\n\x04\
-    \x04\x07\x02\x01\x12\x03J\x02\x1d\n\x0c\n\x05\x04\x07\x02\x01\x05\x12\
-    \x03J\x02\x08\n\x0c\n\x05\x04\x07\x02\x01\x01\x12\x03J\t\x18\n\x0c\n\x05\
-    \x04\x07\x02\x01\x03\x12\x03J\x1b\x1c\n\n\n\x02\x04\x08\x12\x04M\0U\x01\
-    \n\n\n\x03\x04\x08\x01\x12\x03M\x08\x1e\n\x0b\n\x04\x04\x08\x02\0\x12\
-    \x03N\x02\x14\n\x0c\n\x05\x04\x08\x02\0\x05\x12\x03N\x02\x08\n\x0c\n\x05\
-    \x04\x08\x02\0\x01\x12\x03N\t\x0f\n\x0c\n\x05\x04\x08\x02\0\x03\x12\x03N\
-    \x12\x13\n\x0b\n\x04\x04\x08\x02\x01\x12\x03O\x02\x1d\n\x0c\n\x05\x04\
-    \x08\x02\x01\x05\x12\x03O\x02\x08\n\x0c\n\x05\x04\x08\x02\x01\x01\x12\
-    \x03O\t\x18\n\x0c\n\x05\x04\x08\x02\x01\x03\x12\x03O\x1b\x1c\n\x0b\n\x04\
-    \x04\x08\x02\x02\x12\x03P\x02\x1c\n\x0c\n\x05\x04\x08\x02\x02\x05\x12\
-    \x03P\x02\x08\n\x0c\n\x05\x04\x08\x02\x02\x01\x12\x03P\t\x17\n\x0c\n\x05\
-    \x04\x08\x02\x02\x03\x12\x03P\x1a\x1b\n\x0b\n\x04\x04\x08\x02\x03\x12\
-    \x03Q\x02\x1c\n\x0c\n\x05\x04\x08\x02\x03\x05\x12\x03Q\x02\x08\n\x0c\n\
-    \x05\x04\x08\x02\x03\x01\x12\x03Q\t\x17\n\x0c\n\x05\x04\x08\x02\x03\x03\
-    \x12\x03Q\x1a\x1b\n\x0b\n\x04\x04\x08\x02\x04\x12\x03R\x02:\n\x0c\n\x05\
-    \x04\x08\x02\x04\x06\x12\x03R\x02\x1b\n\x0c\n\x05\x04\x08\x02\x04\x01\
-    \x12\x03R\x1c5\n\x0c\n\x05\x04\x08\x02\x04\x03\x12\x03R89\n\x0b\n\x04\
-    \x04\x08\x02\x05\x12\x03S\x02!\n\x0c\n\x05\x04\x08\x02\x05\x06\x12\x03S\
-    \x02\x14\n\x0c\n\x05\x04\x08\x02\x05\x01\x12\x03S\x15\x1c\n\x0c\n\x05\
-    \x04\x08\x02\x05\x03\x12\x03S\x1f\x20\n\x0b\n\x04\x04\x08\x02\x06\x12\
-    \x03T\x02\x1a\n\x0c\n\x05\x04\x08\x02\x06\x06\x12\x03T\x02\x0b\n\x0c\n\
-    \x05\x04\x08\x02\x06\x01\x12\x03T\x0c\x15\n\x0c\n\x05\x04\x08\x02\x06\
+    R\rtypeArguments\x12\x1c\n\targuments\x18\x03\x20\x03(\tR\targuments\"D\
+    \n\x13ModuleBundlePayload\x12-\n\x07modules\x18\x01\x20\x03(\x0b2\x13.Mo\
+    veModuleBytecodeR\x07modules\"O\n\x12MoveModuleBytecode\x12\x1a\n\x08byt\
+    ecode\x18\x01\x20\x01(\x0cR\x08bytecode\x12\x1d\n\x03abi\x18\x02\x20\x01\
+    (\x0b2\x0b.MoveModuleR\x03abi\"\xc6\x01\n\nMoveModule\x12\x18\n\x07addre\
+    ss\x18\x01\x20\x01(\tR\x07address\x12\x12\n\x04name\x18\x02\x20\x01(\tR\
+    \x04name\x12'\n\x07friends\x18\x03\x20\x03(\x0b2\r.MoveModuleIdR\x07frie\
+    nds\x12:\n\x11exposed_functions\x18\x04\x20\x03(\x0b2\r.MoveFunctionR\
+    \x10exposedFunctions\x12%\n\x07structs\x18\x05\x20\x03(\x0b2\x0b.MoveStr\
+    uctR\x07structs\"\xbf\x02\n\x0cMoveFunction\x12\x12\n\x04name\x18\x01\
+    \x20\x01(\tR\x04name\x128\n\nvisibility\x18\x02\x20\x01(\x0e2\x18.MoveFu\
+    nction.VisibilityR\nvisibility\x12\x19\n\x08is_entry\x18\x03\x20\x01(\
+    \x08R\x07isEntry\x12M\n\x13generic_type_params\x18\x04\x20\x03(\x0b2\x1d\
+    .MoveFunctionGenericTypeParamR\x11genericTypeParams\x12!\n\x06params\x18\
+    \x05\x20\x03(\x0b2\t.MoveTypeR\x06params\x12!\n\x06return\x18\x06\x20\
+    \x03(\x0b2\t.MoveTypeR\x06return\"1\n\nVisibility\x12\x0b\n\x07PRIVATE\
+    \x10\0\x12\n\n\x06PUBLIC\x10\x01\x12\n\n\x06FRIEND\x10\x02\"\xe0\x01\n\n\
+    MoveStruct\x12\x12\n\x04name\x18\x01\x20\x01(\tR\x04name\x12\x1b\n\tis_n\
+    ative\x18\x02\x20\x01(\x08R\x08isNative\x12*\n\tabilities\x18\x03\x20\
+    \x03(\x0e2\x0c.MoveAbilityR\tabilities\x12K\n\x13generic_type_params\x18\
+    \x04\x20\x03(\x0b2\x1b.MoveStructGenericTypeParamR\x11genericTypeParams\
+    \x12(\n\x06fields\x18\x05\x20\x03(\x0b2\x10.MoveStructFieldR\x06fields\"\
+    k\n\x1aMoveStructGenericTypeParam\x12.\n\x0bconstraints\x18\x01\x20\x03(\
+    \x0e2\x0c.MoveAbilityR\x0bconstraints\x12\x1d\n\nis_phantom\x18\x02\x20\
+    \x01(\x08R\tisPhantom\"D\n\x0fMoveStructField\x12\x12\n\x04name\x18\x01\
+    \x20\x01(\tR\x04name\x12\x1d\n\x04type\x18\x02\x20\x01(\x0b2\t.MoveTypeR\
+    \x04type\"N\n\x1cMoveFunctionGenericTypeParam\x12.\n\x0bconstraints\x18\
+    \x01\x20\x03(\x0e2\x0c.MoveAbilityR\x0bconstraints\"\xf8\x03\n\x08MoveTy\
+    pe\x12\"\n\x04type\x18\x01\x20\x01(\x0e2\x0e.MoveType.TypeR\x04type\x12#\
+    \n\x06vector\x18\x03\x20\x01(\x0b2\t.MoveTypeH\0R\x06vector\x12(\n\x06st\
+    ruct\x18\x04\x20\x01(\x0b2\x0e.MoveStructTagH\0R\x06struct\x129\n\x18gen\
+    eric_type_param_index\x18\x05\x20\x01(\rH\0R\x15genericTypeParamIndex\
+    \x127\n\treference\x18\x06\x20\x01(\x0b2\x17.MoveType.ReferenceTypeH\0R\
+    \treference\x12\x20\n\nunparsable\x18\x07\x20\x01(\tH\0R\nunparsable\x1a\
+    D\n\rReferenceType\x12\x18\n\x07mutable\x18\x01\x20\x01(\x08R\x07mutable\
+    \x12\x19\n\x02to\x18\x02\x20\x01(\x0b2\t.MoveTypeR\x02to\"\x91\x01\n\x04\
+    Type\x12\x08\n\x04Bool\x10\0\x12\x06\n\x02U8\x10\x01\x12\x07\n\x03U64\
+    \x10\x02\x12\x08\n\x04U128\x10\x03\x12\x0b\n\x07Address\x10\x04\x12\n\n\
+    \x06Signer\x10\x05\x12\n\n\x06Vector\x10\x06\x12\n\n\x06Struct\x10\x07\
+    \x12\x14\n\x10GenericTypeParam\x10\x08\x12\r\n\tReference\x10\t\x12\x0e\
+    \n\nUnparsable\x10\nB\t\n\x07content\"9\n\x0fWriteSetPayload\x12&\n\twri\
+    te_set\x18\x01\x20\x01(\x0b2\t.WriteSetR\x08writeSet\"M\n\x10ScriptFunct\
+    ionId\x12%\n\x06module\x18\x01\x20\x01(\x0b2\r.MoveModuleIdR\x06module\
+    \x12\x12\n\x04name\x18\x02\x20\x01(\tR\x04name\"F\n\x0cMoveResource\x12\
+    \"\n\x04type\x18\x01\x20\x01(\x0b2\x0e.MoveStructTagR\x04type\x12\x12\n\
+    \x04data\x18\x02\x20\x01(\tR\x04data\"<\n\x0cMoveModuleId\x12\x18\n\x07a\
+    ddress\x18\x01\x20\x01(\tR\x07address\x12\x12\n\x04name\x18\x02\x20\x01(\
+    \tR\x04name\"\x90\x01\n\rMoveStructTag\x12\x18\n\x07address\x18\x01\x20\
+    \x01(\tR\x07address\x12\x16\n\x06module\x18\x02\x20\x01(\tR\x06module\
+    \x12\x12\n\x04name\x18\x03\x20\x01(\tR\x04name\x129\n\x13generic_type_pa\
+    rams\x18\x04\x20\x03(\x0b2\t.MoveTypeR\x11genericTypeParams\"\x91\x02\n\
+    \tSignature\x12,\n\x04type\x18\x01\x20\x01(\x0e2\x18.Signature.Signature\
+    TypeR\x04type\x12#\n\x02ed\x18\x02\x20\x01(\x0b2\x11.Ed25519SignatureH\0\
+    R\x02ed\x123\n\x08multi_ed\x18\x03\x20\x01(\x0b2\x16.MultiEd25519Signatu\
+    reH\0R\x07multiEd\x127\n\x0bmulti_agent\x18\x04\x20\x01(\x0b2\x14.MultiA\
+    gentSignatureH\0R\nmultiAgent\"6\n\rSignatureType\x12\x06\n\x02ED\x10\0\
+    \x12\x0c\n\x08MULTI_ED\x10\x01\x12\x0f\n\x0bMULTI_AGENT\x10\x02B\x0b\n\t\
+    signature\"O\n\x10Ed25519Signature\x12\x1d\n\npublic_key\x18\x01\x20\x01\
+    (\tR\tpublicKey\x12\x1c\n\tsignature\x18\x02\x20\x01(\tR\tsignature\"\
+    \x8e\x01\n\x15MultiEd25519Signature\x12\x1f\n\x0bpublic_keys\x18\x01\x20\
+    \x03(\tR\npublicKeys\x12\x1e\n\nsignatures\x18\x02\x20\x03(\tR\nsignatur\
+    es\x12\x1c\n\tthreshold\x18\x03\x20\x01(\rR\tthreshold\x12\x16\n\x06bitm\
+    ap\x18\x04\x20\x01(\tR\x06bitmap\"\xbe\x01\n\x13MultiAgentSignature\x12)\
+    \n\x06sender\x18\x01\x20\x01(\x0b2\x11.AccountSignatureR\x06sender\x12<\
+    \n\x1asecondary_signer_addresses\x18\x02\x20\x03(\tR\x18secondarySignerA\
+    ddresses\x12>\n\x11secondary_signers\x18\x03\x20\x03(\x0b2\x11.AccountSi\
+    gnatureR\x10secondarySigners\"\xe3\x01\n\x10AccountSignature\x12:\n\x04t\
+    ype\x18\x01\x20\x01(\x0e2&.AccountSignature.AccountSignatureTypeR\x04typ\
+    e\x12#\n\x02ed\x18\x02\x20\x01(\x0b2\x11.Ed25519SignatureH\0R\x02ed\x123\
+    \n\x08multi_ed\x18\x03\x20\x01(\x0b2\x16.MultiEd25519SignatureH\0R\x07mu\
+    ltiEd\",\n\x14AccountSignatureType\x12\x06\n\x02ED\x10\0\x12\x0c\n\x08MU\
+    LTI_ED\x10\x01B\x0b\n\tsignature*5\n\x0bMoveAbility\x12\x08\n\x04COPY\
+    \x10\0\x12\x08\n\x04DROP\x10\x01\x12\t\n\x05STORE\x10\x02\x12\x07\n\x03K\
+    EY\x10\x03J\xc5d\n\x07\x12\x05\x03\0\xf5\x02\x01\nD\n\x01\x0c\x12\x03\
+    \x03\0\x122:\x20Copyright\x20(c)\x20Aptos\n\x20SPDX-License-Identifier:\
+    \x20Apache-2.0\n\n\t\n\x02\x03\0\x12\x03\x05\0)\n\n\n\x02\x04\0\x12\x04\
+    \x07\0\x1e\x01\n\n\n\x03\x04\0\x01\x12\x03\x07\x08\x13\n\x0b\n\x04\x04\0\
+    \x02\0\x12\x03\x08\x02*\n\x0c\n\x05\x04\0\x02\0\x06\x12\x03\x08\x02\x1b\
+    \n\x0c\n\x05\x04\0\x02\0\x01\x12\x03\x08\x1c%\n\x0c\n\x05\x04\0\x02\0\
+    \x03\x12\x03\x08()\n\x0b\n\x04\x04\0\x02\x01\x12\x03\t\x02\x15\n\x0c\n\
+    \x05\x04\0\x02\x01\x05\x12\x03\t\x02\x08\n\x0c\n\x05\x04\0\x02\x01\x01\
+    \x12\x03\t\t\x10\n\x0c\n\x05\x04\0\x02\x01\x03\x12\x03\t\x13\x14\n\x0b\n\
+    \x04\x04\0\x02\x02\x12\x03\n\x02\x1b\n\x0c\n\x05\x04\0\x02\x02\x06\x12\
+    \x03\n\x02\x11\n\x0c\n\x05\x04\0\x02\x02\x01\x12\x03\n\x12\x16\n\x0c\n\
+    \x05\x04\0\x02\x02\x03\x12\x03\n\x19\x1a\n\x0b\n\x04\x04\0\x02\x03\x12\
+    \x03\x0b\x02\x13\n\x0c\n\x05\x04\0\x02\x03\x05\x12\x03\x0b\x02\x08\n\x0c\
+    \n\x05\x04\0\x02\x03\x01\x12\x03\x0b\t\x0e\n\x0c\n\x05\x04\0\x02\x03\x03\
+    \x12\x03\x0b\x11\x12\n\x0b\n\x04\x04\0\x02\x04\x12\x03\x0c\x02\x1a\n\x0c\
+    \n\x05\x04\0\x02\x04\x05\x12\x03\x0c\x02\x08\n\x0c\n\x05\x04\0\x02\x04\
+    \x01\x12\x03\x0c\t\x15\n\x0c\n\x05\x04\0\x02\x04\x03\x12\x03\x0c\x18\x19\
+    \n\x0c\n\x04\x04\0\x04\0\x12\x04\x0e\x02\x13\x03\n\x0c\n\x05\x04\0\x04\0\
+    \x01\x12\x03\x0e\x07\x16\n\r\n\x06\x04\0\x04\0\x02\0\x12\x03\x0f\x04\x10\
+    \n\x0e\n\x07\x04\0\x04\0\x02\0\x01\x12\x03\x0f\x04\x0b\n\x0e\n\x07\x04\0\
+    \x04\0\x02\0\x02\x12\x03\x0f\x0e\x0f\n\r\n\x06\x04\0\x04\0\x02\x01\x12\
+    \x03\x10\x04\x17\n\x0e\n\x07\x04\0\x04\0\x02\x01\x01\x12\x03\x10\x04\x12\
+    \n\x0e\n\x07\x04\0\x04\0\x02\x01\x02\x12\x03\x10\x15\x16\n\r\n\x06\x04\0\
+    \x04\0\x02\x02\x12\x03\x11\x04\x19\n\x0e\n\x07\x04\0\x04\0\x02\x02\x01\
+    \x12\x03\x11\x04\x14\n\x0e\n\x07\x04\0\x04\0\x02\x02\x02\x12\x03\x11\x17\
+    \x18\n\r\n\x06\x04\0\x04\0\x02\x03\x12\x03\x12\x04\r\n\x0e\n\x07\x04\0\
+    \x04\0\x02\x03\x01\x12\x03\x12\x04\x08\n\x0e\n\x07\x04\0\x04\0\x02\x03\
+    \x02\x12\x03\x12\x0b\x0c\n\x0b\n\x04\x04\0\x02\x05\x12\x03\x15\x02\x1b\n\
+    \x0c\n\x05\x04\0\x02\x05\x06\x12\x03\x15\x02\x11\n\x0c\n\x05\x04\0\x02\
+    \x05\x01\x12\x03\x15\x12\x16\n\x0c\n\x05\x04\0\x02\x05\x03\x12\x03\x15\
+    \x19\x1a\n\x0c\n\x04\x04\0\x08\0\x12\x04\x17\x02\x1c\x03\n\x0c\n\x05\x04\
+    \0\x08\0\x01\x12\x03\x17\x08\x10\n\x0b\n\x04\x04\0\x02\x06\x12\x03\x18\
+    \x040\n\x0c\n\x05\x04\0\x02\x06\x06\x12\x03\x18\x04\x1c\n\x0c\n\x05\x04\
+    \0\x02\x06\x01\x12\x03\x18\x1d+\n\x0c\n\x05\x04\0\x02\x06\x03\x12\x03\
+    \x18./\n\x0b\n\x04\x04\0\x02\x07\x12\x03\x19\x04#\n\x0c\n\x05\x04\0\x02\
+    \x07\x06\x12\x03\x19\x04\x16\n\x0c\n\x05\x04\0\x02\x07\x01\x12\x03\x19\
+    \x17\x1e\n\x0c\n\x05\x04\0\x02\x07\x03\x12\x03\x19!\"\n\x0b\n\x04\x04\0\
+    \x02\x08\x12\x03\x1a\x044\n\x0c\n\x05\x04\0\x02\x08\x06\x12\x03\x1a\x04\
+    \x1e\n\x0c\n\x05\x04\0\x02\x08\x01\x12\x03\x1a\x1f/\n\x0c\n\x05\x04\0\
+    \x02\x08\x03\x12\x03\x1a23\n\x0b\n\x04\x04\0\x02\t\x12\x03\x1b\x04\x1e\n\
+    \x0c\n\x05\x04\0\x02\t\x06\x12\x03\x1b\x04\x13\n\x0c\n\x05\x04\0\x02\t\
+    \x01\x12\x03\x1b\x14\x18\n\x0c\n\x05\x04\0\x02\t\x03\x12\x03\x1b\x1b\x1d\
+    \n\n\n\x02\x04\x01\x12\x04\x20\0'\x01\n\n\n\x03\x04\x01\x01\x12\x03\x20\
+    \x08\x20\n\x0b\n\x04\x04\x01\x02\0\x12\x03!\x02\x10\n\x0c\n\x05\x04\x01\
+    \x02\0\x05\x12\x03!\x02\x08\n\x0c\n\x05\x04\x01\x02\0\x01\x12\x03!\t\x0b\
+    \n\x0c\n\x05\x04\x01\x02\0\x03\x12\x03!\x0e\x0f\n\x0b\n\x04\x04\x01\x02\
+    \x01\x12\x03\"\x02\x13\n\x0c\n\x05\x04\x01\x02\x01\x05\x12\x03\"\x02\x08\
+    \n\x0c\n\x05\x04\x01\x02\x01\x01\x12\x03\"\t\x0e\n\x0c\n\x05\x04\x01\x02\
+    \x01\x03\x12\x03\"\x11\x12\n\x0b\n\x04\x04\x01\x02\x02\x12\x03#\x02\x1c\
+    \n\x0c\n\x05\x04\x01\x02\x02\x04\x12\x03#\x02\n\n\x0c\n\x05\x04\x01\x02\
+    \x02\x06\x12\x03#\x0b\x10\n\x0c\n\x05\x04\x01\x02\x02\x01\x12\x03#\x11\
+    \x17\n\x0c\n\x05\x04\x01\x02\x02\x03\x12\x03#\x1a\x1b\n\x0b\n\x04\x04\
+    \x01\x02\x03\x12\x03$\x02)\n\x0c\n\x05\x04\x01\x02\x03\x04\x12\x03$\x02\
+    \n\n\x0c\n\x05\x04\x01\x02\x03\x05\x12\x03$\x0b\x0f\n\x0c\n\x05\x04\x01\
+    \x02\x03\x01\x12\x03$\x10$\n\x0c\n\x05\x04\x01\x02\x03\x03\x12\x03$'(\n\
+    \x0b\n\x04\x04\x01\x02\x04\x12\x03%\x02\x16\n\x0c\n\x05\x04\x01\x02\x04\
+    \x05\x12\x03%\x02\x08\n\x0c\n\x05\x04\x01\x02\x04\x01\x12\x03%\t\x11\n\
+    \x0c\n\x05\x04\x01\x02\x04\x03\x12\x03%\x14\x15\n\x0b\n\x04\x04\x01\x02\
+    \x05\x12\x03&\x02.\n\x0c\n\x05\x04\x01\x02\x05\x04\x12\x03&\x02\n\n\x0c\
+    \n\x05\x04\x01\x02\x05\x05\x12\x03&\x0b\x11\n\x0c\n\x05\x04\x01\x02\x05\
+    \x01\x12\x03&\x12)\n\x0c\n\x05\x04\x01\x02\x05\x03\x12\x03&,-\n\n\n\x02\
+    \x04\x02\x12\x04)\0,\x01\n\n\n\x03\x04\x02\x01\x12\x03)\x08\x1a\n\x0b\n\
+    \x04\x04\x02\x02\0\x12\x03*\x02\x17\n\x0c\n\x05\x04\x02\x02\0\x06\x12\
+    \x03*\x02\n\n\x0c\n\x05\x04\x02\x02\0\x01\x12\x03*\x0b\x12\n\x0c\n\x05\
+    \x04\x02\x02\0\x03\x12\x03*\x15\x16\n\x0b\n\x04\x04\x02\x02\x01\x12\x03+\
+    \x02\x1c\n\x0c\n\x05\x04\x02\x02\x01\x04\x12\x03+\x02\n\n\x0c\n\x05\x04\
+    \x02\x02\x01\x06\x12\x03+\x0b\x10\n\x0c\n\x05\x04\x02\x02\x01\x01\x12\
+    \x03+\x11\x17\n\x0c\n\x05\x04\x02\x02\x01\x03\x12\x03+\x1a\x1b\n\n\n\x02\
+    \x04\x03\x12\x04.\0/\x01\n\n\n\x03\x04\x03\x01\x12\x03.\x08\"\n\n\n\x02\
+    \x04\x04\x12\x041\04\x01\n\n\n\x03\x04\x04\x01\x12\x031\x08\x17\n\x0b\n\
+    \x04\x04\x04\x02\0\x12\x032\x02%\n\x0c\n\x05\x04\x04\x02\0\x06\x12\x032\
+    \x02\x18\n\x0c\n\x05\x04\x04\x02\0\x01\x12\x032\x19\x20\n\x0c\n\x05\x04\
+    \x04\x02\0\x03\x12\x032#$\n\x0b\n\x04\x04\x04\x02\x01\x12\x033\x02\x1c\n\
+    \x0c\n\x05\x04\x04\x02\x01\x04\x12\x033\x02\n\n\x0c\n\x05\x04\x04\x02\
+    \x01\x06\x12\x033\x0b\x10\n\x0c\n\x05\x04\x04\x02\x01\x01\x12\x033\x11\
+    \x17\n\x0c\n\x05\x04\x04\x02\x01\x03\x12\x033\x1a\x1b\n\n\n\x02\x04\x05\
+    \x12\x046\0;\x01\n\n\n\x03\x04\x05\x01\x12\x036\x08\r\n\x0b\n\x04\x04\
+    \x05\x02\0\x12\x037\x02\x13\n\x0c\n\x05\x04\x05\x02\0\x06\x12\x037\x02\n\
+    \n\x0c\n\x05\x04\x05\x02\0\x01\x12\x037\x0b\x0e\n\x0c\n\x05\x04\x05\x02\
+    \0\x03\x12\x037\x11\x12\n\x0b\n\x04\x04\x05\x02\x01\x12\x038\x02\x1d\n\
+    \x0c\n\x05\x04\x05\x02\x01\x05\x12\x038\x02\x08\n\x0c\n\x05\x04\x05\x02\
+    \x01\x01\x12\x038\t\x18\n\x0c\n\x05\x04\x05\x02\x01\x03\x12\x038\x1b\x1c\
+    \n\x0b\n\x04\x04\x05\x02\x02\x12\x039\x02\x12\n\x0c\n\x05\x04\x05\x02\
+    \x02\x05\x12\x039\x02\x08\n\x0c\n\x05\x04\x05\x02\x02\x01\x12\x039\t\r\n\
+    \x0c\n\x05\x04\x05\x02\x02\x03\x12\x039\x10\x11\n\x0b\n\x04\x04\x05\x02\
+    \x03\x12\x03:\x02\x12\n\x0c\n\x05\x04\x05\x02\x03\x05\x12\x03:\x02\x08\n\
+    \x0c\n\x05\x04\x05\x02\x03\x01\x12\x03:\t\r\n\x0c\n\x05\x04\x05\x02\x03\
+    \x03\x12\x03:\x10\x11\n\n\n\x02\x04\x06\x12\x04=\0F\x01\n\n\n\x03\x04\
+    \x06\x01\x12\x03=\x08\x17\n\x0b\n\x04\x04\x06\x02\0\x12\x03>\x02\x11\n\
+    \x0c\n\x05\x04\x06\x02\0\x05\x12\x03>\x02\x07\n\x0c\n\x05\x04\x06\x02\0\
+    \x01\x12\x03>\x08\x0c\n\x0c\n\x05\x04\x06\x02\0\x03\x12\x03>\x0f\x10\n\
+    \x0b\n\x04\x04\x06\x02\x01\x12\x03?\x02\x1c\n\x0c\n\x05\x04\x06\x02\x01\
+    \x05\x12\x03?\x02\x07\n\x0c\n\x05\x04\x06\x02\x01\x01\x12\x03?\x08\x17\n\
+    \x0c\n\x05\x04\x06\x02\x01\x03\x12\x03?\x1a\x1b\n\x0b\n\x04\x04\x06\x02\
+    \x02\x12\x03@\x02\x1c\n\x0c\n\x05\x04\x06\x02\x02\x05\x12\x03@\x02\x07\n\
+    \x0c\n\x05\x04\x06\x02\x02\x01\x12\x03@\x08\x17\n\x0c\n\x05\x04\x06\x02\
+    \x02\x03\x12\x03@\x1a\x1b\n\x0b\n\x04\x04\x06\x02\x03\x12\x03A\x02\x16\n\
+    \x0c\n\x05\x04\x06\x02\x03\x05\x12\x03A\x02\x08\n\x0c\n\x05\x04\x06\x02\
+    \x03\x01\x12\x03A\t\x11\n\x0c\n\x05\x04\x06\x02\x03\x03\x12\x03A\x14\x15\
+    \n\x0b\n\x04\x04\x06\x02\x04\x12\x03B\x02\x13\n\x0c\n\x05\x04\x06\x02\
+    \x04\x05\x12\x03B\x02\x06\n\x0c\n\x05\x04\x06\x02\x04\x01\x12\x03B\x07\
+    \x0e\n\x0c\n\x05\x04\x06\x02\x04\x03\x12\x03B\x11\x12\n\x0b\n\x04\x04\
+    \x06\x02\x05\x12\x03C\x02\x17\n\x0c\n\x05\x04\x06\x02\x05\x05\x12\x03C\
+    \x02\x08\n\x0c\n\x05\x04\x06\x02\x05\x01\x12\x03C\t\x12\n\x0c\n\x05\x04\
+    \x06\x02\x05\x03\x12\x03C\x15\x16\n\x0b\n\x04\x04\x06\x02\x06\x12\x03D\
+    \x02\"\n\x0c\n\x05\x04\x06\x02\x06\x05\x12\x03D\x02\x07\n\x0c\n\x05\x04\
+    \x06\x02\x06\x01\x12\x03D\x08\x1d\n\x0c\n\x05\x04\x06\x02\x06\x03\x12\
+    \x03D\x20!\n\x0b\n\x04\x04\x06\x02\x07\x12\x03E\x02&\n\x0c\n\x05\x04\x06\
+    \x02\x07\x04\x12\x03E\x02\n\n\x0c\n\x05\x04\x06\x02\x07\x06\x12\x03E\x0b\
+    \x19\n\x0c\n\x05\x04\x06\x02\x07\x01\x12\x03E\x1a!\n\x0c\n\x05\x04\x06\
+    \x02\x07\x03\x12\x03E$%\n\n\n\x02\x04\x07\x12\x04H\0K\x01\n\n\n\x03\x04\
+    \x07\x01\x12\x03H\x08\x10\n\x0b\n\x04\x04\x07\x02\0\x12\x03I\x02\x1d\n\
+    \x0c\n\x05\x04\x07\x02\0\x05\x12\x03I\x02\x08\n\x0c\n\x05\x04\x07\x02\0\
+    \x01\x12\x03I\t\x18\n\x0c\n\x05\x04\x07\x02\0\x03\x12\x03I\x1b\x1c\n\x0b\
+    \n\x04\x04\x07\x02\x01\x12\x03J\x02\x1d\n\x0c\n\x05\x04\x07\x02\x01\x05\
+    \x12\x03J\x02\x08\n\x0c\n\x05\x04\x07\x02\x01\x01\x12\x03J\t\x18\n\x0c\n\
+    \x05\x04\x07\x02\x01\x03\x12\x03J\x1b\x1c\n\n\n\x02\x04\x08\x12\x04M\0U\
+    \x01\n\n\n\x03\x04\x08\x01\x12\x03M\x08\x1e\n\x0b\n\x04\x04\x08\x02\0\
+    \x12\x03N\x02\x14\n\x0c\n\x05\x04\x08\x02\0\x05\x12\x03N\x02\x08\n\x0c\n\
+    \x05\x04\x08\x02\0\x01\x12\x03N\t\x0f\n\x0c\n\x05\x04\x08\x02\0\x03\x12\
+    \x03N\x12\x13\n\x0b\n\x04\x04\x08\x02\x01\x12\x03O\x02\x1d\n\x0c\n\x05\
+    \x04\x08\x02\x01\x05\x12\x03O\x02\x08\n\x0c\n\x05\x04\x08\x02\x01\x01\
+    \x12\x03O\t\x18\n\x0c\n\x05\x04\x08\x02\x01\x03\x12\x03O\x1b\x1c\n\x0b\n\
+    \x04\x04\x08\x02\x02\x12\x03P\x02\x1c\n\x0c\n\x05\x04\x08\x02\x02\x05\
+    \x12\x03P\x02\x08\n\x0c\n\x05\x04\x08\x02\x02\x01\x12\x03P\t\x17\n\x0c\n\
+    \x05\x04\x08\x02\x02\x03\x12\x03P\x1a\x1b\n\x0b\n\x04\x04\x08\x02\x03\
+    \x12\x03Q\x02\x1c\n\x0c\n\x05\x04\x08\x02\x03\x05\x12\x03Q\x02\x08\n\x0c\
+    \n\x05\x04\x08\x02\x03\x01\x12\x03Q\t\x17\n\x0c\n\x05\x04\x08\x02\x03\
+    \x03\x12\x03Q\x1a\x1b\n\x0b\n\x04\x04\x08\x02\x04\x12\x03R\x02:\n\x0c\n\
+    \x05\x04\x08\x02\x04\x06\x12\x03R\x02\x1b\n\x0c\n\x05\x04\x08\x02\x04\
+    \x01\x12\x03R\x1c5\n\x0c\n\x05\x04\x08\x02\x04\x03\x12\x03R89\n\x0b\n\
+    \x04\x04\x08\x02\x05\x12\x03S\x02!\n\x0c\n\x05\x04\x08\x02\x05\x06\x12\
+    \x03S\x02\x14\n\x0c\n\x05\x04\x08\x02\x05\x01\x12\x03S\x15\x1c\n\x0c\n\
+    \x05\x04\x08\x02\x05\x03\x12\x03S\x1f\x20\n\x0b\n\x04\x04\x08\x02\x06\
+    \x12\x03T\x02\x1a\n\x0c\n\x05\x04\x08\x02\x06\x06\x12\x03T\x02\x0b\n\x0c\
+    \n\x05\x04\x08\x02\x06\x01\x12\x03T\x0c\x15\n\x0c\n\x05\x04\x08\x02\x06\
     \x03\x12\x03T\x18\x19\n\n\n\x02\x04\t\x12\x04W\0c\x01\n\n\n\x03\x04\t\
     \x01\x12\x03W\x08\x10\n\x0c\n\x04\x04\t\x04\0\x12\x04Y\x02\\\x03\n\x0c\n\
     \x05\x04\t\x04\0\x01\x12\x03Y\x07\x13\n\r\n\x06\x04\t\x04\0\x02\0\x12\
@@ -7991,124 +10024,282 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \xd2\x01\x0b\x11\n\r\n\x05\x04\x17\x02\x02\x01\x12\x04\xd2\x01\x12\x1b\n\
     \r\n\x05\x04\x17\x02\x02\x03\x12\x04\xd2\x01\x1e\x1f\n\x0c\n\x02\x04\x18\
     \x12\x06\xd5\x01\0\xd7\x01\x01\n\x0b\n\x03\x04\x18\x01\x12\x04\xd5\x01\
-    \x08\x1b\n\x0c\n\x04\x04\x18\x02\0\x12\x04\xd6\x01\x02\x1e\n\r\n\x05\x04\
-    \x18\x02\0\x04\x12\x04\xd6\x01\x02\n\n\r\n\x05\x04\x18\x02\0\x05\x12\x04\
-    \xd6\x01\x0b\x11\n\r\n\x05\x04\x18\x02\0\x01\x12\x04\xd6\x01\x12\x19\n\r\
-    \n\x05\x04\x18\x02\0\x03\x12\x04\xd6\x01\x1c\x1d\n\x0c\n\x02\x04\x19\x12\
-    \x06\xd9\x01\0\xdb\x01\x01\n\x0b\n\x03\x04\x19\x01\x12\x04\xd9\x01\x08\
-    \x17\n\x0c\n\x04\x04\x19\x02\0\x12\x04\xda\x01\x02\x19\n\r\n\x05\x04\x19\
-    \x02\0\x06\x12\x04\xda\x01\x02\n\n\r\n\x05\x04\x19\x02\0\x01\x12\x04\xda\
-    \x01\x0b\x14\n\r\n\x05\x04\x19\x02\0\x03\x12\x04\xda\x01\x17\x18\n\x0c\n\
-    \x02\x04\x1a\x12\x06\xdd\x01\0\xe0\x01\x01\n\x0b\n\x03\x04\x1a\x01\x12\
-    \x04\xdd\x01\x08\x18\n\x0c\n\x04\x04\x1a\x02\0\x12\x04\xde\x01\x02\x1a\n\
-    \r\n\x05\x04\x1a\x02\0\x06\x12\x04\xde\x01\x02\x0e\n\r\n\x05\x04\x1a\x02\
-    \0\x01\x12\x04\xde\x01\x0f\x15\n\r\n\x05\x04\x1a\x02\0\x03\x12\x04\xde\
-    \x01\x18\x19\n\x0c\n\x04\x04\x1a\x02\x01\x12\x04\xdf\x01\x02\x12\n\r\n\
-    \x05\x04\x1a\x02\x01\x05\x12\x04\xdf\x01\x02\x08\n\r\n\x05\x04\x1a\x02\
-    \x01\x01\x12\x04\xdf\x01\t\r\n\r\n\x05\x04\x1a\x02\x01\x03\x12\x04\xdf\
-    \x01\x10\x11\n\x0c\n\x02\x04\x1b\x12\x06\xe2\x01\0\xe5\x01\x01\n\x0b\n\
-    \x03\x04\x1b\x01\x12\x04\xe2\x01\x08\x14\n\x0c\n\x04\x04\x1b\x02\0\x12\
-    \x04\xe3\x01\x02\x19\n\r\n\x05\x04\x1b\x02\0\x06\x12\x04\xe3\x01\x02\x0f\
-    \n\r\n\x05\x04\x1b\x02\0\x01\x12\x04\xe3\x01\x10\x14\n\r\n\x05\x04\x1b\
-    \x02\0\x03\x12\x04\xe3\x01\x17\x18\n\x0c\n\x04\x04\x1b\x02\x01\x12\x04\
-    \xe4\x01\x02\x12\n\r\n\x05\x04\x1b\x02\x01\x05\x12\x04\xe4\x01\x02\x08\n\
-    \r\n\x05\x04\x1b\x02\x01\x01\x12\x04\xe4\x01\t\r\n\r\n\x05\x04\x1b\x02\
-    \x01\x03\x12\x04\xe4\x01\x10\x11\n\x0c\n\x02\x04\x1c\x12\x06\xe7\x01\0\
-    \xea\x01\x01\n\x0b\n\x03\x04\x1c\x01\x12\x04\xe7\x01\x08\x14\n\x0c\n\x04\
-    \x04\x1c\x02\0\x12\x04\xe8\x01\x02\x15\n\r\n\x05\x04\x1c\x02\0\x05\x12\
-    \x04\xe8\x01\x02\x08\n\r\n\x05\x04\x1c\x02\0\x01\x12\x04\xe8\x01\t\x10\n\
-    \r\n\x05\x04\x1c\x02\0\x03\x12\x04\xe8\x01\x13\x14\n\x0c\n\x04\x04\x1c\
-    \x02\x01\x12\x04\xe9\x01\x02\x12\n\r\n\x05\x04\x1c\x02\x01\x05\x12\x04\
-    \xe9\x01\x02\x08\n\r\n\x05\x04\x1c\x02\x01\x01\x12\x04\xe9\x01\t\r\n\r\n\
-    \x05\x04\x1c\x02\x01\x03\x12\x04\xe9\x01\x10\x11\n\x0c\n\x02\x04\x1d\x12\
-    \x06\xec\x01\0\xf1\x01\x01\n\x0b\n\x03\x04\x1d\x01\x12\x04\xec\x01\x08\
-    \x15\n\x0c\n\x04\x04\x1d\x02\0\x12\x04\xed\x01\x02\x15\n\r\n\x05\x04\x1d\
-    \x02\0\x05\x12\x04\xed\x01\x02\x08\n\r\n\x05\x04\x1d\x02\0\x01\x12\x04\
-    \xed\x01\t\x10\n\r\n\x05\x04\x1d\x02\0\x03\x12\x04\xed\x01\x13\x14\n\x0c\
-    \n\x04\x04\x1d\x02\x01\x12\x04\xee\x01\x02\x14\n\r\n\x05\x04\x1d\x02\x01\
-    \x05\x12\x04\xee\x01\x02\x08\n\r\n\x05\x04\x1d\x02\x01\x01\x12\x04\xee\
-    \x01\t\x0f\n\r\n\x05\x04\x1d\x02\x01\x03\x12\x04\xee\x01\x12\x13\n\x0c\n\
-    \x04\x04\x1d\x02\x02\x12\x04\xef\x01\x02\x12\n\r\n\x05\x04\x1d\x02\x02\
-    \x05\x12\x04\xef\x01\x02\x08\n\r\n\x05\x04\x1d\x02\x02\x01\x12\x04\xef\
-    \x01\t\r\n\r\n\x05\x04\x1d\x02\x02\x03\x12\x04\xef\x01\x10\x11\n\x0c\n\
-    \x04\x04\x1d\x02\x03\x12\x04\xf0\x01\x02*\n\r\n\x05\x04\x1d\x02\x03\x04\
-    \x12\x04\xf0\x01\x02\n\n\r\n\x05\x04\x1d\x02\x03\x05\x12\x04\xf0\x01\x0b\
-    \x11\n\r\n\x05\x04\x1d\x02\x03\x01\x12\x04\xf0\x01\x12%\n\r\n\x05\x04\
-    \x1d\x02\x03\x03\x12\x04\xf0\x01()\n\x0c\n\x02\x04\x1e\x12\x06\xf3\x01\0\
-    \x81\x02\x01\n\x0b\n\x03\x04\x1e\x01\x12\x04\xf3\x01\x08\x11\n\x0e\n\x04\
-    \x04\x1e\x04\0\x12\x06\xf5\x01\x02\xf9\x01\x03\n\r\n\x05\x04\x1e\x04\0\
-    \x01\x12\x04\xf5\x01\x07\x14\n\x0e\n\x06\x04\x1e\x04\0\x02\0\x12\x04\xf6\
-    \x01\x04\x0b\n\x0f\n\x07\x04\x1e\x04\0\x02\0\x01\x12\x04\xf6\x01\x04\x06\
-    \n\x0f\n\x07\x04\x1e\x04\0\x02\0\x02\x12\x04\xf6\x01\t\n\n\x0e\n\x06\x04\
-    \x1e\x04\0\x02\x01\x12\x04\xf7\x01\x04\x11\n\x0f\n\x07\x04\x1e\x04\0\x02\
-    \x01\x01\x12\x04\xf7\x01\x04\x0c\n\x0f\n\x07\x04\x1e\x04\0\x02\x01\x02\
-    \x12\x04\xf7\x01\x0f\x10\n\x0e\n\x06\x04\x1e\x04\0\x02\x02\x12\x04\xf8\
-    \x01\x04\x14\n\x0f\n\x07\x04\x1e\x04\0\x02\x02\x01\x12\x04\xf8\x01\x04\
-    \x0f\n\x0f\n\x07\x04\x1e\x04\0\x02\x02\x02\x12\x04\xf8\x01\x12\x13\n\x0c\
-    \n\x04\x04\x1e\x02\0\x12\x04\xfb\x01\x02\x19\n\r\n\x05\x04\x1e\x02\0\x06\
-    \x12\x04\xfb\x01\x02\x0f\n\r\n\x05\x04\x1e\x02\0\x01\x12\x04\xfb\x01\x10\
-    \x14\n\r\n\x05\x04\x1e\x02\0\x03\x12\x04\xfb\x01\x17\x18\n\x0e\n\x04\x04\
-    \x1e\x08\0\x12\x06\xfc\x01\x02\x80\x02\x03\n\r\n\x05\x04\x1e\x08\0\x01\
-    \x12\x04\xfc\x01\x08\x11\n\x0c\n\x04\x04\x1e\x02\x01\x12\x04\xfd\x01\x04\
-    \x1c\n\r\n\x05\x04\x1e\x02\x01\x06\x12\x04\xfd\x01\x04\x14\n\r\n\x05\x04\
-    \x1e\x02\x01\x01\x12\x04\xfd\x01\x15\x17\n\r\n\x05\x04\x1e\x02\x01\x03\
-    \x12\x04\xfd\x01\x1a\x1b\n\x0c\n\x04\x04\x1e\x02\x02\x12\x04\xfe\x01\x04\
-    '\n\r\n\x05\x04\x1e\x02\x02\x06\x12\x04\xfe\x01\x04\x19\n\r\n\x05\x04\
-    \x1e\x02\x02\x01\x12\x04\xfe\x01\x1a\"\n\r\n\x05\x04\x1e\x02\x02\x03\x12\
-    \x04\xfe\x01%&\n\x0c\n\x04\x04\x1e\x02\x03\x12\x04\xff\x01\x04(\n\r\n\
-    \x05\x04\x1e\x02\x03\x06\x12\x04\xff\x01\x04\x17\n\r\n\x05\x04\x1e\x02\
-    \x03\x01\x12\x04\xff\x01\x18#\n\r\n\x05\x04\x1e\x02\x03\x03\x12\x04\xff\
-    \x01&'\n\x0c\n\x02\x04\x1f\x12\x06\x83\x02\0\x86\x02\x01\n\x0b\n\x03\x04\
-    \x1f\x01\x12\x04\x83\x02\x08\x18\n\x0c\n\x04\x04\x1f\x02\0\x12\x04\x84\
-    \x02\x02\x18\n\r\n\x05\x04\x1f\x02\0\x05\x12\x04\x84\x02\x02\x08\n\r\n\
-    \x05\x04\x1f\x02\0\x01\x12\x04\x84\x02\t\x13\n\r\n\x05\x04\x1f\x02\0\x03\
-    \x12\x04\x84\x02\x16\x17\n\x0c\n\x04\x04\x1f\x02\x01\x12\x04\x85\x02\x02\
-    \x17\n\r\n\x05\x04\x1f\x02\x01\x05\x12\x04\x85\x02\x02\x08\n\r\n\x05\x04\
-    \x1f\x02\x01\x01\x12\x04\x85\x02\t\x12\n\r\n\x05\x04\x1f\x02\x01\x03\x12\
-    \x04\x85\x02\x15\x16\n\x0c\n\x02\x04\x20\x12\x06\x88\x02\0\x8d\x02\x01\n\
-    \x0b\n\x03\x04\x20\x01\x12\x04\x88\x02\x08\x1d\n\x0c\n\x04\x04\x20\x02\0\
-    \x12\x04\x89\x02\x02\"\n\r\n\x05\x04\x20\x02\0\x04\x12\x04\x89\x02\x02\n\
-    \n\r\n\x05\x04\x20\x02\0\x05\x12\x04\x89\x02\x0b\x11\n\r\n\x05\x04\x20\
-    \x02\0\x01\x12\x04\x89\x02\x12\x1d\n\r\n\x05\x04\x20\x02\0\x03\x12\x04\
-    \x89\x02\x20!\n\x0c\n\x04\x04\x20\x02\x01\x12\x04\x8a\x02\x02!\n\r\n\x05\
-    \x04\x20\x02\x01\x04\x12\x04\x8a\x02\x02\n\n\r\n\x05\x04\x20\x02\x01\x05\
-    \x12\x04\x8a\x02\x0b\x11\n\r\n\x05\x04\x20\x02\x01\x01\x12\x04\x8a\x02\
-    \x12\x1c\n\r\n\x05\x04\x20\x02\x01\x03\x12\x04\x8a\x02\x1f\x20\n\x0c\n\
-    \x04\x04\x20\x02\x02\x12\x04\x8b\x02\x02\x17\n\r\n\x05\x04\x20\x02\x02\
-    \x05\x12\x04\x8b\x02\x02\x08\n\r\n\x05\x04\x20\x02\x02\x01\x12\x04\x8b\
-    \x02\t\x12\n\r\n\x05\x04\x20\x02\x02\x03\x12\x04\x8b\x02\x15\x16\n\x0c\n\
-    \x04\x04\x20\x02\x03\x12\x04\x8c\x02\x02\x14\n\r\n\x05\x04\x20\x02\x03\
-    \x05\x12\x04\x8c\x02\x02\x08\n\r\n\x05\x04\x20\x02\x03\x01\x12\x04\x8c\
-    \x02\t\x0f\n\r\n\x05\x04\x20\x02\x03\x03\x12\x04\x8c\x02\x12\x13\n\x0c\n\
-    \x02\x04!\x12\x06\x8f\x02\0\x93\x02\x01\n\x0b\n\x03\x04!\x01\x12\x04\x8f\
-    \x02\x08\x1b\n\x0c\n\x04\x04!\x02\0\x12\x04\x90\x02\x02\x1e\n\r\n\x05\
-    \x04!\x02\0\x06\x12\x04\x90\x02\x02\x12\n\r\n\x05\x04!\x02\0\x01\x12\x04\
-    \x90\x02\x13\x19\n\r\n\x05\x04!\x02\0\x03\x12\x04\x90\x02\x1c\x1d\n\x0c\
-    \n\x04\x04!\x02\x01\x12\x04\x91\x02\x021\n\r\n\x05\x04!\x02\x01\x04\x12\
-    \x04\x91\x02\x02\n\n\r\n\x05\x04!\x02\x01\x05\x12\x04\x91\x02\x0b\x11\n\
-    \r\n\x05\x04!\x02\x01\x01\x12\x04\x91\x02\x12,\n\r\n\x05\x04!\x02\x01\
-    \x03\x12\x04\x91\x02/0\n\x0c\n\x04\x04!\x02\x02\x12\x04\x92\x02\x022\n\r\
-    \n\x05\x04!\x02\x02\x04\x12\x04\x92\x02\x02\n\n\r\n\x05\x04!\x02\x02\x06\
-    \x12\x04\x92\x02\x0b\x1b\n\r\n\x05\x04!\x02\x02\x01\x12\x04\x92\x02\x1c-\
-    \n\r\n\x05\x04!\x02\x02\x03\x12\x04\x92\x0201\n\x0c\n\x02\x04\"\x12\x06\
-    \x95\x02\0\xa1\x02\x01\n\x0b\n\x03\x04\"\x01\x12\x04\x95\x02\x08\x18\n\
-    \x0e\n\x04\x04\"\x04\0\x12\x06\x97\x02\x02\x9a\x02\x03\n\r\n\x05\x04\"\
-    \x04\0\x01\x12\x04\x97\x02\x07\x1b\n\x0e\n\x06\x04\"\x04\0\x02\0\x12\x04\
-    \x98\x02\x04\x0b\n\x0f\n\x07\x04\"\x04\0\x02\0\x01\x12\x04\x98\x02\x04\
-    \x06\n\x0f\n\x07\x04\"\x04\0\x02\0\x02\x12\x04\x98\x02\t\n\n\x0e\n\x06\
-    \x04\"\x04\0\x02\x01\x12\x04\x99\x02\x04\x11\n\x0f\n\x07\x04\"\x04\0\x02\
-    \x01\x01\x12\x04\x99\x02\x04\x0c\n\x0f\n\x07\x04\"\x04\0\x02\x01\x02\x12\
-    \x04\x99\x02\x0f\x10\n\x0c\n\x04\x04\"\x02\0\x12\x04\x9c\x02\x02\x20\n\r\
-    \n\x05\x04\"\x02\0\x06\x12\x04\x9c\x02\x02\x16\n\r\n\x05\x04\"\x02\0\x01\
-    \x12\x04\x9c\x02\x17\x1b\n\r\n\x05\x04\"\x02\0\x03\x12\x04\x9c\x02\x1e\
-    \x1f\n\x0e\n\x04\x04\"\x08\0\x12\x06\x9d\x02\x02\xa0\x02\x03\n\r\n\x05\
-    \x04\"\x08\0\x01\x12\x04\x9d\x02\x08\x11\n\x0c\n\x04\x04\"\x02\x01\x12\
-    \x04\x9e\x02\x04\x1c\n\r\n\x05\x04\"\x02\x01\x06\x12\x04\x9e\x02\x04\x14\
-    \n\r\n\x05\x04\"\x02\x01\x01\x12\x04\x9e\x02\x15\x17\n\r\n\x05\x04\"\x02\
-    \x01\x03\x12\x04\x9e\x02\x1a\x1b\n\x0c\n\x04\x04\"\x02\x02\x12\x04\x9f\
-    \x02\x04'\n\r\n\x05\x04\"\x02\x02\x06\x12\x04\x9f\x02\x04\x19\n\r\n\x05\
-    \x04\"\x02\x02\x01\x12\x04\x9f\x02\x1a\"\n\r\n\x05\x04\"\x02\x02\x03\x12\
-    \x04\x9f\x02%&b\x06proto3\
+    \x08\x1b\n\x0c\n\x04\x04\x18\x02\0\x12\x04\xd6\x01\x02*\n\r\n\x05\x04\
+    \x18\x02\0\x04\x12\x04\xd6\x01\x02\n\n\r\n\x05\x04\x18\x02\0\x06\x12\x04\
+    \xd6\x01\x0b\x1d\n\r\n\x05\x04\x18\x02\0\x01\x12\x04\xd6\x01\x1e%\n\r\n\
+    \x05\x04\x18\x02\0\x03\x12\x04\xd6\x01()\n\x0c\n\x02\x04\x19\x12\x06\xd9\
+    \x01\0\xdc\x01\x01\n\x0b\n\x03\x04\x19\x01\x12\x04\xd9\x01\x08\x1a\n\x0c\
+    \n\x04\x04\x19\x02\0\x12\x04\xda\x01\x02\x15\n\r\n\x05\x04\x19\x02\0\x05\
+    \x12\x04\xda\x01\x02\x07\n\r\n\x05\x04\x19\x02\0\x01\x12\x04\xda\x01\x08\
+    \x10\n\r\n\x05\x04\x19\x02\0\x03\x12\x04\xda\x01\x13\x14\n\x0c\n\x04\x04\
+    \x19\x02\x01\x12\x04\xdb\x01\x02\x15\n\r\n\x05\x04\x19\x02\x01\x06\x12\
+    \x04\xdb\x01\x02\x0c\n\r\n\x05\x04\x19\x02\x01\x01\x12\x04\xdb\x01\r\x10\
+    \n\r\n\x05\x04\x19\x02\x01\x03\x12\x04\xdb\x01\x13\x14\n\x0c\n\x02\x04\
+    \x1a\x12\x06\xde\x01\0\xe4\x01\x01\n\x0b\n\x03\x04\x1a\x01\x12\x04\xde\
+    \x01\x08\x12\n\x0c\n\x04\x04\x1a\x02\0\x12\x04\xdf\x01\x02\x15\n\r\n\x05\
+    \x04\x1a\x02\0\x05\x12\x04\xdf\x01\x02\x08\n\r\n\x05\x04\x1a\x02\0\x01\
+    \x12\x04\xdf\x01\t\x10\n\r\n\x05\x04\x1a\x02\0\x03\x12\x04\xdf\x01\x13\
+    \x14\n\x0c\n\x04\x04\x1a\x02\x01\x12\x04\xe0\x01\x02\x12\n\r\n\x05\x04\
+    \x1a\x02\x01\x05\x12\x04\xe0\x01\x02\x08\n\r\n\x05\x04\x1a\x02\x01\x01\
+    \x12\x04\xe0\x01\t\r\n\r\n\x05\x04\x1a\x02\x01\x03\x12\x04\xe0\x01\x10\
+    \x11\n\x0c\n\x04\x04\x1a\x02\x02\x12\x04\xe1\x01\x02$\n\r\n\x05\x04\x1a\
+    \x02\x02\x04\x12\x04\xe1\x01\x02\n\n\r\n\x05\x04\x1a\x02\x02\x06\x12\x04\
+    \xe1\x01\x0b\x17\n\r\n\x05\x04\x1a\x02\x02\x01\x12\x04\xe1\x01\x18\x1f\n\
+    \r\n\x05\x04\x1a\x02\x02\x03\x12\x04\xe1\x01\"#\n\x0c\n\x04\x04\x1a\x02\
+    \x03\x12\x04\xe2\x01\x02.\n\r\n\x05\x04\x1a\x02\x03\x04\x12\x04\xe2\x01\
+    \x02\n\n\r\n\x05\x04\x1a\x02\x03\x06\x12\x04\xe2\x01\x0b\x17\n\r\n\x05\
+    \x04\x1a\x02\x03\x01\x12\x04\xe2\x01\x18)\n\r\n\x05\x04\x1a\x02\x03\x03\
+    \x12\x04\xe2\x01,-\n\x0c\n\x04\x04\x1a\x02\x04\x12\x04\xe3\x01\x02\"\n\r\
+    \n\x05\x04\x1a\x02\x04\x04\x12\x04\xe3\x01\x02\n\n\r\n\x05\x04\x1a\x02\
+    \x04\x06\x12\x04\xe3\x01\x0b\x15\n\r\n\x05\x04\x1a\x02\x04\x01\x12\x04\
+    \xe3\x01\x16\x1d\n\r\n\x05\x04\x1a\x02\x04\x03\x12\x04\xe3\x01\x20!\n\
+    \x0c\n\x02\x04\x1b\x12\x06\xe5\x01\0\xf1\x01\x01\n\x0b\n\x03\x04\x1b\x01\
+    \x12\x04\xe5\x01\x08\x14\n\x0e\n\x04\x04\x1b\x04\0\x12\x06\xe6\x01\x02\
+    \xea\x01\x03\n\r\n\x05\x04\x1b\x04\0\x01\x12\x04\xe6\x01\x07\x11\n\x0e\n\
+    \x06\x04\x1b\x04\0\x02\0\x12\x04\xe7\x01\x04\x10\n\x0f\n\x07\x04\x1b\x04\
+    \0\x02\0\x01\x12\x04\xe7\x01\x04\x0b\n\x0f\n\x07\x04\x1b\x04\0\x02\0\x02\
+    \x12\x04\xe7\x01\x0e\x0f\n\x0e\n\x06\x04\x1b\x04\0\x02\x01\x12\x04\xe8\
+    \x01\x04\x0f\n\x0f\n\x07\x04\x1b\x04\0\x02\x01\x01\x12\x04\xe8\x01\x04\n\
+    \n\x0f\n\x07\x04\x1b\x04\0\x02\x01\x02\x12\x04\xe8\x01\r\x0e\n\x0e\n\x06\
+    \x04\x1b\x04\0\x02\x02\x12\x04\xe9\x01\x04\x0f\n\x0f\n\x07\x04\x1b\x04\0\
+    \x02\x02\x01\x12\x04\xe9\x01\x04\n\n\x0f\n\x07\x04\x1b\x04\0\x02\x02\x02\
+    \x12\x04\xe9\x01\r\x0e\n\x0c\n\x04\x04\x1b\x02\0\x12\x04\xeb\x01\x02\x12\
+    \n\r\n\x05\x04\x1b\x02\0\x05\x12\x04\xeb\x01\x02\x08\n\r\n\x05\x04\x1b\
+    \x02\0\x01\x12\x04\xeb\x01\t\r\n\r\n\x05\x04\x1b\x02\0\x03\x12\x04\xeb\
+    \x01\x10\x11\n\x0c\n\x04\x04\x1b\x02\x01\x12\x04\xec\x01\x02)\n\r\n\x05\
+    \x04\x1b\x02\x01\x06\x12\x04\xec\x01\x02\x19\n\r\n\x05\x04\x1b\x02\x01\
+    \x01\x12\x04\xec\x01\x1a$\n\r\n\x05\x04\x1b\x02\x01\x03\x12\x04\xec\x01'\
+    (\n\x0c\n\x04\x04\x1b\x02\x02\x12\x04\xed\x01\x02\x14\n\r\n\x05\x04\x1b\
+    \x02\x02\x05\x12\x04\xed\x01\x02\x06\n\r\n\x05\x04\x1b\x02\x02\x01\x12\
+    \x04\xed\x01\x07\x0f\n\r\n\x05\x04\x1b\x02\x02\x03\x12\x04\xed\x01\x12\
+    \x13\n\x0c\n\x04\x04\x1b\x02\x03\x12\x04\xee\x01\x02@\n\r\n\x05\x04\x1b\
+    \x02\x03\x04\x12\x04\xee\x01\x02\n\n\r\n\x05\x04\x1b\x02\x03\x06\x12\x04\
+    \xee\x01\x0b'\n\r\n\x05\x04\x1b\x02\x03\x01\x12\x04\xee\x01(;\n\r\n\x05\
+    \x04\x1b\x02\x03\x03\x12\x04\xee\x01>?\n\x0c\n\x04\x04\x1b\x02\x04\x12\
+    \x04\xef\x01\x02\x1f\n\r\n\x05\x04\x1b\x02\x04\x04\x12\x04\xef\x01\x02\n\
+    \n\r\n\x05\x04\x1b\x02\x04\x06\x12\x04\xef\x01\x0b\x13\n\r\n\x05\x04\x1b\
+    \x02\x04\x01\x12\x04\xef\x01\x14\x1a\n\r\n\x05\x04\x1b\x02\x04\x03\x12\
+    \x04\xef\x01\x1d\x1e\n\x0c\n\x04\x04\x1b\x02\x05\x12\x04\xf0\x01\x02\x1f\
+    \n\r\n\x05\x04\x1b\x02\x05\x04\x12\x04\xf0\x01\x02\n\n\r\n\x05\x04\x1b\
+    \x02\x05\x06\x12\x04\xf0\x01\x0b\x13\n\r\n\x05\x04\x1b\x02\x05\x01\x12\
+    \x04\xf0\x01\x14\x1a\n\r\n\x05\x04\x1b\x02\x05\x03\x12\x04\xf0\x01\x1d\
+    \x1e\n\x0c\n\x02\x04\x1c\x12\x06\xf3\x01\0\xf9\x01\x01\n\x0b\n\x03\x04\
+    \x1c\x01\x12\x04\xf3\x01\x08\x12\n\x0c\n\x04\x04\x1c\x02\0\x12\x04\xf4\
+    \x01\x02\x12\n\r\n\x05\x04\x1c\x02\0\x05\x12\x04\xf4\x01\x02\x08\n\r\n\
+    \x05\x04\x1c\x02\0\x01\x12\x04\xf4\x01\t\r\n\r\n\x05\x04\x1c\x02\0\x03\
+    \x12\x04\xf4\x01\x10\x11\n\x0c\n\x04\x04\x1c\x02\x01\x12\x04\xf5\x01\x02\
+    \x15\n\r\n\x05\x04\x1c\x02\x01\x05\x12\x04\xf5\x01\x02\x06\n\r\n\x05\x04\
+    \x1c\x02\x01\x01\x12\x04\xf5\x01\x07\x10\n\r\n\x05\x04\x1c\x02\x01\x03\
+    \x12\x04\xf5\x01\x13\x14\n\x0c\n\x04\x04\x1c\x02\x02\x12\x04\xf6\x01\x02\
+    %\n\r\n\x05\x04\x1c\x02\x02\x04\x12\x04\xf6\x01\x02\n\n\r\n\x05\x04\x1c\
+    \x02\x02\x06\x12\x04\xf6\x01\x0b\x16\n\r\n\x05\x04\x1c\x02\x02\x01\x12\
+    \x04\xf6\x01\x17\x20\n\r\n\x05\x04\x1c\x02\x02\x03\x12\x04\xf6\x01#$\n\
+    \x0c\n\x04\x04\x1c\x02\x03\x12\x04\xf7\x01\x02>\n\r\n\x05\x04\x1c\x02\
+    \x03\x04\x12\x04\xf7\x01\x02\n\n\r\n\x05\x04\x1c\x02\x03\x06\x12\x04\xf7\
+    \x01\x0b%\n\r\n\x05\x04\x1c\x02\x03\x01\x12\x04\xf7\x01&9\n\r\n\x05\x04\
+    \x1c\x02\x03\x03\x12\x04\xf7\x01<=\n\x0c\n\x04\x04\x1c\x02\x04\x12\x04\
+    \xf8\x01\x02&\n\r\n\x05\x04\x1c\x02\x04\x04\x12\x04\xf8\x01\x02\n\n\r\n\
+    \x05\x04\x1c\x02\x04\x06\x12\x04\xf8\x01\x0b\x1a\n\r\n\x05\x04\x1c\x02\
+    \x04\x01\x12\x04\xf8\x01\x1b!\n\r\n\x05\x04\x1c\x02\x04\x03\x12\x04\xf8\
+    \x01$%\n\x0c\n\x02\x04\x1d\x12\x06\xfb\x01\0\xfe\x01\x01\n\x0b\n\x03\x04\
+    \x1d\x01\x12\x04\xfb\x01\x08\"\n\x0c\n\x04\x04\x1d\x02\0\x12\x04\xfc\x01\
+    \x02'\n\r\n\x05\x04\x1d\x02\0\x04\x12\x04\xfc\x01\x02\n\n\r\n\x05\x04\
+    \x1d\x02\0\x06\x12\x04\xfc\x01\x0b\x16\n\r\n\x05\x04\x1d\x02\0\x01\x12\
+    \x04\xfc\x01\x17\"\n\r\n\x05\x04\x1d\x02\0\x03\x12\x04\xfc\x01%&\n\x0c\n\
+    \x04\x04\x1d\x02\x01\x12\x04\xfd\x01\x02\x16\n\r\n\x05\x04\x1d\x02\x01\
+    \x05\x12\x04\xfd\x01\x02\x06\n\r\n\x05\x04\x1d\x02\x01\x01\x12\x04\xfd\
+    \x01\x07\x11\n\r\n\x05\x04\x1d\x02\x01\x03\x12\x04\xfd\x01\x14\x15\n\x0c\
+    \n\x02\x04\x1e\x12\x06\x80\x02\0\x83\x02\x01\n\x0b\n\x03\x04\x1e\x01\x12\
+    \x04\x80\x02\x08\x17\n\x0c\n\x04\x04\x1e\x02\0\x12\x04\x81\x02\x02\x12\n\
+    \r\n\x05\x04\x1e\x02\0\x05\x12\x04\x81\x02\x02\x08\n\r\n\x05\x04\x1e\x02\
+    \0\x01\x12\x04\x81\x02\t\r\n\r\n\x05\x04\x1e\x02\0\x03\x12\x04\x81\x02\
+    \x10\x11\n\x0c\n\x04\x04\x1e\x02\x01\x12\x04\x82\x02\x02\x14\n\r\n\x05\
+    \x04\x1e\x02\x01\x06\x12\x04\x82\x02\x02\n\n\r\n\x05\x04\x1e\x02\x01\x01\
+    \x12\x04\x82\x02\x0b\x0f\n\r\n\x05\x04\x1e\x02\x01\x03\x12\x04\x82\x02\
+    \x12\x13\n\x0c\n\x02\x04\x1f\x12\x06\x85\x02\0\x87\x02\x01\n\x0b\n\x03\
+    \x04\x1f\x01\x12\x04\x85\x02\x08$\n\x0c\n\x04\x04\x1f\x02\0\x12\x04\x86\
+    \x02\x02'\n\r\n\x05\x04\x1f\x02\0\x04\x12\x04\x86\x02\x02\n\n\r\n\x05\
+    \x04\x1f\x02\0\x06\x12\x04\x86\x02\x0b\x16\n\r\n\x05\x04\x1f\x02\0\x01\
+    \x12\x04\x86\x02\x17\"\n\r\n\x05\x04\x1f\x02\0\x03\x12\x04\x86\x02%&\n\
+    \x0c\n\x02\x04\x20\x12\x06\x89\x02\0\xa4\x02\x01\n\x0b\n\x03\x04\x20\x01\
+    \x12\x04\x89\x02\x08\x10\n\x0e\n\x04\x04\x20\x04\0\x12\x06\x8a\x02\x02\
+    \x96\x02\x03\n\r\n\x05\x04\x20\x04\0\x01\x12\x04\x8a\x02\x07\x0b\n\x0e\n\
+    \x06\x04\x20\x04\0\x02\0\x12\x04\x8b\x02\x04\r\n\x0f\n\x07\x04\x20\x04\0\
+    \x02\0\x01\x12\x04\x8b\x02\x04\x08\n\x0f\n\x07\x04\x20\x04\0\x02\0\x02\
+    \x12\x04\x8b\x02\x0b\x0c\n\x0e\n\x06\x04\x20\x04\0\x02\x01\x12\x04\x8c\
+    \x02\x04\x0b\n\x0f\n\x07\x04\x20\x04\0\x02\x01\x01\x12\x04\x8c\x02\x04\
+    \x06\n\x0f\n\x07\x04\x20\x04\0\x02\x01\x02\x12\x04\x8c\x02\t\n\n\x0e\n\
+    \x06\x04\x20\x04\0\x02\x02\x12\x04\x8d\x02\x04\x0c\n\x0f\n\x07\x04\x20\
+    \x04\0\x02\x02\x01\x12\x04\x8d\x02\x04\x07\n\x0f\n\x07\x04\x20\x04\0\x02\
+    \x02\x02\x12\x04\x8d\x02\n\x0b\n\x0e\n\x06\x04\x20\x04\0\x02\x03\x12\x04\
+    \x8e\x02\x04\r\n\x0f\n\x07\x04\x20\x04\0\x02\x03\x01\x12\x04\x8e\x02\x04\
+    \x08\n\x0f\n\x07\x04\x20\x04\0\x02\x03\x02\x12\x04\x8e\x02\x0b\x0c\n\x0e\
+    \n\x06\x04\x20\x04\0\x02\x04\x12\x04\x8f\x02\x04\x10\n\x0f\n\x07\x04\x20\
+    \x04\0\x02\x04\x01\x12\x04\x8f\x02\x04\x0b\n\x0f\n\x07\x04\x20\x04\0\x02\
+    \x04\x02\x12\x04\x8f\x02\x0e\x0f\n\x0e\n\x06\x04\x20\x04\0\x02\x05\x12\
+    \x04\x90\x02\x04\x0f\n\x0f\n\x07\x04\x20\x04\0\x02\x05\x01\x12\x04\x90\
+    \x02\x04\n\n\x0f\n\x07\x04\x20\x04\0\x02\x05\x02\x12\x04\x90\x02\r\x0e\n\
+    +\n\x06\x04\x20\x04\0\x02\x06\x12\x04\x91\x02\x04\x0f\"\x1b\x20{\x20item\
+    s:\x20Box<MoveType>\x20},\n\n\x0f\n\x07\x04\x20\x04\0\x02\x06\x01\x12\
+    \x04\x91\x02\x04\n\n\x0f\n\x07\x04\x20\x04\0\x02\x06\x02\x12\x04\x91\x02\
+    \r\x0e\n!\n\x06\x04\x20\x04\0\x02\x07\x12\x04\x92\x02\x04\x0f\"\x11(Move\
+    StructTag),\n\n\x0f\n\x07\x04\x20\x04\0\x02\x07\x01\x12\x04\x92\x02\x04\
+    \n\n\x0f\n\x07\x04\x20\x04\0\x02\x07\x02\x12\x04\x92\x02\r\x0e\n!\n\x06\
+    \x04\x20\x04\0\x02\x08\x12\x04\x93\x02\x04\x19\"\x11\x20{\x20index:\x20u\
+    16\x20},\n\n\x0f\n\x07\x04\x20\x04\0\x02\x08\x01\x12\x04\x93\x02\x04\x14\
+    \n\x0f\n\x07\x04\x20\x04\0\x02\x08\x02\x12\x04\x93\x02\x17\x18\n7\n\x06\
+    \x04\x20\x04\0\x02\t\x12\x04\x94\x02\x04\x12\"'\x20{\x20mutable:\x20bool\
+    ,\x20to:\x20Box<MoveType>\x20},\n\n\x0f\n\x07\x04\x20\x04\0\x02\t\x01\
+    \x12\x04\x94\x02\x04\r\n\x0f\n\x07\x04\x20\x04\0\x02\t\x02\x12\x04\x94\
+    \x02\x10\x11\n\x1a\n\x06\x04\x20\x04\0\x02\n\x12\x04\x95\x02\x04\x14\"\n\
+    (String),\n\n\x0f\n\x07\x04\x20\x04\0\x02\n\x01\x12\x04\x95\x02\x04\x0e\
+    \n\x0f\n\x07\x04\x20\x04\0\x02\n\x02\x12\x04\x95\x02\x11\x13\n\x0e\n\x04\
+    \x04\x20\x03\0\x12\x06\x97\x02\x02\x9a\x02\x03\n\r\n\x05\x04\x20\x03\0\
+    \x01\x12\x04\x97\x02\n\x17\n\x0e\n\x06\x04\x20\x03\0\x02\0\x12\x04\x98\
+    \x02\x04\x15\n\x0f\n\x07\x04\x20\x03\0\x02\0\x05\x12\x04\x98\x02\x04\x08\
+    \n\x0f\n\x07\x04\x20\x03\0\x02\0\x01\x12\x04\x98\x02\t\x10\n\x0f\n\x07\
+    \x04\x20\x03\0\x02\0\x03\x12\x04\x98\x02\x13\x14\n\x0e\n\x06\x04\x20\x03\
+    \0\x02\x01\x12\x04\x99\x02\x04\x14\n\x0f\n\x07\x04\x20\x03\0\x02\x01\x06\
+    \x12\x04\x99\x02\x04\x0c\n\x0f\n\x07\x04\x20\x03\0\x02\x01\x01\x12\x04\
+    \x99\x02\r\x0f\n\x0f\n\x07\x04\x20\x03\0\x02\x01\x03\x12\x04\x99\x02\x12\
+    \x13\n\x0c\n\x04\x04\x20\x02\0\x12\x04\x9c\x02\x02\x19\n\r\n\x05\x04\x20\
+    \x02\0\x06\x12\x04\x9c\x02\x02\x0f\n\r\n\x05\x04\x20\x02\0\x01\x12\x04\
+    \x9c\x02\x10\x14\n\r\n\x05\x04\x20\x02\0\x03\x12\x04\x9c\x02\x17\x18\n\
+    \x0e\n\x04\x04\x20\x08\0\x12\x06\x9d\x02\x02\xa3\x02\x03\n\r\n\x05\x04\
+    \x20\x08\0\x01\x12\x04\x9d\x02\x08\x0f\n\x0c\n\x04\x04\x20\x02\x01\x12\
+    \x04\x9e\x02\x04\x18\n\r\n\x05\x04\x20\x02\x01\x06\x12\x04\x9e\x02\x04\
+    \x0c\n\r\n\x05\x04\x20\x02\x01\x01\x12\x04\x9e\x02\r\x13\n\r\n\x05\x04\
+    \x20\x02\x01\x03\x12\x04\x9e\x02\x16\x17\n\x0c\n\x04\x04\x20\x02\x02\x12\
+    \x04\x9f\x02\x04\x1d\n\r\n\x05\x04\x20\x02\x02\x06\x12\x04\x9f\x02\x04\
+    \x11\n\r\n\x05\x04\x20\x02\x02\x01\x12\x04\x9f\x02\x12\x18\n\r\n\x05\x04\
+    \x20\x02\x02\x03\x12\x04\x9f\x02\x1b\x1c\n\x0c\n\x04\x04\x20\x02\x03\x12\
+    \x04\xa0\x02\x04(\n\r\n\x05\x04\x20\x02\x03\x05\x12\x04\xa0\x02\x04\n\n\
+    \r\n\x05\x04\x20\x02\x03\x01\x12\x04\xa0\x02\x0b#\n\r\n\x05\x04\x20\x02\
+    \x03\x03\x12\x04\xa0\x02&'\n\x0c\n\x04\x04\x20\x02\x04\x12\x04\xa1\x02\
+    \x04\x20\n\r\n\x05\x04\x20\x02\x04\x06\x12\x04\xa1\x02\x04\x11\n\r\n\x05\
+    \x04\x20\x02\x04\x01\x12\x04\xa1\x02\x12\x1b\n\r\n\x05\x04\x20\x02\x04\
+    \x03\x12\x04\xa1\x02\x1e\x1f\n\x0c\n\x04\x04\x20\x02\x05\x12\x04\xa2\x02\
+    \x04\x1a\n\r\n\x05\x04\x20\x02\x05\x05\x12\x04\xa2\x02\x04\n\n\r\n\x05\
+    \x04\x20\x02\x05\x01\x12\x04\xa2\x02\x0b\x15\n\r\n\x05\x04\x20\x02\x05\
+    \x03\x12\x04\xa2\x02\x18\x19\n\x0c\n\x02\x05\0\x12\x06\xa6\x02\0\xab\x02\
+    \x01\n\x0b\n\x03\x05\0\x01\x12\x04\xa6\x02\x05\x10\n\x0c\n\x04\x05\0\x02\
+    \0\x12\x04\xa7\x02\x02\x0b\n\r\n\x05\x05\0\x02\0\x01\x12\x04\xa7\x02\x02\
+    \x06\n\r\n\x05\x05\0\x02\0\x02\x12\x04\xa7\x02\t\n\n\x0c\n\x04\x05\0\x02\
+    \x01\x12\x04\xa8\x02\x02\x0b\n\r\n\x05\x05\0\x02\x01\x01\x12\x04\xa8\x02\
+    \x02\x06\n\r\n\x05\x05\0\x02\x01\x02\x12\x04\xa8\x02\t\n\n\x0c\n\x04\x05\
+    \0\x02\x02\x12\x04\xa9\x02\x02\x0c\n\r\n\x05\x05\0\x02\x02\x01\x12\x04\
+    \xa9\x02\x02\x07\n\r\n\x05\x05\0\x02\x02\x02\x12\x04\xa9\x02\n\x0b\n\x0c\
+    \n\x04\x05\0\x02\x03\x12\x04\xaa\x02\x02\n\n\r\n\x05\x05\0\x02\x03\x01\
+    \x12\x04\xaa\x02\x02\x05\n\r\n\x05\x05\0\x02\x03\x02\x12\x04\xaa\x02\x08\
+    \t\n\x0c\n\x02\x04!\x12\x06\xad\x02\0\xaf\x02\x01\n\x0b\n\x03\x04!\x01\
+    \x12\x04\xad\x02\x08\x17\n\x0c\n\x04\x04!\x02\0\x12\x04\xae\x02\x02\x19\
+    \n\r\n\x05\x04!\x02\0\x06\x12\x04\xae\x02\x02\n\n\r\n\x05\x04!\x02\0\x01\
+    \x12\x04\xae\x02\x0b\x14\n\r\n\x05\x04!\x02\0\x03\x12\x04\xae\x02\x17\
+    \x18\n\x0c\n\x02\x04\"\x12\x06\xb1\x02\0\xb4\x02\x01\n\x0b\n\x03\x04\"\
+    \x01\x12\x04\xb1\x02\x08\x18\n\x0c\n\x04\x04\"\x02\0\x12\x04\xb2\x02\x02\
+    \x1a\n\r\n\x05\x04\"\x02\0\x06\x12\x04\xb2\x02\x02\x0e\n\r\n\x05\x04\"\
+    \x02\0\x01\x12\x04\xb2\x02\x0f\x15\n\r\n\x05\x04\"\x02\0\x03\x12\x04\xb2\
+    \x02\x18\x19\n\x0c\n\x04\x04\"\x02\x01\x12\x04\xb3\x02\x02\x12\n\r\n\x05\
+    \x04\"\x02\x01\x05\x12\x04\xb3\x02\x02\x08\n\r\n\x05\x04\"\x02\x01\x01\
+    \x12\x04\xb3\x02\t\r\n\r\n\x05\x04\"\x02\x01\x03\x12\x04\xb3\x02\x10\x11\
+    \n\x0c\n\x02\x04#\x12\x06\xb6\x02\0\xb9\x02\x01\n\x0b\n\x03\x04#\x01\x12\
+    \x04\xb6\x02\x08\x14\n\x0c\n\x04\x04#\x02\0\x12\x04\xb7\x02\x02\x19\n\r\
+    \n\x05\x04#\x02\0\x06\x12\x04\xb7\x02\x02\x0f\n\r\n\x05\x04#\x02\0\x01\
+    \x12\x04\xb7\x02\x10\x14\n\r\n\x05\x04#\x02\0\x03\x12\x04\xb7\x02\x17\
+    \x18\n\x0c\n\x04\x04#\x02\x01\x12\x04\xb8\x02\x02\x12\n\r\n\x05\x04#\x02\
+    \x01\x05\x12\x04\xb8\x02\x02\x08\n\r\n\x05\x04#\x02\x01\x01\x12\x04\xb8\
+    \x02\t\r\n\r\n\x05\x04#\x02\x01\x03\x12\x04\xb8\x02\x10\x11\n\x0c\n\x02\
+    \x04$\x12\x06\xbb\x02\0\xbe\x02\x01\n\x0b\n\x03\x04$\x01\x12\x04\xbb\x02\
+    \x08\x14\n\x0c\n\x04\x04$\x02\0\x12\x04\xbc\x02\x02\x15\n\r\n\x05\x04$\
+    \x02\0\x05\x12\x04\xbc\x02\x02\x08\n\r\n\x05\x04$\x02\0\x01\x12\x04\xbc\
+    \x02\t\x10\n\r\n\x05\x04$\x02\0\x03\x12\x04\xbc\x02\x13\x14\n\x0c\n\x04\
+    \x04$\x02\x01\x12\x04\xbd\x02\x02\x12\n\r\n\x05\x04$\x02\x01\x05\x12\x04\
+    \xbd\x02\x02\x08\n\r\n\x05\x04$\x02\x01\x01\x12\x04\xbd\x02\t\r\n\r\n\
+    \x05\x04$\x02\x01\x03\x12\x04\xbd\x02\x10\x11\n\x0c\n\x02\x04%\x12\x06\
+    \xc0\x02\0\xc5\x02\x01\n\x0b\n\x03\x04%\x01\x12\x04\xc0\x02\x08\x15\n\
+    \x0c\n\x04\x04%\x02\0\x12\x04\xc1\x02\x02\x15\n\r\n\x05\x04%\x02\0\x05\
+    \x12\x04\xc1\x02\x02\x08\n\r\n\x05\x04%\x02\0\x01\x12\x04\xc1\x02\t\x10\
+    \n\r\n\x05\x04%\x02\0\x03\x12\x04\xc1\x02\x13\x14\n\x0c\n\x04\x04%\x02\
+    \x01\x12\x04\xc2\x02\x02\x14\n\r\n\x05\x04%\x02\x01\x05\x12\x04\xc2\x02\
+    \x02\x08\n\r\n\x05\x04%\x02\x01\x01\x12\x04\xc2\x02\t\x0f\n\r\n\x05\x04%\
+    \x02\x01\x03\x12\x04\xc2\x02\x12\x13\n\x0c\n\x04\x04%\x02\x02\x12\x04\
+    \xc3\x02\x02\x12\n\r\n\x05\x04%\x02\x02\x05\x12\x04\xc3\x02\x02\x08\n\r\
+    \n\x05\x04%\x02\x02\x01\x12\x04\xc3\x02\t\r\n\r\n\x05\x04%\x02\x02\x03\
+    \x12\x04\xc3\x02\x10\x11\n\x0c\n\x04\x04%\x02\x03\x12\x04\xc4\x02\x02,\n\
+    \r\n\x05\x04%\x02\x03\x04\x12\x04\xc4\x02\x02\n\n\r\n\x05\x04%\x02\x03\
+    \x06\x12\x04\xc4\x02\x0b\x13\n\r\n\x05\x04%\x02\x03\x01\x12\x04\xc4\x02\
+    \x14'\n\r\n\x05\x04%\x02\x03\x03\x12\x04\xc4\x02*+\n\x0c\n\x02\x04&\x12\
+    \x06\xc7\x02\0\xd5\x02\x01\n\x0b\n\x03\x04&\x01\x12\x04\xc7\x02\x08\x11\
+    \n\x0e\n\x04\x04&\x04\0\x12\x06\xc9\x02\x02\xcd\x02\x03\n\r\n\x05\x04&\
+    \x04\0\x01\x12\x04\xc9\x02\x07\x14\n\x0e\n\x06\x04&\x04\0\x02\0\x12\x04\
+    \xca\x02\x04\x0b\n\x0f\n\x07\x04&\x04\0\x02\0\x01\x12\x04\xca\x02\x04\
+    \x06\n\x0f\n\x07\x04&\x04\0\x02\0\x02\x12\x04\xca\x02\t\n\n\x0e\n\x06\
+    \x04&\x04\0\x02\x01\x12\x04\xcb\x02\x04\x11\n\x0f\n\x07\x04&\x04\0\x02\
+    \x01\x01\x12\x04\xcb\x02\x04\x0c\n\x0f\n\x07\x04&\x04\0\x02\x01\x02\x12\
+    \x04\xcb\x02\x0f\x10\n\x0e\n\x06\x04&\x04\0\x02\x02\x12\x04\xcc\x02\x04\
+    \x14\n\x0f\n\x07\x04&\x04\0\x02\x02\x01\x12\x04\xcc\x02\x04\x0f\n\x0f\n\
+    \x07\x04&\x04\0\x02\x02\x02\x12\x04\xcc\x02\x12\x13\n\x0c\n\x04\x04&\x02\
+    \0\x12\x04\xcf\x02\x02\x19\n\r\n\x05\x04&\x02\0\x06\x12\x04\xcf\x02\x02\
+    \x0f\n\r\n\x05\x04&\x02\0\x01\x12\x04\xcf\x02\x10\x14\n\r\n\x05\x04&\x02\
+    \0\x03\x12\x04\xcf\x02\x17\x18\n\x0e\n\x04\x04&\x08\0\x12\x06\xd0\x02\
+    \x02\xd4\x02\x03\n\r\n\x05\x04&\x08\0\x01\x12\x04\xd0\x02\x08\x11\n\x0c\
+    \n\x04\x04&\x02\x01\x12\x04\xd1\x02\x04\x1c\n\r\n\x05\x04&\x02\x01\x06\
+    \x12\x04\xd1\x02\x04\x14\n\r\n\x05\x04&\x02\x01\x01\x12\x04\xd1\x02\x15\
+    \x17\n\r\n\x05\x04&\x02\x01\x03\x12\x04\xd1\x02\x1a\x1b\n\x0c\n\x04\x04&\
+    \x02\x02\x12\x04\xd2\x02\x04'\n\r\n\x05\x04&\x02\x02\x06\x12\x04\xd2\x02\
+    \x04\x19\n\r\n\x05\x04&\x02\x02\x01\x12\x04\xd2\x02\x1a\"\n\r\n\x05\x04&\
+    \x02\x02\x03\x12\x04\xd2\x02%&\n\x0c\n\x04\x04&\x02\x03\x12\x04\xd3\x02\
+    \x04(\n\r\n\x05\x04&\x02\x03\x06\x12\x04\xd3\x02\x04\x17\n\r\n\x05\x04&\
+    \x02\x03\x01\x12\x04\xd3\x02\x18#\n\r\n\x05\x04&\x02\x03\x03\x12\x04\xd3\
+    \x02&'\n\x0c\n\x02\x04'\x12\x06\xd7\x02\0\xda\x02\x01\n\x0b\n\x03\x04'\
+    \x01\x12\x04\xd7\x02\x08\x18\n\x0c\n\x04\x04'\x02\0\x12\x04\xd8\x02\x02\
+    \x18\n\r\n\x05\x04'\x02\0\x05\x12\x04\xd8\x02\x02\x08\n\r\n\x05\x04'\x02\
+    \0\x01\x12\x04\xd8\x02\t\x13\n\r\n\x05\x04'\x02\0\x03\x12\x04\xd8\x02\
+    \x16\x17\n\x0c\n\x04\x04'\x02\x01\x12\x04\xd9\x02\x02\x17\n\r\n\x05\x04'\
+    \x02\x01\x05\x12\x04\xd9\x02\x02\x08\n\r\n\x05\x04'\x02\x01\x01\x12\x04\
+    \xd9\x02\t\x12\n\r\n\x05\x04'\x02\x01\x03\x12\x04\xd9\x02\x15\x16\n\x0c\
+    \n\x02\x04(\x12\x06\xdc\x02\0\xe1\x02\x01\n\x0b\n\x03\x04(\x01\x12\x04\
+    \xdc\x02\x08\x1d\n\x0c\n\x04\x04(\x02\0\x12\x04\xdd\x02\x02\"\n\r\n\x05\
+    \x04(\x02\0\x04\x12\x04\xdd\x02\x02\n\n\r\n\x05\x04(\x02\0\x05\x12\x04\
+    \xdd\x02\x0b\x11\n\r\n\x05\x04(\x02\0\x01\x12\x04\xdd\x02\x12\x1d\n\r\n\
+    \x05\x04(\x02\0\x03\x12\x04\xdd\x02\x20!\n\x0c\n\x04\x04(\x02\x01\x12\
+    \x04\xde\x02\x02!\n\r\n\x05\x04(\x02\x01\x04\x12\x04\xde\x02\x02\n\n\r\n\
+    \x05\x04(\x02\x01\x05\x12\x04\xde\x02\x0b\x11\n\r\n\x05\x04(\x02\x01\x01\
+    \x12\x04\xde\x02\x12\x1c\n\r\n\x05\x04(\x02\x01\x03\x12\x04\xde\x02\x1f\
+    \x20\n\x0c\n\x04\x04(\x02\x02\x12\x04\xdf\x02\x02\x17\n\r\n\x05\x04(\x02\
+    \x02\x05\x12\x04\xdf\x02\x02\x08\n\r\n\x05\x04(\x02\x02\x01\x12\x04\xdf\
+    \x02\t\x12\n\r\n\x05\x04(\x02\x02\x03\x12\x04\xdf\x02\x15\x16\n\x0c\n\
+    \x04\x04(\x02\x03\x12\x04\xe0\x02\x02\x14\n\r\n\x05\x04(\x02\x03\x05\x12\
+    \x04\xe0\x02\x02\x08\n\r\n\x05\x04(\x02\x03\x01\x12\x04\xe0\x02\t\x0f\n\
+    \r\n\x05\x04(\x02\x03\x03\x12\x04\xe0\x02\x12\x13\n\x0c\n\x02\x04)\x12\
+    \x06\xe3\x02\0\xe7\x02\x01\n\x0b\n\x03\x04)\x01\x12\x04\xe3\x02\x08\x1b\
+    \n\x0c\n\x04\x04)\x02\0\x12\x04\xe4\x02\x02\x1e\n\r\n\x05\x04)\x02\0\x06\
+    \x12\x04\xe4\x02\x02\x12\n\r\n\x05\x04)\x02\0\x01\x12\x04\xe4\x02\x13\
+    \x19\n\r\n\x05\x04)\x02\0\x03\x12\x04\xe4\x02\x1c\x1d\n\x0c\n\x04\x04)\
+    \x02\x01\x12\x04\xe5\x02\x021\n\r\n\x05\x04)\x02\x01\x04\x12\x04\xe5\x02\
+    \x02\n\n\r\n\x05\x04)\x02\x01\x05\x12\x04\xe5\x02\x0b\x11\n\r\n\x05\x04)\
+    \x02\x01\x01\x12\x04\xe5\x02\x12,\n\r\n\x05\x04)\x02\x01\x03\x12\x04\xe5\
+    \x02/0\n\x0c\n\x04\x04)\x02\x02\x12\x04\xe6\x02\x022\n\r\n\x05\x04)\x02\
+    \x02\x04\x12\x04\xe6\x02\x02\n\n\r\n\x05\x04)\x02\x02\x06\x12\x04\xe6\
+    \x02\x0b\x1b\n\r\n\x05\x04)\x02\x02\x01\x12\x04\xe6\x02\x1c-\n\r\n\x05\
+    \x04)\x02\x02\x03\x12\x04\xe6\x0201\n\x0c\n\x02\x04*\x12\x06\xe9\x02\0\
+    \xf5\x02\x01\n\x0b\n\x03\x04*\x01\x12\x04\xe9\x02\x08\x18\n\x0e\n\x04\
+    \x04*\x04\0\x12\x06\xeb\x02\x02\xee\x02\x03\n\r\n\x05\x04*\x04\0\x01\x12\
+    \x04\xeb\x02\x07\x1b\n\x0e\n\x06\x04*\x04\0\x02\0\x12\x04\xec\x02\x04\
+    \x0b\n\x0f\n\x07\x04*\x04\0\x02\0\x01\x12\x04\xec\x02\x04\x06\n\x0f\n\
+    \x07\x04*\x04\0\x02\0\x02\x12\x04\xec\x02\t\n\n\x0e\n\x06\x04*\x04\0\x02\
+    \x01\x12\x04\xed\x02\x04\x11\n\x0f\n\x07\x04*\x04\0\x02\x01\x01\x12\x04\
+    \xed\x02\x04\x0c\n\x0f\n\x07\x04*\x04\0\x02\x01\x02\x12\x04\xed\x02\x0f\
+    \x10\n\x0c\n\x04\x04*\x02\0\x12\x04\xf0\x02\x02\x20\n\r\n\x05\x04*\x02\0\
+    \x06\x12\x04\xf0\x02\x02\x16\n\r\n\x05\x04*\x02\0\x01\x12\x04\xf0\x02\
+    \x17\x1b\n\r\n\x05\x04*\x02\0\x03\x12\x04\xf0\x02\x1e\x1f\n\x0e\n\x04\
+    \x04*\x08\0\x12\x06\xf1\x02\x02\xf4\x02\x03\n\r\n\x05\x04*\x08\0\x01\x12\
+    \x04\xf1\x02\x08\x11\n\x0c\n\x04\x04*\x02\x01\x12\x04\xf2\x02\x04\x1c\n\
+    \r\n\x05\x04*\x02\x01\x06\x12\x04\xf2\x02\x04\x14\n\r\n\x05\x04*\x02\x01\
+    \x01\x12\x04\xf2\x02\x15\x17\n\r\n\x05\x04*\x02\x01\x03\x12\x04\xf2\x02\
+    \x1a\x1b\n\x0c\n\x04\x04*\x02\x02\x12\x04\xf3\x02\x04'\n\r\n\x05\x04*\
+    \x02\x02\x06\x12\x04\xf3\x02\x04\x19\n\r\n\x05\x04*\x02\x02\x01\x12\x04\
+    \xf3\x02\x1a\"\n\r\n\x05\x04*\x02\x02\x03\x12\x04\xf3\x02%&b\x06proto3\
 ";
 
 /// `FileDescriptorProto` object which was a source for this generated file
@@ -8127,7 +10318,7 @@ pub fn file_descriptor() -> &'static ::protobuf::reflect::FileDescriptor {
         let generated_file_descriptor = generated_file_descriptor_lazy.get(|| {
             let mut deps = ::std::vec::Vec::with_capacity(1);
             deps.push(::protobuf::well_known_types::timestamp::file_descriptor().clone());
-            let mut messages = ::std::vec::Vec::with_capacity(35);
+            let mut messages = ::std::vec::Vec::with_capacity(44);
             messages.push(Transaction::generated_message_descriptor_data());
             messages.push(BlockMetadataTransaction::generated_message_descriptor_data());
             messages.push(GenesisTransaction::generated_message_descriptor_data());
@@ -8153,6 +10344,14 @@ pub fn file_descriptor() -> &'static ::protobuf::reflect::FileDescriptor {
             messages.push(ScriptFunctionPayload::generated_message_descriptor_data());
             messages.push(ScriptPayload::generated_message_descriptor_data());
             messages.push(ModuleBundlePayload::generated_message_descriptor_data());
+            messages.push(MoveModuleBytecode::generated_message_descriptor_data());
+            messages.push(MoveModule::generated_message_descriptor_data());
+            messages.push(MoveFunction::generated_message_descriptor_data());
+            messages.push(MoveStruct::generated_message_descriptor_data());
+            messages.push(MoveStructGenericTypeParam::generated_message_descriptor_data());
+            messages.push(MoveStructField::generated_message_descriptor_data());
+            messages.push(MoveFunctionGenericTypeParam::generated_message_descriptor_data());
+            messages.push(MoveType::generated_message_descriptor_data());
             messages.push(WriteSetPayload::generated_message_descriptor_data());
             messages.push(ScriptFunctionId::generated_message_descriptor_data());
             messages.push(MoveResource::generated_message_descriptor_data());
@@ -8163,11 +10362,15 @@ pub fn file_descriptor() -> &'static ::protobuf::reflect::FileDescriptor {
             messages.push(MultiEd25519Signature::generated_message_descriptor_data());
             messages.push(MultiAgentSignature::generated_message_descriptor_data());
             messages.push(AccountSignature::generated_message_descriptor_data());
-            let mut enums = ::std::vec::Vec::with_capacity(6);
+            messages.push(move_type::ReferenceType::generated_message_descriptor_data());
+            let mut enums = ::std::vec::Vec::with_capacity(9);
+            enums.push(MoveAbility::generated_enum_descriptor_data());
             enums.push(transaction::TransactionType::generated_enum_descriptor_data());
             enums.push(write_set::WriteSetType::generated_enum_descriptor_data());
             enums.push(write_set_change::WriteSetChangeType::generated_enum_descriptor_data());
             enums.push(transaction_payload::PayloadType::generated_enum_descriptor_data());
+            enums.push(move_function::Visibility::generated_enum_descriptor_data());
+            enums.push(move_type::Type::generated_enum_descriptor_data());
             enums.push(signature::SignatureType::generated_enum_descriptor_data());
             enums.push(account_signature::AccountSignatureType::generated_enum_descriptor_data());
             ::protobuf::reflect::GeneratedFileDescriptor::new_generated(
