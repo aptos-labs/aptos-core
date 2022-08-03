@@ -132,8 +132,9 @@ impl TransactionBenchState {
             HashValue::zero(),
             0,
             0,
-            validator_set.payload().map(|_| false).collect(),
             *validator_set.payload().next().unwrap().account_address(),
+            Some(0),
+            validator_set.payload().map(|_| false).collect(),
             vec![],
             1,
         );

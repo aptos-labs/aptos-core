@@ -176,9 +176,16 @@ module aptos_framework::stake {
         mint_cap: MintCapability<AptosCoin>,
     }
 
+    // TODO change all types to u32 ?
+    struct IndividualValidatorPerformance has copy, store, drop {
+        missed_votes: u64,
+        successful_proposals: u64,
+        failed_proposals: u64,
+    }
+
     struct ValidatorPerformance has key {
         num_blocks: u64,
-        missed_votes: vector<u64>,
+        validators: vector<IndividualValidatorPerformance>,
     }
 
     /// The events emitted for the entire StakePool's lifecycle.
@@ -418,7 +425,7 @@ module aptos_framework::stake {
         });
         move_to(aptos_framework, ValidatorPerformance {
             num_blocks: 0,
-            missed_votes: vector::empty(),
+            validators: vector::empty(),
         });
     }
 
@@ -860,22 +867,45 @@ module aptos_framework::stake {
 
     /// Update the number of missed votes. This is only called by block::prologue().
     /// This function cannot abort.
-    public(friend) fun update_performance_statistics(missed_votes: vector<u64>) acquires ValidatorPerformance {
+    public(friend) fun update_performance_statistics(proposer_index_optional: vector<u64>, failed_proposer_indices: vector<u64>, missed_votes: vector<u64>) acquires ValidatorPerformance {
         // Validator set cannot change until the end of the epoch, so the validator index in list of missed votes should
         // match with those of the missed vote counts in ValidatorPerformance resource.
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
-        let validator_missed_votes_counts = &mut validator_perf.missed_votes;
-        let i = 0;
-        let len = vector::length(&missed_votes);
-        while (i < len) {
-            let validator_index = *vector::borrow(&missed_votes, i);
-            // Skip any validator indices that are out of bounds, this ensures that this function doesn't abort if there
-            // are out of bounds errors.
-            if (validator_index < vector::length(validator_missed_votes_counts)) {
-                let missed_votes_count = vector::borrow_mut(validator_missed_votes_counts, validator_index);
-                *missed_votes_count = *missed_votes_count + 1;
+        let validators = &mut validator_perf.validators;
+        let validator_len = vector::length(validators);
+
+        // proposer_indices is a vector because it can be missing (for NilBlocks)
+        let p_len = vector::length(&proposer_index_optional);
+        if (p_len >= 1) {
+            let proposer_index = *vector::borrow(&proposer_index_optional, 0);
+            // Here, and in all other vector::borrow, skip any validator indices that are out of bounds,
+            // this ensures that this function doesn't abort if there are out of bounds errors.
+            if (proposer_index < validator_len) {
+                let validator = vector::borrow_mut(validators, proposer_index);
+                validator.successful_proposals = validator.successful_proposals + 1;
             };
-            i = i + 1;
+        };
+
+        let f = 0;
+        let f_len = vector::length(&failed_proposer_indices);
+        while (f < f_len) {
+            let validator_index = *vector::borrow(&failed_proposer_indices, f);
+            if (validator_index < validator_len) {
+                let validator = vector::borrow_mut(validators, validator_index);
+                validator.failed_proposals = validator.failed_proposals + 1;
+            };
+            f = f + 1;
+        };
+
+        let m = 0;
+        let m_len = vector::length(&missed_votes);
+        while (m < m_len) {
+            let validator_index = *vector::borrow(&missed_votes, m);
+            if (validator_index < validator_len) {
+                let validator = vector::borrow_mut(validators, validator_index);
+                validator.missed_votes = validator.missed_votes + 1;
+            };
+            m = m + 1;
         };
         validator_perf.num_blocks = validator_perf.num_blocks + 1;
     }
@@ -925,7 +955,7 @@ module aptos_framework::stake {
         let len = vector::length(&validator_set.active_validators);
         let next_epoch_validators = vector::empty();
         validator_perf.num_blocks = 0;
-        validator_perf.missed_votes = vector::empty();
+        validator_perf.validators = vector::empty();
         while (i < len) {
             let old_validator_info = vector::borrow_mut(&mut validator_set.active_validators, i);
             let pool_address = old_validator_info.addr;
@@ -944,7 +974,11 @@ module aptos_framework::stake {
             };
 
             vector::push_back(&mut next_epoch_validators, new_validator_info);
-            vector::push_back(&mut validator_perf.missed_votes, 0);
+            vector::push_back(&mut validator_perf.validators, IndividualValidatorPerformance {
+                missed_votes: 0,
+                successful_proposals: 0,
+                failed_proposals: 0,
+            });
 
             // Automatically renew a validator's lockup for validators that will still be in the validator set in the
             // next epoch.
@@ -1009,7 +1043,8 @@ module aptos_framework::stake {
     ) acquires StakePool, StakePoolEvents, AptosCoinCapabilities, ValidatorConfig {
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
-        let num_missed_votes = *vector::borrow(&validator_perf.missed_votes, validator_config.validator_index);
+        let cur_validator_perf = *vector::borrow(&validator_perf.validators, validator_config.validator_index);
+        let num_missed_votes = cur_validator_perf.missed_votes;
         let num_blocks = validator_perf.num_blocks;
         let num_successful_votes = num_blocks - num_missed_votes;
 
@@ -1743,9 +1778,10 @@ module aptos_framework::stake {
 
         // Validator 2 missed votes.
         let missed_votes = vector::empty<u64>();
+        let validator_1_index = borrow_global<ValidatorConfig>(validator_1_address).validator_index;
         let validator_2_index = borrow_global<ValidatorConfig>(validator_2_address).validator_index;
         vector::push_back(&mut missed_votes, validator_2_index);
-        update_performance_statistics(missed_votes);
+        update_performance_statistics(vector::empty<u64>(validator_1_index), vector::empty<u64>(), missed_votes);
         end_epoch();
 
         // Validator 2 received no rewards. Validator 1 didn't miss votes so it still receives rewards.
@@ -1757,9 +1793,10 @@ module aptos_framework::stake {
         leave_validator_set(&validator_2, validator_2_address);
         let missed_votes = vector::empty<u64>();
         let validator_1_index = borrow_global<ValidatorConfig>(validator_1_address).validator_index;
+        let validator_2_index = borrow_global<ValidatorConfig>(validator_2_address).validator_index;
         vector::push_back(&mut missed_votes, validator_1_index);
         vector::push_back(&mut missed_votes, validator_2_index);
-        update_performance_statistics(missed_votes);
+        update_performance_statistics(vector::empty<u64>(), vector::empty<u64>(), missed_votes);
         // Fast forward so validator 2's stake is fully unlocked.
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_epoch();
@@ -1787,17 +1824,29 @@ module aptos_framework::stake {
         join_validator_set(&validator, validator_address);
         end_epoch();
 
-        // Invalid validator index in the missed votes vector should not lead to abort.
-        let missed_votes = vector::empty<u64>();
         let valid_validator_index = borrow_global<ValidatorConfig>(validator_address).validator_index;
         let out_of_bounds_index = valid_validator_index + 100;
+
+        // Invalid validator index in the missed votes vector should not lead to abort.
+        let missed_votes = vector::empty<u64>();
         vector::push_back(&mut missed_votes, valid_validator_index);
         vector::push_back(&mut missed_votes, out_of_bounds_index);
-        update_performance_statistics(missed_votes);
+        update_performance_statistics(vector::empty<u64>(), vector::empty<u64>(), missed_votes);
         end_epoch();
 
         // Validator received no rewards due to missing votes.
         assert_validator_state(validator_address, 100, 0, 0, 0, 0);
+
+        let proposer_indices = vector::empty<u64>();
+        vector::push_back(&mut proposer_indices, out_of_bounds_index);
+        update_performance_statistics(proposer_indices, vector::empty<u64>(), vector::empty<u64>());
+        end_epoch();
+
+        let failed_proposer_indices = vector::empty<u64>();
+        vector::push_back(&mut failed_proposer_indices, valid_validator_index);
+        vector::push_back(&mut failed_proposer_indices, out_of_bounds_index);
+        update_performance_statistics(vector::empty<u64>(), failed_proposer_indices, vector::empty<u64>());
+        end_epoch();
     }
 
     #[test(aptos_framework = @aptos_framework)]

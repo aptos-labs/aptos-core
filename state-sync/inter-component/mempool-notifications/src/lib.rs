@@ -374,8 +374,9 @@ mod tests {
             HashValue::new([0; HashValue::LENGTH]),
             0,
             300000001,
-            vec![false],
             AccountAddress::random(),
+            Some(0),
+            vec![false],
             vec![],
             1,
         ))

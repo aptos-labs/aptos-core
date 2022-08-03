@@ -14,8 +14,7 @@ use crate::liveness::{
 use aptos_infallible::Mutex;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::NewBlockEvent,
-    block_metadata::new_block_event_key,
+    account_config::{new_block_event_key, NewBlockEvent},
     contract_event::{ContractEvent, EventWithVersion},
     event::EventKey,
     transaction::Version,

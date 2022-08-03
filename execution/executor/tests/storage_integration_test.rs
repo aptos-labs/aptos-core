@@ -119,8 +119,9 @@ fn test_reconfiguration() {
         gen_block_id(1),
         0,
         1,
-        vec![false],
         validator_account,
+        Some(0),
+        vec![false],
         vec![],
         300000001,
     ));
