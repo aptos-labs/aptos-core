@@ -3,8 +3,9 @@
 
 #[cfg(test)]
 mod direct_mempool_quorum_store_test;
+mod proof_builder_test;
+mod quorum_store_db_test;
 #[cfg(test)]
 mod quorum_store_wrapper_test;
 mod types_test;
 mod utils;
-mod quorum_store_db_test;

@@ -351,7 +351,9 @@ impl QuorumStoreWrapper {
                 Some(next_proof) = proofs_in_progress.next() => {
             match next_proof {
             Ok(proof) => self.handle_local_proof(proof, &mut network_sender).await,
-            Err(_) => {}
+            Err(_) => {
+                            debug!("QS: proof oneshot dropped");
+                        }
             }
                 },
                 Some(msg) = consensus_receiver.next() => {

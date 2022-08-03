@@ -150,7 +150,6 @@ impl BatchStore {
                 }
                 Some(SignedDigest::new(
                     self.epoch,
-                    self.my_peer_id,
                     persist_request.digest,
                     expiration,
                     self.validator_signer.clone(),

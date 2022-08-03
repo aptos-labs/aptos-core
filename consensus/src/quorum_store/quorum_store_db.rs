@@ -88,7 +88,7 @@ impl BatchIdDB for QuorumStoreDB {
         let epoch_batch_id = iter.collect::<Result<HashMap<u64, Round>>>()?;
         let mut ret = None;
         for (epoch, batch_id) in epoch_batch_id {
-            assert!(current_epoch>=epoch);
+            assert!(current_epoch >= epoch);
             if epoch < current_epoch {
                 self.delete_batch_id(epoch)
                     .expect("Could not delete from db");

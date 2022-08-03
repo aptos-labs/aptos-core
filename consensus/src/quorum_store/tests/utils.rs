@@ -1,14 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{ed25519::{Ed25519PrivateKey, Ed25519Signature}, HashValue, PrivateKey, Uniform};
+use aptos_crypto::hash::DefaultHasher;
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519Signature},
+    HashValue, PrivateKey, Uniform,
+};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{RawTransaction, Script, SignedTransaction, Transaction, TransactionPayload},
 };
 use bcs::to_bytes;
-use aptos_crypto::hash::DefaultHasher;
 
 /// Creates a single test transaction
 pub fn create_transaction() -> Transaction {
