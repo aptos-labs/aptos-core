@@ -20,7 +20,7 @@ on:
       FORGE_RUNNER_DURATION_SECS:
         required: false
         type: string
-        default: 300
+        default: 480
         description: Duration of the forge test run
 
 env:
