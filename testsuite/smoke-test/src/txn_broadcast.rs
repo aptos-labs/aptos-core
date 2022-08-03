@@ -32,12 +32,6 @@ async fn test_txn_broadcast() {
         )
         .unwrap();
 
-    for validator in swarm.validators_mut() {
-        validator
-            .wait_until_healthy(Instant::now() + Duration::from_secs(10))
-            .await
-            .unwrap();
-    }
     for fullnode in swarm.full_nodes_mut() {
         fullnode
             .wait_until_healthy(Instant::now() + Duration::from_secs(10))

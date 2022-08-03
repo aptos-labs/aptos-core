@@ -33,12 +33,6 @@ async fn test_full_node_basic_flow() {
     let pfn_peer_id = swarm
         .add_full_node(&version, NodeConfig::default_for_public_full_node())
         .unwrap();
-    swarm
-        .validator_mut(validator_peer_id)
-        .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
-        .await
-        .unwrap();
     for fullnode in swarm.full_nodes_mut() {
         fullnode
             .wait_until_healthy(Instant::now() + Duration::from_secs(10))
@@ -134,12 +128,6 @@ async fn test_vfn_failover() {
             )
             .unwrap();
         vfns.push(vfn);
-    }
-    for validator in swarm.validators_mut() {
-        validator
-            .wait_until_healthy(Instant::now() + Duration::from_secs(10))
-            .await
-            .unwrap();
     }
     for fullnode in swarm.full_nodes_mut() {
         fullnode
