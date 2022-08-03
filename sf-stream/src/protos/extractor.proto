@@ -55,7 +55,7 @@ message UserTransaction {
 message Event {
   EventKey key = 1;
   uint64 sequence_number = 2;
-  string type = 3;
+  MoveType type = 3;
   string data = 4;
 }
 
