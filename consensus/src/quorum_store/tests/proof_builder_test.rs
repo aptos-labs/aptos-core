@@ -12,6 +12,7 @@ use futures::channel::oneshot;
 use std::sync::Arc;
 use tokio::runtime;
 use tokio::sync::mpsc::channel;
+use crate::quorum_store::quorum_store::QuorumStoreError;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_proof_builder_basic() {
@@ -34,6 +35,7 @@ async fn test_proof_builder_basic() {
         assert!(proof_builder_tx.send(ProofBuilderCommand::AppendSignature(signed_digest)).await.is_ok());
     }
 
+    // check normal path
     let (proof, batch_id) = proof_rx
         .await
         .expect("channel dropped")
@@ -43,7 +45,36 @@ async fn test_proof_builder_basic() {
     assert!(proof.verify(&verifier).is_ok());
 
 
+    // check that error path
     let (proof_tx, proof_rx) = oneshot::channel();
-    assert!(proof_builder_tx.send(ProofBuilderCommand::InitProof(signed_digest, 4, proof_tx)).await.is_ok());
-    assert!(proof_rx.await.expect("channel dropped").is_err());
+    assert!(proof_builder_tx.send(ProofBuilderCommand::InitProof(signed_digest.clone(), 4, proof_tx)).await.is_ok());
+    assert_eq!(proof_rx.await.expect("channel dropped"), Err(QuorumStoreError::Timeout(4)));
+
+    // check same digest after expiration
+    let (proof_tx, proof_rx) = oneshot::channel();
+    assert!(proof_builder_tx.send(ProofBuilderCommand::InitProof(signed_digest.clone(), 4, proof_tx)).await.is_ok());
+    for i in 1..arc_signers.len() {
+        let signed_digest =
+            SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[i].clone());
+        assert!(proof_builder_tx.send(ProofBuilderCommand::AppendSignature(signed_digest)).await.is_ok());
+    }
+    let (proof, batch_id) = proof_rx
+        .await
+        .expect("channel dropped")
+        .unwrap();
+    assert_eq!(batch_id, 4);
+    assert_eq!(proof.digest().clone(), digest);
+    assert!(proof.verify(&verifier).is_ok());
+
+    // check wrong signatures
+    let (proof_tx, proof_rx) = oneshot::channel();
+    assert!(proof_builder_tx.send(ProofBuilderCommand::InitProof(signed_digest, 10, proof_tx)).await.is_ok());
+    for i in 1..arc_signers.len() {
+        let signed_digest =
+            SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[1].clone());
+        assert!(proof_builder_tx.send(ProofBuilderCommand::AppendSignature(signed_digest)).await.is_ok());
+    }
+    assert_eq!(proof_rx.await.expect("channel dropped"), Err(QuorumStoreError::Timeout(10)));
+
+
 }
