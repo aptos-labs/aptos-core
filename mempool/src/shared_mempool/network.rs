@@ -596,7 +596,7 @@ impl PrioritizedPeersComparator {
                 let role_a = peer_a.1;
                 let role_b = peer_b.1;
                 match role_a.cmp(&role_b) {
-                    // Tiebreak by hash_peer_id. Stable within a mempool instance but random between instances.
+                    // Tiebreak by hash_peer_id.
                     Ordering::Equal => {
                         let hash_a = self.hash_peer_id(&peer_network_id_a.peer_id());
                         let hash_b = self.hash_peer_id(&peer_network_id_b.peer_id());
@@ -610,6 +610,7 @@ impl PrioritizedPeersComparator {
         }
     }
 
+    /// Stable within a mempool instance but random between instances.
     fn hash_peer_id(&self, peer_id: &PeerId) -> u64 {
         let mut hasher = self.random_state.build_hasher();
         hasher.write(peer_id.as_ref());
