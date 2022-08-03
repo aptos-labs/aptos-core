@@ -140,6 +140,8 @@ struct Resize {
     namespace: String,
     #[structopt(long, default_value = "30")]
     num_validators: usize,
+    #[structopt(long, default_value = "1")]
+    num_fullnodes: usize,
     #[structopt(
         long,
         help = "Override the image tag used for validators",
@@ -242,6 +244,7 @@ fn main() -> Result<()> {
                 runtime.block_on(install_testnet_resources(
                     resize.namespace,
                     resize.num_validators,
+                    resize.num_fullnodes,
                     resize.validator_image_tag,
                     resize.testnet_image_tag,
                     resize.move_modules_dir,
@@ -388,6 +391,7 @@ fn single_test_suite(test_name: &str) -> ForgeConfig<'static> {
 fn land_blocking_test_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+        .with_initial_fullnode_count(1)
         .with_network_tests(&[&PerformanceBenchmark])
 }
 
