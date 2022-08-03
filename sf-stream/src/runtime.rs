@@ -127,12 +127,10 @@ impl SfStreamer {
             Ok(version_result) => match version_result {
                 Some(oldest_version) => {
                     if oldest_version > &self.current_version {
-                        warn!(
+                        panic!(
                             "[sf-stream] oldest txn version is {} but requested version is {}",
                             oldest_version, &self.current_version
                         );
-                        sleep(Duration::from_millis(300)).await;
-                        return vec![];
                     }
                 }
                 None => {
