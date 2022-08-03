@@ -16,9 +16,11 @@ export interface WalletAccount {
   mnemonic: MnemonicState
 }
 
-export interface LocalStorageState {
-  accounts: {
-    [address: string]: WalletAccount
-  } | null,
-  currAccountAddress: string | null;
-}
+export type AccountsState = {
+  [address: string]: WalletAccount
+};
+
+export type DecryptedState = {
+  accounts: AccountsState,
+  decryptionKey: string
+} | null;

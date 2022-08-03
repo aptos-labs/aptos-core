@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export const KEY_LENGTH: number = 64;
-export const WALLET_STATE_LOCAL_STORAGE_KEY = 'aptosWalletState';
+export const WALLET_ENCRYPTED_ACCOUNTS_KEY = 'aptosEncryptedAccounts';
+export const WALLET_SESSION_ACCOUNTS_KEY = 'aptosSessionAccounts';
+export const WALLET_STATE_ACCOUNT_ADDRESS_KEY = 'accountAddress';
 export const WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY = 'aptosWalletNetworkState';
 
 export const STATIC_GAS_AMOUNT = 150;

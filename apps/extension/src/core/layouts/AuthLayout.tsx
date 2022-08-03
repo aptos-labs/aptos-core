@@ -6,6 +6,7 @@ import { useWalletState } from 'core/hooks/useWalletState';
 import React, { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { RoutePaths } from 'core/routes';
+import { isWalletLocked } from 'core/utils/account';
 
 interface AuthLayoutProps {
   children: React.ReactNode,
@@ -43,6 +44,9 @@ export default function AuthLayout({
     }
   }, [routePath]);
 
+  if (isWalletLocked()) {
+    return <Navigate to="/password" />;
+  }
   const redirect = <Navigate to={redirectPath} />;
 
   switch (routePath) {

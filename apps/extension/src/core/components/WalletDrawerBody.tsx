@@ -173,18 +173,18 @@ function WalletDrawerBodyListItem(
 }
 
 function WalletDrawerBody() {
-  const { switchAccount, walletState } = useWalletState();
+  const { accounts, currAccountAddress, switchAccount } = useWalletState();
   const navigate = useNavigate();
 
   const onClick = (address: string) => {
-    if (walletState.accounts) {
+    if (accounts) {
       switchAccount({ accountAddress: address });
       navigate(Routes.login.routePath);
     }
   };
 
   const { getRadioProps, getRootProps } = useRadioGroup({
-    defaultValue: walletState.currAccountAddress || undefined,
+    defaultValue: currAccountAddress || undefined,
     name: 'aptosWalletAccount',
     onChange: onClick,
   });
@@ -193,7 +193,7 @@ function WalletDrawerBody() {
 
   return (
     <VStack {...group} spacing={2} width="100%" py={2}>
-      {walletState.accounts && Object.keys(walletState.accounts).map((address) => {
+      {accounts && Object.keys(accounts).map((address) => {
         const radio = getRadioProps({ value: address });
         return (
           <WalletDrawerBodyListItem

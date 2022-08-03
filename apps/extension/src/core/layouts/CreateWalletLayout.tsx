@@ -64,13 +64,17 @@ const NextButton = () => {
       setIsLoading(true);
       const mnemonicObject = await generateMnemonicObject(mnemonicString);
       const aptosAccount = new AptosAccount(mnemonicObject.seed);
-      await addAccount({ account: aptosAccount, mnemonic: mnemonicObject });
+      await addAccount({
+        account: aptosAccount,
+        mnemonic: mnemonicObject,
+        password: confirmPassword,
+      });
       setIsLoading(false);
       nextStep();
     } else if (activeStep === 2) {
       navigate(Routes.wallet.routePath);
     }
-  }, [activeStep, addAccount, mnemonicString, navigate, nextStep]);
+  }, [activeStep, addAccount, confirmPassword, mnemonicString, navigate, nextStep]);
 
   const NextButtonComponent = useMemo(() => {
     const baseNextButton = (

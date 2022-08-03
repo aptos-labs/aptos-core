@@ -6,11 +6,19 @@ export default class Browser {
     return !process.env.NODE_ENV || process.env.NODE_ENV === 'development';
   }
 
-  public static storage() {
+  public static persistentStorage() {
     if (this.isDev()) {
       return null;
     }
     return chrome.storage.local;
+  }
+
+  public static sessionStorage() {
+    if (this.isDev()) {
+      return null;
+    }
+    // chrome.storage.session is still waiting to get into the @types/chrome
+    return ((chrome.storage as any).session);
   }
 
   public static tabs() {

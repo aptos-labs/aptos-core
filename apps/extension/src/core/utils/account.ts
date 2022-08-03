@@ -2,9 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosAccount } from 'aptos';
-import { WALLET_STATE_LOCAL_STORAGE_KEY, WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY } from 'core/constants';
 import {
-  AptosAccountState, LocalStorageState, Mnemonic, MnemonicState,
+  WALLET_ENCRYPTED_ACCOUNTS_KEY,
+  WALLET_SESSION_ACCOUNTS_KEY,
+  WALLET_STATE_ACCOUNT_ADDRESS_KEY,
+  WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY,
+} from 'core/constants';
+import {
+  AccountsState,
+  AptosAccountState,
+  DecryptedState,
+  Mnemonic,
+  MnemonicState,
 } from 'core/types/stateTypes';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
@@ -38,56 +47,125 @@ export function createNewAccount(): AptosAccount {
   return account;
 }
 
-export function getLocalStorageState(): LocalStorageState | null {
-  // Get from local storage by key
-  const item = window.localStorage.getItem(WALLET_STATE_LOCAL_STORAGE_KEY);
+export function getCurrAccountAddress(): string | null {
+  const address = window.localStorage.getItem(WALLET_STATE_ACCOUNT_ADDRESS_KEY);
+  return address ?? null;
+}
+
+export function getEncryptedAccounts(): AccountsState | null {
+  const item = window.localStorage.getItem(WALLET_ENCRYPTED_ACCOUNTS_KEY);
   if (item) {
-    const localStorageState: LocalStorageState = JSON.parse(item);
-    return localStorageState;
+    const accounts: AccountsState = JSON.parse(item);
+    return accounts;
   }
   return null;
 }
 
-export function getAptosAccountState(localStorage: LocalStorageState): AptosAccountState {
-  const { accounts, currAccountAddress } = localStorage;
-  const currAccountAddressString = currAccountAddress?.toString();
-  if (!currAccountAddressString || !accounts) {
-    return undefined;
+export function getDecryptedAccounts(): AccountsState | null {
+  const item = window.sessionStorage.getItem(WALLET_SESSION_ACCOUNTS_KEY);
+  if (item) {
+    const decryptedState: DecryptedState = JSON.parse(item);
+    return decryptedState?.accounts ?? null;
   }
-  const aptosAccountObject = accounts[currAccountAddressString].aptosAccount;
-  return aptosAccountObject ? AptosAccount.fromAptosAccountObject(aptosAccountObject) : undefined;
+  return null;
 }
 
-export function getMnemonicState(localStorage: LocalStorageState): MnemonicState {
-  const { accounts, currAccountAddress } = localStorage;
-  const currAccountAddressString = currAccountAddress?.toString();
-  if (!currAccountAddressString || !accounts) {
+export function isWalletLocked(): boolean {
+  const localStorageState = getEncryptedAccounts();
+  const currAccountAddress = getCurrAccountAddress();
+  return (localStorageState?.encrypted_accounts !== null
+          && currAccountAddress !== null
+          && getDecryptedAccounts() === null);
+}
+
+export async function storeEncryptedAccounts(
+  accounts: AccountsState,
+  password: string | undefined,
+) {
+  // todo: encrypt/decrypt encrypted_accounts
+  // eslint-disable-next-line no-console
+  console.log(password);
+
+  const decryptedState: DecryptedState = {
+    accounts,
+    decryptionKey: password ?? '',
+  };
+  const decryptedStateString = JSON.stringify(decryptedState);
+  const accountsString = JSON.stringify(accounts);
+  localStorage.setItem(
+    WALLET_ENCRYPTED_ACCOUNTS_KEY,
+    accountsString,
+  );
+  window.sessionStorage.setItem(
+    WALLET_SESSION_ACCOUNTS_KEY,
+    decryptedStateString,
+  );
+  Browser.sessionStorage()?.set({ [WALLET_SESSION_ACCOUNTS_KEY]: decryptedStateString });
+}
+
+export function unlockAccounts(password: string): AccountsState | null {
+  const encryptedAccounts = getEncryptedAccounts();
+
+  // todo: encrypt/decrypt encrypted_accounts
+  // eslint-disable-next-line no-console
+  console.log(password);
+
+  const decryptedState: DecryptedState = encryptedAccounts ? {
+    accounts: encryptedAccounts,
+    decryptionKey: password,
+  } : null;
+  const decryptedString = JSON.stringify(decryptedState);
+  window.sessionStorage.setItem(
+    WALLET_SESSION_ACCOUNTS_KEY,
+    decryptedString,
+  );
+  Browser.sessionStorage()?.set([WALLET_SESSION_ACCOUNTS_KEY], decryptedString);
+  return encryptedAccounts ?? null;
+}
+
+export function getAptosAccountState(accounts: AccountsState, address: string): AptosAccountState {
+  if (address && accounts) {
+    const aptosAccountObject = accounts[address].aptosAccount;
+    return aptosAccountObject ? AptosAccount.fromAptosAccountObject(aptosAccountObject) : undefined;
+  }
+  return undefined;
+}
+
+export function getMnemonicState(address: string): MnemonicState {
+  const accounts = getDecryptedAccounts();
+  if (!address || !accounts) {
     return undefined;
   }
-  const { mnemonic } = accounts[currAccountAddressString];
+  const { mnemonic } = accounts[address];
   return mnemonic;
 }
 
+// todo: fix this to prompt the password for the encryption if needed
 export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
   return new Promise((resolve) => {
-    Browser.storage()?.get([WALLET_STATE_LOCAL_STORAGE_KEY], (result: any) => {
-      if (!result[WALLET_STATE_LOCAL_STORAGE_KEY]) {
-        resolve(undefined);
-      }
-      const localStorage: LocalStorageState = JSON.parse(result[WALLET_STATE_LOCAL_STORAGE_KEY]);
-      if (localStorage) {
-        const aptosAccount = getAptosAccountState(localStorage);
-        resolve(aptosAccount);
-      } else {
-        resolve(undefined);
-      }
+    Browser.persistentStorage()?.get([WALLET_STATE_ACCOUNT_ADDRESS_KEY], (addressResult: any) => {
+      const address: string = addressResult[WALLET_STATE_ACCOUNT_ADDRESS_KEY];
+      Browser.sessionStorage()?.get([WALLET_SESSION_ACCOUNTS_KEY], (accountResult: any) => {
+        if (!accountResult[WALLET_SESSION_ACCOUNTS_KEY]) {
+          resolve(undefined);
+        }
+        const result = accountResult[WALLET_SESSION_ACCOUNTS_KEY];
+        const decryptedState: DecryptedState = JSON.parse(result);
+        const accounts = decryptedState?.accounts;
+        if (accounts && address) {
+          const aptosAccount = getAptosAccountState(accounts, address);
+          resolve(aptosAccount);
+        } else {
+          resolve(undefined);
+        }
+      });
     });
   });
 }
 
 export function getBackgroundNodeUrl(): Promise<string> {
   return new Promise((resolve) => {
-    Browser.storage()?.get([WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY], (result: any) => {
+    Browser.persistentStorage()?.get([WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY], (result: any) => {
       const network = result[WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY];
       if (network) {
         resolve(network);

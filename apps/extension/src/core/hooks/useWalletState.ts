@@ -4,10 +4,18 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import constate from 'constate';
-import { getLocalStorageState } from 'core/utils/account';
-import { WALLET_STATE_LOCAL_STORAGE_KEY, WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY } from 'core/constants';
 import {
-  AptosAccountState, LocalStorageState, Mnemonic, WalletAccount,
+  getDecryptedAccounts, getCurrAccountAddress, storeEncryptedAccounts,
+} from 'core/utils/account';
+import {
+  WALLET_STATE_ACCOUNT_ADDRESS_KEY,
+  WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY,
+} from 'core/constants';
+import {
+  AccountsState,
+  AptosAccountState,
+  Mnemonic,
+  WalletAccount,
 } from 'core/types/stateTypes';
 import {
   getFaucetUrlFromNodeUrl, getLocalStorageNodeNetworkUrl, NodeUrl,
@@ -27,19 +35,15 @@ import {
 } from 'core/components/Toast';
 import { ProviderEvent, sendProviderEvent } from 'core/utils/providerEvents';
 
-const defaultValue: LocalStorageState = {
-  accounts: null,
-  currAccountAddress: null,
-};
-
 export interface UpdateWalletStateProps {
   account: AptosAccountState
 }
 
 export interface AddAccountProps {
   account: AptosAccount
-  isImport?: boolean;
+  isImport?: boolean
   mnemonic?: Mnemonic
+  password?: string
 }
 
 export interface RemoveAccountProps {
@@ -47,19 +51,36 @@ export interface RemoveAccountProps {
 }
 
 export default function useWalletStateRecorder() {
-  const [localStorageState, setLocalStorageState] = useState<LocalStorageState>(
-    () => getLocalStorageState() ?? defaultValue,
+  const currAccountAddress = getCurrAccountAddress();
+
+  const [activeAccounts, setActiveAccounts] = useState<AccountsState | null>(
+    () => getDecryptedAccounts(),
   );
 
-  const { currAccountAddress } = localStorageState;
+  const updateCurrAccountAddress = (address: string | null) => {
+    if (address) {
+      window.localStorage.setItem(WALLET_STATE_ACCOUNT_ADDRESS_KEY, address);
+    } else {
+      window.localStorage.removeItem(WALLET_STATE_ACCOUNT_ADDRESS_KEY);
+    }
+    Browser.persistentStorage()?.set({ [WALLET_STATE_ACCOUNT_ADDRESS_KEY]: address });
+  };
 
-  const aptosAccount = (localStorageState.accounts && currAccountAddress)
+  const updateAccountsState = async (
+    accounts: AccountsState,
+    password: string | undefined = undefined,
+  ) => {
+    setActiveAccounts(accounts);
+    await storeEncryptedAccounts(accounts, password);
+  };
+
+  const aptosAccount = (activeAccounts && currAccountAddress)
     ? AptosAccount.fromAptosAccountObject(
-      localStorageState.accounts[currAccountAddress].aptosAccount,
+      activeAccounts[currAccountAddress].aptosAccount,
     ) : undefined;
 
-  const accountMnemonic = (localStorageState.accounts && currAccountAddress)
-    ? localStorageState.accounts[currAccountAddress].mnemonic
+  const accountMnemonic = (activeAccounts && currAccountAddress)
+    ? activeAccounts[currAccountAddress].mnemonic
     : undefined;
 
   const [nodeUrl, setNodeUrl] = useState<NodeUrl>(
@@ -72,7 +93,7 @@ export default function useWalletStateRecorder() {
   );
 
   const addAccount = useCallback(async ({
-    account, isImport = false, mnemonic,
+    account, isImport = false, mnemonic, password = undefined,
   }: AddAccountProps) => {
     const newAccountAddress = account.address().hex();
 
@@ -85,26 +106,16 @@ export default function useWalletStateRecorder() {
       aptosAccount: account.toPrivateKeyObject(),
       mnemonic,
     };
-    let localStorageStateCopy = { ...localStorageState };
-    localStorageStateCopy = {
-      accounts: {
-        ...localStorageStateCopy.accounts,
-        [newAccountAddress]: newAccount,
-      },
-      currAccountAddress: newAccountAddress,
-    };
     try {
       if (faucetNetwork) {
         const faucetClient = new FaucetClient(nodeUrl, faucetNetwork);
         await faucetClient.fundAccount(account.address(), 0);
       }
-      setLocalStorageState(localStorageStateCopy);
-      const localStorageStateString = JSON.stringify(localStorageStateCopy);
-      window.localStorage.setItem(
-        WALLET_STATE_LOCAL_STORAGE_KEY,
-        localStorageStateString,
-      );
-      Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateString });
+      await updateAccountsState({
+        ...activeAccounts,
+        [account.address().hex()]: newAccount,
+      }, password);
+      updateCurrAccountAddress(account.address().hex());
       sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED, account);
       if (isImport) {
         importAccountToast();
@@ -120,74 +131,63 @@ export default function useWalletStateRecorder() {
       console.error(err);
       throw err;
     }
-  }, [nodeUrl, faucetNetwork, localStorageState]);
+  }, [nodeUrl, faucetNetwork, activeAccounts]);
 
   const switchAccount = useCallback(({ accountAddress }: RemoveAccountProps) => {
     if (!accountAddress
-      || (localStorageState.accounts
-         && localStorageState.accounts[accountAddress] === undefined)
+      || (activeAccounts
+         && activeAccounts[accountAddress] === undefined)
     ) {
       console.error('No account found');
       return;
     }
     const account = AptosAccount.fromAptosAccountObject(
-      localStorageState.accounts![accountAddress].aptosAccount,
+      activeAccounts![accountAddress].aptosAccount,
     );
-    const localStorageStateCopy = {
-      ...localStorageState,
-      currAccountAddress: accountAddress,
-    };
     try {
-      setLocalStorageState(localStorageStateCopy);
-      const localStorageStateString = JSON.stringify(localStorageStateCopy);
-      window.localStorage.setItem(
-        WALLET_STATE_LOCAL_STORAGE_KEY,
-        localStorageStateString,
-      );
-      Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateString });
+      updateCurrAccountAddress(accountAddress);
       switchAccountToast(accountAddress);
       sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED, account);
     } catch (error) {
       switchAccountErrorToast();
       console.error(error);
     }
-  }, [localStorageState]);
+  }, [activeAccounts]);
 
   const updateNetworkState = useCallback((network: NodeUrl) => {
     try {
       setNodeUrl(network);
       window.localStorage.setItem(WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY, network);
-      Browser.storage()?.set({ [WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY]: network });
+      Browser.persistentStorage()?.set({ [WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY]: network });
       sendProviderEvent(ProviderEvent.NETWORK_CHANGED, aptosAccount);
     } catch (error) {
       console.error(error);
     }
   }, [aptosAccount]);
 
-  const removeAccount = useCallback(({
+  const removeAccount = useCallback(async ({
     accountAddress,
   }: RemoveAccountProps) => {
     let newAccountAddress: string | null = null;
     let toastMessage = `Still using account with address: ${accountAddress?.substring(0, 6)}...`;
-    let localStorageStateCopy: LocalStorageState = { ...localStorageState };
     if (
       !accountAddress
-      || !localStorageStateCopy.accounts
-      || localStorageStateCopy.accounts[accountAddress] === undefined
+      || !activeAccounts
+      || activeAccounts[accountAddress] === undefined
     ) {
       console.error('No account found');
       return;
     }
-    delete localStorageStateCopy.accounts[accountAddress];
+    delete activeAccounts[accountAddress];
 
-    if (Object.keys(localStorageStateCopy.accounts).length === 0) {
+    if (Object.keys(activeAccounts).length === 0) {
       newAccountAddress = null;
       toastMessage = 'No other accounts in wallet, signing out';
     } else if (accountAddress === currAccountAddress) {
       // switch to another account in wallet
-      if (Object.keys(localStorageStateCopy.accounts).length >= 1) {
-        newAccountAddress = localStorageStateCopy.accounts[
-          Object.keys(localStorageStateCopy.accounts)[0]
+      if (Object.keys(activeAccounts).length >= 1) {
+        newAccountAddress = activeAccounts[
+          Object.keys(activeAccounts)[0]
         ].aptosAccount.address!;
       }
       toastMessage = `Switching to account with address: ${newAccountAddress?.substring(0, 6)}...`;
@@ -195,26 +195,19 @@ export default function useWalletStateRecorder() {
       newAccountAddress = currAccountAddress || null;
       toastMessage = `Using the same account with address: ${newAccountAddress?.substring(0, 6)}...`;
     }
-    localStorageStateCopy = {
-      ...localStorageStateCopy,
-      currAccountAddress: newAccountAddress,
-    };
     try {
-      setLocalStorageState(localStorageStateCopy);
-      window.localStorage.setItem(
-        WALLET_STATE_LOCAL_STORAGE_KEY,
-        JSON.stringify(localStorageStateCopy),
-      );
-      Browser.storage()?.set({ [WALLET_STATE_LOCAL_STORAGE_KEY]: localStorageStateCopy });
+      await updateAccountsState(activeAccounts);
+      updateCurrAccountAddress(newAccountAddress);
       removeAccountToast(toastMessage);
     } catch (err) {
       removeAccountErrorToast();
       console.error(err);
     }
-  }, [currAccountAddress, localStorageState]);
+  }, [activeAccounts, currAccountAddress]);
 
   return {
     accountMnemonic,
+    accounts: activeAccounts,
     addAccount,
     aptosAccount,
     currAccountAddress,
@@ -223,7 +216,6 @@ export default function useWalletStateRecorder() {
     removeAccount,
     switchAccount,
     updateNetworkState,
-    walletState: localStorageState,
   };
 }
 

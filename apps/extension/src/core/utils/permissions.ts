@@ -30,16 +30,17 @@ export default class Permissions {
       return false;
     }
     const { favIconUrl, title, url } = await this.getCurrentTab();
-    const window = await chrome.windows.getCurrent();
-    const left = (window.left ?? 0) + (window.width ?? 0) - PROMPT_WIDTH;
-    const { top } = window;
-    await chrome.windows.create({
-      height: PROMPT_HEIGHT,
-      left,
-      top,
-      type: 'popup',
-      url: 'prompt.html',
-      width: PROMPT_WIDTH,
+    chrome.windows.getCurrent(async (window) => {
+      const left = (window.left ?? 0) + (window.width ?? 0) - PROMPT_WIDTH;
+      const { top } = window;
+      await chrome.windows.create({
+        height: PROMPT_HEIGHT,
+        left,
+        top,
+        type: 'popup',
+        url: 'prompt.html',
+        width: PROMPT_WIDTH,
+      });
     });
     return new Promise((resolve) => {
       chrome.runtime.onMessage.addListener(function handler(request, sender, sendResponse) {
@@ -116,11 +117,14 @@ export default class Permissions {
   }
 
   static async getAllDomains(): Promise<{ [address: string]: string[] }> {
-    const result = await Browser.storage()?.get([PERMISSIONS_STORAGE_KEY]);
-    if (result && result[PERMISSIONS_STORAGE_KEY]) {
-      return result[PERMISSIONS_STORAGE_KEY];
-    }
-    return {};
+    return new Promise((resolve) => {
+      Browser.persistentStorage()?.get([PERMISSIONS_STORAGE_KEY], (result) => {
+        if (result && result[PERMISSIONS_STORAGE_KEY]) {
+          resolve(result[PERMISSIONS_STORAGE_KEY]);
+        }
+        resolve({});
+      });
+    });
   }
 
   public static async getDomains(address: string): Promise<Set<string>> {
@@ -131,6 +135,6 @@ export default class Permissions {
   static async saveDomains(domains: Set<string>, address: string): Promise<void> {
     const allDomains = await this.getAllDomains();
     allDomains[address] = Array.from(domains);
-    return Browser.storage()!.set({ [PERMISSIONS_STORAGE_KEY]: allDomains });
+    return Browser.persistentStorage()!.set({ [PERMISSIONS_STORAGE_KEY]: allDomains });
   }
 }
