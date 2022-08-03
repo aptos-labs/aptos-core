@@ -1,24 +1,24 @@
 ---
-title: "AIT-2"
-slug: "ait-2"
+title: "AIT-3"
+slug: "ait-3"
 ---
 
-# AIT-2
+# AIT-3
 
-<p class="card-section-h2">Welcome to AIT-2</p>
+<p class="card-section-h2">Welcome to AIT-3</p>
 
-The Aptos Incentivized Testnet-2 (AIT-2) is a rewards program for any Aptos community member. All you need is an interest in becoming an Aptos node operator, and be willing and capable to test our new staking and node reputation frameworks.
+The Aptos Incentivized Testnet-3 (AIT-3) is a rewards program for any Aptos community member. All you need is an interest in becoming an Aptos node operator, and be willing and capable to test our new staking and node reputation frameworks.
 
-:::tip **Key AIT-2 dates:** 
+:::tip **Key AIT-3 dates:** 
 *All dates and times shown are for Pacific Time, year 2022.*
-- **June 30:** Registration starts. Node and identity verification begins.
-- **July 7:** Registration ends. Only 48 hours left to complete identity verification.
-- **July 11:** Selection process concludes. Email notifications are sent. If your node is selected, you will have 24 hours to join the AIT-2 Validator set.
-- **July 12:** Aptos Incentivized Testnet 2 goes live at noon. Validator score tracking begins.
-- **July 22:** AIT-2 concludes.
+- **August 19:** Registration starts. Node and identity verification begins.
+- ~~**July 7:** Registration ends. Only 48 hours left to complete identity verification.~~
+- ~~**July 11:** Selection process concludes. Email notifications are sent. If your node is selected, you will have 24 hours to join the AIT-3 Validator set.~~
+- **August 19:** AIT-3 goes live at noon. Validator score tracking begins.
+- **September 9:** AIT-3 concludes.
 :::
 
-To participate in the Aptos Incentivized Testnet-2 (AIT-2) program, follow the below steps. Use these steps as a checklist to keep track of your progress. A detailed documentation for each step is provided.
+To participate in the Aptos Incentivized Testnet-3 (AIT-3) program, follow the below steps. Use these steps as a checklist to keep track of your progress. A detailed documentation for each step is provided.
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-2 g-4">
@@ -26,8 +26,8 @@ To participate in the Aptos Incentivized Testnet-2 (AIT-2) program, follow the b
     <div class="card h-100">
     <h3 class="card-header">Step 1</h3>
       <div class="card-body d-flex flex-column">
-        <a href="#ait-2-program" class="card-title card-link"> <h2>See the AIT-2 program</h2></a>
-        <p class="card-text">Read the below AIT-2 steps thoroughly.</p>
+        <a href="#ait-3-program" class="card-title card-link"> <h2>See the AIT-3 program</h2></a>
+        <p class="card-text">Read the below AIT-3 steps thoroughly.</p>
       </div>
     </div>
   </div>
@@ -35,7 +35,7 @@ To participate in the Aptos Incentivized Testnet-2 (AIT-2) program, follow the b
     <div class="card h-100">
      <h3 class="card-header">Step 2</h3>
       <div class="card-body d-flex flex-column">
-      <a href="#install-the-nodes-for-ait-2" class="card-title card-link stretched-link"> <h2>Install the nodes</h2></a>
+      <a href="#install-the-nodes-for-ait-3" class="card-title card-link stretched-link"> <h2>Install the nodes</h2></a>
         <p class="card-text">Ready to dive in? Follow these guides to install the nodes.</p>     
       </div>
     </div>
@@ -44,9 +44,9 @@ To participate in the Aptos Incentivized Testnet-2 (AIT-2) program, follow the b
 </div>
 </div>
 
-## AIT-2 program
+## AIT-3 program
 
-Participants in the AIT-2 program must demonstrate the ability to configure and deploy a node, and pass the sanctions screening requirements.
+Participants in the AIT-3 program must demonstrate the ability to configure and deploy a node, and pass the sanctions screening requirements.
 
 <div class="docs-card-container">
 <div class="step">
@@ -55,7 +55,7 @@ Participants in the AIT-2 program must demonstrate the ability to configure and 
     </div>
     <div>
         <div class="step-title">Create an account with Discord at the Aptos community site</div>
-        <div class="step-caption">First time users, sign up using Discord option on the <a class="reference external" href="https://community.aptoslabs.com/">Aptos Community page</a> and join the <a href="https://discord.gg/aptoslabs"> Aptos Discord server.</a> Then log in using Discord option on the <a class="reference external" href="https://community.aptoslabs.com/">Aptos Community page.</a> <strong>IMPORTANT</strong>: You must use the Discord option to login for AIT-2. Return to this page after you sign up or sign in.</div> 
+        <div class="step-caption">First time users, sign up using Discord option on the <a class="reference external" href="https://community.aptoslabs.com/">Aptos Community page</a> and join the <a href="https://discord.gg/aptoslabs"> Aptos Discord server.</a> Then log in using Discord option on the <a class="reference external" href="https://community.aptoslabs.com/">Aptos Community page.</a> <strong>IMPORTANT</strong>: You must use the Discord option to login for AIT-3. Return to this page after you sign up or sign in.</div> 
     </div>
 </div>
 <div class="step">
@@ -73,7 +73,7 @@ Participants in the AIT-2 program must demonstrate the ability to configure and 
     </div>
     <div>
         <div class="step-title">Follow the instructions to install and deploy a Validator node in the test mode.</div>
-        <div class="step-caption">Follow the detailed node installation steps provided in: <a href="#install-the-nodes-for-ait-2">Install the nodes for AIT-2</a>. <strong>Make sure to set your node in the Test mode.</strong> Instructions are provided in the node installation sections. Test mode is required for Aptos Labs to do a health check on your node.  </div>
+        <div class="step-caption">Follow the detailed node installation steps provided in: <a href="#install-the-nodes-for-ait-2">Install the nodes for AIT-3</a>. <strong>Make sure to set your node in the Test mode.</strong> Instructions are provided in the node installation sections. Test mode is required for Aptos Labs to do a health check on your node.  </div>
     </div>
 </div>
 <div class="step">
@@ -100,7 +100,7 @@ Participants in the AIT-2 program must demonstrate the ability to configure and 
     </div>
     <div>
         <div class="step-title">On July 11th, Aptos will inform you whether your node is selected</div>
-        <div class="step-caption">On July 11th, you will receive an email notification. If your node is selected, you will have 24 hours to join the AIT-2 Validator set. Follow the  instructions in <a href="https://aptos.dev/tutorials/validator-node/connect-to-testnet/">Connecting to Aptos Incentivized Testnet</a> to join the AIT-2 and the AIT-2 Validator set. </div>
+        <div class="step-caption">On July 11th, you will receive an email notification. If your node is selected, you will have 24 hours to join the AIT-3 Validator set. Follow the  instructions in <a href="https://aptos.dev/tutorials/validator-node/connect-to-testnet/">Connecting to Aptos Incentivized Testnet</a> to join the AIT-3 and the AIT-3 Validator set. </div>
     </div>
 </div>
 <div class="step">
@@ -117,7 +117,7 @@ Participants in the AIT-2 program must demonstrate the ability to configure and 
         <div class="circle">8</div>
     </div>
     <div>
-        <div class="step-title">At the conclusion of AIT-2, follow the procedure to leave the Validator set and shutdown your node</div>
+        <div class="step-title">At the conclusion of AIT-3, follow the procedure to leave the Validator set and shutdown your node</div>
         <div class="step-caption">Steps to properly leave the validator set and shutdown your node are detailed HERE. </div>
     </div>
 </div>
@@ -133,13 +133,13 @@ Participants in the AIT-2 program must demonstrate the ability to configure and 
 <div>
 <br />
 
-## Install the nodes for AIT-2
+## Install the nodes for AIT-3
 
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-1 g-4">
   <div class="col">
     <div class="card h-100">
-    <h3 class="card-header">Install node for AIT-2</h3>
+    <h3 class="card-header">Install node for AIT-3</h3>
       <div class="card-body d-flex flex-column">
         <p class="card-text"><a href="node-requirements" class="card-link"><strong>Make sure to first check the Node Requirements.</strong></a></p>
         <p class="card-text">Pick your preferred installation method from below:</p>
