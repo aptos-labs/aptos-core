@@ -1339,6 +1339,16 @@ impl TransactionOutputListWithProof {
             // Check the events against the expected events root hash
             verify_events_against_root_hash(&txn_output.events, txn_info)?;
 
+            // Verify the write set matches for both the transaction info and output
+            let write_set_hash = CryptoHash::hash(&txn_output.write_set);
+            ensure!(
+                txn_info.state_change_hash == write_set_hash,
+                "The write set in transaction output does not match the transaction info \
+                     in proof. Hash of write set in transaction output: {}. Write set hash in txn_info: {}.",
+                write_set_hash,
+                txn_info.state_change_hash,
+            );
+
             // Verify the gas matches for both the transaction info and output
             ensure!(
                 txn_output.gas_used() == txn_info.gas_used(),
