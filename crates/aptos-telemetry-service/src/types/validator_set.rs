@@ -1,9 +1,5 @@
-use std::collections::BTreeMap;
-
-use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
-    account_address::{AccountAddress},
-    chain_id::ChainId,
+    account_address::AccountAddress,
     network_address::NetworkAddress,
 };
 use serde::{Deserialize, Serialize};

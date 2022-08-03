@@ -17,13 +17,18 @@ pub struct AuthRequest {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct MetricsResponse {
-    pub authenticated: bool,
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct AuthResponse {
     pub handshake_msg: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
+pub struct Claims {
+    pub chain_id: ChainId,
+    pub peer_id: PeerId,
+    pub peer_role: PeerRole,
+    pub epoch: u64,
+    pub exp: usize,
+    pub iat: usize,
 }
 
 /// A useful struct for serialization a telemetry event
@@ -40,14 +45,4 @@ pub struct TelemetryDump {
     pub user_id: String,
     pub timestamp_micros: String,
     pub events: Vec<TelemetryEvent>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    pub chain_id: ChainId,
-    pub peer_id: PeerId,
-    pub peer_role: PeerRole,
-    pub epoch: u64,
-    pub exp: usize,
-    pub iat: usize,
 }
