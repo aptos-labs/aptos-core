@@ -11,17 +11,11 @@
   </head>
   <body>
     <elements-api id="spec_viewer"
-      apiDescriptionUrl="willbereplaced"
+      apiDescriptionUrl="https://raw.githubusercontent.com/aptos-labs/aptos-core/devnet/api/doc/openapi.yaml"
       router="hash"
       layout="sidebar"
       hideInternal="true"
+      hideTryIt="false"
     />
-    <script>
-      const params = new URLSearchParams(window.location.search);
-      document.getElementById("spec_viewer").apiDescriptionUrl = params.get('spec');
-      document.getElementById("spec_viewer").hideTryIt = params.get('hideTryIt') === "true";
-    </script>
-    
-    
   </body>
 </html>
