@@ -1,3 +1,18 @@
+# Note: To test changes to this workflow, it is not sufficient to just make a
+# PR and see how it works there. If you do that, the PR will not use the
+# changes you made to this workflow, it'll use the workflow from the commit
+# that the PR is based on. This is because the parent workflow, build-images,
+# uses github.event.pull_request.head.sha as the value for GIT_SHA, not github.sha.
+# With that in mind, the best way to test changes to this workflow is instead to
+# temporarily add something like this to the workflow, under `on`:
+#
+#   push:
+#     branches:
+#       - banool/improve-sdk-release
+#
+# Where you provide the name of the branch on which you're making the changes.
+# This is an example: https://github.com/aptos-labs/aptos-core/commit/d4a03de85af388611c2e69fc8e14bd63ddaf4a04
+
 name: "API + TS SDK CI"
 on:
   # This is called from within the build-images.yaml workflow since we depend
@@ -8,33 +23,12 @@ on:
         required: true
         type: string
         description:
-
-env:
-  CARGO_INCREMENTAL: "0"
-  CARGO_TERM_COLOR: always
-
-# Cancel redundant builds.
-concurrency:
-  # Cancel redundant builds on PRs (only on PR, not on branches).
-  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) }}
-  cancel-in-progress: true
+  # todo, temporary, remove
+  push:
+    branches:
+      - banool/finalize_ts_sdk_ci
 
 jobs:
-  # Confirm that any changes to the API specs resulting from the changes in the
-  # PR / commit have been checked in.
-  confirm_api_spec_generated:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - run: mkdir -p /tmp/api_specs
-      - run: docker run --rm ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -- -f yaml -o /tmp/api_specs/spec.yaml
-      - run: docker run --rm ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -- -f json -o /tmp/api_specs/spec.json
-      - run: echo "If this lint fails, run the following commands locally to fix it:"
-      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/v1/spec.yaml"
-      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/v1/spec.json"
-      - run: diff -u /tmp/api_specs/spec.yaml api/doc/v1/spec.yaml
-      - run: diff -u /tmp/api_specs/spec.json api/doc/v1/spec.json
-
   # Confirm that the generated client within the TS SDK has been re-generated
   # if there are any changes that would affect it within the PR / commit. If
   # everything is checked in, run tests, build the SDK, and upload it to npm.js.
@@ -43,8 +37,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    needs: [confirm_api_spec_generated]
-    if: needs.confirm_api_spec_generated.result == 'success'
     steps:
       - uses: actions/checkout@v3
         with:
@@ -59,6 +51,18 @@ jobs:
         with:
           node-version-file: .node-version
           registry-url: 'https://registry.npmjs.org'
+
+      # Build the API specs.
+      - run: mkdir -p /tmp/api_specs
+      - run: docker run --rm ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -- -f yaml -o /tmp/api_specs/spec.yaml
+      - run: docker run --rm ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -- -f json -o /tmp/api_specs/spec.json
+
+      # Confirm that the specs we built here are the same as those checked in.
+      - run: echo "If this lint fails, run the following commands locally to fix it:"
+      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/v1/spec.yaml"
+      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/v1/spec.json"
+      - run: diff -u /tmp/api_specs/spec.yaml api/doc/v1/spec.yaml
+      - run: diff -u /tmp/api_specs/spec.json api/doc/v1/spec.json
 
       # Set up dotenv file for tests.
       - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
@@ -97,7 +101,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}
 
-      - name: print docker-compose testnet logs when previous steps failed
+      - name: Print docker-compose testnet logs if previous steps failed
         if: ${{ failure() }}
         working-directory: docker/compose/validator-testnet
         run: docker logs local-testnet
