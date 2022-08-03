@@ -14,7 +14,7 @@ module HelloBlockchain::Message {
         to_message: string::String,
     }
 
-    /// There is no message present
+    /// There is no message presenut
     const ENO_MESSAGE: u64 = 0;
 
     public fun get_message(addr: address): string::String acquires MessageHolder {

@@ -2,5 +2,8 @@
 name = "Examples"
 version = "0.0.0"
 
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+
 [addresses]
-MoonCoinType = "_"
+MoonCoinType = "0x1"
