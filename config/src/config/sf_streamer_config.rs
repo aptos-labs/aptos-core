@@ -7,5 +7,6 @@ use serde::{Deserialize, Serialize};
 #[serde(default, deny_unknown_fields)]
 pub struct SfStreamerConfig {
     pub enabled: bool,
-    pub starting_version: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub starting_version: Option<u64>,
 }
