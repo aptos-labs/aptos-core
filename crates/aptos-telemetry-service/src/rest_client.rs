@@ -1,11 +1,12 @@
 use anyhow::{anyhow, Result};
 use aptos_rest_client::{Client, Response, state::State};
 use aptos_types::{
-    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
+    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, network_address::NetworkAddress, PeerId
 };
 use serde::de::DeserializeOwned;
+use url::Url;
 
-use crate::types::validator_set::{ValidatorSet,ValidatorInfo};
+use crate::types::validator_set::{ValidatorSet,ValidatorInfo, ValidatorConfig};
 
 #[derive(Clone)]
 pub struct RestClient {
@@ -13,9 +14,9 @@ pub struct RestClient {
 }
 
 impl RestClient {
-    pub fn new(api_url: String) -> Self {
+    pub fn new(api_url: Url) -> Self {
         Self {
-            client: Client::new(url::Url::parse(&api_url).unwrap()),
+            client: Client::new(api_url),
         }
     }
 
@@ -42,5 +43,34 @@ impl RestClient {
             return Err(anyhow!("No validator sets were found!"));
         }
         Ok((validator_infos, state))
+    }
+
+
+    pub async fn validator_set_validator_addresses(
+        &self,
+    ) -> Result<(Vec<(PeerId, Vec<NetworkAddress>)>, State)> {
+        self.validator_set_addresses(|info| Self::validator_addresses(info.config()))
+            .await
+    }
+
+    fn validator_addresses(config: &ValidatorConfig) -> Result<Vec<NetworkAddress>> {
+        config
+            .validator_network_addresses()
+            .map_err(|e| anyhow!("unable to parse network address {}", e.to_string()))
+    }
+
+    async fn validator_set_addresses<F: Fn(ValidatorInfo) -> Result<Vec<NetworkAddress>>>(
+        &self,
+        address_accessor: F,
+    ) -> Result<(Vec<(PeerId, Vec<NetworkAddress>)>, State)> {
+        let (set, state) = self.validator_set().await?;
+        let mut decoded_set = Vec::new();
+        for info in set {
+            let peer_id = *info.account_address();
+            let addrs = address_accessor(info)?;
+            decoded_set.push((peer_id, addrs));
+        }
+
+        Ok((decoded_set, state))
     }
 }

@@ -1,35 +1,47 @@
+use std::{collections::HashMap, time::Duration};
+
+use crate::{
+    context::Context, index, validator_cache::ValidatorSetCache,
+    AptosTelemetryServiceConfig,
+};
+use aptos_config::keys::ConfigKey;
 use aptos_crypto::{x25519, Uniform};
-use aptos_rest_client::aptos_api_types::{mime_types, X_APTOS_CHAIN_ID};
+use aptos_rest_client::aptos_api_types::mime_types;
+use rand::SeedableRng;
 use serde_json::Value;
+use warp::http::header::CONTENT_TYPE;
 use warp::http::Response;
 use warp::hyper::body::Bytes;
-use warp::http::header::CONTENT_TYPE;
-use crate::{context::Context, index, rest_client::RestClient, validator_cache::ValidatorCache};
-use rand::SeedableRng;
 
-pub fn new_test_context(_test_name: &'static str) -> TestContext {
+pub fn new_test_context() -> TestContext {
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let server_private_key = x25519::PrivateKey::generate(&mut rng);
 
-    let rest_client = RestClient::new("https://devnet.aptoslabs.com".to_owned());
-    let validator_cache = ValidatorCache::new(rest_client);
+    let config = &AptosTelemetryServiceConfig {
+        address: format!("{}:{}", "127.0.0.1", 80).parse().unwrap(),
+        tls_cert_path: None,
+        tls_key_path: None,
+        trusted_full_node_addresses: HashMap::new(),
+        server_private_key: ConfigKey::new(server_private_key),
+        jwt_signing_key: "jwt_signing_key".into(),
+        update_interval: Duration::from_secs(60),
+    };
+    let cache = ValidatorSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
 
-    TestContext::new(
-        Context::new(server_private_key, validator_cache),
-    )
+    TestContext::new(Context::new(config, cache))
 }
 
 #[derive(Clone)]
 pub struct TestContext {
     pub expect_status_code: u16,
-    pub context: Context
+    pub inner: Context,
 }
 
 impl TestContext {
     pub fn new(context: Context) -> Self {
         Self {
             expect_status_code: 200,
-            context
+            inner: context,
         }
     }
 
@@ -44,7 +56,7 @@ impl TestContext {
     }
 
     pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
-        req.reply(&index::routes(self.context.clone())).await
+        req.reply(&index::routes(self.inner.clone())).await
     }
 
     pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {

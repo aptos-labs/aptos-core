@@ -1,77 +1,83 @@
-use std::{sync::Arc, collections::HashMap};
-use anyhow::{anyhow,Result};
-use aptos_config::config::{Peer, PeerRole};
-use aptos_rest_client::state::State;
-use aptos_types::{network_address::NetworkAddress, PeerId, chain_id::ChainId};
+use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_infallible::RwLock;
+use aptos_logger::error;
+use aptos_types::chain_id::ChainId;
+use std::{collections::HashMap, sync::Arc};
+use tokio::time;
+use url::Url;
 
-use crate::{rest_client::RestClient, types::validator_set::{ValidatorConfig, ValidatorInfo}};
+use crate::{
+    rest_client::RestClient,
+    AptosTelemetryServiceConfig,
+};
+
+pub type EpochNum = u64;
+pub type ValidatorSetCache = Arc<RwLock<HashMap<ChainId, (EpochNum, PeerSet)>>>;
 
 #[derive(Clone)]
-pub struct ValidatorCache {
-    client: RestClient,
-    pub(crate) validator_store: Arc<RwLock<HashMap<(ChainId,PeerId), Peer>>>,
+pub struct ValidatorSetCacheUpdater {
+    cache: ValidatorSetCache,
+
+    query_addresses: Arc<HashMap<ChainId, String>>,
+    update_interval: time::Duration,
 }
 
-impl ValidatorCache {
-    pub fn new(rest_client: RestClient) -> ValidatorCache {
-        ValidatorCache {
-            client: rest_client,
-            validator_store: Arc::new(RwLock::new(HashMap::new())),
+impl ValidatorSetCacheUpdater {
+    pub fn new(
+        cache: ValidatorSetCache,
+        config: &AptosTelemetryServiceConfig,
+    ) -> Self {
+        Self {
+            cache,
+            query_addresses: Arc::new(config.trusted_full_node_addresses.clone()),
+            update_interval: config.update_interval,
         }
     }
 
-    pub async fn update(&self) {    
-        let validators = self.validator_set_validator_addresses().await;
-        match validators {
-            Ok((validators, state)) => {
-                let chain_id = state.chain_id;
-                let chain_id = ChainId::new(chain_id);
-                let mut store = self.validator_store.write();
-                store.clear();
-                for (peer_id, network_addresses) in validators {
-                    let peer = Peer::from_addrs(PeerRole::Validator, network_addresses);
-                    store.insert((chain_id, peer_id), peer);
+    pub fn run(&self) {
+        let mut interval = time::interval(self.update_interval);
+        let cloned_self = self.clone();
+        tokio::spawn(async move {
+            loop {
+                cloned_self.clone().update().await;
+                interval.tick().await;
+            }
+        });
+    }
+
+    pub async fn update(&self) {
+        for (chain_id, url) in self.query_addresses.iter() {
+            let client = RestClient::new(Url::parse(url).unwrap());
+            let validators = client.validator_set_validator_addresses().await;
+            match validators {
+                Ok((validators, state)) => {
+                    let received_chain_id = ChainId::new(state.chain_id);
+                    if received_chain_id != *chain_id {
+                        error!("Chain Id mismatch: Received in headers: {}. Provided in configuration: {} for {}", received_chain_id, chain_id, url);
+                        continue;
+                    }
+
+                    let mut store = self.cache.write();
+
+                    let peer_set = validators
+                        .iter()
+                        .map(|(peer_id, addrs)| {
+                            (
+                                *peer_id,
+                                Peer::from_addrs(PeerRole::Validator, addrs.to_vec()),
+                            )
+                        })
+                        .collect();
+
+                    store.insert(*chain_id, (state.epoch, peer_set));
                 }
-                println!("Updated store {:#?}", store);
-            },
-            Err(err) => {
-                println!("Unable to update validators: {}", err)
+                Err(err) => {
+                    error!(
+                        "Fetching validator set failed for Chain Id {}. Err: {}",
+                        chain_id, err
+                    )
+                }
             }
         }
     }
-    
-    async fn validator_set_validator_addresses(
-        &self,
-    ) -> Result<(Vec<(PeerId, Vec<NetworkAddress>)>, State)> {
-        self.validator_set_addresses(|info| {
-            Self::validator_addresses(info.config())
-        })
-        .await
-    }
-    
-    fn validator_addresses(
-        config: &ValidatorConfig,
-    ) -> Result<Vec<NetworkAddress>> {
-        config
-            .validator_network_addresses()
-            .map_err(|e| anyhow!("unable to parse network address {}", e.to_string()))
-    }
-    
-    async fn validator_set_addresses<F: Fn(ValidatorInfo) -> Result<Vec<NetworkAddress>>> (
-        &self,
-        address_accessor: F,
-    ) -> Result<(Vec<(PeerId, Vec<NetworkAddress>)>, State)> {
-        let (set, state) = self.client.validator_set().await?;
-        println!("validatorset: {:?}", set);
-        let mut decoded_set = Vec::new();
-        for info in set {
-            let peer_id = *info.account_address();
-            let addrs = address_accessor(info)?;
-            decoded_set.push((peer_id, addrs));
-        }
-    
-        Ok((decoded_set, state))
-    }
 }
-
