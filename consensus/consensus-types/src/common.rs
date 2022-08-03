@@ -7,6 +7,8 @@ use aptos_types::{account_address::AccountAddress, transaction::SignedTransactio
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt;
+use aptos_types::validator_verifier::ValidatorVerifier;
+
 
 /// The round of a block is a consensus-internal counter, which starts with 0 and increases
 /// monotonically. It is used for the protocol safety and liveness (please see the detailed
@@ -23,7 +25,7 @@ pub struct TransactionSummary {
 
 impl fmt::Display for TransactionSummary {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.sender, self.sequence_number,)
+        write!(f, "{}:{}", self.sender, self.sequence_number, )
     }
 }
 
@@ -54,6 +56,20 @@ impl Payload {
             Payload::InQuorumStore(_) => false,
             Payload::Empty => false,
         }
+    }
+
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        match self {
+            Payload::Empty => Ok(()),
+            Payload::DirectMempool(_) => Ok(()),
+            Payload::InQuorumStore(proofs) => {
+                for proof in proofs.into_iter(){
+                    proof.verify(validator)?;
+                }
+                Ok(())
+            }
+        }
+
     }
 }
 
