@@ -15,7 +15,7 @@ spec:
     latency: "{latency_ms}ms"
     correlation: "{correlation_percentage}"
     jitter: "{jitter_ms}ms"
-  direction: both
+  direction: from
   target:
     selector:
       namespaces:
