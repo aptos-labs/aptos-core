@@ -13,6 +13,13 @@ RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-
 
 ### Build Rust code ###
 FROM rust-base as builder
+
+# Confirm that this Dockerfile is being invoked from an appropriate builder.
+# See https://github.com/aptos-labs/aptos-core/pull/2471
+# See https://github.com/aptos-labs/aptos-core/pull/2472
+ARG CORRECT_DOCKER_BUILDER
+RUN test -n "$CORRECT_DOCKER_BUILDER" || (printf "\n===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg CORRECT_DOCKER_BUILDER=true\n\nFor more information, see https://github.com/aptos-labs/aptos-core/pull/2472\n\nThanks!" && false)
+
 COPY --link . /aptos/
 
 ARG GIT_SHA
