@@ -287,7 +287,7 @@ export class TokenClient {
       value_type: "0x3::token::CollectionData",
       key: Buffer.from(collectionName).toString("hex"),
     };
-    // eslint-disable-next-line no-unused-vars
+
     const collectionTable = await this.aptosClient.getTableItem(handle, getCollectionTableItemRequest);
     return collectionTable;
   }
