@@ -13,7 +13,7 @@ mod print;
 pub mod rest_client;
 mod validate_transaction;
 mod validator_config;
-pub mod validator_set;
+mod validator_set;
 mod validator_state;
 
 mod network_checker;

@@ -1,26 +1,33 @@
-use aptos_config::config::{Peer, PeerRole};
+use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_crypto::{noise, x25519, Uniform};
-use aptos_types::{chain_id::ChainId, PeerId, account_address, network_address::{NetworkAddress, DnsName}};
-use serde_json::{json, Value};
-use aptos_types::network_address::Protocol::{Dns, Tcp, NoiseIK, Handshake};
+use aptos_types::network_address::Protocol::{Dns, Handshake, NoiseIK, Tcp};
+use aptos_types::{
+    account_address,
+    chain_id::ChainId,
+    network_address::{DnsName, NetworkAddress},
+    PeerId,
+};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use serde_json::json;
 
 use crate::{
-    current_function_name,
     tests::test_context::new_test_context,
-    types::auth::{AuthResponse},
+    types::auth::{AuthResponse, Claims},
 };
 
 #[tokio::test]
 async fn test_auth() {
-    let context = new_test_context(current_function_name!());
-    let server_public_key = context.context.noise_config().public_key();
-    
+    let context = new_test_context();
+    let server_public_key = context.inner.noise_config().public_key();
+
     let mut rng = rand::thread_rng();
     let initiator_static = x25519::PrivateKey::generate(&mut rng);
     let initiator_public_key = initiator_static.public_key();
     let initiator = noise::NoiseConfig::new(initiator_static);
     let chain_id = ChainId::new(21);
-    let peer_id = PeerId::from(account_address::from_identity_public_key(initiator_public_key.clone()));
+    let peer_id = PeerId::from(account_address::from_identity_public_key(
+        initiator_public_key.clone(),
+    ));
     let protocols = vec![
         Dns(DnsName::try_from("example.com".to_string()).unwrap()),
         Tcp(1234),
@@ -28,9 +35,15 @@ async fn test_auth() {
         Handshake(0),
     ];
     let addr = NetworkAddress::from_protocols(protocols).unwrap();
-    let peer = Peer::from_addrs(PeerRole::Validator, vec![addr]); 
-    
-    context.context.validator_cache().validator_store.write().insert((chain_id, peer_id), peer);
+    let peer = Peer::from_addrs(PeerRole::Validator, vec![addr]);
+    let mut peer_set = PeerSet::new();
+    peer_set.insert(peer_id, peer);
+
+    context
+        .inner
+        .validator_cache()
+        .write()
+        .insert(chain_id, (1, peer_set));
 
     // buffer to first noise handshake message
     let mut client_noise_msg = vec![0; noise::handshake_init_msg_len(0)];
@@ -65,24 +78,47 @@ async fn test_auth() {
 
     let resp: AuthResponse = serde_json::from_value(resp).unwrap();
 
-    let (_, session) = initiator
+    let (response_payload, _) = initiator
         .finalize_connection(initiator_state, resp.handshake_msg.unwrap().as_slice())
         .unwrap();
+
+    let jwt = String::from_utf8(response_payload).unwrap();
+
+    let decoded = decode::<Claims>(
+        &jwt,
+        &DecodingKey::from_secret(b"jwt_signing_key"),
+        &Validation::new(Algorithm::HS512),
+    )
+    .unwrap();
+
+    assert_eq!(
+        decoded.claims,
+        Claims {
+            chain_id,
+            peer_id,
+            peer_role: PeerRole::Validator,
+            epoch: 1,
+            exp: decoded.claims.exp,
+            iat: decoded.claims.iat
+        },
+    )
 }
 
 #[tokio::test]
 #[should_panic]
 async fn test_auth_wrong_key() {
-    let context = new_test_context(current_function_name!());
-    let server_public_key = context.context.noise_config().public_key();
-    
+    let context = new_test_context();
+    let server_public_key = context.inner.noise_config().public_key();
+
     let mut rng = rand::thread_rng();
     let initiator_static = x25519::PrivateKey::generate(&mut rng);
     let initiator_static2 = x25519::PrivateKey::generate(&mut rng);
     let initiator_public_key = initiator_static.public_key();
     let initiator = noise::NoiseConfig::new(initiator_static);
     let chain_id = ChainId::new(21);
-    let peer_id = PeerId::from(account_address::from_identity_public_key(initiator_public_key.clone()));
+    let peer_id = PeerId::from(account_address::from_identity_public_key(
+        initiator_public_key.clone(),
+    ));
     let protocols = vec![
         Dns(DnsName::try_from("example.com".to_string()).unwrap()),
         Tcp(1234),
@@ -90,9 +126,15 @@ async fn test_auth_wrong_key() {
         Handshake(0),
     ];
     let addr = NetworkAddress::from_protocols(protocols).unwrap();
-    let peer = Peer::from_addrs(PeerRole::Validator, vec![addr]); 
-    
-    context.context.validator_cache().validator_store.write().insert((chain_id, peer_id), peer);
+    let peer = Peer::from_addrs(PeerRole::Validator, vec![addr]);
+    let mut peer_set = PeerSet::new();
+    peer_set.insert(peer_id, peer);
+
+    context
+        .inner
+        .validator_cache()
+        .write()
+        .insert(chain_id, (1, peer_set));
 
     // buffer to first noise handshake message
     let mut client_noise_msg = vec![0; noise::handshake_init_msg_len(0)];

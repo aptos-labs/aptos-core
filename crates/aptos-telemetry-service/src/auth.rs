@@ -1,7 +1,8 @@
 use crate::context::Context;
 use crate::types::auth::{AuthRequest, AuthResponse, Claims};
-use aptos_config::config::{Peer, PeerRole};
+use aptos_config::config::PeerRole;
 use aptos_crypto::{noise, x25519};
+use aptos_logger::warn;
 use aptos_types::chain_id::ChainId;
 use aptos_types::PeerId;
 use chrono::Utc;
@@ -43,30 +44,51 @@ pub async fn handle_auth(
         .parse_client_init_message(&prologue, client_init_message)
         .map_err(|_| reject::reject())?;
 
-    let epoch = 0;
-    let peer_role = match context.validator_cache().validator_store.read().get(&(body.chain_id, body.peer_id)) {
-        Some(peer) => authenticate_inbound(peer, &remote_public_key),
-        None => {
-            // if not, verify that their peerid is constructed correctly from their public key
-            let derived_remote_peer_id =
-                aptos_types::account_address::from_identity_public_key(remote_public_key);
-            if derived_remote_peer_id != body.peer_id {
-                Err(reject::reject())
-            } else {
-                Ok(PeerRole::Unknown)
+    let (epoch, peer_role) = match context.validator_cache().read().get(&body.chain_id) {
+        Some((epoch, peer_set)) => {
+            match peer_set.get(&body.peer_id) {
+                Some(peer) => {
+                    let remote_public_key = &remote_public_key;
+                    if !peer.keys.contains(remote_public_key) {
+                        return Err(reject::reject());
+                    }
+                    Ok((*epoch, peer.role))
+                }
+                None => {
+                    // if not, verify that their peerid is constructed correctly from their public key
+                    let derived_remote_peer_id =
+                        aptos_types::account_address::from_identity_public_key(remote_public_key);
+                    if derived_remote_peer_id != body.peer_id {
+                        Err(reject::reject())
+                    } else {
+                        Ok((*epoch, PeerRole::Unknown))
+                    }
+                }
             }
+        }
+        None => {
+            warn!(
+                "Validator set unavailable for Chain ID {}. Rejecting request.",
+                body.chain_id
+            );
+            Err(reject::reject())
         }
     }?;
 
-    let token = create_jwt(body.chain_id, body.peer_id, peer_role, epoch)
-        .map_err(|_| reject::reject())?;
+    let token =
+        context.jwt_auth().create_jwt_token(body.chain_id, body.peer_id, peer_role, epoch).map_err(|_| reject::reject())?;
 
     let mut rng = rand::rngs::OsRng;
     let response_payload = token.as_bytes();
     let mut server_response = vec![0u8; noise::handshake_resp_msg_len(response_payload.len())];
     context
         .noise_config()
-        .respond_to_client(&mut rng, handshake_state, Some(response_payload), &mut server_response)
+        .respond_to_client(
+            &mut rng,
+            handshake_state,
+            Some(response_payload),
+            &mut server_response,
+        )
         .map_err(|_| reject::reject())?;
 
     Ok(reply::json(&AuthResponse {
@@ -74,31 +96,44 @@ pub async fn handle_auth(
     }))
 }
 
-pub fn create_jwt(chain_id: ChainId, peer_id: PeerId, peer_role: PeerRole, epoch: u64) -> Result<String, Error> {
-    let issued = Utc::now().timestamp();
-    let expiration = Utc::now()
-        .checked_add_signed(chrono::Duration::minutes(60))
-        .expect("valid timestamp")
-        .timestamp();
-
-    let claims = Claims {
-        chain_id,
-        peer_id,
-        peer_role,
-        epoch,
-        exp: expiration as usize,
-        iat: issued as usize,
-    };
-    let header = Header::new(Algorithm::HS512);
-    jsonwebtoken::encode(&header, &claims, &EncodingKey::from_secret(b"open_to_the_world_secret"))
+#[derive(Clone)]
+pub struct JWTAuthentication {
+    secret: EncodingKey,
 }
 
-fn authenticate_inbound(
-    peer: &Peer,
-    remote_public_key: &x25519::PublicKey,
-) -> Result<PeerRole, Rejection> {
-    if !peer.keys.contains(remote_public_key) {
-        return Err(reject::reject());
+impl JWTAuthentication {
+    pub fn new(key: EncodingKey) -> Self {
+        Self {
+            secret: key,
+        }
     }
-    Ok(peer.role)
+
+    pub fn create_jwt_token(
+        &self,
+        chain_id: ChainId,
+        peer_id: PeerId,
+        peer_role: PeerRole,
+        epoch: u64,
+    ) -> Result<String, Error> {
+        let issued = Utc::now().timestamp();
+        let expiration = Utc::now()
+            .checked_add_signed(chrono::Duration::minutes(60))
+            .expect("valid timestamp")
+            .timestamp();
+
+        let claims = Claims {
+            chain_id,
+            peer_id,
+            peer_role,
+            epoch,
+            exp: expiration as usize,
+            iat: issued as usize,
+        };
+        let header = Header::new(Algorithm::HS512);
+        jsonwebtoken::encode(
+            &header,
+            &claims,
+            &self.secret,
+        )
+    }
 }
