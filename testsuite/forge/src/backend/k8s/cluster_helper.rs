@@ -840,42 +840,11 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
             }
             if let Some(data) = &configmap.data {
                 info!("Got configmap {} with data: {:?}", &configmap_name, data);
-                let keep: bool = data.get("keep").unwrap().parse().unwrap();
-                if keep {
-                    info!("Explicitly keeping namespace {}", configmap_namespace);
-                    return false;
-                }
-                if data.get("cleanup").is_none() {
-                    // This is needed for backward compatibility where older namespaces created
-                    // don't have "cleanup" time set. Delete this code once we roll out the cleanup
-                    // feature fully
-                    let start: u64 = data.get("start").unwrap().parse().unwrap();
-                    let namespace_uptime = time_since_the_epoch - start;
-                    info!(
-                        "Namespace {} has lived for {}/{} seconds",
-                        configmap_namespace, namespace_uptime, NAMESPACE_CLEANUP_THRESHOLD_SECS
-                    );
-                    if keep {
-                        info!("Explicitly keeping namespace {}", configmap_namespace);
-                        return false;
-                    }
-                    if namespace_uptime > NAMESPACE_CLEANUP_THRESHOLD_SECS {
-                        return true;
-                    }
-                } else {
-                    // TODO(rustielin): come up with some sane values for namespaces
-                    let cleanup_time_since_epoch: u64 =
-                        data.get("cleanup").unwrap().parse().unwrap();
-                    info!(
-                        "Namespace {} has remaining {} seconds before cleanup",
-                        configmap_namespace,
-                        cleanup_time_since_epoch - time_since_the_epoch
-                    );
-
-                    if cleanup_time_since_epoch <= time_since_the_epoch {
-                        return true;
-                    }
-                }
+                return check_namespace_for_cleanup(
+                    data,
+                    configmap_namespace,
+                    time_since_the_epoch,
+                );
             }
             false
         })
@@ -886,6 +855,49 @@ pub async fn cleanup_cluster_with_management() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn check_namespace_for_cleanup(
+    data: &BTreeMap<String, String>,
+    namespace: String,
+    time_since_the_epoch: u64,
+) -> bool {
+    let keep: bool = data.get("keep").unwrap().parse().unwrap();
+    if keep {
+        info!("Explicitly keeping namespace {}", namespace);
+        return false;
+    }
+    if data.get("cleanup").is_none() {
+        // This is needed for backward compatibility where older namespaces created
+        // don't have "cleanup" time set. Delete this code once we roll out the cleanup
+        // feature fully
+        let start: u64 = data.get("start").unwrap().parse().unwrap();
+        let namespace_uptime = time_since_the_epoch - start;
+        info!(
+            "Namespace {} has lived for {}/{} seconds",
+            namespace, namespace_uptime, NAMESPACE_CLEANUP_THRESHOLD_SECS
+        );
+        if keep {
+            info!("Explicitly keeping namespace {}", namespace);
+            return false;
+        }
+        if namespace_uptime > NAMESPACE_CLEANUP_THRESHOLD_SECS {
+            return true;
+        }
+    } else {
+        // TODO(rustielin): come up with some sane values for namespaces
+        let cleanup_time_since_epoch: u64 = data.get("cleanup").unwrap().parse().unwrap();
+        info!(
+            "Namespace {} has remaining {} seconds before cleanup",
+            namespace,
+            cleanup_time_since_epoch - time_since_the_epoch
+        );
+
+        if cleanup_time_since_epoch <= time_since_the_epoch {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(test)]
@@ -939,5 +951,71 @@ mod tests {
             Err(ApiError::RetryableError(_)) => {}
             _ => panic!("Expected retryable error"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_check_namespace_for_cleanup() {
+        let start = SystemTime::now();
+        let time_since_the_epoch = start
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
+        let mut data = BTreeMap::new();
+
+        // Ensure very old run without keep is cleaned up.
+        data.insert("keep".to_string(), "false".to_string());
+        data.insert("start".to_string(), "0".to_string());
+
+        assert!(check_namespace_for_cleanup(
+            &data,
+            "foo".to_string(),
+            time_since_the_epoch
+        ));
+
+        // Ensure old run with keep is not cleaned up.
+        data.insert("keep".to_string(), "true".to_string());
+        data.insert("start".to_string(), "0".to_string());
+
+        assert!(!check_namespace_for_cleanup(
+            &data,
+            "foo".to_string(),
+            time_since_the_epoch
+        ));
+
+        // Ensure very old run without keep is cleaned up.
+        data.insert("keep".to_string(), "false".to_string());
+        data.insert("cleanup".to_string(), "20".to_string());
+
+        assert!(check_namespace_for_cleanup(
+            &data,
+            "foo".to_string(),
+            time_since_the_epoch
+        ));
+
+        // Ensure old run with keep is not cleaned up.
+        data.insert("keep".to_string(), "true".to_string());
+        data.insert("cleanup".to_string(), "20".to_string());
+
+        assert!(!check_namespace_for_cleanup(
+            &data,
+            "foo".to_string(),
+            time_since_the_epoch
+        ));
+
+        // Ensure a run with clean up some time in future is not cleaned up.
+        data.insert("keep".to_string(), "false".to_string());
+        let cleanup_time = (start
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            + Duration::from_secs(3600))
+        .as_secs();
+        data.insert("cleanup".to_string(), cleanup_time.to_string());
+
+        assert!(!check_namespace_for_cleanup(
+            &data,
+            "foo".to_string(),
+            time_since_the_epoch
+        ));
     }
 }
