@@ -20,6 +20,8 @@ variable "GIT_BRANCH" {}
 
 variable "GIT_TAG" {}
 
+variable "BUILT_VIA_BUILDKIT" {}
+
 variable "LAST_GREEN_COMMIT" {}
 
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
@@ -47,9 +49,10 @@ target "builder" {
   cache-to   = generate_cache_to("builder")
   tags       = generate_tags("builder")
   args       = {
-    GIT_SHA = "${GIT_SHA}"
+    GIT_SHA         = "${GIT_SHA}"
     GIT_BRANCH      = "${GIT_BRANCH}"
     GIT_TAG         = "${GIT_TAG}"
+    BUILT_VIA_BUILDKIT = "true"
   }
 }
 
@@ -81,6 +84,12 @@ target "_common" {
     "org.label-schema.schema-version" = "1.0",
     "org.label-schema.build-date"     = "${BUILD_DATE}"
     "org.label-schema.git-sha"        = "${GIT_SHA}"
+  }
+  args = {
+    GIT_SHA         = "${GIT_SHA}"
+    GIT_BRANCH      = "${GIT_BRANCH}"
+    GIT_TAG         = "${GIT_TAG}"
+    BUILT_VIA_BUILDKIT = "true"
   }
 }
 

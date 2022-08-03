@@ -15,6 +15,7 @@ export GIT_SHA=$(git rev-parse HEAD)
 export GIT_BRANCH=$(git symbolic-ref --short HEAD)
 export GIT_TAG=$(git tag -l --contains HEAD)
 export BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+export BUILT_VIA_BUILDKIT="true"
 
 if [ "$CI" == "true" ]; then
   # builder target is the one that builds the rust binaries and is the most expensive.
