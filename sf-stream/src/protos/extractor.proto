@@ -5,6 +5,10 @@ syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
 
+option go_package = "github.com/streamingfast/firehose-aptos/types/pb/sf/aptos/type/v1;pbaptos";
+
+// Transaction is actually right what will be transported inside the Firehose's Block envelope.
+// meaning we get a 1 transaction == 1 block mapping.
 message Transaction {
   google.protobuf.Timestamp timestamp = 1;
   uint64 version = 2;
@@ -27,7 +31,13 @@ message Transaction {
     StateCheckpointTransaction state_checkpoint = 9;
     UserTransaction user = 10;
   }
+}
 
+// TransactionTrimmed is a real Transaction with most of the fields removed so that
+// we can easily decode only the few fields that we have interest in in certain situations.
+message TransactionTrimmed {
+  google.protobuf.Timestamp timestamp = 1;
+  uint64 version = 2;
 }
 
 message BlockMetadataTransaction {
