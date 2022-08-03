@@ -633,11 +633,11 @@ impl LoggerService {
 
         if let Err(e) = result {
             STRUCT_LOG_SEND_ERROR_COUNT.inc();
-            eprintln!(
-                "[Logging] Error while sending data to logstash({}): {}",
-                stream.endpoint(),
-                e
-            );
+            //eprintln!(
+            //    "[Logging] Error while sending data to logstash({}): {}",
+            //    stream.endpoint(),
+            //    e
+            //);
         } else {
             SENT_STRUCT_LOG_COUNT.inc();
             SENT_STRUCT_LOG_BYTES.inc_by(message_length as u64);
