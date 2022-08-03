@@ -175,7 +175,7 @@ If M1/M2 support is important to you, please comment on and follow this issue: h
 
 4. Finally, start the fullnode via docker:
    ```bash
-    docker run --pull=always --rm -p 8080:8080 -p 9101:9101 -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data --workdir /opt/aptos/etc --name=aptos-fullnode aptoslabs/validator:devnet /opt/aptos/bin/aptos-node -f /opt/aptos/etc/public_full_node.yaml
+    docker run --pull=always --rm -p 8080:8080 -p 9101:9101 -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data --workdir /opt/aptos/etc --name=aptos-fullnode aptoslabs/validator:devnet aptos-node -f /opt/aptos/etc/public_full_node.yaml
    ```
 
 ## Verify the correctness of your FullNode
