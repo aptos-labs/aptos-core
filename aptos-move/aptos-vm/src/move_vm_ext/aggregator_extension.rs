@@ -635,6 +635,7 @@ mod test {
         aggregator_data.remove_aggregator(test_id(6));
     }
 
+    #[allow(clippy::redundant_closure)]
     static TEST_RESOLVER: Lazy<FakeTestStorage> = Lazy::new(|| FakeTestStorage::new());
 
     #[test]
