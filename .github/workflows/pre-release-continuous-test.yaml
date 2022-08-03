@@ -22,9 +22,11 @@ jobs:
     with:
       FORGE_NAMESPACE: forge-continuous-0
       FORGE_CLUSTER_NAME: aptos-forge-1
+      FORGE_RUNNER_DURATION_SECS: 14400  # 4 hours
   run-forge-1:
     uses: ./.github/workflows/run-forge.yaml
     secrets: inherit
     with:
       FORGE_NAMESPACE: forge-continuous-1
       FORGE_CLUSTER_NAME: aptos-forge-1
+      FORGE_RUNNER_DURATION_SECS: 14400  # 4 hours
