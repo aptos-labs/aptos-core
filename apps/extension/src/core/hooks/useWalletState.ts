@@ -5,7 +5,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import constate from 'constate';
 import {
-  getDecryptedAccounts, getCurrAccountAddress, storeEncryptedAccounts,
+  getDecryptedAccounts, getCurrentPublicAccount, storeEncryptedAccounts,
 } from 'core/utils/account';
 import {
   WALLET_STATE_ACCOUNT_ADDRESS_KEY,
@@ -15,6 +15,7 @@ import {
   AccountsState,
   AptosAccountState,
   Mnemonic,
+  PublicAccount,
   WalletAccount,
 } from 'core/types/stateTypes';
 import {
@@ -51,19 +52,20 @@ export interface RemoveAccountProps {
 }
 
 export default function useWalletStateRecorder() {
-  const currAccountAddress = getCurrAccountAddress();
+  const currAccountAddress = getCurrentPublicAccount()?.address;
 
   const [activeAccounts, setActiveAccounts] = useState<AccountsState | null>(
     () => getDecryptedAccounts(),
   );
 
-  const updateCurrAccountAddress = (address: string | null) => {
-    if (address) {
-      window.localStorage.setItem(WALLET_STATE_ACCOUNT_ADDRESS_KEY, address);
+  const updateCurrentAccount = (publicAccount: PublicAccount | null) => {
+    const string = JSON.stringify(publicAccount);
+    if (publicAccount) {
+      window.localStorage.setItem(WALLET_STATE_ACCOUNT_ADDRESS_KEY, string);
     } else {
       window.localStorage.removeItem(WALLET_STATE_ACCOUNT_ADDRESS_KEY);
     }
-    Browser.persistentStorage()?.set({ [WALLET_STATE_ACCOUNT_ADDRESS_KEY]: address });
+    Browser.persistentStorage()?.set({ [WALLET_STATE_ACCOUNT_ADDRESS_KEY]: string });
   };
 
   const updateAccountsState = async (
@@ -115,7 +117,10 @@ export default function useWalletStateRecorder() {
         ...activeAccounts,
         [account.address().hex()]: newAccount,
       }, password);
-      updateCurrAccountAddress(account.address().hex());
+      updateCurrentAccount({
+        address: account.address().hex(),
+        pubKey: account.pubKey().hex(),
+      });
       sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED, account);
       if (isImport) {
         importAccountToast();
@@ -145,7 +150,10 @@ export default function useWalletStateRecorder() {
       activeAccounts![accountAddress].aptosAccount,
     );
     try {
-      updateCurrAccountAddress(accountAddress);
+      updateCurrentAccount({
+        address: accountAddress,
+        pubKey: account.pubKey().hex(),
+      });
       switchAccountToast(accountAddress);
       sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED, account);
     } catch (error) {
@@ -196,8 +204,14 @@ export default function useWalletStateRecorder() {
       toastMessage = `Using the same account with address: ${newAccountAddress?.substring(0, 6)}...`;
     }
     try {
+      const account = activeAccounts ? AptosAccount.fromAptosAccountObject(
+        activeAccounts[accountAddress].aptosAccount,
+      ) : null;
       await updateAccountsState(activeAccounts);
-      updateCurrAccountAddress(newAccountAddress);
+      updateCurrentAccount(account ? {
+        address: account.address().hex(),
+        pubKey: account.pubKey().hex(),
+      } : null);
       removeAccountToast(toastMessage);
     } catch (err) {
       removeAccountErrorToast();

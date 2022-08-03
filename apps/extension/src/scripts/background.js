@@ -5,11 +5,24 @@ import { AptosClient, BCS, HexString } from 'aptos';
 import fetchAdapter from '@vespaiach/axios-fetch-adapter';
 import { sign } from 'tweetnacl';
 import { MessageMethod, PermissionType } from '../core/types/dappTypes';
-import { getBackgroundAptosAccountState, getBackgroundNodeUrl, getBackgroundNetworkName } from '../core/utils/account';
+import {
+  getBackgroundAptosAccountState,
+  getBackgroundNodeUrl,
+  getBackgroundNetworkName,
+  getBackgroundCurrentPublicAccount,
+} from '../core/utils/account';
 import Permissions from '../core/utils/permissions';
 import { DappErrorType } from '../core/types/errors';
 
 // Utils
+
+async function checkAccount(sendResponse) {
+  const account = await getBackgroundAptosAccountState();
+  if (account === undefined) {
+    sendResponse({ error: DappErrorType.NO_ACCOUNTS });
+  }
+  return account;
+}
 
 async function getCurrentDomain() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -21,8 +34,8 @@ async function signTransaction(account, signingMessage) {
   return account.signHexString(signingMessage).hex();
 }
 
-async function checkConnected(account, sendResponse) {
-  if (Permissions.isDomainAllowed(await getCurrentDomain(), account.address().hex())) {
+async function checkConnected(address, sendResponse) {
+  if (Permissions.isDomainAllowed(await getCurrentDomain(), address)) {
     return true;
   }
   sendResponse({ error: DappErrorType.UNAUTHORIZED });
@@ -35,16 +48,11 @@ function rejectRequest(sendResponse) {
 
 // Aptos dApp methods
 
-function getAccountAddress(account, sendResponse) {
-  if (!checkConnected(account, sendResponse)) {
+function getAccountAddress(publicAccount, sendResponse) {
+  if (!checkConnected(publicAccount.address, sendResponse)) {
     return;
   }
-
-  if (account.address()) {
-    sendResponse({ address: account.address().hex(), publicKey: account.pubKey().hex() });
-  } else {
-    sendResponse({ error: DappErrorType.NO_ACCOUNTS });
-  }
+  sendResponse({ address: publicAccount.address, publicKey: publicAccount.pubKey });
 }
 
 async function getChainId(client, sendResponse) {
@@ -65,47 +73,47 @@ async function getNetwork(sendResponse) {
   }
 }
 
-async function getSequenceNumber(client, account, sendResponse) {
-  if (!checkConnected(account, sendResponse)) {
+async function getSequenceNumber(client, publicAccount, sendResponse) {
+  if (!checkConnected(publicAccount.address, sendResponse)) {
     return;
   }
 
   try {
-    const address = account.address().hex();
-    const { sequence_number: sequenceNumber } = await client.getAccount(address);
+    const { sequence_number: sequenceNumber } = await client.getAccount(publicAccount.address);
     sendResponse({ sequenceNumber });
   } catch (error) {
     sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
   }
 }
 
-async function connect(account, sendResponse) {
+async function connect(publicAccount, sendResponse) {
   if (await Permissions.requestPermissions(
     PermissionType.CONNECT,
     await getCurrentDomain(),
-    account.address().hex(),
+    publicAccount.address,
   )) {
-    getAccountAddress(account, sendResponse);
+    getAccountAddress(publicAccount, sendResponse);
   } else {
     rejectRequest(sendResponse);
   }
 }
 
-async function disconnect(account, sendResponse) {
-  await Permissions.removeDomain(await getCurrentDomain(), account.address().hex());
+async function disconnect(address, sendResponse) {
+  await Permissions.removeDomain(await getCurrentDomain(), address);
   sendResponse({});
 }
 
-async function isConnected(account, sendResponse) {
+async function isConnected(address, sendResponse) {
   const status = await Permissions.isDomainAllowed(
     await getCurrentDomain(),
-    account.address().hex(),
+    address,
   );
   sendResponse(status);
 }
 
-async function submitTransaction(client, account, signedTransaction, sendResponse) {
-  if (!checkConnected(account, sendResponse)) {
+async function submitTransaction(client, publicAccount, signedTransaction, sendResponse) {
+  const account = await checkAccount(sendResponse);
+  if (!checkConnected(publicAccount.address, sendResponse) || account === undefined) {
     return;
   }
 
@@ -119,8 +127,9 @@ async function submitTransaction(client, account, signedTransaction, sendRespons
   }
 }
 
-async function signTransactionAndSendResponse(account, signingMessage, sendResponse) {
-  if (!checkConnected(account, sendResponse)) {
+async function signTransactionAndSendResponse(publicAccount, signingMessage, sendResponse) {
+  const account = await checkAccount(sendResponse);
+  if (!checkConnected(publicAccount.address, sendResponse) || account === undefined) {
     return;
   }
 
@@ -141,8 +150,9 @@ async function signTransactionAndSendResponse(account, signingMessage, sendRespo
   }
 }
 
-async function signMessage(account, message, sendResponse) {
-  if (!checkConnected(account, sendResponse)) {
+async function signMessage(publicAccount, message, sendResponse) {
+  const account = await checkAccount(sendResponse);
+  if (!checkConnected(publicAccount.address, sendResponse) || account === undefined) {
     return;
   }
 
@@ -167,9 +177,9 @@ async function signMessage(account, message, sendResponse) {
 }
 
 async function handleDappRequest(request, sendResponse) {
-  const account = await getBackgroundAptosAccountState();
+  const publicAccount = await getBackgroundCurrentPublicAccount();
   const network = await getBackgroundNodeUrl();
-  if (account === undefined) {
+  if (publicAccount === undefined) {
     sendResponse({ error: DappErrorType.NO_ACCOUNTS });
     return;
   }
@@ -178,16 +188,16 @@ async function handleDappRequest(request, sendResponse) {
   const client = new AptosClient(network, { adapter: fetchAdapter });
   switch (request.method) {
     case MessageMethod.CONNECT:
-      connect(account, sendResponse);
+      connect(publicAccount, sendResponse);
       break;
     case MessageMethod.DISCONNECT:
-      disconnect(account, sendResponse);
+      disconnect(publicAccount.address, sendResponse);
       break;
     case MessageMethod.IS_CONNECTED:
-      isConnected(account, sendResponse);
+      isConnected(publicAccount.address, sendResponse);
       break;
     case MessageMethod.GET_ACCOUNT_ADDRESS:
-      getAccountAddress(account, sendResponse);
+      getAccountAddress(publicAccount, sendResponse);
       break;
     case MessageMethod.GET_CHAIN_ID:
       getChainId(client, sendResponse);
@@ -196,16 +206,16 @@ async function handleDappRequest(request, sendResponse) {
       getNetwork(sendResponse);
       break;
     case MessageMethod.GET_SEQUENCE_NUMBER:
-      getSequenceNumber(client, account, sendResponse);
+      getSequenceNumber(client, publicAccount, sendResponse);
       break;
     case MessageMethod.SUBMIT_TRANSACTION:
-      submitTransaction(client, account, request.args.signedTransaction, sendResponse);
+      submitTransaction(client, publicAccount, request.args.signedTransaction, sendResponse);
       break;
     case MessageMethod.SIGN_TRANSACTION:
-      signTransactionAndSendResponse(account, request.args.signingMessage, sendResponse);
+      signTransactionAndSendResponse(publicAccount, request.args.signingMessage, sendResponse);
       break;
     case MessageMethod.SIGN_MESSAGE:
-      signMessage(account, request.args.message, sendResponse);
+      signMessage(publicAccount, request.args.message, sendResponse);
       break;
     default:
       // method not supported

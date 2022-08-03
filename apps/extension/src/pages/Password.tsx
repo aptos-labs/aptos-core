@@ -21,10 +21,14 @@ interface FormValues {
   password: string;
 }
 
-function Password() {
+interface Props {
+  isBackground: boolean
+  onUnlock: () => void
+}
+
+function Password({ isBackground, onUnlock }: Props) {
   const { colorMode } = useColorMode();
   const [error, setError] = useState<string | undefined>(undefined);
-  const navigate = useNavigate();
   const { handleSubmit, register } = useForm<FormValues>({
     defaultValues: {
       password: '',
@@ -33,9 +37,11 @@ function Password() {
 
   const onSubmit: SubmitHandler<Record<string, any>> = async (data, event) => {
     event?.preventDefault();
-    const accounts = await unlockAccounts(data.password);
+    const accounts = await unlockAccounts(data.password, isBackground ?? false);
     if (accounts) {
-      navigate(Routes.wallet.routePath);
+      if (onUnlock) {
+        onUnlock();
+      }
     } else {
       setError('Incorrect password');
     }
@@ -87,6 +93,14 @@ function Password() {
         </VStack>
       </form>
     </VStack>
+  );
+}
+
+// Used for password in main navigation stack
+export function NavigationPassword() {
+  const navigate = useNavigate();
+  return (
+    <Password isBackground={false} onUnlock={() => { navigate(Routes.wallet.routePath); }} />
   );
 }
 

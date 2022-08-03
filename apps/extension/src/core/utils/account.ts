@@ -15,6 +15,7 @@ import {
   DecryptedState,
   Mnemonic,
   MnemonicState,
+  PublicAccount,
 } from 'core/types/stateTypes';
 import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
@@ -60,9 +61,20 @@ export function createNewAccount(): AptosAccount {
   return account;
 }
 
-export function getCurrAccountAddress(): string | null {
-  const address = window.localStorage.getItem(WALLET_STATE_ACCOUNT_ADDRESS_KEY);
-  return address ?? null;
+export function getCurrentPublicAccount(): PublicAccount | null {
+  const item = window.localStorage.getItem(WALLET_STATE_ACCOUNT_ADDRESS_KEY);
+  if (item) {
+    return JSON.parse(item);
+  }
+  return null;
+}
+
+export async function getBackgroundCurrentPublicAccount(): Promise<PublicAccount | null> {
+  const result = await Browser.persistentStorage()?.get([WALLET_STATE_ACCOUNT_ADDRESS_KEY]);
+  if (result && result[WALLET_STATE_ACCOUNT_ADDRESS_KEY]) {
+    return JSON.parse(result[WALLET_STATE_ACCOUNT_ADDRESS_KEY]);
+  }
+  return null;
 }
 
 export function getEncryptedAccounts(): EncryptedAccounts | null {
@@ -74,10 +86,28 @@ export function getEncryptedAccounts(): EncryptedAccounts | null {
   return null;
 }
 
+export async function getBackgroundEncryptedAccounts(): Promise<EncryptedAccounts | null> {
+  const result = await Browser.persistentStorage()?.get([WALLET_ENCRYPTED_ACCOUNTS_KEY]);
+  if (result && result[WALLET_ENCRYPTED_ACCOUNTS_KEY]) {
+    const accounts: EncryptedAccounts = JSON.parse(result[WALLET_ENCRYPTED_ACCOUNTS_KEY]);
+    return accounts;
+  }
+  return null;
+}
+
 export function getDecryptedAccounts(): AccountsState | null {
   const item = window.sessionStorage.getItem(WALLET_SESSION_ACCOUNTS_KEY);
   if (item) {
     const decryptedState: DecryptedState = JSON.parse(item);
+    return decryptedState?.accounts ?? null;
+  }
+  return null;
+}
+
+export async function getBackgroundDecryptedAccounts(): Promise<AccountsState | null> {
+  const result = await Browser.sessionStorage()?.get([WALLET_SESSION_ACCOUNTS_KEY]);
+  if (result && result[WALLET_SESSION_ACCOUNTS_KEY]) {
+    const decryptedState: DecryptedState = JSON.parse(result[WALLET_SESSION_ACCOUNTS_KEY]);
     return decryptedState?.accounts ?? null;
   }
   return null;
@@ -94,10 +124,18 @@ export function getDecryptionKeyFromSession(): Uint8Array | null {
 
 export function isWalletLocked(): boolean {
   const localStorageState = getEncryptedAccounts();
-  const currAccountAddress = getCurrAccountAddress();
+  const publicAccount = getCurrentPublicAccount();
   return (localStorageState?.encrypted !== null
-          && currAccountAddress !== null
+          && publicAccount !== null
           && getDecryptedAccounts() === null);
+}
+
+export async function isBackgroundWalletLocked(): Promise<boolean> {
+  const localStorageState = await getBackgroundEncryptedAccounts();
+  const publicAccount = await getBackgroundCurrentPublicAccount();
+  return (localStorageState?.encrypted !== null
+          && publicAccount !== null
+          && await getBackgroundDecryptedAccounts() === null);
 }
 
 async function deriveEncryptionKey(
@@ -155,8 +193,16 @@ export async function storeEncryptedAccounts(
   Browser.sessionStorage()?.set({ [WALLET_SESSION_ACCOUNTS_KEY]: decryptedString });
 }
 
-export async function unlockAccounts(password: string): Promise<AccountsState | null> {
-  const encryptedAccounts = getEncryptedAccounts();
+export async function unlockAccounts(
+  password: string,
+  background: boolean = false,
+): Promise<AccountsState | null> {
+  let encryptedAccounts;
+  if (background) {
+    encryptedAccounts = await getBackgroundEncryptedAccounts();
+  } else {
+    encryptedAccounts = getEncryptedAccounts();
+  }
   if (encryptedAccounts) {
     try {
       const encrypted = bs58.decode(encryptedAccounts.encrypted);
@@ -200,11 +246,9 @@ export function getMnemonicState(address: string): MnemonicState {
   return mnemonic;
 }
 
-// todo: fix this to prompt the password for the encryption if needed
 export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
   return new Promise((resolve) => {
-    Browser.persistentStorage()?.get([WALLET_STATE_ACCOUNT_ADDRESS_KEY], (addressResult: any) => {
-      const address: string = addressResult[WALLET_STATE_ACCOUNT_ADDRESS_KEY];
+    getBackgroundCurrentPublicAccount().then((publicAccount) => {
       Browser.sessionStorage()?.get([WALLET_SESSION_ACCOUNTS_KEY], (accountResult: any) => {
         if (!accountResult[WALLET_SESSION_ACCOUNTS_KEY]) {
           resolve(undefined);
@@ -212,8 +256,8 @@ export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
         const result = accountResult[WALLET_SESSION_ACCOUNTS_KEY];
         const decryptedState: DecryptedState = JSON.parse(result);
         const accounts = decryptedState?.accounts;
-        if (accounts && address) {
-          const aptosAccount = getAptosAccountState(accounts, address);
+        if (accounts && publicAccount?.address) {
+          const aptosAccount = getAptosAccountState(accounts, publicAccount.address);
           resolve(aptosAccount);
         } else {
           resolve(undefined);

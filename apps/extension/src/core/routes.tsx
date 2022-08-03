@@ -8,7 +8,7 @@ import Credentials from 'pages/Credentials';
 import Gallery from 'pages/Gallery';
 import Help from 'pages/Help';
 import Network from 'pages/Network';
-import Password from 'pages/Password';
+import { NavigationPassword } from 'pages/Password';
 import Settings from 'pages/Settings';
 import Token from 'pages/Token';
 import Wallet from 'pages/Wallet';
@@ -75,7 +75,7 @@ export const Routes = Object.freeze({
     routePath: '/no-wallet',
   },
   password: {
-    element: <Password />,
+    element: <NavigationPassword />,
     routePath: '/password',
   },
   recovery_phrase: {

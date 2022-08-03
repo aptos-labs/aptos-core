@@ -101,10 +101,11 @@ class Web3 {
       window.postMessage({ args, id, method });
       window.addEventListener('message', function handler(event) {
         if (event.data.responseMethod === method
-            && event.data.id === id) {
+            && event.data.id === id
+            && event.data.response) {
           const { response } = event.data;
           this.removeEventListener('message', handler);
-          if (response.error) {
+          if (response && response.error) {
             reject(response.error ?? 'Error');
           } else {
             resolve(response);

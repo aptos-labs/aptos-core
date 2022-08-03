@@ -17,6 +17,9 @@ import {
 } from '@chakra-ui/react';
 import { InfoIcon } from '@chakra-ui/icons';
 import { PermissionType, PromptMessage } from 'core/types/dappTypes';
+import { isBackgroundWalletLocked } from 'core/utils/account';
+import { useEffect } from 'react';
+import Password from 'pages/Password';
 
 const theme = extendTheme({
   initialColorMode: 'light',
@@ -33,6 +36,11 @@ const theme = extendTheme({
 
 function PromptState() {
   const [permissionInfo, setPermissionInfo] = useState(undefined);
+  const [isUnlocked, setIsUnlocked] = useState(undefined)
+
+  useEffect(async () => {
+    setIsUnlocked(!await isBackgroundWalletLocked())
+  }, []);
 
   chrome.runtime.sendMessage(PromptMessage.LOADED, (response) => {
     setPermissionInfo(response);
@@ -50,7 +58,7 @@ function PromptState() {
     window.close();
   };
 
-  if (permissionInfo) {
+  if (permissionInfo && isUnlocked) {
     const {
       domain, imageURI, promptType, title,
     } = permissionInfo;
@@ -120,6 +128,12 @@ function PromptState() {
         </SimpleGrid>
       </VStack>
     );
+  } else {
+    return (isUnlocked == false 
+      ? <VStack w="100vw" h="100vh">
+          <Password isBackground={true} onUnlock={() => setIsUnlocked(true)} />
+        </VStack>
+      : null);
   }
   return null;
 }

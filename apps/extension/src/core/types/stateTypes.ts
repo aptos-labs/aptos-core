@@ -24,3 +24,8 @@ export type DecryptedState = {
   accounts: AccountsState,
   decryptionKey: Uint8Array
 } | null;
+
+export type PublicAccount = {
+  address: string,
+  pubKey: string
+};
