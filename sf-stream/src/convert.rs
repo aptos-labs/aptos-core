@@ -5,12 +5,12 @@ use crate::protos::extractor;
 use aptos_api_types::{
     DeleteModule, DeleteResource, Event, GenesisPayload, HashValue, MoveAbility, MoveFunction,
     MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule, MoveModuleBytecode,
-    MoveModuleId, MoveStruct, MoveStructField, MoveStructTag, MoveType, ScriptPayload, Transaction,
-    TransactionInfo, TransactionPayload, WriteSet, WriteSetChange,
+    MoveModuleId, MoveResource, MoveStruct, MoveStructField, MoveStructTag, MoveType,
+    ScriptPayload, Transaction, TransactionInfo, TransactionPayload, WriteSet, WriteSetChange,
 };
 use aptos_logger::warn;
 pub use move_deps::move_binary_format::file_format::Ability;
-use protobuf::EnumOrUnknown;
+use protobuf::{EnumOrUnknown, MessageField};
 use std::{str::FromStr, time::Duration};
 
 pub fn convert_move_module_id(move_module_id: &MoveModuleId) -> extractor::MoveModuleId {
@@ -32,7 +32,7 @@ pub fn convert_move_ability(move_ability: &MoveAbility) -> EnumOrUnknown<extract
 pub fn convert_move_struct_field(msf: &MoveStructField) -> extractor::MoveStructField {
     extractor::MoveStructField {
         name: msf.name.0.to_string(),
-        type_: protobuf::MessageField::some(convert_move_type(&msf.typ)),
+        type_: MessageField::some(convert_move_type(&msf.typ)),
         special_fields: Default::default(),
     }
 }
@@ -114,15 +114,39 @@ pub fn convert_move_module(move_module: &MoveModule) -> extractor::MoveModule {
     }
 }
 
+pub fn convert_move_resource(move_resource: &MoveResource) -> extractor::MoveResource {
+    extractor::MoveResource {
+        type_: MessageField::some(extractor::MoveStructTag {
+            address: move_resource.typ.address.to_string(),
+            module: move_resource.typ.module.to_string(),
+            name: move_resource.typ.name.to_string(),
+            generic_type_params: move_resource
+                .typ
+                .generic_type_params
+                .iter()
+                .map(|move_type| convert_move_type(move_type))
+                .collect(),
+            special_fields: Default::default(),
+        }),
+        data: serde_json::to_string(&move_resource.data).unwrap_or_else(|_| {
+            panic!(
+                "Could not convert move_resource data to json '{:?}'",
+                move_resource
+            )
+        }),
+        special_fields: Default::default(),
+    }
+}
+
 pub fn convert_move_module_bytecode(mmb: &MoveModuleBytecode) -> extractor::MoveModuleBytecode {
     let abi = mmb.clone().try_parse_abi().map_or_else(
         |e| {
             warn!("[sf-stream] Could not decode MoveModuleBytecode ABI: {}", e);
-            protobuf::MessageField::none()
+            MessageField::none()
         },
         |mmb| match mmb.abi {
-            None => protobuf::MessageField::none(),
-            Some(move_module) => protobuf::MessageField::some(convert_move_module(&move_module)),
+            None => MessageField::none(),
+            Some(move_module) => MessageField::some(convert_move_module(&move_module)),
         },
     );
     extractor::MoveModuleBytecode {
@@ -141,8 +165,8 @@ pub fn convert_transaction_payload(payload: &TransactionPayload) -> extractor::T
             payload: Some(
                 extractor::transaction_payload::Payload::ScriptFunctionPayload(
                     extractor::ScriptFunctionPayload {
-                        function: protobuf::MessageField::some(extractor::ScriptFunctionId {
-                            module: protobuf::MessageField::some(convert_move_module_id(
+                        function: MessageField::some(extractor::ScriptFunctionId {
+                            module: MessageField::some(convert_move_module_id(
                                 &sfp.function.module,
                             )),
                             name: sfp.function.name.to_string(),
@@ -209,7 +233,7 @@ pub fn convert_events(events: &[Event]) -> Vec<extractor::Event> {
     events.iter().map(convert_event).collect()
 }
 
-pub fn convert_write_set(write_set: &WriteSet) -> protobuf::MessageField<extractor::WriteSet> {
+pub fn convert_write_set(write_set: &WriteSet) -> MessageField<extractor::WriteSet> {
     let (write_set_type, write_set) = match write_set {
         WriteSet::ScriptWriteSet(sws) => {
             let write_set_type =
@@ -218,7 +242,7 @@ pub fn convert_write_set(write_set: &WriteSet) -> protobuf::MessageField<extract
             let write_set =
                 extractor::write_set::Write_set::ScriptWriteSet(extractor::ScriptWriteSet {
                     execute_as: sws.execute_as.to_string(),
-                    script: protobuf::MessageField::some(convert_script_payload(&sws.script)),
+                    script: MessageField::some(convert_script_payload(&sws.script)),
                     special_fields: Default::default(),
                 });
             (write_set_type, Some(write_set))
@@ -236,7 +260,7 @@ pub fn convert_write_set(write_set: &WriteSet) -> protobuf::MessageField<extract
             (write_set_type, Some(write_set))
         }
     };
-    protobuf::MessageField::some(extractor::WriteSet {
+    MessageField::some(extractor::WriteSet {
         write_set_type,
         write_set,
         special_fields: Default::default(),
@@ -284,7 +308,7 @@ pub fn convert_move_type(move_type: &MoveType) -> extractor::MoveType {
         MoveType::Reference { mutable, to } => Some(extractor::move_type::Content::Reference(
             extractor::move_type::ReferenceType {
                 mutable: mutable.clone(),
-                to: protobuf::MessageField::some(convert_move_type(&to)),
+                to: MessageField::some(convert_move_type(&to)),
                 special_fields: Default::default(),
             },
         )),
@@ -330,7 +354,7 @@ pub fn convert_delete_module(delete_module: &DeleteModule) -> extractor::DeleteM
     extractor::DeleteModule {
         address: delete_module.address.to_string(),
         state_key_hash: convert_hex_string_to_bytes(&delete_module.state_key_hash),
-        module: protobuf::MessageField::some(extractor::MoveModuleId {
+        module: MessageField::some(extractor::MoveModuleId {
             address: delete_module.module.address.to_string(),
             name: delete_module.module.name.to_string(),
             special_fields: Default::default(),
@@ -343,7 +367,7 @@ pub fn convert_delete_resource(delete_resource: &DeleteResource) -> extractor::D
     extractor::DeleteResource {
         address: delete_resource.address.to_string(),
         state_key_hash: convert_hex_string_to_bytes(&delete_resource.state_key_hash),
-        resource: protobuf::MessageField::some(extractor::MoveStructTag {
+        resource: MessageField::some(extractor::MoveStructTag {
             address: delete_resource.address.to_string(),
             module: delete_resource.resource.module.to_string(),
             name: delete_resource.resource.name.to_string(),
@@ -397,7 +421,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
                         ),
                         handle: delete_table_item.handle.to_string(),
                         key: delete_table_item.key.to_string(),
-                        data: protobuf::MessageField::some(extractor::DeleteTableData {
+                        data: MessageField::some(extractor::DeleteTableData {
                             key: data.key.to_string(),
                             key_type: data.key_type.clone(),
                             special_fields: Default::default(),
@@ -416,7 +440,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
                 extractor::WriteModule {
                     address: write_module.address.to_string(),
                     state_key_hash: convert_hex_string_to_bytes(&write_module.state_key_hash),
-                    data: write_module.data.bytecode.to_string(),
+                    data: MessageField::some(convert_move_module_bytecode(&write_module.data)),
                     special_fields: Default::default(),
                 },
             )),
@@ -430,30 +454,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
                 extractor::WriteResource {
                     address: write_resource.address.to_string(),
                     state_key_hash: convert_hex_string_to_bytes(&write_resource.state_key_hash),
-                    data: protobuf::MessageField::some(extractor::MoveResource {
-                        type_: protobuf::MessageField::some(extractor::MoveStructTag {
-                            address: write_resource.data.typ.address.to_string(),
-                            module: write_resource.data.typ.module.to_string(),
-                            name: write_resource.data.typ.name.to_string(),
-                            generic_type_params: write_resource
-                                .data
-                                .typ
-                                .generic_type_params
-                                .iter()
-                                .map(|move_type| convert_move_type(move_type))
-                                .collect(),
-                            special_fields: Default::default(),
-                        }),
-                        data: serde_json::to_string(&write_resource.data.data).unwrap_or_else(
-                            |_| {
-                                panic!(
-                                    "Could not convert write_resource data to json '{:?}'",
-                                    write_resource
-                                )
-                            },
-                        ),
-                        special_fields: Default::default(),
-                    }),
+                    data: MessageField::some(convert_move_resource(&write_resource.data)),
                     special_fields: Default::default(),
                 },
             )),
@@ -477,7 +478,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
                         ),
                         handle: write_table_item.handle.to_string(),
                         key: write_table_item.key.to_string(),
-                        data: protobuf::MessageField::some(extractor::WriteTableData {
+                        data: MessageField::some(extractor::WriteTableData {
                             key: data.key.to_string(),
                             key_type: data.key_type.clone(),
                             value: data.value.to_string(),
@@ -512,7 +513,7 @@ pub fn convert_script_payload(script_payload: &ScriptPayload) -> extractor::Scri
 
 pub fn convert_event(event: &Event) -> extractor::Event {
     extractor::Event {
-        key: protobuf::MessageField::some(extractor::EventKey {
+        key: MessageField::some(extractor::EventKey {
             creation_number: event.key.0.get_creation_number(),
             account_address: event.key.0.get_creator_address().to_string(),
             special_fields: Default::default(),
@@ -526,8 +527,8 @@ pub fn convert_event(event: &Event) -> extractor::Event {
 
 pub fn convert_timestamp_secs(
     timestamp: u64,
-) -> protobuf::MessageField<protobuf::well_known_types::timestamp::Timestamp> {
-    protobuf::MessageField::some(protobuf::well_known_types::timestamp::Timestamp {
+) -> MessageField<protobuf::well_known_types::timestamp::Timestamp> {
+    MessageField::some(protobuf::well_known_types::timestamp::Timestamp {
         seconds: timestamp as i64,
         nanos: 0,
         special_fields: Default::default(),
@@ -536,9 +537,9 @@ pub fn convert_timestamp_secs(
 
 pub fn convert_timestamp_usecs(
     timestamp: u64,
-) -> protobuf::MessageField<protobuf::well_known_types::timestamp::Timestamp> {
+) -> MessageField<protobuf::well_known_types::timestamp::Timestamp> {
     let ts = Duration::from_nanos(timestamp * 1000);
-    protobuf::MessageField::some(protobuf::well_known_types::timestamp::Timestamp {
+    MessageField::some(protobuf::well_known_types::timestamp::Timestamp {
         seconds: ts.as_secs() as i64,
         nanos: ts.subsec_nanos() as i32,
         special_fields: Default::default(),
@@ -564,9 +565,8 @@ pub fn convert_transaction(
     block_height: u64,
     current_epoch: u64,
 ) -> extractor::Transaction {
-    let mut timestamp: Option<
-        protobuf::MessageField<protobuf::well_known_types::timestamp::Timestamp>,
-    > = None;
+    let mut timestamp: Option<MessageField<protobuf::well_known_types::timestamp::Timestamp>> =
+        None;
 
     let txn_type = match transaction {
         Transaction::UserTransaction(_) => extractor::transaction::TransactionType::USER,
@@ -584,7 +584,7 @@ pub fn convert_transaction(
         Transaction::UserTransaction(ut) => {
             timestamp = Some(convert_timestamp_usecs(ut.timestamp.0));
             extractor::transaction::Txn_data::User(extractor::UserTransaction {
-                request: protobuf::MessageField::some(extractor::UserTransactionRequest {
+                request: MessageField::some(extractor::UserTransactionRequest {
                     sender: ut.request.sender.to_string(),
                     sequence_number: ut.request.sequence_number.0,
                     max_gas_amount: ut.request.max_gas_amount.0,
@@ -592,9 +592,7 @@ pub fn convert_transaction(
                     expiration_timestamp_secs: convert_timestamp_secs(
                         ut.request.expiration_timestamp_secs.0,
                     ),
-                    payload: protobuf::MessageField::some(convert_transaction_payload(
-                        &ut.request.payload,
-                    )),
+                    payload: MessageField::some(convert_transaction_payload(&ut.request.payload)),
                     signature: Default::default(),
                     special_fields: Default::default(),
                 }),
@@ -642,7 +640,7 @@ pub fn convert_transaction(
                 transaction
             )
         }),
-        info: protobuf::MessageField::some(convert_transaction_info(
+        info: MessageField::some(convert_transaction_info(
             transaction.transaction_info().unwrap_or_else(|_| {
                 panic!(
                     "Could not extract transaction_info from Transaction '{:?}'",

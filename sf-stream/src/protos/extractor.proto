@@ -158,7 +158,7 @@ message DeleteTableData {
 message WriteModule {
   string address = 1;
   bytes state_key_hash = 2;
-  string data = 3;
+  MoveModuleBytecode data = 3;
 }
 
 message WriteResource {
