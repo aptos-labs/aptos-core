@@ -107,7 +107,7 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           items: [
-            "nodes/full-node/fullnode-source-code-and-docker",
+            "nodes/full-node/fullnode-source-code-or-docker",
             "nodes/full-node/update-fullnode-with-new-releases",
             "nodes/full-node/network-identity-fullnode",
             "nodes/full-node/troubleshooting-fullnode",
