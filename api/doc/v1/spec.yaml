@@ -2214,8 +2214,8 @@ components:
     RoleType:
       type: string
       enum:
-      - Validator
-      - FullNode
+      - validator
+      - full_node
     ScriptFunctionId:
       type: object
       required:

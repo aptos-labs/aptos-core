@@ -89,8 +89,8 @@ class TokenClient(RestClient):
                 creator,
                 collection_name.encode("utf-8").hex(),
                 token_name.encode("utf-8").hex(),
-                str(amount),
                 str(0),
+                str(amount),
             ]
         }
         self.submit_transaction_helper(account, payload)

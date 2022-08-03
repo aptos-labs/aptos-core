@@ -72,7 +72,7 @@ key 0x3::token::Collections {
 }
 
 task 4 'view_table'. lines 13-15:
-{"count":"1","description":"","maximum":"100","mutability_config":{"description":false,"maximum":false,"uri":false},"name":"aptos_punks","uri":""}
+{"description":"","maximum":"100","mutability_config":{"description":false,"maximum":false,"uri":false},"name":"aptos_punks","supply":"1","uri":""}
 
 task 5 'run'. lines 16-18:
 Events:
@@ -95,4 +95,4 @@ Events:
 return values: 0
 
 task 7 'view_table'. lines 21-21:
-{"description":"","largest_property_version":"0","maximum":"100","mutability_config":{"description":false,"maximum":false,"properties":false,"royalty":false,"uri":false},"name":"geek_token","properties":{"map":{"data":[]}},"royalty":{"payee_address":"0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6","royalty_points_denominator":"0","royalty_points_nominator":"0"},"supply":"10","uri":""}
+{"default_properties":{"map":{"data":[]}},"description":"","largest_property_version":"0","maximum":"100","mutability_config":{"description":false,"maximum":false,"properties":false,"royalty":false,"uri":false},"name":"geek_token","royalty":{"payee_address":"0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6","royalty_points_denominator":"0","royalty_points_numerator":"0"},"supply":"10","uri":""}

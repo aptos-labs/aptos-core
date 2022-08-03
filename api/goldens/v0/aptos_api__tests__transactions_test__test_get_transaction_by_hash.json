@@ -87,7 +87,6 @@
       "key": "my name",
       "key_type": "0x1::string::String",
       "value": {
-        "count": "0",
         "description": "awesome collection",
         "maximum": "18446744073709551615",
         "mutability_config": {
@@ -96,6 +95,7 @@
           "uri": false
         },
         "name": "my name",
+        "supply": "0",
         "uri": "http://aptoslabs.com/ifonly.json"
       },
       "value_type": "0x3::token::CollectionData"

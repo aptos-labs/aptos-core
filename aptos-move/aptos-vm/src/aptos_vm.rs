@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::delta_ext::TransactionOutputExt;
 use crate::move_vm_ext::{NativeCodeContext, PublishRequest};
 use crate::{
     adapter_common,
@@ -32,8 +33,8 @@ use aptos_types::{
     on_chain_config::{new_epoch_event_key, VMConfig, Version},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
-        Transaction, TransactionOutput, TransactionOutputExt, TransactionPayload,
-        TransactionStatus, VMValidatorResult, WriteSetPayload,
+        Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,
+        WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteSet, WriteSetMut},

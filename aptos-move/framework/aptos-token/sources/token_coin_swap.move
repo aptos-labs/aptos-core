@@ -90,7 +90,7 @@ module aptos_token::token_coin_swap {
         let royalty = token::get_royalty(token_id);
 
         let total_cost = token_swap.min_price_per_token * token_amount;
-        let royalty_fee = total_cost * token::get_royalty_nominator(&royalty) / token::get_royalty_denominator(&royalty);
+        let royalty_fee = total_cost * token::get_royalty_numerator(&royalty) / token::get_royalty_denominator(&royalty);
         let remaining = total_cost - royalty_fee;
 
         //deposite to the original creators

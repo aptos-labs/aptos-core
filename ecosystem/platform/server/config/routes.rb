@@ -19,6 +19,12 @@ Rails.application.routes.draw do
     root to: redirect('/it2') # creates user_root_path, where users go after confirming email
   end
 
+  # Redirect community.aptoslabs.com to aptoslabs.com
+  constraints host: /community.aptoslabs.com/ do
+    match '/*path' => redirect { |params, _req| "https://aptoslabs.com/#{params[:path]}" }, via: %i[get post]
+    match '/' => redirect { |_params, _req| 'https://aptoslabs.com/community' }, via: %i[get post]
+  end
+
   # CMS
   resources :articles, param: :slug, only: %i[index show]
 

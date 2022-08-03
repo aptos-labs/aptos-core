@@ -13,7 +13,14 @@ RUN apt-get update && apt-get install -y cmake curl clang git pkg-config libssl-
 
 ### Build Rust code ###
 FROM rust-base as builder
-COPY --link . /aptos/
+
+# Confirm that this Dockerfile is being invoked from an appropriate builder.
+# See https://github.com/aptos-labs/aptos-core/pull/2471
+# See https://github.com/aptos-labs/aptos-core/pull/2472
+ARG BUILT_VIA_BUILDKIT
+ENV BUILT_VIA_BUILDKIT $BUILT_VIA_BUILDKIT
+
+RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nFor more information, see https://github.com/aptos-labs/aptos-core/pull/2472\n\nThanks!" && false)
 
 ARG GIT_SHA
 ENV GIT_SHA ${GIT_SHA}
@@ -24,6 +31,8 @@ ENV GIT_BRANCH ${GIT_BRANCH}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 
+COPY --link . /aptos/
+
 RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOME/registry docker/build-rust-all.sh && rm -rf $CARGO_HOME/registry/index
 
 ### Validator Image ###
@@ -32,7 +41,7 @@ FROM debian-base AS validator
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && apt-get clean && rm -r /var/lib/apt/lists/*
 
 ### Needed to run debugging tools like perf
-RUN apt-get update && apt-get install -y linux-perf sudo procps
+RUN apt-get update && apt-get install -y linux-perf sudo procps gdb
 ### Because build machine perf might not match run machine perf, we have to symlink
 ### Even if version slightly off, still mostly works
 RUN ln -sf /usr/bin/perf_* /usr/bin/perf

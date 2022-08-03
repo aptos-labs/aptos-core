@@ -40,13 +40,9 @@ pub struct GenesisInfo {
     /// Maximum stake to be in the validator set
     pub max_stake: u64,
     /// Minimum number of seconds to lockup staked coins
-    pub min_lockup_duration_secs: u64,
-    /// Maximum number of seconds to lockup staked coins
-    pub max_lockup_duration_secs: u64,
+    pub recurring_lockup_duration_secs: u64,
     /// Duration of an epoch
     pub epoch_duration_secs: u64,
-    /// Initial timestamp for genesis validators to be locked up
-    pub initial_lockup_timestamp: u64,
     /// The genesis transaction, once it's been generated
     genesis: Option<Transaction>,
 }
@@ -61,10 +57,8 @@ impl GenesisInfo {
         allow_new_validators: bool,
         min_stake: u64,
         max_stake: u64,
-        min_lockup_duration_secs: u64,
-        max_lockup_duration_secs: u64,
+        recurring_lockup_duration_secs: u64,
         epoch_duration_secs: u64,
-        initial_lockup_timestamp: u64,
     ) -> anyhow::Result<GenesisInfo> {
         let mut validators = Vec::new();
 
@@ -81,10 +75,8 @@ impl GenesisInfo {
             allow_new_validators,
             min_stake,
             max_stake,
-            min_lockup_duration_secs,
-            max_lockup_duration_secs,
+            recurring_lockup_duration_secs,
             epoch_duration_secs,
-            initial_lockup_timestamp,
             genesis: None,
         })
     }
@@ -109,10 +101,8 @@ impl GenesisInfo {
                 epoch_duration_secs: self.epoch_duration_secs,
                 min_stake: self.min_stake,
                 max_stake: self.max_stake,
-                min_lockup_duration_secs: self.min_lockup_duration_secs,
-                max_lockup_duration_secs: self.max_lockup_duration_secs,
+                recurring_lockup_duration_secs: self.recurring_lockup_duration_secs,
                 allow_new_validators: self.allow_new_validators,
-                initial_lockup_timestamp: self.initial_lockup_timestamp,
             },
         )
     }
