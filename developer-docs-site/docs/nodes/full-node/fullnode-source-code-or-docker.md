@@ -1,10 +1,10 @@
 ---
-title: "FullNode Using Aptos Source and Docker"
-slug: "fullnode-source-code-and-docker"
+title: "FullNode Using Aptos Source or Docker"
+slug: "fullnode-source-code-or-docker"
 sidebar_position: 10
 ---
 
-# FullNode Using Aptos Source and Docker
+# FullNode Using Aptos Source or Docker
 
 You can run your own [FullNode](/concepts/basics-fullnodes) to synchronize with the state of the Aptos Blockchain and stay up-to-date. FullNodes replicate the entire state of the blockchain by querying other Aptos FullNodes or validators.
 
@@ -26,11 +26,6 @@ Before you get started with this tutorial, read the following sections:
 * [FullNode concepts](/concepts/basics-fullnodes).
 * [REST specifications](/rest-api).
 
-:::caution Docker support only on Linux
-
-Docker container is currently supported only on Linux x86-64 platform. If you are on macOS or Windows platform, use the Aptos-core source approach.
-
-:::
 
 ## Hardware requirements
 
@@ -60,14 +55,14 @@ Given that devnet is currently being reset on a weekly basis, we estimate that A
 
 ## Configuring a FullNode
 
-You can configure a public FullNode in two ways:
+You can configure a public FullNode in one of two ways:
 
-1. Using the [aptos-core](https://github.com/aptos-labs/aptos-core) source code.
+1. Building and running [aptos-core](https://github.com/aptos-labs/aptos-core) from source code.
 2. Using Docker.
 
-This document describes how to configure your public FullNode using both the methods.
+This document describes how to configure your public FullNode using both methods.
 
-### Using Aptos-core source code
+### Approach #1: Building and running from Aptos-core source code
 
 1. Clone the Aptos repo.
 
@@ -116,7 +111,7 @@ With your development environment ready, now you can start to setup your FullNod
       curl -O https://devnet.aptoslabs.com/waypoint.txt
       ```
 
-8. Edit the `fullnode.yaml` file in your current working directory as follows. See the example YAML file in: `docker/compose/public_full_node/public_full_node.yaml`.
+8. Edit the `fullnode.yaml` file in your current working directory as follows.
 
     - Specify the correct path to the `waypoint.txt` you just downloaded by editing the `base.waypoint.from_file` in the `fullnode.yaml`. By default it points to `waypoint.txt` in the current working directory.
     E.g.
@@ -152,42 +147,36 @@ This will build a release binary: `aptos-core/target/release/aptos-node`. The re
 
 :::
 
-### Using Docker
+### Approach #2: Using Docker
 
 This section describes how to configure and run your FullNode using Docker.
 
-1. Install [Docker](https://docs.docker.com/get-docker/) including [Docker-Compose](https://docs.docker.com/compose/install/).
+:::caution Running Aptos-core via Docker is currently only suported on x86-64 CPUs and not on ARM64 CPUs (which includes M1/M2 Macs).
+
+We currently only publish docker images compatible with x86-64 CPUs. 
+If you have an M1/M2 (ARM64) Mac, use the Aptos-core source approach.
+If M1/M2 support is important to you, please comment on and follow this issue: https://github.com/aptos-labs/aptos-core/issues/1412
+
+:::
+
+1. Install [Docker](https://docs.docker.com/get-docker/).
 2. Create a directory for your local public FullNode, and `cd` into it.
-3. Download the following YAML configuration files:
-
-    - Click on [Public FullNode Docker Compose](https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/docker-compose.yaml) and save the file, or run the below command on your terminal:
+   For example: 
+   ```bash
+   mkdir aptos-fullnode && cd aptos-fullnode
+   ```
+3. Run the following script to prepare your local config and data dir for DevNet:
+    ```bash
+    mkdir data && \
+    curl -O https://raw.githubusercontent.com/aptos-labs/aptos-core/devnet/config/src/config/test_data/public_full_node.yaml && \
+    curl -O https://devnet.aptoslabs.com/waypoint.txt && \
+    curl -O https://devnet.aptoslabs.com/genesis.blob
     ```
-    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/public_full_node/docker-compose.yaml
-    ```
 
-    and
-
-    - Click on [Public FullNode Aptos-core](https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml) and save the file, or run the below command on your terminal:
-    ```
-    wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/docker/compose/public_full_node/public_full_node.yaml
-    ```
-4. The Aptos devnet publishes the `genesis.blob` and `waypoint.txt` files. Download them:
-
-    - Click on [genesis][devnet_genesis] or run the below command on your terminal:
-      ```
-      wget https://devnet.aptoslabs.com/genesis.blob
-      ```
-
-    - Click on [waypoint][devnet_waypoint] and save the file, or run the below command on your terminal:
-      ```
-      wget https://devnet.aptoslabs.com/waypoint.txt
-      ```
-
-5. Start Docker Compose by running the command:
-
-    ```
-    docker-compose up
-    ```
+4. Finally, start the fullnode via docker:
+   ```bash
+    docker run --pull=always --rm -p 8080:8080 -p 9101:9101 -v $(pwd):/opt/aptos/etc -v $(pwd)/data:/opt/aptos/data --workdir /opt/aptos/etc --name=aptos-fullnode aptoslabs/validator:devnet /opt/aptos/bin/aptos-node -f /opt/aptos/etc/public_full_node.yaml
+   ```
 
 ## Verify the correctness of your FullNode
 
@@ -295,9 +284,6 @@ full_node_networks:
             role: "Upstream"
 ...            
 ```
-
-[pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
-[pfn_docker_compose]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/docker-compose.yaml
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob
 [devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt

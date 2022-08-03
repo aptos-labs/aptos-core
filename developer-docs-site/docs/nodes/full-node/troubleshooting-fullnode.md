@@ -8,7 +8,7 @@ sidebar_position: 13
 
 **Q: When starting the node, it throws a YAML-parsing error.**
 
-**A:** YAML files are sensitive to formatting errors. Use a dedicated YAML editor or use a YAML syntax checker in your preferred editor to check if each line in the YAML file is indented correctly. See the example YAML file in: `docker/compose/public_full_node/public_full_node.yaml`.
+**A:** YAML files are sensitive to formatting errors. Use a dedicated YAML editor or use a YAML syntax checker in your preferred editor to check if each line in the YAML file is indented correctly.
 
 **Q: When I start a node with `cargo run -p ...` command I get "Unable to fetch any peers to poll" error.**
 
@@ -25,7 +25,7 @@ Also my sync version does not increase, indicating that I am not syncing.
 You can workaround this by:
 
 1. Checking your network configuration, and
-2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See this section: [Add upstream seed peers](/nodes/full-node/fullnode-source-code-and-docker#add-upstream-seed-peers).
+2. Adding a seed peer to connect to, in your `public_full_node.yaml` file. See this section: [Add upstream seed peers](/nodes/full-node/fullnode-source-code-or-docker#add-upstream-seed-peers).
 
 For example, after you add a single peer to the `seeds` section in your `public_full_node.yaml` file like below, restart the `cargo run -p ...` command:
 
@@ -43,9 +43,6 @@ full_node_networks:
             - "/dns4/pfn0.node.devnet.aptoslabs.com/tcp/6182/noise-ik/bb14af025d226288a3488b4433cf5cb54d6a710365a2d95ac6ffbd9b9198a86a/handshake/0"
             role: "Upstream"
 ```
-
-[pfn_config_file]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/public_full_node.yaml
-[pfn_docker_compose]: https://github.com/aptos-labs/aptos-core/tree/main/docker/compose/public_full_node/docker-compose.yaml
 [rest_spec]: https://github.com/aptos-labs/aptos-core/tree/main/api
 [devnet_genesis]: https://devnet.aptoslabs.com/genesis.blob
 [devnet_waypoint]: https://devnet.aptoslabs.com/waypoint.txt
