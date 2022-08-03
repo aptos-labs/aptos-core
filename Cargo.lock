@@ -1095,6 +1095,7 @@ dependencies = [
  "executor-types",
  "fail 0.5.0",
  "futures",
+ "hex",
  "hyper",
  "mempool-notifications",
  "move-deps",

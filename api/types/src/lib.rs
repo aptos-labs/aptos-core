@@ -40,12 +40,13 @@ pub use response::{
 };
 pub use table::TableItemRequest;
 pub use transaction::{
-    BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem, DirectWriteSet,
-    EncodeSubmissionRequest, Event, GenesisPayload, GenesisTransaction, PendingTransaction,
-    ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
-    TransactionData, TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
-    TransactionSigningMessage, UserCreateSigningMessageRequest, UserTransaction,
-    UserTransactionRequest, WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload,
-    WriteTableItem,
+    AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem,
+    DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest, Event, GenesisPayload,
+    GenesisTransaction, MultiEd25519Signature, PendingTransaction, ScriptFunctionPayload,
+    ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction, TransactionData,
+    TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
+    TransactionSignature, TransactionSigningMessage, UserCreateSigningMessageRequest,
+    UserTransaction, UserTransactionRequest, WriteModule, WriteResource, WriteSet, WriteSetChange,
+    WriteSetPayload, WriteTableItem,
 };
 pub use wrappers::{IdentifierWrapper, MoveStructTagParam};

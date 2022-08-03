@@ -4,7 +4,7 @@
 use crate::{
     protos::extractor::{
         transaction::{TransactionType, Txn_data},
-        transaction_payload::{Payload, PayloadType},
+        transaction_payload::{Payload, Type as PayloadType},
         write_set_change::Change::WriteTableItem,
     },
     runtime::SfStreamer,
