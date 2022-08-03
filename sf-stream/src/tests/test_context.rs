@@ -47,10 +47,7 @@ pub fn new_test_context(fake_start_time_usecs: u64) -> TestContext {
     .unwrap()
     .with_init_genesis_config(Some(Arc::new(|genesis_config| {
         genesis_config.min_price_per_gas_unit = 0;
-        genesis_config.min_lockup_duration_secs = 0;
-        genesis_config.max_lockup_duration_secs = 86400;
-        // changed from lockup_timestamp being 0
-        genesis_config.initial_lockup_duration_secs = 0;
+        genesis_config.recurring_lockup_duration_secs = 86400;
     })))
     .with_randomize_first_validator_ports(false);
 

@@ -137,7 +137,7 @@ impl SfStreamer {
                 }
                 None => {
                     return vec![];
-                },
+                }
             },
             Err(err) => {
                 warn!("[sf-stream] failed to get first txn version: {}", err);
