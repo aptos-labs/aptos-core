@@ -257,8 +257,6 @@ module aptos_token::token_coin_swap {
 
         let token_listing = &borrow_global<TokenListings<coin::FakeMoney>>(signer::address_of(&token_owner)).listings;
 
-        // completely sold, no listing left
-        assert!(table::length(token_listing) == 1, 1);
         let token_coin_swap = table::borrow(token_listing, token_id);
         // sold 50 token only 50 tokens left
         assert!(token_coin_swap.token_amount == 50, token_coin_swap.token_amount);
