@@ -48,11 +48,11 @@ RUN ln -sf /usr/bin/perf_* /usr/bin/perf
 
 RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
 
-RUN mkdir -p /opt/aptos/bin /opt/aptos/etc
-COPY --link --from=builder /aptos/dist/aptos-node /opt/aptos/bin/
-COPY --link --from=builder /aptos/dist/db-backup /opt/aptos/bin/
-COPY --link --from=builder /aptos/dist/db-bootstrapper /opt/aptos/bin/
-COPY --link --from=builder /aptos/dist/db-restore /opt/aptos/bin/
+RUN mkdir -p /opt/aptos/etc
+COPY --link --from=builder /aptos/dist/aptos-node /usr/local/bin/
+COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/
+COPY --link --from=builder /aptos/dist/db-bootstrapper /usr/local/bin/
+COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/
 
 # Admission control
 EXPOSE 8000
@@ -75,7 +75,6 @@ FROM debian-base AS indexer
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
-RUN mkdir -p /opt/aptos/bin
 COPY --link --from=builder /aptos/dist/aptos-indexer /usr/local/bin/aptos-indexer
 
 ENV RUST_LOG_FORMAT=json
@@ -87,7 +86,6 @@ FROM debian-base AS node-checker
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
-RUN mkdir -p /opt/aptos/bin
 COPY --link --from=builder /aptos/dist/aptos-node-checker /usr/local/bin/aptos-node-checker
 
 ENV RUST_LOG_FORMAT=json
@@ -134,9 +132,9 @@ FROM debian-base AS faucet
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates nano net-tools tcpdump iproute2 netcat \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
-RUN mkdir -p /opt/aptos/bin  /aptos/client/data/wallet/
+RUN mkdir -p /aptos/client/data/wallet/
 
-COPY --link --from=builder /aptos/dist/aptos-faucet /opt/aptos/bin/aptos-faucet
+COPY --link --from=builder /aptos/dist/aptos-faucet /usr/local/bin/aptos-faucet
 
 #install needed tools
 RUN apt-get update && apt-get install -y procps
