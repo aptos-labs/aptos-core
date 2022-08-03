@@ -14,7 +14,8 @@ pub trait Factory {
     async fn launch_swarm(
         &self,
         rng: &mut StdRng,
-        node_num: NonZeroUsize,
+        num_validators: NonZeroUsize,
+        num_fullnodes: usize,
         version: &Version,
         genesis_version: &Version,
         genesis_modules: Option<&GenesisConfig>,
