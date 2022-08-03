@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    scale_stateful_set_replicas, FullNode, HealthCheckError, Node, NodeExt, Result, Validator,
-    Version, KUBECTL_BIN,
+    get_free_port, scale_stateful_set_replicas, FullNode, HealthCheckError, Node, NodeExt, Result,
+    Validator, Version, KUBECTL_BIN,
 };
 use anyhow::{anyhow, format_err, Context};
 use aptos_config::config::NodeConfig;
@@ -26,50 +26,44 @@ const NODE_METRIC_PORT: u64 = 9101;
 pub const REST_API_SERVICE_PORT: u32 = 8080;
 pub const REST_API_HAPROXY_SERVICE_PORT: u32 = 80;
 
+// when we interact with the node over port-forward
+const LOCALHOST: &str = "127.0.0.1";
+
 pub struct K8sNode {
     pub(crate) name: String,
-    pub(crate) sts_name: String,
+    pub(crate) stateful_set_name: String,
     pub(crate) peer_id: PeerId,
-    pub(crate) node_id: usize,
-    pub(crate) dns: String,
-    pub(crate) ip: String,
-    pub(crate) port: u32,
+    pub(crate) index: usize,
+    pub(crate) service_name: String,
     pub(crate) rest_api_port: u32,
     pub version: Version,
     pub namespace: String,
-    // this controls whether the connection routes to HAProxy first
-    pub enable_haproxy: bool,
+    // whether this node has HAProxy in front of it
+    pub haproxy_enabled: bool,
+    // whether we should try using port-forward on the Service to reach this node
+    pub port_forward_enabled: bool,
 }
 
 impl K8sNode {
-    fn port(&self) -> u32 {
-        self.port
-    }
-
     fn rest_api_port(&self) -> u32 {
         self.rest_api_port
     }
 
-    #[allow(dead_code)]
-    fn dns(&self) -> String {
-        self.dns.clone()
-    }
-
-    fn ip(&self) -> String {
-        self.ip.clone()
+    fn service_name(&self) -> String {
+        self.service_name.clone()
     }
 
     #[allow(dead_code)]
-    fn node_id(&self) -> usize {
-        self.node_id
+    fn index(&self) -> usize {
+        self.index
     }
 
     pub(crate) fn rest_client(&self) -> RestClient {
         RestClient::new(self.rest_api_endpoint())
     }
 
-    pub fn sts_name(&self) -> &str {
-        &self.sts_name
+    pub fn stateful_set_name(&self) -> &str {
+        &self.stateful_set_name
     }
 
     fn namespace(&self) -> &str {
@@ -77,7 +71,7 @@ impl K8sNode {
     }
 
     pub fn spawn_port_forward(&self) -> Result<()> {
-        let remote_rest_api_port = if self.enable_haproxy {
+        let remote_rest_api_port = if self.haproxy_enabled {
             REST_API_HAPROXY_SERVICE_PORT
         } else {
             REST_API_SERVICE_PORT
@@ -86,7 +80,7 @@ impl K8sNode {
             "port-forward",
             "-n",
             self.namespace(),
-            &format!("svc/{}", self.dns()),
+            &format!("svc/{}", self.service_name()),
             &format!("{}:{}", self.rest_api_port(), remote_rest_api_port),
         ];
         // spawn a port-forward child process
@@ -140,12 +134,22 @@ impl Node for K8sNode {
     }
 
     fn rest_api_endpoint(&self) -> Url {
-        Url::from_str(&format!("http://{}:{}", self.ip(), self.rest_api_port()))
-            .expect("Invalid URL.")
+        let host = if self.port_forward_enabled {
+            LOCALHOST
+        } else {
+            &self.service_name
+        };
+        Url::from_str(&format!("http://{}:{}", host, self.rest_api_port())).expect("Invalid URL.")
     }
 
+    // TODO: verify this still works
     fn inspection_service_endpoint(&self) -> Url {
-        Url::parse(&format!("http://{}:{}", self.ip(), self.port())).unwrap()
+        Url::parse(&format!(
+            "http://{}:{}",
+            &self.service_name(),
+            self.rest_api_port()
+        ))
+        .unwrap()
     }
 
     fn config(&self) -> &NodeConfig {
@@ -153,7 +157,7 @@ impl Node for K8sNode {
     }
 
     async fn start(&mut self) -> Result<()> {
-        scale_stateful_set_replicas(self.sts_name(), 1)?;
+        scale_stateful_set_replicas(self.stateful_set_name(), 1)?;
         self.wait_until_healthy(Instant::now() + Duration::from_secs(60))
             .await?;
 
@@ -161,12 +165,12 @@ impl Node for K8sNode {
     }
 
     fn stop(&mut self) -> Result<()> {
-        info!("going to stop node {}", self.sts_name());
-        scale_stateful_set_replicas(self.sts_name(), 0)
+        info!("going to stop node {}", self.stateful_set_name());
+        scale_stateful_set_replicas(self.stateful_set_name(), 0)
     }
 
     fn clear_storage(&mut self) -> Result<()> {
-        let sts_name = self.sts_name.clone();
+        let sts_name = self.stateful_set_name.clone();
         let pvc_name = if sts_name.contains("fullnode") {
             format!("fn-{}-0", sts_name)
         } else {
@@ -178,7 +182,7 @@ impl Node for K8sNode {
             .stdout(Stdio::inherit())
             .args(&delete_pvc_args)
             .output()
-            .expect("failed to scale sts replicas");
+            .expect("failed to clear node storage");
         assert!(
             cleanup_output.status.success(),
             "{}",
@@ -198,6 +202,7 @@ impl Node for K8sNode {
             })
     }
 
+    // TODO: replace this with prometheus query?
     fn counter(&self, counter: &str, port: u64) -> Result<f64> {
         let response: Value =
             reqwest::blocking::get(format!("http://localhost:{}/counters", port))?.json()?;
@@ -220,12 +225,10 @@ impl Node for K8sNode {
         }
     }
 
+    // TODO: verify this still works
     fn expose_metric(&self) -> Result<u64> {
-        let pod_name = format!("{}-0", self.sts_name);
-        let mut port = NODE_METRIC_PORT + 2 * self.node_id as u64;
-        if pod_name.contains("fullnode") {
-            port += 1;
-        }
+        let pod_name = format!("{}-0", self.stateful_set_name);
+        let port = get_free_port() as u64;
         let port_forward_args = [
             "port-forward",
             &format!("pod/{}", pod_name),
@@ -249,6 +252,11 @@ impl FullNode for K8sNode {}
 
 impl Debug for K8sNode {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{} @ {}:{}", self.name, self.ip, self.rest_api_port)
+        let host = if self.port_forward_enabled {
+            LOCALHOST
+        } else {
+            &self.service_name
+        };
+        write!(f, "{} @ {}:{}", self.name, host, self.rest_api_port)
     }
 }
