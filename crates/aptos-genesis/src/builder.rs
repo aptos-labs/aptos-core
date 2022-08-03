@@ -32,7 +32,6 @@ use std::{
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
 const VALIDATOR_IDENTITY: &str = "validator-identity.yaml";
@@ -365,7 +364,6 @@ fn write_yaml<T: Serialize>(path: &Path, object: &T) -> anyhow::Result<()> {
 }
 
 const ONE_DAY: u64 = 86400;
-const ONE_YEAR: u64 = 31536000;
 
 #[derive(Clone)]
 pub struct GenesisConfigurations {
@@ -373,12 +371,8 @@ pub struct GenesisConfigurations {
     pub epoch_duration_secs: u64,
     pub min_stake: u64,
     pub max_stake: u64,
-    pub min_lockup_duration_secs: u64,
-    pub max_lockup_duration_secs: u64,
+    pub recurring_lockup_duration_secs: u64,
     pub allow_new_validators: bool,
-    /// this is duration here, to be easier to specify
-    /// and gets translated to absolute time in the on-chain config
-    pub initial_lockup_duration_secs: u64,
 }
 
 pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut u64) + Send + Sync>;
@@ -557,21 +551,12 @@ impl Builder {
             allow_new_validators: false,
             min_stake: 0,
             max_stake: u64::MAX,
-            min_lockup_duration_secs: 0,
-            max_lockup_duration_secs: ONE_YEAR,
+            recurring_lockup_duration_secs: ONE_DAY,
             epoch_duration_secs: ONE_DAY,
-            initial_lockup_duration_secs: ONE_DAY,
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
             (init_genesis_config)(&mut genesis_config);
         }
-
-        let now_secs = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let initial_validator_lockup_expiration =
-            now_secs + genesis_config.initial_lockup_duration_secs;
 
         // Build genesis & waypoint
         let mut genesis_info = GenesisInfo::new(
@@ -583,10 +568,8 @@ impl Builder {
             genesis_config.allow_new_validators,
             genesis_config.min_stake,
             genesis_config.max_stake,
-            genesis_config.min_lockup_duration_secs,
-            genesis_config.max_lockup_duration_secs,
+            genesis_config.recurring_lockup_duration_secs,
             genesis_config.epoch_duration_secs,
-            initial_validator_lockup_expiration,
         )?;
         let waypoint = genesis_info.generate_waypoint()?;
         let genesis = genesis_info.get_genesis();

@@ -17,6 +17,11 @@ on:
         type: string
         default: aptos-forge-0
         description: The Forge k8s cluster to be used for test
+      FORGE_RUNNER_DURATION_SECS:
+        required: false
+        type: string
+        default: 300
+        description: Duration of the forge test run
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
@@ -32,6 +37,8 @@ env:
   FORGE_COMMENT: forge_comment.txt
   FORGE_PRE_COMMENT: forge_pre_comment.txt
   FORGE_RUNNER_MODE: k8s
+  FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
+  FORGE_RUNNER_TPS_THRESHOLD: 4000
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
 
 jobs:
