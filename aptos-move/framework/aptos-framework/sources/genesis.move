@@ -4,7 +4,6 @@ module aptos_framework::genesis {
     use std::vector;
 
     use aptos_framework::account;
-    use aptos_framework::aggregator_factory;
     use aptos_framework::aptos_governance;
     use aptos_framework::coins;
     use aptos_framework::consensus_config;
