@@ -16,16 +16,23 @@ test(
     const bob = new AptosAccount();
 
     // Fund both Alice's and Bob's Account
-    await faucetClient.fundAccount(alice.address(), 10000);
-    await faucetClient.fundAccount(bob.address(), 5000);
+    await faucetClient.fundAccount(alice.address(), 1000000);
+    await faucetClient.fundAccount(bob.address(), 1000000);
 
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";
 
     // Create collection and token on Alice's account
-    await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev");
+    let txnHash1 = await tokenClient.createCollection(
+      alice,
+      collectionName,
+      "Alice's simple collection",
+      "https://aptos.dev",
+    );
+    const txn1 = await client.waitForTransactionWithResult(txnHash1);
+    expect((txn1 as any)?.success).toBe(true);
 
-    await tokenClient.createToken(
+    let txnHash2 = await tokenClient.createToken(
       alice,
       collectionName,
       tokenName,
@@ -39,6 +46,8 @@ test(
       ["2"],
       ["int"],
     );
+    const txn2 = await client.waitForTransactionWithResult(txnHash2);
+    expect((txn2 as any)?.success).toBe(true);
 
     const tokenId = {
       token_data_id: {

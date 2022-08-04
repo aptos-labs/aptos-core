@@ -1,14 +1,23 @@
 ## IMPORTANT NOTE TO EDITORS OF THIS FILE ##
 
-## Note that when you create a PR the jobs in this file are triggered off the `pull_request_target` event instead of `pull_request` event.
-## This is because the `pull_request` event makes secrets only available to PRs from branches, not from forks, and some of these jobs require secrets.
-## So with `pull_request_target` we're making secrets available to fork-based PRs too.
-## Using `pull_request_target" has a side effect, which is that the workflow execution will be driven by the state of the <workflow>.yaml on the `main` (=target) branch, even if you edited the <workflow>.yaml in your PR.
-## So when you for example add a new job here, you won't see that job appear in the PR itself. It will only become effective once you merge the PR to main.
-## Therefore, if you want to add a new job here and want to test it's functionality prior to a merge to main, you have to to _temporarily_ change the trigger event from `pull_request_target` to `pull_request`.
+## Note that when you create a PR the jobs in this file are triggered off the
+## `pull_request_target` event instead of `pull_request` event. This is because
+## the `pull_request` event makes secrets only available to PRs from branches,
+## not from forks, and some of these jobs require secrets. So with `pull_request_target`
+## we're making secrets available to fork-based PRs too. Using `pull_request_target"
+## has a side effect, which is that the workflow execution will be driven by the
+## state of the <workflow>.yaml on the `main` (=target) branch, even if you edited
+## the <workflow>.yaml in your PR. So when you for example add a new job here, you
+## won't see that job appear in the PR itself. It will only become effective once
+## you merge the PR to main. Therefore, if you want to add a new job here and want
+## to test it's functionality prior to a merge to main, you have to to _temporarily_
+## change the trigger event from `pull_request_target` to `pull_request`.
 
-## Additionally, because `pull_request_target` gets secrets injected for forked PRs we use `https://github.com/sushichop/action-repository-permission`
-## to ensure these jobs are only executed when a repo member with "write" permission has triggered the workflow (directly through a push or indirectly by applying a label or enabling auto_merge).
+## Additionally, because `pull_request_target` gets secrets injected for forked PRs
+## we use `https://github.com/sushichop/action-repository-permission` to ensure these
+## jobs are only executed when a repo member with "write" permission has triggered
+## the workflow (directly through a push or indirectly by applying a label or enabling
+## auto_merge).
 
 name: "Build+Push Images"
 on: # build on main branch OR when a PR is labeled with `CICD:build-images`
@@ -125,6 +134,7 @@ jobs:
     uses: ./.github/workflows/sdk-release.yaml
     secrets: inherit
     with:
+      # See explanation above for why we do this.
       GIT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
   forge-e2e-test:
