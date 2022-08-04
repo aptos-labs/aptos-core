@@ -21,7 +21,11 @@ fn golden_path() -> PathBuf {
 
 impl GoldenOutputs {
     pub fn new(name: &str) -> Self {
-        let mut mint = Mint::new(golden_path());
+        GoldenOutputs::new_at_path(golden_path(), name)
+    }
+
+    pub fn new_at_path(path: PathBuf, name: &str) -> Self {
+        let mut mint = Mint::new(path);
         let mut file_path = PathBuf::new();
         file_path.push(name);
         let file = RefCell::new(

@@ -17,6 +17,7 @@ use crate::{
     golden_outputs::GoldenOutputs,
 };
 use aptos_crypto::HashValue;
+use aptos_gas::NativeGasParameters;
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -45,7 +46,7 @@ use move_deps::{
         language_storage::{ModuleId, ResourceKey, TypeTag},
         move_resource::MoveResource,
     },
-    move_vm_types::gas_schedule::GasStatus,
+    move_vm_types::gas::UnmeteredGasMeter,
 };
 use num_cpus;
 
@@ -122,7 +123,18 @@ impl FakeExecutor {
         // files can persist on windows machines.
         let file_name = test_name.replace(':', "_");
         self.executed_output = Some(GoldenOutputs::new(&file_name));
+        self.set_tracing(test_name, file_name)
+    }
 
+    pub fn set_golden_file_at(&mut self, path: &str, test_name: &str) {
+        // 'test_name' includes ':' in the names, lets re-write these to be '_'s so that these
+        // files can persist on windows machines.
+        let file_name = test_name.replace(':', "_");
+        self.executed_output = Some(GoldenOutputs::new_at_path(PathBuf::from(path), &file_name));
+        self.set_tracing(test_name, file_name)
+    }
+
+    fn set_tracing(&mut self, test_name: &str, file_name: String) {
         // NOTE: tracing is only available when
         //  - the e2e test outputs a golden file, and
         //  - the environment variable is properly set
@@ -219,7 +231,7 @@ impl FakeExecutor {
         self.read_account_resource_at_address(account.address())
     }
 
-    fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
+    pub fn read_resource<T: MoveResource>(&self, addr: &AccountAddress) -> Option<T> {
         let ap = AccessPath::resource_access_path(ResourceKey::new(*addr, T::struct_tag()));
         let data_blob = StateView::get_state_value(&self.data_store, &StateKey::AccessPath(ap))
             .expect("account must exist in data store")
@@ -335,7 +347,7 @@ impl FakeExecutor {
         assert_eq!(output, parallel_output);
 
         if let Some(logger) = &self.executed_output {
-            logger.log(format!("{:?}\n", output).as_str());
+            logger.log(format!("{:#?}\n", output).as_str());
         }
 
         // dump serialized transaction output after execution, if tracing
@@ -456,8 +468,8 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) {
         let write_set = {
-            let mut gas_status = GasStatus::new_unmetered();
-            let vm = MoveVmExt::new().unwrap();
+            // TODO(Gas): we probably want to switch to non-zero costs in the future
+            let vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
             let remote_view = RemoteStorage::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
             session
@@ -466,7 +478,7 @@ impl FakeExecutor {
                     &Self::name(function_name),
                     type_params,
                     args,
-                    &mut gas_status,
+                    &mut UnmeteredGasMeter,
                 )
                 .unwrap_or_else(|e| {
                     panic!(
@@ -493,8 +505,8 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> Result<WriteSet, VMStatus> {
-        let mut gas_status = GasStatus::new_unmetered();
-        let vm = MoveVmExt::new().unwrap();
+        // TODO(Gas): we probably want to switch to non-zero costs in the future
+        let vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
         let remote_view = RemoteStorage::new(&self.data_store);
         let mut session = vm.new_session(&remote_view, SessionId::void());
         session
@@ -503,7 +515,7 @@ impl FakeExecutor {
                 &Self::name(function_name),
                 type_params,
                 args,
-                &mut gas_status,
+                &mut UnmeteredGasMeter,
             )
             .map_err(|e| e.into_vm_status())?;
         let session_out = session.finish().expect("Failed to generate txn effects");

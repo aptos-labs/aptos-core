@@ -1,14 +1,14 @@
 /** Faucet creates and funds accounts. This is a thin wrapper around that. */
-import axios from "axios";
-import { AptosClient, AptosClientConfig, raiseForStatus } from "./aptos_client";
-import { Types } from "./types";
+import { AptosClient } from "./aptos_client";
+import { OpenAPIConfig } from "./generated";
+import { AxiosHttpRequest } from "./generated/core/AxiosHttpRequest";
 import { HexString, MaybeHexString } from "./hex_string";
 
 /**
  * Class for requsting tokens from faucet
  */
 export class FaucetClient extends AptosClient {
-  faucetUrl: string;
+  faucetRequester: AxiosHttpRequest;
 
   /**
    * Establishes a connection to Aptos node
@@ -17,9 +17,20 @@ export class FaucetClient extends AptosClient {
    * @param config An optional config for inner axios instance
    * Detailed config description: {@link https://github.com/axios/axios#request-config}
    */
-  constructor(nodeUrl: string, faucetUrl: string, config?: AptosClientConfig) {
+  constructor(nodeUrl: string, faucetUrl: string, config?: OpenAPIConfig) {
     super(nodeUrl, config);
-    this.faucetUrl = faucetUrl;
+    // Build a requester configured to talk to the faucet.
+    this.faucetRequester = new AxiosHttpRequest({
+      BASE: faucetUrl,
+      VERSION: config?.VERSION ?? "0.1.0",
+      WITH_CREDENTIALS: config?.WITH_CREDENTIALS ?? false,
+      CREDENTIALS: config?.CREDENTIALS ?? "include",
+      TOKEN: config?.TOKEN,
+      USERNAME: config?.USERNAME,
+      PASSWORD: config?.PASSWORD,
+      HEADERS: config?.HEADERS,
+      ENCODE_PATH: config?.ENCODE_PATH,
+    });
   }
 
   /**
@@ -29,13 +40,17 @@ export class FaucetClient extends AptosClient {
    * @param amount Amount of tokens to mint
    * @returns Hashes of submitted transactions
    */
-  async fundAccount(address: MaybeHexString, amount: number): Promise<Types.HexEncodedBytes[]> {
-    const url = `${this.faucetUrl}/mint?amount=${amount}&address=${HexString.ensure(address).noPrefix()}`;
-    const response = await axios.post<Array<string>>(url, {}, { validateStatus: () => true });
-    raiseForStatus(200, response);
+  async fundAccount(address: MaybeHexString, amount: number): Promise<string[]> {
+    const tnxHashes = await this.faucetRequester.request<Array<string>>({
+      method: "POST",
+      url: "/mint",
+      query: {
+        address: HexString.ensure(address).noPrefix(),
+        amount,
+      },
+    });
 
-    const tnxHashes = response.data;
-    const promises = [];
+    const promises: Promise<void>[] = [];
     for (let i = 0; i < tnxHashes.length; i += 1) {
       const tnxHash = tnxHashes[i];
       promises.push(this.waitForTransaction(tnxHash));

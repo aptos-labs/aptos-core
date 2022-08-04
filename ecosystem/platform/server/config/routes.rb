@@ -4,6 +4,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 Rails.application.routes.draw do
+  # Redirect community.aptoslabs.com to aptoslabs.com
+  constraints host: /community.aptoslabs.com/ do
+    match '/*path' => redirect { |params, _req| "https://aptoslabs.com/#{params[:path]}" }, via: %i[get post]
+    match '/' => redirect { |_params, _req| 'https://aptoslabs.com/community' }, via: %i[get post]
+  end
+
   devise_for :users, {
     controllers: {
       omniauth_callbacks: 'users/omniauth_callbacks',
@@ -48,11 +54,6 @@ Rails.application.routes.draw do
   # IT2
   resources :it2_profiles, except: %i[index destroy]
   resources :it2_surveys, except: %i[index destroy]
-
-  # NFTs
-  resources :nfts, only: %i[show update]
-  resources :nft_offers, only: %i[show update]
-  get 'nft-nyc', to: 'nft_nyc#show'
 
   # Leaderboards
   get 'leaderboard/it1', to: redirect('/it1')

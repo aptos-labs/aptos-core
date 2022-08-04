@@ -19,6 +19,7 @@ use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, ValidatorConfiguration};
 use aptos_rest_client::Transaction;
+use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::chain_id::ChainId;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
@@ -29,11 +30,7 @@ use rand::SeedableRng;
 use reqwest::Url;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::{
-    path::PathBuf,
-    thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{path::PathBuf, thread, time::Duration};
 use tokio::time::Instant;
 
 /// Tool for manipulating nodes
@@ -92,13 +89,7 @@ impl CliCommand<Transaction> for AddStake {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "add_stake",
-                vec![],
-                vec![bcs::to_bytes(&self.amount)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_add_stake(self.amount))
             .await
     }
 }
@@ -123,13 +114,7 @@ impl CliCommand<Transaction> for UnlockStake {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "unlock",
-                vec![],
-                vec![bcs::to_bytes(&self.amount)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_unlock(self.amount))
             .await
     }
 }
@@ -154,13 +139,7 @@ impl CliCommand<Transaction> for WithdrawStake {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         self.node_op_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "withdraw",
-                vec![],
-                vec![bcs::to_bytes(&self.amount)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_withdraw(self.amount))
             .await
     }
 }
@@ -170,11 +149,6 @@ impl CliCommand<Transaction> for WithdrawStake {
 pub struct IncreaseLockup {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    /// Number of seconds to increase the lockup period by
-    ///
-    /// Examples: '1d', '5 days', '1 month'
-    #[clap(long, parse(try_from_str=parse_duration::parse))]
-    pub(crate) lockup_duration: Duration,
 }
 
 #[async_trait]
@@ -184,26 +158,8 @@ impl CliCommand<Transaction> for IncreaseLockup {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
-        if self.lockup_duration.is_zero() {
-            return Err(CliError::CommandArgumentError(
-                "Must provide a non-zero lockup duration".to_string(),
-            ));
-        }
-
-        let lockup_timestamp_secs = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            .saturating_add(self.lockup_duration.as_secs());
-
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "increase_lockup",
-                vec![],
-                vec![bcs::to_bytes(&lockup_timestamp_secs)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_increase_lockup())
             .await
     }
 }
@@ -382,19 +338,13 @@ impl CliCommand<Transaction> for RegisterValidatorCandidate {
             };
 
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "register_validator_candidate",
-                vec![],
-                vec![
-                    bcs::to_bytes(&consensus_public_key)?,
-                    bcs::to_bytes(&consensus_proof_of_possession)?,
-                    // Double BCS encode, so that we can hide the original type
-                    bcs::to_bytes(&bcs::to_bytes(&validator_network_addresses)?)?,
-                    bcs::to_bytes(&bcs::to_bytes(&full_node_network_addresses)?)?,
-                ],
-            )
+            .submit_transaction(aptos_stdlib::stake_register_validator_candidate(
+                consensus_public_key.to_bytes().to_vec(),
+                consensus_proof_of_possession.to_bytes().to_vec(),
+                // Double BCS encode, so that we can hide the original type
+                bcs::to_bytes(&validator_network_addresses)?,
+                bcs::to_bytes(&full_node_network_addresses)?,
+            ))
             .await
     }
 }
@@ -438,13 +388,7 @@ impl CliCommand<Transaction> for JoinValidatorSet {
             .address(&self.txn_options.profile_options)?;
 
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "join_validator_set",
-                vec![],
-                vec![bcs::to_bytes(&address)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_join_validator_set(address))
             .await
     }
 }
@@ -470,13 +414,7 @@ impl CliCommand<Transaction> for LeaveValidatorSet {
             .address(&self.txn_options.profile_options)?;
 
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "leave_validator_set",
-                vec![],
-                vec![bcs::to_bytes(&address)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_leave_validator_set(address))
             .await
     }
 }
@@ -758,18 +696,12 @@ impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
             };
 
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "update_network_and_fullnode_addresses",
-                vec![],
-                vec![
-                    bcs::to_bytes(&address)?,
-                    // Double BCS encode, so that we can hide the original type
-                    bcs::to_bytes(&bcs::to_bytes(&validator_network_addresses)?)?,
-                    bcs::to_bytes(&bcs::to_bytes(&full_node_network_addresses)?)?,
-                ],
-            )
+            .submit_transaction(aptos_stdlib::stake_update_network_and_fullnode_addresses(
+                address,
+                // Double BCS encode, so that we can hide the original type
+                bcs::to_bytes(&validator_network_addresses)?,
+                bcs::to_bytes(&full_node_network_addresses)?,
+            ))
             .await
     }
 }

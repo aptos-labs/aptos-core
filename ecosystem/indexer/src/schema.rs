@@ -100,17 +100,36 @@ table! {
 }
 
 table! {
-    tokens (token_id) {
-        token_id -> Varchar,
+    token_datas (token_data_id) {
+        token_data_id -> Varchar,
         creator -> Varchar,
         collection -> Varchar,
         name -> Varchar,
         description -> Varchar,
-        max_amount -> Nullable<Int8>,
+        max_amount -> Int8,
         supply -> Int8,
         uri -> Varchar,
+        royalty_payee_address -> Varchar,
+        royalty_points_denominator -> Int8,
+        royalty_points_numerator -> Int8,
+        mutability_config -> Varchar,
+        property_keys -> Varchar,
+        property_values -> Varchar,
+        property_types -> Varchar,
         minted_at -> Timestamp,
         last_minted_at -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    token_propertys (token_id) {
+        token_id -> Varchar,
+        previous_token_id -> Varchar,
+        property_keys -> Varchar,
+        property_values -> Varchar,
+        property_types -> Varchar,
+        updated_at -> Timestamp,
         inserted_at -> Timestamp,
     }
 }
@@ -169,7 +188,8 @@ allow_tables_to_appear_in_same_query!(
     ownerships,
     processor_statuses,
     token_activities,
-    tokens,
+    token_datas,
+    token_propertys,
     transactions,
     user_transactions,
     write_set_changes,

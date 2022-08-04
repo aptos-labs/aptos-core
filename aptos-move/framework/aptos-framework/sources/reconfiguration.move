@@ -14,7 +14,7 @@ module aptos_framework::reconfiguration {
     // TODO: migrate all to callback in block prologue
     friend aptos_framework::consensus_config;
     friend aptos_framework::version;
-    friend aptos_framework::vm_config;
+    friend aptos_framework::gas_schedule;
 
     /// Event that signals consensus to start a new epoch,
     /// with new configuration information. This is also called a

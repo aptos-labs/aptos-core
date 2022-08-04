@@ -3,7 +3,7 @@
 
 use crate::common::types::{CliError, MovePackageDir};
 use crate::CliTypedResult;
-use aptos_vm::move_vm_ext::{ModuleMetadata, PackageMetadata, UpgradePolicy};
+use framework::natives::code::{ModuleMetadata, PackageMetadata, UpgradePolicy};
 use move_deps::move_package::compilation::compiled_package::CompiledPackage;
 use move_deps::move_package::BuildConfig;
 
@@ -54,8 +54,7 @@ impl BuiltPackage {
     /// Extracts metadata, as needed for publishing a package, from the built package.
     pub fn extract_metadata(
         &self,
-        name: String,
-        upgrade_policy: UpgradePolicy,
+        upgrade_policy: UpgradePolicy, // TODO: put this into Move.toml
     ) -> CliTypedResult<PackageMetadata> {
         let package_path = self.package_dir.get_package_path()?;
 
@@ -86,7 +85,7 @@ impl BuiltPackage {
         }
 
         Ok(PackageMetadata {
-            name,
+            name: self.name().to_string(),
             upgrade_policy,
             manifest,
             modules,

@@ -1,95 +1,60 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
-use crate::{models::events::Event, schema::tokens};
+use crate::{models::events::Event, schema::token_datas};
 use aptos_rest_client::types;
-use std::{collections::HashMap, fmt, fmt::Formatter, str::FromStr};
+use std::{fmt, fmt::Formatter};
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Associations, Debug, Identifiable, Insertable, Queryable, Serialize, Clone)]
-#[diesel(table_name = "tokens")]
-#[primary_key(token_id)]
-pub struct Token {
-    pub token_id: String,
+#[diesel(table_name = "token_datas")]
+#[primary_key(token_data_id)]
+pub struct TokenData {
+    pub token_data_id: String,
     pub creator: String,
     pub collection: String,
     pub name: String,
     pub description: String,
-    pub max_amount: Option<i64>,
+    pub max_amount: i64,
     pub supply: i64,
     pub uri: String,
+    pub royalty_payee_address: String,
+    pub royalty_points_denominator: i64,
+    pub royalty_points_numerator: i64,
+    pub mutability_config: String,
+    pub property_keys: String,
+    pub property_values: String,
+    pub property_types: String,
     pub minted_at: chrono::NaiveDateTime,
     pub inserted_at: chrono::NaiveDateTime,
     pub last_minted_at: chrono::NaiveDateTime,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TokenId {
+pub struct TokenDataId {
     pub creator: String,
     pub collection: String,
     pub name: String,
 }
 
-impl fmt::Display for TokenId {
+impl fmt::Display for TokenDataId {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}::{}::{}", self.creator, self.collection, self.name)
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TokenData {
-    pub collection: String,
-    pub description: String,
-    pub name: String,
-    #[serde(deserialize_with = "deserialize_option_from_string")]
-    pub maximum: MoveOption<i64>,
-    #[serde(deserialize_with = "deserialize_option_from_string")]
-    pub supply: MoveOption<i64>,
-    pub uri: String,
+pub struct TokenId {
+    pub token_data_id: TokenDataId,
+    #[serde(deserialize_with = "types::deserialize_from_string")]
+    pub property_version: i64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct MoveOption<T> {
-    pub value: Option<T>,
-}
-
-impl<T: std::str::FromStr> FromStr for MoveOption<T> {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.is_empty() {
-            Ok(MoveOption { value: None })
-        } else {
-            s.parse::<T>().map_or_else(
-                |_e| Err(anyhow::format_err!("Invalid MoveOption {:?}", s)),
-                |v| Ok(MoveOption { value: Some(v) }),
-            )
-        }
+impl fmt::Display for TokenId {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{}::{}", self.token_data_id, self.property_version)
     }
-}
-
-pub fn deserialize_option_from_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-where
-    T: FromStr,
-    D: Deserializer<'de>,
-    <T as FromStr>::Err: std::fmt::Display,
-    <T as FromStr>::Err: std::fmt::Debug,
-{
-    use serde::de::Error;
-
-    let res: Result<HashMap<String, Vec<String>>, _> = Deserialize::deserialize(deserializer);
-
-    res.map_or_else(
-        |e| Err(D::Error::custom(e)),
-        |v| {
-            if v["vec"].is_empty() {
-                Ok("".parse::<T>().unwrap())
-            } else {
-                v["vec"][0].parse::<T>().map_err(D::Error::custom)
-            }
-        },
-    )
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -107,17 +72,45 @@ pub struct DepositEventType {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CreationEventType {
-    pub id: TokenId,
-    pub token_data: TokenData,
-    pub initial_balance: i64,
+pub struct CreateTokenDataEventType {
+    pub id: TokenDataId,
+    pub description: String,
+    #[serde(deserialize_with = "types::deserialize_from_string")]
+    pub maximum: i64,
+    pub uri: String,
+    pub royalty_payee_address: String,
+    #[serde(deserialize_with = "types::deserialize_from_string")]
+    pub royalty_points_denominator: i64,
+    #[serde(deserialize_with = "types::deserialize_from_string")]
+    pub royalty_points_numerator: i64,
+    pub name: String,
+    pub mutability_config: serde_json::Value,
+    pub property_keys: serde_json::Value,
+    pub property_values: serde_json::Value,
+    pub property_types: serde_json::Value,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct MintEventType {
+pub struct MintTokenEventType {
+    #[serde(deserialize_with = "types::deserialize_from_string")]
+    pub amount: i64,
+    pub id: TokenDataId,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BurnTokenEventType {
     #[serde(deserialize_with = "types::deserialize_from_string")]
     pub amount: i64,
     pub id: TokenId,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MutateTokenPropertyMapEventType {
+    pub old_id: TokenId,
+    pub new_id: TokenId,
+    pub keys: serde_json::Value,
+    pub values: serde_json::Value,
+    pub types: serde_json::Value,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -126,39 +119,53 @@ pub struct CreateCollectionEventType {
     pub collection_name: String,
     pub uri: String,
     pub description: String,
-    #[serde(deserialize_with = "deserialize_option_from_string")]
-    pub maximum: MoveOption<i64>,
+    #[serde(deserialize_with = "types::deserialize_from_string")]
+    pub maximum: i64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum TokenEvent {
     WithdrawEvent(WithdrawEventType),
     DepositEvent(DepositEventType),
-    CreationEvent(CreationEventType),
-    MintEvent(MintEventType),
+    CreateTokenDataEvent(CreateTokenDataEventType),
+    MintTokenEvent(MintTokenEventType),
     CollectionCreationEvent(CreateCollectionEventType),
-    BurnEvent,
+    BurnTokenEvent(BurnTokenEventType),
+    MutateTokenPropertyMapEvent(MutateTokenPropertyMapEventType),
 }
 
 impl TokenEvent {
     pub fn from_event(event: &Event) -> Option<TokenEvent> {
         let data = event.data.clone();
         match event.type_.as_str() {
-            "0x1::token::WithdrawEvent" => {
+            "0x3::token::WithdrawEvent" => {
                 let event = serde_json::from_value::<WithdrawEventType>(data).unwrap();
                 Some(TokenEvent::WithdrawEvent(event))
             }
-            "0x1::token::DepositEvent" => {
+            "0x3::token::DepositEvent" => {
                 let event = serde_json::from_value::<DepositEventType>(data).unwrap();
                 Some(TokenEvent::DepositEvent(event))
             }
-            "0x1::token::CreateTokenEvent" => {
-                let event = serde_json::from_value::<CreationEventType>(data).unwrap();
-                Some(TokenEvent::CreationEvent(event))
+            "0x3::token::CreateTokenDataEvent" => {
+                let event = serde_json::from_value::<CreateTokenDataEventType>(data).unwrap();
+                Some(TokenEvent::CreateTokenDataEvent(event))
             }
-            "0x1::token::CreateCollectionEvent" => {
+            "0x3::token::CreateCollectionEvent" => {
                 let event = serde_json::from_value::<CreateCollectionEventType>(data).unwrap();
                 Some(TokenEvent::CollectionCreationEvent(event))
+            }
+            "0x3::token::BurnTokenEvent" => {
+                let event = serde_json::from_value::<BurnTokenEventType>(data).unwrap();
+                Some(TokenEvent::BurnTokenEvent(event))
+            }
+            "0x3::token::MutateTokenPropertyMapEvent" => {
+                let event =
+                    serde_json::from_value::<MutateTokenPropertyMapEventType>(data).unwrap();
+                Some(TokenEvent::MutateTokenPropertyMapEvent(event))
+            }
+            "0x3::token::MintTokenEvent" => {
+                let event = serde_json::from_value::<MintTokenEventType>(data).unwrap();
+                Some(TokenEvent::MintTokenEvent(event))
             }
             _ => None,
         }

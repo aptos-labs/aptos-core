@@ -38,6 +38,7 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         version: Version,
     ) -> Result<Option<AccountState>> {
         AccountState::from_access_paths_and_values(
+            account,
             &self
                 .0
                 .get_state_values_by_key_prefix(&StateKeyPrefix::from(account), version)?,

@@ -45,13 +45,20 @@ pub trait Swarm: Sync {
     /// Returns a mutable reference to the FullNode with the provided PeerId
     fn full_node_mut(&mut self, id: PeerId) -> Option<&mut dyn FullNode>;
 
-    /// Adds a Validator to the swarm with the provided PeerId
+    /// Adds a Validator to the swarm and returns the PeerId
     fn add_validator(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId>;
 
     /// Removes the Validator with the provided PeerId
     fn remove_validator(&mut self, id: PeerId) -> Result<()>;
 
-    /// Adds a FullNode to the swarm with the provided PeerId
+    fn add_validator_full_node(
+        &mut self,
+        version: &Version,
+        template: NodeConfig,
+        id: PeerId,
+    ) -> Result<PeerId>;
+
+    /// Adds a FullNode to the swarm and returns the PeerId
     fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId>;
 
     /// Removes the FullNode with the provided PeerId

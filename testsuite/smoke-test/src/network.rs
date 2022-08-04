@@ -45,16 +45,9 @@ async fn test_connection_limiting() {
 
     let vfn_peer_id = swarm
         .add_validator_fullnode(&version, full_node_config, validator_peer_id)
-        .await
         .unwrap();
 
     // Wait till nodes are healthy
-    swarm
-        .validator_mut(validator_peer_id)
-        .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
-        .await
-        .unwrap();
     swarm
         .fullnode_mut(vfn_peer_id)
         .unwrap()

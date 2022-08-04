@@ -29,16 +29,9 @@ async fn test_full_node_basic_flow() {
             NodeConfig::default_for_validator_full_node(),
             validator_peer_id,
         )
-        .await
         .unwrap();
     let pfn_peer_id = swarm
         .add_full_node(&version, NodeConfig::default_for_public_full_node())
-        .unwrap();
-    swarm
-        .validator_mut(validator_peer_id)
-        .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
-        .await
         .unwrap();
     for fullnode in swarm.full_nodes_mut() {
         fullnode
@@ -133,15 +126,8 @@ async fn test_vfn_failover() {
                 NodeConfig::default_for_validator_full_node(),
                 validator_peer_id,
             )
-            .await
             .unwrap();
         vfns.push(vfn);
-    }
-    for validator in swarm.validators_mut() {
-        validator
-            .wait_until_healthy(Instant::now() + Duration::from_secs(10))
-            .await
-            .unwrap();
     }
     for fullnode in swarm.full_nodes_mut() {
         fullnode
@@ -202,6 +188,15 @@ async fn test_private_full_node() {
     let transaction_factory = swarm.chain_info().transaction_factory();
     let version = swarm.versions().max().unwrap();
 
+    // Add a single vfn to connect to
+    let validator_peer_id = swarm.validators().next().unwrap().peer_id();
+    let vfn_peer_id = swarm
+        .add_validator_fullnode(
+            &version,
+            NodeConfig::default_for_validator_full_node(),
+            validator_peer_id,
+        )
+        .unwrap();
     // Here we want to add two swarms, a private full node, followed by a user full node connected to it
     let mut private_config = NodeConfig::default_for_public_full_node();
     let private_network = private_config.full_node_networks.first_mut().unwrap();
@@ -227,7 +222,7 @@ async fn test_private_full_node() {
     // Now we need to connect the VFNs to the private swarm
     add_node_to_seeds(
         &mut private_config,
-        swarm.validators().next().unwrap().config(),
+        swarm.fullnode(vfn_peer_id).unwrap().config(),
         NetworkId::Public,
         PeerRole::PreferredUpstream,
     );

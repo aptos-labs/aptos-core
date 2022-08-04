@@ -8,7 +8,7 @@ use crate::liveness::{
         ActiveInactiveHeuristic, LeaderReputation, MetadataBackend, NewBlockEventAggregation,
         ReputationHeuristic,
     },
-    proposer_election::{next, ProposerElection},
+    proposer_election::{choose_index, ProposerElection},
 };
 
 use aptos_infallible::Mutex;
@@ -24,6 +24,7 @@ use aptos_types::{
 use consensus_types::common::{Author, Round};
 use itertools::Itertools;
 use move_deps::move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
+use num_traits::Pow;
 use storage_interface::{DbReader, Order};
 
 use super::leader_reputation::{AptosDBBackend, ProposerAndVoterHeuristic};
@@ -62,6 +63,7 @@ impl TestBlockBuilder {
 
     fn new_epoch(&mut self) -> &mut Self {
         self.epoch += 1;
+        self.round = 0;
         self
     }
 
@@ -449,51 +451,80 @@ fn test_api() {
     let inactive_weight = 1;
     let proposers: Vec<AccountAddress> =
         (0..5).map(|_| AccountAddress::random()).sorted().collect();
+    let voting_powers: Vec<u64> = (0..5).map(|i| i + 1).collect();
+
     let mut block_builder = TestBlockBuilder::new();
-    let history = vec![
-        block_builder.create_block(proposers[0], vec![false, true, true, false, false], vec![]),
-        block_builder.create_block(proposers[0], vec![false, false, false, true, false], vec![]),
-    ];
-    let leader_reputation = LeaderReputation::new(
-        0,
-        proposers.clone(),
-        Box::new(MockHistory::new(1, history)),
-        Box::new(ActiveInactiveHeuristic::new(
-            proposers[0],
-            active_weight,
-            inactive_weight,
-            proposers.len(),
-        )),
-        4,
-    );
-    let round = 42u64;
     // first metadata is ignored because of window size 1
     let expected_weights = vec![
         active_weight,
-        inactive_weight,
-        inactive_weight,
-        active_weight,
-        inactive_weight,
+        inactive_weight * 2,
+        inactive_weight * 3,
+        active_weight * 4,
+        inactive_weight * 5,
     ];
-    let sum = expected_weights.iter().fold(0, |mut s, w| {
-        s += *w;
-        s
-    });
-    let mut state = round.to_le_bytes().to_vec();
-    let chosen_weight = next(&mut state) % sum;
-    let mut expected_index = 0usize;
-    let mut accu = 0u64;
-    for (i, w) in expected_weights.iter().enumerate() {
-        accu += *w;
-        if accu >= chosen_weight {
-            expected_index = i;
-        }
+    let total_weights: u64 = expected_weights.iter().sum();
+
+    let mut selected = [0; 5].to_vec();
+    for epoch in 1..1000 {
+        block_builder.new_epoch();
+        let history = vec![
+            block_builder.create_block(proposers[0], vec![false, true, true, false, false], vec![]),
+            block_builder.create_block(
+                proposers[0],
+                vec![false, false, false, true, false],
+                vec![],
+            ),
+        ];
+        let leader_reputation = LeaderReputation::new(
+            epoch,
+            proposers.clone(),
+            voting_powers.clone(),
+            Box::new(MockHistory::new(1, history)),
+            Box::new(ProposerAndVoterHeuristic::new(
+                proposers[0],
+                active_weight,
+                inactive_weight,
+                0,
+                10,
+                proposers.len(),
+                proposers.len(),
+            )),
+            4,
+        );
+        let round = 42u64;
+        let state = [epoch.to_le_bytes(), round.to_le_bytes()].concat().to_vec();
+
+        let expected_index = choose_index(expected_weights.clone(), state);
+        selected[expected_index] += 1;
+        let unexpected_index = (expected_index + 1) % proposers.len();
+        let output = leader_reputation.get_valid_proposer(round);
+        assert_eq!(output, proposers[expected_index]);
+        assert!(leader_reputation.is_valid_proposer(proposers[expected_index], round));
+        assert!(!leader_reputation.is_valid_proposer(proposers[unexpected_index], round));
     }
-    let unexpected_index = (expected_index + 1) % proposers.len();
-    let output = leader_reputation.get_valid_proposer(round);
-    assert_eq!(output, proposers[expected_index]);
-    assert!(leader_reputation.is_valid_proposer(proposers[expected_index], 42));
-    assert!(!leader_reputation.is_valid_proposer(proposers[unexpected_index], 42));
+
+    for i in 0..5 {
+        let p = expected_weights[i] as f32 / total_weights as f32;
+        let expected = (1000.0 * p) as i32;
+        let std_dev = (1000.0 * p * (1.0 - p)).pow(0.5);
+        // We've run the election enough times, to expect occurances to be close to the average
+        // (each test is independent, as seed is different for every cycle)
+        // We check that difference from average is below 3 standard deviations,
+        // which will approximately be true in 99.7% of cases.
+        // (as we can approximate each selection with normal distribution)
+        //
+        // Test is deterministic, as all seeds are, so if it passes once, shouldn't ever fail.
+        // Meaning, wheen we change the selection formula, there is 0.3% chance this test will fail
+        // unnecessarily.
+        assert!(
+            expected.abs_diff(selected[i]) as f32 <= 3.0 * std_dev,
+            "{}: expected={} selected={}, std_dev: {}",
+            i,
+            expected,
+            selected[i],
+            std_dev
+        );
+    }
 }
 
 struct MockDbReader {

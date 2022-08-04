@@ -4,6 +4,7 @@
 mod aptos_debug_natives;
 mod built_package;
 pub use built_package::*;
+mod transactional_tests_runner;
 
 use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
 use crate::{
@@ -16,13 +17,14 @@ use crate::{
     },
     CliCommand, CliResult,
 };
+use aptos_gas::NativeGasParameters;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
+use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
-use aptos_vm;
-use aptos_vm::move_vm_ext::UpgradePolicy;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
+use framework::natives::code::UpgradePolicy;
 use move_deps::move_cli::base::test::UnitTestResult;
 use move_deps::{
     move_cli,
@@ -45,6 +47,7 @@ use std::{
     str::FromStr,
 };
 use tokio::task;
+use transactional_tests_runner::TransactionalTestOpts;
 
 /// CLI tool for performing Move tasks
 ///
@@ -56,6 +59,7 @@ pub enum MoveTool {
     Run(RunFunction),
     Test(TestPackage),
     Prove(ProvePackage),
+    TransactionalTest(TransactionalTestOpts),
 }
 
 impl MoveTool {
@@ -67,6 +71,7 @@ impl MoveTool {
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
+            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
         }
     }
 }
@@ -213,7 +218,8 @@ impl CliCommand<&'static str> for TestPackage {
                 filter: self.filter,
                 ..UnitTestingConfig::default_with_bound(Some(100_000))
             },
-            aptos_debug_natives::aptos_debug_natives(),
+            // TODO(Gas): we may want to switch to non-zero costs in the future
+            aptos_debug_natives::aptos_debug_natives(NativeGasParameters::zeros()),
             false,
             &mut std::io::stdout(),
         )
@@ -224,6 +230,26 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestResult::Success => Ok("Success"),
             UnitTestResult::Failure => Err(CliError::MoveTestError),
         }
+    }
+}
+
+#[async_trait]
+impl CliCommand<()> for TransactionalTestOpts {
+    fn command_name(&self) -> &'static str {
+        "TransactionalTest"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        let root_path = self.root_path.display().to_string();
+
+        let requirements = vec![transactional_tests_runner::Requirements::new(
+            run_aptos_test,
+            "tests".to_string(),
+            root_path,
+            self.pattern.clone(),
+        )];
+
+        transactional_tests_runner::runner(&self, &requirements)
     }
 }
 
@@ -324,10 +350,8 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 .map(TransactionSummary::from)
         } else {
             // Send the compiled module and metadata using the code::publish_package_txn.
-            let metadata = package.extract_metadata(
-                package.name().to_owned(),
-                upgrade_policy.unwrap_or_else(UpgradePolicy::compat),
-            )?;
+            let metadata =
+                package.extract_metadata(upgrade_policy.unwrap_or_else(UpgradePolicy::compat))?;
             let payload = aptos_transaction_builder::aptos_stdlib::code_publish_package_txn(
                 bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
                 compiled_units,
@@ -348,8 +372,8 @@ pub struct RunFunction {
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
-    #[clap(long, parse(try_from_str = parse_function_name))]
-    function_id: FunctionId,
+    #[clap(long)]
+    function_id: MemberId,
     /// Hex encoded arguments separated by spaces.
     ///
     /// Example: `0x01 0x02 0x03`
@@ -386,7 +410,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
         self.txn_options
             .submit_transaction(TransactionPayload::ScriptFunction(ScriptFunction::new(
                 self.function_id.module_id.clone(),
-                self.function_id.function_id.clone(),
+                self.function_id.member_id.clone(),
                 type_args,
                 args,
             )))
@@ -478,12 +502,14 @@ impl FromStr for ArgWithType {
     }
 }
 
-pub struct FunctionId {
+/// Identifier of a module member (function or struct).
+#[derive(Debug, Clone)]
+pub struct MemberId {
     pub module_id: ModuleId,
-    pub function_id: Identifier,
+    pub member_id: Identifier,
 }
 
-fn parse_function_name(function_id: &str) -> CliTypedResult<FunctionId> {
+fn parse_member_id(function_id: &str) -> CliTypedResult<MemberId> {
     let ids: Vec<&str> = function_id.split_terminator("::").collect();
     if ids.len() != 3 {
         return Err(CliError::CommandArgumentError(
@@ -494,11 +520,19 @@ fn parse_function_name(function_id: &str) -> CliTypedResult<FunctionId> {
     let address = load_account_arg(ids.get(0).unwrap())?;
     let module = Identifier::from_str(ids.get(1).unwrap())
         .map_err(|err| CliError::UnableToParse("Module Name", err.to_string()))?;
-    let function_id = Identifier::from_str(ids.get(2).unwrap())
-        .map_err(|err| CliError::UnableToParse("Function Name", err.to_string()))?;
+    let member_id = Identifier::from_str(ids.get(2).unwrap())
+        .map_err(|err| CliError::UnableToParse("Member Name", err.to_string()))?;
     let module_id = ModuleId::new(address, module);
-    Ok(FunctionId {
+    Ok(MemberId {
         module_id,
-        function_id,
+        member_id,
     })
+}
+
+impl FromStr for MemberId {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        parse_member_id(s)
+    }
 }

@@ -36,11 +36,9 @@ task 3 'view'. lines 11-11:
 key 0x3::token::Collections {
     collection_data: store 0x1::table::Table<0x1::string::String, 0x3::token::CollectionData> {
         handle: 5713946181763753045826830927579154558u128
-        length: 1
     }
     token_data: store 0x1::table::Table<0x3::token::TokenDataId, 0x3::token::TokenData> {
         handle: 201565269216226451971031276281575418327u128
-        length: 1
     }
     create_collection_events: store 0x1::event::EventHandle<0x3::token::CreateCollectionEvent> {
         counter: 1

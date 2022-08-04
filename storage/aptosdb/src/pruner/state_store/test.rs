@@ -1,16 +1,25 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_config::config::StoragePrunerConfig;
 use std::collections::HashMap;
+use std::sync::mpsc::channel;
+use std::sync::Arc;
 
 use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
 use aptos_temppath::TempPath;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
-use schemadb::ReadOptions;
+use aptos_types::transaction::Version;
+use schemadb::{ReadOptions, DB};
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 
+use crate::pruner::state_pruner_worker::StatePrunerWorker;
 use crate::stale_node_index::StaleNodeIndexSchema;
-use crate::{change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB};
+use crate::{
+    change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB, PrunerManager,
+    StatePrunerManager,
+};
 
 fn put_value_set(
     db: &DB,
@@ -69,8 +78,7 @@ fn test_state_store_pruner() {
         1000,  /* snapshot_size_threshold, does not matter */
         false, /* hack_for_tests */
     );
-    let pruner = Pruner::new(
-        Arc::clone(&aptos_db.ledger_db),
+    let pruner = StatePrunerManager::new(
         Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
@@ -94,9 +102,7 @@ fn test_state_store_pruner() {
 
     // Prune till version=0. This should basically be a no-op
     {
-        pruner
-            .wake_and_wait_state_pruner(0 /* latest_version */)
-            .unwrap();
+        pruner.wake_and_wait_pruner(0 /* latest_version */).unwrap();
         for i in 0..num_versions {
             verify_state_in_store(
                 state_store,
@@ -111,7 +117,7 @@ fn test_state_store_pruner() {
     // we expect versions 0 to 9 to be pruned.
     {
         pruner
-            .wake_and_wait_state_pruner(prune_batch_size as u64 /* latest_version */)
+            .wake_and_wait_pruner(prune_batch_size as u64 /* latest_version */)
             .unwrap();
         for i in 0..prune_batch_size {
             assert!(state_store
@@ -160,8 +166,7 @@ fn test_state_store_pruner_partial_version() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let state_store = &aptos_db.state_store;
-    let pruner = Pruner::new(
-        Arc::clone(&aptos_db.ledger_db),
+    let pruner = StatePrunerManager::new(
         Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
@@ -195,9 +200,7 @@ fn test_state_store_pruner_partial_version() {
 
     // Prune till version=0. This should basically be a no-op
     {
-        pruner
-            .wake_and_wait_state_pruner(0 /* latest_version */)
-            .unwrap();
+        pruner.wake_and_wait_pruner(0 /* latest_version */).unwrap();
         verify_state_in_store(state_store, key1.clone(), Some(&value1), 1);
         verify_state_in_store(state_store, key2.clone(), Some(&value2_update), 1);
         verify_state_in_store(state_store, key3.clone(), Some(&value3), 1);
@@ -206,9 +209,7 @@ fn test_state_store_pruner_partial_version() {
     // Test for batched pruning, since we use a batch size of 1, updating the latest version to 1
     // should prune 1 stale node with the version 0.
     {
-        assert!(pruner
-            .wake_and_wait_state_pruner(1 /* latest_version */,)
-            .is_ok());
+        assert!(pruner.wake_and_wait_pruner(1 /* latest_version */,).is_ok());
         assert!(state_store
             .get_state_value_with_proof_by_version(&key1, 0_u64)
             .is_err());
@@ -219,16 +220,10 @@ fn test_state_store_pruner_partial_version() {
     }
     // Prune 3 more times. All version 0 and 1 stale nodes should be gone.
     {
-        assert!(pruner
-            .wake_and_wait_state_pruner(2 /* latest_version */,)
-            .is_ok());
-        assert!(pruner
-            .wake_and_wait_state_pruner(2 /* latest_version */,)
-            .is_ok());
+        assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
+        assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
 
-        assert!(pruner
-            .wake_and_wait_state_pruner(2 /* latest_version */,)
-            .is_ok());
+        assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
         assert!(state_store
             .get_state_value_with_proof_by_version(&key1, 0_u64)
             .is_err());
@@ -262,9 +257,8 @@ fn test_state_store_pruner_disabled() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let state_store = &aptos_db.state_store;
-    let pruner = Pruner::new(
+    let pruner = StatePrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
             state_store_prune_window: None,
             ledger_prune_window: Some(0),
@@ -287,9 +281,7 @@ fn test_state_store_pruner_disabled() {
 
     // Prune till version=0. This should basically be a no-op
     {
-        pruner
-            .ensure_disabled(PrunerIndex::StateStorePrunerIndex)
-            .unwrap();
+        pruner.ensure_disabled().unwrap();
         for i in 0..num_versions {
             verify_state_in_store(
                 state_store,
@@ -303,9 +295,7 @@ fn test_state_store_pruner_disabled() {
     // Notify the pruner to update the version to be 10 - since we use a batch size of 10,
     // we expect versions 0 to 9 to be pruned.
     {
-        pruner
-            .ensure_disabled(PrunerIndex::StateStorePrunerIndex)
-            .unwrap();
+        pruner.ensure_disabled().unwrap();
         for i in 0..prune_batch_size {
             assert!(state_store
                 .get_state_value_with_proof_by_version(&key, i as u64)

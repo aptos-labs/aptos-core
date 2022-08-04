@@ -1,14 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{pruner::*, AptosDB, ChangeSet, EventStore};
+use crate::{AptosDB, ChangeSet, EventStore, LedgerPrunerManager, PrunerManager};
+use aptos_config::config::StoragePrunerConfig;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
+use aptos_types::transaction::Version;
 use aptos_types::{
     contract_event::ContractEvent,
     proptest_types::{AccountInfoUniverse, ContractEventGen},
 };
 use proptest::{collection::vec, prelude::*, proptest};
+use std::sync::Arc;
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
@@ -55,9 +58,8 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
     let event_store = &aptos_db.event_store;
     let mut cs = ChangeSet::new();
     let num_versions = events.len();
-    let pruner = Pruner::new(
+    let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: Some(0),
@@ -77,7 +79,7 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
     // start pruning events batches of size 2 and verify transactions have been pruned from DB
     for i in (0..=num_versions).step_by(2) {
         pruner
-            .wake_and_wait_ledger_pruner(i as u64 /* latest_version */)
+            .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();
         // ensure that all events up to i * 2 has been pruned
         for j in 0..i {
@@ -100,9 +102,8 @@ fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
     let event_store = &aptos_db.event_store;
     let mut cs = ChangeSet::new();
     let num_versions = events.len();
-    let pruner = Pruner::new(
+    let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
             state_store_prune_window: Some(0),
             ledger_prune_window: None,
@@ -121,9 +122,7 @@ fn verify_event_store_pruner_disabled(events: Vec<Vec<ContractEvent>>) {
 
     // Verify no pruning has happened.
     for _i in (0..=num_versions).step_by(2) {
-        pruner
-            .ensure_disabled(PrunerIndex::LedgerPrunerIndex)
-            .unwrap();
+        pruner.ensure_disabled().unwrap();
         // ensure that all events up to i * 2 are valid in DB
         for version in 0..num_versions {
             verify_events_in_store(&events, version as u64, event_store);

@@ -1,12 +1,38 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::COMPRESSION_SUFFIX_LABEL;
 use aptos_types::transaction::Version;
 use serde::{Deserialize, Serialize};
 
 /// A storage service request.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub enum StorageServiceRequest {
+pub struct StorageServiceRequest {
+    pub data_request: DataRequest, // The data to fetch from the storage service
+    pub use_compression: bool,     // Whether or not the client wishes data to be compressed
+}
+
+impl StorageServiceRequest {
+    pub fn new(data_request: DataRequest, use_compression: bool) -> Self {
+        Self {
+            data_request,
+            use_compression,
+        }
+    }
+
+    /// Returns a summary label for the request
+    pub fn get_label(&self) -> String {
+        let mut label = self.data_request.get_label().to_string();
+        if self.use_compression {
+            label += COMPRESSION_SUFFIX_LABEL;
+        }
+        label
+    }
+}
+
+/// A single data request.
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub enum DataRequest {
     GetEpochEndingLedgerInfos(EpochEndingLedgerInfoRequest), // Fetches a list of epoch ending ledger infos
     GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest), // Subscribes to new transaction outputs
     GetNewTransactionsWithProof(NewTransactionsWithProofRequest), // Subscribes to new transactions with a proof
@@ -18,7 +44,7 @@ pub enum StorageServiceRequest {
     GetTransactionsWithProof(TransactionsWithProofRequest), // Fetches a list of transactions with a proof
 }
 
-impl StorageServiceRequest {
+impl DataRequest {
     /// Returns a summary label for the request
     pub fn get_label(&self) -> &'static str {
         match self {
@@ -47,8 +73,8 @@ impl StorageServiceRequest {
 /// A storage service request for fetching a list of epoch ending ledger infos.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct EpochEndingLedgerInfoRequest {
-    pub start_epoch: u64,
-    pub expected_end_epoch: u64,
+    pub start_epoch: u64,        // The epoch to start at
+    pub expected_end_epoch: u64, // The epoch to finish at
 }
 
 /// A storage service request for fetching a new transaction output list
