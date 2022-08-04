@@ -139,7 +139,7 @@ module aptos_framework::genesis {
             let cur_full_node_network_addresses = *vector::borrow(&full_node_network_addresses, i);
             let consensus_pubkey = *vector::borrow(&consensus_pubkeys, i);
             let pop = *vector::borrow(&proof_of_possession, i);
-            stake::register_validator_candidate(
+            stake::initialize_validator(
                 &owner_account,
                 consensus_pubkey,
                 pop,

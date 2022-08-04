@@ -1,6 +1,6 @@
 /**
  * Validator lifecycle:
- * 1. Prepare a validator node set up and call stake::register_validator_candidate
+ * 1. Prepare a validator node set up and call stake::initialize_validator
  * 2. Once ready to deposit stake (or have funds assigned by a staking service in exchange for ownership capability),
  * call stake::add_stake (or *_with_cap versions if called from the staking service)
  * 3. Call stake::join_validator_set (or _with_cap version) to join the active validator set. Changes are effective in
@@ -159,7 +159,7 @@ module aptos_framework::stake {
 
     /// The events emitted for the entire StakePool's lifecycle.
     struct StakePoolEvents has key {
-        register_validator_candidate_events: EventHandle<RegisterValidatorCandidateEvent>,
+        initialize_validator_events: EventHandle<RegisterValidatorCandidateEvent>,
         set_operator_events: EventHandle<SetOperatorEvent>,
         add_stake_events: EventHandle<AddStakeEvent>,
         rotate_consensus_key_events: EventHandle<RotateConsensusKeyEvent>,
@@ -319,17 +319,52 @@ module aptos_framework::stake {
         move_to(account, AptosCoinCapabilities { mint_cap })
     }
 
+    /// Initialize the validator account and give ownership to the signing account
+    /// except it leaves the ValidatorConfig to be set by another entity.
+    /// Note: this triggers setting the operator and owner, set it to the account's address
+    /// to set later.
+    public entry fun initialize_owner_only(account: &signer, operator: address, voter: address) acquires OwnerCapability, StakePool, StakePoolEvents {
+        initialize_owner(account);
+
+        move_to(account, ValidatorConfig {
+            consensus_pubkey: vector::empty(),
+            network_addresses: vector::empty(),
+            fullnode_addresses: vector::empty(),
+            validator_index: 0,
+        });
+
+        let account_address = signer::address_of(account);
+        if (account_address != operator) {
+            set_operator(account, operator)
+        };
+        if (account_address != voter) {
+            set_delegated_voter(account, voter)
+        };
+    }
+
     /// Initialize the validator account and give ownership to the signing account.
-    public entry fun register_validator_candidate(
+    public entry fun initialize_validator(
         account: &signer,
         consensus_pubkey: vector<u8>,
         proof_of_possession: vector<u8>,
         network_addresses: vector<u8>,
         fullnode_addresses: vector<u8>,
     ) {
+        assert!(signature::bls12381_verify_proof_of_possession(consensus_pubkey, proof_of_possession), error::invalid_argument(EINVALID_PUBLIC_KEY));
+
+        initialize_owner(account);
+        move_to(account, ValidatorConfig {
+            consensus_pubkey,
+            network_addresses,
+            fullnode_addresses,
+            validator_index: 0,
+        });
+    }
+
+
+    fun initialize_owner(account: &signer) {
         let account_address = signer::address_of(account);
         assert!(!exists<StakePool>(account_address), error::invalid_argument(EALREADY_REGISTERED));
-        assert!(signature::bls12381_verify_proof_of_possession(consensus_pubkey, proof_of_possession), error::invalid_argument(EINVALID_PUBLIC_KEY));
 
         move_to(account, StakePool {
             active: coin::zero<AptosCoin>(),
@@ -340,8 +375,9 @@ module aptos_framework::stake {
             operator_address: account_address,
             delegated_voter: account_address,
         });
+
         move_to(account, StakePoolEvents {
-            register_validator_candidate_events: event::new_event_handle<RegisterValidatorCandidateEvent>(account),
+            initialize_validator_events: event::new_event_handle<RegisterValidatorCandidateEvent>(account),
             set_operator_events: event::new_event_handle<SetOperatorEvent>(account),
             add_stake_events: event::new_event_handle<AddStakeEvent>(account),
             rotate_consensus_key_events: event::new_event_handle<RotateConsensusKeyEvent>(account),
@@ -353,12 +389,7 @@ module aptos_framework::stake {
             withdraw_stake_events: event::new_event_handle<WithdrawStakeEvent>(account),
             leave_validator_set_events: event::new_event_handle<LeaveValidatorSetEvent>(account),
         });
-        move_to(account, ValidatorConfig {
-            consensus_pubkey,
-            network_addresses,
-            fullnode_addresses,
-            validator_index: 0,
-        });
+
         move_to(account, OwnerCapability {
            pool_address: account_address,
         });
@@ -482,7 +513,7 @@ module aptos_framework::stake {
         new_consensus_pubkey: vector<u8>,
         proof_of_possession: vector<u8>,
     ) acquires StakePool, StakePoolEvents, ValidatorConfig {
-        let stake_pool = borrow_global<StakePool>(pool_address);
+        let stake_pool = borrow_global_mut<StakePool>(pool_address);
         assert!(signer::address_of(account) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
 
         assert!(exists<ValidatorConfig>(pool_address), error::not_found(EVALIDATOR_CONFIG));
@@ -576,7 +607,7 @@ module aptos_framework::stake {
         join_validator_set_internal(account, pool_address);
     }
 
-    /// Request to have `pool_address` join the validator set. Can only be called after calling `register_validator_candidate`.
+    /// Request to have `pool_address` join the validator set. Can only be called after calling `initialize_validator`.
     /// If the validator has the required stake (more than minimum and less than maximum allowed), they will be
     /// added to the pending_active queue. All validators in this queue will be added to the active set when the next
     /// epoch starts (eligibility will be rechecked).
@@ -590,15 +621,15 @@ module aptos_framework::stake {
         // Account has to be the operator.
         assert!(signer::address_of(account) == stake_pool.operator_address, error::invalid_argument(ENOT_OPERATOR));
 
-        // Requires the validator to have a lockup more than the minimum.
-        let config = staking_config::get();
-        let (minimum_stake, maximum_stake) = staking_config::get_required_stake(&config);
-
         // Throw an error is the validator is already active.
         assert!(
             get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE,
             error::invalid_argument(EALREADY_ACTIVE_VALIDATOR),
         );
+
+        // Requires the validator to have a lockup more than the minimum.
+        let config = staking_config::get();
+        let (minimum_stake, maximum_stake) = staking_config::get_required_stake(&config);
 
         // The validator is not yet activated so all added stake should be in active.
         let voting_power = coin::value<AptosCoin>(&stake_pool.active);
@@ -607,6 +638,8 @@ module aptos_framework::stake {
 
         // Add validator to pending_active, to be activated in the next epoch.
         let validator_config = borrow_global_mut<ValidatorConfig>(pool_address);
+        assert!(!vector::is_empty(&validator_config.consensus_pubkey), error::invalid_argument(EINVALID_PUBLIC_KEY));
+
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
         vector::push_back(&mut validator_set.pending_active, generate_validator_info(pool_address, *validator_config));
 
@@ -1457,7 +1490,7 @@ module aptos_framework::stake {
         store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
 
         let pool_address = signer::address_of(&validator);
-        register_validator_candidate(&validator, CONSENSUS_KEY_1, CONSENSUS_POP_1, vector::empty(), vector::empty());
+        initialize_validator(&validator, CONSENSUS_KEY_1, CONSENSUS_POP_1, vector::empty(), vector::empty());
         let owner_cap = extract_owner_cap(&validator);
 
         // Add stake when the validator is not yet activated.
@@ -1683,6 +1716,50 @@ module aptos_framework::stake {
         assert_validator_state(validator_address, 100, 0, 0, 0, 0);
     }
 
+    #[test(aptos_framework = @aptos_framework, core_resources = @core_resources, validator = @0x123)]
+    #[expected_failure(abort_code = 0x10010)]
+    public entry fun test_invalid_config(
+        aptos_framework: signer,
+        core_resources: signer,
+        validator: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet {
+        timestamp::set_time_has_started_for_testing(&aptos_framework);
+        initialize(&aptos_framework);
+        staking_config::initialize(&aptos_framework, 50, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100);
+
+        let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
+        register_owner_only(&validator, &mint_cap);
+        store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
+        coin::destroy_burn_cap<AptosCoin>(burn_cap);
+
+        // Join the validator set with enough stake.
+        let validator_address = signer::address_of(&validator);
+        join_validator_set(&validator, validator_address);
+    }
+
+    #[test(aptos_framework = @aptos_framework, core_resources = @core_resources, validator = @0x123)]
+    public entry fun test_valid_config(
+        aptos_framework: signer,
+        core_resources: signer,
+        validator: signer,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet {
+        timestamp::set_time_has_started_for_testing(&aptos_framework);
+        initialize(&aptos_framework);
+        staking_config::initialize(&aptos_framework, 50, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100);
+
+        let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
+        register_owner_only(&validator, &mint_cap);
+        store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
+        coin::destroy_burn_cap<AptosCoin>(burn_cap);
+
+        // Set the valid to true
+        let validator_address = signer::address_of(&validator);
+        rotate_consensus_key(&validator, validator_address, CONSENSUS_KEY_2, CONSENSUS_POP_2);
+
+        // Join the validator set with enough stake.
+        join_validator_set(&validator, validator_address);
+    }
+
     #[test_only]
     public entry fun register_mint_stake(
         account: &signer,
@@ -1691,7 +1768,20 @@ module aptos_framework::stake {
         aptos_framework::coin::register_for_test<AptosCoin>(account);
         let address = signer::address_of(account);
         coin::deposit<AptosCoin>(address, coin::mint<AptosCoin>(1000, mint_cap));
-        register_validator_candidate(account, CONSENSUS_KEY_1, CONSENSUS_POP_1, vector::empty(), vector::empty());
+        initialize_validator(account, CONSENSUS_KEY_1, CONSENSUS_POP_1, vector::empty(), vector::empty());
+        add_stake(account, 100);
+        assert_validator_state(signer::address_of(account), 100, 0, 0, 0, 0);
+    }
+
+    #[test_only]
+    public entry fun register_owner_only(
+        account: &signer,
+        mint_cap: &MintCapability<AptosCoin>,
+    ) acquires OwnerCapability, StakePool, StakePoolEvents, ValidatorConfig, ValidatorSet {
+        aptos_framework::coin::register_for_test<AptosCoin>(account);
+        let address = signer::address_of(account);
+        coin::deposit<AptosCoin>(address, coin::mint<AptosCoin>(1000, mint_cap));
+        initialize_owner_only(account, address, address);
         add_stake(account, 100);
         assert_validator_state(signer::address_of(account), 100, 0, 0, 0, 0);
     }
