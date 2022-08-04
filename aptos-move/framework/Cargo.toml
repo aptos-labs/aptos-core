@@ -31,7 +31,7 @@ aptos-types = { path = "../../types" }
 move-deps = { path = "../move-deps", features = ["address32"] }
 
 [dev-dependencies]
-aptos-vm = { path = "../../aptos-move/aptos-vm" }
+aptos-vm = { path = "../../aptos-move/aptos-vm", features = ["aggregator-extension"] }
 move-deps = { path = "../move-deps", features = ["table-extension"] }
 
 [features]
