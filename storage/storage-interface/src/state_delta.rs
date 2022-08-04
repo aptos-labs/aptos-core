@@ -22,7 +22,7 @@ pub struct StateDelta {
     pub base_version: Option<Version>,
     pub current: SparseMerkleTree<StateValue>,
     pub current_version: Option<Version>,
-    pub updates_since_base: HashMap<StateKey, StateValue>,
+    pub updates_since_base: HashMap<StateKey, Option<StateValue>>,
 }
 
 impl StateDelta {
@@ -31,7 +31,7 @@ impl StateDelta {
         base_version: Option<Version>,
         current: SparseMerkleTree<StateValue>,
         current_version: Option<Version>,
-        updates_since_base: HashMap<StateKey, StateValue>,
+        updates_since_base: HashMap<StateKey, Option<StateValue>>,
     ) -> Self {
         assert!(base_version.map_or(0, |v| v + 1) <= current_version.map_or(0, |v| v + 1));
         Self {

@@ -89,7 +89,7 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_infallible::Mutex;
-use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProof};
+use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProofExt};
 use std::sync::MutexGuard;
 use std::{
     borrow::Borrow,
@@ -401,7 +401,7 @@ where
 {
     pub fn batch_update(
         &self,
-        updates: Vec<(HashValue, &V)>,
+        updates: Vec<(HashValue, Option<&V>)>,
         proof_reader: &impl ProofRead,
     ) -> Result<Self, UpdateError> {
         self.clone()
@@ -567,7 +567,7 @@ where
     /// new, returned tree.
     pub fn batch_update(
         &self,
-        updates: Vec<(HashValue, &V)>,
+        updates: Vec<(HashValue, Option<&V>)>,
         proof_reader: &impl ProofRead,
     ) -> Result<Self, UpdateError> {
         // Flatten, dedup and sort the updates with a btree map since the updates between different
@@ -635,7 +635,7 @@ where
 /// A type that implements `ProofRead` can provide proof for keys in persistent storage.
 pub trait ProofRead: Sync {
     /// Gets verified proof for this key in persistent storage.
-    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProof>;
+    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt>;
 }
 
 /// All errors `update` can possibly return.
