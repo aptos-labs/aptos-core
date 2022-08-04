@@ -104,19 +104,19 @@ export function useSequenceNumber() {
     }
     const aptosClient = new AptosClient(nodeUrl);
     const account = await aptosClient.getAccount(accountAddress!);
-    return Number(account.sequence_number);
+    return BigInt(account.sequence_number);
   }, { enabled: false });
 
   return {
     get: async () => {
-      const value = queryClient.getQueryData<number>(queryKey);
+      const value = queryClient.getQueryData<bigint>(queryKey);
       return value !== undefined
         ? value
         : (await refetch({ throwOnError: true })).data!;
     },
-    increment: () => queryClient.setQueryData<number | undefined>(
+    increment: () => queryClient.setQueryData<bigint | undefined>(
       queryKey,
-      (prev?: number) => prev && prev + 1,
+      (prev?: bigint) => prev && prev + BigInt(1),
     ),
     refetch,
   };

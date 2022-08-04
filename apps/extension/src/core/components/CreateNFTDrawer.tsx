@@ -25,6 +25,7 @@ import { SubmitHandler, useForm } from 'react-hook-form';
 import useWalletState from 'core/hooks/useWalletState';
 import { secondaryTextColor } from 'core/colors';
 import { useCreateTokenAndCollection } from 'core/mutations/collectibles';
+import { useAccountCoinBalance } from 'core/queries/account';
 
 // eslint-disable-next-line global-require
 window.Buffer = window.Buffer || require('buffer').Buffer;
@@ -34,6 +35,10 @@ export default function CreateNFTModal() {
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { handleSubmit, register, watch } = useForm();
   const { aptosAccount, nodeUrl } = useWalletState();
+
+  const { data: coinBalance } = useAccountCoinBalance({
+    address: aptosAccount?.address().hex(),
+  });
 
   const collectionName: string | undefined = watch('collectionName');
   const tokenName: string | undefined = watch('tokenName');
@@ -66,7 +71,12 @@ export default function CreateNFTModal() {
 
   return (
     <>
-      <Button size="xs" onClick={onOpen} leftIcon={<AddIcon fontSize="xs" />}>
+      <Button
+        size="xs"
+        disabled={!coinBalance}
+        onClick={onOpen}
+        leftIcon={<AddIcon fontSize="xs" />}
+      >
         New
       </Button>
       <Drawer

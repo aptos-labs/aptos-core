@@ -69,8 +69,8 @@ class Web3 {
     );
 
     const rawTransaction = createRawTransaction(transaction, {
-      address,
       chainId,
+      sender: address,
       sequenceNumber,
     });
 

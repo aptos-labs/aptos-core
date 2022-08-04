@@ -36,7 +36,7 @@ export const useSwitchNetwork = () => {
       address: aptosAccount?.address().hex(),
       nodeUrl: newNodeUrl,
     });
-    if (!accountExists && aptosAccount) {
+    if (!accountExists && aptosAccount && newFaucetNetwork) {
       const faucetClient = new FaucetClient(newNodeUrl, newFaucetNetwork);
       try {
         await faucetClient.fundAccount(aptosAccount.address(), 0);

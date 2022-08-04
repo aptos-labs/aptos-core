@@ -12,15 +12,18 @@ import TransferDrawer from 'core/components/TransferDrawer';
 import Faucet from 'core/components/Faucet';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
+import useWalletState from 'core/hooks/useWalletState';
 
 function Wallet() {
+  const { faucetNetwork } = useWalletState();
+
   return (
     <AuthLayout routePath={PageRoutes.wallet.routePath}>
       <WalletLayout>
         <VStack width="100%" paddingTop={8}>
           <WalletAccountBalance />
           <HStack spacing={4}>
-            <Faucet />
+            { faucetNetwork && <Faucet /> }
             <TransferDrawer />
           </HStack>
         </VStack>

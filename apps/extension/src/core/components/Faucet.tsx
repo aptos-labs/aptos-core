@@ -49,7 +49,7 @@ export default function Faucet() {
 
   const faucetOnClick = async () => {
     try {
-      if (address) {
+      if (address && faucetNetwork) {
         await fundWithFaucet({ address, faucetUrl: faucetNetwork, nodeUrl });
       }
     } catch (err) {

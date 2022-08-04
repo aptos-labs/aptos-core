@@ -4,8 +4,6 @@
 import {
   AptosClient,
   MaybeHexString,
-  TxnBuilderTypes,
-  BCS,
   RequestError,
 } from 'aptos';
 import { toast } from 'core/components/Toast';
@@ -17,105 +15,17 @@ import { coinEvents } from 'core/utils/analytics/events';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
 import { AptosError, ScriptFunctionPayload, UserTransaction } from 'aptos/dist/api/data-contracts';
 import { useChainId } from 'core/queries/network';
-import { aptosCoinStructTag, coinNamespace } from 'core/constants';
 import { MoveExecutionStatus, parseMoveVmStatus } from 'core/utils/move';
+import {
+  buildCoinTransferPayload,
+  buildAccountTransferPayload,
+  createRawTransaction,
+} from 'core/utils/transaction';
 
-/* function parseTypeTag(typeTag: string): TxnBuilderTypes.TypeTag {
-  if (typeTag.startsWith('vector')) {
-    return new TxnBuilderTypes.TypeTagVector(
-      parseTypeTag(typeTag.substring(7, typeTag.length - 1)),
-    );
-  }
-  if (typeTag.includes('::')) {
-    if (typeTag.split('::').length === 3) {
-      return new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString(typeTag));
-    }
-    if (typeTag.split('::').length === 4) {
-      const [address, module, name, tempTypeArgs] = typeTag.split('::');
-      const typeArgs = parseTypeTag(tempTypeArgs);
-      const structTag = new StructTag(
-        AccountAddress.fromHex(address),
-        new Identifier(module),
-        new Identifier(name),
-        [typeArgs],
-      );
-
-      return new TypeTagStruct(structTag);
-    }
-  }
-
-  switch (typeTag) {
-    case 'bool':
-      return new TxnBuilderTypes.TypeTagBool();
-    case 'u8':
-      return new TxnBuilderTypes.TypeTagU8();
-    case 'u64':
-      return new TxnBuilderTypes.TypeTagU64();
-    case 'u128':
-      return new TxnBuilderTypes.TypeTagU128();
-    case 'address':
-      return new TxnBuilderTypes.TypeTagAddress();
-    case 'signer':
-      return new TxnBuilderTypes.TypeTagSigner();
-    default:
-      throw new Error('Unknown type tag');
-  }
-} */
-
-interface CoinTransferRequestParams {
+export interface SubmitCoinTransferParams {
   amount: number,
-  chainId: number,
+  create: boolean,
   recipient: MaybeHexString,
-  sender: MaybeHexString,
-  sequenceNumber: number
-}
-
-/**
- * Create a coin transfer BCS-encoded transaction
- * @param amount amount of coins to transfer
- * @param chainId (required for encoding locally)
- * @param recipient recipient address
- * @param sender sender address
- * @param sequenceNumber (required for encoding locally)
- */
-function createCoinTransferTransaction({
-  amount,
-  chainId,
-  recipient,
-  sender,
-  sequenceNumber,
-}: CoinTransferRequestParams) {
-  const {
-    AccountAddress,
-    ChainId,
-    RawTransaction,
-    ScriptFunction,
-    StructTag,
-    TransactionPayloadScriptFunction,
-    TypeTagStruct,
-  } = TxnBuilderTypes;
-
-  const typeArgs = [
-    new TypeTagStruct(StructTag.fromString(aptosCoinStructTag)),
-  ];
-
-  const encodedArgs = [
-    BCS.bcsToBytes(AccountAddress.fromHex(recipient)),
-    BCS.bcsSerializeUint64(BigInt(amount)),
-  ];
-
-  const scriptFunction = ScriptFunction.natural(coinNamespace, 'transfer', typeArgs, encodedArgs);
-  const encodedPayload = new TransactionPayloadScriptFunction(scriptFunction);
-
-  return new RawTransaction(
-    AccountAddress.fromHex(sender),
-    BigInt(sequenceNumber),
-    encodedPayload,
-    BigInt(1000),
-    BigInt(1),
-    BigInt(Math.floor(Date.now() / 1000) + 10),
-    new ChainId(chainId),
-  );
 }
 
 /**
@@ -126,25 +36,26 @@ function useCreateCoinTransferTransaction() {
   const { data: chainId } = useChainId();
   const { get: getSequenceNumber } = useSequenceNumber();
 
-  const sender = aptosAccount?.address().hex();
+  const sender = aptosAccount?.address();
   const isReady = sender && chainId !== undefined;
 
   return isReady
-    ? async ({
-      amount,
-      recipient,
-    }: SubmitCoinTransferParams) => createCoinTransferTransaction({
-      amount,
-      chainId,
-      recipient,
-      sender,
-      sequenceNumber: await getSequenceNumber(),
-    })
+    ? async ({ amount, create, recipient }: SubmitCoinTransferParams) => {
+      const payload = create
+        ? buildAccountTransferPayload(recipient, BigInt(amount))
+        : buildCoinTransferPayload(recipient, BigInt(amount));
+      return createRawTransaction(payload, {
+        chainId,
+        sender,
+        sequenceNumber: await getSequenceNumber(),
+      });
+    }
     : undefined;
 }
 
 export interface UseCoinTransferParams {
   amount?: number,
+  create?: boolean,
   enabled?: boolean,
   recipient?: string,
 }
@@ -154,6 +65,7 @@ export interface UseCoinTransferParams {
  */
 export function useCoinTransferSimulation({
   amount,
+  create,
   enabled,
   recipient,
 } : UseCoinTransferParams) {
@@ -162,13 +74,14 @@ export function useCoinTransferSimulation({
   const createTxn = useCreateCoinTransferTransaction();
 
   const isReady = Boolean(aptosAccount && createTxn);
-  const isInputValid = Boolean(amount && recipient);
+  const isInputValid = Boolean(amount && create !== undefined && recipient);
 
   return useQuery(
     [queryKeys.getCoinTransferSimulation, recipient, amount],
     async () => {
       const rawTxn = await createTxn!({
         amount: amount!,
+        create: create!,
         recipient: recipient!,
       });
 
@@ -194,11 +107,6 @@ export function useCoinTransferSimulation({
   );
 }
 
-export interface SubmitCoinTransferParams {
-  amount: number,
-  recipient: MaybeHexString,
-}
-
 /**
  * Mutation for submitting a coin transfer transaction
  */
@@ -215,10 +123,10 @@ export function useCoinTransferTransaction() {
 
   const submitCoinTransferTransaction = async ({
     amount,
+    create,
     recipient,
   }: SubmitCoinTransferParams) => {
-    const rawTxn = await createTxn!({ amount, recipient });
-
+    const rawTxn = await createTxn!({ amount, create, recipient });
     const aptosClient = new AptosClient(nodeUrl);
     const signedTxn = AptosClient.generateBCSTransaction(aptosAccount!, rawTxn);
 

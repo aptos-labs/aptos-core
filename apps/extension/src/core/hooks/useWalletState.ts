@@ -73,7 +73,6 @@ export default function useWalletState() {
   const addAccount = useCallback(async ({
     account, isImport = false, mnemonic,
   }: AddAccountProps) => {
-    const faucetClient = new FaucetClient(nodeUrl, faucetNetwork);
     const newAccount: WalletAccount = {
       aptosAccount: account.toPrivateKeyObject(),
       mnemonic,
@@ -87,7 +86,10 @@ export default function useWalletState() {
       currAccountAddress: account.address().hex(),
     };
     try {
-      await faucetClient.fundAccount(account.address(), 0);
+      if (faucetNetwork) {
+        const faucetClient = new FaucetClient(nodeUrl, faucetNetwork);
+        await faucetClient.fundAccount(account.address(), 0);
+      }
       setLocalStorageState(localStorageStateCopy);
       const localStorageStateString = JSON.stringify(localStorageStateCopy);
       window.localStorage.setItem(

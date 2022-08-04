@@ -99,8 +99,9 @@ function TransferDrawer() {
     isFetching: isSimulationLoading,
   } = useCoinTransferSimulation({
     amount: debouncedAmount,
+    create: !doesRecipientAccountExist,
     enabled: isDrawerOpen,
-    recipient: validRecipient,
+    recipient: validRecipientAddress,
   });
 
   const {
@@ -110,12 +111,13 @@ function TransferDrawer() {
 
   const onSubmit: SubmitHandler<CoinTransferFormData> = async (data, event) => {
     event?.preventDefault();
-    if (!validRecipient || !debouncedAmount) {
+    if (!validRecipientAddress || !debouncedAmount) {
       return;
     }
     const onChainTxn = await submitCoinTransfer({
       amount: debouncedAmount,
-      recipient: validRecipient,
+      create: !doesRecipientAccountExist,
+      recipient: validRecipientAddress,
     });
     if (onChainTxn && onChainTxn.success) {
       closeDrawer();
@@ -136,13 +138,15 @@ function TransferDrawer() {
   const isBalanceEnough = !maxAmount || debouncedAmount <= maxAmount;
 
   const canSubmitForm = canSubmitTransaction
+    && validRecipientAddress
     && debouncedAmount
     && isBalanceEnough
-    && simulatedTxn?.success;
+    && (!doesRecipientAccountExist || simulatedTxn?.success);
 
   return (
     <>
       <Button
+        disabled={!coinBalance}
         leftIcon={<IoIosSend />}
         onClick={openDrawer}
       >
@@ -191,14 +195,20 @@ function TransferDrawer() {
                     </Button>
                   ) : (
                     <Button
-                      color={secondaryTextColor[colorMode]}
+                      color={
+                        validRecipient
+                          ? secondaryTextColor[colorMode]
+                          : secondaryErrorMessageColor[colorMode]
+                      }
                       fontSize="sm"
                       fontWeight={400}
                       height="24px"
                       variant="unstyled"
                       cursor="default"
                     >
-                      { validRecipientAddress ? 'Account not found' : 'Invalid address' }
+                      { validRecipientAddress
+                        ? 'Account not found, will be created'
+                        : 'Invalid address' }
                     </Button>
                   )}
                 </VStack>

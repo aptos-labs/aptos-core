@@ -20,7 +20,6 @@ import { collapseHexString } from 'core/utils/hex';
 import {
   secondaryGridBgColor,
   secondaryGridHoverBgColor,
-  secondaryTextColor,
   timestampColor,
 } from 'core/colors';
 import useWalletState from 'core/hooks/useWalletState';
@@ -104,7 +103,6 @@ export function ActivityItem({ transaction }: ActivityItemProps) {
         paddingLeft={4}
         paddingRight={4}
         cursor="pointer"
-        color={secondaryTextColor[colorMode]}
         bgColor={secondaryGridBgColor[colorMode]}
         borderRadius=".5rem"
         _hover={{

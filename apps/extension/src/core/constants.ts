@@ -7,6 +7,7 @@ export const WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY = 'aptosWalletNetworkState';
 
 export const STATIC_GAS_AMOUNT = 150;
 
+export const accountNamespace = '0x1::account';
 export const coinNamespace = '0x1::coin';
 export const aptosCoinStructTag = '0x1::aptos_coin::AptosCoin';
 export const coinStoreStructTag = `${coinNamespace}::CoinStore`;
