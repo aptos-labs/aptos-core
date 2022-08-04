@@ -152,11 +152,11 @@ test(
     const authKey = TxnBuilderTypes.AuthenticationKey.fromMultiEd25519PublicKey(multiSigPublicKey);
 
     const mutisigAccountAddress = authKey.derivedAddress();
-    await faucetClient.fundAccount(mutisigAccountAddress, 500000);
+    await faucetClient.fundAccount(mutisigAccountAddress, 5000000);
 
     let resources = await client.getAccountResources(mutisigAccountAddress);
     let accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
-    expect((accountResource!.data as any).coin.value).toBe("500000");
+    expect((accountResource!.data as any).coin.value).toBe("5000000");
 
     const account4 = new AptosAccount();
     await faucetClient.fundAccount(account4.address(), 0);
@@ -184,7 +184,7 @@ test(
       TxnBuilderTypes.AccountAddress.fromHex(mutisigAccountAddress),
       BigInt(sequnceNumber),
       scriptFunctionPayload,
-      100000n,
+      1000000n,
       1n,
       BigInt(Math.floor(Date.now() / 1000) + 10),
       new TxnBuilderTypes.ChainId(chainId),
@@ -226,8 +226,8 @@ test(
 
     const account1 = new AptosAccount();
     const account2 = new AptosAccount();
-    const txns1 = await faucetClient.fundAccount(account1.address(), 50000);
-    const txns2 = await faucetClient.fundAccount(account2.address(), 10000);
+    const txns1 = await faucetClient.fundAccount(account1.address(), 1000000);
+    const txns2 = await faucetClient.fundAccount(account2.address(), 1000000);
     const tx1 = await client.getTransactionByHash(txns1[1]);
     const tx2 = await client.getTransactionByHash(txns2[1]);
     expect(tx1.type).toBe("user_transaction");
@@ -237,8 +237,8 @@ test(
       const resources2 = await client.getAccountResources(account2.address());
       const account1Resource = resources1.find((r) => isEqual(r.type, aptosCoin));
       const account2Resource = resources2.find((r) => isEqual(r.type, aptosCoin));
-      expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("50000");
-      expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("10000");
+      expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("1000000");
+      expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("1000000");
     };
     await checkAptosCoin();
 
@@ -246,7 +246,7 @@ test(
       type: "script_function_payload",
       function: coinTransferFunction,
       type_arguments: ["0x1::aptos_coin::AptosCoin"],
-      arguments: [account2.address().hex(), "1000"],
+      arguments: [account2.address().hex(), "100000"],
     };
     const txnRequest = await client.generateTransaction(account1.address(), payload);
     const transactionRes = (await client.simulateTransaction(account1, txnRequest))[0];
@@ -261,7 +261,7 @@ test(
       return (
         write.address === account2.address().hex() &&
         isEqual(write.data.type, aptosCoin) &&
-        (write.data.data as { coin: { value: string } }).coin.value === "11000"
+        (write.data.data as { coin: { value: string } }).coin.value === "1100000"
       );
     });
     expect(account2AptosCoin).toHaveLength(1);

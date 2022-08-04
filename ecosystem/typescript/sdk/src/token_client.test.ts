@@ -16,8 +16,8 @@ test(
     const bob = new AptosAccount();
 
     // Fund both Alice's and Bob's Account
-    await faucetClient.fundAccount(alice.address(), 1000000);
-    await faucetClient.fundAccount(bob.address(), 1000000);
+    await faucetClient.fundAccount(alice.address(), 10000000);
+    await faucetClient.fundAccount(bob.address(), 10000000);
 
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";

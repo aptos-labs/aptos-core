@@ -29,7 +29,7 @@ export class TokenClient {
    */
   async submitTransactionHelper(account: AptosAccount, payload: Gen.TransactionPayload) {
     const txnRequest = await this.aptosClient.generateTransaction(account.address(), payload, {
-      max_gas_amount: "200000",
+      max_gas_amount: "500000",
     });
     const signedTxn = await this.aptosClient.signTransaction(account, txnRequest);
     const res = await this.aptosClient.submitTransaction(signedTxn);
