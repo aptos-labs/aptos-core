@@ -7,6 +7,7 @@ use crate::{
         transaction::{TransactionType, Txn_data},
         transaction_payload::{Payload, Type as PayloadType},
         write_set_change::Change::WriteTableItem,
+        Transaction,
     },
     runtime::SfStreamer,
     tests::{convert_protubuf_txn_arr_to_serde_value, new_test_context, TestContext},
@@ -21,23 +22,25 @@ use std::{collections::HashMap, convert::TryInto, path::PathBuf, sync::Arc, time
 
 #[tokio::test]
 async fn test_genesis_works() {
-    let test_context = new_test_context(current_function_name!(), 0);
+    let mut test_context = new_test_context(current_function_name!(), 0);
 
-    let context = Arc::new(test_context.context);
+    let context = Arc::new(test_context.context.clone());
     let mut streamer = SfStreamer::new(context, 0, None);
     let converted = streamer.batch_convert(10).await;
 
     // position 0 should be genesis
-    let txn = converted.first().unwrap().clone();
+    let txn = converted.first().unwrap();
     assert_eq!(txn.version, 0);
     assert_eq!(txn.type_.unwrap(), TransactionType::GENESIS);
     assert_eq!(txn.block_height, 0);
-    if let Txn_data::Genesis(txn) = txn.txn_data.unwrap() {
+    if let Txn_data::Genesis(txn) = txn.txn_data.as_ref().unwrap() {
         assert_eq!(
             txn.events[0].key.account_address,
             aptos_root_address().to_string()
         );
     }
+
+    test_context.check_golden_output(convert_protubuf_txn_arr_to_serde_value(&converted));
 }
 
 #[tokio::test]
@@ -85,7 +88,12 @@ async fn test_block_transactions_work() {
         }
     }
 
-    test_context.check_golden_output(convert_protubuf_txn_arr_to_serde_value(&converted_1));
+    let converted: Vec<Transaction> = converted_0
+        .iter()
+        .cloned()
+        .chain(converted_1.iter().cloned())
+        .collect();
+    test_context.check_golden_output(convert_protubuf_txn_arr_to_serde_value(&converted));
 
     // state checkpoint expected
     let txn = converted_1[2].clone();
@@ -198,7 +206,7 @@ async fn test_table_item_parsing_works() {
         assert_eq!(table_kv.get(&expected_k).unwrap(), &expected_v);
     }
 
-    test_context.check_golden_output(convert_protubuf_txn_arr_to_serde_value(&converted[1..]));
+    test_context.check_golden_output(convert_protubuf_txn_arr_to_serde_value(&converted));
 }
 
 async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
