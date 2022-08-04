@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_gas::{AptosGasMeter, AptosGasParameters};
 use aptos_state_view::StateView;
 use aptos_types::{
     transaction::ExecutionStatus,
@@ -16,13 +17,9 @@ use language_e2e_tests::{
     common_transactions::peer_to_peer_txn, test_with_different_versions,
     versioning::CURRENT_RELEASE_VERSIONS,
 };
-use move_deps::{
-    move_binary_format::file_format::NUMBER_OF_NATIVE_FUNCTIONS,
-    move_core_types::{
-        gas_schedule::{GasAlgebra, GasPrice, GasUnits},
-        vm_status::StatusCode::TYPE_MISMATCH,
-    },
-    move_vm_types::gas_schedule::{zero_cost_schedule, GasStatus},
+use move_deps::move_core_types::{
+    gas_schedule::{GasAlgebra, GasPrice},
+    vm_status::StatusCode::TYPE_MISMATCH,
 };
 
 #[test]
@@ -38,19 +35,19 @@ fn failed_transaction_cleanup_test() {
 
         let txn_data = TransactionMetadata {
             sender: *sender.address(),
-            max_gas_amount: GasUnits::new(100_000),
+            max_gas_amount: 100_000,
             gas_unit_price: GasPrice::new(0),
             sequence_number: 10,
             ..Default::default()
         };
 
-        let gas_schedule = zero_cost_schedule(NUMBER_OF_NATIVE_FUNCTIONS);
-        let mut gas_status = GasStatus::new(&gas_schedule, GasUnits::new(10_000));
+        let gas_params = AptosGasParameters::zeros();
+        let mut gas_meter = AptosGasMeter::new(gas_params, 10_000);
 
         // TYPE_MISMATCH should be kept and charged.
         let out1 = aptos_vm.failed_transaction_cleanup(
             VMStatus::Error(StatusCode::TYPE_MISMATCH),
-            &mut gas_status,
+            &mut gas_meter,
             &txn_data,
             &data_cache,
             &log_context,
@@ -67,7 +64,7 @@ fn failed_transaction_cleanup_test() {
         // Invariant violations should be discarded and not charged.
         let out2 = aptos_vm.failed_transaction_cleanup(
             VMStatus::Error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR),
-            &mut gas_status,
+            &mut gas_meter,
             &txn_data,
             &data_cache,
             &log_context,
