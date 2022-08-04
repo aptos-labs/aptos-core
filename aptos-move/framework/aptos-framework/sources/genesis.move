@@ -16,7 +16,6 @@ module aptos_framework::genesis {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_framework::vm_config;
-    use aptos_std::table::{Self, Table};
 
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;

@@ -42,6 +42,12 @@ pub enum ScriptFunctionCall {
         new_auth_key: Bytes,
     },
 
+    AccountRotateAuthenticationKeyEd25519 {
+        t: TypeTag,
+        new_public_key: Bytes,
+        signature: Bytes,
+    },
+
     AccountTransfer {
         to: AccountAddress,
         amount: u64,
@@ -236,6 +242,11 @@ impl ScriptFunctionCall {
             AccountRotateAuthenticationKey { new_auth_key } => {
                 account_rotate_authentication_key(new_auth_key)
             }
+            AccountRotateAuthenticationKeyEd25519 {
+                t,
+                new_public_key,
+                signature,
+            } => account_rotate_authentication_key_ed25519(t, new_public_key, signature),
             AccountTransfer { to, amount } => account_transfer(to, amount),
             AptosCoinClaimMintCapability {} => aptos_coin_claim_mint_capability(),
             AptosCoinDelegateMintCapability { to } => aptos_coin_delegate_mint_capability(to),
@@ -398,6 +409,28 @@ pub fn account_rotate_authentication_key(new_auth_key: Vec<u8>) -> TransactionPa
         ident_str!("rotate_authentication_key").to_owned(),
         vec![],
         vec![bcs::to_bytes(&new_auth_key).unwrap()],
+    ))
+}
+
+pub fn account_rotate_authentication_key_ed25519(
+    t: TypeTag,
+    new_public_key: Vec<u8>,
+    signature: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("rotate_authentication_key_ed25519").to_owned(),
+        vec![t],
+        vec![
+            bcs::to_bytes(&new_public_key).unwrap(),
+            bcs::to_bytes(&signature).unwrap(),
+        ],
     ))
 }
 
@@ -986,6 +1019,20 @@ mod decoder {
         }
     }
 
+    pub fn account_rotate_authentication_key_ed25519(
+        payload: &TransactionPayload,
+    ) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::AccountRotateAuthenticationKeyEd25519 {
+                t: script.ty_args().get(0)?.clone(),
+                new_public_key: bcs::from_bytes(script.args().get(0)?).ok()?,
+                signature: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn account_transfer(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::AccountTransfer {
@@ -1331,6 +1378,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "account_rotate_authentication_key".to_string(),
             Box::new(decoder::account_rotate_authentication_key),
+        );
+        map.insert(
+            "account_rotate_authentication_key_ed25519".to_string(),
+            Box::new(decoder::account_rotate_authentication_key_ed25519),
         );
         map.insert(
             "account_transfer".to_string(),

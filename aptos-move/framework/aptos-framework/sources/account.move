@@ -12,10 +12,8 @@ module aptos_framework::account {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
-    use aptos_framework::transaction_publishing_option;
     use aptos_std::table::{Self, Table};
-    use aptos_std::type_info::{Self, TypeInfo};
-    use aptos_std::signature::{Self, ed25519_verify};
+    use aptos_std::signature;
 
     friend aptos_framework::coins;
     friend aptos_framework::genesis;
@@ -51,9 +49,8 @@ module aptos_framework::account {
         address_map: Table<address, address>,
     }
 
-    struct RotationProof has drop{
-        originator: address,
-        current: vector<u8>, // old auth key
+    struct RotationProof has drop {
+        originator: address, // originating address
         destination: vector<u8>, // new auth key
     }
 
@@ -227,19 +224,19 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    fun verify_hashed<T: drop> (data: T, signature: vector<u8>, public_key: vector<u8>): bool {
+    fun verify_hashed<T: drop> (data: RotationProof, signature: vector<u8>, public_key: vector<u8>): bool {
         let encoded = Proof {
-            type_info: type_info::type_of<T>,
+            type_info: type_info::type_of<T>(),
             inner:data,
         };
         verify(signature, public_key, bcs::to_bytes(&encoded))
     }
 
     fun verify(signature: vector<u8>, public_key: vector<u8>, message: vector<u8>): bool {
-        ed25519_verify(signature, public_key, message)
+            signature::ed25519_verify(signature, public_key, message)
     }
 
-    public entry fun rotate_authentication_key_ed25519<T: drop>(account: &signer,new_public_key: vector<u8>, signature: vector<u8>) acquires Account, OriginatingAddress {
+    public entry fun rotate_authentication_key_ed25519(account: &signer, new_public_key: vector<u8>, signature: vector<u8>) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT));
         assert!(
@@ -247,21 +244,28 @@ module aptos_framework::account {
             error::invalid_argument(EMALFORMED_PUBLIC_KEY)
         );
 
-        let account_resource = borrow_global_mut<Account>(addr);
-        let current_authentication_key = account_resource.authentication_key as address;
+        let account_resource = borrow_global<Account>(addr);
+        let current_auth_key = account_resource.authentication_key as address;
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@core_resources).address_map;
-        let originating_address = table::borrow(address_map, current_authentication_key);
+        let originating_address = table::borrow(address_map, current_auth_key);
         let new_auth_key = hash::sha3_256(new_public_key);
 
-        let data = RotationProof {
+        let proof= RotationProof {
             originator: *originating_address,
-            current: account_resource.authentication_key,
             destination: new_auth_key,
         };
 
-        if (verify_hashed<T>(data, signature, new_public_key)) {
-            table::remove(address_map, current_authentication_key);
-            table::add(address_map, new_auth_key as address, *originating_address);
+        rotate_authentication_key_ed25519_internal(account, proof, new_public_key, signature);
+    }
+
+    fun rotate_authentication_key_ed25519_internal(account: &signer, proof: RotationProof, new_public_key: vector<u8>, signature: vector<u8>) acquires Account, OriginatingAddress {
+        let address_map = &mut borrow_global_mut<OriginatingAddress>(@core_resources).address_map;
+        let new_auth_key = hash::sha3_256(new_public_key) as address;
+
+        if (verify_hashed<RotationProof>(proof, signature, new_public_key)) {
+            let account_resource = borrow_global<Account>(signer::address_of(account));
+            let originating_address = table::remove(address_map, account_resource.authentication_key as address);
+            table::add(address_map, new_auth_key, originating_address);
             account_resource.authentication_key = new_auth_key;
         };
     }
