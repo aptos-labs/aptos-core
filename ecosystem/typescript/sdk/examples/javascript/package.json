@@ -10,6 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "aptos": "*"
+    "aptos": "file:../../",
+    "dotenv": "^16.0.1",
+    "lodash": "^4.17.21"
   }
 }

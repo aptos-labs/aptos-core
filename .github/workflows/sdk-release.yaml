@@ -34,6 +34,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      APTOS_NODE_URL: http://127.0.0.1:8080/v1
+      APTOS_FAUCET_URL: http://127.0.0.1:8081
     steps:
       - uses: actions/checkout@v3
         with:
@@ -61,9 +64,11 @@ jobs:
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/api_specs/spec.yaml api/doc/v1/spec.yaml
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/api_specs/spec.json api/doc/v1/spec.json
 
-      # Set up dotenv file for tests.
+      # Set up dotenv file for tests (jest doesn't read env vars properly).
       - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
       - run: echo 'APTOS_FAUCET_URL="http://127.0.0.1:8081"' >> ./ecosystem/typescript/sdk/.env
+      - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/typescript/.env
+      - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/javascript/.env
 
       # Run package install. If install fails, it probably means the lockfile
       # was not included in the commit.
