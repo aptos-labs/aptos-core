@@ -94,9 +94,6 @@ module aptos_framework::genesis {
         // Give TransactionFee BurnCapability<AptosCoin> so it can burn gas.
         transaction_fee::store_aptos_coin_burn_cap(&aptos_framework_account, burn_cap);
 
-        // Make sure we can create aggregators.
-        aggregator_factory::initialize_aggregator_factory(&aptos_framework_account);
-
         // This needs to be called at the very end.
         chain_id::initialize(&aptos_framework_account, chain_id);
         reconfiguration::initialize(&aptos_framework_account);
