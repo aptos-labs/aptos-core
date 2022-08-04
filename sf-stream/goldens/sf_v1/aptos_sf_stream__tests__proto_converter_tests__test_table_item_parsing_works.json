@@ -3,11 +3,11 @@
     "timestamp": "1970-01-01T00:00:00.000000000Z",
     "info": {
       "hash": "",
-      "stateRootHash": "e4H0lxRASiptJlb9J+xIgwjAyN+C4kSpF0NNxROaMFw=",
+      "stateRootHash": "vFzIihdOKsXx2Ayo0JewwHmhB1GvaoR5Rniq8TUWBoE=",
       "eventRootHash": "yiRZ4QasOt783U2DVxCMX0/z0H8Gi0mhXlDmA2syuY8=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "OF48lNvrk3E3MdYDkTn5Pl9dhgjH5ET4Pj0L9j9blic=",
+      "accumulatorRootHash": "Z9jtrNsarpB42k7A6Kz8IO0FZfkT3QtXR8/qVBdhHkM=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -110,7 +110,7 @@
                 "module": "aptos_governance",
                 "name": "VotingRecords"
               },
-              "data": "{\"votes\":{\"handle\":\"250572580766766989648150312918132283230\",\"length\":\"0\"}}"
+              "data": "{\"votes\":{\"handle\":\"250572580766766989648150312918132283230\"}}"
             }
           }
         },
@@ -180,7 +180,7 @@
                 "module": "consensus_config",
                 "name": "ConsensusConfig"
               },
-              "data": "{\"config\":\"0x00010a0000000000000014000000000000000201e8030000000000000a0000000000000001000000000000000a0000000a0000000000000001000000000000000a00000000000000\"}"
+              "data": "{\"config\":\"0x00010a0000000000000014000000000000000201e8030000000000000a0000000000000001000000000000000a0000000a000000000000000100000000000000010a00000000000000\"}"
             }
           }
         },
@@ -355,7 +355,7 @@
                   }
                 ]
               },
-              "data": "{\"events\":{\"create_proposal_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"3\"}}},\"register_forum_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"4\"}}},\"resolve_proposal_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"5\"}}},\"vote_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"6\"}}}},\"next_proposal_id\":\"0\",\"proposals\":{\"handle\":\"66250964772389598023276627514581198483\",\"length\":\"0\"}}"
+              "data": "{\"events\":{\"create_proposal_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"3\"}}},\"register_forum_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"4\"}}},\"resolve_proposal_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"5\"}}},\"vote_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"6\"}}}},\"next_proposal_id\":\"0\",\"proposals\":{\"handle\":\"66250964772389598023276627514581198483\"}}"
             }
           }
         },
@@ -1654,7 +1654,7 @@
             "address": "0x1",
             "stateKeyHash": "KkLOGzh8zDG7g0XaKDRl9gEotb3og4H0VKLzHMazngY=",
             "data": {
-              "bytecode": "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",
+              "bytecode": "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",
               "abi": {
                 "address": "0x1",
                 "name": "big_vector",
@@ -2346,8 +2346,8 @@
                           "type": "Struct",
                           "struct": {
                             "address": "0x1",
-                            "module": "table",
-                            "name": "Table",
+                            "module": "table_with_length",
+                            "name": "TableWithLength",
                             "genericTypeParams": [
                               {
                                 "type": "U64"
@@ -2780,7 +2780,7 @@
             "address": "0x1",
             "stateKeyHash": "rcJWda+TjLXXa52aRsG0ExXsb49m8vN7SBcb9fN/ffw=",
             "data": {
-              "bytecode": "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",
+              "bytecode": "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",
               "abi": {
                 "address": "0x1",
                 "name": "bucket_table",
@@ -3231,8 +3231,8 @@
                           "type": "Struct",
                           "struct": {
                             "address": "0x1",
-                            "module": "table",
-                            "name": "Table",
+                            "module": "table_with_length",
+                            "name": "TableWithLength",
                             "genericTypeParams": [
                               {
                                 "type": "U64"
@@ -6336,7 +6336,7 @@
             "address": "0x1",
             "stateKeyHash": "r7Tj5S+CY15bIWvaWB3SyI6BhphaWFL2XBLwklaitVA=",
             "data": {
-              "bytecode": "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",
+              "bytecode": "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",
               "abi": {
                 "address": "0x1",
                 "name": "iterable_table",
@@ -7306,8 +7306,8 @@
                           "type": "Struct",
                           "struct": {
                             "address": "0x1",
-                            "module": "table",
-                            "name": "Table",
+                            "module": "table_with_length",
+                            "name": "TableWithLength",
                             "genericTypeParams": [
                               {
                                 "type": "GenericTypeParam",
@@ -11262,10 +11262,16 @@
             "address": "0x1",
             "stateKeyHash": "6x0YXzj7VmxHF6ZPxdL76ZmAVI0MGz0ssc3fu71PHXA=",
             "data": {
-              "bytecode": "oRzrCwUAAAANAQAEAgQOAxKKAQScARYFsgF5B6sC/AEIpwQgBscEHgrlBA0L8gQEDPYEmwINkQcEDpUHBAAAAAEAAg4BAAAAAwQCAwEAAQAEAAECAwAABQIBAwMAAAAGAwQCAwAABwMFAwMAAAAIBgcDAwAAAAkGCAIDAAAKAAgCAwIACwMJAgMAAAwDCQMDAAAADQoBAgMAAA4LAQMDAAAADwoBAwMAAAAQCwkCAwAAEQsMAgMAABIBCgIDBAATAQ0CAAAAFAYOAgMAABUGDwMDAAABGAwMAAEQAxAEEAcRABEFEQgQChALEA8RERADBwsBAgkACQEJAAkBAAMHCwECCQAJAQkACwABCQECBgsBAgkACQEJAAEGCQEBBgsAAQkBAgcLAQIJAAkBCQABBwsAAQkBAQcJAQEBAQsBAgkACQEBBgsBAgkACQEBAwEEAQkBAQsAAQkBAwkACQELAAEJAQIJAAkBBXRhYmxlBWVycm9yA0JveAVUYWJsZQNhZGQHYWRkX2JveAZib3Jyb3cKYm9ycm93X2JveA5ib3Jyb3dfYm94X211dApib3Jyb3dfbXV0F2JvcnJvd19tdXRfd2l0aF9kZWZhdWx0CGNvbnRhaW5zDGNvbnRhaW5zX2JveA1kZXN0cm95X2VtcHR5EWRlc3Ryb3lfZW1wdHlfYm94EmRyb3BfdW5jaGVja2VkX2JveAVlbXB0eQZsZW5ndGgDbmV3EG5ld190YWJsZV9oYW5kbGUGcmVtb3ZlCnJlbW92ZV9ib3gDdmFsBmhhbmRsZQ1pbnZhbGlkX3N0YXRlAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEDCGQAAAAAAAAAAwhmAAAAAAAAAAMIZQAAAAAAAAAAAgEWCQABAgIXBBEDAA4BEQABAAABDgoACwELAjkAOAAKADcAFAYBAAAAAAAAABYLADYAFQIBAAIAAgEAAAEFCwALATgBNwECAwACAAQAAgAFAQAAAQULAAsBOAI2AQIGAQAABhMKAAoBDAQMAwsDLgsEOAMgAwsFDwoACgELAjgECwALATgFAgcBAAABBAsACwE4BgIIAAIACQEAAAEODgA3ABQGAAAAAAAAAAAhAwkHARESJw4AOAcLADgIAgoAAgALAAIADAEAAAEGCwA3ABQGAAAAAAAAAAAhAg0BAAABBAsANwAUAg4BAAABBDgJBgAAAAAAAAAAOQECDwACABABAAAODwoACwE4CjoADAIKADcAFAYBAAAAAAAAABcLADYAFQsCAhEAAgABAQAAABEBDgA=",
+              "bytecode": "oRzrCwUAAAAOAQACAgIOAxB3BIcBFgWdAXcHlALnAQj7AyAGmwQUCq8ECwu6BAQMvgSyAQ3wBQIO8gUCD/QFAgABAAIOAQAAAAMEAgMBAAEABAABAgMAAAUCAQMDAAAABgMEAgMAAAcDBQMDAAAACAYHAwMAAAAJBggCAwAACgAIAgMCAAsDCQIDAAAMAwkDAwAAAA0KAQIDAAAOCwEDAwAAAA8KAQMDAAAAEAEKAgMEABEBDAIAAAASBg0CAwAAEwYOAwMAAAEPAw8EDwcQABAFEAgPCg8LDw0QDw8DBwsBAgkACQEJAAkBAAMHCwECCQAJAQkACwABCQECBgsBAgkACQEJAAEGCQEBBgsAAQkBAgcLAQIJAAkBCQABBwsAAQkBAQcJAQEBAQsBAgkACQEBBgsBAgkACQEBBAEJAQELAAEJAQMJAAkBCwABCQECCQAJARF0YWJsZV93aXRoX2xlbmd0aAV0YWJsZQNCb3gFVGFibGUDYWRkB2FkZF9ib3gGYm9ycm93CmJvcnJvd19ib3gOYm9ycm93X2JveF9tdXQKYm9ycm93X211dBdib3Jyb3dfbXV0X3dpdGhfZGVmYXVsdAhjb250YWlucwxjb250YWluc19ib3gHZGVzdHJveRFkZXN0cm95X2VtcHR5X2JveBJkcm9wX3VuY2hlY2tlZF9ib3gDbmV3EG5ld190YWJsZV9oYW5kbGUGcmVtb3ZlCnJlbW92ZV9ib3gDdmFsBmhhbmRsZQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAwhkAAAAAAAAAAMIZQAAAAAAAAAAAgEUCQABAgEVBAANARAAAQAAAQYLAAsBCwI5ADgAAgEAAgACAQAAAQULAAsBOAE3AAIDAAIABAACAAUBAAABBQsACwE4AjYAAgYBAAAGEwoACgEMBAwDCwMuCwQ4AyADCwUPCgAKAQsCOAQLAAsBOAUCBwEAAAEECwALATgGAggAAgAJAwAAAQUOADgHCwA4CAIKAAIACwACAAwBAAABAzgJOQECDQACAA4BAAANBwsACwE4CjoADAILAgIPAAIAAAAADQAAAA==",
               "abi": {
                 "address": "0x1",
                 "name": "table",
+                "friends": [
+                  {
+                    "address": "0x1",
+                    "name": "table_with_length"
+                  }
+                ],
                 "exposedFunctions": [
                   {
                     "name": "add",
@@ -11531,8 +11537,8 @@
                     ]
                   },
                   {
-                    "name": "destroy_empty",
-                    "visibility": "PUBLIC",
+                    "name": "destroy",
+                    "visibility": "FRIEND",
                     "genericTypeParams": [
                       {
                         "constraints": [
@@ -11560,90 +11566,6 @@
                             }
                           ]
                         }
-                      }
-                    ]
-                  },
-                  {
-                    "name": "empty",
-                    "visibility": "PUBLIC",
-                    "genericTypeParams": [
-                      {
-                        "constraints": [
-                          "COPY",
-                          "DROP"
-                        ]
-                      },
-                      {}
-                    ],
-                    "params": [
-                      {
-                        "type": "Reference",
-                        "reference": {
-                          "to": {
-                            "type": "Struct",
-                            "struct": {
-                              "address": "0x1",
-                              "module": "table",
-                              "name": "Table",
-                              "genericTypeParams": [
-                                {
-                                  "type": "GenericTypeParam",
-                                  "genericTypeParamIndex": 0
-                                },
-                                {
-                                  "type": "GenericTypeParam",
-                                  "genericTypeParamIndex": 1
-                                }
-                              ]
-                            }
-                          }
-                        }
-                      }
-                    ],
-                    "return": [
-                      {}
-                    ]
-                  },
-                  {
-                    "name": "length",
-                    "visibility": "PUBLIC",
-                    "genericTypeParams": [
-                      {
-                        "constraints": [
-                          "COPY",
-                          "DROP"
-                        ]
-                      },
-                      {}
-                    ],
-                    "params": [
-                      {
-                        "type": "Reference",
-                        "reference": {
-                          "to": {
-                            "type": "Struct",
-                            "struct": {
-                              "address": "0x1",
-                              "module": "table",
-                              "name": "Table",
-                              "genericTypeParams": [
-                                {
-                                  "type": "GenericTypeParam",
-                                  "genericTypeParamIndex": 0
-                                },
-                                {
-                                  "type": "GenericTypeParam",
-                                  "genericTypeParamIndex": 1
-                                }
-                              ]
-                            }
-                          }
-                        }
-                      }
-                    ],
-                    "return": [
-                      {
-                        "type": "U64"
                       }
                     ]
                   },
@@ -11762,6 +11684,518 @@
                         "name": "handle",
                         "type": {
                           "type": "U128"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "writeModule": {
+            "address": "0x1",
+            "stateKeyHash": "IPckZ63Kji28AcgfzbL5W/uO0GEkXHFRMZNnNV4f8VE=",
+            "data": {
+              "bytecode": "oRzrCwUAAAANAQAGAgYQAxaDAQSZARAFqQF0B50CrQEIygMgBuoDHgqIBA0LlQQCDJcE6AEN/wUEDoMGBAAAAAEAAgADBAIDAQABAg8EAgMBAAEABAABAgMAAAUCAwIDAAAGBAUCAwAABwAFAgMCAAgCBgIDAAAJBwECAwAACggGAgMAAAsICQIDAAAMAQcCAwQADQQKAgMAAgQMAQIDAAIFDQMCAwACBg4FAgMAAgcMBQIDAgIIDQYCAwABEAkJAAIRDwECAwACDAEPAgMEAg0OCgIDAAoLCwsMCw0LDgsQCxELEgsDBwsAAgkACQEJAAkBAAIGCwACCQAJAQkAAQYJAQIHCwACCQAJAQkAAQcJAQEBAQsAAgkACQEBBgsAAgkACQEBAwEJAQIJAAkBAwcLAQIJAAkBCQAJAQIGCwECCQAJAQkAAgcLAQIJAAkBCQABCwECCQAJARF0YWJsZV93aXRoX2xlbmd0aAVlcnJvcgV0YWJsZQ9UYWJsZVdpdGhMZW5ndGgDYWRkBmJvcnJvdwpib3Jyb3dfbXV0F2JvcnJvd19tdXRfd2l0aF9kZWZhdWx0CGNvbnRhaW5zDWRlc3Ryb3lfZW1wdHkFZW1wdHkGbGVuZ3RoA25ldwZyZW1vdmUFaW5uZXIFVGFibGUNaW52YWxpZF9zdGF0ZQdkZXN0cm95AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEDCGQAAAAAAAAAAwhmAAAAAAAAAAMIZQAAAAAAAAAAAgIOCwECCQAJAQsDAAsAAQAAAQ4KADYACwELAjgACgA3ARQGAQAAAAAAAAAWCwA2ARUCAQEAAAEFCwA3AAsBOAECAgEAAAEFCwA2AAsBOAICAwEAAAEGCwA2AAsBCwI4AwIEAQAAAQULADcACwE4BAIFAQAADxAOADcBFAYAAAAAAAAAACEDCQcBEQ8nCwA6AAEMAQsBOAUCBgEAAAEGCwA3ARQGAAAAAAAAAAAhAgcBAAABBAsANwEUAggBAAABBDgGBgAAAAAAAAAAOQACCQEAAAoPCgA2AAsBOAcMAgoANwEUBgEAAAAAAAAAFwsANgEVCwICAAAAAQALAQsA",
+              "abi": {
+                "address": "0x1",
+                "name": "table_with_length",
+                "exposedFunctions": [
+                  {
+                    "name": "add",
+                    "visibility": "PUBLIC",
+                    "genericTypeParams": [
+                      {
+                        "constraints": [
+                          "COPY",
+                          "DROP"
+                        ]
+                      },
+                      {}
+                    ],
+                    "params": [
+                      {
+                        "type": "Reference",
+                        "reference": {
+                          "mutable": true,
+                          "to": {
+                            "type": "Struct",
+                            "struct": {
+                              "address": "0x1",
+                              "module": "table_with_length",
+                              "name": "TableWithLength",
+                              "genericTypeParams": [
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 0
+                                },
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 1
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "GenericTypeParam",
+                        "genericTypeParamIndex": 0
+                      },
+                      {
+                        "type": "GenericTypeParam",
+                        "genericTypeParamIndex": 1
+                      }
+                    ]
+                  },
+                  {
+                    "name": "borrow",
+                    "visibility": "PUBLIC",
+                    "genericTypeParams": [
+                      {
+                        "constraints": [
+                          "COPY",
+                          "DROP"
+                        ]
+                      },
+                      {}
+                    ],
+                    "params": [
+                      {
+                        "type": "Reference",
+                        "reference": {
+                          "to": {
+                            "type": "Struct",
+                            "struct": {
+                              "address": "0x1",
+                              "module": "table_with_length",
+                              "name": "TableWithLength",
+                              "genericTypeParams": [
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 0
+                                },
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 1
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "GenericTypeParam",
+                        "genericTypeParamIndex": 0
+                      }
+                    ],
+                    "return": [
+                      {
+                        "type": "Reference",
+                        "reference": {
+                          "to": {
+                            "type": "GenericTypeParam",
+                            "genericTypeParamIndex": 1
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "name": "borrow_mut",
+                    "visibility": "PUBLIC",
+                    "genericTypeParams": [
+                      {
+                        "constraints": [
+                          "COPY",
+                          "DROP"
+                        ]
+                      },
+                      {}
+                    ],
+                    "params": [
+                      {
+                        "type": "Reference",
+                        "reference": {
+                          "mutable": true,
+                          "to": {
+                            "type": "Struct",
+                            "struct": {
+                              "address": "0x1",
+                              "module": "table_with_length",
+                              "name": "TableWithLength",
+                              "genericTypeParams": [
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 0
+                                },
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 1
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "GenericTypeParam",
+                        "genericTypeParamIndex": 0
+                      }
+                    ],
+                    "return": [
+                      {
+                        "type": "Reference",
+                        "reference": {
+                          "mutable": true,
+                          "to": {
+                            "type": "GenericTypeParam",
+                            "genericTypeParamIndex": 1
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "name": "borrow_mut_with_default",
+                    "visibility": "PUBLIC",
+                    "genericTypeParams": [
+                      {
+                        "constraints": [
+                          "COPY",
+                          "DROP"
+                        ]
+                      },
+                      {
+                        "constraints": [
+                          "DROP"
+                        ]
+                      }
+                    ],
+                    "params": [
+                      {
+                        "type": "Reference",
+                        "reference": {
+                          "mutable": true,
+                          "to": {
+                            "type": "Struct",
+                            "struct": {
+                              "address": "0x1",
+                              "module": "table_with_length",
+                              "name": "TableWithLength",
+                              "genericTypeParams": [
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 0
+                                },
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 1
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "GenericTypeParam",
+                        "genericTypeParamIndex": 0
+                      },
+                      {
+                        "type": "GenericTypeParam",
+                        "genericTypeParamIndex": 1
+                      }
+                    ],
+                    "return": [
+                      {
+                        "type": "Reference",
+                        "reference": {
+                          "mutable": true,
+                          "to": {
+                            "type": "GenericTypeParam",
+                            "genericTypeParamIndex": 1
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "name": "contains",
+                    "visibility": "PUBLIC",
+                    "genericTypeParams": [
+                      {
+                        "constraints": [
+                          "COPY",
+                          "DROP"
+                        ]
+                      },
+                      {}
+                    ],
+                    "params": [
+                      {
+                        "type": "Reference",
+                        "reference": {
+                          "to": {
+                            "type": "Struct",
+                            "struct": {
+                              "address": "0x1",
+                              "module": "table_with_length",
+                              "name": "TableWithLength",
+                              "genericTypeParams": [
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 0
+                                },
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 1
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "GenericTypeParam",
+                        "genericTypeParamIndex": 0
+                      }
+                    ],
+                    "return": [
+                      {}
+                    ]
+                  },
+                  {
+                    "name": "destroy_empty",
+                    "visibility": "PUBLIC",
+                    "genericTypeParams": [
+                      {
+                        "constraints": [
+                          "COPY",
+                          "DROP"
+                        ]
+                      },
+                      {}
+                    ],
+                    "params": [
+                      {
+                        "type": "Struct",
+                        "struct": {
+                          "address": "0x1",
+                          "module": "table_with_length",
+                          "name": "TableWithLength",
+                          "genericTypeParams": [
+                            {
+                              "type": "GenericTypeParam",
+                              "genericTypeParamIndex": 0
+                            },
+                            {
+                              "type": "GenericTypeParam",
+                              "genericTypeParamIndex": 1
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "name": "empty",
+                    "visibility": "PUBLIC",
+                    "genericTypeParams": [
+                      {
+                        "constraints": [
+                          "COPY",
+                          "DROP"
+                        ]
+                      },
+                      {}
+                    ],
+                    "params": [
+                      {
+                        "type": "Reference",
+                        "reference": {
+                          "to": {
+                            "type": "Struct",
+                            "struct": {
+                              "address": "0x1",
+                              "module": "table_with_length",
+                              "name": "TableWithLength",
+                              "genericTypeParams": [
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 0
+                                },
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 1
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "return": [
+                      {}
+                    ]
+                  },
+                  {
+                    "name": "length",
+                    "visibility": "PUBLIC",
+                    "genericTypeParams": [
+                      {
+                        "constraints": [
+                          "COPY",
+                          "DROP"
+                        ]
+                      },
+                      {}
+                    ],
+                    "params": [
+                      {
+                        "type": "Reference",
+                        "reference": {
+                          "to": {
+                            "type": "Struct",
+                            "struct": {
+                              "address": "0x1",
+                              "module": "table_with_length",
+                              "name": "TableWithLength",
+                              "genericTypeParams": [
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 0
+                                },
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 1
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    ],
+                    "return": [
+                      {
+                        "type": "U64"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "new",
+                    "visibility": "PUBLIC",
+                    "genericTypeParams": [
+                      {
+                        "constraints": [
+                          "COPY",
+                          "DROP"
+                        ]
+                      },
+                      {
+                        "constraints": [
+                          "STORE"
+                        ]
+                      }
+                    ],
+                    "return": [
+                      {
+                        "type": "Struct",
+                        "struct": {
+                          "address": "0x1",
+                          "module": "table_with_length",
+                          "name": "TableWithLength",
+                          "genericTypeParams": [
+                            {
+                              "type": "GenericTypeParam",
+                              "genericTypeParamIndex": 0
+                            },
+                            {
+                              "type": "GenericTypeParam",
+                              "genericTypeParamIndex": 1
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "name": "remove",
+                    "visibility": "PUBLIC",
+                    "genericTypeParams": [
+                      {
+                        "constraints": [
+                          "COPY",
+                          "DROP"
+                        ]
+                      },
+                      {}
+                    ],
+                    "params": [
+                      {
+                        "type": "Reference",
+                        "reference": {
+                          "mutable": true,
+                          "to": {
+                            "type": "Struct",
+                            "struct": {
+                              "address": "0x1",
+                              "module": "table_with_length",
+                              "name": "TableWithLength",
+                              "genericTypeParams": [
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 0
+                                },
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 1
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "GenericTypeParam",
+                        "genericTypeParamIndex": 0
+                      }
+                    ],
+                    "return": [
+                      {
+                        "type": "GenericTypeParam",
+                        "genericTypeParamIndex": 1
+                      }
+                    ]
+                  }
+                ],
+                "structs": [
+                  {
+                    "name": "TableWithLength",
+                    "abilities": [
+                      "STORE"
+                    ],
+                    "fields": [
+                      {
+                        "name": "inner",
+                        "type": {
+                          "type": "Struct",
+                          "struct": {
+                            "address": "0x1",
+                            "module": "table",
+                            "name": "Table",
+                            "genericTypeParams": [
+                              {
+                                "type": "GenericTypeParam",
+                                "genericTypeParamIndex": 0
+                              },
+                              {
+                                "type": "GenericTypeParam",
+                                "genericTypeParamIndex": 1
+                              }
+                            ]
+                          }
                         }
                       },
                       {
@@ -13977,7 +14411,7 @@
             "address": "0x3",
             "stateKeyHash": "2PqvVfx1qSW21H9Lxe3xJsHTUfXdjShUxckSNl0PmZQ=",
             "data": {
-              "bytecode": "oRzrCwUAAAALAQAOAg5aA2j5AQThAjoFmwPlBAeACOsMCOsUQAarFcgBCvMWngIMkRnxEA2CKjgAAAEBAQIBAwEEAQUABgAHBgAACAQAAAkHAAAKCAAACwYAAAwGAAANBgAADgYAAA8GAAAQBwAAEQQAABIEAAATBwAAFAcAABUHAAAWCAAAFwYABBoHAAVDBAIDAQABAkYEAQYBBlgGAAAYAAEAABkCAwAAGwQDAAAcBQYAAB0EAwAAHgcIAAAfCQoAACALCgAAIQUMAAAiDQMAACMOCAAAJA8DAAAlEAMAACYQAwAAJxEDAAAoEgMAACkKEwAAKhQBAAArFAEAACwUFQAALRYDAAAuFwMAAC8XAwAAMBgDAAAxGQMAADIaCgAAMxsDAAA0HB0AADUeHwAANiADAAA3IQMAADgCHQAAOSIdAAVlJSYCAwAFZiUnAgMAA2cXFQABaAEBAAVpKisCAwACai0DAQYFawMwAgMEAmwXMgEGAW0BAQAFbjUDAgMABms4OQAGbwM5AAFwAQEABXEqRgIDACEkIiQhKSUpJiwnLycpKDEoMyg0IS8qLyYxJS8qKSYzJjwqJCUkIiknJCg8KEAoLChBJjQmQSZALiQCBQgNAQMDBgwIDQMABgYMCBEIEQgRAwoBAQYKAQEIAgMFCBEIEQEIDAIIDAMBCA0EBQgRCBEDAQgODgYMCBEIEQgRAwMIEQUDAwoBCggRCgoCCggRDQYMCBEIEQgRAwgRBQMDCA4KCBEKCgIKCBECBgwICgIFCAoEBgwGDAgNAwcGDAYMBQgRCBEDAwEICQEGCAkBBQIGDAgNAQYMAgcICggKBQYMBQgRCBEDAwYMCAwDBwYMBQgNAwoIEQoKAgoIEQIHCAoDAQgKAQYICgEGCA0EBgwIDQUDBQUIDQoIEQoKAgoIEQMFCA0DAgMGCA8CCA0ICgIGCxICCQAJAQkAAQEBBgkBBwMHCAMFBQgKBwgLBwgPAggMCAsCBwsSAgkACQEJAAEHCQEBCAACBwsTAQkACQAHBwsSAggRCAEIEQUIAQcLEgIIEQgBBwgDCAICCBEIAQELEgIJAAkBAQgEAQsTAQkAAQgFAQgHAwcLEgIJAAkBCQAJAQIIDggMDAMDBQgRAwMDBQcIAQcIAwgLCAwDCggRCgoCCggRAQgUBAcLEgIIDQgKCA0FBwsSAggNCAoBBwgPAQgGAgcICgcIDwQGCxICCAwICwUGCAsIDAkHCxICCA0ICggNAwgNCBQIDQcLEgIIDQgKBQcLEgIIDQgKAQgQAQgIBgcLEgIIDAgLCAwHCxICCAwICwUHCAsIDQsHCxICCAwICwgMBQcLEgIIDAgLAwMDCAoIDQgKBwgLBAcLEgIIDQgKCA0HCxICCA0ICgcIFAYHCxICCA0ICggNCAoHAwcIDwcLEgIIDQgKAQkBBXRva2VuBWVycm9yBWV2ZW50BnNpZ25lcgZzdHJpbmcFdGFibGUMcHJvcGVydHlfbWFwDkJ1cm5Ub2tlbkV2ZW50DkNvbGxlY3Rpb25EYXRhGkNvbGxlY3Rpb25NdXRhYmlsaXR5Q29uZmlnC0NvbGxlY3Rpb25zFUNyZWF0ZUNvbGxlY3Rpb25FdmVudBRDcmVhdGVUb2tlbkRhdGFFdmVudAxEZXBvc2l0RXZlbnQOTWludFRva2VuRXZlbnQbTXV0YXRlVG9rZW5Qcm9wZXJ0eU1hcEV2ZW50B1JveWFsdHkFVG9rZW4JVG9rZW5EYXRhC1Rva2VuRGF0YUlkB1Rva2VuSWQVVG9rZW5NdXRhYmlsaXR5Q29uZmlnClRva2VuU3RvcmUNV2l0aGRyYXdFdmVudApiYWxhbmNlX29mBGJ1cm4GU3RyaW5nEWNyZWF0ZV9jb2xsZWN0aW9uI2NyZWF0ZV9jb2xsZWN0aW9uX211dGFiaWxpdHlfY29uZmlnGGNyZWF0ZV9jb2xsZWN0aW9uX3NjcmlwdBRjcmVhdGVfdG9rZW5fZGF0YV9pZA9jcmVhdGVfdG9rZW5faWQTY3JlYXRlX3Rva2VuX2lkX3Jhdx5jcmVhdGVfdG9rZW5fbXV0YWJpbGl0eV9jb25maWcTY3JlYXRlX3Rva2VuX3NjcmlwdBBjcmVhdGVfdG9rZW5kYXRhDWRlcG9zaXRfdG9rZW4OZGlyZWN0X2RlcG9zaXQlZGlyZWN0X2RlcG9zaXRfd2l0aG91dF9ldmVudF9pbnRlcm5hbA9kaXJlY3RfdHJhbnNmZXIWZGlyZWN0X3RyYW5zZmVyX3NjcmlwdAtnZXRfcm95YWx0eRdnZXRfcm95YWx0eV9kZW5vbWluYXRvchVnZXRfcm95YWx0eV9udW1lcmF0b3IRZ2V0X3JveWFsdHlfcGF5ZWUQaW5pdGlhbGl6ZV90b2tlbhdpbml0aWFsaXplX3Rva2VuX3NjcmlwdBZpbml0aWFsaXplX3Rva2VuX3N0b3JlBW1lcmdlC21pbnRfc2NyaXB0Cm1pbnRfdG9rZW4XbXV0YXRlX3Rva2VuX3Byb3BlcnRpZXMFc3BsaXQIdG9rZW5faWQIdHJhbnNmZXIedXBkYXRlX3Rva2VuX3Byb3BlcnR5X2ludGVybmFsDndpdGhkcmF3X3Rva2VuHHdpdGhkcmF3X3dpdGhfZXZlbnRfaW50ZXJuYWwCaWQGYW1vdW50C2Rlc2NyaXB0aW9uBG5hbWUDdXJpBnN1cHBseQdtYXhpbXVtEW11dGFiaWxpdHlfY29uZmlnD2NvbGxlY3Rpb25fZGF0YQVUYWJsZQp0b2tlbl9kYXRhGGNyZWF0ZV9jb2xsZWN0aW9uX2V2ZW50cwtFdmVudEhhbmRsZRhjcmVhdGVfdG9rZW5fZGF0YV9ldmVudHMRbWludF90b2tlbl9ldmVudHMHY3JlYXRvcg9jb2xsZWN0aW9uX25hbWUVcm95YWx0eV9wYXllZV9hZGRyZXNzGnJveWFsdHlfcG9pbnRzX2Rlbm9taW5hdG9yGHJveWFsdHlfcG9pbnRzX251bWVyYXRvcg1wcm9wZXJ0eV9rZXlzD3Byb3BlcnR5X3ZhbHVlcw5wcm9wZXJ0eV90eXBlcwZvbGRfaWQGbmV3X2lkBGtleXMGdmFsdWVzBXR5cGVzDXBheWVlX2FkZHJlc3MQdG9rZW5fcHJvcGVydGllcwtQcm9wZXJ0eU1hcBhsYXJnZXN0X3Byb3BlcnR5X3ZlcnNpb24Hcm95YWx0eRJkZWZhdWx0X3Byb3BlcnRpZXMKY29sbGVjdGlvbg10b2tlbl9kYXRhX2lkEHByb3BlcnR5X3ZlcnNpb24KcHJvcGVydGllcwZ0b2tlbnMOZGVwb3NpdF9ldmVudHMPd2l0aGRyYXdfZXZlbnRzC2J1cm5fZXZlbnRzHG11dGF0ZV90b2tlbl9wcm9wZXJ0eV9ldmVudHMIY29udGFpbnMGYm9ycm93CmFkZHJlc3Nfb2YJbm90X2ZvdW5kCmJvcnJvd19tdXQKZW1pdF9ldmVudANuZXcQbmV3X2V2ZW50X2hhbmRsZQ5hbHJlYWR5X2V4aXN0cwNhZGQFZW1wdHkQ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",
+              "bytecode": "oRzrCwUAAAALAQAOAg5aA2j5AQThAjoFmwPrBAeGCOsMCPEUQAaxFcgBCvkWngIMlxnuEA2FKjgAAAEBAQIBAwEEAQUABgAHBgAACAQAAAkHAAAKCAAACwYAAAwGAAANBgAADgYAAA8GAAAQBwAAEQQAABIEAAATBwAAFAcAABUHAAAWCAAAFwYABBoHAAVDBAIDAQABAkYEAQYBBlgGAAAYAAEAABkCAwAAGwQDAAAcBQYAAB0EAwAAHgcIAAAfCQoAACALCgAAIQUMAAAiDQMAACMOCAAAJA8DAAAlEAMAACYQAwAAJxEDAAAoEgMAACkKEwAAKhQBAAArFAEAACwUFQAALRYDAAAuFwMAAC8XAwAAMBgDAAAxGQMAADIaCgAAMxsDAAA0HB0AADUeHwAANiADAAA3IQMAADgCHQAAOSIdAAVlJSYCAwAFZiUnAgMAA2cXFQABaAEBAAVpKisCAwACai0DAQYFawMwAgMEAmwXMgEGAW0BAQAFbjUDAgMABms4OQAGbwM5AAFwAQEABXEqRgIDACEkIiQhKSUpJiwnLycpKDEoMyg0IS8qLyYxJS8qKSYzJjwqJCUkIiknJCg8KEAoLChBJjQmQSZALiQCBQgNAQMDBgwIDQMABgYMCBEIEQgRAwoBAQYKAQEIAgMFCBEIEQEIDAIIDAMBCA0EBQgRCBEDAQgODgYMCBEIEQgRAwMIEQUDAwoBCggRCgoCCggRDQYMCBEIEQgRAwgRBQMDCA4KCBEKCgIKCBECBgwICgIFCAoEBgwGDAgNAwcGDAYMBQgRCBEDAwEICQEGCAkBBQIGDAgNAQYMAgcICggKBQYMBQgRCBEDAwYMCAwDCgYMBQUIEQgRAwMKCBEKCgIKCBECBwgKAwEICgEGCAoBBggNBAYMCA0FAwUFCA0KCBEKCgIKCBEDBQgNAwIDBggPAggNCAoCBgsSAgkACQEJAAEBAQYJAQcDBwgDBQUICgcICwcIDwIIDAgLAgcLEgIJAAkBCQABBwkBAQgAAgcLEwEJAAkABwcLEgIIEQgBCBEFCAEHCxICCBEIAQcIAwgCAggRCAEBCxICCQAJAQEIBAELEwEJAAEIBQEIBwMHCxICCQAJAQkACQECCA4IDAwDAwUIEQMDAwUHCAEHCAMICwgMAwoIEQoKAgoIEQEIFAQHCxICCA0ICggNBQcLEgIIDQgKAQcIDwEIBgIHCAoHCA8EBgsSAggMCAsFBggLCAwJBwsSAggNCAoIDQMIDQgUCA0HCxICCA0ICgUHCxICCA0ICgEIEAEICAYHCxICCAwICwgMBwsSAggMCAsFBwgLCA0MBwsSAggMCAsIDAUHCxICCAwICwMDAwgKCA0ICgcICwgNBAcLEgIIDQgKCA0HCxICCA0ICgcIFAYHCxICCA0ICggNCAoHAwcIDwcLEgIIDQgKAQkBBXRva2VuBWVycm9yBWV2ZW50BnNpZ25lcgZzdHJpbmcFdGFibGUMcHJvcGVydHlfbWFwDkJ1cm5Ub2tlbkV2ZW50DkNvbGxlY3Rpb25EYXRhGkNvbGxlY3Rpb25NdXRhYmlsaXR5Q29uZmlnC0NvbGxlY3Rpb25zFUNyZWF0ZUNvbGxlY3Rpb25FdmVudBRDcmVhdGVUb2tlbkRhdGFFdmVudAxEZXBvc2l0RXZlbnQOTWludFRva2VuRXZlbnQbTXV0YXRlVG9rZW5Qcm9wZXJ0eU1hcEV2ZW50B1JveWFsdHkFVG9rZW4JVG9rZW5EYXRhC1Rva2VuRGF0YUlkB1Rva2VuSWQVVG9rZW5NdXRhYmlsaXR5Q29uZmlnClRva2VuU3RvcmUNV2l0aGRyYXdFdmVudApiYWxhbmNlX29mBGJ1cm4GU3RyaW5nEWNyZWF0ZV9jb2xsZWN0aW9uI2NyZWF0ZV9jb2xsZWN0aW9uX211dGFiaWxpdHlfY29uZmlnGGNyZWF0ZV9jb2xsZWN0aW9uX3NjcmlwdBRjcmVhdGVfdG9rZW5fZGF0YV9pZA9jcmVhdGVfdG9rZW5faWQTY3JlYXRlX3Rva2VuX2lkX3Jhdx5jcmVhdGVfdG9rZW5fbXV0YWJpbGl0eV9jb25maWcTY3JlYXRlX3Rva2VuX3NjcmlwdBBjcmVhdGVfdG9rZW5kYXRhDWRlcG9zaXRfdG9rZW4OZGlyZWN0X2RlcG9zaXQlZGlyZWN0X2RlcG9zaXRfd2l0aG91dF9ldmVudF9pbnRlcm5hbA9kaXJlY3RfdHJhbnNmZXIWZGlyZWN0X3RyYW5zZmVyX3NjcmlwdAtnZXRfcm95YWx0eRdnZXRfcm95YWx0eV9kZW5vbWluYXRvchVnZXRfcm95YWx0eV9udW1lcmF0b3IRZ2V0X3JveWFsdHlfcGF5ZWUQaW5pdGlhbGl6ZV90b2tlbhdpbml0aWFsaXplX3Rva2VuX3NjcmlwdBZpbml0aWFsaXplX3Rva2VuX3N0b3JlBW1lcmdlC21pbnRfc2NyaXB0Cm1pbnRfdG9rZW4XbXV0YXRlX3Rva2VuX3Byb3BlcnRpZXMFc3BsaXQIdG9rZW5faWQIdHJhbnNmZXIedXBkYXRlX3Rva2VuX3Byb3BlcnR5X2ludGVybmFsDndpdGhkcmF3X3Rva2VuHHdpdGhkcmF3X3dpdGhfZXZlbnRfaW50ZXJuYWwCaWQGYW1vdW50C2Rlc2NyaXB0aW9uBG5hbWUDdXJpBnN1cHBseQdtYXhpbXVtEW11dGFiaWxpdHlfY29uZmlnD2NvbGxlY3Rpb25fZGF0YQVUYWJsZQp0b2tlbl9kYXRhGGNyZWF0ZV9jb2xsZWN0aW9uX2V2ZW50cwtFdmVudEhhbmRsZRhjcmVhdGVfdG9rZW5fZGF0YV9ldmVudHMRbWludF90b2tlbl9ldmVudHMHY3JlYXRvcg9jb2xsZWN0aW9uX25hbWUVcm95YWx0eV9wYXllZV9hZGRyZXNzGnJveWFsdHlfcG9pbnRzX2Rlbm9taW5hdG9yGHJveWFsdHlfcG9pbnRzX251bWVyYXRvcg1wcm9wZXJ0eV9rZXlzD3Byb3BlcnR5X3ZhbHVlcw5wcm9wZXJ0eV90eXBlcwZvbGRfaWQGbmV3X2lkBGtleXMGdmFsdWVzBXR5cGVzDXBheWVlX2FkZHJlc3MQdG9rZW5fcHJvcGVydGllcwtQcm9wZXJ0eU1hcBhsYXJnZXN0X3Byb3BlcnR5X3ZlcnNpb24Hcm95YWx0eRJkZWZhdWx0X3Byb3BlcnRpZXMKY29sbGVjdGlvbg10b2tlbl9kYXRhX2lkEHByb3BlcnR5X3ZlcnNpb24KcHJvcGVydGllcwZ0b2tlbnMOZGVwb3NpdF9ldmVudHMPd2l0aGRyYXdfZXZlbnRzC2J1cm5fZXZlbnRzHG11dGF0ZV90b2tlbl9wcm9wZXJ0eV9ldmVudHMIY29udGFpbnMGYm9ycm93CmFkZHJlc3Nfb2YJbm90X2ZvdW5kCmJvcnJvd19tdXQKZW1pdF9ldmVudANuZXcQbmV3X2V2ZW50X2hhbmRsZQ5hbHJlYWR5X2V4aXN0cwNhZGQF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",
               "abi": {
                 "address": "0x3",
                 "name": "token",
@@ -14859,12 +15293,26 @@
                         "type": "Address"
                       },
                       {
+                        "type": "Address"
+                      },
+                      {
                         "type": "Struct",
                         "struct": {
-                          "address": "0x3",
-                          "module": "token",
-                          "name": "TokenId"
+                          "address": "0x1",
+                          "module": "string",
+                          "name": "String"
                         }
+                      },
+                      {
+                        "type": "Struct",
+                        "struct": {
+                          "address": "0x1",
+                          "module": "string",
+                          "name": "String"
+                        }
+                      },
+                      {
+                        "type": "U64"
                       },
                       {
                         "type": "U64"
@@ -16409,7 +16857,7 @@
             "address": "0x3",
             "stateKeyHash": "j83HuO+ZUxKvu/ih62wPPZdGKEfnyUMNVZwES7SMUR4=",
             "data": {
-              "bytecode": "oRzrCwUAAAAKAQAKAgoYAyJyBJQBGAWsAewBB5gDyAII4AVACqAGDwyvBogDDbcJAgAAAQEBAgEDAAQABQgABAYHAAIIBwADEAQCAwEAAQQRBAAABwABAAAJAgEAAAoAAQAACwIBAAAMAwEAAA0EAQAADgUBAAESAwcAAxMJCgIDAAMUCQwCAwADFQ0OAgMAAxYPAQIDAAQXEAEABBgSEQADGQEPAgMEAxoUFQIDAAMbFgECAwAEHBcYAAQdGRoABB4bAQAICAkLCgsJCAsLDggPCA4LEAgPCwgLEAsDBgwFCAEABgwFBQgCCAIDAQYMBAYMBQgBAwcMBQUIAggCAwMFBwsDAgULAwIIAQgEBwsDAggBCAQLAwIIAQgEBQgEAQUCBQsDAggBCAQCBwsDAgkACQEJAAEHCQECCAEIBAEJAQEGCwMCCQAJAQEDAQsDAgkACQECBgwIBAEIAQQFCAIIAgMKBwsDAgULAwIIAQgEBQcLAwIIAQgECAEHCwMCCAEIBAcIBAcLAwIFCwMCCAEIBAUIBAgBAgYLAwIJAAkBCQABAQMHCwMCCQAJAQkACQEDBgwIAQMBCAQBBggEAQYIAQIHCAQIBA90b2tlbl90cmFuc2ZlcnMGc2lnbmVyBnN0cmluZwV0YWJsZQV0b2tlbg5Ub2tlblRyYW5zZmVycwdUb2tlbklkDGNhbmNlbF9vZmZlcgZTdHJpbmcTY2FuY2VsX29mZmVyX3NjcmlwdAVjbGFpbQxjbGFpbV9zY3JpcHQaaW5pdGlhbGl6ZV90b2tlbl90cmFuc2ZlcnMFb2ZmZXIMb2ZmZXJfc2NyaXB0DnBlbmRpbmdfY2xhaW1zBVRhYmxlBVRva2VuCmFkZHJlc3Nfb2YKYm9ycm93X211dAZyZW1vdmUGbGVuZ3RoDWRlc3Ryb3lfZW1wdHkNZGVwb3NpdF90b2tlbhNjcmVhdGVfdG9rZW5faWRfcmF3A25ldwhjb250YWlucwNhZGQOd2l0aGRyYXdfdG9rZW4IdG9rZW5faWQFbWVyZ2UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAIBDwsDAgULAwIIAQgEAAEAAQAGIwoAEQcMBgsGKgAPAAwDCgMKATgADAQKBAsCOAEMBwsELjgCBgAAAAAAAAAAIQMWBR0LAwsBOAMMBQsFOAQFHwsDAQsACwcRDAIBAQQBABELCwILAwsECwURDQwGDgALAQsGEQACAgEAAQAGIwoAEQcMBgsBKgAPAAwDCgMKBjgADAQKBAsCOAEMBwsELjgCBgAAAAAAAAAAIQMWBR0LAwsGOAMMBQsFOAQFHwsDAQsACwcRDAIDAQQBABELCwILAwsECwURDQwGDgALAQsGEQICBAAAAAEFCwA4BRIALQACBQEAAQATQQoAEQcMCwoLKQAgAwgFCgoAEQQLCyoADwAMCgoKCgEMBQwECwQuCwU4BiADGQUdCgoKATgHOAgLCgsBOAAMCAsACwILAxERDAwODBESFAwNCggKDQwHDAYLBi4LBzgJAzQFPAsICw04CgwJCwkLDBETBUALCAsNCww4CwIGAQQBABEMCwILAwsECwURDQwHDgALAQsHCwYRBQIAAAA=",
+              "bytecode": "oRzrCwUAAAAKAQAKAgoYAyJyBJQBGAWsAewBB5gD3gII9gVACrYGDwzFBogDDc0JAgAAAQEBAgEDAAQABQgABAYHAAIIBwADEAQCAwEAAQQRBAAABwABAAAJAgEAAAoAAQAACwIBAAAMAwEAAA0EAQAADgUBAAESAwcAAxMJCgIDAAMUCQwCAwADFQ0OAgMAAxYPAQIDAAQXEAEABBgSEQADGQEPAgMEAxoUFQIDAAMbFgECAwAEHBcYAAQdGRoABB4bAQAICAkLCgsJCAsLDggPCA4LEAgPCwgLEAsDBgwFCAEABgwFBQgCCAIDAQYMBAYMBQgBAwcMBQUIAggCAwMFBwsDAgULAwIIAQgEBwsDAggBCAQLAwIIAQgEBQgEAQUCBQsDAggBCAQCBwsDAgkACQEJAAEHCQECCAEIBAEJAQEGCwMCCQAJAQEDAQsDAgkACQECBgwIBAEIAQQFCAIIAgMKBwsDAgULAwIIAQgEBQcLAwIIAQgECAEHCwMCCAEIBAcIBAcLAwIFCwMCCAEIBAUIBAgBAgYLAwIJAAkBCQABAQMHCwMCCQAJAQkACQEDBgwIAQMBCAQBBggEAQYIAQIHCAQIBA90b2tlbl90cmFuc2ZlcnMGc2lnbmVyBnN0cmluZxF0YWJsZV93aXRoX2xlbmd0aAV0b2tlbg5Ub2tlblRyYW5zZmVycwdUb2tlbklkDGNhbmNlbF9vZmZlcgZTdHJpbmcTY2FuY2VsX29mZmVyX3NjcmlwdAVjbGFpbQxjbGFpbV9zY3JpcHQaaW5pdGlhbGl6ZV90b2tlbl90cmFuc2ZlcnMFb2ZmZXIMb2ZmZXJfc2NyaXB0DnBlbmRpbmdfY2xhaW1zD1RhYmxlV2l0aExlbmd0aAVUb2tlbgphZGRyZXNzX29mCmJvcnJvd19tdXQGcmVtb3ZlBmxlbmd0aA1kZXN0cm95X2VtcHR5DWRlcG9zaXRfdG9rZW4TY3JlYXRlX3Rva2VuX2lkX3JhdwNuZXcIY29udGFpbnMDYWRkDndpdGhkcmF3X3Rva2VuCHRva2VuX2lkBW1lcmdlAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQACAQ8LAwIFCwMCCAEIBAABAAEABiMKABEHDAYLBioADwAMAwoDCgE4AAwECgQLAjgBDAcLBC44AgYAAAAAAAAAACEDFgUdCwMLATgDDAULBTgEBR8LAwELAAsHEQwCAQEEAQARCwsCCwMLBAsFEQ0MBg4ACwELBhEAAgIBAAEABiMKABEHDAYLASoADwAMAwoDCgY4AAwECgQLAjgBDAcLBC44AgYAAAAAAAAAACEDFgUdCwMLBjgDDAULBTgEBR8LAwELAAsHEQwCAwEEAQARCwsCCwMLBAsFEQ0MBg4ACwELBhECAgQAAAABBQsAOAUSAC0AAgUBAAEAE0EKABEHDAsKCykAIAMIBQoKABEECwsqAA8ADAoKCgoBDAUMBAsELgsFOAYgAxkFHQoKCgE4BzgICwoLATgADAgLAAsCCwMREQwMDgwREhQMDQoICg0MBwwGCwYuCwc4CQM0BTwLCAsNOAoMCQsJCwwREwVACwgLDQsMOAsCBgEEAQARDAsCCwMLBAsFEQ0MBw4ACwELBwsGEQUCAAAA",
               "abi": {
                 "address": "0x3",
                 "name": "token_transfers",
@@ -16614,8 +17062,8 @@
                           "type": "Struct",
                           "struct": {
                             "address": "0x1",
-                            "module": "table",
-                            "name": "Table",
+                            "module": "table_with_length",
+                            "name": "TableWithLength",
                             "genericTypeParams": [
                               {
                                 "type": "Address"
@@ -16624,8 +17072,8 @@
                                 "type": "Struct",
                                 "struct": {
                                   "address": "0x1",
-                                  "module": "table",
-                                  "name": "Table",
+                                  "module": "table_with_length",
+                                  "name": "TableWithLength",
                                   "genericTypeParams": [
                                     {
                                       "type": "Struct",
@@ -16965,7 +17413,7 @@
                     "module": "aptos_governance",
                     "name": "VotingRecords"
                   },
-                  "data": "{\"votes\":{\"handle\":\"250572580766766989648150312918132283230\",\"length\":\"0\"}}"
+                  "data": "{\"votes\":{\"handle\":\"250572580766766989648150312918132283230\"}}"
                 }
               }
             },
@@ -17035,7 +17483,7 @@
                     "module": "consensus_config",
                     "name": "ConsensusConfig"
                   },
-                  "data": "{\"config\":\"0x00010a0000000000000014000000000000000201e8030000000000000a0000000000000001000000000000000a0000000a0000000000000001000000000000000a00000000000000\"}"
+                  "data": "{\"config\":\"0x00010a0000000000000014000000000000000201e8030000000000000a0000000000000001000000000000000a0000000a000000000000000100000000000000010a00000000000000\"}"
                 }
               }
             },
@@ -17210,7 +17658,7 @@
                       }
                     ]
                   },
-                  "data": "{\"events\":{\"create_proposal_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"3\"}}},\"register_forum_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"4\"}}},\"resolve_proposal_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"5\"}}},\"vote_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"6\"}}}},\"next_proposal_id\":\"0\",\"proposals\":{\"handle\":\"66250964772389598023276627514581198483\",\"length\":\"0\"}}"
+                  "data": "{\"events\":{\"create_proposal_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"3\"}}},\"register_forum_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"4\"}}},\"resolve_proposal_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"5\"}}},\"vote_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"6\"}}}},\"next_proposal_id\":\"0\",\"proposals\":{\"handle\":\"66250964772389598023276627514581198483\"}}"
                 }
               }
             },
@@ -18509,7 +18957,7 @@
                 "address": "0x1",
                 "stateKeyHash": "KkLOGzh8zDG7g0XaKDRl9gEotb3og4H0VKLzHMazngY=",
                 "data": {
-                  "bytecode": "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",
+                  "bytecode": "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",
                   "abi": {
                     "address": "0x1",
                     "name": "big_vector",
@@ -19201,8 +19649,8 @@
                               "type": "Struct",
                               "struct": {
                                 "address": "0x1",
-                                "module": "table",
-                                "name": "Table",
+                                "module": "table_with_length",
+                                "name": "TableWithLength",
                                 "genericTypeParams": [
                                   {
                                     "type": "U64"
@@ -19635,7 +20083,7 @@
                 "address": "0x1",
                 "stateKeyHash": "rcJWda+TjLXXa52aRsG0ExXsb49m8vN7SBcb9fN/ffw=",
                 "data": {
-                  "bytecode": "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",
+                  "bytecode": "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",
                   "abi": {
                     "address": "0x1",
                     "name": "bucket_table",
@@ -20086,8 +20534,8 @@
                               "type": "Struct",
                               "struct": {
                                 "address": "0x1",
-                                "module": "table",
-                                "name": "Table",
+                                "module": "table_with_length",
+                                "name": "TableWithLength",
                                 "genericTypeParams": [
                                   {
                                     "type": "U64"
@@ -23191,7 +23639,7 @@
                 "address": "0x1",
                 "stateKeyHash": "r7Tj5S+CY15bIWvaWB3SyI6BhphaWFL2XBLwklaitVA=",
                 "data": {
-                  "bytecode": "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",
+                  "bytecode": "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",
                   "abi": {
                     "address": "0x1",
                     "name": "iterable_table",
@@ -24161,8 +24609,8 @@
                               "type": "Struct",
                               "struct": {
                                 "address": "0x1",
-                                "module": "table",
-                                "name": "Table",
+                                "module": "table_with_length",
+                                "name": "TableWithLength",
                                 "genericTypeParams": [
                                   {
                                     "type": "GenericTypeParam",
@@ -28117,10 +28565,16 @@
                 "address": "0x1",
                 "stateKeyHash": "6x0YXzj7VmxHF6ZPxdL76ZmAVI0MGz0ssc3fu71PHXA=",
                 "data": {
-                  "bytecode": "oRzrCwUAAAANAQAEAgQOAxKKAQScARYFsgF5B6sC/AEIpwQgBscEHgrlBA0L8gQEDPYEmwINkQcEDpUHBAAAAAEAAg4BAAAAAwQCAwEAAQAEAAECAwAABQIBAwMAAAAGAwQCAwAABwMFAwMAAAAIBgcDAwAAAAkGCAIDAAAKAAgCAwIACwMJAgMAAAwDCQMDAAAADQoBAgMAAA4LAQMDAAAADwoBAwMAAAAQCwkCAwAAEQsMAgMAABIBCgIDBAATAQ0CAAAAFAYOAgMAABUGDwMDAAABGAwMAAEQAxAEEAcRABEFEQgQChALEA8RERADBwsBAgkACQEJAAkBAAMHCwECCQAJAQkACwABCQECBgsBAgkACQEJAAEGCQEBBgsAAQkBAgcLAQIJAAkBCQABBwsAAQkBAQcJAQEBAQsBAgkACQEBBgsBAgkACQEBAwEEAQkBAQsAAQkBAwkACQELAAEJAQIJAAkBBXRhYmxlBWVycm9yA0JveAVUYWJsZQNhZGQHYWRkX2JveAZib3Jyb3cKYm9ycm93X2JveA5ib3Jyb3dfYm94X211dApib3Jyb3dfbXV0F2JvcnJvd19tdXRfd2l0aF9kZWZhdWx0CGNvbnRhaW5zDGNvbnRhaW5zX2JveA1kZXN0cm95X2VtcHR5EWRlc3Ryb3lfZW1wdHlfYm94EmRyb3BfdW5jaGVja2VkX2JveAVlbXB0eQZsZW5ndGgDbmV3EG5ld190YWJsZV9oYW5kbGUGcmVtb3ZlCnJlbW92ZV9ib3gDdmFsBmhhbmRsZQ1pbnZhbGlkX3N0YXRlAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEDCGQAAAAAAAAAAwhmAAAAAAAAAAMIZQAAAAAAAAAAAgEWCQABAgIXBBEDAA4BEQABAAABDgoACwELAjkAOAAKADcAFAYBAAAAAAAAABYLADYAFQIBAAIAAgEAAAEFCwALATgBNwECAwACAAQAAgAFAQAAAQULAAsBOAI2AQIGAQAABhMKAAoBDAQMAwsDLgsEOAMgAwsFDwoACgELAjgECwALATgFAgcBAAABBAsACwE4BgIIAAIACQEAAAEODgA3ABQGAAAAAAAAAAAhAwkHARESJw4AOAcLADgIAgoAAgALAAIADAEAAAEGCwA3ABQGAAAAAAAAAAAhAg0BAAABBAsANwAUAg4BAAABBDgJBgAAAAAAAAAAOQECDwACABABAAAODwoACwE4CjoADAIKADcAFAYBAAAAAAAAABcLADYAFQsCAhEAAgABAQAAABEBDgA=",
+                  "bytecode": "oRzrCwUAAAAOAQACAgIOAxB3BIcBFgWdAXcHlALnAQj7AyAGmwQUCq8ECwu6BAQMvgSyAQ3wBQIO8gUCD/QFAgABAAIOAQAAAAMEAgMBAAEABAABAgMAAAUCAQMDAAAABgMEAgMAAAcDBQMDAAAACAYHAwMAAAAJBggCAwAACgAIAgMCAAsDCQIDAAAMAwkDAwAAAA0KAQIDAAAOCwEDAwAAAA8KAQMDAAAAEAEKAgMEABEBDAIAAAASBg0CAwAAEwYOAwMAAAEPAw8EDwcQABAFEAgPCg8LDw0QDw8DBwsBAgkACQEJAAkBAAMHCwECCQAJAQkACwABCQECBgsBAgkACQEJAAEGCQEBBgsAAQkBAgcLAQIJAAkBCQABBwsAAQkBAQcJAQEBAQsBAgkACQEBBgsBAgkACQEBBAEJAQELAAEJAQMJAAkBCwABCQECCQAJARF0YWJsZV93aXRoX2xlbmd0aAV0YWJsZQNCb3gFVGFibGUDYWRkB2FkZF9ib3gGYm9ycm93CmJvcnJvd19ib3gOYm9ycm93X2JveF9tdXQKYm9ycm93X211dBdib3Jyb3dfbXV0X3dpdGhfZGVmYXVsdAhjb250YWlucwxjb250YWluc19ib3gHZGVzdHJveRFkZXN0cm95X2VtcHR5X2JveBJkcm9wX3VuY2hlY2tlZF9ib3gDbmV3EG5ld190YWJsZV9oYW5kbGUGcmVtb3ZlCnJlbW92ZV9ib3gDdmFsBmhhbmRsZQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAwhkAAAAAAAAAAMIZQAAAAAAAAAAAgEUCQABAgEVBAANARAAAQAAAQYLAAsBCwI5ADgAAgEAAgACAQAAAQULAAsBOAE3AAIDAAIABAACAAUBAAABBQsACwE4AjYAAgYBAAAGEwoACgEMBAwDCwMuCwQ4AyADCwUPCgAKAQsCOAQLAAsBOAUCBwEAAAEECwALATgGAggAAgAJAwAAAQUOADgHCwA4CAIKAAIACwACAAwBAAABAzgJOQECDQACAA4BAAANBwsACwE4CjoADAILAgIPAAIAAAAADQAAAA==",
                   "abi": {
                     "address": "0x1",
                     "name": "table",
+                    "friends": [
+                      {
+                        "address": "0x1",
+                        "name": "table_with_length"
+                      }
+                    ],
                     "exposedFunctions": [
                       {
                         "name": "add",
@@ -28386,8 +28840,8 @@
                         ]
                       },
                       {
-                        "name": "destroy_empty",
-                        "visibility": "PUBLIC",
+                        "name": "destroy",
+                        "visibility": "FRIEND",
                         "genericTypeParams": [
                           {
                             "constraints": [
@@ -28415,90 +28869,6 @@
                                 }
                               ]
                             }
-                          }
-                        ]
-                      },
-                      {
-                        "name": "empty",
-                        "visibility": "PUBLIC",
-                        "genericTypeParams": [
-                          {
-                            "constraints": [
-                              "COPY",
-                              "DROP"
-                            ]
-                          },
-                          {}
-                        ],
-                        "params": [
-                          {
-                            "type": "Reference",
-                            "reference": {
-                              "to": {
-                                "type": "Struct",
-                                "struct": {
-                                  "address": "0x1",
-                                  "module": "table",
-                                  "name": "Table",
-                                  "genericTypeParams": [
-                                    {
-                                      "type": "GenericTypeParam",
-                                      "genericTypeParamIndex": 0
-                                    },
-                                    {
-                                      "type": "GenericTypeParam",
-                                      "genericTypeParamIndex": 1
-                                    }
-                                  ]
-                                }
-                              }
-                            }
-                          }
-                        ],
-                        "return": [
-                          {}
-                        ]
-                      },
-                      {
-                        "name": "length",
-                        "visibility": "PUBLIC",
-                        "genericTypeParams": [
-                          {
-                            "constraints": [
-                              "COPY",
-                              "DROP"
-                            ]
-                          },
-                          {}
-                        ],
-                        "params": [
-                          {
-                            "type": "Reference",
-                            "reference": {
-                              "to": {
-                                "type": "Struct",
-                                "struct": {
-                                  "address": "0x1",
-                                  "module": "table",
-                                  "name": "Table",
-                                  "genericTypeParams": [
-                                    {
-                                      "type": "GenericTypeParam",
-                                      "genericTypeParamIndex": 0
-                                    },
-                                    {
-                                      "type": "GenericTypeParam",
-                                      "genericTypeParamIndex": 1
-                                    }
-                                  ]
-                                }
-                              }
-                            }
-                          }
-                        ],
-                        "return": [
-                          {
-                            "type": "U64"
                           }
                         ]
                       },
@@ -28617,6 +28987,518 @@
                             "name": "handle",
                             "type": {
                               "type": "U128"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "writeModule": {
+                "address": "0x1",
+                "stateKeyHash": "IPckZ63Kji28AcgfzbL5W/uO0GEkXHFRMZNnNV4f8VE=",
+                "data": {
+                  "bytecode": "oRzrCwUAAAANAQAGAgYQAxaDAQSZARAFqQF0B50CrQEIygMgBuoDHgqIBA0LlQQCDJcE6AEN/wUEDoMGBAAAAAEAAgADBAIDAQABAg8EAgMBAAEABAABAgMAAAUCAwIDAAAGBAUCAwAABwAFAgMCAAgCBgIDAAAJBwECAwAACggGAgMAAAsICQIDAAAMAQcCAwQADQQKAgMAAgQMAQIDAAIFDQMCAwACBg4FAgMAAgcMBQIDAgIIDQYCAwABEAkJAAIRDwECAwACDAEPAgMEAg0OCgIDAAoLCwsMCw0LDgsQCxELEgsDBwsAAgkACQEJAAkBAAIGCwACCQAJAQkAAQYJAQIHCwACCQAJAQkAAQcJAQEBAQsAAgkACQEBBgsAAgkACQEBAwEJAQIJAAkBAwcLAQIJAAkBCQAJAQIGCwECCQAJAQkAAgcLAQIJAAkBCQABCwECCQAJARF0YWJsZV93aXRoX2xlbmd0aAVlcnJvcgV0YWJsZQ9UYWJsZVdpdGhMZW5ndGgDYWRkBmJvcnJvdwpib3Jyb3dfbXV0F2JvcnJvd19tdXRfd2l0aF9kZWZhdWx0CGNvbnRhaW5zDWRlc3Ryb3lfZW1wdHkFZW1wdHkGbGVuZ3RoA25ldwZyZW1vdmUFaW5uZXIFVGFibGUNaW52YWxpZF9zdGF0ZQdkZXN0cm95AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEDCGQAAAAAAAAAAwhmAAAAAAAAAAMIZQAAAAAAAAAAAgIOCwECCQAJAQsDAAsAAQAAAQ4KADYACwELAjgACgA3ARQGAQAAAAAAAAAWCwA2ARUCAQEAAAEFCwA3AAsBOAECAgEAAAEFCwA2AAsBOAICAwEAAAEGCwA2AAsBCwI4AwIEAQAAAQULADcACwE4BAIFAQAADxAOADcBFAYAAAAAAAAAACEDCQcBEQ8nCwA6AAEMAQsBOAUCBgEAAAEGCwA3ARQGAAAAAAAAAAAhAgcBAAABBAsANwEUAggBAAABBDgGBgAAAAAAAAAAOQACCQEAAAoPCgA2AAsBOAcMAgoANwEUBgEAAAAAAAAAFwsANgEVCwICAAAAAQALAQsA",
+                  "abi": {
+                    "address": "0x1",
+                    "name": "table_with_length",
+                    "exposedFunctions": [
+                      {
+                        "name": "add",
+                        "visibility": "PUBLIC",
+                        "genericTypeParams": [
+                          {
+                            "constraints": [
+                              "COPY",
+                              "DROP"
+                            ]
+                          },
+                          {}
+                        ],
+                        "params": [
+                          {
+                            "type": "Reference",
+                            "reference": {
+                              "mutable": true,
+                              "to": {
+                                "type": "Struct",
+                                "struct": {
+                                  "address": "0x1",
+                                  "module": "table_with_length",
+                                  "name": "TableWithLength",
+                                  "genericTypeParams": [
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 0
+                                    },
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 1
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "type": "GenericTypeParam",
+                            "genericTypeParamIndex": 0
+                          },
+                          {
+                            "type": "GenericTypeParam",
+                            "genericTypeParamIndex": 1
+                          }
+                        ]
+                      },
+                      {
+                        "name": "borrow",
+                        "visibility": "PUBLIC",
+                        "genericTypeParams": [
+                          {
+                            "constraints": [
+                              "COPY",
+                              "DROP"
+                            ]
+                          },
+                          {}
+                        ],
+                        "params": [
+                          {
+                            "type": "Reference",
+                            "reference": {
+                              "to": {
+                                "type": "Struct",
+                                "struct": {
+                                  "address": "0x1",
+                                  "module": "table_with_length",
+                                  "name": "TableWithLength",
+                                  "genericTypeParams": [
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 0
+                                    },
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 1
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "type": "GenericTypeParam",
+                            "genericTypeParamIndex": 0
+                          }
+                        ],
+                        "return": [
+                          {
+                            "type": "Reference",
+                            "reference": {
+                              "to": {
+                                "type": "GenericTypeParam",
+                                "genericTypeParamIndex": 1
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "name": "borrow_mut",
+                        "visibility": "PUBLIC",
+                        "genericTypeParams": [
+                          {
+                            "constraints": [
+                              "COPY",
+                              "DROP"
+                            ]
+                          },
+                          {}
+                        ],
+                        "params": [
+                          {
+                            "type": "Reference",
+                            "reference": {
+                              "mutable": true,
+                              "to": {
+                                "type": "Struct",
+                                "struct": {
+                                  "address": "0x1",
+                                  "module": "table_with_length",
+                                  "name": "TableWithLength",
+                                  "genericTypeParams": [
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 0
+                                    },
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 1
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "type": "GenericTypeParam",
+                            "genericTypeParamIndex": 0
+                          }
+                        ],
+                        "return": [
+                          {
+                            "type": "Reference",
+                            "reference": {
+                              "mutable": true,
+                              "to": {
+                                "type": "GenericTypeParam",
+                                "genericTypeParamIndex": 1
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "name": "borrow_mut_with_default",
+                        "visibility": "PUBLIC",
+                        "genericTypeParams": [
+                          {
+                            "constraints": [
+                              "COPY",
+                              "DROP"
+                            ]
+                          },
+                          {
+                            "constraints": [
+                              "DROP"
+                            ]
+                          }
+                        ],
+                        "params": [
+                          {
+                            "type": "Reference",
+                            "reference": {
+                              "mutable": true,
+                              "to": {
+                                "type": "Struct",
+                                "struct": {
+                                  "address": "0x1",
+                                  "module": "table_with_length",
+                                  "name": "TableWithLength",
+                                  "genericTypeParams": [
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 0
+                                    },
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 1
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "type": "GenericTypeParam",
+                            "genericTypeParamIndex": 0
+                          },
+                          {
+                            "type": "GenericTypeParam",
+                            "genericTypeParamIndex": 1
+                          }
+                        ],
+                        "return": [
+                          {
+                            "type": "Reference",
+                            "reference": {
+                              "mutable": true,
+                              "to": {
+                                "type": "GenericTypeParam",
+                                "genericTypeParamIndex": 1
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "name": "contains",
+                        "visibility": "PUBLIC",
+                        "genericTypeParams": [
+                          {
+                            "constraints": [
+                              "COPY",
+                              "DROP"
+                            ]
+                          },
+                          {}
+                        ],
+                        "params": [
+                          {
+                            "type": "Reference",
+                            "reference": {
+                              "to": {
+                                "type": "Struct",
+                                "struct": {
+                                  "address": "0x1",
+                                  "module": "table_with_length",
+                                  "name": "TableWithLength",
+                                  "genericTypeParams": [
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 0
+                                    },
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 1
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "type": "GenericTypeParam",
+                            "genericTypeParamIndex": 0
+                          }
+                        ],
+                        "return": [
+                          {}
+                        ]
+                      },
+                      {
+                        "name": "destroy_empty",
+                        "visibility": "PUBLIC",
+                        "genericTypeParams": [
+                          {
+                            "constraints": [
+                              "COPY",
+                              "DROP"
+                            ]
+                          },
+                          {}
+                        ],
+                        "params": [
+                          {
+                            "type": "Struct",
+                            "struct": {
+                              "address": "0x1",
+                              "module": "table_with_length",
+                              "name": "TableWithLength",
+                              "genericTypeParams": [
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 0
+                                },
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 1
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "name": "empty",
+                        "visibility": "PUBLIC",
+                        "genericTypeParams": [
+                          {
+                            "constraints": [
+                              "COPY",
+                              "DROP"
+                            ]
+                          },
+                          {}
+                        ],
+                        "params": [
+                          {
+                            "type": "Reference",
+                            "reference": {
+                              "to": {
+                                "type": "Struct",
+                                "struct": {
+                                  "address": "0x1",
+                                  "module": "table_with_length",
+                                  "name": "TableWithLength",
+                                  "genericTypeParams": [
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 0
+                                    },
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 1
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "return": [
+                          {}
+                        ]
+                      },
+                      {
+                        "name": "length",
+                        "visibility": "PUBLIC",
+                        "genericTypeParams": [
+                          {
+                            "constraints": [
+                              "COPY",
+                              "DROP"
+                            ]
+                          },
+                          {}
+                        ],
+                        "params": [
+                          {
+                            "type": "Reference",
+                            "reference": {
+                              "to": {
+                                "type": "Struct",
+                                "struct": {
+                                  "address": "0x1",
+                                  "module": "table_with_length",
+                                  "name": "TableWithLength",
+                                  "genericTypeParams": [
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 0
+                                    },
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 1
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "return": [
+                          {
+                            "type": "U64"
+                          }
+                        ]
+                      },
+                      {
+                        "name": "new",
+                        "visibility": "PUBLIC",
+                        "genericTypeParams": [
+                          {
+                            "constraints": [
+                              "COPY",
+                              "DROP"
+                            ]
+                          },
+                          {
+                            "constraints": [
+                              "STORE"
+                            ]
+                          }
+                        ],
+                        "return": [
+                          {
+                            "type": "Struct",
+                            "struct": {
+                              "address": "0x1",
+                              "module": "table_with_length",
+                              "name": "TableWithLength",
+                              "genericTypeParams": [
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 0
+                                },
+                                {
+                                  "type": "GenericTypeParam",
+                                  "genericTypeParamIndex": 1
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "name": "remove",
+                        "visibility": "PUBLIC",
+                        "genericTypeParams": [
+                          {
+                            "constraints": [
+                              "COPY",
+                              "DROP"
+                            ]
+                          },
+                          {}
+                        ],
+                        "params": [
+                          {
+                            "type": "Reference",
+                            "reference": {
+                              "mutable": true,
+                              "to": {
+                                "type": "Struct",
+                                "struct": {
+                                  "address": "0x1",
+                                  "module": "table_with_length",
+                                  "name": "TableWithLength",
+                                  "genericTypeParams": [
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 0
+                                    },
+                                    {
+                                      "type": "GenericTypeParam",
+                                      "genericTypeParamIndex": 1
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "type": "GenericTypeParam",
+                            "genericTypeParamIndex": 0
+                          }
+                        ],
+                        "return": [
+                          {
+                            "type": "GenericTypeParam",
+                            "genericTypeParamIndex": 1
+                          }
+                        ]
+                      }
+                    ],
+                    "structs": [
+                      {
+                        "name": "TableWithLength",
+                        "abilities": [
+                          "STORE"
+                        ],
+                        "fields": [
+                          {
+                            "name": "inner",
+                            "type": {
+                              "type": "Struct",
+                              "struct": {
+                                "address": "0x1",
+                                "module": "table",
+                                "name": "Table",
+                                "genericTypeParams": [
+                                  {
+                                    "type": "GenericTypeParam",
+                                    "genericTypeParamIndex": 0
+                                  },
+                                  {
+                                    "type": "GenericTypeParam",
+                                    "genericTypeParamIndex": 1
+                                  }
+                                ]
+                              }
                             }
                           },
                           {
@@ -30832,7 +31714,7 @@
                 "address": "0x3",
                 "stateKeyHash": "2PqvVfx1qSW21H9Lxe3xJsHTUfXdjShUxckSNl0PmZQ=",
                 "data": {
-                  "bytecode": "oRzrCwUAAAALAQAOAg5aA2j5AQThAjoFmwPlBAeACOsMCOsUQAarFcgBCvMWngIMkRnxEA2CKjgAAAEBAQIBAwEEAQUABgAHBgAACAQAAAkHAAAKCAAACwYAAAwGAAANBgAADgYAAA8GAAAQBwAAEQQAABIEAAATBwAAFAcAABUHAAAWCAAAFwYABBoHAAVDBAIDAQABAkYEAQYBBlgGAAAYAAEAABkCAwAAGwQDAAAcBQYAAB0EAwAAHgcIAAAfCQoAACALCgAAIQUMAAAiDQMAACMOCAAAJA8DAAAlEAMAACYQAwAAJxEDAAAoEgMAACkKEwAAKhQBAAArFAEAACwUFQAALRYDAAAuFwMAAC8XAwAAMBgDAAAxGQMAADIaCgAAMxsDAAA0HB0AADUeHwAANiADAAA3IQMAADgCHQAAOSIdAAVlJSYCAwAFZiUnAgMAA2cXFQABaAEBAAVpKisCAwACai0DAQYFawMwAgMEAmwXMgEGAW0BAQAFbjUDAgMABms4OQAGbwM5AAFwAQEABXEqRgIDACEkIiQhKSUpJiwnLycpKDEoMyg0IS8qLyYxJS8qKSYzJjwqJCUkIiknJCg8KEAoLChBJjQmQSZALiQCBQgNAQMDBgwIDQMABgYMCBEIEQgRAwoBAQYKAQEIAgMFCBEIEQEIDAIIDAMBCA0EBQgRCBEDAQgODgYMCBEIEQgRAwMIEQUDAwoBCggRCgoCCggRDQYMCBEIEQgRAwgRBQMDCA4KCBEKCgIKCBECBgwICgIFCAoEBgwGDAgNAwcGDAYMBQgRCBEDAwEICQEGCAkBBQIGDAgNAQYMAgcICggKBQYMBQgRCBEDAwYMCAwDBwYMBQgNAwoIEQoKAgoIEQIHCAoDAQgKAQYICgEGCA0EBgwIDQUDBQUIDQoIEQoKAgoIEQMFCA0DAgMGCA8CCA0ICgIGCxICCQAJAQkAAQEBBgkBBwMHCAMFBQgKBwgLBwgPAggMCAsCBwsSAgkACQEJAAEHCQEBCAACBwsTAQkACQAHBwsSAggRCAEIEQUIAQcLEgIIEQgBBwgDCAICCBEIAQELEgIJAAkBAQgEAQsTAQkAAQgFAQgHAwcLEgIJAAkBCQAJAQIIDggMDAMDBQgRAwMDBQcIAQcIAwgLCAwDCggRCgoCCggRAQgUBAcLEgIIDQgKCA0FBwsSAggNCAoBBwgPAQgGAgcICgcIDwQGCxICCAwICwUGCAsIDAkHCxICCA0ICggNAwgNCBQIDQcLEgIIDQgKBQcLEgIIDQgKAQgQAQgIBgcLEgIIDAgLCAwHCxICCAwICwUHCAsIDQsHCxICCAwICwgMBQcLEgIIDAgLAwMDCAoIDQgKBwgLBAcLEgIIDQgKCA0HCxICCA0ICgcIFAYHCxICCA0ICggNCAoHAwcIDwcLEgIIDQgKAQkBBXRva2VuBWVycm9yBWV2ZW50BnNpZ25lcgZzdHJpbmcFdGFibGUMcHJvcGVydHlfbWFwDkJ1cm5Ub2tlbkV2ZW50DkNvbGxlY3Rpb25EYXRhGkNvbGxlY3Rpb25NdXRhYmlsaXR5Q29uZmlnC0NvbGxlY3Rpb25zFUNyZWF0ZUNvbGxlY3Rpb25FdmVudBRDcmVhdGVUb2tlbkRhdGFFdmVudAxEZXBvc2l0RXZlbnQOTWludFRva2VuRXZlbnQbTXV0YXRlVG9rZW5Qcm9wZXJ0eU1hcEV2ZW50B1JveWFsdHkFVG9rZW4JVG9rZW5EYXRhC1Rva2VuRGF0YUlkB1Rva2VuSWQVVG9rZW5NdXRhYmlsaXR5Q29uZmlnClRva2VuU3RvcmUNV2l0aGRyYXdFdmVudApiYWxhbmNlX29mBGJ1cm4GU3RyaW5nEWNyZWF0ZV9jb2xsZWN0aW9uI2NyZWF0ZV9jb2xsZWN0aW9uX211dGFiaWxpdHlfY29uZmlnGGNyZWF0ZV9jb2xsZWN0aW9uX3NjcmlwdBRjcmVhdGVfdG9rZW5fZGF0YV9pZA9jcmVhdGVfdG9rZW5faWQTY3JlYXRlX3Rva2VuX2lkX3Jhdx5jcmVhdGVfdG9rZW5fbXV0YWJpbGl0eV9jb25maWcTY3JlYXRlX3Rva2VuX3NjcmlwdBBjcmVhdGVfdG9rZW5kYXRhDWRlcG9zaXRfdG9rZW4OZGlyZWN0X2RlcG9zaXQlZGlyZWN0X2RlcG9zaXRfd2l0aG91dF9ldmVudF9pbnRlcm5hbA9kaXJlY3RfdHJhbnNmZXIWZGlyZWN0X3RyYW5zZmVyX3NjcmlwdAtnZXRfcm95YWx0eRdnZXRfcm95YWx0eV9kZW5vbWluYXRvchVnZXRfcm95YWx0eV9udW1lcmF0b3IRZ2V0X3JveWFsdHlfcGF5ZWUQaW5pdGlhbGl6ZV90b2tlbhdpbml0aWFsaXplX3Rva2VuX3NjcmlwdBZpbml0aWFsaXplX3Rva2VuX3N0b3JlBW1lcmdlC21pbnRfc2NyaXB0Cm1pbnRfdG9rZW4XbXV0YXRlX3Rva2VuX3Byb3BlcnRpZXMFc3BsaXQIdG9rZW5faWQIdHJhbnNmZXIedXBkYXRlX3Rva2VuX3Byb3BlcnR5X2ludGVybmFsDndpdGhkcmF3X3Rva2VuHHdpdGhkcmF3X3dpdGhfZXZlbnRfaW50ZXJuYWwCaWQGYW1vdW50C2Rlc2NyaXB0aW9uBG5hbWUDdXJpBnN1cHBseQdtYXhpbXVtEW11dGFiaWxpdHlfY29uZmlnD2NvbGxlY3Rpb25fZGF0YQVUYWJsZQp0b2tlbl9kYXRhGGNyZWF0ZV9jb2xsZWN0aW9uX2V2ZW50cwtFdmVudEhhbmRsZRhjcmVhdGVfdG9rZW5fZGF0YV9ldmVudHMRbWludF90b2tlbl9ldmVudHMHY3JlYXRvcg9jb2xsZWN0aW9uX25hbWUVcm95YWx0eV9wYXllZV9hZGRyZXNzGnJveWFsdHlfcG9pbnRzX2Rlbm9taW5hdG9yGHJveWFsdHlfcG9pbnRzX251bWVyYXRvcg1wcm9wZXJ0eV9rZXlzD3Byb3BlcnR5X3ZhbHVlcw5wcm9wZXJ0eV90eXBlcwZvbGRfaWQGbmV3X2lkBGtleXMGdmFsdWVzBXR5cGVzDXBheWVlX2FkZHJlc3MQdG9rZW5fcHJvcGVydGllcwtQcm9wZXJ0eU1hcBhsYXJnZXN0X3Byb3BlcnR5X3ZlcnNpb24Hcm95YWx0eRJkZWZhdWx0X3Byb3BlcnRpZXMKY29sbGVjdGlvbg10b2tlbl9kYXRhX2lkEHByb3BlcnR5X3ZlcnNpb24KcHJvcGVydGllcwZ0b2tlbnMOZGVwb3NpdF9ldmVudHMPd2l0aGRyYXdfZXZlbnRzC2J1cm5fZXZlbnRzHG11dGF0ZV90b2tlbl9wcm9wZXJ0eV9ldmVudHMIY29udGFpbnMGYm9ycm93CmFkZHJlc3Nfb2YJbm90X2ZvdW5kCmJvcnJvd19tdXQKZW1pdF9ldmVudANuZXcQbmV3X2V2ZW50X2hhbmRsZQ5hbHJlYWR5X2V4aXN0cwNhZGQFZW1wdHkQ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",
+                  "bytecode": "oRzrCwUAAAALAQAOAg5aA2j5AQThAjoFmwPrBAeGCOsMCPEUQAaxFcgBCvkWngIMlxnuEA2FKjgAAAEBAQIBAwEEAQUABgAHBgAACAQAAAkHAAAKCAAACwYAAAwGAAANBgAADgYAAA8GAAAQBwAAEQQAABIEAAATBwAAFAcAABUHAAAWCAAAFwYABBoHAAVDBAIDAQABAkYEAQYBBlgGAAAYAAEAABkCAwAAGwQDAAAcBQYAAB0EAwAAHgcIAAAfCQoAACALCgAAIQUMAAAiDQMAACMOCAAAJA8DAAAlEAMAACYQAwAAJxEDAAAoEgMAACkKEwAAKhQBAAArFAEAACwUFQAALRYDAAAuFwMAAC8XAwAAMBgDAAAxGQMAADIaCgAAMxsDAAA0HB0AADUeHwAANiADAAA3IQMAADgCHQAAOSIdAAVlJSYCAwAFZiUnAgMAA2cXFQABaAEBAAVpKisCAwACai0DAQYFawMwAgMEAmwXMgEGAW0BAQAFbjUDAgMABms4OQAGbwM5AAFwAQEABXEqRgIDACEkIiQhKSUpJiwnLycpKDEoMyg0IS8qLyYxJS8qKSYzJjwqJCUkIiknJCg8KEAoLChBJjQmQSZALiQCBQgNAQMDBgwIDQMABgYMCBEIEQgRAwoBAQYKAQEIAgMFCBEIEQEIDAIIDAMBCA0EBQgRCBEDAQgODgYMCBEIEQgRAwMIEQUDAwoBCggRCgoCCggRDQYMCBEIEQgRAwgRBQMDCA4KCBEKCgIKCBECBgwICgIFCAoEBgwGDAgNAwcGDAYMBQgRCBEDAwEICQEGCAkBBQIGDAgNAQYMAgcICggKBQYMBQgRCBEDAwYMCAwDCgYMBQUIEQgRAwMKCBEKCgIKCBECBwgKAwEICgEGCAoBBggNBAYMCA0FAwUFCA0KCBEKCgIKCBEDBQgNAwIDBggPAggNCAoCBgsSAgkACQEJAAEBAQYJAQcDBwgDBQUICgcICwcIDwIIDAgLAgcLEgIJAAkBCQABBwkBAQgAAgcLEwEJAAkABwcLEgIIEQgBCBEFCAEHCxICCBEIAQcIAwgCAggRCAEBCxICCQAJAQEIBAELEwEJAAEIBQEIBwMHCxICCQAJAQkACQECCA4IDAwDAwUIEQMDAwUHCAEHCAMICwgMAwoIEQoKAgoIEQEIFAQHCxICCA0ICggNBQcLEgIIDQgKAQcIDwEIBgIHCAoHCA8EBgsSAggMCAsFBggLCAwJBwsSAggNCAoIDQMIDQgUCA0HCxICCA0ICgUHCxICCA0ICgEIEAEICAYHCxICCAwICwgMBwsSAggMCAsFBwgLCA0MBwsSAggMCAsIDAUHCxICCAwICwMDAwgKCA0ICgcICwgNBAcLEgIIDQgKCA0HCxICCA0ICgcIFAYHCxICCA0ICggNCAoHAwcIDwcLEgIIDQgKAQkBBXRva2VuBWVycm9yBWV2ZW50BnNpZ25lcgZzdHJpbmcFdGFibGUMcHJvcGVydHlfbWFwDkJ1cm5Ub2tlbkV2ZW50DkNvbGxlY3Rpb25EYXRhGkNvbGxlY3Rpb25NdXRhYmlsaXR5Q29uZmlnC0NvbGxlY3Rpb25zFUNyZWF0ZUNvbGxlY3Rpb25FdmVudBRDcmVhdGVUb2tlbkRhdGFFdmVudAxEZXBvc2l0RXZlbnQOTWludFRva2VuRXZlbnQbTXV0YXRlVG9rZW5Qcm9wZXJ0eU1hcEV2ZW50B1JveWFsdHkFVG9rZW4JVG9rZW5EYXRhC1Rva2VuRGF0YUlkB1Rva2VuSWQVVG9rZW5NdXRhYmlsaXR5Q29uZmlnClRva2VuU3RvcmUNV2l0aGRyYXdFdmVudApiYWxhbmNlX29mBGJ1cm4GU3RyaW5nEWNyZWF0ZV9jb2xsZWN0aW9uI2NyZWF0ZV9jb2xsZWN0aW9uX211dGFiaWxpdHlfY29uZmlnGGNyZWF0ZV9jb2xsZWN0aW9uX3NjcmlwdBRjcmVhdGVfdG9rZW5fZGF0YV9pZA9jcmVhdGVfdG9rZW5faWQTY3JlYXRlX3Rva2VuX2lkX3Jhdx5jcmVhdGVfdG9rZW5fbXV0YWJpbGl0eV9jb25maWcTY3JlYXRlX3Rva2VuX3NjcmlwdBBjcmVhdGVfdG9rZW5kYXRhDWRlcG9zaXRfdG9rZW4OZGlyZWN0X2RlcG9zaXQlZGlyZWN0X2RlcG9zaXRfd2l0aG91dF9ldmVudF9pbnRlcm5hbA9kaXJlY3RfdHJhbnNmZXIWZGlyZWN0X3RyYW5zZmVyX3NjcmlwdAtnZXRfcm95YWx0eRdnZXRfcm95YWx0eV9kZW5vbWluYXRvchVnZXRfcm95YWx0eV9udW1lcmF0b3IRZ2V0X3JveWFsdHlfcGF5ZWUQaW5pdGlhbGl6ZV90b2tlbhdpbml0aWFsaXplX3Rva2VuX3NjcmlwdBZpbml0aWFsaXplX3Rva2VuX3N0b3JlBW1lcmdlC21pbnRfc2NyaXB0Cm1pbnRfdG9rZW4XbXV0YXRlX3Rva2VuX3Byb3BlcnRpZXMFc3BsaXQIdG9rZW5faWQIdHJhbnNmZXIedXBkYXRlX3Rva2VuX3Byb3BlcnR5X2ludGVybmFsDndpdGhkcmF3X3Rva2VuHHdpdGhkcmF3X3dpdGhfZXZlbnRfaW50ZXJuYWwCaWQGYW1vdW50C2Rlc2NyaXB0aW9uBG5hbWUDdXJpBnN1cHBseQdtYXhpbXVtEW11dGFiaWxpdHlfY29uZmlnD2NvbGxlY3Rpb25fZGF0YQVUYWJsZQp0b2tlbl9kYXRhGGNyZWF0ZV9jb2xsZWN0aW9uX2V2ZW50cwtFdmVudEhhbmRsZRhjcmVhdGVfdG9rZW5fZGF0YV9ldmVudHMRbWludF90b2tlbl9ldmVudHMHY3JlYXRvcg9jb2xsZWN0aW9uX25hbWUVcm95YWx0eV9wYXllZV9hZGRyZXNzGnJveWFsdHlfcG9pbnRzX2Rlbm9taW5hdG9yGHJveWFsdHlfcG9pbnRzX251bWVyYXRvcg1wcm9wZXJ0eV9rZXlzD3Byb3BlcnR5X3ZhbHVlcw5wcm9wZXJ0eV90eXBlcwZvbGRfaWQGbmV3X2lkBGtleXMGdmFsdWVzBXR5cGVzDXBheWVlX2FkZHJlc3MQdG9rZW5fcHJvcGVydGllcwtQcm9wZXJ0eU1hcBhsYXJnZXN0X3Byb3BlcnR5X3ZlcnNpb24Hcm95YWx0eRJkZWZhdWx0X3Byb3BlcnRpZXMKY29sbGVjdGlvbg10b2tlbl9kYXRhX2lkEHByb3BlcnR5X3ZlcnNpb24KcHJvcGVydGllcwZ0b2tlbnMOZGVwb3NpdF9ldmVudHMPd2l0aGRyYXdfZXZlbnRzC2J1cm5fZXZlbnRzHG11dGF0ZV90b2tlbl9wcm9wZXJ0eV9ldmVudHMIY29udGFpbnMGYm9ycm93CmFkZHJlc3Nfb2YJbm90X2ZvdW5kCmJvcnJvd19tdXQKZW1pdF9ldmVudANuZXcQbmV3X2V2ZW50X2hhbmRsZQ5hbHJlYWR5X2V4aXN0cwNhZGQF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",
                   "abi": {
                     "address": "0x3",
                     "name": "token",
@@ -31714,12 +32596,26 @@
                             "type": "Address"
                           },
                           {
+                            "type": "Address"
+                          },
+                          {
                             "type": "Struct",
                             "struct": {
-                              "address": "0x3",
-                              "module": "token",
-                              "name": "TokenId"
+                              "address": "0x1",
+                              "module": "string",
+                              "name": "String"
                             }
+                          },
+                          {
+                            "type": "Struct",
+                            "struct": {
+                              "address": "0x1",
+                              "module": "string",
+                              "name": "String"
+                            }
+                          },
+                          {
+                            "type": "U64"
                           },
                           {
                             "type": "U64"
@@ -33264,7 +34160,7 @@
                 "address": "0x3",
                 "stateKeyHash": "j83HuO+ZUxKvu/ih62wPPZdGKEfnyUMNVZwES7SMUR4=",
                 "data": {
-                  "bytecode": "oRzrCwUAAAAKAQAKAgoYAyJyBJQBGAWsAewBB5gDyAII4AVACqAGDwyvBogDDbcJAgAAAQEBAgEDAAQABQgABAYHAAIIBwADEAQCAwEAAQQRBAAABwABAAAJAgEAAAoAAQAACwIBAAAMAwEAAA0EAQAADgUBAAESAwcAAxMJCgIDAAMUCQwCAwADFQ0OAgMAAxYPAQIDAAQXEAEABBgSEQADGQEPAgMEAxoUFQIDAAMbFgECAwAEHBcYAAQdGRoABB4bAQAICAkLCgsJCAsLDggPCA4LEAgPCwgLEAsDBgwFCAEABgwFBQgCCAIDAQYMBAYMBQgBAwcMBQUIAggCAwMFBwsDAgULAwIIAQgEBwsDAggBCAQLAwIIAQgEBQgEAQUCBQsDAggBCAQCBwsDAgkACQEJAAEHCQECCAEIBAEJAQEGCwMCCQAJAQEDAQsDAgkACQECBgwIBAEIAQQFCAIIAgMKBwsDAgULAwIIAQgEBQcLAwIIAQgECAEHCwMCCAEIBAcIBAcLAwIFCwMCCAEIBAUIBAgBAgYLAwIJAAkBCQABAQMHCwMCCQAJAQkACQEDBgwIAQMBCAQBBggEAQYIAQIHCAQIBA90b2tlbl90cmFuc2ZlcnMGc2lnbmVyBnN0cmluZwV0YWJsZQV0b2tlbg5Ub2tlblRyYW5zZmVycwdUb2tlbklkDGNhbmNlbF9vZmZlcgZTdHJpbmcTY2FuY2VsX29mZmVyX3NjcmlwdAVjbGFpbQxjbGFpbV9zY3JpcHQaaW5pdGlhbGl6ZV90b2tlbl90cmFuc2ZlcnMFb2ZmZXIMb2ZmZXJfc2NyaXB0DnBlbmRpbmdfY2xhaW1zBVRhYmxlBVRva2VuCmFkZHJlc3Nfb2YKYm9ycm93X211dAZyZW1vdmUGbGVuZ3RoDWRlc3Ryb3lfZW1wdHkNZGVwb3NpdF90b2tlbhNjcmVhdGVfdG9rZW5faWRfcmF3A25ldwhjb250YWlucwNhZGQOd2l0aGRyYXdfdG9rZW4IdG9rZW5faWQFbWVyZ2UAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAIBDwsDAgULAwIIAQgEAAEAAQAGIwoAEQcMBgsGKgAPAAwDCgMKATgADAQKBAsCOAEMBwsELjgCBgAAAAAAAAAAIQMWBR0LAwsBOAMMBQsFOAQFHwsDAQsACwcRDAIBAQQBABELCwILAwsECwURDQwGDgALAQsGEQACAgEAAQAGIwoAEQcMBgsBKgAPAAwDCgMKBjgADAQKBAsCOAEMBwsELjgCBgAAAAAAAAAAIQMWBR0LAwsGOAMMBQsFOAQFHwsDAQsACwcRDAIDAQQBABELCwILAwsECwURDQwGDgALAQsGEQICBAAAAAEFCwA4BRIALQACBQEAAQATQQoAEQcMCwoLKQAgAwgFCgoAEQQLCyoADwAMCgoKCgEMBQwECwQuCwU4BiADGQUdCgoKATgHOAgLCgsBOAAMCAsACwILAxERDAwODBESFAwNCggKDQwHDAYLBi4LBzgJAzQFPAsICw04CgwJCwkLDBETBUALCAsNCww4CwIGAQQBABEMCwILAwsECwURDQwHDgALAQsHCwYRBQIAAAA=",
+                  "bytecode": "oRzrCwUAAAAKAQAKAgoYAyJyBJQBGAWsAewBB5gD3gII9gVACrYGDwzFBogDDc0JAgAAAQEBAgEDAAQABQgABAYHAAIIBwADEAQCAwEAAQQRBAAABwABAAAJAgEAAAoAAQAACwIBAAAMAwEAAA0EAQAADgUBAAESAwcAAxMJCgIDAAMUCQwCAwADFQ0OAgMAAxYPAQIDAAQXEAEABBgSEQADGQEPAgMEAxoUFQIDAAMbFgECAwAEHBcYAAQdGRoABB4bAQAICAkLCgsJCAsLDggPCA4LEAgPCwgLEAsDBgwFCAEABgwFBQgCCAIDAQYMBAYMBQgBAwcMBQUIAggCAwMFBwsDAgULAwIIAQgEBwsDAggBCAQLAwIIAQgEBQgEAQUCBQsDAggBCAQCBwsDAgkACQEJAAEHCQECCAEIBAEJAQEGCwMCCQAJAQEDAQsDAgkACQECBgwIBAEIAQQFCAIIAgMKBwsDAgULAwIIAQgEBQcLAwIIAQgECAEHCwMCCAEIBAcIBAcLAwIFCwMCCAEIBAUIBAgBAgYLAwIJAAkBCQABAQMHCwMCCQAJAQkACQEDBgwIAQMBCAQBBggEAQYIAQIHCAQIBA90b2tlbl90cmFuc2ZlcnMGc2lnbmVyBnN0cmluZxF0YWJsZV93aXRoX2xlbmd0aAV0b2tlbg5Ub2tlblRyYW5zZmVycwdUb2tlbklkDGNhbmNlbF9vZmZlcgZTdHJpbmcTY2FuY2VsX29mZmVyX3NjcmlwdAVjbGFpbQxjbGFpbV9zY3JpcHQaaW5pdGlhbGl6ZV90b2tlbl90cmFuc2ZlcnMFb2ZmZXIMb2ZmZXJfc2NyaXB0DnBlbmRpbmdfY2xhaW1zD1RhYmxlV2l0aExlbmd0aAVUb2tlbgphZGRyZXNzX29mCmJvcnJvd19tdXQGcmVtb3ZlBmxlbmd0aA1kZXN0cm95X2VtcHR5DWRlcG9zaXRfdG9rZW4TY3JlYXRlX3Rva2VuX2lkX3JhdwNuZXcIY29udGFpbnMDYWRkDndpdGhkcmF3X3Rva2VuCHRva2VuX2lkBW1lcmdlAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQACAQ8LAwIFCwMCCAEIBAABAAEABiMKABEHDAYLBioADwAMAwoDCgE4AAwECgQLAjgBDAcLBC44AgYAAAAAAAAAACEDFgUdCwMLATgDDAULBTgEBR8LAwELAAsHEQwCAQEEAQARCwsCCwMLBAsFEQ0MBg4ACwELBhEAAgIBAAEABiMKABEHDAYLASoADwAMAwoDCgY4AAwECgQLAjgBDAcLBC44AgYAAAAAAAAAACEDFgUdCwMLBjgDDAULBTgEBR8LAwELAAsHEQwCAwEEAQARCwsCCwMLBAsFEQ0MBg4ACwELBhECAgQAAAABBQsAOAUSAC0AAgUBAAEAE0EKABEHDAsKCykAIAMIBQoKABEECwsqAA8ADAoKCgoBDAUMBAsELgsFOAYgAxkFHQoKCgE4BzgICwoLATgADAgLAAsCCwMREQwMDgwREhQMDQoICg0MBwwGCwYuCwc4CQM0BTwLCAsNOAoMCQsJCwwREwVACwgLDQsMOAsCBgEEAQARDAsCCwMLBAsFEQ0MBw4ACwELBwsGEQUCAAAA",
                   "abi": {
                     "address": "0x3",
                     "name": "token_transfers",
@@ -33469,8 +34365,8 @@
                               "type": "Struct",
                               "struct": {
                                 "address": "0x1",
-                                "module": "table",
-                                "name": "Table",
+                                "module": "table_with_length",
+                                "name": "TableWithLength",
                                 "genericTypeParams": [
                                   {
                                     "type": "Address"
@@ -33479,8 +34375,8 @@
                                     "type": "Struct",
                                     "struct": {
                                       "address": "0x1",
-                                      "module": "table",
-                                      "name": "Table",
+                                      "module": "table_with_length",
+                                      "name": "TableWithLength",
                                       "genericTypeParams": [
                                         {
                                           "type": "Struct",
@@ -34028,7 +34924,7 @@
       "eventRootHash": "YPVlJld+KeJV8TgWig4e7McIG/o+rxMn60yg554WVK8=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "WXte9rkaEKWJVOg18MbLeYA8EsZTaTW745p9xFBEu5Q=",
+      "accumulatorRootHash": "wAow+lXSGpsuluvBhhvPZ9FXglDUKtXN2dIaXC0cMxE=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -34116,7 +35012,7 @@
       "gasUsed": "133",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "LkTQs9FmqF8l9nMtbP3c5SiGYXvsiDEiepGsvCS68Mo=",
+      "accumulatorRootHash": "EpOY1LSzFJ8OfRJNqvTWkbUxS+76lCw/DvR+XJAN4Sw=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -34245,7 +35141,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "tIXW+FkF58cH0Q4KTG1dIdukXRkPfYKl7QfhWqlxkKA="
+      "accumulatorRootHash": "eudy92mIRcYs6C74RbA0GgILJrs8LMqVly9w6radid4="
     },
     "blockHeight": "1",
     "type": "STATE_CHECKPOINT",
@@ -34260,7 +35156,7 @@
       "eventRootHash": "xQa4qACFHx4YpbLjBVf8UKi4CXw95t7b2M90GQXvP8Y=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "LJ03GA2t0V06AKUN1MlBwtdosMP0Gg3Xt/fVjk+PZz4=",
+      "accumulatorRootHash": "RDuYtXcijFxNfY396x1XytOpfCRtdUSXuC/iYHjXMwU=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -34348,7 +35244,7 @@
       "gasUsed": "12",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "t9wLorB1Jm1VczTob2OqDPLOrUc7pTJCHVMVN5yKV2M=",
+      "accumulatorRootHash": "rfnG/7vMbkdsVGTvyKdtDR5TWgEzRigxkjDbcKVcSXI=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -34967,7 +35863,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "kcXdPiDs3x24IRoba4fjtrN6cHHmVAwZ0FDNUIP5RjE="
+      "accumulatorRootHash": "cKcYTfO1h/YZxQNELuBT6zJCH6hKb7TmZ5HbbpD4p3I="
     },
     "blockHeight": "2",
     "type": "STATE_CHECKPOINT",
@@ -34982,7 +35878,7 @@
       "eventRootHash": "dliD7Dy093TZN3Zy5Vpvn9Jb7Q3dr30c4Jc4Sa/Z7Ew=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "T4YDNKy9IcDG0PjohQJLLjfzeTX/cAlpgozcYZMRqk8=",
+      "accumulatorRootHash": "q/sl+XjHhffcYYeUX73gmO2NTBtifRDteSO7wBDypeY=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -35065,12 +35961,12 @@
     "version": "8",
     "info": {
       "hash": "",
-      "stateRootHash": "5yveFANuTqiP5ufsAGRNGqw4uoaOAlNMucE4N/SKxqs=",
+      "stateRootHash": "cCYpDrKUNAGlnnNEfQhBPDW59YwNa4mgHhL8tTU7hcg=",
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
-      "gasUsed": "207",
+      "gasUsed": "202",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "TNm1rM+M9M9q0MGpnSD0kFyUouaIt08S2ROfbpZUqlQ=",
+      "accumulatorRootHash": "6k1nIbWd83MjrKYwyg3OXCZwxngyj/bY4cpb9qKQOEM=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -35113,7 +36009,7 @@
                 "module": "TableTestData",
                 "name": "TestTables"
               },
-              "data": "{\"address_table\":{\"handle\":\"41628359270430184382576100336413025137\",\"length\":\"1\"},\"bool_table\":{\"handle\":\"116805451356881919234795654828585245422\",\"length\":\"1\"},\"id_table\":{\"handle\":\"42476557240047746846051606255260451578\",\"length\":\"1\"},\"id_table_id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"3\"},\"string_table\":{\"handle\":\"197462526584581373455022954953075872503\",\"length\":\"1\"},\"table_table\":{\"handle\":\"173762023824516962257854099098347371333\",\"length\":\"1\"},\"u128_table\":{\"handle\":\"264174305102852503668387453535717062944\",\"length\":\"1\"},\"u64_table\":{\"handle\":\"244137585226792454604764828144434396505\",\"length\":\"1\"},\"u8_table\":{\"handle\":\"220633321004698923375349919200168202717\",\"length\":\"1\"},\"vector_string_table\":{\"handle\":\"47764489834007697894366516307929645470\",\"length\":\"1\"},\"vector_u8_table\":{\"handle\":\"16782827087248467185076840030228801590\",\"length\":\"1\"}}"
+              "data": "{\"address_table\":{\"handle\":\"41628359270430184382576100336413025137\"},\"bool_table\":{\"handle\":\"116805451356881919234795654828585245422\"},\"id_table\":{\"handle\":\"42476557240047746846051606255260451578\"},\"id_table_id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"3\"},\"string_table\":{\"handle\":\"197462526584581373455022954953075872503\"},\"table_table\":{\"handle\":\"173762023824516962257854099098347371333\"},\"u128_table\":{\"handle\":\"264174305102852503668387453535717062944\"},\"u64_table\":{\"handle\":\"244137585226792454604764828144434396505\"},\"u8_table\":{\"handle\":\"220633321004698923375349919200168202717\"},\"vector_string_table\":{\"handle\":\"47764489834007697894366516307929645470\"},\"vector_u8_table\":{\"handle\":\"16782827087248467185076840030228801590\"}}"
             }
           }
         },
@@ -35210,7 +36106,7 @@
             "data": {
               "key": "1",
               "keyType": "u8",
-              "value": "{\"handle\":\"97503092101121011699859040571956850102\",\"length\":\"1\"}",
+              "value": "{\"handle\":\"97503092101121011699859040571956850102\"}",
               "valueType": "0x1::table::Table<u8, u8>"
             }
           }
@@ -35310,7 +36206,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "DUxdiS500fB16jCR2en9A97tZqCR65po+hp2dh42ECw="
+      "accumulatorRootHash": "0AjKQd/tVHgquVL4jDhFOevQFUlerPFhHWrV6CRNFEQ="
     },
     "blockHeight": "3",
     "type": "STATE_CHECKPOINT",
