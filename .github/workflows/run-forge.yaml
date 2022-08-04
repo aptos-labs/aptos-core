@@ -22,6 +22,11 @@ on:
         type: string
         default: 480
         description: Duration of the forge test run
+      FORGE_RUNNER_TPS_THRESHOLD:
+        required: false
+        type: string
+        default: 6000
+        description: Minimum required avg tps to pass forge
 
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
@@ -38,7 +43,7 @@ env:
   FORGE_PRE_COMMENT: forge_pre_comment.txt
   FORGE_RUNNER_MODE: k8s
   FORGE_RUNNER_DURATION_SECS: ${{ inputs.FORGE_RUNNER_DURATION_SECS }}
-  FORGE_RUNNER_TPS_THRESHOLD: 6000
+  FORGE_RUNNER_TPS_THRESHOLD: ${{ inputs.FORGE_RUNNER_TPS_THRESHOLD }}
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
 
 jobs:
