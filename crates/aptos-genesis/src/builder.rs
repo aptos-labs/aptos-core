@@ -432,6 +432,11 @@ impl Builder {
     where
         R: rand::RngCore + rand::CryptoRng,
     {
+        println!(
+            "Building genesis with {:?} validators. Directory of output: {:?}",
+            self.num_validators.get(),
+            self.config_dir
+        );
         let mut keygen = KeyGen::from_seed(rng.gen());
 
         // Generate root key
