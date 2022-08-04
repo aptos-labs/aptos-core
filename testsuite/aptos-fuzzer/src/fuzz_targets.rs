@@ -15,10 +15,11 @@ mod network;
 mod proof;
 mod safety_rules;
 mod secure_storage_vault;
-mod state_sync;
 mod storage;
 mod transaction;
 mod vm;
+
+// TODO(joshlind): add a fuzzer for state sync v2!
 
 static ALL_TARGETS: Lazy<BTreeMap<&'static str, Box<dyn FuzzTargetImpl>>> = Lazy::new(|| {
     // List fuzz targets here in this format:
@@ -66,8 +67,6 @@ static ALL_TARGETS: Lazy<BTreeMap<&'static str, Box<dyn FuzzTargetImpl>>> = Lazy
         Box::new(secure_storage_vault::VaultTransitRestoreResponse::default()),
         Box::new(secure_storage_vault::VaultTransitSignResponse::default()),
         Box::new(secure_storage_vault::VaultUnsealedResponse::default()),
-        // State Sync
-        Box::new(state_sync::StateSyncMsg::default()),
         // Storage
         // Box::new(storage::StorageSaveBlocks::default()),
         Box::new(storage::StorageSchemaDecode::default()),

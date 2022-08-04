@@ -41,10 +41,8 @@ use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
 use network_builder::builder::NetworkBuilder;
 use rand::{rngs::StdRng, SeedableRng};
-use state_sync_multiplexer::{
-    state_sync_v1_network_config, StateSyncMultiplexer, StateSyncRuntimes,
-};
-use state_sync_v1::network::{StateSyncEvents, StateSyncSender};
+use state_sync_driver::driver_factory::DriverFactory;
+use state_sync_driver::driver_factory::StateSyncRuntimes;
 use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
@@ -326,7 +324,6 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
         NetworkId,
         storage_service_client::StorageServiceNetworkSender,
     >,
-    state_sync_network_handles: Vec<(NetworkId, StateSyncSender, StateSyncEvents)>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
     mempool_notifier: M,
     consensus_listener: ConsensusNotificationListener,
@@ -359,15 +356,15 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     // Create the chunk executor
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
 
-    // Create the state sync multiplexer
-    let state_sync_multiplexer = StateSyncMultiplexer::new(
-        state_sync_network_handles,
-        mempool_notifier,
-        consensus_listener,
-        db_rw,
-        chunk_executor,
+    // Create the state sync driver factory
+    let state_sync = DriverFactory::create_and_spawn_driver(
+        true,
         node_config,
         waypoint,
+        db_rw,
+        chunk_executor,
+        mempool_notifier,
+        consensus_listener,
         event_subscription_service,
         aptos_data_client,
         streaming_service_client,
@@ -376,7 +373,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     // Create and return the new state sync handle
     Ok(StateSyncRuntimes::new(
         aptos_data_client_runtime,
-        state_sync_multiplexer,
+        state_sync,
         storage_service_runtime,
         streaming_service_runtime,
     ))
@@ -510,7 +507,6 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
 
     let chain_id = fetch_chain_id(&db_rw)?;
     let mut network_runtimes = vec![];
-    let mut state_sync_network_handles = vec![];
     let mut mempool_network_handles = vec![];
     let mut consensus_network_handles = None;
     let mut storage_service_server_network_handles = vec![];
@@ -583,11 +579,6 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         );
         let network_id = network_config.network_id;
 
-        // Create the endpoints to connect the Network to State Sync.
-        let (state_sync_sender, state_sync_events) =
-            network_builder.add_p2p_service(&state_sync_v1_network_config());
-        state_sync_network_handles.push((network_id, state_sync_sender, state_sync_events));
-
         // TODO(philiphayes): configure which networks we serve the storage service
         // on? for example, if we're a light node we wouldn't want to provide the
         // storage service at all.
@@ -639,7 +630,10 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         mempool_notifications::new_mempool_notifier_listener_pair();
     let (consensus_notifier, consensus_listener) =
         consensus_notifications::new_consensus_notifier_listener_pair(
-            node_config.state_sync.client_commit_timeout_ms,
+            node_config
+                .state_sync
+                .state_sync_driver
+                .commit_notification_timeout_ms,
         );
 
     // Create the state sync runtimes
@@ -647,7 +641,6 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         &node_config,
         storage_service_server_network_handles,
         storage_service_client_network_handles,
-        state_sync_network_handles,
         peer_metadata_storage.clone(),
         mempool_notifier,
         consensus_listener,
