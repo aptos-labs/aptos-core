@@ -7,9 +7,6 @@ import { application } from "./application"
 import DialogController from "./dialog_controller.ts"
 application.register("dialog", DialogController)
 
-import NftController from "./nft_controller.ts"
-application.register("nft", NftController)
-
 import HeaderController from "./header_controller.ts"
 application.register("header", HeaderController)
 

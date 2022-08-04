@@ -55,11 +55,6 @@ Rails.application.routes.draw do
   resources :it2_profiles, except: %i[index destroy]
   resources :it2_surveys, except: %i[index destroy]
 
-  # NFTs
-  resources :nfts, only: %i[show update]
-  resources :nft_offers, only: %i[show update]
-  get 'nft-nyc', to: 'nft_nyc#show'
-
   # Leaderboards
   get 'leaderboard/it1', to: redirect('/it1')
   get 'leaderboard/it2', to: redirect('/it2')
