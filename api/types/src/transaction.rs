@@ -264,10 +264,10 @@ impl From<(&BlockMetadata, TransactionInfo, Vec<Event>)> for Transaction {
             id: txn.id().into(),
             epoch: txn.epoch().into(),
             round: txn.round().into(),
-            events,
-            previous_block_votes: txn.previous_block_votes().clone(),
             proposer: txn.proposer().clone().into(),
             failed_proposer_indices: txn.failed_proposer_indices().clone(),
+            previous_block_votes: txn.previous_block_votes().clone(),
+            events,
             timestamp: txn.timestamp_usecs().into(),
         })
     }
@@ -405,10 +405,10 @@ pub struct BlockMetadataTransaction {
     pub id: HashValue,
     pub epoch: U64,
     pub round: U64,
-    pub events: Vec<Event>,
-    pub previous_block_votes: Vec<bool>,
     pub proposer: Address,
     pub failed_proposer_indices: Vec<u32>,
+    pub previous_block_votes: Vec<bool>,
+    pub events: Vec<Event>,
     pub timestamp: U64,
 }
 
