@@ -15,7 +15,6 @@
     "fmt": "yarn _fmt --write",
     "fmt:check": "yarn _fmt --check",
     "cov:clean": "rm -rf coverage",
-    "changelog": "standard-version --skip.bump --skip.commit --skip.tag",
     "generate-client": "openapi -i ../../../api/doc/v1/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
     "checked-publish": "./checked_publish.sh"
   },
@@ -63,5 +62,5 @@
     "ts-node": "^10.9.1",
     "typescript": "^4.7.4"
   },
-  "version": "1.3.1"
+  "version": "1.3.2"
 }
