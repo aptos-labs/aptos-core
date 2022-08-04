@@ -1,14 +1,17 @@
 use crate::context::Context;
+use crate::jwt_auth::{create_jwt_token, jwt_from_header, authorize_jwt};
 use crate::types::auth::{AuthRequest, AuthResponse, Claims};
 use aptos_config::config::PeerRole;
 use aptos_crypto::{noise, x25519};
 use aptos_logger::warn;
-use aptos_types::chain_id::ChainId;
 use aptos_types::PeerId;
-use chrono::Utc;
-use jsonwebtoken::{errors::Error, Algorithm, EncodingKey, Header};
 use warp::filters::BoxedFilter;
-use warp::{reject, reply, Filter, Rejection, Reply};
+use warp::{
+    filters::header::headers_cloned,
+    http::header::{HeaderMap, HeaderValue},
+    reject, Filter, Rejection,
+};
+use warp::{reply, Reply};
 
 pub fn auth(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("auth")
@@ -75,8 +78,8 @@ pub async fn handle_auth(
         }
     }?;
 
-    let token =
-        context.jwt_auth().create_jwt_token(body.chain_id, body.peer_id, peer_role, epoch).map_err(|_| reject::reject())?;
+    let token = create_jwt_token(context.clone(), body.chain_id, body.peer_id, peer_role, epoch)
+        .map_err(|_| reject::reject())?;
 
     let mut rng = rand::rngs::OsRng;
     let response_payload = token.as_bytes();
@@ -96,44 +99,13 @@ pub async fn handle_auth(
     }))
 }
 
-#[derive(Clone)]
-pub struct JWTAuthentication {
-    secret: EncodingKey,
-}
-
-impl JWTAuthentication {
-    pub fn new(key: EncodingKey) -> Self {
-        Self {
-            secret: key,
-        }
-    }
-
-    pub fn create_jwt_token(
-        &self,
-        chain_id: ChainId,
-        peer_id: PeerId,
-        peer_role: PeerRole,
-        epoch: u64,
-    ) -> Result<String, Error> {
-        let issued = Utc::now().timestamp();
-        let expiration = Utc::now()
-            .checked_add_signed(chrono::Duration::minutes(60))
-            .expect("valid timestamp")
-            .timestamp();
-
-        let claims = Claims {
-            chain_id,
-            peer_id,
-            peer_role,
-            epoch,
-            exp: expiration as usize,
-            iat: issued as usize,
-        };
-        let header = Header::new(Algorithm::HS512);
-        jsonwebtoken::encode(
-            &header,
-            &claims,
-            &self.secret,
-        )
-    }
+pub fn with_auth(
+    context: Context,
+    roles: Vec<PeerRole>,
+) -> impl Filter<Extract = (Claims,), Error = Rejection> + Clone {
+    headers_cloned()
+        .map(move |headers: HeaderMap<HeaderValue>| headers)
+        .and_then(jwt_from_header)
+        .and(warp::any().map(move || (context.clone(), roles.clone())))
+        .and_then(authorize_jwt)
 }

@@ -16,14 +16,15 @@ use warp::{Filter, Reply};
 
 use crate::{context::Context, index::routes, validator_cache::{ValidatorSetCache, ValidatorSetCacheUpdater}};
 
-pub mod auth;
-pub mod context;
-pub mod index;
-pub mod rest_client;
+mod context;
+mod auth;
+mod index;
 #[cfg(any(test))]
 pub(crate) mod tests;
 pub(crate) mod types;
-pub mod validator_cache;
+mod rest_client;
+mod validator_cache;
+mod jwt_auth;
 
 #[derive(Clone, Debug, Parser)]
 #[clap(name = "Aptos Telemetry Service", author, version)]

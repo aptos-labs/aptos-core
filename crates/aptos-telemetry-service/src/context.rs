@@ -1,24 +1,31 @@
 use std::{convert::Infallible, sync::Arc};
 
-use crate::{validator_cache::ValidatorSetCache, AptosTelemetryServiceConfig, auth::JWTAuthentication};
+use crate::{
+    validator_cache::ValidatorSetCache,
+    AptosTelemetryServiceConfig,
+};
 use aptos_crypto::noise;
-use jsonwebtoken::EncodingKey;
+use jsonwebtoken::{DecodingKey, EncodingKey};
 use warp::Filter;
 
 #[derive(Clone)]
 pub struct Context {
-    jwt_auth: JWTAuthentication,
     noise_config: Arc<noise::NoiseConfig>,
     validator_cache: ValidatorSetCache,
+
+    pub jwt_encoding_key: EncodingKey,
+    pub jwt_decoding_key: DecodingKey,
 }
 
 impl Context {
     pub fn new(config: &AptosTelemetryServiceConfig, validator_cache: ValidatorSetCache) -> Self {
         let private_key = config.server_private_key.private_key();
         Self {
-            jwt_auth: JWTAuthentication::new(EncodingKey::from_secret(config.jwt_signing_key.as_bytes())),
             noise_config: Arc::new(noise::NoiseConfig::new(private_key)),
             validator_cache,
+
+            jwt_encoding_key: EncodingKey::from_secret(config.jwt_signing_key.as_bytes()),
+            jwt_decoding_key: DecodingKey::from_secret(config.jwt_signing_key.as_bytes()),
         }
     }
 
@@ -32,9 +39,5 @@ impl Context {
 
     pub fn noise_config(&self) -> Arc<noise::NoiseConfig> {
         return self.noise_config.clone();
-    }
-
-    pub fn jwt_auth(&self) -> &JWTAuthentication {
-        return &self.jwt_auth
     }
 }
