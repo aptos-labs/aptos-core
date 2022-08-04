@@ -13,8 +13,6 @@ use crate::{
 use aptos_logger::{debug, trace};
 use warp::Filter;
 
-shadow_rs::shadow!(build);
-
 pub fn list_route(
     server_context: RosettaContext,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
@@ -90,7 +88,7 @@ async fn network_options(
         rosetta_version: ROSETTA_VERSION.to_string(),
         // TODO: Get from node via REST API
         node_version: NODE_VERSION.to_string(),
-        middleware_version: build::PKG_VERSION.to_string(),
+        middleware_version: "0.1.0".to_string(),
     };
 
     let operation_statuses = OperationStatusType::all()
