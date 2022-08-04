@@ -17,8 +17,8 @@ use aptos_types::{
     move_resource::MoveStorage,
     on_chain_config::{access_path_for_config, ConfigID},
     proof::{
-        AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleRangeProof,
-        TransactionAccumulatorSummary,
+        AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleProofExt,
+        SparseMerkleRangeProof, TransactionAccumulatorSummary,
     },
     state_proof::StateProof,
     state_store::{
@@ -381,12 +381,21 @@ pub trait DbReader: Send + Sync {
     /// ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
     ///
     /// This is used by aptos core (executor) internally.
+    fn get_state_value_with_proof_by_version_ext(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
+        unimplemented!()
+    }
+
     fn get_state_value_with_proof_by_version(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        unimplemented!()
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
+        self.get_state_value_with_proof_by_version_ext(state_key, version)
+            .map(|(value, proof_ext)| proof_ext.into())
     }
 
     /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.

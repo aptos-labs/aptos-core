@@ -32,12 +32,14 @@ use proptest::{collection::hash_map, prelude::*};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 
+use crate::{Key, TreeReader};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::hash_map::HashMap,
     io::{prelude::*, Cursor, Read, SeekFrom, Write},
     mem::size_of,
 };
+use storage_interface::DbReader;
 use thiserror::Error;
 
 /// The unique key of each node.
@@ -319,11 +321,14 @@ impl InternalNode {
     }
 
     pub fn hash(&self) -> HashValue {
-        self.merkle_hash(
+        self.gen_node_in_proof(
             0,  /* start index */
             16, /* the number of leaves in the subtree of which we want the hash of root */
             self.generate_bitmaps(),
+            None,
         )
+        .expect("cannot fail")
+        .hash()
     }
 
     pub fn children_sorted(&self) -> impl Iterator<Item = (&Nibble, &Child)> {
@@ -438,23 +443,25 @@ impl InternalNode {
         (bitmaps.0 & mask, bitmaps.1 & mask)
     }
 
-    fn merkle_hash(
+    fn gen_node_in_proof<K: crate::Key, R: TreeReader<K>>(
         &self,
         start: u8,
         width: u8,
         (existence_bitmap, leaf_bitmap): (u16, u16),
-    ) -> HashValue {
+        reader_and_node_key: Option<(&R, &NodeKey)>,
+    ) -> Result<NodeInProof> {
         // Given a bit [start, 1 << nibble_height], return the value of that range.
         let (range_existence_bitmap, range_leaf_bitmap) =
             Self::range_bitmaps(start, width, (existence_bitmap, leaf_bitmap));
-        if range_existence_bitmap == 0 {
+        Ok(if range_existence_bitmap == 0 {
             // No child under this subtree
-            *SPARSE_MERKLE_PLACEHOLDER_HASH
+            NodeInProof::Other(*SPARSE_MERKLE_PLACEHOLDER_HASH)
         } else if width == 1 || (range_existence_bitmap.count_ones() == 1 && range_leaf_bitmap != 0)
         {
             // Only 1 leaf child under this subtree or reach the lowest level
             let only_child_index = Nibble::from(range_existence_bitmap.trailing_zeros() as u8);
-            self.child(only_child_index)
+            let only_child = self
+                .child(only_child_index)
                 .with_context(|| {
                     format!(
                         "Corrupted internal node: existence_bitmap indicates \
@@ -462,21 +469,40 @@ impl InternalNode {
                         only_child_index
                     )
                 })
-                .unwrap()
-                .hash
+                .unwrap();
+            if matches!(only_child.node_type, NodeType::Leaf) {
+                if let Some((tree_reader, node_key)) = reader_and_node_key {
+                    let only_child_node_key =
+                        node_key.gen_child_node_key(only_child.version, only_child_index);
+                    match tree_reader.get_node(&only_child_node_key)? {
+                        Node::Internal(_) => unreachable!("Corrupted internal node: in-memory leaf child is internal node on disk"),
+                        Node::Leaf(leaf_node) => NodeInProof::Leaf(SparseMerkleLeafNode::from(leaf_node))
+                    }
+                } else {
+                    NodeInProof::Other(only_child.hash)
+                }
+            } else {
+                NodeInProof::Other(only_child.hash)
+            }
         } else {
-            let left_child = self.merkle_hash(
-                start,
-                width / 2,
-                (range_existence_bitmap, range_leaf_bitmap),
-            );
-            let right_child = self.merkle_hash(
-                start + width / 2,
-                width / 2,
-                (range_existence_bitmap, range_leaf_bitmap),
-            );
-            SparseMerkleInternalNode::new(left_child, right_child).hash()
-        }
+            let left_child = self
+                .gen_node_in_proof(
+                    start,
+                    width / 2,
+                    (range_existence_bitmap, range_leaf_bitmap),
+                    None,
+                )?
+                .hash();
+            let right_child = self
+                .gen_node_in_proof(
+                    start + width / 2,
+                    width / 2,
+                    (range_existence_bitmap, range_leaf_bitmap),
+                    None,
+                )?
+                .hash();
+            NodeInProof::Other(SparseMerkleInternalNode::new(left_child, right_child).hash())
+        })
     }
 
     /// Gets the child and its corresponding siblings that are necessary to generate the proof for
@@ -499,10 +525,11 @@ impl InternalNode {
     ///     |   MSB|<---------------------- uint 16 ---------------------------->|LSB
     ///  height    chs: `child_half_start`         shs: `sibling_half_start`
     /// ```
-    pub fn get_child_with_siblings(
+    pub fn get_child_with_siblings<K: crate::Key, R: TreeReader<K>>(
         &self,
         node_key: &NodeKey,
         n: Nibble,
+        reader: &R,
     ) -> (Option<NodeKey>, Vec<HashValue>) {
         let mut siblings = vec![];
         let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
@@ -514,10 +541,11 @@ impl InternalNode {
             let width = 1 << h;
             let (child_half_start, sibling_half_start) = get_child_and_sibling_half_start(n, h);
             // Compute the root hash of the subtree rooted at the sibling of `r`.
-            siblings.push(self.merkle_hash(
+            siblings.push(self.gen_node_in_proof(
                 sibling_half_start,
                 width,
                 (existence_bitmap, leaf_bitmap),
+                Some((reader, node_key)),
             ));
 
             let (range_existence_bitmap, range_leaf_bitmap) =
