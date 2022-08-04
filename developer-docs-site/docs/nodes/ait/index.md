@@ -7,7 +7,9 @@ slug: "ait-3"
 
 <p class="card-section-h2">Welcome to AIT-3</p>
 
-The Aptos Incentivized Testnet-3 (AIT-3) is a rewards program for any Aptos community member. All you need is an interest in becoming an Aptos node operator, and be willing and capable to test our new staking and node reputation frameworks.
+The Aptos Incentivized Testnet-3 (AIT-3) is a rewards program for any Aptos community member. All you need is an interest in becoming an Aptos validator node operator, and be willing and capable to test the new features.
+
+## Key AIT-3 dates
 
 :::tip **Key AIT-3 dates:** 
 *All dates and times shown are for Pacific Time, year 2022.*
@@ -17,6 +19,70 @@ The Aptos Incentivized Testnet-3 (AIT-3) is a rewards program for any Aptos comm
 - **August 19:** AIT-3 goes live at noon. Validator score tracking begins.
 - **September 9:** AIT-3 concludes.
 :::
+
+## What's new in AIT-3
+
+Several new features are up for testing by the AIT-3 participants. See below:
+
+### Aptos Wallet
+
+- The new Aptos Wallet, available as a Chrome webapp extension.
+
+### Staking
+
+- Separate accounts for the fund owner and the node operator.
+- Rotating the keys.
+- Effects of changing the stake to weigh more on the proposer. **Hypothesis**: This better reflects the higher compute cost of the proposer.
+
+### On-chain governance
+
+Community to vote on proposals. The following proposals are being considered:
+
+#### Proposal to change the staking parameters
+
+The following staking parameters are being considered: 
+  - Minimum and maximum stake.
+  - Minimum and maximum lockup.
+  - Rewards rate.
+  - Joining and withdrawal limit.
+  - Epoch duration.
+
+#### Gas schedule
+
+- Proposal on the gas schedule.
+
+#### AptosFramework modules
+
+Proposals on AptosFramework modules, such as:
+
+- Deploy AptosFramework modules.
+- Upgrade AptosFramework modules.
+- Proposals on breaking changes.
+
+### Off-chain upgrades
+
+- Changes to consensus.
+- Upgrade the Move VM version.
+- See the version of the software.
+
+### Nodes
+
+- Nodes dynamically joining and leaving when the network is under load. Require the node to leave the network for at least X duration of time (in minutes). 
+- Send all types of transactions to the Aptos blockchain to test for a consistent load on the network and monitor the cost.
+
+### Disaster recovery
+
+- Conduct disaster recovery exercise in simulation
+    - DDOS mitigation.
+    - Data corruption, data loss. 
+    - Operators to restore the node from the backup data.
+- Other operational exercises
+    - Operator to rollback from version B to version A.
+    - Operator to update node configuration.
+- Manual writeset transaction.
+
+
+
 
 To participate in the Aptos Incentivized Testnet-3 (AIT-3) program, follow the below steps. Use these steps as a checklist to keep track of your progress. A detailed documentation for each step is provided.
 
@@ -49,18 +115,10 @@ To participate in the Aptos Incentivized Testnet-3 (AIT-3) program, follow the b
 Participants in the AIT-3 program must demonstrate the ability to configure and deploy a node, and pass the sanctions screening requirements.
 
 <div class="docs-card-container">
+
 <div class="step">
     <div>
         <div class="circle">1</div>
-    </div>
-    <div>
-        <div class="step-title">Create an account with Discord at the Aptos community site</div>
-        <div class="step-caption">First time users, sign up using Discord option on the <a class="reference external" href="https://community.aptoslabs.com/">Aptos Community page</a> and join the <a href="https://discord.gg/aptoslabs"> Aptos Discord server.</a> Then log in using Discord option on the <a class="reference external" href="https://community.aptoslabs.com/">Aptos Community page.</a> <strong>IMPORTANT</strong>: You must use the Discord option to login for AIT-3. Return to this page after you sign up or sign in.</div> 
-    </div>
-</div>
-<div class="step">
-    <div>
-        <div class="circle">2</div>
     </div>
     <div>
         <div class="step-title">Read the Node Requirements</div>
@@ -69,11 +127,11 @@ Participants in the AIT-3 program must demonstrate the ability to configure and 
 </div>
 <div class="step">
     <div>
-        <div class="circle">3</div>
+        <div class="circle">2</div>
     </div>
     <div>
-        <div class="step-title">Follow the instructions to install and deploy a Validator node in the test mode.</div>
-        <div class="step-caption">Follow the detailed node installation steps provided in: <a href="#install-the-nodes-for-ait-2">Install the nodes for AIT-3</a>. <strong>Make sure to set your node in the Test mode.</strong> Instructions are provided in the node installation sections. Test mode is required for Aptos Labs to do a health check on your node.  </div>
+        <div class="step-title">Follow the instructions and deploy a validator node in the test mode.</div>
+        <div class="step-caption">Follow the detailed node installation steps provided in: <a href="#install-the-nodes-for-ait-3">Install the nodes for AIT-3</a>. <strong>Make sure to set your node in the Test mode.</strong> Instructions are provided in the node installation sections. Test mode is required for Aptos Labs to do a health check on your node.  </div>
     </div>
 </div>
 <div class="step">
