@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosAccount } from 'aptos';
-import { WALLET_STATE_LOCAL_STORAGE_KEY } from 'core/constants';
+import { WALLET_STATE_LOCAL_STORAGE_KEY, WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY } from 'core/constants';
 import {
   AptosAccountState, LocalStorageState, Mnemonic, MnemonicState,
 } from 'core/types/stateTypes';
@@ -10,6 +10,7 @@ import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 
 import Browser from 'core/utils/browser';
+import { nodeUrlMap } from './network';
 
 export async function generateMnemonicObject(mnemonicString: string): Promise<Mnemonic> {
   const seed = await bip39.mnemonicToSeed(mnemonicString);
@@ -69,6 +70,19 @@ export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
         resolve(aptosAccount);
       } else {
         resolve(undefined);
+      }
+    });
+  });
+}
+
+export function getBackgroundNodeUrl(): Promise<string> {
+  return new Promise((resolve) => {
+    Browser.storage()?.get([WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY], (result: any) => {
+      const network = result[WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY];
+      if (network) {
+        resolve(network);
+      } else {
+        resolve(nodeUrlMap.Devnet);
       }
     });
   });

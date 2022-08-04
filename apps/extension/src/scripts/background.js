@@ -4,9 +4,8 @@
 import { AptosClient, BCS } from 'aptos';
 import fetchAdapter from '@vespaiach/axios-fetch-adapter';
 import { sign } from 'tweetnacl';
-import { nodeUrlMap } from '../core/utils/network';
 import { MessageMethod, PermissionType } from '../core/types/dappTypes';
-import { getBackgroundAptosAccountState } from '../core/utils/account';
+import { getBackgroundAptosAccountState, getBackgroundNodeUrl } from '../core/utils/account';
 import Permissions from '../core/utils/permissions';
 import { DappErrorType } from '../core/types/errors';
 
@@ -147,13 +146,14 @@ async function signMessage(account, message, sendResponse) {
 
 async function handleDappRequest(request, sendResponse) {
   const account = await getBackgroundAptosAccountState();
+  const network = await getBackgroundNodeUrl();
   if (account === undefined) {
     sendResponse({ error: DappErrorType.NO_ACCOUNTS });
     return;
   }
 
   // The fetch adapter is neccessary to use axios from a service worker
-  const client = new AptosClient(nodeUrlMap.Devnet, { adapter: fetchAdapter });
+  const client = new AptosClient(network, { adapter: fetchAdapter });
   switch (request.method) {
     case MessageMethod.CONNECT:
       connect(account, sendResponse);

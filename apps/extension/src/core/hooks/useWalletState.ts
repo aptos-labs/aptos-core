@@ -147,6 +147,7 @@ export default function useWalletState() {
     try {
       setNodeUrl(network);
       window.localStorage.setItem(WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY, network);
+      Browser.storage()?.set({ [WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY]: network });
     } catch (error) {
       console.error(error);
     }
