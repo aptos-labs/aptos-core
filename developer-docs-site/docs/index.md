@@ -10,8 +10,8 @@ hide_table_of_contents: true
 
 Welcome! At Aptos Labs we are building a Layer 1 for everyone. This documentation will help you develop applications for the Aptos Blockchain, run nodes, and be a part of the blossoming Aptos community. This documentation covers both basic and advanced topics. Here you will find concepts, how-to guides, quickstarts, tutorials, API references, code examples, release notes, and more.
 
-:::tip Looking for the AIT-3 docs?
-  Click [here for Aptos Incentivized Testnet-3 docs](/nodes/ait/ait-3).
+:::tip Looking for the DRAFT AIT-3 docs?
+  Click [here for Aptos Incentivized Testnet-3 DRAFT docs](/nodes/ait/ait-3).
 :::
 
 ## Start here
