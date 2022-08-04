@@ -35,8 +35,8 @@ validator:
     provide_genesis: true
     sync_only: false
     concurrency_level: 8
-    round_initial_timeout_ms:
-    quorum_store_poll_count: 1
+    round_initial_timeout_ms: 1000
+    quorum_store_poll_count: 5
     ledger_prune_window: 10000000
     state_store_prune_window: 1000000
     ledger_pruning_batch_size: 10000
