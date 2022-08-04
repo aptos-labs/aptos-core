@@ -27,6 +27,7 @@ use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{bls12381, x25519, PrivateKey};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
+use aptos_logger::warn;
 use aptos_rest_client::Transaction;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_types::validator_info::ValidatorInfo;
@@ -50,9 +51,8 @@ impl CliTestFramework {
             endpoint,
             faucet_endpoint,
         };
-        let mut keygen = KeyGen::from_seed([9; 32]);
+        let mut keygen = KeyGen::from_os_rng();
 
-        // TODO: Make this allow a passed in random seed
         for _ in 0..num_accounts {
             framework
                 .add_cli_account(keygen.generate_ed25519_private_key())
@@ -74,6 +74,9 @@ impl CliTestFramework {
         let address = self.account_id(index);
         if client.get_account(address).await.is_err() {
             self.fund_account(index).await?;
+            warn!("Funded account {:?}", address);
+        } else {
+            warn!("Account {:?} already exists", address);
         }
 
         Ok(index)
