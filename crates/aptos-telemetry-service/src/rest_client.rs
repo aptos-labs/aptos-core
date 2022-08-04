@@ -1,12 +1,13 @@
 use anyhow::{anyhow, Result};
-use aptos_rest_client::{Client, Response, state::State};
+use aptos_rest_client::{state::State, Client, Response};
 use aptos_types::{
-    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, network_address::NetworkAddress, PeerId
+    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
+    network_address::NetworkAddress, PeerId,
 };
 use serde::de::DeserializeOwned;
 use url::Url;
 
-use crate::types::validator_set::{ValidatorSet,ValidatorInfo, ValidatorConfig};
+use crate::types::validator_set::{ValidatorConfig, ValidatorInfo, ValidatorSet};
 
 #[derive(Clone)]
 pub struct RestClient {
@@ -44,7 +45,6 @@ impl RestClient {
         }
         Ok((validator_infos, state))
     }
-
 
     pub async fn validator_set_validator_addresses(
         &self,

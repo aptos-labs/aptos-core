@@ -1,9 +1,6 @@
 use std::{convert::Infallible, sync::Arc};
 
-use crate::{
-    validator_cache::ValidatorSetCache,
-    AptosTelemetryServiceConfig,
-};
+use crate::{validator_cache::ValidatorSetCache, AptosTelemetryServiceConfig};
 use aptos_crypto::noise;
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use warp::Filter;
@@ -34,10 +31,10 @@ impl Context {
     }
 
     pub fn validator_cache(&self) -> ValidatorSetCache {
-        return self.validator_cache.clone();
+        self.validator_cache.clone()
     }
 
     pub fn noise_config(&self) -> Arc<noise::NoiseConfig> {
-        return self.noise_config.clone();
+        self.noise_config.clone()
     }
 }
