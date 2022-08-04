@@ -5,7 +5,7 @@ chain:
   root_key: '0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956'
   min_stake: 0
   max_stake: 100000
-  epoch_duration_secs: 120 # 2 minutes
+  epoch_duration_secs: 600 # 10 minutes
   recurring_lockup_duration_secs: 86400 # 1 day
   # instead of specifying "initial_lockup_timestamp", just take the delta between
   # the current timestamp
