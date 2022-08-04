@@ -13,6 +13,6 @@ pub(crate) static AGGREGATOR_MODULE: Lazy<ModuleId> =
     Lazy::new(|| ModuleId::new(CORE_CODE_ADDRESS, AGGREGATOR_MODULE_IDENTIFIER.to_owned()));
 
 pub use crate::delta_ext::{
-    delta_change_set::{deserialize, serialize, DeltaChangeSet, DeltaOp},
+    delta_change_set::{addition, deserialize, serialize, subtraction, DeltaChangeSet, DeltaOp},
     transaction::{ChangeSetExt, TransactionOutputExt},
 };

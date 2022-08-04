@@ -41,6 +41,11 @@ fn move_framework_unit_tests() {
 }
 
 #[test]
+fn move_experimental_unit_tests() {
+    run_tests_for_pkg("aptos-experimental");
+}
+
+#[test]
 fn move_stdlib_unit_tests() {
     run_tests_for_pkg("aptos-stdlib");
 }
