@@ -70,17 +70,6 @@
     }
   },
   {
-    "type": "0x1::stake::ValidatorSetConfiguration",
-    "data": {
-      "allow_validator_set_change": false,
-      "maximum_stake": "18446744073709551615",
-      "minimum_stake": "0",
-      "recurring_lockup_duration_secs": "86400",
-      "rewards_rate": "273972",
-      "rewards_rate_denominator": "1000000000"
-    }
-  },
-  {
     "type": "0x1::voting::VotingForum<0x1::governance_proposal::GovernanceProposal>",
     "data": {
       "events": {
@@ -771,6 +760,17 @@
           "val": "1"
         }
       ]
+    }
+  },
+  {
+    "type": "0x1::staking_config::StakingConfig",
+    "data": {
+      "allow_validator_set_change": false,
+      "maximum_stake": "18446744073709551615",
+      "minimum_stake": "0",
+      "recurring_lockup_duration_secs": "86400",
+      "rewards_rate": "273972",
+      "rewards_rate_denominator": "1000000000"
     }
   },
   {
