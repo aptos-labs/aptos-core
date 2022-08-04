@@ -56,21 +56,6 @@ impl BlockMetadata {
     }
 
     pub fn get_prologue_move_args(self, signer: AccountAddress) -> Vec<MoveValue> {
-        // Convert the previous vote bitmask (true if the validator at that index voted)
-        // into a list of validator indices who missed the votes (previous vote = false).
-        let missed_votes = self
-            .previous_block_votes
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, &validator_voted)| {
-                if validator_voted {
-                    None
-                } else {
-                    Some(idx as u64)
-                }
-            })
-            .collect::<Vec<_>>();
-
         vec![
             MoveValue::Signer(signer),
             MoveValue::U64(self.epoch),
@@ -78,7 +63,7 @@ impl BlockMetadata {
             MoveValue::Address(self.proposer),
             MoveValue::Vector(
                 self.proposer_index
-                    .map_or_else(|| vec![], |index| vec![MoveValue::U64(u64::from(index))]),
+                    .map_or_else(Vec::new, |index| vec![MoveValue::U64(u64::from(index))]),
             ),
             MoveValue::Vector(
                 self.failed_proposer_indices
@@ -93,7 +78,6 @@ impl BlockMetadata {
                     .map(MoveValue::Bool)
                     .collect(),
             ),
-            MoveValue::Vector(missed_votes.into_iter().map(MoveValue::U64).collect()),
             MoveValue::U64(self.timestamp_usecs),
         ]
     }

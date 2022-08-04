@@ -266,7 +266,7 @@ impl From<(&BlockMetadata, TransactionInfo, Vec<Event>)> for Transaction {
             round: txn.round().into(),
             events,
             previous_block_votes: txn.previous_block_votes().clone(),
-            proposer: txn.proposer().clone().into(),
+            proposer: txn.proposer().into(),
             failed_proposer_indices: txn.failed_proposer_indices().clone(),
             timestamp: txn.timestamp_usecs().into(),
         })

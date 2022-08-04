@@ -80,7 +80,6 @@ module aptos_framework::block {
         proposer_index_optional: vector<u64>,
         failed_proposer_indices: vector<u64>,
         previous_block_votes: vector<bool>,
-        missed_vote_indices: vector<u64>,
         timestamp: u64
     ) acquires BlockMetadata {
         timestamp::assert_operating();
@@ -109,7 +108,7 @@ module aptos_framework::block {
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
-        stake::update_performance_statistics(proposer_index_optional, failed_proposer_indices, missed_vote_indices);
+        stake::update_performance_statistics(proposer_index_optional, failed_proposer_indices);
 
         if (timestamp - reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_interval) {
             reconfiguration::reconfigure();

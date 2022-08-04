@@ -29,7 +29,7 @@ use aptos_types::account_config::new_block_event_key;
 use aptos_types::{
     account_config,
     block_metadata::BlockMetadata,
-    on_chain_config::{new_epoch_event_key, GasSchedule, VMConfig, Version},
+    on_chain_config::{new_epoch_event_key, GasSchedule, Version},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
         Transaction, TransactionOutput, TransactionPayload, TransactionStatus, VMValidatorResult,

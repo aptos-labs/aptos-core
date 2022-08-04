@@ -100,7 +100,6 @@ pub static NEW_BLOCK_EVENT_PATH: Lazy<Vec<u8>> = Lazy::new(|| {
 });
 
 /// Should be kept in-sync with BlockMetadata move struct in block.move.
-/// TODO: Should be renamed to BlockMetadata to match.
 #[derive(Deserialize, Serialize)]
 pub struct BlockResource {
     height: u64,
