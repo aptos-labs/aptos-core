@@ -25,13 +25,11 @@ async fn test_auth() {
     let initiator_public_key = initiator_static.public_key();
     let initiator = noise::NoiseConfig::new(initiator_static);
     let chain_id = ChainId::new(21);
-    let peer_id = PeerId::from(account_address::from_identity_public_key(
-        initiator_public_key.clone(),
-    ));
+    let peer_id = account_address::from_identity_public_key(initiator_public_key);
     let protocols = vec![
         Dns(DnsName::try_from("example.com".to_string()).unwrap()),
         Tcp(1234),
-        NoiseIK(initiator_public_key.clone()),
+        NoiseIK(initiator_public_key),
         Handshake(0),
     ];
     let addr = NetworkAddress::from_protocols(protocols).unwrap();
@@ -116,9 +114,7 @@ async fn test_auth_wrong_key() {
     let initiator_public_key = initiator_static.public_key();
     let initiator = noise::NoiseConfig::new(initiator_static);
     let chain_id = ChainId::new(21);
-    let peer_id = PeerId::from(account_address::from_identity_public_key(
-        initiator_public_key.clone(),
-    ));
+    let peer_id: PeerId = account_address::from_identity_public_key(initiator_public_key);
     let protocols = vec![
         Dns(DnsName::try_from("example.com".to_string()).unwrap()),
         Tcp(1234),
@@ -169,7 +165,7 @@ async fn test_auth_wrong_key() {
 
     let resp: AuthResponse = serde_json::from_value(resp).unwrap();
 
-    let (_, session) = initiator
+    initiator
         .finalize_connection(initiator_state, resp.handshake_msg.unwrap().as_slice())
         .unwrap();
 }

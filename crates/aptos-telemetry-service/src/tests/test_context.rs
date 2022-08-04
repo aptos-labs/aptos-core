@@ -1,8 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use crate::{
-    context::Context, index, validator_cache::ValidatorSetCache,
-    AptosTelemetryServiceConfig,
+    context::Context, index, validator_cache::ValidatorSetCache, AptosTelemetryServiceConfig,
 };
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::{x25519, Uniform};
@@ -45,6 +44,7 @@ impl TestContext {
         }
     }
 
+    #[allow(dead_code)]
     pub async fn get(&self, path: &str) -> Value {
         self.execute(warp::test::request().method("GET").path(path))
             .await

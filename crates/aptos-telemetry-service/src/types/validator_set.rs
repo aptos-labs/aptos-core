@@ -1,10 +1,7 @@
-use aptos_types::{
-    account_address::AccountAddress,
-    network_address::NetworkAddress,
-};
-use serde::{Deserialize, Serialize};
-use aptos_rest_client::types::{deserialize_from_prefixed_hex_string,deserialize_from_string};
+use aptos_rest_client::types::{deserialize_from_prefixed_hex_string, deserialize_from_string};
+use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress};
 use hex::FromHex;
+use serde::{Deserialize, Serialize};
 use serde_repr::*;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -50,7 +47,6 @@ impl ValidatorInfo {
 pub enum ConsensusScheme {
     Ed25519 = 0,
 }
-
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ValidatorSet {
