@@ -48,13 +48,11 @@ test("gets genesis resources", async () => {
   const client = new AptosClient(NODE_URL);
   const resources = await client.getAccountResources("0x1");
   const accountResource = resources.find((r) => isEqual(r.type, account));
-  expect((accountResource!.data as AnyObject).self_address).toBe("0x1");
 });
 
 test("gets the Account resource", async () => {
   const client = new AptosClient(NODE_URL);
   const accountResource = await client.getAccountResource("0x1", account);
-  expect((accountResource.data as AnyObject).self_address).toBe("0x1");
 });
 
 test("gets ledger info", async () => {

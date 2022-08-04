@@ -5,7 +5,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "44378",
+    "gas_used": "41112",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -27,7 +27,6 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
             "sequence_number": "12"
           }
         }
@@ -49,7 +48,6 @@
                 }
               }
             },
-            "self_address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
             "sequence_number": "0"
           }
         }
@@ -236,7 +234,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "44378",
+    "gas_used": "41112",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -258,7 +256,6 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
             "sequence_number": "13"
           }
         }
@@ -280,7 +277,6 @@
                 }
               }
             },
-            "self_address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
             "sequence_number": "0"
           }
         }
@@ -467,7 +463,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "44378",
+    "gas_used": "41112",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -489,7 +485,6 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
             "sequence_number": "14"
           }
         }
@@ -511,7 +506,6 @@
                 }
               }
             },
-            "self_address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
             "sequence_number": "0"
           }
         }
@@ -698,7 +692,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "44378",
+    "gas_used": "41112",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -720,7 +714,6 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
             "sequence_number": "15"
           }
         }
@@ -742,7 +735,6 @@
                 }
               }
             },
-            "self_address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
             "sequence_number": "0"
           }
         }
@@ -929,7 +921,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "44378",
+    "gas_used": "41112",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -951,7 +943,6 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
             "sequence_number": "16"
           }
         }
@@ -973,7 +964,6 @@
                 }
               }
             },
-            "self_address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
             "sequence_number": "0"
           }
         }
@@ -1160,7 +1150,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "44378",
+    "gas_used": "41112",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1182,7 +1172,6 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
             "sequence_number": "17"
           }
         }
@@ -1204,7 +1193,6 @@
                 }
               }
             },
-            "self_address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
             "sequence_number": "0"
           }
         }
@@ -1391,7 +1379,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "44378",
+    "gas_used": "41112",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1413,7 +1401,6 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
             "sequence_number": "18"
           }
         }
@@ -1435,7 +1422,6 @@
                 }
               }
             },
-            "self_address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
             "sequence_number": "0"
           }
         }
@@ -1622,7 +1608,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "44378",
+    "gas_used": "41112",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1644,7 +1630,6 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
             "sequence_number": "19"
           }
         }
@@ -1666,7 +1651,6 @@
                 }
               }
             },
-            "self_address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
             "sequence_number": "0"
           }
         }
@@ -1853,7 +1837,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "44378",
+    "gas_used": "41112",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1875,7 +1859,6 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
             "sequence_number": "20"
           }
         }
@@ -1897,7 +1880,6 @@
                 }
               }
             },
-            "self_address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
             "sequence_number": "0"
           }
         }

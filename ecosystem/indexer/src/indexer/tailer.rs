@@ -399,7 +399,6 @@ mod test {
                         "type":"0x1::account::Account",
                         "data":{
                            "authentication_key":"0x1e4dcad3d5d94307f30d51ff66d2ce784e0c2822d3138766907179bcb61f9edc",
-                           "self_address":"0x1",
                            "sequence_number":"0"
                         }
                      }
@@ -480,7 +479,6 @@ mod test {
                               "type":"0x1::account::Account",
                               "data":{
                                  "authentication_key":"0x1e4dcad3d5d94307f30d51ff66d2ce784e0c2822d3138766907179bcb61f9edc",
-                                 "self_address":"0x1",
                                  "sequence_number":"0"
                               }
                            }

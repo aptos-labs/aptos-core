@@ -8,7 +8,7 @@
       "eventRootHash": "YPVlJld+KeJV8TgWig4e7McIG/o+rxMn60yg554WVK8=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "4IEr90E1L0uyqcGP8tEpbdl7z48PwD8qMYfc8auyEiA=",
+      "accumulatorRootHash": "bTh3lXEeNIljbjonlMk5+IDFN4/l8MkiSaH/UAEjGJw=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -91,12 +91,12 @@
     "version": "2",
     "info": {
       "hash": "",
-      "stateRootHash": "0LvMgaTMpRSJvQzPftcCWcJ0DS3dy5Q1cwDg4ljDrmk=",
+      "stateRootHash": "YG7T1XbAbLw8rukc5IW1gXFV/pn3u9L0J6tanOnasJk=",
       "eventRootHash": "6llLf9EwoZ37+xJflmiRHF3KOw3ClFeYXcASEj/i/XA=",
-      "gasUsed": "44378",
+      "gasUsed": "41112",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "YvUJ569U7Q4XIpSqW1s8d4rPBB7m7kBft7BxkuFVqE4=",
+      "accumulatorRootHash": "LulYMtygRFEfowptPRfzs6tPV4j6cawUYmYCVvGIfy0=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -109,7 +109,7 @@
                 "module": "account",
                 "name": "Account"
               },
-              "data": "{\"authentication_key\":\"0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a\",\"coin_register_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa550c18\",\"creation_num\":\"0\"}}},\"self_address\":\"0xa550c18\",\"sequence_number\":\"1\"}"
+              "data": "{\"authentication_key\":\"0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a\",\"coin_register_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa550c18\",\"creation_num\":\"0\"}}},\"sequence_number\":\"1\"}"
             }
           }
         },
@@ -124,7 +124,7 @@
                 "module": "account",
                 "name": "Account"
               },
-              "data": "{\"authentication_key\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"coin_register_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"0\"}}},\"self_address\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"sequence_number\":\"0\"}"
+              "data": "{\"authentication_key\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"coin_register_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"0\"}}},\"sequence_number\":\"0\"}"
             }
           }
         },
@@ -225,7 +225,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "sfVGHHZA4gHaKIcU4NUleAsSvKjm84TTxNO3F9OnV7U="
+      "accumulatorRootHash": "mthKU6HdPhzhKErNMhIngKfpMwk4LAnJtEotnbNB/ao="
     },
     "blockHeight": "1",
     "type": "STATE_CHECKPOINT",
@@ -240,7 +240,7 @@
       "eventRootHash": "xQa4qACFHx4YpbLjBVf8UKi4CXw95t7b2M90GQXvP8Y=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "NdPwFgbcn+ntBh27KhUfzwpHdXcp7nnQnGhOixsmz80=",
+      "accumulatorRootHash": "iy4SI3iTSXXoY/Aix1ET7XfHAFNFwyeZ3CvlR7lG1MM=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -323,12 +323,12 @@
     "version": "5",
     "info": {
       "hash": "",
-      "stateRootHash": "zw7d+KuH/I8CLNUGkOXHbXwLNgJbV+Fh2pPo5KASwi0=",
+      "stateRootHash": "uUbfqPVcD0wmLXsmEN+OU7I0s9OJgAGUat0irSdNBMA=",
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "gasUsed": "4496",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "y4yyCuiZLSZZuTXse/Znu88i5LFA7DM4QFItC4V6g7c=",
+      "accumulatorRootHash": "s/yhscu8BEZ7JZ3HdFJk7Kq/F6unY+B08cDtjkf/EgI=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -341,7 +341,7 @@
                 "module": "account",
                 "name": "Account"
               },
-              "data": "{\"authentication_key\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"coin_register_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"0\"}}},\"self_address\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"sequence_number\":\"1\"}"
+              "data": "{\"authentication_key\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"coin_register_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"0\"}}},\"sequence_number\":\"1\"}"
             }
           }
         },
@@ -947,7 +947,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "DKLvGL/xnl5lAlocMn2GI8vmw7MvFEh3pxHdyWRpQKk="
+      "accumulatorRootHash": "gQlUC6hhBRBTphD+XLDUE+IwdTUxfM/uhSOxuOF8Mw8="
     },
     "blockHeight": "2",
     "type": "STATE_CHECKPOINT",
@@ -962,7 +962,7 @@
       "eventRootHash": "dliD7Dy093TZN3Zy5Vpvn9Jb7Q3dr30c4Jc4Sa/Z7Ew=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "RNvntjwQ9cp5eLtkcbm5YdCpLDY2sIBTw/BWVKos+H4=",
+      "accumulatorRootHash": "UjEueXvDVuf+Cf506dq0fDc4uqdSD3MYZQg8VLtRFmw=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -1045,12 +1045,12 @@
     "version": "8",
     "info": {
       "hash": "",
-      "stateRootHash": "cCYpDrKUNAGlnnNEfQhBPDW59YwNa4mgHhL8tTU7hcg=",
+      "stateRootHash": "hgU5GHSlMITe6kaSFqqBOS+j5mNWJ+rxUVMDEc1AAXE=",
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "gasUsed": "28029",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "TgfSBtRH/xwIl69iCuf2a60VB1y3GECcPrmX5a+5NBY=",
+      "accumulatorRootHash": "XLT0jnlbZxHEYuPKNTgUG7oFm2U2EaKunaEmrSTUZks=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -1063,7 +1063,7 @@
                 "module": "account",
                 "name": "Account"
               },
-              "data": "{\"authentication_key\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"coin_register_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"0\"}}},\"self_address\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"sequence_number\":\"2\"}"
+              "data": "{\"authentication_key\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"coin_register_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"0\"}}},\"sequence_number\":\"2\"}"
             }
           }
         },
@@ -1290,7 +1290,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "QKpFePfbYjF4EL5YIEbFhxHz4EGHvYx0wmqH19Bx4/Y="
+      "accumulatorRootHash": "FIDJ83oh+Fad9iGrmhQxx26X9jfY75M2k1HyiKQl8n0="
     },
     "blockHeight": "3",
     "type": "STATE_CHECKPOINT",
