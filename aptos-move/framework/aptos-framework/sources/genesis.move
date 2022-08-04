@@ -4,18 +4,19 @@ module aptos_framework::genesis {
     use std::vector;
 
     use aptos_framework::account;
+    use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::aptos_governance;
-    use aptos_framework::coins;
-    use aptos_framework::consensus_config;
-    use aptos_framework::version;
     use aptos_framework::block;
     use aptos_framework::chain_id;
+    use aptos_framework::coins;
+    use aptos_framework::consensus_config;
+    use aptos_framework::gas_schedule;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
-    use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
-    use aptos_framework::gas_schedule;
+    use aptos_framework::staking_config;
+    use aptos_framework::version;
 
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;
@@ -66,7 +67,8 @@ module aptos_framework::genesis {
         // Consensus config setup
         consensus_config::initialize(&aptos_framework_account);
         version::initialize(&aptos_framework_account, initial_version);
-        stake::initialize_validator_set(
+        stake::initialize(&aptos_framework_account);
+        staking_config::initialize(
             &aptos_framework_account,
             minimum_stake,
             maximum_stake,
