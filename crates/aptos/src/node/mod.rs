@@ -341,7 +341,7 @@ impl CliCommand<Transaction> for RegisterValidatorCandidate {
             .submit_transaction(aptos_stdlib::stake_register_validator_candidate(
                 consensus_public_key.to_bytes().to_vec(),
                 consensus_proof_of_possession.to_bytes().to_vec(),
-                // Double BCS encode, so that we can hide the original type
+                // BCS encode, so that we can hide the original type
                 bcs::to_bytes(&validator_network_addresses)?,
                 bcs::to_bytes(&full_node_network_addresses)?,
             ))
@@ -698,7 +698,7 @@ impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_update_network_and_fullnode_addresses(
                 address,
-                // Double BCS encode, so that we can hide the original type
+                // BCS encode, so that we can hide the original type
                 bcs::to_bytes(&validator_network_addresses)?,
                 bcs::to_bytes(&full_node_network_addresses)?,
             ))
