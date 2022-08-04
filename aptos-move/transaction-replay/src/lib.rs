@@ -153,7 +153,7 @@ impl AptosDebugger {
             ..Default::default()
         };
 
-        let (_, output) = vm
+        let (_, output_ext) = vm
             .execute_writeset_transaction(
                 &cache.as_move_resolver(),
                 payload,
@@ -163,7 +163,7 @@ impl AptosDebugger {
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
         // Since we execute write sets, deltas cannot be produced.
-        let (_, output) = output.into();
+        let (_, output) = output_ext.into();
 
         if save_write_set {
             self.save_write_sets(&output)?;

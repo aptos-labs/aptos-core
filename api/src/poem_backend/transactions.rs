@@ -28,6 +28,7 @@ use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::transaction::{
     ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction, TransactionStatus,
 };
+use aptos_types::vm_status::VMStatus;
 use aptos_vm::AptosVM;
 use poem_openapi::param::{Path, Query};
 use poem_openapi::payload::Json;
@@ -530,15 +531,18 @@ impl TransactionsApi {
         }
         let ledger_info = self.context.get_latest_ledger_info_poem()?;
         let move_resolver = self.context.move_resolver_poem()?;
-        let (status, output) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
+        let (status, output_ext) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
         let version = ledger_info.version();
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,
             _ => ExecutionStatus::MiscellaneousError(None),
         };
 
-        // TODO: Here we need to materialize deltas.
-        let (_, output) = output.into();
+        // Apply deltas.
+        // TODO: while `into_transaction_output_with_status()` should never fail
+        // to apply deltas, we should propagate errors properly.
+        let (vm_status, output) = output_ext.into_transaction_output_with_status(&move_resolver);
+        debug_assert!(vm_status == VMStatus::Executed);
 
         let zero_hash = aptos_crypto::HashValue::zero();
         let info = aptos_types::transaction::TransactionInfo::new(

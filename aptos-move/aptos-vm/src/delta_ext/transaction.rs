@@ -69,6 +69,9 @@ impl TransactionOutputExt {
     }
 
     /// Similar to `into()` but tries to apply delta changes as well.
+    /// TODO: ideally, we may want to expose this function to VM instead. Since
+    /// we do not care about rerunning the epilogue - it sufficies to have it
+    /// here for now.
     pub fn into_transaction_output_with_status(
         self,
         state_view: &impl StateView,
@@ -84,9 +87,12 @@ impl TransactionOutputExt {
             Err(_) => {
                 // TODO: at this point we know that delta application failed
                 // (and it should have occurred in user transaction in general).
-                // We need to rerun the epilogue and charge gas. Since we
-                // support only a limited set of features for the aggregator
-                // anyway, for now - panic.
+                // We need to rerun the epilogue and charge gas. Currently, the use
+                // case of an aggregator is for gas fees (which are computed in
+                // the epilogue), and therefore this should never happen.
+                // Also, it is worth mentioning that current VM error handling is
+                // rather ugly and has a lot of legacy code. This makes proper error
+                // handling quite challenging.
                 panic!("something terrible happened when applying aggregator deltas")
             }
             Ok(mut materialized_deltas) => {

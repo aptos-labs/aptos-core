@@ -20,6 +20,7 @@ use aptos_crypto::signing_message;
 use aptos_types::{
     mempool_status::MempoolStatusCode,
     transaction::{RawTransaction, RawTransactionWithData, SignedTransaction},
+    vm_status::VMStatus,
 };
 
 use aptos_crypto::HashValue;
@@ -343,15 +344,18 @@ impl Transactions {
             ));
         }
         let state_view = &*self.context.move_resolver()?;
-        let (status, output) = AptosVM::simulate_signed_transaction(&txn, state_view);
+        let (status, output_ext) = AptosVM::simulate_signed_transaction(&txn, state_view);
         let version = self.ledger_info.version();
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,
             _ => ExecutionStatus::MiscellaneousError(None),
         };
 
-        // TODO: Here we need to materialize deltas.
-        let (_, output) = output.into();
+        // Apply deltas.
+        // TODO: while `into_transaction_output_with_status()` should never fail
+        // to apply deltas, we should propagate errors properly.
+        let (vm_status, output) = output_ext.into_transaction_output_with_status(state_view);
+        debug_assert!(vm_status == VMStatus::Executed);
 
         let zero_hash = HashValue::zero();
         let info = TransactionInfo::new(
