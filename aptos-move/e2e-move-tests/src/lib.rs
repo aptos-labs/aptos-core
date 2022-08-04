@@ -5,7 +5,9 @@ use aptos::common::types::MovePackageDir;
 use aptos::move_tool::{BuiltPackage, MemberId};
 use aptos_types::access_path;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{ScriptFunction, TransactionPayload, TransactionStatus};
+use aptos_types::transaction::{
+    ScriptFunction, SignedTransaction, TransactionPayload, TransactionStatus,
+};
 use cached_framework_packages::aptos_stdlib;
 use framework::natives::code::UpgradePolicy;
 use language_e2e_tests::account::{Account, AccountData};
@@ -47,14 +49,61 @@ impl MoveHarness {
         }
     }
 
+    pub fn new_no_parallel() -> Self {
+        Self {
+            executor: FakeExecutor::from_fresh_genesis().set_not_parallel(),
+            txn_seq_no: BTreeMap::default(),
+        }
+    }
+
     /// Creates an account for the given static address. This address needs to be static so
     /// we can load regular Move code to there without need to rewrite code addresses.
     pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
         let data = AccountData::with_account(acc, 1_000_000, 10);
+        self.txn_seq_no.insert(addr, 10);
         self.executor.add_account_data(&data);
         data.account().clone()
+    }
+
+    /// Runs a signed transaction. On success, applies the write set.
+    pub fn run(&mut self, txn: SignedTransaction) -> TransactionStatus {
+        let output = self.executor.execute_transaction(txn);
+        if matches!(output.status(), TransactionStatus::Keep(_)) {
+            self.executor.apply_write_set(output.write_set());
+        }
+        output.status().to_owned()
+    }
+
+    /// Runs a block of signed transactions. On success, applies the write set.
+    pub fn run_block(&mut self, txn_block: Vec<SignedTransaction>) -> Vec<TransactionStatus> {
+        let mut result = vec![];
+        for output in self.executor.execute_block(txn_block).unwrap() {
+            if matches!(output.status(), TransactionStatus::Keep(_)) {
+                self.executor.apply_write_set(output.write_set());
+            }
+            result.push(output.status().to_owned())
+        }
+        result
+    }
+
+    /// Creates a transaction, based on provided payload.
+    pub fn create_transaction_payload(
+        &mut self,
+        account: &Account,
+        payload: TransactionPayload,
+    ) -> SignedTransaction {
+        // We initialize for some reason with 10, so use 10 as the first value here too
+        let seq_no_ref = self.txn_seq_no.get_mut(account.address()).unwrap();
+        let seq_no = *seq_no_ref;
+        *seq_no_ref += 1;
+        account
+            .transaction()
+            .sequence_number(seq_no)
+            .gas_unit_price(1)
+            .payload(payload)
+            .sign()
     }
 
     /// Runs a transaction, based on provided payload. If the transaction succeeds, any generated
@@ -64,38 +113,24 @@ impl MoveHarness {
         account: &Account,
         payload: TransactionPayload,
     ) -> TransactionStatus {
-        let seq_no = if let Some(n) = self.txn_seq_no.get(account.address()) {
-            *n
-        } else {
-            10 // that is what we used above to initialize the account with
-        };
-        let txn = account
-            .transaction()
-            .sequence_number(seq_no)
-            .gas_unit_price(1)
-            .payload(payload)
-            .sign();
-        let output = self.executor.execute_transaction(txn);
-        if matches!(output.status(), TransactionStatus::Keep(_)) {
-            self.executor.apply_write_set(output.write_set());
-            self.txn_seq_no.insert(*account.address(), seq_no + 1);
-        }
-        output.status().to_owned()
+        let txn = self.create_transaction_payload(account, payload);
+        self.run(txn)
     }
 
-    /// Run the specified entry point `fun`. Arguments need to be provided in bcs-serialized form.
-    pub fn run_entry_function(
+    /// Creates a transaction which runs the specified entry point `fun`. Arguments need to be
+    /// provided in bcs-serialized form.
+    pub fn create_entry_function(
         &mut self,
         account: &Account,
         fun: MemberId,
         ty_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
-    ) -> TransactionStatus {
+    ) -> SignedTransaction {
         let MemberId {
             module_id,
             member_id: function_id,
         } = fun;
-        self.run_transaction_payload(
+        self.create_transaction_payload(
             account,
             TransactionPayload::ScriptFunction(ScriptFunction::new(
                 module_id,
@@ -106,26 +141,50 @@ impl MoveHarness {
         )
     }
 
-    /// Publishes the Move Package found at the given path on behalf of the given account.
-    pub fn publish_package(
+    /// Run the specified entry point `fun`. Arguments need to be provided in bcs-serialized form.
+    pub fn run_entry_function(
+        &mut self,
+        account: &Account,
+        fun: MemberId,
+        ty_args: Vec<TypeTag>,
+        args: Vec<Vec<u8>>,
+    ) -> TransactionStatus {
+        let txn = self.create_entry_function(account, fun, ty_args, args);
+        self.run(txn)
+    }
+
+    /// Creates a transaction which publishes the Move Package found at the given path on behalf
+    /// of the given account.
+    pub fn create_publish_package(
         &mut self,
         account: &Account,
         path: &Path,
         upgrade_policy: UpgradePolicy,
-    ) -> TransactionStatus {
+    ) -> SignedTransaction {
         let package = BuiltPackage::build(MovePackageDir::new(path.to_owned()), true, false)
             .expect("building package must succeed");
         let code = package.extract_code();
         let metadata = package
             .extract_metadata(upgrade_policy)
             .expect("extracting package metdata must succeed");
-        self.run_transaction_payload(
+        self.create_transaction_payload(
             account,
             aptos_stdlib::code_publish_package_txn(
                 bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
                 code,
             ),
         )
+    }
+
+    /// Runs transaction which publishes the Move Package.
+    pub fn publish_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        upgrade_policy: UpgradePolicy,
+    ) -> TransactionStatus {
+        let txn = self.create_publish_package(account, path, upgrade_policy);
+        self.run(txn)
     }
 
     /// Reads the raw, serialized data of a resource.
