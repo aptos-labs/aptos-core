@@ -99,6 +99,10 @@ pub enum ScriptFunctionCall {
         coin_type: TypeTag,
     },
 
+    GasScheduleSetGasSchedule {
+        gas_schedule_blob: Bytes,
+    },
+
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
         coin_type: TypeTag,
@@ -209,20 +213,6 @@ pub enum ScriptFunctionCall {
     VersionSetVersion {
         major: u64,
     },
-
-    VmConfigSetGasConstants {
-        global_memory_per_byte_cost: u64,
-        global_memory_per_byte_write_cost: u64,
-        min_transaction_gas_units: u64,
-        large_transaction_cutoff: u64,
-        intrinsic_gas_per_byte: u64,
-        maximum_number_of_gas_units: u64,
-        min_price_per_gas_unit: u64,
-        max_price_per_gas_unit: u64,
-        max_transaction_size_in_bytes: u64,
-        gas_unit_scaling_factor: u64,
-        default_account_size: u64,
-    },
 }
 
 impl ScriptFunctionCall {
@@ -264,6 +254,9 @@ impl ScriptFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinsRegister { coin_type } => coins_register(coin_type),
+            GasScheduleSetGasSchedule { gas_schedule_blob } => {
+                gas_schedule_set_gas_schedule(gas_schedule_blob)
+            }
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -321,31 +314,6 @@ impl ScriptFunctionCall {
             ),
             StakeWithdraw { withdraw_amount } => stake_withdraw(withdraw_amount),
             VersionSetVersion { major } => version_set_version(major),
-            VmConfigSetGasConstants {
-                global_memory_per_byte_cost,
-                global_memory_per_byte_write_cost,
-                min_transaction_gas_units,
-                large_transaction_cutoff,
-                intrinsic_gas_per_byte,
-                maximum_number_of_gas_units,
-                min_price_per_gas_unit,
-                max_price_per_gas_unit,
-                max_transaction_size_in_bytes,
-                gas_unit_scaling_factor,
-                default_account_size,
-            } => vm_config_set_gas_constants(
-                global_memory_per_byte_cost,
-                global_memory_per_byte_write_cost,
-                min_transaction_gas_units,
-                large_transaction_cutoff,
-                intrinsic_gas_per_byte,
-                maximum_number_of_gas_units,
-                min_price_per_gas_unit,
-                max_price_per_gas_unit,
-                max_transaction_size_in_bytes,
-                gas_unit_scaling_factor,
-                default_account_size,
-            ),
         }
     }
 
@@ -569,6 +537,21 @@ pub fn coins_register(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("register").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+pub fn gas_schedule_set_gas_schedule(gas_schedule_blob: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("gas_schedule").to_owned(),
+        ),
+        ident_str!("set_gas_schedule").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&gas_schedule_blob).unwrap()],
     ))
 }
 
@@ -919,45 +902,6 @@ pub fn version_set_version(major: u64) -> TransactionPayload {
         vec![bcs::to_bytes(&major).unwrap()],
     ))
 }
-
-pub fn vm_config_set_gas_constants(
-    global_memory_per_byte_cost: u64,
-    global_memory_per_byte_write_cost: u64,
-    min_transaction_gas_units: u64,
-    large_transaction_cutoff: u64,
-    intrinsic_gas_per_byte: u64,
-    maximum_number_of_gas_units: u64,
-    min_price_per_gas_unit: u64,
-    max_price_per_gas_unit: u64,
-    max_transaction_size_in_bytes: u64,
-    gas_unit_scaling_factor: u64,
-    default_account_size: u64,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("vm_config").to_owned(),
-        ),
-        ident_str!("set_gas_constants").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&global_memory_per_byte_cost).unwrap(),
-            bcs::to_bytes(&global_memory_per_byte_write_cost).unwrap(),
-            bcs::to_bytes(&min_transaction_gas_units).unwrap(),
-            bcs::to_bytes(&large_transaction_cutoff).unwrap(),
-            bcs::to_bytes(&intrinsic_gas_per_byte).unwrap(),
-            bcs::to_bytes(&maximum_number_of_gas_units).unwrap(),
-            bcs::to_bytes(&min_price_per_gas_unit).unwrap(),
-            bcs::to_bytes(&max_price_per_gas_unit).unwrap(),
-            bcs::to_bytes(&max_transaction_size_in_bytes).unwrap(),
-            bcs::to_bytes(&gas_unit_scaling_factor).unwrap(),
-            bcs::to_bytes(&default_account_size).unwrap(),
-        ],
-    ))
-}
 mod decoder {
     use super::*;
     pub fn account_create_account(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
@@ -1080,6 +1024,18 @@ mod decoder {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::CoinsRegister {
                 coin_type: script.ty_args().get(0)?.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn gas_schedule_set_gas_schedule(
+        payload: &TransactionPayload,
+    ) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::GasScheduleSetGasSchedule {
+                gas_schedule_blob: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -1284,26 +1240,6 @@ mod decoder {
             None
         }
     }
-
-    pub fn vm_config_set_gas_constants(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::VmConfigSetGasConstants {
-                global_memory_per_byte_cost: bcs::from_bytes(script.args().get(0)?).ok()?,
-                global_memory_per_byte_write_cost: bcs::from_bytes(script.args().get(1)?).ok()?,
-                min_transaction_gas_units: bcs::from_bytes(script.args().get(2)?).ok()?,
-                large_transaction_cutoff: bcs::from_bytes(script.args().get(3)?).ok()?,
-                intrinsic_gas_per_byte: bcs::from_bytes(script.args().get(4)?).ok()?,
-                maximum_number_of_gas_units: bcs::from_bytes(script.args().get(5)?).ok()?,
-                min_price_per_gas_unit: bcs::from_bytes(script.args().get(6)?).ok()?,
-                max_price_per_gas_unit: bcs::from_bytes(script.args().get(7)?).ok()?,
-                max_transaction_size_in_bytes: bcs::from_bytes(script.args().get(8)?).ok()?,
-                gas_unit_scaling_factor: bcs::from_bytes(script.args().get(9)?).ok()?,
-                default_account_size: bcs::from_bytes(script.args().get(10)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
 }
 
 type ScriptFunctionDecoderMap = std::collections::HashMap<
@@ -1361,6 +1297,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "coins_register".to_string(),
             Box::new(decoder::coins_register),
+        );
+        map.insert(
+            "gas_schedule_set_gas_schedule".to_string(),
+            Box::new(decoder::gas_schedule_set_gas_schedule),
         );
         map.insert(
             "managed_coin_burn".to_string(),
@@ -1430,10 +1370,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "version_set_version".to_string(),
             Box::new(decoder::version_set_version),
-        );
-        map.insert(
-            "vm_config_set_gas_constants".to_string(),
-            Box::new(decoder::vm_config_set_gas_constants),
         );
         map
     });

@@ -685,7 +685,6 @@ impl AccountResourceGen {
         AccountResource::new(
             account_info.sequence_number,
             account_info.public_key.to_bytes().to_vec(),
-            account_info.address,
             EventHandle::random(0),
         )
     }
@@ -710,11 +709,12 @@ pub struct AccountStateGen {
 
 impl AccountStateGen {
     pub fn materialize(self, account_index: Index, universe: &AccountInfoUniverse) -> AccountState {
+        let address = universe.get_account_info(account_index).address;
         let account_resource = self
             .account_resource_gen
             .materialize(account_index, universe);
         let balance_resource = self.balance_resource_gen.materialize();
-        AccountState::try_from((&account_resource, &balance_resource)).unwrap()
+        AccountState::try_from((address, &account_resource, &balance_resource)).unwrap()
     }
 }
 

@@ -20,7 +20,6 @@ use move_deps::{
     move_binary_format::errors::*,
     move_core_types::{
         account_address::AccountAddress,
-        gas_schedule::{GasAlgebra, GasCarrier, InternalGasUnits},
         language_storage::{ModuleId, StructTag},
         resolver::{ModuleResolver, ResourceResolver},
     },
@@ -163,13 +162,8 @@ impl<'a, S: StateView> TableResolver for RemoteStorage<'a, S> {
         self.get_state_value(&StateKey::table_item((*handle).into(), key.to_vec()))
     }
 
-    fn operation_cost(
-        &self,
-        _op: TableOperation,
-        _key_size: usize,
-        _val_size: usize,
-    ) -> InternalGasUnits<GasCarrier> {
-        InternalGasUnits::new(1)
+    fn operation_cost(&self, _op: TableOperation, _key_size: usize, _val_size: usize) -> u64 {
+        1
     }
 }
 
@@ -244,12 +238,7 @@ impl<S: StateView> TableResolver for RemoteStorageOwned<S> {
         self.as_move_resolver().resolve_table_entry(handle, key)
     }
 
-    fn operation_cost(
-        &self,
-        op: TableOperation,
-        key_size: usize,
-        val_size: usize,
-    ) -> InternalGasUnits<GasCarrier> {
+    fn operation_cost(&self, op: TableOperation, key_size: usize, val_size: usize) -> u64 {
         self.as_move_resolver()
             .operation_cost(op, key_size, val_size)
     }
