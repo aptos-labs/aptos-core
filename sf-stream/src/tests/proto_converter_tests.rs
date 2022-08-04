@@ -7,7 +7,6 @@ use crate::{
         transaction::{TransactionType, Txn_data},
         transaction_payload::{Payload, Type as PayloadType},
         write_set_change::Change::WriteTableItem,
-        Transaction,
     },
     runtime::SfStreamer,
     tests::{convert_protubuf_txn_arr_to_serde_value, new_test_context, TestContext},
@@ -86,12 +85,7 @@ async fn test_block_transactions_work() {
         }
     }
 
-    let converted: Vec<Transaction> = converted_0
-        .iter()
-        .cloned()
-        .chain(converted_1.iter().cloned())
-        .collect();
-    test_context.check_golden_output(convert_protubuf_txn_arr_to_serde_value(&converted));
+    test_context.check_golden_output(convert_protubuf_txn_arr_to_serde_value(&converted_1));
 
     // state checkpoint expected
     let txn = converted_1[2].clone();
@@ -204,7 +198,7 @@ async fn test_table_item_parsing_works() {
         assert_eq!(table_kv.get(&expected_k).unwrap(), &expected_v);
     }
 
-    test_context.check_golden_output(convert_protubuf_txn_arr_to_serde_value(&converted));
+    test_context.check_golden_output(convert_protubuf_txn_arr_to_serde_value(&converted[1..]));
 }
 
 async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
