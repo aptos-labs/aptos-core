@@ -1,9 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-  AptosClient, MaybeHexString,
-} from 'aptos';
+import { AptosClient, MaybeHexString } from 'aptos';
 import useWalletState from 'core/hooks/useWalletState';
 import { useQuery, useQueryClient } from 'react-query';
 import { aptosCoinStoreStructTag } from 'core/constants';
@@ -65,23 +63,23 @@ interface UseAccountCoinBalanceParams {
 }
 
 /**
- * Query coin balance for the current account
+ * Query coin balance for the specified account
+ * @param address account address of the balance to be queried
  * @param refetchInterval automatic refetch interval in milliseconds
  */
 export function useAccountCoinBalance({
   address,
   refetchInterval,
 }: UseAccountCoinBalanceParams = {}) {
-  const { aptosAccount, nodeUrl } = useWalletState();
+  const { nodeUrl } = useWalletState();
 
-  const accountAddress = address || aptosAccount?.address()?.hex();
-
-  return useQuery([accountQueryKeys.getAccountCoinBalance, accountAddress], async () => {
+  return useQuery([accountQueryKeys.getAccountCoinBalance, address], async () => {
     const client = new AptosClient(nodeUrl);
-    const resource: any = await client.getAccountResource(accountAddress!, aptosCoinStoreStructTag);
-    return Number(resource.data.coin.value);
+    return client.getAccountResource(address!, aptosCoinStoreStructTag)
+      .then((res: any) => Number(res.data.coin.value))
+      .catch(() => 0);
   }, {
-    enabled: Boolean(accountAddress),
+    enabled: Boolean(address),
     refetchInterval,
   });
 }
