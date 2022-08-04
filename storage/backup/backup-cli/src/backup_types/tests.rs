@@ -20,7 +20,7 @@ use crate::{
     },
 };
 use aptos_temppath::TempPath;
-use aptos_types::transaction::{Transaction, Version};
+use aptos_types::transaction::Version;
 use aptosdb::AptosDB;
 use executor_test_helpers::integration_test_impl::test_execution_with_storage_impl;
 use proptest::{prelude::*, sample::Index};
@@ -32,7 +32,8 @@ use tokio::time::Duration;
 struct TestData {
     db: Arc<AptosDB>,
     txn_start_ver: Version,
-    state_snapshot_ver: Option<Version>,
+    state_snapshot_epoch: Option<u64>,
+    state_snapshot_ver: Option<u64>,
     target_ver: Version,
 }
 
@@ -40,34 +41,30 @@ fn test_data_strategy() -> impl Strategy<Value = TestData> {
     let db = test_execution_with_storage_impl();
     let latest_ver = db.get_latest_version().unwrap();
 
-    let state_checkpoint_versions = db
-        .get_transactions(0, 100, latest_ver, false)
+    let latest_epoch_state = db.get_latest_epoch_state().unwrap();
+    let epoch_ending_lis = db
+        .get_epoch_ending_ledger_infos(0, latest_epoch_state.epoch)
         .unwrap()
-        .transactions
-        .into_iter()
-        .enumerate()
-        .filter_map(|(idx, txn)| match txn {
-            Transaction::GenesisTransaction(_) | Transaction::StateCheckpoint(_) => {
-                Some(idx as Version)
-            }
-            _ => None,
-        })
-        .collect::<Vec<_>>();
+        .ledger_info_with_sigs;
 
     any::<Index>()
         .prop_flat_map(move |state_snapshot_index| {
-            let state_snapshot_ver = *state_snapshot_index.get(&state_checkpoint_versions);
+            let state_snapshot_epoch_li = state_snapshot_index.get(&epoch_ending_lis);
+            let state_snapshot_ver = state_snapshot_epoch_li.ledger_info().version();
+            let state_snapshot_epoch = state_snapshot_epoch_li.ledger_info().epoch();
             (
                 0..=state_snapshot_ver,
-                prop_oneof![Just(Some(state_snapshot_ver)), Just(None)],
+                prop_oneof![Just(Some(state_snapshot_epoch)), Just(None)],
+                Just(state_snapshot_ver),
                 state_snapshot_ver..=latest_ver,
             )
         })
         .prop_map(
-            move |(txn_start_ver, state_snapshot_ver, target_ver)| TestData {
+            move |(txn_start_ver, state_snapshot_epoch, state_snapshot_ver, target_ver)| TestData {
                 db: Arc::clone(&db),
                 txn_start_ver,
-                state_snapshot_ver,
+                state_snapshot_epoch,
+                state_snapshot_ver: state_snapshot_epoch.map(|_| state_snapshot_ver),
                 target_ver,
             },
         )
@@ -90,10 +87,10 @@ fn test_end_to_end_impl(d: TestData) {
     let global_backup_opt = GlobalBackupOpt {
         max_chunk_size: 2048,
     };
-    let state_snapshot_manifest = d.state_snapshot_ver.map(|version| {
+    let state_snapshot_manifest = d.state_snapshot_epoch.map(|epoch| {
         rt.block_on(
             StateSnapshotBackupController::new(
-                StateSnapshotBackupOpt { version },
+                StateSnapshotBackupOpt { epoch },
                 global_backup_opt.clone(),
                 Arc::clone(&client),
                 Arc::clone(&store),

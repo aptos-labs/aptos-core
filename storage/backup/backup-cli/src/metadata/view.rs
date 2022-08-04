@@ -29,7 +29,7 @@ impl MetadataView {
 
         BackupStorageState {
             latest_epoch_ending_epoch,
-            latest_state_snapshot_version,
+            latest_state_snapshot_epoch: latest_state_snapshot_version,
             latest_transaction_version,
         }
     }
@@ -129,7 +129,7 @@ impl From<Vec<Metadata>> for MetadataView {
 
 pub struct BackupStorageState {
     pub latest_epoch_ending_epoch: Option<u64>,
-    pub latest_state_snapshot_version: Option<Version>,
+    pub latest_state_snapshot_epoch: Option<Version>,
     pub latest_transaction_version: Option<Version>,
 }
 
@@ -139,7 +139,7 @@ impl fmt::Display for BackupStorageState {
             f,
             "latest_epoch_ending_epoch: {}, latest_state_snapshot_version: {}, latest_transaction_version: {}",
             self.latest_epoch_ending_epoch.as_ref().map_or("none".to_string(), u64::to_string),
-            self.latest_state_snapshot_version.as_ref().map_or("none".to_string(), Version::to_string),
+            self.latest_state_snapshot_epoch.as_ref().map_or("none".to_string(), Version::to_string),
             self.latest_transaction_version.as_ref().map_or("none".to_string(), Version::to_string),
         )
     }
@@ -170,7 +170,7 @@ impl FromStr for BackupStorageState {
 
         Ok(Self {
             latest_epoch_ending_epoch: captures.get(1).parse_option_u64()?,
-            latest_state_snapshot_version: captures.get(2).parse_option_u64()?,
+            latest_state_snapshot_epoch: captures.get(2).parse_option_u64()?,
             latest_transaction_version: captures.get(3).parse_option_u64()?,
         })
     }

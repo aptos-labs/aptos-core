@@ -10,7 +10,7 @@ use crate::{
     metadata,
     metadata::cache::MetadataCacheOpt,
     metrics::backup::{
-        EPOCH_ENDING_EPOCH, HEARTBEAT_TS, STATE_SNAPSHOT_VERSION, TRANSACTION_VERSION,
+        EPOCH_ENDING_EPOCH, HEARTBEAT_TS, STATE_SNAPSHOT_EPOCH, TRANSACTION_VERSION,
     },
     storage::BackupStorage,
     utils::{
@@ -35,12 +35,10 @@ use tokio_stream::wrappers::IntervalStream;
 pub struct BackupCoordinatorOpt {
     #[structopt(flatten)]
     pub metadata_cache_opt: MetadataCacheOpt,
-    // We replay transactions on top of a state snapshot at about 2000 tps, having a state snapshot
-    // every 2000 * 3600 * 2 = 14.4 Mil versions will guarantee that to achieve any state in
-    // history, it won't take us more than two hours in transaction replaying. Defaulting to 10 Mil
-    // here to make it less than two, and easier for eyes.
-    #[structopt(long, default_value = "10000000")]
-    pub state_snapshot_interval: usize,
+    // Taking a state snapshot involves going through the entire state tree, should be taken
+    // infrequently.
+    #[structopt(long, default_value = "24")]
+    pub state_snapshot_interval_epochs: usize,
     // Assuming the network runs at 100 tps, it's 100 * 3600 = 360k transactions per hour, we don't
     // want the backups to lag behind too much. Defaulting to 100k here in case the network is way
     // slower than expected.
@@ -53,11 +51,11 @@ pub struct BackupCoordinatorOpt {
 impl BackupCoordinatorOpt {
     fn validate(&self) -> Result<()> {
         ensure!(
-            self.state_snapshot_interval > 0 && self.transaction_batch_size > 0,
+            self.state_snapshot_interval_epochs > 0 && self.transaction_batch_size > 0,
             "Backup interval and batch size must be greater than 0."
         );
         ensure!(
-            self.state_snapshot_interval % self.transaction_batch_size == 0,
+            self.state_snapshot_interval_epochs % self.transaction_batch_size == 0,
             "State snapshot interval should be N x transaction_batch_size, N >= 1. \
              Otherwise there can be edge case where the only snapshot is taken at a version  \
              that's not yet in a transaction backup, resulting in replaying all transactions \
@@ -72,7 +70,7 @@ pub struct BackupCoordinator {
     storage: Arc<dyn BackupStorage>,
     global_opt: GlobalBackupOpt,
     metadata_cache_opt: MetadataCacheOpt,
-    state_snapshot_interval: usize,
+    state_snapshot_interval_epochs: usize,
     transaction_batch_size: usize,
     concurrent_downloads: usize,
 }
@@ -90,11 +88,12 @@ impl BackupCoordinator {
             storage,
             global_opt,
             metadata_cache_opt: opt.metadata_cache_opt,
-            state_snapshot_interval: opt.state_snapshot_interval,
+            state_snapshot_interval_epochs: opt.state_snapshot_interval_epochs,
             transaction_batch_size: opt.transaction_batch_size,
             concurrent_downloads: opt.concurernt_downloads.get(),
         }
     }
+
     pub async fn run(&self) -> Result<()> {
         // Connect to both the local node and the backup storage.
         let backup_state = metadata::cache::sync_and_load(
@@ -129,7 +128,7 @@ impl BackupCoordinator {
             .boxed_local();
         let backup_state_snapshots = self
             .backup_work_stream(
-                backup_state.latest_state_snapshot_version,
+                backup_state.latest_state_snapshot_epoch,
                 &rx2,
                 Self::backup_state_snapshot,
             )
@@ -220,27 +219,26 @@ impl BackupCoordinator {
 
     async fn backup_state_snapshot(
         &self,
-        last_snapshot_version_in_backup: Option<Version>,
+        last_snapshot_epoch_in_backup: Option<Version>,
         db_state: DbState,
     ) -> Result<Option<Version>> {
-        if let Some(version) = last_snapshot_version_in_backup {
-            STATE_SNAPSHOT_VERSION.set(version as i64);
+        if let Some(epoch) = last_snapshot_epoch_in_backup {
+            STATE_SNAPSHOT_EPOCH.set(epoch as i64);
         }
-        let next_snapshot_version = get_next_snapshot(
-            last_snapshot_version_in_backup,
+        let epoch = get_next_snapshot(
+            last_snapshot_epoch_in_backup,
             db_state,
-            self.state_snapshot_interval,
+            self.state_snapshot_interval_epochs,
         );
 
-        if db_state.committed_version < next_snapshot_version {
+        // <= becuse db_state.epoch is still open
+        if db_state.epoch <= epoch {
             // wait for the next db_state update
-            return Ok(last_snapshot_version_in_backup);
+            return Ok(last_snapshot_epoch_in_backup);
         }
 
         StateSnapshotBackupController::new(
-            StateSnapshotBackupOpt {
-                version: next_snapshot_version,
-            },
+            StateSnapshotBackupOpt { epoch },
             self.global_opt.clone(),
             Arc::clone(&self.client),
             Arc::clone(&self.storage),
@@ -248,7 +246,7 @@ impl BackupCoordinator {
         .run()
         .await?;
 
-        Ok(Some(next_snapshot_version))
+        Ok(Some(epoch))
     }
 
     async fn backup_transactions(
@@ -352,7 +350,8 @@ fn get_next_snapshot(last_in_backup: Option<u64>, db_state: DbState, interval: u
         None => 0,
     };
 
-    let last_for_db: u64 = db_state.committed_version / interval as u64 * interval as u64;
+    // Notice that db_state.epoch is not closed yet.
+    let last_for_db: u64 = db_state.epoch.saturating_sub(1) / interval as u64 * interval as u64;
 
     std::cmp::max(next_for_storage, last_for_db)
 }
@@ -373,15 +372,19 @@ mod tests {
 
     #[test]
     fn test_get_next_snapshot() {
-        let _state = |v| DbState {
-            epoch: 0,
-            committed_version: v,
+        let _state = |epoch| DbState {
+            epoch,
+            committed_version: 0,
         };
 
         assert_eq!(get_next_snapshot(None, _state(90), 100), 0);
         assert_eq!(get_next_snapshot(Some(0), _state(90), 100), 100);
+        assert_eq!(get_next_snapshot(Some(0), _state(100), 100), 100);
+        assert_eq!(get_next_snapshot(Some(0), _state(101), 100), 100);
         assert_eq!(get_next_snapshot(Some(0), _state(190), 100), 100);
-        assert_eq!(get_next_snapshot(Some(0), _state(200), 100), 200);
+        // Notice that epoch 200 is not closed yet.
+        assert_eq!(get_next_snapshot(Some(0), _state(200), 100), 100);
+        assert_eq!(get_next_snapshot(Some(0), _state(201), 100), 200);
         assert_eq!(get_next_snapshot(Some(0), _state(250), 100), 200);
         assert_eq!(get_next_snapshot(Some(200), _state(250), 100), 300);
     }

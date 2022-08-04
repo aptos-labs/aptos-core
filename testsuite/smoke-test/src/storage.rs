@@ -205,7 +205,7 @@ fn wait_for_backups(
         let state: BackupStorageState = std::str::from_utf8(&output)?.parse()?;
         if state.latest_epoch_ending_epoch.is_some()
             && state.latest_transaction_version.is_some()
-            && state.latest_state_snapshot_version.is_some()
+            && state.latest_state_snapshot_epoch.is_some()
             && state.latest_epoch_ending_epoch.unwrap() >= target_epoch
             && state.latest_transaction_version.unwrap() >= target_version
         {
@@ -224,7 +224,7 @@ pub(crate) fn db_backup(
     target_epoch: u64,
     target_version: Version,
     transaction_batch_size: usize,
-    state_snapshot_interval: usize,
+    state_snapshot_interval_epochs: usize,
     trusted_waypoints: &[Waypoint],
 ) -> TempPath {
     let now = Instant::now();
@@ -247,8 +247,8 @@ pub(crate) fn db_backup(
             &format!("http://localhost:{}", backup_service_port),
             "--transaction-batch-size",
             &transaction_batch_size.to_string(),
-            "--state-snapshot-interval",
-            &state_snapshot_interval.to_string(),
+            "--state-snapshot-interval-epochs",
+            &state_snapshot_interval_epochs.to_string(),
             "--metadata-cache-dir",
             metadata_cache_path1.path().to_str().unwrap(),
             "local-fs",
