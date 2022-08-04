@@ -28,6 +28,6 @@ module CommunityPlatform
 
     # Enable gzip compression for HTTP responses.
     # TODO: Remove when the CDN handles compression.
-    config.middleware.use Rack::Deflater
+    config.middleware.insert_before(Rack::Sendfile, Rack::Deflater)
   end
 end
