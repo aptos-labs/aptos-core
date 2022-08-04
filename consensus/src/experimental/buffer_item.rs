@@ -32,7 +32,11 @@ fn generate_commit_ledger_info(
     )
 }
 
-fn get_verified_signatures(unverified_signatures: &PartialSignatures) -> PartialSignatures {
+fn get_verified_signatures(
+    unverified_signatures: &PartialSignatures,
+    validator: &ValidatorVerifier,
+    commit_ledger_info: &LedgerInfo,
+) -> PartialSignatures {
     // Returns a valid partial signature from a set of unverified signatures.
     // TODO: Validating individual signatures in expensive. Replace this with optimistic signature
     // verification for BLS.
@@ -43,7 +47,7 @@ fn get_verified_signatures(unverified_signatures: &PartialSignatures) -> Partial
             .filter(|(author, sig)| validator.verify(**author, commit_ledger_info, sig).is_ok())
             .map(|(author, sig)| (*author, sig.clone()))
             .collect(),
-    );
+    )
 }
 
 fn generate_executed_item_from_ordered(
@@ -58,7 +62,7 @@ fn generate_executed_item_from_ordered(
         generate_commit_ledger_info(&commit_info, &ordered_proof),
         unverified_signatures,
     );
-    Self::Executed(Box::new(ExecutedItem {
+    BufferItem::Executed(Box::new(ExecutedItem {
         executed_blocks,
         partial_commit_proof,
         callback,
@@ -73,7 +77,7 @@ fn aggregate_commit_proof(
     validator: &ValidatorVerifier,
 ) -> LedgerInfoWithSignatures {
     let aggregated_sig = validator
-        .generate_and_verify_multi_signature(&verified_signatures, commit_ledger_info)
+        .generate_and_verify_multi_signature(verified_signatures, commit_ledger_info)
         .expect("Failed to generate aggregated signature");
     LedgerInfoWithSignatures::new(commit_ledger_info.clone(), aggregated_sig)
 }
@@ -195,14 +199,21 @@ impl BufferItem {
                     .check_voting_power(unverified_signatures.signatures().keys())
                     .is_ok()
                 {
-                    let verified_signatures = get_verified_signatures(&unverified_signatures);
+                    let commit_ledger_info =
+                        generate_commit_ledger_info(&commit_info, &ordered_proof);
+
+                    let verified_signatures = get_verified_signatures(
+                        &unverified_signatures,
+                        validator,
+                        &commit_ledger_info,
+                    );
                     // We need to check for voting power again as some of the signatures might be
                     // filtered out in the above step and the voting power might not be sufficient
                     if (validator.check_voting_power(verified_signatures.signatures().keys()))
                         .is_ok()
                     {
                         let commit_proof = aggregate_commit_proof(
-                            &generate_commit_ledger_info(&commit_info, &ordered_proof),
+                            &commit_ledger_info,
                             &verified_signatures,
                             validator,
                         );
