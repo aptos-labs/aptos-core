@@ -8,7 +8,6 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 edition = "2018"
-build = "build.rs"
 
 [dependencies]
 anyhow = "1.0.57"
@@ -26,7 +25,6 @@ reqwest = { version = "0.11.10", features = ["blocking", "json"] }
 serde = "1.0.137"
 serde_json = "1.0.81"
 serde_yaml = "0.8.24"
-shadow-rs = "0.11.0"
 tempfile = "3.3.0"
 thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["full"] }
@@ -61,6 +59,3 @@ move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "tes
 short-hex-str = { path = "../short-hex-str" }
 storage-interface = { path = "../../storage/storage-interface" }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }
-
-[build-dependencies]
-shadow-rs = "0.11.0"

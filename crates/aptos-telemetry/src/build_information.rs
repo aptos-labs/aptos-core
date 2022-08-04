@@ -29,9 +29,6 @@ pub const BUILD_VERSION: &str = "build_version";
 #[macro_export]
 macro_rules! collect_build_information {
     () => {{
-        // Get access to shadow BUILD information
-        shadow_rs::shadow!(build);
-
         // Get Git metadata from environment variables set during build-time.
         // This is applicable for docker based builds.
         const GIT_SHA: Option<&str> = option_env!("GIT_SHA");
@@ -40,62 +37,27 @@ macro_rules! collect_build_information {
 
         // Collect and return the build information
         let mut build_information: std::collections::BTreeMap<String, String> = BTreeMap::new();
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_BRANCH.into(),
-            GIT_BRANCH.unwrap_or(build::BRANCH).into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_CARGO_VERSION.into(),
-            build::CARGO_VERSION.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_CLAP_VERSION.into(),
-            build::CLAP_LONG_VERSION.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_COMMIT_HASH.into(),
-            GIT_SHA.unwrap_or(build::COMMIT_HASH).into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_OS.into(),
-            build::BUILD_OS.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_PKG_VERSION.into(),
-            build::PKG_VERSION.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_PROJECT_NAME.into(),
-            build::PROJECT_NAME.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_RUST_CHANNEL.into(),
-            build::RUST_CHANNEL.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_RUST_VERSION.into(),
-            build::RUST_VERSION.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_TAG.into(),
-            GIT_TAG.unwrap_or(build::TAG).into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_TARGET.into(),
-            build::BUILD_TARGET.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_TARGET_ARCH.into(),
-            build::BUILD_TARGET_ARCH.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_TIME.into(),
-            build::BUILD_TIME.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_VERSION.into(),
-            build::VERSION.into(),
-        );
+        if let Some(git_branch) = GIT_BRANCH {
+            build_information.insert(
+                aptos_telemetry::build_information::BUILD_BRANCH.into(),
+                git_branch.into(),
+            );
+        }
+
+        if let Some(git_hash) = GIT_SHA {
+            build_information.insert(
+                aptos_telemetry::build_information::BUILD_COMMIT_HASH.into(),
+                git_hash.into(),
+            );
+        }
+
+        if let Some(git_tag) = GIT_TAG {
+            build_information.insert(
+                aptos_telemetry::build_information::BUILD_TAG.into(),
+                git_tag.into(),
+            );
+        }
+
         build_information
     }};
 }
