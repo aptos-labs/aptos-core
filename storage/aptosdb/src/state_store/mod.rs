@@ -16,6 +16,7 @@ use aptos_logger::{debug, info};
 use aptos_state_view::StateViewId;
 #[cfg(test)]
 use aptos_types::nibble::nibble_path::NibblePath;
+use aptos_types::proof::SparseMerkleProofExt;
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProof, SparseMerkleRangeProof},
     state_store::{
@@ -124,12 +125,14 @@ impl DbReader for StateDb {
     }
 
     /// Get the state value with proof given the state key and version
-    fn get_state_value_with_proof_by_version(
+    fn get_state_value_with_proof_by_version_ext(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        let (leaf_data, proof) = self.state_merkle_db.get_with_proof(state_key, version)?;
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
+        let (leaf_data, proof) = self
+            .state_merkle_db
+            .get_with_proof_ext(state_key, version)?;
         Ok((
             match leaf_data {
                 Some((_, (key, version))) => Some(self.expect_value_by_version(&key, version)?),
@@ -169,14 +172,14 @@ impl DbReader for StateStore {
         self.deref().get_state_proof_by_version(state_key, version)
     }
 
-    /// Get the state value with proof given the state key and version
-    fn get_state_value_with_proof_by_version(
+    /// Get the state value with proof extension given the state key and version
+    fn get_state_value_with_proof_by_version_ext(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         self.deref()
-            .get_state_value_with_proof_by_version(state_key, version)
+            .get_state_value_with_proof_by_version_ext(state_key, version)
     }
 }
 

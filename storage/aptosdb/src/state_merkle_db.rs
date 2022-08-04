@@ -9,6 +9,7 @@ use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_jellyfish_merkle::{
     node_type::NodeKey, JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
 };
+use aptos_types::proof::SparseMerkleProofExt;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
@@ -44,6 +45,17 @@ impl StateMerkleDb {
         version: Version,
     ) -> Result<(Option<(HashValue, (StateKey, Version))>, SparseMerkleProof)> {
         JellyfishMerkleTree::new(self).get_with_proof(state_key.hash(), version)
+    }
+
+    pub fn get_with_proof_ext(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<(
+        Option<(HashValue, (StateKey, Version))>,
+        SparseMerkleProofExt,
+    )> {
+        JellyfishMerkleTree::new(self).get_with_proof_ext(state_key.hash(), version)
     }
 
     pub fn get_range_proof(

@@ -126,12 +126,7 @@ impl TryFrom<&StateValue> for AccountState {
     type Error = Error;
 
     fn try_from(state_value: &StateValue) -> Result<Self> {
-        let bytes = state_value
-            .maybe_bytes
-            .as_ref()
-            .ok_or_else(|| anyhow!("Empty state value passed"))?;
-
-        AccountState::try_from(bytes).map_err(Into::into)
+        AccountState::try_from(&state_value.maybe_bytes).map_err(Into::into)
     }
 }
 
@@ -171,9 +166,7 @@ impl TryFrom<&HashMap<StateKey, StateValue>> for AccountState {
         for (key, value) in key_value_map {
             match key {
                 StateKey::AccessPath(access_path) => {
-                    if let Some(bytes) = &value.maybe_bytes {
-                        btree_map.insert(access_path.path.clone(), bytes.clone());
-                    }
+                    btree_map.insert(access_path.path.clone(), value.maybe_bytes.clone());
                 }
                 _ => return Err(anyhow!("Encountered unexpected key type {:?}", key)),
             }

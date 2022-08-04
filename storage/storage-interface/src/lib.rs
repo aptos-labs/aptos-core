@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::proof::SparseMerkleProofExt;
 use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     access_path::AccessPath,
@@ -432,12 +433,21 @@ pub trait DbReader: Send + Sync {
     /// ../aptosdb/struct.AptosDB.html#method.get_account_state_with_proof_by_version
     ///
     /// This is used by aptos core (executor) internally.
+    fn get_state_value_with_proof_by_version_ext(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
+        unimplemented!()
+    }
+
     fn get_state_value_with_proof_by_version(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        unimplemented!()
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
+        self.get_state_value_with_proof_by_version_ext(state_key, version)
+            .map(|(value, proof_ext)| proof_ext.into())
     }
 
     /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.

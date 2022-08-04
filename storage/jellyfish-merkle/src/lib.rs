@@ -81,6 +81,7 @@ pub mod test_helper;
 
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::proof::SparseMerkleProofExt;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble, ROOT_NIBBLE_HEIGHT},
     proof::{SparseMerkleProof, SparseMerkleRangeProof},
@@ -678,6 +679,15 @@ where
         key: HashValue,
         version: Version,
     ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProof)> {
+        self.get_with_proof_ext(key, version)
+            .map(|_value, proof_ext| proof_ext.into())
+    }
+
+    pub fn get_with_proof_ext(
+        &self,
+        key: HashValue,
+        version: Version,
+    ) -> Result<(Option<(HashValue, (K, Version))>, SparseMerkleProofExt)> {
         // Empty tree just returns proof with no sibling hash.
         let mut next_node_key = NodeKey::new_empty_path(version);
         let mut siblings = vec![];
@@ -699,15 +709,15 @@ where
                     let queried_child_index = nibble_iter
                         .next()
                         .ok_or_else(|| format_err!("ran out of nibbles"))?;
-                    let (child_node_key, mut siblings_in_internal) =
-                        internal_node.get_child_with_siblings(&next_node_key, queried_child_index);
+                    let (child_node_key, mut siblings_in_internal) = internal_node
+                        .get_child_with_siblings(&next_node_key, queried_child_index, &self.reader);
                     siblings.append(&mut siblings_in_internal);
                     next_node_key = match child_node_key {
                         Some(node_key) => node_key,
                         None => {
                             return Ok((
                                 None,
-                                SparseMerkleProof::new(None, {
+                                SparseMerkleProofExt::new(None, {
                                     siblings.reverse();
                                     siblings
                                 }),
@@ -722,7 +732,7 @@ where
                         } else {
                             None
                         },
-                        SparseMerkleProof::new(Some(leaf_node.into()), {
+                        SparseMerkleProofExt::new(Some(leaf_node.into()), {
                             siblings.reverse();
                             siblings
                         }),

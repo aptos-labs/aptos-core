@@ -64,6 +64,7 @@ use aptos_config::config::{
 use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_types::proof::SparseMerkleProofExt;
 use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     account_address::AccountAddress,
@@ -1228,16 +1229,15 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_state_value_with_proof_by_version(
+    fn get_state_value_with_proof_by_version_ext(
         &self,
         state_store_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         gauged_api("get_state_value_with_proof_by_version", || {
             if let Some(state_pruner) = &self.state_pruner {
                 error_if_version_is_pruned(state_pruner, "State", version)?;
             }
-
             self.state_store
                 .get_state_value_with_proof_by_version(state_store_key, version)
         })

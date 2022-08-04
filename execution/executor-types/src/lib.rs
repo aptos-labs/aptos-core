@@ -12,6 +12,7 @@ use aptos_crypto::{
     hash::{EventAccumulatorHasher, TransactionAccumulatorHasher, ACCUMULATOR_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_types::proof::SparseMerkleProofExt;
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
@@ -297,11 +298,11 @@ impl StateComputeResult {
 }
 
 pub struct ProofReader {
-    proofs: HashMap<HashValue, SparseMerkleProof>,
+    proofs: HashMap<HashValue, SparseMerkleProofExt>,
 }
 
 impl ProofReader {
-    pub fn new(proofs: HashMap<HashValue, SparseMerkleProof>) -> Self {
+    pub fn new(proofs: HashMap<HashValue, SparseMerkleProofExt>) -> Self {
         ProofReader { proofs }
     }
 
@@ -311,7 +312,7 @@ impl ProofReader {
 }
 
 impl ProofRead for ProofReader {
-    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProof> {
+    fn get_proof(&self, key: HashValue) -> Option<&SparseMerkleProofExt> {
         self.proofs.get(&key)
     }
 }

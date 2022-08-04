@@ -13,15 +13,22 @@ use proptest::{
     prelude::*,
     sample::Index,
 };
+use std::collections::HashSet;
 use std::{collections::VecDeque, sync::Arc};
 
-type TxnOutput = Vec<(HashValue, StateValue)>;
+type TxnOutput = Vec<(HashValue, Option<StateValue>)>;
 type BlockOutput = Vec<TxnOutput>;
 
 #[derive(Debug)]
 pub enum Action {
     Commit,
     Execute(BlockOutput),
+}
+
+#[derive(Clone, Debug)]
+enum Op {
+    Delete(Vec<u8>),
+    Write(Vec<u8>),
 }
 
 pub fn arb_smt_correctness_case() -> impl Strategy<Value = Vec<Action>> {
@@ -33,18 +40,25 @@ pub fn arb_smt_correctness_case() -> impl Strategy<Value = Vec<Action>> {
                     // txns
                     vec(
                         // txn updates
-                        (any::<Index>(), any::<Vec<u8>>()),
-                        1..4,
+                        (
+                            any::<Index>(),
+                            prop_oneof![
+                                any::<Vec<u8>>().prop_map(Op::Delete),
+                                any::<Vec<u8>>().prop_map(Op::Write)
+                            ]
+                        ),
+                        1..20,
                     ),
                     1..10,
                 ),
                 Just(vec![]),
             ],
-            1..10,
+            1..20,
         ),
     )
         .prop_map(|(keys, commit_or_execute)| {
             let keys: Vec<_> = keys.into_iter().collect();
+            let mut existing = HashSet::<HashValue>::new();
             commit_or_execute
                 .into_iter()
                 .map(|txns| {
@@ -56,7 +70,25 @@ pub fn arb_smt_correctness_case() -> impl Strategy<Value = Vec<Action>> {
                                 .map(|updates| {
                                     updates
                                         .into_iter()
-                                        .map(|(k_idx, v)| (*k_idx.get(&keys), v.to_vec().into()))
+                                        .map(|(k_idx, v)| {
+                                            let key = *k_idx.get(&keys);
+                                            match v {
+                                                Op::Write(value) => {
+                                                    existing.insert(key);
+                                                    (key, Some(value.to_vec().into()))
+                                                }
+                                                Op::Delete(backup_write) => {
+                                                    if existing.contains(&key) {
+                                                        existing.remove(&key);
+                                                        println!("delete");
+                                                        (key, None)
+                                                    } else {
+                                                        existing.insert(key);
+                                                        (key, Some(backup_write.to_vec().into()))
+                                                    }
+                                                }
+                                            }
+                                        })
                                         .collect()
                                 })
                                 .collect::<Vec<_>>(),
@@ -87,7 +119,7 @@ pub fn test_smt_correctness_impl(input: Vec<Action>) {
             Action::Execute(block) => {
                 let updates = block
                     .iter()
-                    .map(|txn_updates| txn_updates.iter().map(|(k, v)| (*k, v)).collect())
+                    .map(|txn_updates| txn_updates.iter().map(|(k, v)| (*k, v.as_ref())).collect())
                     .collect::<Vec<_>>();
                 let updates_flat_batch = updates.iter().flatten().cloned().collect::<Vec<_>>();
 

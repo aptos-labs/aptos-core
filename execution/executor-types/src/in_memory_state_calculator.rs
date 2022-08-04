@@ -41,7 +41,7 @@ pub struct InMemoryStateCalculator {
     // This makes sure all in-mem nodes seen while proofs were fetched stays in mem during the
     // calculation
     _frozen_base: FrozenSparseMerkleTree<StateValue>,
-    state_cache: HashMap<StateKey, StateValue>,
+    state_cache: HashMap<StateKey, Option<StateValue>>,
     proof_reader: ProofReader,
 
     checkpoint: SparseMerkleTree<StateValue>,
@@ -52,8 +52,8 @@ pub struct InMemoryStateCalculator {
     latest: FrozenSparseMerkleTree<StateValue>,
 
     next_version: Version,
-    updates_between_checkpoint_and_latest: HashMap<StateKey, StateValue>,
-    updates_after_latest: HashMap<StateKey, StateValue>,
+    updates_between_checkpoint_and_latest: HashMap<StateKey, Option<StateValue>>,
+    updates_after_latest: HashMap<StateKey, Option<StateValue>>,
 }
 
 impl InMemoryStateCalculator {
@@ -89,7 +89,7 @@ impl InMemoryStateCalculator {
         to_keep: &[(Transaction, ParsedTransactionOutput)],
         new_epoch: bool,
     ) -> Result<(
-        Vec<HashMap<StateKey, StateValue>>,
+        Vec<HashMap<StateKey, Option<StateValue>>>,
         Vec<Option<HashValue>>,
         StateDelta,
         Option<EpochState>,
@@ -123,7 +123,7 @@ impl InMemoryStateCalculator {
         &mut self,
         txn: &Transaction,
         txn_output: &ParsedTransactionOutput,
-    ) -> Result<(HashMap<StateKey, StateValue>, Option<HashValue>)> {
+    ) -> Result<(HashMap<StateKey, Option<StateValue>>, Option<HashValue>)> {
         let updated_state_kvs = process_write_set(
             Some(txn),
             &mut self.state_cache,
@@ -151,7 +151,7 @@ impl InMemoryStateCalculator {
         let smt_updates: Vec<_> = self
             .updates_after_latest
             .iter()
-            .map(|(key, value)| (key.hash(), value))
+            .map(|(key, value)| (key.hash(), value.as_ref()))
             .collect();
         let new_checkpoint = self.latest.batch_update(smt_updates, &self.proof_reader)?;
         let root_hash = new_checkpoint.root_hash();
@@ -238,9 +238,9 @@ impl InMemoryStateCalculator {
 // Returns all state key-value pair touched.
 pub fn process_write_set(
     transaction: Option<&Transaction>,
-    state_cache: &mut HashMap<StateKey, StateValue>,
+    state_cache: &mut HashMap<StateKey, Option<StateValue>>,
     write_set: WriteSet,
-) -> Result<HashMap<StateKey, StateValue>> {
+) -> Result<HashMap<StateKey, Option<StateValue>>> {
     // Find all keys this transaction touches while processing each write op.
     write_set
         .into_iter()
@@ -252,13 +252,13 @@ pub fn process_write_set(
 
 fn process_state_key_write_op(
     transaction: Option<&Transaction>,
-    state_cache: &mut HashMap<StateKey, StateValue>,
+    state_cache: &mut HashMap<StateKey, Option<StateValue>>,
     state_key: StateKey,
     write_op: WriteOp,
-) -> Result<(StateKey, StateValue)> {
+) -> Result<(StateKey, Option<StateValue>)> {
     let state_value = match write_op {
-        WriteOp::Value(new_value) => StateValue::from(new_value),
-        WriteOp::Deletion => StateValue::empty(),
+        WriteOp::Value(new_value) => Some(StateValue::from(new_value)),
+        WriteOp::Deletion => None,
     };
     match state_cache.entry(state_key.clone()) {
         hash_map::Entry::Occupied(mut entry) => {

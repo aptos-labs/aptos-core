@@ -6,6 +6,7 @@ use crate::{proof_fetcher::ProofFetcher, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_state_view::{StateView, StateViewId};
+use aptos_types::proof::SparseMerkleProofExt;
 use aptos_types::{
     proof::SparseMerkleProof,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -72,7 +73,7 @@ pub struct CachedStateView {
     /// completely and migrate to fine grained storage. A value of None in this cache reflects that
     /// the corresponding key has been deleted. This is a temporary hack until we support deletion
     /// in JMT node.
-    state_cache: RwLock<HashMap<StateKey, StateValue>>,
+    state_cache: RwLock<HashMap<StateKey, Option<StateValue>>>,
     proof_fetcher: Arc<dyn ProofFetcher>,
 }
 
@@ -160,8 +161,8 @@ impl CachedStateView {
 
 pub struct StateCache {
     pub frozen_base: FrozenSparseMerkleTree<StateValue>,
-    pub state_cache: HashMap<StateKey, StateValue>,
-    pub proofs: HashMap<HashValue, SparseMerkleProof>,
+    pub state_cache: HashMap<StateKey, Option<StateValue>>,
+    pub proofs: HashMap<HashValue, SparseMerkleProofExt>,
 }
 
 impl StateView for CachedStateView {
@@ -173,15 +174,15 @@ impl StateView for CachedStateView {
         // First check if the cache has the state value.
         if let Some(contents) = self.state_cache.read().get(state_key) {
             // This can return None, which means the value has been deleted from the DB.
-            return Ok(contents.maybe_bytes.as_ref().cloned());
+            return Ok(contents.map(|v| v.maybe_bytes.clone()));
         }
         let state_value_option = self.get_state_value_internal(state_key)?;
         // Update the cache if still empty
         let mut cache = self.state_cache.write();
         let new_value = cache
             .entry(state_key.clone())
-            .or_insert_with(|| state_value_option.unwrap_or_default());
-        Ok(new_value.maybe_bytes.as_ref().cloned())
+            .or_insert_with(state_value_option);
+        Ok(new_value.map(|v| v.maybe_bytes.clone()))
     }
 
     fn is_genesis(&self) -> bool {
