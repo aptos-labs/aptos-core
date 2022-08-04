@@ -16,6 +16,7 @@ use aptos_types::{
     transaction::{ChangeSet, SignatureCheckedTransaction},
     write_set::{WriteOp, WriteSetMut},
 };
+use framework::natives::code::{NativeCodeContext, PublishRequest};
 use move_deps::{
     move_binary_format::errors::{Location, VMResult},
     move_core_types::{
@@ -107,11 +108,26 @@ where
             .into_change_set()
             .map_err(|e| e.finish(Location::Undefined))?;
 
+        // TODO: Once we are ready to connect aggregator with delta writes,
+        // make sure we pass them to the session output.
+        //
+        // Expected changes will be:
+        //   * Use `Aggregator` for gas fees tracking in coin.
+        //   * Pass `aggregator_change_set` further to produce `DeltaChangeSet`.
+        //   * Have e2e tests and benchmarks.
+        // let aggregator_context: NativeAggregatorContext = extensions.remove();
+        // let _ = aggregator_context.into_change_set();
+
         Ok(SessionOutput {
             change_set,
             events,
             table_change_set,
         })
+    }
+
+    pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
+        let ctx = self.get_native_extensions().get_mut::<NativeCodeContext>();
+        ctx.requested_module_bundle.take()
     }
 }
 

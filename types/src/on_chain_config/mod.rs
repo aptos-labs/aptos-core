@@ -18,8 +18,8 @@ use std::{collections::HashMap, fmt, sync::Arc};
 
 mod aptos_version;
 mod consensus_config;
+mod gas_schedule;
 mod validator_set;
-mod vm_config;
 
 pub use self::{
     aptos_version::{
@@ -28,8 +28,8 @@ pub use self::{
     consensus_config::{
         ConsensusConfigV1, LeaderReputationType, OnChainConsensusConfig, ProposerElectionType,
     },
+    gas_schedule::GasSchedule,
     validator_set::{ConsensusScheme, ValidatorSet},
-    vm_config::VMConfig,
 };
 
 /// To register an on-chain config in Rust:
@@ -57,7 +57,7 @@ impl fmt::Display for ConfigID {
 
 /// State sync will panic if the value of any config in this registry is uninitialized
 pub const ON_CHAIN_CONFIG_REGISTRY: &[ConfigID] = &[
-    VMConfig::CONFIG_ID,
+    GasSchedule::CONFIG_ID,
     ValidatorSet::CONFIG_ID,
     Version::CONFIG_ID,
     OnChainConsensusConfig::CONFIG_ID,

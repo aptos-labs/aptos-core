@@ -21,8 +21,16 @@ impl NetworkTest for PerformanceBenchmark {
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
 
+        let all_fullnodes = ctx
+            .swarm()
+            .full_nodes()
+            .map(|v| v.peer_id())
+            .collect::<Vec<_>>();
+
+        let all_nodes = [&all_validators[..], &all_fullnodes[..]].concat();
+
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1)?;
+        let txn_stat = generate_traffic(ctx, &all_nodes, duration, 1)?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
         // ensure we meet the success criteria

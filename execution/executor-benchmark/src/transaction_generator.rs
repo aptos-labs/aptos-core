@@ -186,7 +186,8 @@ impl TransactionGenerator {
         TransactionFactory::new(ChainId::test())
             .with_transaction_expiration_time(300)
             .with_gas_unit_price(1)
-            .with_max_gas_amount(1000)
+            // TODO(Gas): double check if this is correct
+            .with_max_gas_amount(4_000_000)
     }
 
     // Write metadata

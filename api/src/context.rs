@@ -172,7 +172,10 @@ impl Context {
         address: AccountAddress,
         version: u64,
     ) -> Result<Option<AccountState>> {
-        AccountState::from_access_paths_and_values(&self.get_state_values(address, version)?)
+        AccountState::from_access_paths_and_values(
+            address,
+            &self.get_state_values(address, version)?,
+        )
     }
 
     pub fn get_block_timestamp(&self, version: u64) -> Result<u64> {

@@ -452,7 +452,6 @@ impl AccountData {
         MoveStructLayout::new(vec![
             MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
             MoveTypeLayout::U64,
-            MoveTypeLayout::Address,
             MoveTypeLayout::Struct(MoveStructLayout::new(vec![
                 MoveTypeLayout::U64,
                 MoveTypeLayout::Struct(MoveStructLayout::new(vec![
@@ -468,7 +467,6 @@ impl AccountData {
         let account = Value::struct_(Struct::pack(vec![
             Value::vector_u8(AuthenticationKey::ed25519(&self.account.pubkey).to_vec()),
             Value::u64(self.sequence_number),
-            Value::address(*self.address()),
             Value::struct_(Struct::pack(vec![
                 Value::u64(self.coin_register_events.count()),
                 Value::struct_(Struct::pack(vec![

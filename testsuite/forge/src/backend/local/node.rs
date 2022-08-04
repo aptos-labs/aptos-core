@@ -108,6 +108,12 @@ impl LocalNode {
             )
         })?;
 
+        println!(
+            "Started node {:?} (PID: {:?}) with command: {:?}",
+            self.name,
+            process.id(),
+            node_command
+        );
         self.process = Some(Process(process));
 
         Ok(())

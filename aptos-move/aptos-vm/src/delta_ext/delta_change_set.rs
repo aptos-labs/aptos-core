@@ -31,7 +31,7 @@ pub enum DeltaOp {
 
 impl DeltaOp {
     /// Returns the result of delta application to `base` or error if
-    /// postocndition is not satisfied.
+    /// postcondition is not satisfied.
     pub fn apply_to(&self, base: u128) -> PartialVMResult<u128> {
         match self {
             DeltaOp::Addition { value, limit } => addition(base, *value, *limit),
@@ -73,7 +73,7 @@ impl DeltaOp {
 }
 
 /// Implements application of `Addition` to `base`.
-fn addition(base: u128, value: u128, limit: u128) -> PartialVMResult<u128> {
+pub fn addition(base: u128, value: u128, limit: u128) -> PartialVMResult<u128> {
     if limit < base || value > (limit - base) {
         Err(abort_error(
             format!("overflow when adding {} to {}", value, base),
@@ -85,7 +85,7 @@ fn addition(base: u128, value: u128, limit: u128) -> PartialVMResult<u128> {
 }
 
 /// Implements application of `Subtraction` to `base`.
-fn subtraction(base: u128, value: u128) -> PartialVMResult<u128> {
+pub fn subtraction(base: u128, value: u128) -> PartialVMResult<u128> {
     if value > base {
         Err(abort_error(
             format!("underflow when subtracting {} from {}", value, base),
