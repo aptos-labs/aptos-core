@@ -8,7 +8,7 @@
       "eventRootHash": "YPVlJld+KeJV8TgWig4e7McIG/o+rxMn60yg554WVK8=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "4IEr90E1L0uyqcGP8tEpbdl7z48PwD8qMYfc8auyEiA=",
+      "accumulatorRootHash": "bTh3lXEeNIljbjonlMk5+IDFN4/l8MkiSaH/UAEjGJw=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -91,12 +91,12 @@
     "version": "2",
     "info": {
       "hash": "",
-      "stateRootHash": "0LvMgaTMpRSJvQzPftcCWcJ0DS3dy5Q1cwDg4ljDrmk=",
+      "stateRootHash": "YG7T1XbAbLw8rukc5IW1gXFV/pn3u9L0J6tanOnasJk=",
       "eventRootHash": "6llLf9EwoZ37+xJflmiRHF3KOw3ClFeYXcASEj/i/XA=",
-      "gasUsed": "44378",
+      "gasUsed": "41112",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "YvUJ569U7Q4XIpSqW1s8d4rPBB7m7kBft7BxkuFVqE4=",
+      "accumulatorRootHash": "LulYMtygRFEfowptPRfzs6tPV4j6cawUYmYCVvGIfy0=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -109,7 +109,7 @@
                 "module": "account",
                 "name": "Account"
               },
-              "data": "{\"authentication_key\":\"0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a\",\"coin_register_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa550c18\",\"creation_num\":\"0\"}}},\"self_address\":\"0xa550c18\",\"sequence_number\":\"1\"}"
+              "data": "{\"authentication_key\":\"0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a\",\"coin_register_events\":{\"counter\":\"0\",\"guid\":{\"id\":{\"addr\":\"0xa550c18\",\"creation_num\":\"0\"}}},\"sequence_number\":\"1\"}"
             }
           }
         },
@@ -124,7 +124,7 @@
                 "module": "account",
                 "name": "Account"
               },
-              "data": "{\"authentication_key\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"coin_register_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"0\"}}},\"self_address\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"sequence_number\":\"0\"}"
+              "data": "{\"authentication_key\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"coin_register_events\":{\"counter\":\"1\",\"guid\":{\"id\":{\"addr\":\"0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf\",\"creation_num\":\"0\"}}},\"sequence_number\":\"0\"}"
             }
           }
         },
@@ -225,7 +225,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "sfVGHHZA4gHaKIcU4NUleAsSvKjm84TTxNO3F9OnV7U="
+      "accumulatorRootHash": "mthKU6HdPhzhKErNMhIngKfpMwk4LAnJtEotnbNB/ao="
     },
     "blockHeight": "1",
     "type": "STATE_CHECKPOINT",
