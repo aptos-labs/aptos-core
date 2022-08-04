@@ -20,7 +20,7 @@ on:
       FORGE_RUNNER_DURATION_SECS:
         required: false
         type: string
-        default: 480
+        default: 3600
         description: Duration of the forge test run
       FORGE_RUNNER_TPS_THRESHOLD:
         required: false
