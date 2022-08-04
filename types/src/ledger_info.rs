@@ -243,7 +243,7 @@ impl LedgerInfoWithV0 {
     pub fn genesis(genesis_state_root_hash: HashValue, validator_set: ValidatorSet) -> Self {
         Self::new(
             LedgerInfo::genesis(genesis_state_root_hash, validator_set),
-            MultiSignature::default(),
+            MultiSignature::empty(),
         )
     }
 
@@ -271,7 +271,7 @@ impl LedgerInfoWithV0 {
         &self,
         validator: &ValidatorVerifier,
     ) -> ::std::result::Result<(), VerifyError> {
-        validator.verify_mutli_signatures(self.ledger_info(), &self.signatures)
+        validator.verify_multi_signatures(self.ledger_info(), &self.signatures)
     }
 
     pub fn check_voting_power(
@@ -289,8 +289,7 @@ impl LedgerInfoWithV0 {
 }
 
 /// Contains the ledger info and partially aggregated signature from a set of validators, this data
-/// is only used during the aggregating the votes from different validators and is not persisted in
-/// DB.
+/// is only used during the aggregating the votes from different validators and is not persisted in DB.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LedgerInfoWithPartialSignatures {
     ledger_info: LedgerInfo,

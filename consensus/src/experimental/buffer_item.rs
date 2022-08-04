@@ -22,7 +22,7 @@ use aptos_crypto::HashValue;
 use aptos_types::ledger_info::LedgerInfoWithPartialSignatures;
 use aptos_types::multi_signature::PartialSignatures;
 
-fn generate_commit_proof(
+fn generate_commit_ledger_info(
     commit_info: &BlockInfo,
     ordered_proof: &LedgerInfoWithSignatures,
 ) -> LedgerInfo {
@@ -32,15 +32,11 @@ fn generate_commit_proof(
     )
 }
 
-fn aggregate_ledger_info(
-    commit_ledger_info: &LedgerInfo,
-    unverified_signatures: &PartialSignatures,
-    validator: &ValidatorVerifier,
-) -> LedgerInfoWithSignatures {
+fn get_verified_signatures(unverified_signatures: &PartialSignatures) -> PartialSignatures {
     // Returns a valid partial signature from a set of unverified signatures.
     // TODO: Validating individual signatures in expensive. Replace this with optimistic signature
     // verification for BLS.
-    let valid_sigs = PartialSignatures::new(
+    PartialSignatures::new(
         unverified_signatures
             .signatures()
             .iter()
@@ -48,8 +44,36 @@ fn aggregate_ledger_info(
             .map(|(author, sig)| (*author, sig.clone()))
             .collect(),
     );
+}
+
+fn generate_executed_item_from_ordered(
+    commit_info: BlockInfo,
+    executed_blocks: Vec<ExecutedBlock>,
+    unverified_signatures: PartialSignatures,
+    callback: StateComputerCommitCallBackType,
+    ordered_proof: LedgerInfoWithSignatures,
+) -> BufferItem {
+    debug!("{} advance to executed from ordered", commit_info);
+    let partial_commit_proof = LedgerInfoWithPartialSignatures::new(
+        generate_commit_ledger_info(&commit_info, &ordered_proof),
+        unverified_signatures,
+    );
+    Self::Executed(Box::new(ExecutedItem {
+        executed_blocks,
+        partial_commit_proof,
+        callback,
+        commit_info,
+        ordered_proof,
+    }))
+}
+
+fn aggregate_commit_proof(
+    commit_ledger_info: &LedgerInfo,
+    verified_signatures: &PartialSignatures,
+    validator: &ValidatorVerifier,
+) -> LedgerInfoWithSignatures {
     let aggregated_sig = validator
-        .generate_and_verify_multi_signature(&valid_sigs, commit_ledger_info)
+        .generate_and_verify_multi_signature(&verified_signatures, commit_ledger_info)
         .expect("Failed to generate aggregated signature");
     LedgerInfoWithSignatures::new(commit_ledger_info.clone(), aggregated_sig)
 }
@@ -157,6 +181,7 @@ impl BufferItem {
                 if let Some(commit_proof) = commit_proof {
                     // We have already received the commit proof in fast forward sync path,
                     // we can just use that proof and proceed to aggregated
+                    assert_eq!(commit_proof.commit_info().clone(), commit_info);
                     debug!(
                         "{} advance to aggregated from ordered",
                         commit_proof.commit_info()
@@ -170,33 +195,43 @@ impl BufferItem {
                     .check_voting_power(unverified_signatures.signatures().keys())
                     .is_ok()
                 {
-                    let commit_proof = aggregate_ledger_info(
-                        &generate_commit_proof(&commit_info, &ordered_proof),
-                        &unverified_signatures,
-                        validator,
-                    );
-                    debug!(
-                        "{} advance to aggregated from ordered",
-                        commit_proof.commit_info()
-                    );
-                    Self::Aggregated(Box::new(AggregatedItem {
-                        executed_blocks,
-                        commit_proof,
-                        callback,
-                    }))
+                    let verified_signatures = get_verified_signatures(&unverified_signatures);
+                    // We need to check for voting power again as some of the signatures might be
+                    // filtered out in the above step and the voting power might not be sufficient
+                    if (validator.check_voting_power(verified_signatures.signatures().keys()))
+                        .is_ok()
+                    {
+                        let commit_proof = aggregate_commit_proof(
+                            &generate_commit_ledger_info(&commit_info, &ordered_proof),
+                            &verified_signatures,
+                            validator,
+                        );
+                        debug!(
+                            "{} advance to aggregated from ordered",
+                            commit_proof.commit_info()
+                        );
+                        Self::Aggregated(Box::new(AggregatedItem {
+                            executed_blocks,
+                            commit_proof,
+                            callback,
+                        }))
+                    } else {
+                        generate_executed_item_from_ordered(
+                            commit_info,
+                            executed_blocks,
+                            unverified_signatures,
+                            callback,
+                            ordered_proof,
+                        )
+                    }
                 } else {
-                    debug!("{} advance to executed from ordered", commit_info);
-                    let partial_commit_proof = LedgerInfoWithPartialSignatures::new(
-                        generate_commit_proof(&commit_info, &ordered_proof),
-                        unverified_signatures,
-                    );
-                    Self::Executed(Box::new(ExecutedItem {
-                        executed_blocks,
-                        partial_commit_proof,
-                        callback,
+                    generate_executed_item_from_ordered(
                         commit_info,
+                        executed_blocks,
+                        unverified_signatures,
+                        callback,
                         ordered_proof,
-                    }))
+                    )
                 }
             }
             _ => {
@@ -310,7 +345,7 @@ impl BufferItem {
                 {
                     Self::Aggregated(Box::new(AggregatedItem {
                         executed_blocks: signed_item.executed_blocks,
-                        commit_proof: aggregate_ledger_info(
+                        commit_proof: aggregate_commit_proof(
                             signed_item.partial_commit_proof.ledger_info(),
                             signed_item.partial_commit_proof.partial_sigs(),
                             validator,
@@ -328,7 +363,7 @@ impl BufferItem {
                 {
                     Self::Aggregated(Box::new(AggregatedItem {
                         executed_blocks: executed_item.executed_blocks,
-                        commit_proof: aggregate_ledger_info(
+                        commit_proof: aggregate_commit_proof(
                             executed_item.partial_commit_proof.ledger_info(),
                             executed_item.partial_commit_proof.partial_sigs(),
                             validator,
