@@ -27,7 +27,6 @@ class User < ApplicationRecord
   has_one :it1_profile, dependent: :destroy
   has_one :it2_profile, dependent: :destroy
   has_one :it2_survey, dependent: :destroy
-  has_many :nfts, dependent: :destroy
 
   before_save :maybe_enqueue_forum_sync
 
