@@ -219,6 +219,23 @@ pub static PEER_SEND_FAILURES: Lazy<IntCounterVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static APTOS_NETWORK_HC_RTT: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_outbound_healthcheck_rtt_mili",
+        "HealthCheck RTT in milli",
+        &["role_type", "network_id", "peer_id", "protocol_id"]
+    )
+    .unwrap()
+});
+
+pub fn health_check_rtt(network_context: &NetworkContext) -> Histogram {
+    APTOS_NETWORK_HC_RTT.with_label_values(&[
+        network_context.role().as_str(),
+        network_context.network_id().as_str(),
+        network_context.peer_id().short_str().as_str(),
+    ])
+}
+
 pub static APTOS_NETWORK_OUTBOUND_RPC_REQUEST_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_network_outbound_rpc_request_latency_seconds",
