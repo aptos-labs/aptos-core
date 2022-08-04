@@ -63,15 +63,15 @@ impl DbReader for MockDbReaderWriter {
 }
 
 fn get_mock_account_state() -> AccountState {
-    let account_resource =
-        AccountResource::new(0, vec![], AccountAddress::random(), EventHandle::random(0));
+    let account_resource = AccountResource::new(0, vec![], EventHandle::random(0));
 
-    let mut account_state = AccountState::default();
-    account_state.insert(
-        AccountResource::resource_path(),
-        bcs::to_bytes(&account_resource).unwrap(),
-    );
-    account_state
+    AccountState::new(
+        AccountAddress::random(),
+        std::collections::BTreeMap::from([(
+            AccountResource::resource_path(),
+            bcs::to_bytes(&account_resource).unwrap(),
+        )]),
+    )
 }
 
 impl DbWriter for MockDbReaderWriter {}
