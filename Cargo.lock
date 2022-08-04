@@ -131,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "aptos-config",
