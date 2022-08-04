@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions};
+use aptos_rest_client::aptos_api_types::HashValue;
 use aptos_rest_client::{
     aptos_api_types::{WriteResource, WriteSetChange},
     Transaction,
@@ -49,35 +50,29 @@ const SUPPORTED_COINS: [&str; 2] = [
 ];
 
 /// A shortened transaction output
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct TransferSummary {
-    pub gas_used: Option<u64>,
+    pub gas_unit_price: u64,
+    pub gas_used: u64,
     pub balance_changes: BTreeMap<AccountAddress, serde_json::Value>,
-    pub sender: Option<AccountAddress>,
+    pub sender: AccountAddress,
     pub success: bool,
-    pub version: Option<u64>,
+    pub version: u64,
     pub vm_status: String,
+    pub transaction_hash: HashValue,
 }
 
 impl From<Transaction> for TransferSummary {
     fn from(transaction: Transaction) -> Self {
-        let mut summary = TransferSummary {
-            success: transaction.success(),
-            version: transaction.version(),
-            vm_status: transaction.vm_status(),
-            ..Default::default()
-        };
-
         if let Transaction::UserTransaction(txn) = transaction {
-            summary.sender = Some(*txn.request.sender.inner());
-            summary.gas_used = Some(
-                txn.info
-                    .gas_used
-                    .0
-                    .saturating_mul(txn.request.gas_unit_price.0),
-            );
-            summary.version = Some(txn.info.version.0);
-            summary.balance_changes = txn
+            let vm_status = txn.info.vm_status;
+            let success = txn.info.success;
+            let sender = *txn.request.sender.inner();
+            let gas_unit_price = txn.request.gas_unit_price.0;
+            let gas_used = txn.info.gas_used.0;
+            let transaction_hash = txn.info.hash;
+            let version = txn.info.version.0;
+            let balance_changes = txn
                 .info
                 .changes
                 .iter()
@@ -95,8 +90,19 @@ impl From<Transaction> for TransferSummary {
                     _ => None,
                 })
                 .collect();
-        }
 
-        summary
+            TransferSummary {
+                gas_unit_price,
+                gas_used,
+                balance_changes,
+                sender,
+                success,
+                version,
+                vm_status,
+                transaction_hash,
+            }
+        } else {
+            panic!("Can't call From<Transaction> for a non UserTransaction")
+        }
     }
 }
