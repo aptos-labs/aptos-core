@@ -3,7 +3,14 @@ title: "AIT-3"
 slug: "ait-3"
 ---
 
+import ThemedImage from '@theme/ThemedImage';
+import useBaseUrl from '@docusaurus/useBaseUrl';
+
 # AIT-3
+
+:::caution DRAFT-only
+These AIT-3 docs are draft-only for now.
+:::
 
 <p class="card-section-h2">Welcome to AIT-3</p>
 
@@ -44,7 +51,7 @@ The following staking parameters are being considered:
   - Minimum and maximum stake.
   - Minimum and maximum lockup.
   - Rewards rate.
-  - Joining and withdrawal limit.
+  - Limits on adding and withdrawing the stake.
   - Epoch duration.
 
 #### Gas schedule
@@ -72,9 +79,9 @@ Proposals on AptosFramework modules, such as:
 
 ### Disaster recovery
 
-- Conduct disaster recovery exercise in simulation
+- Conduct disaster recovery exercise in the simulation for:
     - DDOS mitigation.
-    - Data corruption, data loss. 
+    - Data corruption and data loss. 
     - Operators to restore the node from the backup data.
 - Other operational exercises
     - Operator to rollback from version B to version A.
@@ -84,15 +91,13 @@ Proposals on AptosFramework modules, such as:
 
 
 
-To participate in the Aptos Incentivized Testnet-3 (AIT-3) program, follow the below steps. Use these steps as a checklist to keep track of your progress. A detailed documentation for each step is provided.
-
 <div class="docs-card-container">
 <div class="row row-cols-1 row-cols-md-2 g-4">
   <div class="col">
     <div class="card h-100">
     <h3 class="card-header">Step 1</h3>
       <div class="card-body d-flex flex-column">
-        <a href="#ait-3-program" class="card-title card-link"> <h2>See the AIT-3 program</h2></a>
+        <a href="#ait-3-program" class="card-title card-link"> <h2>Read the AIT-3 program</h2></a>
         <p class="card-text">Read the below AIT-3 steps thoroughly.</p>
       </div>
     </div>
@@ -113,6 +118,42 @@ To participate in the Aptos Incentivized Testnet-3 (AIT-3) program, follow the b
 ## AIT-3 program
 
 Participants in the AIT-3 program must demonstrate the ability to configure and deploy a node, and pass the sanctions screening requirements.
+
+### Summary steps
+
+#### Install the validator node and register
+
+<ThemedImage
+  alt="Signed Transaction Flow"
+  sources={{
+    light: useBaseUrl('/img/docs/install-node-and-register.svg'),
+    dark: useBaseUrl('/img/docs/install-node-and-register.svg'),
+  }}
+/>
+
+#### Install the Wallet
+
+<ThemedImage
+  alt="Signed Transaction Flow"
+  sources={{
+    light: useBaseUrl('/img/docs/wallet-actions.svg'),
+    dark: useBaseUrl('/img/docs/wallet-actions.svg'),
+  }}
+/>
+
+#### Participate in staking and governance
+
+<ThemedImage
+  alt="Signed Transaction Flow"
+  sources={{
+    light: useBaseUrl('/img/docs/owner-staking-op-voter-actions.svg'),
+    dark: useBaseUrl('/img/docs/owner-staking-op-voter-actions.svg'),
+  }}
+/>
+
+### Detailed steps
+
+To participate in the AIT-3 program, follow the below steps. Use these steps as a checklist to keep track of your progress. Click on the links in each step for a detailed documentation.
 
 <div class="docs-card-container">
 
