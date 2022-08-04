@@ -579,7 +579,7 @@ class K8sForgeRunner(ForgeRunner):
         rendered = template.decode().format(
             FORGE_POD_NAME=forge_pod_name,
             FORGE_TEST_SUITE=context.forge_test_suite,
-            FORGE_RUNNER_DURATION_SECS=context.forge_runner_duration_secs,
+            FORGE_RUNNER_DURATION_SECS=3600, #context.forge_runner_duration_secs,
             FORGE_RUNNER_TPS_THRESHOLD=context.forge_runner_tps_threshold,
             IMAGE_TAG=context.forge_image_tag,
             AWS_ACCOUNT_NUM=context.aws_account_num,

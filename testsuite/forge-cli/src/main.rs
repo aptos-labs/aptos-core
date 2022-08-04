@@ -190,7 +190,7 @@ fn main() -> Result<()> {
 
     let args = Args::from_args();
     let global_emit_job_request = EmitJobRequest::default()
-        .duration(Duration::from_secs(args.duration_secs as u64))
+        .duration(Duration::from_secs(3600)) // args.duration_secs as u64))
         .thread_params(EmitThreadParams::default())
         .mempool_backlog(args.mempool_backlog.try_into().unwrap());
 

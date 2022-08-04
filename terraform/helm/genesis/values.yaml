@@ -5,7 +5,6 @@ chain:
   era: 1
   # -- Aptos Chain ID
   chain_id: 4
-  # -- If true, genesis will create a resources account that can mint coins.
   is_test: true
   # -- If specified, the key for the minting capability in testnet
   root_key: "0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956"
@@ -19,8 +18,8 @@ chain:
   required_proposer_stake: 100000000000000
   # -- Maximum stake. Defaults to 1B APTOS coins with 8 decimals
   max_stake: 100000000000000000
-  # -- Length of each epoch in seconds. Defaults to 2 hours
-  epoch_duration_secs: 7200
+  # -- Length of each epoch in seconds. Defaults to 5 minutes
+  epoch_duration_secs: 300
   # -- Recurring lockup duration in seconds. Defaults to 1 day
   recurring_lockup_duration_secs: 86400
   # -- Voting duration in seconds. Defaults to 12 hours

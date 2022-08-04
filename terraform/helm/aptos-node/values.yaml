@@ -49,8 +49,8 @@ validator:
   config:
     sync_only: false
     concurrency_level: 8
-    round_initial_timeout_ms:
-    quorum_store_poll_count: 1
+    round_initial_timeout_ms: 1000
+    quorum_store_poll_count: 5
     enable_state_store_pruner: true
     enable_ledger_pruner: true
     ledger_prune_window: 10000000
