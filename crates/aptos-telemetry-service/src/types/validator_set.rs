@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use aptos_rest_client::types::{deserialize_from_prefixed_hex_string, deserialize_from_string};
 use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress};
 use hex::FromHex;

@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use std::convert::Infallible;
 
 use crate::{auth, context::Context};

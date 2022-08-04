@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use aptos_config::config::PeerRole;
 use aptos_types::{chain_id::ChainId, PeerId};
 use chrono::Utc;
