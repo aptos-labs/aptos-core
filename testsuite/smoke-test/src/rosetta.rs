@@ -3,9 +3,16 @@
 
 use crate::smoke_test_environment::SwarmBuilder;
 use anyhow::anyhow;
+use aptos::common::types::{GasOptions, DEFAULT_GAS_UNIT_PRICE, DEFAULT_MAX_GAS};
+use aptos::test::INVALID_ACCOUNT;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::HashValue;
+use aptos_rest_client::aptos_api_types::UserTransaction;
+use aptos_rest_client::Transaction;
+use aptos_rosetta::types::{
+    AccountIdentifier, Operation, OperationStatusType, OperationType, TransactionType,
+};
 use aptos_rosetta::{
     client::RosettaClient,
     common::{native_coin, BLOCKCHAIN, Y2K_MS},
@@ -16,7 +23,8 @@ use aptos_rosetta::{
     ROSETTA_VERSION,
 };
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
-use forge::{LocalSwarm, Node};
+use forge::{LocalSwarm, Node, NodeExt};
+use std::str::FromStr;
 use std::{future::Future, time::Duration};
 use tokio::{task::JoinHandle, time::Instant};
 
@@ -131,42 +139,76 @@ async fn test_account_balance() {
         }
     );
 
+    // First fund account 1 with lots more gas
+    cli.fund_account(0, Some(DEFAULT_FUNDED_COINS * 2))
+        .await
+        .unwrap();
+
+    let mut account_1_balance = DEFAULT_FUNDED_COINS * 3;
+    let mut account_2_balance = DEFAULT_FUNDED_COINS;
     // At some time both accounts should exist with initial amounts
     try_until_ok(Duration::from_secs(5), DEFAULT_INTERVAL_DURATION, || {
-        account_has_balance(&rosetta_client, chain_id, account_1, DEFAULT_FUNDED_COINS)
+        account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance)
     })
     .await
     .unwrap();
     try_until_ok_default(|| {
-        account_has_balance(&rosetta_client, chain_id, account_2, DEFAULT_FUNDED_COINS)
+        account_has_balance(&rosetta_client, chain_id, account_2, account_2_balance)
     })
     .await
     .unwrap();
 
     // Send money, and expect the gas and fees to show up accordingly
     const TRANSFER_AMOUNT: u64 = 5000;
-    let response = cli.transfer_coins(0, 1, TRANSFER_AMOUNT).await.unwrap();
-    let gas_used = response.gas_used.unwrap();
+    let response = cli
+        .transfer_coins(
+            0,
+            1,
+            TRANSFER_AMOUNT,
+            Some(GasOptions {
+                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
+                max_gas: DEFAULT_MAX_GAS,
+            }),
+        )
+        .await
+        .unwrap();
+    account_1_balance -= TRANSFER_AMOUNT + response.gas_used.unwrap();
+    account_2_balance += TRANSFER_AMOUNT;
+    account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance)
+        .await
+        .unwrap();
+    account_has_balance(&rosetta_client, chain_id, account_2, account_2_balance)
+        .await
+        .unwrap();
 
-    account_has_balance(
-        &rosetta_client,
-        chain_id,
-        account_1,
-        DEFAULT_FUNDED_COINS - TRANSFER_AMOUNT - gas_used,
-    )
-    .await
-    .unwrap();
-    account_has_balance(
-        &rosetta_client,
-        chain_id,
-        account_2,
-        DEFAULT_FUNDED_COINS + TRANSFER_AMOUNT,
-    )
-    .await
-    .unwrap();
+    // Failed transaction spends gas
+    let _ = cli
+        .transfer_invalid_addr(
+            0,
+            TRANSFER_AMOUNT,
+            Some(GasOptions {
+                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
+                max_gas: DEFAULT_MAX_GAS,
+            }),
+        )
+        .await
+        .unwrap_err();
 
-    // TODO: Receive money by faucet
-    // TODO: Make a bad transaction, which will cause gas to be spent but no transfer
+    // Make a bad transaction, which will cause gas to be spent but no transfer
+    let validator = swarm.validators().next().unwrap();
+    let rest_client = validator.rest_client();
+    let txns = rest_client
+        .get_account_transactions(account_1, None, None)
+        .await
+        .unwrap()
+        .into_inner();
+    let failed_txn = txns.last().unwrap();
+    if let Transaction::UserTransaction(txn) = failed_txn {
+        account_1_balance -= txn.request.gas_unit_price.0 * txn.info.gas_used.0;
+        account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance)
+            .await
+            .unwrap();
+    }
 }
 
 async fn account_has_balance(
@@ -176,7 +218,6 @@ async fn account_has_balance(
     expected_balance: u64,
 ) -> anyhow::Result<u64> {
     let response = get_balance(rosetta_client, chain_id, account, None).await?;
-
     if response.balances.iter().any(|amount| {
         amount.currency == native_coin() && amount.value == expected_balance.to_string()
     }) {
@@ -208,7 +249,7 @@ async fn get_balance(
 
 #[tokio::test]
 async fn test_block() {
-    let (swarm, _cli, _faucet, rosetta_client) = setup_test(1, 0).await;
+    let (swarm, _cli, _faucet, rosetta_client) = setup_test(1, 2).await;
     let chain_id = swarm.chain_id();
 
     // Genesis by version
@@ -325,6 +366,308 @@ async fn test_block() {
         .unwrap();
     assert!(newer_block.block_identifier.index >= latest_block.block_identifier.index);
     assert!(newer_block.timestamp >= latest_block.timestamp);
+}
+
+#[tokio::test]
+async fn test_block_transactions() {
+    let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 2).await;
+    let chain_id = swarm.chain_id();
+
+    // Make sure first that there's money to transfer
+    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(0).await.unwrap());
+    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(1).await.unwrap());
+
+    // Now let's see some transfers
+    const TRANSFER_AMOUNT: u64 = 5000;
+    let response = cli
+        .transfer_coins(
+            0,
+            1,
+            TRANSFER_AMOUNT,
+            Some(GasOptions {
+                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
+                max_gas: DEFAULT_MAX_GAS,
+            }),
+        )
+        .await
+        .unwrap();
+    let sender = cli.account_id(0);
+    let receiver = cli.account_id(1);
+
+    let transfer_version = response.version.unwrap();
+
+    let validator = swarm.validators().next().unwrap();
+    let rest_client = validator.rest_client();
+    let block_info = rest_client
+        .get_block_info(transfer_version)
+        .await
+        .unwrap()
+        .into_inner();
+
+    let block_with_transfer = rosetta_client
+        .block(&BlockRequest::by_index(chain_id, block_info.block_height))
+        .await
+        .unwrap();
+    let block_with_transfer = block_with_transfer.block.unwrap();
+
+    // Ensure the block is all good
+    assert_eq!(
+        block_with_transfer.timestamp,
+        block_info.block_timestamp.saturating_div(1000)
+    );
+    assert_eq!(
+        block_with_transfer.block_identifier.index,
+        block_info.block_height
+    );
+    assert_eq!(
+        block_with_transfer.block_identifier.hash,
+        format!("{:x}", block_info.block_hash)
+    );
+    assert_eq!(
+        block_with_transfer.parent_block_identifier.index,
+        block_info.block_height.saturating_sub(1)
+    );
+
+    // Verify individual txns
+    let num_txns = block_info
+        .end_version
+        .saturating_sub(block_info.start_version) as usize;
+    let actual_txns = rest_client
+        .get_transactions(Some(block_info.start_version), Some(num_txns as u16))
+        .await
+        .unwrap()
+        .into_inner();
+    for i in 0..num_txns {
+        let expected_version = block_info.start_version.saturating_add(i as u64);
+        let actual_txn = actual_txns.get(i).unwrap();
+        let block_txn = block_with_transfer.transactions.get(i).unwrap();
+
+        // Identifiers should match the txn
+        let block_txn_metadata = block_txn.metadata.unwrap();
+        assert_eq!(block_txn_metadata.version.0, expected_version);
+        assert_eq!(
+            block_txn.transaction_identifier.hash,
+            format!("{:x}", actual_txn.transaction_info().unwrap().hash)
+        );
+
+        // first transaction has to be block metadata
+        if expected_version == block_info.start_version {
+            assert_eq!(
+                TransactionType::BlockMetadata,
+                block_txn_metadata.transaction_type
+            );
+
+            // No operations occur in block metadata txn
+            assert!(block_txn.operations.is_empty());
+        } else if expected_version == transfer_version {
+            if let Transaction::UserTransaction(actual_txn) = actual_txn {
+                assert_transfer_transaction(
+                    sender,
+                    receiver,
+                    TRANSFER_AMOUNT,
+                    actual_txn,
+                    block_txn,
+                )
+            } else {
+                panic!("Must be a user txn");
+            }
+        } else if let Transaction::StateCheckpointTransaction(actual_txn) = actual_txn {
+            // If we have a state checkpoint it should be at the end of the block and have no operations
+            assert_eq!(
+                TransactionType::StateCheckpoint,
+                block_txn_metadata.transaction_type
+            );
+            assert_eq!(block_txn_metadata.version.0, block_info.end_version);
+            assert!(block_txn.operations.is_empty());
+            assert_eq!(
+                actual_txn.info.hash.to_string(),
+                block_txn.transaction_identifier.hash
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_invalid_transaction_gas_charged() {
+    let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 1).await;
+    let chain_id = swarm.chain_id();
+
+    // Make sure first that there's money to transfer
+    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(0).await.unwrap());
+
+    // Now let's see some transfers
+    const TRANSFER_AMOUNT: u64 = 5000;
+    let _ = cli
+        .transfer_invalid_addr(
+            0,
+            TRANSFER_AMOUNT,
+            Some(GasOptions {
+                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
+                max_gas: DEFAULT_MAX_GAS,
+            }),
+        )
+        .await
+        .unwrap_err();
+
+    let sender = cli.account_id(0);
+
+    // Find failed transaction
+    let validator = swarm.validators().next().unwrap();
+    let rest_client = validator.rest_client();
+    let txns = rest_client
+        .get_account_transactions(sender, None, None)
+        .await
+        .unwrap()
+        .into_inner();
+    let actual_txn = txns.iter().find(|txn| !txn.success()).unwrap();
+    let actual_txn = if let Transaction::UserTransaction(txn) = actual_txn {
+        txn
+    } else {
+        panic!("Not a user transaction");
+    };
+    let txn_version = actual_txn.info.version.0;
+
+    let block_info = rest_client
+        .get_block_info(txn_version)
+        .await
+        .unwrap()
+        .into_inner();
+
+    let block_with_transfer = rosetta_client
+        .block(&BlockRequest::by_index(chain_id, block_info.block_height))
+        .await
+        .unwrap();
+    let block_with_transfer = block_with_transfer.block.unwrap();
+    // Verify failed txn
+    let rosetta_txn = block_with_transfer
+        .transactions
+        .get(txn_version.saturating_sub(block_info.start_version) as usize)
+        .unwrap();
+
+    assert_transfer_transaction(
+        sender,
+        AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
+        TRANSFER_AMOUNT,
+        actual_txn,
+        rosetta_txn,
+    );
+}
+
+fn assert_transfer_transaction(
+    sender: AccountAddress,
+    receiver: AccountAddress,
+    transfer_amount: u64,
+    actual_txn: &UserTransaction,
+    rosetta_txn: &aptos_rosetta::types::Transaction,
+) {
+    // Check the transaction
+    assert_eq!(
+        format!("{:x}", actual_txn.info.hash),
+        rosetta_txn.transaction_identifier.hash
+    );
+
+    let rosetta_txn_metadata = rosetta_txn.metadata.as_ref().unwrap();
+    assert_eq!(TransactionType::User, rosetta_txn_metadata.transaction_type);
+    assert_eq!(actual_txn.info.version.0, rosetta_txn_metadata.version.0);
+    assert_eq!(rosetta_txn.operations.len(), 3);
+
+    // Check the operations
+    let mut seen_deposit = false;
+    let mut seen_withdraw = false;
+    for (i, operation) in rosetta_txn.operations.iter().enumerate() {
+        assert_eq!(i as u64, operation.operation_identifier.index);
+        if !seen_deposit && !seen_withdraw {
+            match OperationType::from_str(&operation.operation_type).unwrap() {
+                OperationType::Deposit => {
+                    seen_deposit = true;
+                    assert_deposit(
+                        operation,
+                        transfer_amount,
+                        receiver,
+                        actual_txn.info.success,
+                    );
+                }
+                OperationType::Withdraw => {
+                    seen_withdraw = true;
+                    assert_withdraw(operation, transfer_amount, sender, actual_txn.info.success);
+                }
+                _ => panic!("Shouldn't get any other operations"),
+            }
+        } else if !seen_deposit {
+            seen_deposit = true;
+            assert_deposit(
+                operation,
+                transfer_amount,
+                receiver,
+                actual_txn.info.success,
+            );
+        } else if !seen_withdraw {
+            seen_withdraw = true;
+            assert_withdraw(operation, transfer_amount, sender, actual_txn.info.success);
+        } else {
+            // Gas is always last
+            assert_withdraw(
+                operation,
+                actual_txn.request.gas_unit_price.0 * actual_txn.info.gas_used.0,
+                sender,
+                true,
+            );
+        }
+    }
+}
+
+fn assert_deposit(
+    operation: &Operation,
+    expected_amount: u64,
+    account: AccountAddress,
+    success: bool,
+) {
+    assert_transfer(
+        operation,
+        OperationType::Deposit,
+        expected_amount.to_string(),
+        account,
+        success,
+    );
+}
+
+fn assert_withdraw(
+    operation: &Operation,
+    expected_amount: u64,
+    account: AccountAddress,
+    success: bool,
+) {
+    assert_transfer(
+        operation,
+        OperationType::Withdraw,
+        format!("-{}", expected_amount),
+        account,
+        success,
+    );
+}
+
+fn assert_transfer(
+    operation: &Operation,
+    expected_type: OperationType,
+    expected_amount: String,
+    account: AccountAddress,
+    success: bool,
+) {
+    assert_eq!(expected_type.to_string(), operation.operation_type);
+    let amount = operation.amount.as_ref().unwrap();
+    assert_eq!(native_coin(), amount.currency);
+    assert_eq!(expected_amount, amount.value);
+    assert_eq!(
+        &AccountIdentifier::from(account),
+        operation.account.as_ref().unwrap()
+    );
+    let expected_status = if success {
+        OperationStatusType::Success
+    } else {
+        OperationStatusType::Failure
+    }
+    .to_string();
+    assert_eq!(&expected_status, operation.status.as_ref().unwrap());
 }
 
 fn assert_genesis_block(block: &Block) {
