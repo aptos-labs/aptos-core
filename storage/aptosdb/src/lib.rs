@@ -72,7 +72,7 @@ use aptos_types::{
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
-        accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProof,
+        accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleProofExt
         TransactionInfoListWithProof,
     },
     state_proof::StateProof,
@@ -1154,11 +1154,11 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_state_value_with_proof_by_version(
+    fn get_state_value_with_proof_by_version_ext(
         &self,
         state_store_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
         gauged_api("get_state_value_with_proof_by_version", || {
             error_if_version_is_pruned(&self.state_pruner, "State", version)?;
 

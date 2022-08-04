@@ -13,7 +13,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Debug, Default, CryptoHasher, Eq, PartialEq, Serialize, Ord, PartialOrd, Hash)]
 pub struct StateValue {
-    pub maybe_bytes: Option<Vec<u8>>,
+    pub maybe_bytes: Vec<u8>,
     #[serde(skip)]
     hash: HashValue,
 }
@@ -23,7 +23,7 @@ impl Arbitrary for StateValue {
     type Parameters = ();
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         any::<Vec<u8>>()
-            .prop_map(|maybe_bytes| StateValue::new(Some(maybe_bytes)))
+            .prop_map(|maybe_bytes| StateValue::new(maybe_bytes))
             .boxed()
     }
 
@@ -38,7 +38,7 @@ impl<'de> Deserialize<'de> for StateValue {
         #[derive(Deserialize)]
         #[serde(rename = "StateValue")]
         struct MaybeBytes {
-            maybe_bytes: Option<Vec<u8>>,
+            maybe_bytes: Vec<u8>,
         }
         let bytes = MaybeBytes::deserialize(deserializer)?;
 
@@ -47,25 +47,17 @@ impl<'de> Deserialize<'de> for StateValue {
 }
 
 impl StateValue {
-    fn new(maybe_bytes: Option<Vec<u8>>) -> Self {
+    fn new(maybe_bytes: Vec<u8>) -> Self {
         let mut hasher = StateValueHasher::default();
-        let hash = if let Some(bytes) = &maybe_bytes {
-            hasher.update(bytes);
-            hasher.finish()
-        } else {
-            HashValue::zero()
-        };
+        hasher.update(maybe_bytes.as_slice());
+        let hash = hasher.finish();
         Self { maybe_bytes, hash }
-    }
-
-    pub fn empty() -> Self {
-        StateValue::new(None)
     }
 }
 
 impl From<Vec<u8>> for StateValue {
     fn from(bytes: Vec<u8>) -> Self {
-        StateValue::new(Some(bytes))
+        StateValue::new(bytes)
     }
 }
 

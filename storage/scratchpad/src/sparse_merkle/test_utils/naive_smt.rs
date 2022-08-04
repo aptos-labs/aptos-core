@@ -6,11 +6,12 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_types::proof::{SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleProof};
+use aptos_types::proof::definition::NodeInProof;
+use aptos_types::proof::{SparseMerkleInternalNode, SparseMerkleLeafNode, SparseMerkleProofExt};
 use bitvec::prelude::*;
 use std::collections::{BTreeMap, HashMap};
 
-type Cache = HashMap<BitVec<Msb0, u8>, HashValue>;
+type Cache = HashMap<BitVec<Msb0, u8>, NodeInProof>;
 
 struct NaiveSubTree<'a> {
     leaves: &'a [(HashValue, HashValue)],
@@ -22,7 +23,7 @@ impl<'a> NaiveSubTree<'a> {
         &'a self,
         key: &HashValue,
         cache: &mut Cache,
-    ) -> (Option<SparseMerkleLeafNode>, Vec<HashValue>) {
+    ) -> (Option<SparseMerkleLeafNode>, Vec<NodeInProof>) {
         if self.is_empty() {
             (None, Vec::new())
         } else if self.leaves.len() == 1 {
@@ -35,11 +36,11 @@ impl<'a> NaiveSubTree<'a> {
             let (left, right) = self.children();
             if key.bit(self.depth) {
                 let (ret_leaf, mut ret_siblings) = right.get_proof(key, cache);
-                ret_siblings.push(left.get_hash(cache));
+                ret_siblings.push(left.get_node_in_proof(cache));
                 (ret_leaf, ret_siblings)
             } else {
                 let (ret_leaf, mut ret_siblings) = left.get_proof(key, cache);
-                ret_siblings.push(right.get_hash(cache));
+                ret_siblings.push(right.get_node_in_proof(cache));
                 (ret_leaf, ret_siblings)
             }
         }
@@ -49,9 +50,9 @@ impl<'a> NaiveSubTree<'a> {
         self.leaves.is_empty()
     }
 
-    fn get_hash(&self, cache: &mut Cache) -> HashValue {
+    fn get_node_in_proof(&self, cache: &mut Cache) -> NodeInProof {
         if self.leaves.is_empty() {
-            return *SPARSE_MERKLE_PLACEHOLDER_HASH;
+            return NodeInProof::from(*SPARSE_MERKLE_PLACEHOLDER_HASH);
         }
 
         let position = self.leaves[0]
@@ -62,23 +63,28 @@ impl<'a> NaiveSubTree<'a> {
             .to_bitvec();
 
         match cache.get(&position) {
-            Some(hash) => *hash,
+            Some(node) => *node,
             None => {
-                let hash = self.get_hash_uncached(cache);
-                cache.insert(position, hash);
-                hash
+                let node = self.get_node_in_proof_uncached(cache);
+                cache.insert(position, node);
+                node
             }
         }
     }
 
-    fn get_hash_uncached(&self, cache: &mut Cache) -> HashValue {
+    fn get_node_in_proof_uncached(&self, cache: &mut Cache) -> NodeInProof {
         assert!(!self.leaves.is_empty());
         if self.leaves.len() == 1 {
             let only_leaf = self.leaves[0];
-            SparseMerkleLeafNode::new(only_leaf.0, only_leaf.1).hash()
+            SparseMerkleLeafNode::new(only_leaf.0, only_leaf.1).into()
         } else {
             let (left, right) = self.children();
-            SparseMerkleInternalNode::new(left.get_hash(cache), right.get_hash(cache)).hash()
+            SparseMerkleInternalNode::new(
+                left.get_node_in_proof(cache).hash(),
+                right.get_node_in_proof(cache).hash(),
+            )
+            .hash()
+            .into()
         }
     }
 
@@ -106,16 +112,24 @@ pub struct NaiveSmt {
 
 impl NaiveSmt {
     pub fn new<V: CryptoHash>(leaves: &[(HashValue, &V)]) -> Self {
-        Self::default().update(leaves)
+        Self::default().update(
+            leaves
+                .iter()
+                .map(|(k, v)| (*k, Some(*v)))
+                .collect::<Vec<_>>()
+                .as_slice(),
+        )
     }
 
-    pub fn update<V: CryptoHash>(self, updates: &[(HashValue, &V)]) -> Self {
+    pub fn update<V: CryptoHash>(self, updates: &[(HashValue, Option<&V>)]) -> Self {
         let mut leaves = self.leaves.into_iter().collect::<BTreeMap<_, _>>();
-        let mut new_leaves = updates
-            .iter()
-            .map(|(address, value)| (*address, value.hash()))
-            .collect::<BTreeMap<_, _>>();
-        leaves.append(&mut new_leaves);
+        for (key, value_option) in updates {
+            if let Some(value) = value_option {
+                leaves.insert(*key, value.hash());
+            } else {
+                leaves.remove(key).unwrap();
+            }
+        }
 
         Self {
             leaves: leaves.into_iter().collect::<Vec<_>>(),
@@ -123,14 +137,14 @@ impl NaiveSmt {
         }
     }
 
-    pub fn get_proof(&mut self, key: &HashValue) -> SparseMerkleProof {
+    pub fn get_proof(&mut self, key: &HashValue) -> SparseMerkleProofExt {
         let root = NaiveSubTree {
             leaves: &self.leaves,
             depth: 0,
         };
 
         let (leaf, siblings) = root.get_proof(key, &mut self.cache);
-        SparseMerkleProof::new(leaf, siblings)
+        SparseMerkleProofExt::new(leaf, siblings)
     }
 
     pub fn get_root_hash(&mut self) -> HashValue {
@@ -139,6 +153,6 @@ impl NaiveSmt {
             depth: 0,
         };
 
-        root.get_hash(&mut self.cache)
+        root.get_node_in_proof(&mut self.cache).hash()
     }
 }
