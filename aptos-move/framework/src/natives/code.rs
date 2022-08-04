@@ -89,8 +89,6 @@ impl FromStr for UpgradePolicy {
 /// Abort code when code publishing is requested twice (0x03 == INVALID_STATE)
 const EALREADY_REQUESTED: u64 = 0x03_0000;
 
-const ENOT_SUPPORTED: u64 = 0x03_0002;
-
 const CHECK_COMPAT_POLICY: u8 = 1;
 
 /// The native code context.
@@ -145,11 +143,6 @@ fn native_request_publish(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert_eq!(args.len(), 4);
-
-    if !cfg!(any(test, feature = "fuzzing")) {
-        // This feature is currently disabled outside of test builds
-        return Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(ENOT_SUPPORTED));
-    }
 
     let policy = pop_arg!(args, u8);
     let mut code = vec![];
