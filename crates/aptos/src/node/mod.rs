@@ -338,7 +338,7 @@ impl CliCommand<Transaction> for RegisterValidatorCandidate {
             };
 
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_register_validator_candidate(
+            .submit_transaction(aptos_stdlib::stake_initialize_validator(
                 bcs::to_bytes(&consensus_public_key)?,
                 bcs::to_bytes(&consensus_proof_of_possession)?,
                 // Double BCS encode, so that we can hide the original type
