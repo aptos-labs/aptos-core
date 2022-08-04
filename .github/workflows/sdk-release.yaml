@@ -1,3 +1,19 @@
+## IMPORTANT NOTE TO EDITORS OF THIS FILE ##
+
+## If you are trying to change how this CI works, you MUST go read the important
+## note at the top of build-images. In short, to test this, you must temporarily
+## change build-images to use the pull_request trigger instead of pull_request_target.
+
+## Make sure to add the CICD:CICD:build-images and CICD:run-e2e-tests labels to test
+## this within an in-review PR.
+
+## If the above approach is too slow (since you have to wait for the rust images
+## to build), you can cut the iteration time dramatically by adding a push trigger
+## and replacing inputs.GITHUB_SHA with a specific commit from the main branch for
+## which you know the rust images step has completed. So to be clear:
+##   - Replace ${{ inputs.GIT_SHA }} for the checkout step with ${{ github.sha }}
+##   - Replace all other instances of ${{ inputs.GIT_SHA }} with the said specific commit.
+
 name: "API + TS SDK CI"
 on:
   # This is called from within the build-images.yaml workflow since we depend
@@ -9,32 +25,7 @@ on:
         type: string
         description:
 
-env:
-  CARGO_INCREMENTAL: "0"
-  CARGO_TERM_COLOR: always
-
-# Cancel redundant builds.
-concurrency:
-  # Cancel redundant builds on PRs (only on PR, not on branches).
-  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) }}
-  cancel-in-progress: true
-
 jobs:
-  # Confirm that any changes to the API specs resulting from the changes in the
-  # PR / commit have been checked in.
-  confirm_api_spec_generated:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - run: mkdir -p /tmp/api_specs
-      - run: docker run --rm ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -- -f yaml -o /tmp/api_specs/spec.yaml
-      - run: docker run --rm ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -- -f json -o /tmp/api_specs/spec.json
-      - run: echo "If this lint fails, run the following commands locally to fix it:"
-      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/v1/spec.yaml"
-      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/v1/spec.json"
-      - run: diff -u /tmp/api_specs/spec.yaml api/doc/v1/spec.yaml
-      - run: diff -u /tmp/api_specs/spec.json api/doc/v1/spec.json
-
   # Confirm that the generated client within the TS SDK has been re-generated
   # if there are any changes that would affect it within the PR / commit. If
   # everything is checked in, run tests, build the SDK, and upload it to npm.js.
@@ -43,8 +34,6 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    needs: [confirm_api_spec_generated]
-    if: needs.confirm_api_spec_generated.result == 'success'
     steps:
       - uses: actions/checkout@v3
         with:
@@ -60,24 +49,34 @@ jobs:
           node-version-file: .node-version
           registry-url: 'https://registry.npmjs.org'
 
+      # Build the API specs.
+      - run: mkdir -p /tmp/api_specs
+      - run: docker run --rm ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml > /tmp/api_specs/spec.yaml
+      - run: docker run --rm ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json > /tmp/api_specs/spec.json
+
+      # Confirm that the specs we built here are the same as those checked in.
+      - run: echo "If this lint fails, run the following commands locally to fix it:"
+      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/v1/spec.yaml"
+      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/v1/spec.json"
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/api_specs/spec.yaml api/doc/v1/spec.yaml
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/api_specs/spec.json api/doc/v1/spec.json
+
       # Set up dotenv file for tests.
       - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
       - run: echo 'APTOS_FAUCET_URL="http://127.0.0.1:8081"' >> ./ecosystem/typescript/sdk/.env
 
-      # Run package install. If install fails, it could mean the lockfile was
-      # not included in the commit.
+      # Run package install. If install fails, it probably means the lockfile
+      # was not included in the commit.
       - run: cd ./ecosystem/typescript/sdk && yarn install --frozen-lockfile
 
       # Ensure any changes to the generated client were checked in.
       - run: cd ./ecosystem/typescript/sdk && yarn generate-client -o /tmp/generated_client
-      - run: diff -bur ./ecosystem/typescript/sdk/src/generated/ /tmp/generated_client/
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ./ecosystem/typescript/sdk/src/generated/ /tmp/generated_client/
 
       # Run a local testnet built from the same commit.
       - run: docker run --rm -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos node run-local-testnet --with-faucet
 
-      # Run package install, test, build. If install fails, it is probably
-      # because the lockfile was included in the commit.
-      - run: cd ./ecosystem/typescript/sdk && yarn install --frozen-lockfile
+      # Test and build.
       - run: cd ./ecosystem/typescript/sdk && yarn test
       - run: cd ./ecosystem/typescript/sdk && yarn build
 
@@ -97,7 +96,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}
 
-      - name: print docker-compose testnet logs when previous steps failed
+      - name: Print docker-compose testnet logs if previous steps failed
         if: ${{ failure() }}
         working-directory: docker/compose/validator-testnet
         run: docker logs local-testnet
