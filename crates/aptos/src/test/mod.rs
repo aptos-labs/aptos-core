@@ -237,14 +237,9 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn increase_lockup(
-        &self,
-        index: usize,
-        lockup_duration: Duration,
-    ) -> CliTypedResult<Transaction> {
+    pub async fn increase_lockup(&self, index: usize) -> CliTypedResult<Transaction> {
         IncreaseLockup {
             txn_options: self.transaction_options(index),
-            lockup_duration,
         }
         .execute()
         .await
