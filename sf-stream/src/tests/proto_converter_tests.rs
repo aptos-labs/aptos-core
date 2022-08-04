@@ -7,6 +7,7 @@ use crate::{
         transaction::{TransactionType, Txn_data},
         transaction_payload::{Payload, Type as PayloadType},
         write_set_change::Change::WriteTableItem,
+        Transaction,
     },
     runtime::SfStreamer,
     tests::{convert_protubuf_txn_arr_to_serde_value, new_test_context, TestContext},
@@ -85,7 +86,7 @@ async fn test_block_transactions_work() {
         }
     }
 
-    let converted = converted_0
+    let converted: Vec<Transaction> = converted_0
         .iter()
         .cloned()
         .chain(converted_1.iter().cloned())

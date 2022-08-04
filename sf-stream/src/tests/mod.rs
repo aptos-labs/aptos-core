@@ -31,11 +31,11 @@ pub fn convert_protubuf_txn_to_serde_value(txn: &extractor::Transaction) -> serd
 }
 
 pub fn convert_protubuf_txn_arr_to_serde_value(
-    txns: &Vec<extractor::Transaction>,
+    txns: &[extractor::Transaction],
 ) -> serde_json::Value {
     let txns_value = txns
         .iter()
-        .map(|txn| convert_protubuf_txn_to_serde_value(txn))
+        .map(convert_protubuf_txn_to_serde_value)
         .collect::<Vec<serde_json::Value>>();
     serde_json::to_value(txns_value).unwrap()
 }

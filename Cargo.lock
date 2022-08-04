@@ -1089,7 +1089,7 @@ dependencies = [
  "aptos-vm",
  "aptosdb",
  "base64 0.13.0",
- "bytes 1.2.1",
+ "bytes 1.1.0",
  "cached-framework-packages",
  "executor",
  "executor-types",
