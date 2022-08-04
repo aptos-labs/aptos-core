@@ -8,7 +8,7 @@
       "eventRootHash": "YPVlJld+KeJV8TgWig4e7McIG/o+rxMn60yg554WVK8=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "wAow+lXSGpsuluvBhhvPZ9FXglDUKtXN2dIaXC0cMxE=",
+      "accumulatorRootHash": "4IEr90E1L0uyqcGP8tEpbdl7z48PwD8qMYfc8auyEiA=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -93,10 +93,10 @@
       "hash": "",
       "stateRootHash": "0LvMgaTMpRSJvQzPftcCWcJ0DS3dy5Q1cwDg4ljDrmk=",
       "eventRootHash": "6llLf9EwoZ37+xJflmiRHF3KOw3ClFeYXcASEj/i/XA=",
-      "gasUsed": "133",
+      "gasUsed": "44378",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "EpOY1LSzFJ8OfRJNqvTWkbUxS+76lCw/DvR+XJAN4Sw=",
+      "accumulatorRootHash": "YvUJ569U7Q4XIpSqW1s8d4rPBB7m7kBft7BxkuFVqE4=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -175,7 +175,7 @@
     "user": {
       "request": {
         "sender": "0xa550c18",
-        "maxGasAmount": "2000",
+        "maxGasAmount": "4000000",
         "expirationTimestampSecs": "1969-12-31T23:59:59.000000000Z",
         "payload": {
           "scriptFunctionPayload": {
@@ -194,7 +194,7 @@
         "signature": {
           "ed255198": {
             "publicKey": "FEGPhnoL1tQquy2qUM1opahpziCCgkgfV1BPYwUQ0NM=",
-            "signature": "OO69jDzav6cKS1VwHHsr6QzQaZsnmhOU4YtDBo9n8Klx385Ibw8bFAt72GUbL4isldNv3wM17Ym3eXPBebYEDg=="
+            "signature": "BPHZ/DDkp2fqrjdDD4O/mZmfV8WJZ35LrM5vHLo7LUvknlNL1asMUHZqU8UpqO2YYEWu6IS9N2fWHu7eu3noAw=="
           }
         }
       },
@@ -225,7 +225,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "eudy92mIRcYs6C74RbA0GgILJrs8LMqVly9w6radid4="
+      "accumulatorRootHash": "sfVGHHZA4gHaKIcU4NUleAsSvKjm84TTxNO3F9OnV7U="
     },
     "blockHeight": "1",
     "type": "STATE_CHECKPOINT",
