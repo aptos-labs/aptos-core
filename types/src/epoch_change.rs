@@ -250,7 +250,7 @@ mod tests {
         let proof_6 = EpochChangeProof::new(
             vec![LedgerInfoWithSignatures::new(
                 valid_ledger_info[0].ledger_info().clone(),
-                MultiSignature::default(),
+                MultiSignature::empty(),
             )],
             /* more = */ false,
         );

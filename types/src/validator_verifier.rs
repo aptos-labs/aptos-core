@@ -46,6 +46,8 @@ pub enum VerifyError {
     InconsistentBlockInfo,
     #[error("Failed to aggregate public keys")]
     FailedToAggregateKey,
+    #[error("Failed to aggregate signatures")]
+    FailedToAggregateSignature,
 }
 
 /// Helper struct to manage validator information for validation
@@ -166,6 +168,7 @@ impl ValidatorVerifier {
         }
     }
 
+    // Generates a multi signature from partial signatures without actually verifying it.
     pub fn generate_multi_signature(
         &self,
         partial_signatures: &PartialSignatures,
@@ -183,7 +186,7 @@ impl ValidatorVerifier {
         let aggregated_sig = bls12381::Signature::aggregate(
             partial_signatures.signatures().values().cloned().collect(),
         )
-        .map_err(|_| VerifyError::FailedToAggregateKey)?;
+        .map_err(|_| VerifyError::FailedToAggregateSignature)?;
 
         // Verify the optimistically aggregated signature.
         let mut pub_keys_to_agg = vec![];
@@ -196,8 +199,8 @@ impl ValidatorVerifier {
             );
         }
 
-        let aggregated_key =
-            PublicKey::aggregate(pub_keys_to_agg).map_err(|_| VerifyError::FailedToAggregateKey)?;
+        let aggregated_key = PublicKey::aggregate(pub_keys_to_agg)
+            .map_err(|_| VerifyError::FailedToAggregateSignature)?;
         Ok((
             MultiSignature::new(validator_bitmask, Some(aggregated_sig)),
             Some(aggregated_key),
@@ -214,14 +217,19 @@ impl ValidatorVerifier {
             aggregated_sig
                 .multi_sig()
                 .as_ref()
-                .ok_or(VerifyError::FailedToAggregateKey)?
+                .ok_or(VerifyError::FailedToAggregateSignature)?
                 .verify(message, &aggregated_key)
                 .expect("Failed to verify the aggregated bls signature")
         }
         Ok(aggregated_sig)
     }
 
-    pub fn verify_mutli_signatures<T: CryptoHash + Serialize>(
+    /// This function will successfully return when at least quorum_size signatures of known authors
+    /// are successfully verified. It creates an aggregated public key using the voter bitmask passed
+    /// in the multi-signature and verifies the message passed in the multi-signature using the aggregated
+    /// public key.
+    ///
+    pub fn verify_multi_signatures<T: CryptoHash + Serialize>(
         &self,
         message: &T,
         multi_signature: &MultiSignature,
@@ -247,6 +255,7 @@ impl ValidatorVerifier {
             .collect();
 
         if pub_keys_to_agg.is_empty() {
+            // No signatures to aggregate - should only be the case in case of testing
             return Ok(());
         }
         let aggregated_key =
@@ -264,9 +273,9 @@ impl ValidatorVerifier {
     /// Ensure there are not more than the maximum expected signatures (all possible signatures).
     fn check_num_of_signatures(
         &self,
-        aggregated_signature: &MultiSignature,
+        multi_signature: &MultiSignature,
     ) -> std::result::Result<(), VerifyError> {
-        let num_of_signatures = aggregated_signature.get_num_voters();
+        let num_of_signatures = multi_signature.get_num_voters();
         if num_of_signatures > self.len() {
             return Err(VerifyError::TooManySignatures {
                 num_of_signatures,
@@ -539,7 +548,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            validator.verify_mutli_signatures(&dummy_struct, &multi_sig),
+            validator.verify_multi_signatures(&dummy_struct, &multi_sig),
             Err(VerifyError::InvalidSignature)
         );
     }
@@ -580,7 +589,7 @@ mod tests {
             .0;
         // Check against signatures == N; this will pass.
         assert_eq!(
-            validator_verifier.verify_mutli_signatures(&dummy_struct, &aggregated_signature),
+            validator_verifier.verify_multi_signatures(&dummy_struct, &aggregated_signature),
             Ok(())
         );
 
@@ -605,7 +614,7 @@ mod tests {
             .unwrap()
             .0;
         assert_eq!(
-            validator_verifier.verify_mutli_signatures(&dummy_struct, &aggregated_signature),
+            validator_verifier.verify_multi_signatures(&dummy_struct, &aggregated_signature),
             Ok(())
         );
 
@@ -629,7 +638,7 @@ mod tests {
             .unwrap()
             .0;
         assert_eq!(
-            validator_verifier.verify_mutli_signatures(&dummy_struct, &aggregated_signature),
+            validator_verifier.verify_multi_signatures(&dummy_struct, &aggregated_signature),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 4,
                 expected_voting_power: 5
@@ -713,7 +722,7 @@ mod tests {
 
         // Check against all signatures (6 voting power); this will pass.
         assert_eq!(
-            validator_verifier.verify_mutli_signatures(&dummy_struct, &aggregated_signature),
+            validator_verifier.verify_multi_signatures(&dummy_struct, &aggregated_signature),
             Ok(())
         );
 
@@ -740,7 +749,7 @@ mod tests {
             .0;
 
         assert_eq!(
-            validator_verifier.verify_mutli_signatures(&dummy_struct, &aggregated_signature),
+            validator_verifier.verify_multi_signatures(&dummy_struct, &aggregated_signature),
             Ok(())
         );
 
@@ -763,7 +772,7 @@ mod tests {
             .unwrap()
             .0;
         assert_eq!(
-            validator_verifier.verify_mutli_signatures(&dummy_struct, &aggregated_signature),
+            validator_verifier.verify_multi_signatures(&dummy_struct, &aggregated_signature),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 3,
                 expected_voting_power: 5

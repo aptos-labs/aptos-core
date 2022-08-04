@@ -449,7 +449,7 @@ mod tests {
     fn create_ledger_info() -> LedgerInfoWithSignatures {
         LedgerInfoWithSignatures::new(
             LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
-            MultiSignature::default(),
+            MultiSignature::empty(),
         )
     }
 
