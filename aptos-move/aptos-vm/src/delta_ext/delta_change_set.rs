@@ -31,7 +31,7 @@ pub enum DeltaOp {
 
 impl DeltaOp {
     /// Returns the result of delta application to `base` or error if
-    /// postocndition is not satisfied.
+    /// postcondition is not satisfied.
     pub fn apply_to(&self, base: u128) -> PartialVMResult<u128> {
         match self {
             DeltaOp::Addition { value, limit } => addition(base, *value, *limit),
