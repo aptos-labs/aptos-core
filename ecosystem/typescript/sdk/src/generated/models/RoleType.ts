@@ -3,6 +3,6 @@
 /* eslint-disable */
 
 export enum RoleType {
-    VALIDATOR = 'Validator',
-    FULL_NODE = 'FullNode',
+    VALIDATOR = 'validator',
+    FULL_NODE = 'full_node',
 }

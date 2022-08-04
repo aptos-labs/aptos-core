@@ -19,7 +19,7 @@ fi
 
 # Functions to help check if the version went backwards.
 verlte() {
-    [ "$1" = "$(printf "$1\n$2" | gsort -V | head -n1)" ]
+    [ "$1" = "$(printf "$1\n$2" | sort -V | head -n1)" ]
 }
 
 # Ensure the version didn't go backwards.
@@ -34,3 +34,4 @@ if ! grep -q "# $NEW_VERSION" CHANGELOG.md; then
     exit 1
 fi
 
+echo "Version and changelog look good"

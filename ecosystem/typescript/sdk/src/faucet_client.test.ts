@@ -22,12 +22,12 @@ test(
     const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
     const account1 = new AptosAccount();
-    const txns = await faucetClient.fundAccount(account1.address(), 5000);
+    const txns = await faucetClient.fundAccount(account1.address(), 50000);
     const tx1 = await client.getTransactionByHash(txns[1]);
     expect(tx1.type).toBe("user_transaction");
     let resources = await client.getAccountResources(account1.address());
     let accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
-    expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("5000");
+    expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("50000");
 
     const account2 = new AptosAccount();
     await faucetClient.fundAccount(account2.address(), 0);
@@ -48,10 +48,11 @@ test(
       arguments: [account2.address().hex(), "717"],
     };
 
-    const txnRequest = await client.generateTransaction(account1.address(), payload);
+    const txnRequest = await client.generateTransaction(account1.address(), payload, { max_gas_amount: "20000" });
     const signedTxn = await client.signTransaction(account1, txnRequest);
     const transactionRes = await client.submitTransaction(signedTxn);
-    await client.waitForTransaction(transactionRes.hash);
+    const txn = await client.waitForTransactionWithResult(transactionRes.hash);
+    expect((txn as any)?.success).toBe(true);
 
     resources = await client.getAccountResources(account2.address());
     accountResource = resources.find((r) => isEqual(r.type, aptosCoin));

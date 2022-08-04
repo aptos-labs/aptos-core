@@ -82,10 +82,10 @@ test(
     const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
     const account1 = new AptosAccount();
-    await faucetClient.fundAccount(account1.address(), 5000);
+    await faucetClient.fundAccount(account1.address(), 50000);
     let resources = await client.getAccountResources(account1.address());
     let accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
-    expect((accountResource!.data as any).coin.value).toBe("5000");
+    expect((accountResource!.data as any).coin.value).toBe("50000");
 
     const account2 = new AptosAccount();
     await faucetClient.fundAccount(account2.address(), 0);
@@ -113,7 +113,7 @@ test(
       TxnBuilderTypes.AccountAddress.fromHex(account1.address()),
       BigInt(sequnceNumber),
       scriptFunctionPayload,
-      1000n,
+      10000n,
       1n,
       BigInt(Math.floor(Date.now() / 1000) + 10),
       new TxnBuilderTypes.ChainId(chainId),
@@ -152,11 +152,11 @@ test(
     const authKey = TxnBuilderTypes.AuthenticationKey.fromMultiEd25519PublicKey(multiSigPublicKey);
 
     const mutisigAccountAddress = authKey.derivedAddress();
-    await faucetClient.fundAccount(mutisigAccountAddress, 5000);
+    await faucetClient.fundAccount(mutisigAccountAddress, 500000);
 
     let resources = await client.getAccountResources(mutisigAccountAddress);
     let accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
-    expect((accountResource!.data as any).coin.value).toBe("5000");
+    expect((accountResource!.data as any).coin.value).toBe("500000");
 
     const account4 = new AptosAccount();
     await faucetClient.fundAccount(account4.address(), 0);
@@ -184,7 +184,7 @@ test(
       TxnBuilderTypes.AccountAddress.fromHex(mutisigAccountAddress),
       BigInt(sequnceNumber),
       scriptFunctionPayload,
-      1000n,
+      100000n,
       1n,
       BigInt(Math.floor(Date.now() / 1000) + 10),
       new TxnBuilderTypes.ChainId(chainId),
@@ -226,8 +226,8 @@ test(
 
     const account1 = new AptosAccount();
     const account2 = new AptosAccount();
-    const txns1 = await faucetClient.fundAccount(account1.address(), 5000);
-    const txns2 = await faucetClient.fundAccount(account2.address(), 1000);
+    const txns1 = await faucetClient.fundAccount(account1.address(), 50000);
+    const txns2 = await faucetClient.fundAccount(account2.address(), 10000);
     const tx1 = await client.getTransactionByHash(txns1[1]);
     const tx2 = await client.getTransactionByHash(txns2[1]);
     expect(tx1.type).toBe("user_transaction");
@@ -237,8 +237,8 @@ test(
       const resources2 = await client.getAccountResources(account2.address());
       const account1Resource = resources1.find((r) => isEqual(r.type, aptosCoin));
       const account2Resource = resources2.find((r) => isEqual(r.type, aptosCoin));
-      expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("5000");
-      expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("1000");
+      expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("50000");
+      expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("10000");
     };
     await checkAptosCoin();
 
@@ -261,7 +261,7 @@ test(
       return (
         write.address === account2.address().hex() &&
         isEqual(write.data.type, aptosCoin) &&
-        (write.data.data as { coin: { value: string } }).coin.value === "2000"
+        (write.data.data as { coin: { value: string } }).coin.value === "11000"
       );
     });
     expect(account2AptosCoin).toHaveLength(1);
@@ -278,8 +278,8 @@ test(
 
     const account1 = new AptosAccount();
     const account2 = new AptosAccount();
-    const txns1 = await faucetClient.fundAccount(account1.address(), 5000);
-    const txns2 = await faucetClient.fundAccount(account2.address(), 1000);
+    const txns1 = await faucetClient.fundAccount(account1.address(), 50000);
+    const txns2 = await faucetClient.fundAccount(account2.address(), 10000);
     const tx1 = await client.getTransactionByHash(txns1[1]);
     const tx2 = await client.getTransactionByHash(txns2[1]);
     expect(tx1.type).toBe("user_transaction");
@@ -289,8 +289,8 @@ test(
       const resources2 = await client.getAccountResources(account2.address());
       const account1Resource = resources1.find((r) => isEqual(r.type, aptosCoin));
       const account2Resource = resources2.find((r) => isEqual(r.type, aptosCoin));
-      expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("5000");
-      expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("1000");
+      expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("50000");
+      expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("10000");
     };
     await checkAptosCoin();
 
@@ -313,7 +313,7 @@ test(
       TxnBuilderTypes.AccountAddress.fromHex(account1.address()),
       BigInt(sequnceNumber),
       scriptFunctionPayload,
-      1000n,
+      10000n,
       1n,
       BigInt(Math.floor(Date.now() / 1000) + 10),
       new TxnBuilderTypes.ChainId(chainId),
@@ -332,7 +332,7 @@ test(
       return (
         write.address === account2.address().toShortString() &&
         isEqual(write.data.type, aptosCoin) &&
-        (write.data.data as { coin: { value: string } }).coin.value === "2000"
+        (write.data.data as { coin: { value: string } }).coin.value === "11000"
       );
     });
     expect(account2AptosCoin).toHaveLength(1);
@@ -354,16 +354,16 @@ test.skip(
     const aliceAccountAddress = TxnBuilderTypes.AccountAddress.fromHex(alice.address());
     const bobAccountAddress = TxnBuilderTypes.AccountAddress.fromHex(bob.address());
 
-    await faucetClient.fundAccount(alice.address(), 5000);
+    await faucetClient.fundAccount(alice.address(), 50000);
 
     let resources = await client.getAccountResources(alice.address());
     let accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
-    expect((accountResource!.data as any).coin.value).toBe("5000");
+    expect((accountResource!.data as any).coin.value).toBe("50000");
 
-    await faucetClient.fundAccount(bob.address(), 6000);
+    await faucetClient.fundAccount(bob.address(), 60000);
     resources = await client.getAccountResources(bob.address());
     accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
-    expect((accountResource!.data as any).coin.value).toBe("6000");
+    expect((accountResource!.data as any).coin.value).toBe("60000");
 
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";
