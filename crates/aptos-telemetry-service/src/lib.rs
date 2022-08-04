@@ -1,9 +1,6 @@
 use core::time;
 use std::{
-    collections::HashMap,
-    convert::Infallible,
-    net::SocketAddr,
-    path::PathBuf, fs::File, io::Read,
+    collections::HashMap, convert::Infallible, fs::File, io::Read, net::SocketAddr, path::PathBuf,
 };
 
 use aptos_config::keys::ConfigKey;
@@ -11,20 +8,23 @@ use aptos_crypto::x25519;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use serde_yaml;
 use warp::{Filter, Reply};
 
-use crate::{context::Context, index::routes, validator_cache::{ValidatorSetCache, ValidatorSetCacheUpdater}};
+use crate::{
+    context::Context,
+    index::routes,
+    validator_cache::{ValidatorSetCache, ValidatorSetCacheUpdater},
+};
 
-mod context;
 mod auth;
+mod context;
 mod index;
+mod jwt_auth;
+mod rest_client;
 #[cfg(any(test))]
 pub(crate) mod tests;
 pub(crate) mod types;
-mod rest_client;
 mod validator_cache;
-mod jwt_auth;
 
 #[derive(Clone, Debug, Parser)]
 #[clap(name = "Aptos Telemetry Service", author, version)]

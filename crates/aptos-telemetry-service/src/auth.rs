@@ -1,5 +1,5 @@
 use crate::context::Context;
-use crate::jwt_auth::{create_jwt_token, jwt_from_header, authorize_jwt};
+use crate::jwt_auth::{authorize_jwt, create_jwt_token, jwt_from_header};
 use crate::types::auth::{AuthRequest, AuthResponse, Claims};
 use aptos_config::config::PeerRole;
 use aptos_crypto::{noise, x25519};
@@ -42,7 +42,7 @@ pub async fn handle_auth(
     prologue[CHAIN_ID_LENGTH..ID_SIZE].copy_from_slice(body.peer_id.as_ref());
     prologue[ID_SIZE..PROLOGUE_SIZE].copy_from_slice(body.server_public_key.as_slice());
 
-    let (remote_public_key, handshake_state, payload) = context
+    let (remote_public_key, handshake_state, _payload) = context
         .noise_config()
         .parse_client_init_message(&prologue, client_init_message)
         .map_err(|_| reject::reject())?;
@@ -78,8 +78,14 @@ pub async fn handle_auth(
         }
     }?;
 
-    let token = create_jwt_token(context.clone(), body.chain_id, body.peer_id, peer_role, epoch)
-        .map_err(|_| reject::reject())?;
+    let token = create_jwt_token(
+        context.clone(),
+        body.chain_id,
+        body.peer_id,
+        peer_role,
+        epoch,
+    )
+    .map_err(|_| reject::reject())?;
 
     let mut rng = rand::rngs::OsRng;
     let response_payload = token.as_bytes();
@@ -99,6 +105,7 @@ pub async fn handle_auth(
     }))
 }
 
+#[allow(dead_code)]
 pub fn with_auth(
     context: Context,
     roles: Vec<PeerRole>,

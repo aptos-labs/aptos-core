@@ -1,12 +1,13 @@
 use std::convert::Infallible;
 
-
-use warp::{Filter, Reply, Rejection, reply, http::{HeaderValue, StatusCode}};
 use crate::{auth, context::Context};
-
+use warp::{
+    http::{HeaderValue, StatusCode},
+    reply, Filter, Rejection, Reply,
+};
 
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
-    auth::auth(context.clone()).recover(handle_rejection)
+    auth::auth(context).recover(handle_rejection)
 }
 
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
