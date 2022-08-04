@@ -18,7 +18,7 @@ use std::time::Duration;
 
 #[tokio::test]
 async fn test_account_flow() {
-    let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
+    let (_swarm, cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .build_with_cli(2)
         .await;
@@ -41,28 +41,8 @@ async fn test_account_flow() {
         .await
         .unwrap();
     let expected_sender_amount =
-        DEFAULT_FUNDED_COINS - response.gas_used.unwrap() - transfer_amount;
+        DEFAULT_FUNDED_COINS - (response.gas_used * response.gas_unit_price) - transfer_amount;
     let expected_receiver_amount = DEFAULT_FUNDED_COINS + transfer_amount;
-
-    // Double check gas calculation
-    let client = swarm.validators().next().unwrap().rest_client();
-    let txn = client
-        .get_transaction_by_version(response.version.unwrap())
-        .await
-        .unwrap()
-        .into_inner();
-    match txn {
-        Transaction::UserTransaction(txn) => {
-            assert_eq!(
-                response.gas_used.unwrap(),
-                txn.request
-                    .gas_unit_price
-                    .0
-                    .saturating_mul(txn.info.gas_used.0)
-            );
-        }
-        _ => panic!("Didn't get a user transaction"),
-    }
 
     assert_eq!(
         expected_sender_amount,
