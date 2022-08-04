@@ -627,8 +627,8 @@ impl TryFrom<TransactionSignature> for TransactionAuthenticator {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct Ed25519Signature {
-    public_key: HexEncodedBytes,
-    signature: HexEncodedBytes,
+    pub public_key: HexEncodedBytes,
+    pub signature: HexEncodedBytes,
 }
 
 impl TryFrom<Ed25519Signature> for TransactionAuthenticator {
@@ -675,10 +675,10 @@ impl TryFrom<Ed25519Signature> for AccountAuthenticator {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MultiEd25519Signature {
-    public_keys: Vec<HexEncodedBytes>,
-    signatures: Vec<HexEncodedBytes>,
-    threshold: u8,
-    bitmap: HexEncodedBytes,
+    pub public_keys: Vec<HexEncodedBytes>,
+    pub signatures: Vec<HexEncodedBytes>,
+    pub threshold: u8,
+    pub bitmap: HexEncodedBytes,
 }
 
 impl TryFrom<MultiEd25519Signature> for TransactionAuthenticator {
@@ -762,9 +762,9 @@ impl TryFrom<AccountSignature> for AccountAuthenticator {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MultiAgentSignature {
-    sender: AccountSignature,
-    secondary_signer_addresses: Vec<Address>,
-    secondary_signers: Vec<AccountSignature>,
+    pub sender: AccountSignature,
+    pub secondary_signer_addresses: Vec<Address>,
+    pub secondary_signers: Vec<AccountSignature>,
 }
 
 impl TryFrom<MultiAgentSignature> for TransactionAuthenticator {

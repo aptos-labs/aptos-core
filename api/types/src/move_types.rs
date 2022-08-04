@@ -738,7 +738,7 @@ pub struct MoveStruct {
 // custom macro, since some of the enum type information (such as the
 // variants) is currently being lost.
 #[derive(Clone, Debug, PartialEq)]
-pub struct MoveAbility(Ability);
+pub struct MoveAbility(pub Ability);
 
 impl From<Ability> for MoveAbility {
     fn from(a: Ability) -> Self {
