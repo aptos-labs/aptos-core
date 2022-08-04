@@ -167,7 +167,7 @@ module aptos_framework::aptos_governance {
 
         // The proposer's stake needs to be at least the required bond amount.
         let governance_config = borrow_global<GovernanceConfig>(@aptos_framework);
-        let stake_balance = stake::get_active_staked_balance(stake_pool);
+        let stake_balance = stake::get_current_epoch_voting_power(stake_pool);
         assert!(
             stake_balance >= governance_config.required_proposer_stake,
             error::invalid_argument(EINSUFFICIENT_PROPOSER_STAKE),
@@ -233,7 +233,7 @@ module aptos_framework::aptos_governance {
         // Voting power does not include pending_active or pending_inactive balances.
         // In general, the stake pool should not have pending_inactive balance if it still has lockup (required to vote)
         // And if pending_active will be added to active in the next epoch.
-        let voting_power = stake::get_active_staked_balance(stake_pool);
+        let voting_power = stake::get_current_epoch_voting_power(stake_pool);
         // Short-circuit if the voter has no voting power.
         assert!(voting_power > 0, error::invalid_argument(ENO_VOTING_POWER));
 
@@ -406,12 +406,11 @@ module aptos_framework::aptos_governance {
         stake::create_validator_set(aptos_framework, active_validators);
 
         let (mint_cap, burn_cap) = aptos_coin::initialize(aptos_framework, core_resources);
-        let proposer_stake = coin::mint(100, &mint_cap);
-        let yes_voter_stake = coin::mint(20, &mint_cap);
-        let no_voter_stake = coin::mint(10, &mint_cap);
-        stake::create_stake_pool(proposer, proposer_stake, 10000);
-        stake::create_stake_pool(yes_voter, yes_voter_stake, 10000);
-        stake::create_stake_pool(no_voter, no_voter_stake, 10000);
+        // Spread stake among active and pending_inactive because both need to be accounted for when computing voting
+        // power.
+        stake::create_stake_pool(proposer, coin::mint(50, &mint_cap), coin::mint(50, &mint_cap), 10000);
+        stake::create_stake_pool(yes_voter, coin::mint(10, &mint_cap), coin::mint(10, &mint_cap), 10000);
+        stake::create_stake_pool(no_voter, coin::mint(5, &mint_cap), coin::mint(5, &mint_cap), 10000);
         coin::destroy_mint_cap<AptosCoin>(mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
     }
