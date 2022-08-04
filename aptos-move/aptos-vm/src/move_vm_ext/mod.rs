@@ -3,7 +3,6 @@
 
 ///! MoveVM and Session wrapped, to make sure Aptos natives and extensions are always installed and
 ///! taken care of after session finish.
-
 mod aggregator_extension;
 mod resolver;
 mod session;

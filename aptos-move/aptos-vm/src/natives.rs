@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::move_vm_ext::{aggregator_natives, NativeAggregatorContext};
+use aptos_gas::NativeGasParameters;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use framework::natives::{code::NativeCodeContext, transaction_context::NativeTransactionContext};
 use move_deps::move_unit_test;

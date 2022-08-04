@@ -7,7 +7,7 @@ use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
 use move_deps::{
     move_binary_format::errors::{PartialVMError, PartialVMResult},
-    move_core_types::{account_address::AccountAddress, gas_schedule::GasCost},
+    move_core_types::account_address::AccountAddress,
     move_table_extension::{TableHandle, TableResolver},
     move_vm_runtime::{
         native_functions,
@@ -25,6 +25,7 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
     convert::TryInto,
+    sync::Arc,
 };
 
 /// Describes the state of each aggregator instance.
@@ -291,14 +292,18 @@ pub fn aggregator_natives(aggregator_addr: AccountAddress) -> NativeFunctionTabl
     native_functions::make_table(
         aggregator_addr,
         &[
-            ("aggregator", "add", native_add),
-            ("aggregator", "read", native_read),
-            ("aggregator", "remove_aggregator", native_remove_aggregator),
-            ("aggregator", "sub", native_sub),
+            ("aggregator", "add", Arc::new(native_add)),
+            ("aggregator", "read", Arc::new(native_read)),
+            (
+                "aggregator",
+                "remove_aggregator",
+                Arc::new(native_remove_aggregator),
+            ),
+            ("aggregator", "sub", Arc::new(native_sub)),
             (
                 "aggregator_factory",
                 "new_aggregator",
-                native_new_aggregator,
+                Arc::new(native_new_aggregator),
             ),
         ],
     )
@@ -349,11 +354,8 @@ fn native_new_aggregator(
     aggregator_data.create_new_aggregator(id, limit);
 
     // TODO: charge gas properly.
-    let cost = GasCost::new(0, 0).total();
-
-    // Return `Aggregator` Move struct to the user.
     Ok(NativeResult::ok(
-        cost,
+        0,
         smallvec![Value::struct_(Struct::pack(vec![
             Value::u128(handle),
             Value::u128(key),
@@ -388,8 +390,7 @@ fn native_add(
     aggregator.add(value)?;
 
     // TODO: charge gas properly.
-    let cost = GasCost::new(0, 0).total();
-    Ok(NativeResult::ok(cost, smallvec![]))
+    Ok(NativeResult::ok(0, smallvec![]))
 }
 
 /// Move signature:
@@ -418,9 +419,8 @@ fn native_read(
     aggregator.materialize(aggregator_context, &id)?;
 
     // TODO: charge gas properly.
-    let cost = GasCost::new(0, 0).total();
     Ok(NativeResult::ok(
-        cost,
+        0,
         smallvec![Value::u128(aggregator.value)],
     ))
 }
@@ -456,8 +456,7 @@ fn native_sub(
     aggregator.sub(value)?;
 
     // TODO: charge gas properly.
-    let cost = GasCost::new(0, 0).total();
-    Ok(NativeResult::ok(cost, smallvec![]))
+    Ok(NativeResult::ok(0, smallvec![]))
 }
 
 /// Move signature:
@@ -485,8 +484,7 @@ fn native_remove_aggregator(
     aggregator_data.remove_aggregator(id);
 
     // TODO: charge gas properly.
-    let cost = GasCost::new(0, 0).total();
-    Ok(NativeResult::ok(cost, smallvec![]))
+    Ok(NativeResult::ok(0, smallvec![]))
 }
 
 // ================================ Utilities ================================
@@ -554,10 +552,7 @@ mod test {
     use aptos_state_view::StateView;
     use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
     use claim::{assert_err, assert_matches, assert_ok};
-    use move_deps::{
-        move_core_types::gas_schedule::{GasAlgebra, GasCarrier, InternalGasUnits},
-        move_table_extension::TableOperation,
-    };
+    use move_deps::move_table_extension::TableOperation;
     use once_cell::sync::Lazy;
     use std::collections::HashMap;
 
@@ -597,13 +592,8 @@ mod test {
             self.get_state_value(&state_key)
         }
 
-        fn operation_cost(
-            &self,
-            _op: TableOperation,
-            _key_size: usize,
-            _val_size: usize,
-        ) -> InternalGasUnits<GasCarrier> {
-            InternalGasUnits::new(1)
+        fn operation_cost(&self, _op: TableOperation, _key_size: usize, _val_size: usize) -> u64 {
+            1
         }
     }
 
