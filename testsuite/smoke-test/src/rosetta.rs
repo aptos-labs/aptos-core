@@ -172,7 +172,7 @@ async fn test_account_balance() {
         )
         .await
         .unwrap();
-    account_1_balance -= TRANSFER_AMOUNT + response.gas_used.unwrap();
+    account_1_balance -= TRANSFER_AMOUNT + response.gas_used * response.gas_unit_price;
     account_2_balance += TRANSFER_AMOUNT;
     account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance)
         .await
@@ -394,7 +394,7 @@ async fn test_block_transactions() {
     let sender = cli.account_id(0);
     let receiver = cli.account_id(1);
 
-    let transfer_version = response.version.unwrap();
+    let transfer_version = response.version;
 
     let validator = swarm.validators().next().unwrap();
     let rest_client = validator.rest_client();
