@@ -25,7 +25,8 @@ use crate::{
 use anyhow::anyhow;
 use aptos_crypto::{ed25519::Ed25519PublicKey, ValidCryptoMaterialStringExt};
 use aptos_rest_client::aptos_api_types::{
-    Address, Event, MoveStructTag, MoveType, TransactionPayload, WriteResource,
+    Address, Event, MoveStructTag, MoveType, TransactionPayload, UserTransactionRequest,
+    WriteResource,
 };
 use aptos_rest_client::{
     aptos::Balance,
@@ -506,31 +507,22 @@ impl Display for TransactionType {
 impl Transaction {
     pub async fn from_transaction(txn: aptos_rest_client::Transaction) -> ApiResult<Transaction> {
         use aptos_rest_client::Transaction::*;
-        let (txn_type, maybe_sender, txn_info, events, maybe_payload) = match txn {
+        let (txn_type, maybe_user_transaction_request, txn_info, events) = match txn {
             // Pending transactions aren't supported by Rosetta (for now)
             PendingTransaction(_) => return Err(ApiError::TransactionIsPending),
             UserTransaction(txn) => (
                 TransactionType::User,
-                Some(txn.request.sender),
+                Some(txn.request),
                 txn.info,
                 txn.events,
-                Some(txn.request.payload),
             ),
-            GenesisTransaction(txn) => (TransactionType::Genesis, None, txn.info, txn.events, None),
-            BlockMetadataTransaction(txn) => (
-                TransactionType::BlockMetadata,
-                None,
-                txn.info,
-                txn.events,
-                None,
-            ),
-            StateCheckpointTransaction(txn) => (
-                TransactionType::StateCheckpoint,
-                None,
-                txn.info,
-                vec![],
-                None,
-            ),
+            GenesisTransaction(txn) => (TransactionType::Genesis, None, txn.info, txn.events),
+            BlockMetadataTransaction(txn) => {
+                (TransactionType::BlockMetadata, None, txn.info, txn.events)
+            }
+            StateCheckpointTransaction(txn) => {
+                (TransactionType::StateCheckpoint, None, txn.info, vec![])
+            }
         };
 
         // Operations must be sequential and operation index must always be in the same order
@@ -543,7 +535,7 @@ impl Transaction {
                 let mut ops = parse_operations_from_write_set(
                     change,
                     &events,
-                    &maybe_sender,
+                    &maybe_user_transaction_request,
                     operation_index,
                 );
                 operation_index += ops.len() as u64;
@@ -551,28 +543,26 @@ impl Transaction {
             }
         } else {
             // Parse all failed operations from the payload
-            if let Some(sender) = maybe_sender {
-                if let Some(payload) = maybe_payload {
-                    let mut ops = parse_operations_from_txn_payload(
-                        operation_index,
-                        *sender.inner(),
-                        payload,
-                    );
-                    operation_index += ops.len() as u64;
-                    operations.append(&mut ops);
-                }
+            if let Some(ref request) = maybe_user_transaction_request {
+                let mut ops = parse_operations_from_txn_payload(
+                    operation_index,
+                    *request.sender.inner(),
+                    &request.payload,
+                );
+                operation_index += ops.len() as u64;
+                operations.append(&mut ops);
             }
         };
 
         // Everything committed costs gas
-        if let Some(sender) = maybe_sender {
+        if let Some(ref request) = maybe_user_transaction_request {
             operations.push(Operation::withdraw(
                 operation_index,
                 // Gas charging is always successful if it's been committed
                 Some(OperationStatusType::Success),
-                *sender.inner(),
+                *request.sender.inner(),
                 native_coin(),
-                txn_info.gas_used.0,
+                txn_info.gas_used.0.saturating_mul(request.gas_unit_price.0),
             ));
         }
 
@@ -595,7 +585,7 @@ impl Transaction {
 fn parse_operations_from_txn_payload(
     operation_index: u64,
     sender: AccountAddress,
-    payload: TransactionPayload,
+    payload: &TransactionPayload,
 ) -> Vec<Operation> {
     let mut operations = vec![];
     if let TransactionPayload::ScriptFunctionPayload(inner) = payload {
@@ -662,7 +652,7 @@ fn parse_operations_from_txn_payload(
 fn parse_operations_from_write_set(
     change: &WriteSetChange,
     events: &[Event],
-    maybe_sender: &Option<Address>,
+    maybe_request: &Option<UserTransactionRequest>,
     mut operation_index: u64,
 ) -> Vec<Operation> {
     let mut operations = vec![];
@@ -692,8 +682,9 @@ fn parse_operations_from_write_set(
                             operation_index,
                             Some(OperationStatusType::Success),
                             address,
-                            maybe_sender
-                                .map(|inner| *inner.inner())
+                            maybe_request
+                                .as_ref()
+                                .map(|inner| *inner.sender.inner())
                                 .unwrap_or(AccountAddress::ONE),
                         ));
                         operation_index += 1;
