@@ -39,9 +39,8 @@ load_test:
   config:
     numFullnodeGroups:
     mint_key:
+    mempool_backlog: 5000
     duration: 300
-    accounts_per_client: 12
-    workers_per_ac: 64
     enableBurst: false
     waitMillis: 1000
     txn_expiration_time_secs: 30
