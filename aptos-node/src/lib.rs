@@ -16,6 +16,7 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Level};
+use aptos_sf_stream::runtime::bootstrap as bootstrap_sf_stream;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -153,6 +154,7 @@ pub struct AptosHandle {
     _consensus_runtime: Option<Runtime>,
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
+    _sf_stream: Option<Runtime>,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
 }
@@ -656,7 +658,16 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
 
     let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let api_runtime = bootstrap_api(&node_config, chain_id, aptos_db, mp_client_sender)?;
+    let api_runtime = bootstrap_api(
+        &node_config,
+        chain_id,
+        aptos_db.clone(),
+        mp_client_sender.clone(),
+    )?;
+    let sf_runtime = match bootstrap_sf_stream(&node_config, chain_id, aptos_db, mp_client_sender) {
+        None => None,
+        Some(res) => Some(res?),
+    };
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
@@ -725,6 +736,7 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         _consensus_runtime: consensus_runtime,
         _mempool: mempool,
         _network_runtimes: network_runtimes,
+        _sf_stream: sf_runtime,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
     })
