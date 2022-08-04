@@ -5,6 +5,7 @@ use crate::{Factory, GenesisConfig, Result, Swarm, Version};
 use anyhow::bail;
 use aptos_logger::info;
 use rand::rngs::StdRng;
+use std::time::Duration;
 use std::{convert::TryInto, num::NonZeroUsize};
 
 pub mod chaos;
@@ -95,6 +96,7 @@ impl Factory for K8sFactory {
         init_version: &Version,
         genesis_version: &Version,
         genesis_config: Option<&GenesisConfig>,
+        cleanup_duration: Duration,
     ) -> Result<Box<dyn Swarm>> {
         let genesis_modules_path = match genesis_config {
             Some(config) => match config {
@@ -125,7 +127,8 @@ impl Factory for K8sFactory {
             // clear the cluster of resources
             delete_k8s_resources(kube_client, &self.kube_namespace).await?;
             // create the forge-management configmap before installing anything
-            create_management_configmap(self.kube_namespace.clone(), self.keep).await?;
+            create_management_configmap(self.kube_namespace.clone(), self.keep, cleanup_duration)
+                .await?;
             // try installing testnet resources, but clean up if it fails
             match install_testnet_resources(
                 self.kube_namespace.clone(),

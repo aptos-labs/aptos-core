@@ -3,6 +3,7 @@
 
 use crate::*;
 use rand::{Rng, SeedableRng};
+use std::time::Duration;
 use std::{
     io::{self, Write},
     num::NonZeroUsize,
@@ -290,6 +291,8 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 &initial_version,
                 &genesis_version,
                 self.tests.genesis_config.as_ref(),
+                self.global_job_request.duration
+                    + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
             ))?;
 
             // Run AptosTests

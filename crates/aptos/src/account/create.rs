@@ -10,7 +10,8 @@ use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
 
-pub const DEFAULT_FUNDED_COINS: u64 = 10000;
+// TODO(Gas): double check if this is correct
+pub const DEFAULT_FUNDED_COINS: u64 = 100_000_000;
 
 /// Command to create a new account on-chain
 ///

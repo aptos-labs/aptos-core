@@ -1,7 +1,7 @@
 [package]
 name = "framework"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
 description = "Aptos stdlib"
 repository = "https://github.com/aptos-labs/aptos-core"
@@ -12,6 +12,7 @@ publish = false
 [dependencies]
 anyhow = "1.0.57"
 bcs = "0.1.3"
+better_any = "0.1.1"
 clap = "3.1.8"
 curve25519-dalek = { version = "3", default-features = false }
 include_dir = "0.7.2"
@@ -19,6 +20,7 @@ libsecp256k1 = "0.7.0"
 log = "0.4.17"
 once_cell = "1.10.0"
 rayon = "1.5.2"
+serde = { version = "1.0.137", default-features = false }
 sha2 = "0.9.3"
 siphasher = "0.3.10"
 smallvec = "1.8.0"
@@ -31,6 +33,7 @@ aptos-types = { path = "../../types" }
 move-deps = { path = "../move-deps", features = ["address32"] }
 
 [dev-dependencies]
+aptos-gas = { path = "../../aptos-move/aptos-gas" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 move-deps = { path = "../move-deps", features = ["table-extension"] }
 

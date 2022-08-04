@@ -5,7 +5,7 @@ members = [
     "api",
     "api/openapi-spec-generator",
     "api/types",
-    "aptos-move/aptos-module-verifier",
+    "aptos-move/aptos-gas",
     "aptos-move/aptos-resource-viewer",
     "aptos-move/aptos-sdk-builder",
     "aptos-move/aptos-transaction-benchmarks",

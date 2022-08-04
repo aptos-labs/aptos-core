@@ -34,15 +34,18 @@ impl AptosTest for ExternalTransactionSigner {
         let sender_auth_key = AuthenticationKey::ed25519(&public_key);
         let sender_address = sender_auth_key.derived_address();
         ctx.create_user_account(&public_key).await?;
-        ctx.mint(sender_address, 10_000_000).await?;
+        // TODO(Gas): double check if this is correct
+        ctx.mint(sender_address, 1_000_000_000).await?;
 
         let receiver = ctx.random_account();
         ctx.create_user_account(receiver.public_key()).await?;
-        ctx.mint(receiver.address(), 1_000_000).await?;
+        // TODO(Gas): double check if this is correct
+        ctx.mint(receiver.address(), 1_000_000_000).await?;
 
         let amount = 1_000_000;
         let test_gas_unit_price = 1;
-        let test_max_gas_amount = 1_000_000;
+        // TODO(Gas): double check if this is correct
+        let test_max_gas_amount = 4_000_000;
 
         // prepare transfer transaction
         let test_sequence_number = client
