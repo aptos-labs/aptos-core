@@ -70,7 +70,12 @@ impl From<Transaction> for TransferSummary {
 
         if let Transaction::UserTransaction(txn) = transaction {
             summary.sender = Some(*txn.request.sender.inner());
-            summary.gas_used = Some(txn.info.gas_used.0);
+            summary.gas_used = Some(
+                txn.info
+                    .gas_used
+                    .0
+                    .saturating_mul(txn.request.gas_unit_price.0),
+            );
             summary.version = Some(txn.info.version.0);
             summary.balance_changes = txn
                 .info

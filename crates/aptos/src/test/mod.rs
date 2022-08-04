@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{account_address_from_public_key, FaucetOptions};
+use crate::common::types::{account_address_from_public_key, FaucetOptions, GasOptions};
 use crate::node::{
-    AddStake, IncreaseLockup, JoinValidatorSet, LeaveValidatorSet, OperatorArgs,
-    RegisterValidatorCandidate, ShowValidatorConfig, ShowValidatorSet, ShowValidatorStake,
-    UnlockStake, UpdateValidatorNetworkAddresses, ValidatorConfigArgs, WithdrawStake,
+    AddStake, JoinValidatorSet, LeaveValidatorSet, OperatorArgs, RegisterValidatorCandidate,
+    ShowValidatorConfig, ShowValidatorSet, ShowValidatorStake, UnlockStake,
+    UpdateValidatorNetworkAddresses, ValidatorConfigArgs, WithdrawStake,
 };
 use crate::{
     account::{
@@ -35,6 +35,8 @@ use reqwest::Url;
 use serde_json::Value;
 use std::{str::FromStr, time::Duration};
 use tokio::time::{sleep, Instant};
+
+pub const INVALID_ACCOUNT: &str = "0xDEADBEEFCAFEBABE";
 
 /// A framework for testing the CLI
 pub struct CliTestFramework {
@@ -73,7 +75,7 @@ impl CliTestFramework {
         let client = aptos_rest_client::Client::new(self.endpoint.clone());
         let address = self.account_id(index);
         if client.get_account(address).await.is_err() {
-            self.fund_account(index).await?;
+            self.fund_account(index, None).await?;
         }
 
         Ok(index)
@@ -118,12 +120,12 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn fund_account(&self, index: usize) -> CliTypedResult<String> {
+    pub async fn fund_account(&self, index: usize, amount: Option<u64>) -> CliTypedResult<String> {
         FundAccount {
             profile_options: Default::default(),
             account: self.account_id(index),
             faucet_options: self.faucet_options(),
-            num_coins: DEFAULT_FUNDED_COINS,
+            num_coins: amount.unwrap_or(DEFAULT_FUNDED_COINS),
         }
         .execute()
         .await
@@ -145,10 +147,26 @@ impl CliTestFramework {
         sender_index: usize,
         receiver_index: usize,
         amount: u64,
+        gas_options: Option<GasOptions>,
     ) -> CliTypedResult<TransferSummary> {
         TransferCoins {
-            txn_options: self.transaction_options(sender_index),
+            txn_options: self.transaction_options(sender_index, gas_options),
             account: self.account_id(receiver_index),
+            amount,
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn transfer_invalid_addr(
+        &self,
+        sender_index: usize,
+        amount: u64,
+        gas_options: Option<GasOptions>,
+    ) -> CliTypedResult<TransferSummary> {
+        TransferCoins {
+            txn_options: self.transaction_options(sender_index, gas_options),
+            account: AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
             amount,
         }
         .execute()
@@ -195,7 +213,7 @@ impl CliTestFramework {
         validator_network_public_key: x25519::PublicKey,
     ) -> CliTypedResult<Transaction> {
         RegisterValidatorCandidate {
-            txn_options: self.transaction_options(index),
+            txn_options: self.transaction_options(index, None),
             validator_config_args: ValidatorConfigArgs {
                 validator_config_file: None,
                 consensus_public_key: Some(consensus_public_key),
@@ -212,7 +230,7 @@ impl CliTestFramework {
 
     pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
         AddStake {
-            txn_options: self.transaction_options(index),
+            txn_options: self.transaction_options(index, None),
             amount,
         }
         .execute()
@@ -221,7 +239,7 @@ impl CliTestFramework {
 
     pub async fn unlock_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
         UnlockStake {
-            txn_options: self.transaction_options(index),
+            txn_options: self.transaction_options(index, None),
             amount,
         }
         .execute()
@@ -230,21 +248,8 @@ impl CliTestFramework {
 
     pub async fn withdraw_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
         WithdrawStake {
-            node_op_options: self.transaction_options(index),
+            node_op_options: self.transaction_options(index, None),
             amount,
-        }
-        .execute()
-        .await
-    }
-
-    pub async fn increase_lockup(
-        &self,
-        index: usize,
-        lockup_duration: Duration,
-    ) -> CliTypedResult<Transaction> {
-        IncreaseLockup {
-            txn_options: self.transaction_options(index),
-            lockup_duration,
         }
         .execute()
         .await
@@ -252,7 +257,7 @@ impl CliTestFramework {
 
     pub async fn join_validator_set(&self, index: usize) -> CliTypedResult<Transaction> {
         JoinValidatorSet {
-            txn_options: self.transaction_options(index),
+            txn_options: self.transaction_options(index, None),
             operator_args: self.operator_args(index),
         }
         .execute()
@@ -261,7 +266,7 @@ impl CliTestFramework {
 
     pub async fn leave_validator_set(&self, index: usize) -> CliTypedResult<Transaction> {
         LeaveValidatorSet {
-            txn_options: self.transaction_options(index),
+            txn_options: self.transaction_options(index, None),
             operator_args: self.operator_args(index),
         }
         .execute()
@@ -275,7 +280,7 @@ impl CliTestFramework {
         validator_network_public_key: x25519::PublicKey,
     ) -> CliTypedResult<Transaction> {
         UpdateValidatorNetworkAddresses {
-            txn_options: self.transaction_options(index),
+            txn_options: self.transaction_options(index, None),
             operator_args: self.operator_args(index),
             validator_config_args: ValidatorConfigArgs {
                 validator_config_file: None,
@@ -372,11 +377,16 @@ impl CliTestFramework {
         FaucetOptions::new(Some(self.faucet_endpoint.clone()))
     }
 
-    fn transaction_options(&self, index: usize) -> TransactionOptions {
+    fn transaction_options(
+        &self,
+        index: usize,
+        gas_options: Option<GasOptions>,
+    ) -> TransactionOptions {
         TransactionOptions {
             private_key_options: PrivateKeyInputOptions::from_private_key(self.private_key(index))
                 .unwrap(),
             rest_options: self.rest_options(),
+            gas_options: gas_options.unwrap_or_default(),
             ..Default::default()
         }
     }
