@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::context::Context;
 use crate::jwt_auth::{authorize_jwt, create_jwt_token, jwt_from_header};
 use crate::types::auth::{AuthRequest, AuthResponse, Claims};
