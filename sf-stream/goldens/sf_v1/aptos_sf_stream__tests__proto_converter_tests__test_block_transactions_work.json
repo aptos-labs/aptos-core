@@ -8,7 +8,7 @@
       "eventRootHash": "YPVlJld+KeJV8TgWig4e7McIG/o+rxMn60yg554WVK8=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "bTh3lXEeNIljbjonlMk5+IDFN4/l8MkiSaH/UAEjGJw=",
+      "accumulatorRootHash": "HUdQkeQ0rVUqvhBvkdTmu1y4Cp8mS4vVVkiIxAcBO8k=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -96,7 +96,7 @@
       "gasUsed": "41112",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "LulYMtygRFEfowptPRfzs6tPV4j6cawUYmYCVvGIfy0=",
+      "accumulatorRootHash": "pezYMoxeUVh+a4ealYbZOhf2FwApQgt58EyvexGe5eM=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -225,7 +225,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "mthKU6HdPhzhKErNMhIngKfpMwk4LAnJtEotnbNB/ao="
+      "accumulatorRootHash": "MnBhWDIOAPOERbOwUoI2ufWDe3/VARAUxi+6+qh7ibI="
     },
     "blockHeight": "1",
     "type": "STATE_CHECKPOINT",
