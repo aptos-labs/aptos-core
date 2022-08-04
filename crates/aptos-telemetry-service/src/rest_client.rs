@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use anyhow::{anyhow, Result};
 use aptos_rest_client::{state::State, Client, Response};
 use aptos_types::{

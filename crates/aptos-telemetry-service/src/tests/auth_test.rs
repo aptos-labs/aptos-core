@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_crypto::{noise, x25519, Uniform};
 use aptos_types::network_address::Protocol::{Dns, Handshake, NoiseIK, Tcp};

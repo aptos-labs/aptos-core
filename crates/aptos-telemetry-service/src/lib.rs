@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use core::time;
 use std::{
     collections::HashMap, convert::Infallible, fs::File, io::Read, net::SocketAddr, path::PathBuf,
