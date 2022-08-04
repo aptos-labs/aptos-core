@@ -57,7 +57,7 @@ impl MultiSignature {
     }
 }
 
-/// Contains the ledger info and partially aggregated signature from a set of validators, this data
+/// Partially aggregated signature from a set of validators, this data
 /// is only used during the aggregating the votes from different validators and is not persisted in
 /// DB.
 #[derive(Clone, Debug, Eq, PartialEq)]
