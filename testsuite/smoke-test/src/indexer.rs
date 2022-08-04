@@ -146,8 +146,9 @@ impl AptosTest for Indexer {
         client.get_ledger_information().await.unwrap();
 
         // Set up accounts, generate some traffic
-        let mut account1 = ctx.create_and_fund_user_account(50000).await.unwrap();
-        let account2 = ctx.create_and_fund_user_account(50000).await.unwrap();
+        // TODO(Gas): double check this
+        let mut account1 = ctx.create_and_fund_user_account(100_000_000).await.unwrap();
+        let account2 = ctx.create_and_fund_user_account(100_000_000).await.unwrap();
         // This transfer should emit events
         let t_tx = ctx.transfer(&mut account1, &account2, 717).await.unwrap();
         // test NFT creation event indexing
