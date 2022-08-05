@@ -23,7 +23,7 @@ test(
     const tokenName = "Alice Token";
 
     // Create collection and token on Alice's account
-    let txnHash1 = await tokenClient.createCollection(
+    const txnHash1 = await tokenClient.createCollection(
       alice,
       collectionName,
       "Alice's simple collection",
@@ -32,7 +32,7 @@ test(
     const txn1 = await client.waitForTransactionWithResult(txnHash1);
     expect((txn1 as any)?.success).toBe(true);
 
-    let txnHash2 = await tokenClient.createToken(
+    const txnHash2 = await tokenClient.createToken(
       alice,
       collectionName,
       tokenName,
