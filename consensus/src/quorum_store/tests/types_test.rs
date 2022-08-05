@@ -33,12 +33,12 @@ fn test_batch() {
 
 #[test]
 fn test_fragment() {
-    let mut epoch = 0;
-    let mut batch_id = 0;
-    let mut fragment_id = 0;
+    let epoch = 0;
+    let batch_id = 0;
+    let fragment_id = 0;
     let mut data = Vec::new();
     let mut maybe_expiration = None;
-    let mut source = AccountAddress::random();
+    let source = AccountAddress::random();
 
     let signed_txns = create_vec_signed_transactions(500);
     for txn in signed_txns.iter() {
