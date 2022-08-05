@@ -67,11 +67,13 @@ impl DBPruner for LedgerPruner {
             current_target_version,
         )?;
 
-        // Record progress first to make sure API won't return error values
-        // when a version is being pruned.
-        self.record_progress(current_target_version);
         // Commit all the changes to DB atomically
         self.db.write_schemas(db_batch)?;
+
+        // TODO(zcc): recording progress after writing schemas might provide wrong answers to
+        // API calls when they query min_readable_version while the write_schemas are still in
+        // progress.
+        self.record_progress(current_target_version);
         Ok(current_target_version)
     }
 
