@@ -312,7 +312,7 @@ Alice: 3927
 Bob: 1000
 ```
 
-The output shows that Bob received 1000 coins from Alice. Alice paid 43 coins for gas.
+The output shows that Bob received 1000 coins from Alice. Alice paid 73 coins for gas.
 
 ### Verify
 
