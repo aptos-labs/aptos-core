@@ -14,7 +14,8 @@ pub(crate) type BatchId = u64;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SerializedTransaction {
-    bytes: Vec<u8>,
+    // pub(crate) for testing purposes
+    pub(crate) bytes: Vec<u8>,
 }
 
 impl SerializedTransaction {

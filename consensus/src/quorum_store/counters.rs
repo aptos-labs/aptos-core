@@ -1,5 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
+
 use aptos_metrics_core::{
     op_counters::DurationHistogram, register_histogram, register_histogram_vec, HistogramVec,
 };
