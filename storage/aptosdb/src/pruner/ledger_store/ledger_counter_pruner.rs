@@ -4,6 +4,7 @@ use crate::{pruner::db_sub_pruner::DBSubPruner, LedgerStore};
 use schemadb::SchemaBatch;
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub struct LedgerCounterPruner {
     /// Keeps track of the target version that the pruner needs to achieve.
     ledger_store: Arc<LedgerStore>,
