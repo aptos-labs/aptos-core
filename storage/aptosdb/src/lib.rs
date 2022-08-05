@@ -1201,7 +1201,7 @@ impl DbReader for AptosDB {
                                 None
                             )
                         } else {
-                            let num_txns = committed_version + 1;
+                            let num_txns = executed_trees.state().base_version.map_or(0, |v| v + 1);
                             let frozen_subtrees = self
                                 .ledger_store
                                 .get_frozen_subtree_hashes(num_txns)?;
