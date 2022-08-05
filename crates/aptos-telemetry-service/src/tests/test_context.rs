@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
 
+use crate::GCPBigQueryConfig;
 use crate::{
     context::Context, index, validator_cache::ValidatorSetCache, AptosTelemetryServiceConfig,
 };
@@ -15,7 +16,7 @@ use warp::http::header::CONTENT_TYPE;
 use warp::http::Response;
 use warp::hyper::body::Bytes;
 
-pub fn new_test_context() -> TestContext {
+pub async fn new_test_context() -> TestContext {
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let server_private_key = x25519::PrivateKey::generate(&mut rng);
 
@@ -26,11 +27,17 @@ pub fn new_test_context() -> TestContext {
         trusted_full_node_addresses: HashMap::new(),
         server_private_key: ConfigKey::new(server_private_key),
         jwt_signing_key: "jwt_signing_key".into(),
-        update_interval: Duration::from_secs(60),
+        update_interval: 60,
+        gcp_sa_key_file: String::from(""),
+        gcp_bq_config: GCPBigQueryConfig {
+            project_id: String::from("1"),
+            dataset_id: String::from("2"),
+            table_id: String::from("3"),
+        },
     };
     let cache = ValidatorSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
 
-    TestContext::new(Context::new(config, cache))
+    TestContext::new(Context::new(config, cache, None))
 }
 
 #[derive(Clone)]

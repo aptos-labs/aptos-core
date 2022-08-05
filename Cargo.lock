@@ -1182,6 +1182,7 @@ dependencies = [
  "bcs",
  "chrono",
  "clap 3.2.16",
+ "gcp-bigquery-client",
  "hex",
  "jsonwebtoken",
  "rand 0.7.3",
@@ -1190,6 +1191,7 @@ dependencies = [
  "serde 1.0.141",
  "serde_json",
  "serde_repr",
+ "serde_with",
  "serde_yaml 0.8.26",
  "thiserror",
  "tokio",
@@ -3576,6 +3578,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f5f3913fa0bfe7ee1fd8248b6b9f42a5af4b9d65ec2dd2c3c26132b950ecfc2"
 
 [[package]]
+name = "gcp-bigquery-client"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09ab5966c98f6d4e71e247cda6a6d8497bc8a1df3a4ba9ee548087842cffc21d"
+dependencies = [
+ "async-stream",
+ "hyper",
+ "hyper-rustls",
+ "log",
+ "reqwest",
+ "serde 1.0.141",
+ "serde_json",
+ "thiserror",
+ "time 0.3.12",
+ "tokio",
+ "tokio-stream",
+ "url",
+ "yup-oauth2",
+]
+
+[[package]]
 name = "generate-format"
 version = "0.1.0"
 dependencies = [
@@ -3996,6 +4019,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyper-rustls"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d87c48c02e0dc5e3b849a2041db3029fd066650f8f717c07bf8ed78ccb895cac"
+dependencies = [
+ "http",
+ "hyper",
+ "log",
+ "rustls 0.20.6",
+ "rustls-native-certs",
+ "tokio",
+ "tokio-rustls 0.23.4",
+]
+
+[[package]]
 name = "hyper-timeout"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4121,6 +4159,7 @@ checksum = "10a35a97730320ffe8e2d410b5d3b69279b98d2c14bdb8b70ea89ecf7888d41e"
 dependencies = [
  "autocfg",
  "hashbrown 0.12.3",
+ "serde 1.0.141",
 ]
 
 [[package]]
@@ -6415,7 +6454,7 @@ dependencies = [
  "poem-derive",
  "regex",
  "rfc7239",
- "rustls-pemfile",
+ "rustls-pemfile 1.0.1",
  "serde 1.0.141",
  "serde_json",
  "serde_urlencoded",
@@ -7154,6 +7193,7 @@ dependencies = [
  "http",
  "http-body",
  "hyper",
+ "hyper-rustls",
  "hyper-tls",
  "ipnet",
  "js-sys",
@@ -7165,17 +7205,21 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "proc-macro-hack",
+ "rustls 0.20.6",
+ "rustls-pemfile 1.0.1",
  "serde 1.0.141",
  "serde_json",
  "serde_urlencoded",
  "tokio",
  "tokio-native-tls",
+ "tokio-rustls 0.23.4",
  "tokio-util 0.7.3",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "webpki-roots",
  "winreg",
 ]
 
@@ -7321,6 +7365,27 @@ dependencies = [
  "ring",
  "sct 0.7.0",
  "webpki 0.22.0",
+]
+
+[[package]]
+name = "rustls-native-certs"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0167bac7a9f490495f3c33013e7722b53cb087ecbe082fb0c6387c96f634ea50"
+dependencies = [
+ "openssl-probe",
+ "rustls-pemfile 1.0.1",
+ "schannel",
+ "security-framework",
+]
+
+[[package]]
+name = "rustls-pemfile"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ee86d63972a7c661d1536fefe8c3c8407321c3df668891286de28abcd087360"
+dependencies = [
+ "base64 0.13.0",
 ]
 
 [[package]]
@@ -7483,6 +7548,12 @@ dependencies = [
  "ring",
  "untrusted",
 ]
+
+[[package]]
+name = "seahash"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1c107b6f4780854c8b126e228ea8869f4d7b71260f962fefb57b996b8959ba6b"
 
 [[package]]
 name = "security-framework"
@@ -7691,6 +7762,34 @@ dependencies = [
  "itoa 1.0.2",
  "ryu",
  "serde 1.0.141",
+]
+
+[[package]]
+name = "serde_with"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89df7a26519371a3cce44fbb914c2819c84d9b897890987fa3ab096491cc0ea8"
+dependencies = [
+ "base64 0.13.0",
+ "chrono",
+ "hex",
+ "indexmap",
+ "serde 1.0.141",
+ "serde_json",
+ "serde_with_macros",
+ "time 0.3.12",
+]
+
+[[package]]
+name = "serde_with_macros"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "de337f322382fcdfbb21a014f7c224ee041a23785651db67b9827403178f698f"
+dependencies = [
+ "darling",
+ "proc-macro2 1.0.42",
+ "quote 1.0.20",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -8488,6 +8587,7 @@ dependencies = [
  "js-sys",
  "libc",
  "num_threads",
+ "serde 1.0.141",
  "time-macros",
 ]
 
@@ -9477,6 +9577,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "webpki-roots"
+version = "0.22.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1c760f0d366a6c24a02ed7816e23e691f5d92291f94d15e836006fd11b04daf"
+dependencies = [
+ "webpki 0.22.0",
+]
+
+[[package]]
 name = "which"
 version = "4.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9606,6 +9715,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56c1936c4cc7a1c9ab21a1ebb602eb942ba868cbd44a99cb7cdc5892335e1c85"
 dependencies = [
  "linked-hash-map",
+]
+
+[[package]]
+name = "yup-oauth2"
+version = "7.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "98748970d2ddf05253e6525810d989740334aa7509457864048a829902db76f3"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.13.0",
+ "futures",
+ "http",
+ "hyper",
+ "hyper-rustls",
+ "itertools",
+ "log",
+ "percent-encoding",
+ "rustls 0.20.6",
+ "rustls-pemfile 0.3.0",
+ "seahash",
+ "serde 1.0.141",
+ "serde_json",
+ "time 0.3.12",
+ "tokio",
+ "tower-service",
+ "url",
 ]
 
 [[package]]
