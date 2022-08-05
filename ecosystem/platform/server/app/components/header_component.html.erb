@@ -5,10 +5,10 @@
   </a>
 
   <nav class="hidden md:flex md:h-full items-center text-base flex-row flex-wrap md:justify-end mr-16 lg:mr-32 font-mono text-sm open:flex open:absolute open:max-h-[calc(100vh-4rem)] open:overflow-y-auto open:top-16 open:left-0 open:right-0 open:gap-2 open:p-10 open:bg-neutral-800 open:m-0" data-header-target="nav">
-    <ul class="flex flex-col md:flex-row md:gap-8 w-full md:h-full">
+    <ul class="flex flex-col md:flex-row md:gap-8 lg:gap-12 w-full md:h-full">
     <% nav_groups.each do |group| %>
       <li class="group py-4 first:pt-0 last:pb-0 md:first:pt-4 md:last:pb-4 relative md:flex items-center border-b border-neutral-700 last:border-none md:border-none" data-action="mouseover->header#navGroupHover click->header#navGroupToggle">
-        <%= content_tag :a, group.item.name, href: group.item.url, title: group.item.title, class: 'text-base text-neutral-100 hover:text-teal-400 md:hover:text-white', target: group.item.url.starts_with?('http') ? '_blank' : '', data: { action: group.item.url == '#' ? 'click->header#preventDefault' : nil } %>
+        <%= content_tag :a, group.item.name, href: group.item.url, title: group.item.title, class: 'text-base md:text-sm lg:text-base text-neutral-100 hover:text-teal-400 md:hover:text-white', target: group.item.url.starts_with?('http') ? '_blank' : '', data: { action: group.item.url == '#' ? 'click->header#preventDefault' : nil } %>
         <% if group.children.length > 0 %>
         <div class="absolute hidden md:group-focus-within:flex md:group-hover:flex h-[3px] bottom-0 left-0 right-0 rounded bg-teal-400"></div>
         <button class="md:hidden float-right mt-[5px] rotate-180">
