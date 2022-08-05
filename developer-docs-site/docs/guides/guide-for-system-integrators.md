@@ -7,7 +7,7 @@ slug: "guide-for-system-integrators"
 This is documentation is currently under construction with more being added on a regular basis.
 :::
 
-# System Integrators' Guide
+# System Integrators Guide
 
 If you provide blockchain services to your customers and wish to add the Aptos blockchain to your platform, then this guide is for you. This system integrators guide will walk you through all you need to integrate the Aptos blockchain into your platform. This guide assumes that you are familiar with the blockchains.
 
