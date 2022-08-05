@@ -4,6 +4,7 @@ use crate::{pruner::db_sub_pruner::DBSubPruner, TransactionStore};
 use schemadb::SchemaBatch;
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub struct WriteSetPruner {
     transaction_store: Arc<TransactionStore>,
 }
