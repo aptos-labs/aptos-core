@@ -9,7 +9,9 @@ use crate::{
     transaction_generator::TransactionGenerator,
     EmitThreadParams,
 };
-use aptos_logger::{debug, info, warn};
+use aptos_logger::sample::SampleRate;
+use aptos_logger::sample::Sampling;
+use aptos_logger::{debug, info, sample, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
@@ -245,7 +247,10 @@ pub async fn submit_transaction(
     stats.submitted.fetch_add(1, Ordering::Relaxed);
     let resp = client.submit(&txn).await;
     if let Err(e) = resp {
-        warn!("[{:?}] Failed to submit request: {:?}", client, e);
+        sample!(
+            SampleRate::Duration(Duration::from_secs(60)),
+            warn!("[{:?}] Failed to submit request: {:?}", client, e)
+        );
     }
     Ok(())
 }
