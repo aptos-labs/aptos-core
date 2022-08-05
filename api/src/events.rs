@@ -1,6 +1,23 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+// READ ME
+// READ ME
+// READ ME
+// READ ME
+//
+// If you plan to change this file, please speak to @dport or @gregnazario
+// first. This file contains endpoint handlers for the v0 API. This API is
+// now locked except for critical security fixes. All new feature development
+// should be made to the v1 API. You can find this code under `poem_backend`.
+// The v0 API is deprecated and will be removed in September 1st.
+// See https://github.com/aptos-labs/aptos-core/issues/2590
+//
+// READ ME
+// READ ME
+// READ ME
+// READ ME
+
 use crate::{
     accept_type::AcceptType,
     accounts::Account,
