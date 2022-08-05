@@ -14,7 +14,7 @@
         <button class="md:hidden float-right mt-[5px] rotate-180">
           <%= render IconComponent.new(:accordion_arrow, size: :small) %>
         </button>
-        <div class="hidden open:flex md:group-focus-within:flex md:group-hover:flex md:absolute md:top-full md:-ml-8">
+        <div class="hidden max-sm:open:flex md:group-focus-within:flex md:group-hover:flex md:absolute md:top-full md:-ml-8">
           <ul class="flex-1 md:mt-[1px] md:bg-neutral-800 md:rounded md:p-8 md:min-w-[270px] md:shadow">
             <% group.children.each do |item| %>
               <li class="my-4 md:py-4 md:my-0 last:mb-0 text-base ml-4 md:ml-0 md:border-b border-neutral-700 last:border-none">
