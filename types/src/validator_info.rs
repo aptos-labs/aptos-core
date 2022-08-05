@@ -26,6 +26,9 @@ pub struct ValidatorInfo {
     consensus_voting_power: u64,
     // Validator config
     config: ValidatorConfig,
+    pending_inactive: bool,
+    successful_proposals: u64,
+    failed_proposals: u64,
 }
 
 impl fmt::Display for ValidatorInfo {
@@ -48,6 +51,9 @@ impl ValidatorInfo {
             account_address,
             consensus_voting_power,
             config,
+            pending_inactive: false,
+            successful_proposals: 0,
+            failed_proposals: 0,
         }
     }
 
@@ -69,6 +75,9 @@ impl ValidatorInfo {
             account_address,
             consensus_voting_power,
             config,
+            pending_inactive: false,
+            successful_proposals: 0,
+            failed_proposals: 0,
         }
     }
 

@@ -6,12 +6,7 @@ use crate::{on_chain_config::OnChainConfig, validator_info::ValidatorInfo};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::{
-    fmt,
-    iter::{Chain, IntoIterator},
-    vec,
-    vec::IntoIter,
-};
+use std::{fmt, iter::IntoIterator, vec, vec::IntoIter};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -25,7 +20,8 @@ pub enum ConsensusScheme {
 pub struct ValidatorSet {
     scheme: ConsensusScheme,
     pub active_validators: Vec<ValidatorInfo>,
-    pub pending_inactive: Vec<ValidatorInfo>,
+    //pub pending_inactive: Vec<ValidatorInfo>,
+    pub num_pending_inactive: u64,
     pub pending_active: Vec<ValidatorInfo>,
 }
 
@@ -48,15 +44,13 @@ impl ValidatorSet {
         Self {
             scheme: ConsensusScheme::Ed25519,
             active_validators: payload,
-            pending_inactive: vec![],
+            num_pending_inactive: 0,
             pending_active: vec![],
         }
     }
 
     pub fn payload(&self) -> impl Iterator<Item = &ValidatorInfo> {
-        self.active_validators
-            .iter()
-            .chain(self.pending_inactive.iter())
+        self.active_validators.iter()
     }
 
     pub fn empty() -> Self {
@@ -88,11 +82,9 @@ impl OnChainConfig for ValidatorSet {
 
 impl IntoIterator for ValidatorSet {
     type Item = ValidatorInfo;
-    type IntoIter = Chain<IntoIter<Self::Item>, IntoIter<Self::Item>>;
+    type IntoIter = IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.active_validators
-            .into_iter()
-            .chain(self.pending_inactive.into_iter())
+        self.active_validators.into_iter()
     }
 }
