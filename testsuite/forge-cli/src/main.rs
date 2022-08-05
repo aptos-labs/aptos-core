@@ -421,7 +421,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
         "bench_with_fullnode" => config
             .with_network_tests(&[&PerformanceBenchmarkWithFN])
-            .with_initial_fullnode_count(30),
+            .with_initial_fullnode_count(6),
 
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
