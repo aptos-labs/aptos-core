@@ -1,7 +1,6 @@
 import isEqual from "lodash/isEqual";
 
 import { AptosClient } from "./aptos_client";
-import { AnyObject } from "./util";
 import * as Gen from "./generated/index";
 import { FAUCET_URL, NODE_URL } from "./util.test";
 import { FaucetClient } from "./faucet_client";
@@ -33,9 +32,9 @@ const coinTransferFunction = {
 
 test("gets genesis account", async () => {
   const client = new AptosClient(NODE_URL);
-  const account = await client.getAccount("0x1");
-  expect(account.authentication_key.length).toBe(66);
-  expect(account.sequence_number).not.toBeNull();
+  const genesisAccount = await client.getAccount("0x1");
+  expect(genesisAccount.authentication_key.length).toBe(66);
+  expect(genesisAccount.sequence_number).not.toBeNull();
 });
 
 test("gets transactions", async () => {
@@ -48,11 +47,13 @@ test("gets genesis resources", async () => {
   const client = new AptosClient(NODE_URL);
   const resources = await client.getAccountResources("0x1");
   const accountResource = resources.find((r) => isEqual(r.type, account));
+  expect(accountResource).toBeDefined();
 });
 
 test("gets the Account resource", async () => {
   const client = new AptosClient(NODE_URL);
   const accountResource = await client.getAccountResource("0x1", account);
+  expect(accountResource).toBeDefined();
 });
 
 test("gets ledger info", async () => {
