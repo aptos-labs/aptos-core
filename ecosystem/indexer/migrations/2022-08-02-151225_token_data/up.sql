@@ -6,7 +6,7 @@ CREATE TABLE token_datas
     collection VARCHAR NOT NULL,
     name VARCHAR NOT NULL,
     description VARCHAR NOT NULL,
-    max_amount bigint NOT NULL,
+    max_amount VARCHAR NOT NULL,
     supply bigint NOT NULL,
     uri VARCHAR NOT NULL,
     royalty_payee_address VARCHAR NOT NULL,
