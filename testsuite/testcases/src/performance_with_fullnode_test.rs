@@ -4,22 +4,17 @@
 use crate::generate_traffic;
 use forge::{NetworkContext, NetworkTest, Result, Test};
 
-pub struct PerformanceBenchmark;
+pub struct PerformanceBenchmarkWithFN;
 
-impl Test for PerformanceBenchmark {
+impl Test for PerformanceBenchmarkWithFN {
     fn name(&self) -> &'static str {
-        "performance benchmark"
+        "performance benchmark with full nodes"
     }
 }
 
-impl NetworkTest for PerformanceBenchmark {
+impl NetworkTest for PerformanceBenchmarkWithFN {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
         let duration = ctx.global_job.duration;
-        let all_validators = ctx
-            .swarm()
-            .validators()
-            .map(|v| v.peer_id())
-            .collect::<Vec<_>>();
 
         let all_fullnodes = ctx
             .swarm()
@@ -27,10 +22,8 @@ impl NetworkTest for PerformanceBenchmark {
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
 
-        let all_nodes = [&all_validators[..], &all_fullnodes[..]].concat();
-
         // Generate some traffic
-        let txn_stat = generate_traffic(ctx, &all_nodes, duration, 1)?;
+        let txn_stat = generate_traffic(ctx, &all_fullnodes, duration, 1)?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
         // ensure we meet the success criteria
