@@ -16,7 +16,7 @@
           "type": {
             "address": "0x1",
             "module": "block",
-            "name": "BlockMetadata",
+            "name": "BlockResource",
             "generic_type_params": []
           },
           "data": {
