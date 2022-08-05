@@ -29,10 +29,32 @@ RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOM
 ### Validator Image ###
 FROM debian-base AS validator
 
+RUN export DEBIAN_FRONTEND=noninteractive
+
+RUN echo "deb http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+RUN echo "deb-src http://deb.debian.org/debian sid main contrib non-free" >> /etc/apt/sources.list
+
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates && apt-get clean && rm -r /var/lib/apt/lists/*
+RUN apt-get install -y bpfcc-tools python-bpfcc libbpfcc libbpfcc-dev
 
 ### Needed to run debugging tools like perf
+
+# According to https://packages.debian.org/source/sid/bpfcc,
+# BCC build dependencies:
+#RUN sudo apt-get install -y arping bison clang-format cmake dh-python \
+#	  dpkg-dev pkg-kde-tools ethtool flex inetutils-ping iperf \
+#	  libbpf-dev libclang-dev libclang-cpp-dev libedit-dev libelf-dev \
+#	  libfl-dev libzip-dev linux-libc-dev llvm-dev libluajit-5.1-dev \
+#	  luajit python3-netaddr python3-pyroute2 python3-distutils python3
+#Get bcc code
+#RUN git clone https://github.com/iovisor/bcc.git
+#mkdir bcc/build; cd bcc/build
+#cmake ..
+#make
+#sudo make install
+
 RUN apt-get update && apt-get install -y linux-perf sudo procps gdb
+RUN apt-get install -y strace htop
 ### Because build machine perf might not match run machine perf, we have to symlink
 ### Even if version slightly off, still mostly works
 RUN ln -sf /usr/bin/perf_* /usr/bin/perf
