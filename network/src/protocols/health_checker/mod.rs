@@ -350,6 +350,9 @@ impl HealthChecker {
                         round,
                         duration.as_millis(),
                     );
+                    counters::health_check_rtt(&self.network_context)
+                        .observe(duration.as_secs_f64());
+
                     // Update last successful ping to current round.
                     // If it's not in storage, don't bother updating it
                     let _ = self.network_interface.app_data().write(peer_id, |entry| {
