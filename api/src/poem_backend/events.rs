@@ -87,14 +87,17 @@ impl EventsApi {
         event_key: EventKey,
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
         let latest_ledger_info = self.context.get_latest_ledger_info_poem()?;
-        let events = self
+        let ledger_version = latest_ledger_info.version();
+        let last_sequence_number = self
             .context
-            .get_events(
-                &event_key.into(),
-                page.start(0, u64::MAX)?,
-                page.limit()?,
-                latest_ledger_info.version(),
-            )
+            .get_event_latest_sequence_number(&event_key.into(), ledger_version)
+            .context("Failed to get latest sequence number from storage {}")
+            .map_err(BasicErrorWith404::internal)?;
+        let limit = page.limit()?;
+        let start = page.compute_start(limit, last_sequence_number)?;
+        let contract_events = self
+            .context
+            .get_events(&event_key.into(), start, limit, ledger_version)
             // TODO: Previously this was a 500, but I'm making this a 400. I suspect
             // both could be true depending on the error. Make this more specific.
             .context(format!("Failed to find events by key {}", event_key))

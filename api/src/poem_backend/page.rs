@@ -18,6 +18,15 @@ impl Page {
         Self { start, limit }
     }
 
+    pub fn compute_start<E: BadRequestError>(&self, limit: u16, max: u64) -> Result<u64, E> {
+        let last_page_start = if max > (limit as u64) {
+            max - ((limit + 1) as u64)
+        } else {
+            0
+        };
+        self.start(last_page_start, max)
+    }
+
     pub fn start<E: BadRequestError>(&self, default: u64, max: u64) -> Result<u64, E> {
         let start = self.start.unwrap_or(default);
         if start > max {
