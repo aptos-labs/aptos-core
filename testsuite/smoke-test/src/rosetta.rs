@@ -148,12 +148,12 @@ async fn test_account_balance() {
     let mut account_2_balance = DEFAULT_FUNDED_COINS;
     // At some time both accounts should exist with initial amounts
     try_until_ok(Duration::from_secs(5), DEFAULT_INTERVAL_DURATION, || {
-        account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance)
+        account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance, 0)
     })
     .await
     .unwrap();
     try_until_ok_default(|| {
-        account_has_balance(&rosetta_client, chain_id, account_2, account_2_balance)
+        account_has_balance(&rosetta_client, chain_id, account_2, account_2_balance, 0)
     })
     .await
     .unwrap();
@@ -174,10 +174,10 @@ async fn test_account_balance() {
         .unwrap();
     account_1_balance -= TRANSFER_AMOUNT + response.gas_used * response.gas_unit_price;
     account_2_balance += TRANSFER_AMOUNT;
-    account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance)
+    account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance, 1)
         .await
         .unwrap();
-    account_has_balance(&rosetta_client, chain_id, account_2, account_2_balance)
+    account_has_balance(&rosetta_client, chain_id, account_2, account_2_balance, 0)
         .await
         .unwrap();
 
@@ -205,10 +205,21 @@ async fn test_account_balance() {
     let failed_txn = txns.last().unwrap();
     if let Transaction::UserTransaction(txn) = failed_txn {
         account_1_balance -= txn.request.gas_unit_price.0 * txn.info.gas_used.0;
-        account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance)
+        account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance, 2)
             .await
             .unwrap();
     }
+
+    // Check that the balance hasn't changed (and should be 0) in the invalid account
+    account_has_balance(
+        &rosetta_client,
+        chain_id,
+        AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
+        0,
+        0,
+    )
+    .await
+    .unwrap();
 }
 
 async fn account_has_balance(
@@ -216,8 +227,11 @@ async fn account_has_balance(
     chain_id: ChainId,
     account: AccountAddress,
     expected_balance: u64,
+    expected_sequence_number: u64,
 ) -> anyhow::Result<u64> {
     let response = get_balance(rosetta_client, chain_id, account, None).await?;
+    assert_eq!(expected_sequence_number, response.metadata.sequence_number);
+
     if response.balances.iter().any(|amount| {
         amount.currency == native_coin() && amount.value == expected_balance.to_string()
     }) {
