@@ -19,8 +19,7 @@ impl MetadataView {
     pub fn get_storage_state(&self) -> BackupStorageState {
         let latest_epoch_ending_epoch =
             self.epoch_ending_backups.iter().map(|e| e.last_epoch).max();
-        let latest_state_snapshot_version =
-            self.state_snapshot_backups.iter().map(|s| s.version).max();
+        let latest_state_snapshot_epoch = self.state_snapshot_backups.iter().map(|s| s.epoch).max();
         let latest_transaction_version = self
             .transaction_backups
             .iter()
@@ -29,7 +28,7 @@ impl MetadataView {
 
         BackupStorageState {
             latest_epoch_ending_epoch,
-            latest_state_snapshot_epoch: latest_state_snapshot_version,
+            latest_state_snapshot_epoch,
             latest_transaction_version,
         }
     }
@@ -137,7 +136,7 @@ impl fmt::Display for BackupStorageState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "latest_epoch_ending_epoch: {}, latest_state_snapshot_version: {}, latest_transaction_version: {}",
+            "latest_epoch_ending_epoch: {}, latest_state_snapshot_epoch: {}, latest_transaction_version: {}",
             self.latest_epoch_ending_epoch.as_ref().map_or("none".to_string(), u64::to_string),
             self.latest_state_snapshot_epoch.as_ref().map_or("none".to_string(), Version::to_string),
             self.latest_transaction_version.as_ref().map_or("none".to_string(), Version::to_string),
@@ -165,7 +164,7 @@ impl FromStr for BackupStorageState {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let captures = regex::Regex::new(
-            r"latest_epoch_ending_epoch: (none|\d+), latest_state_snapshot_version: (none|\d+), latest_transaction_version: (none|\d+)",
+            r"latest_epoch_ending_epoch: (none|\d+), latest_state_snapshot_epoch: (none|\d+), latest_transaction_version: (none|\d+)",
         )?.captures(s).ok_or_else(|| anyhow!("Not in BackupStorageState display format: {}", s))?;
 
         Ok(Self {
