@@ -254,8 +254,8 @@ impl ValidatorVerifier {
             })
             .collect();
 
-        if pub_keys_to_agg.is_empty() {
-            // No signatures to aggregate - should only be the case in case of testing
+        if self.quorum_voting_power == 0 {
+            // This should happen only in case of tests.
             return Ok(());
         }
         let aggregated_key =
