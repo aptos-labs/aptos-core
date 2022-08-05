@@ -42,7 +42,7 @@ FORGE_RUNNER_MODE=${FORGE_RUNNER_MODE:-k8s}
 FORGE_NAMESPACE_KEEP=${FORGE_NAMESPACE_KEEP:-false}
 FORGE_NAMESPACE_REUSE=${FORGE_NAMESPACE_REUSE:-false}
 FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-false}
-FORGE_TEST_SUITE=${FORGE_TEST_SUITE:-land_blocking}
+FORGE_TEST_SUITE=${FORGE_TEST_SUITE:-bench_with_fullnode}
 FORGE_RUNNER_DURATION_SECS=${FORGE_RUNNER_DURATION_SECS:-300}
 FORGE_RUNNER_TPS_THRESHOLD=${FORGE_RUNNER_TPS_THRESHOLD:-400}
 
@@ -185,7 +185,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # more file descriptors for heavy txn generation
     ulimit -n 1048576
 
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 5000 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
         --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD --duration-secs $FORGE_RUNNER_DURATION_SECS  \
         test k8s-swarm \
         --image-tag $IMAGE_TAG \
