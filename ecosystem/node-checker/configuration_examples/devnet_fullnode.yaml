@@ -11,7 +11,7 @@ chain_id: ~
 role_type: ~
 evaluators:
   - api_latency
-  - api_transaction_presence
+  - api_transaction_availability
 evaluator_args:
   build_version_args: {}
   consensus_proposals_args: {}
@@ -34,6 +34,7 @@ evaluator_args:
     version_delta_tolerance: 5000
   tps_args:
     emit_args:
+      mempool_backlog: 0
       accounts_per_client: 15
       workers_per_ac: ~
       wait_millis: 0
