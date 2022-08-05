@@ -4,11 +4,11 @@
     "version": "1",
     "info": {
       "hash": "",
-      "stateRootHash": "4oOF1OcQyZ44NUFP1sm2v3WbQUkBwccYk2TyPCwra6U=",
+      "stateRootHash": "HMrdtIsVJVa/+d7HWaNbMM/zS8BF7norqgbBkz3p2Ks=",
       "eventRootHash": "YPVlJld+KeJV8TgWig4e7McIG/o+rxMn60yg554WVK8=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "kcazc29aWhpcssMGt9pj/aOhD6Tqn72ZMTXjDnD+vSM=",
+      "accumulatorRootHash": "+frUKK1tqTQDiSDscNcfEnCgRHXRX3WzYPGZFbegB0c=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -36,7 +36,7 @@
                 "module": "stake",
                 "name": "ValidatorPerformance"
               },
-              "data": "{\"missed_votes\":[\"1\"],\"num_blocks\":\"1\"}"
+              "data": "{\"validators\":[{\"failed_proposals\":\"0\",\"successful_proposals\":\"1\"}]}"
             }
           }
         },
@@ -96,7 +96,7 @@
       "gasUsed": "41112",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "mn/hS6vwxV7/ZXHf+sht20xqPWu/rWcqY2nULarhwUI=",
+      "accumulatorRootHash": "Raok5XaHEuw/DgmG++27qw3R6aMHAOGM/eVJ994si3c=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -225,7 +225,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "LXQc098xN5KmfFkaKgDF1kMoZ/dEvi108UQInZWxhWU="
+      "accumulatorRootHash": "eTMY0bnqb1UA9vJ6mIW7lnaYcPEiWM3RX/mX8cn+PkQ="
     },
     "blockHeight": "1",
     "type": "STATE_CHECKPOINT",

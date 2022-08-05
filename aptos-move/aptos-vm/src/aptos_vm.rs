@@ -25,9 +25,10 @@ use aptos_gas::AptosGasMeter;
 use aptos_logger::prelude::*;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
+use aptos_types::account_config::new_block_event_key;
 use aptos_types::{
     account_config,
-    block_metadata::{new_block_event_key, BlockMetadata},
+    block_metadata::BlockMetadata,
     on_chain_config::{new_epoch_event_key, GasSchedule, Version},
     transaction::{
         ChangeSet, ExecutionStatus, ModuleBundle, SignatureCheckedTransaction, SignedTransaction,
@@ -677,38 +678,7 @@ impl AptosVM {
             .0
             .new_session(storage, SessionId::block_meta(&block_metadata));
 
-        let (epoch, round, timestamp, previous_vote, proposer, failed_proposer_indices) =
-            block_metadata.into_inner();
-        // Convert the previous vote bitmask (true if the validator at that index voted)
-        // into a list of validator indices who missed the votes (previous vote = false).
-        let missed_votes = previous_vote
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, &validator_voted)| {
-                if validator_voted {
-                    None
-                } else {
-                    Some(idx as u64)
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let args = serialize_values(&vec![
-            MoveValue::Signer(txn_data.sender),
-            MoveValue::U64(epoch),
-            MoveValue::U64(round),
-            MoveValue::Vector(previous_vote.into_iter().map(MoveValue::Bool).collect()),
-            MoveValue::Vector(missed_votes.into_iter().map(MoveValue::U64).collect()),
-            MoveValue::Address(proposer),
-            MoveValue::Vector(
-                failed_proposer_indices
-                    .into_iter()
-                    .map(u64::from)
-                    .map(MoveValue::U64)
-                    .collect(),
-            ),
-            MoveValue::U64(timestamp),
-        ]);
+        let args = serialize_values(&block_metadata.get_prologue_move_args(txn_data.sender));
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,

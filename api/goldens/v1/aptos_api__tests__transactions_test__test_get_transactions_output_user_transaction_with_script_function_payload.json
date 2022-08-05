@@ -46,10 +46,12 @@
             "generic_type_params": []
           },
           "data": {
-            "missed_votes": [
-              "1"
-            ],
-            "num_blocks": "1"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "1"
+              }
+            ]
           }
         },
         "type": "write_resource"

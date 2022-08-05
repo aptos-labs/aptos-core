@@ -10,6 +10,8 @@ module aptos_framework::block {
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
 
+    /// Should be in-sync with BlockResource rust struct in new_block.rs
+    /// TODO rename to BlockResource for consistency.
     struct BlockMetadata has key {
         /// Height of the current block
         height: u64,
@@ -19,6 +21,7 @@ module aptos_framework::block {
         new_block_events: event::EventHandle<Self::NewBlockEvent>,
     }
 
+    /// Should be in-sync with NewBlockEvent rust struct in new_block.rs
     struct NewBlockEvent has drop, store {
         epoch: u64,
         round: u64,
@@ -73,10 +76,10 @@ module aptos_framework::block {
         vm: signer,
         epoch: u64,
         round: u64,
-        previous_block_votes: vector<bool>,
-        missed_votes: vector<u64>,
         proposer: address,
+        proposer_index_optional: vector<u64>,
         failed_proposer_indices: vector<u64>,
+        previous_block_votes: vector<bool>,
         timestamp: u64
     ) acquires BlockMetadata {
         timestamp::assert_operating();
@@ -105,7 +108,7 @@ module aptos_framework::block {
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
-        stake::update_performance_statistics(missed_votes);
+        stake::update_performance_statistics(proposer_index_optional, failed_proposer_indices);
 
         if (timestamp - reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_interval) {
             reconfiguration::reconfigure();

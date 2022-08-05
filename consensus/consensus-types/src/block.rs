@@ -350,10 +350,24 @@ impl Block {
             self.id(),
             self.epoch(),
             self.round(),
+            self.author().unwrap_or(AccountAddress::ZERO),
+            self.author().map(|proposer| {
+                u32::try_from(
+                    validators
+                        .iter()
+                        .position(|&v| v == proposer)
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "Proposer {} not in validator list {:?}",
+                                proposer, validators
+                            )
+                        }),
+                )
+                .unwrap()
+            }),
             // A bitmap of voters
             Self::voters_to_bitmap(validators, self.quorum_cert().ledger_info().signatures()),
             // For nil block, we use 0x0 which is convention for nil address in move.
-            self.author().unwrap_or(AccountAddress::ZERO),
             self.block_data()
                 .failed_authors()
                 .map_or(vec![], |failed_authors| {

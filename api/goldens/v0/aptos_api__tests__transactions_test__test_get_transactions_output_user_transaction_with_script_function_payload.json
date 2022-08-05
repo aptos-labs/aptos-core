@@ -38,10 +38,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "1"
-            ],
-            "num_blocks": "1"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "1"
+              }
+            ]
           }
         }
       },
