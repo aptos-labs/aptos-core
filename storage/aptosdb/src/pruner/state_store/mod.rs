@@ -142,11 +142,13 @@ impl StateStorePruner {
                 batch.delete::<StaleNodeIndexSchema>(&index)
             })?;
 
-            // Record progress first to make sure API won't return error values
-            // when a version is being pruned.
-            self.record_progress(new_min_readable_version);
             // Delete the stale node indices.
             self.db.write_schemas(batch)?;
+
+            // TODO(zcc): recording progress after writing schemas might provide wrong answers to
+            // API calls when they query min_readable_version while the write_schemas are still in
+            // progress.
+            self.record_progress(new_min_readable_version);
             self.pruned_to_the_end_of_target_version
                 .store(is_end_of_target_version, Ordering::Relaxed);
             Ok(new_min_readable_version)

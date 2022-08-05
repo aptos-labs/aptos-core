@@ -109,9 +109,6 @@ impl PrunerManager for LedgerPrunerManager {
 
             while Instant::now() < end {
                 if self.get_min_readable_version() >= min_readable_ledger_version {
-                    // A hack to make sure the items have been removed from DB as we update the
-                    // min_readable_version before finishing deleting items from DB.
-                    sleep(Duration::from_millis(100));
                     return Ok(());
                 }
                 sleep(Duration::from_millis(1));
