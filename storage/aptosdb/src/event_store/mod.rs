@@ -22,9 +22,12 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_types::{
-    account_address::AccountAddress, account_config::NewBlockEvent,
-    block_metadata::new_block_event_key, contract_event::ContractEvent, event::EventKey,
-    proof::position::Position, transaction::Version,
+    account_address::AccountAddress,
+    account_config::{new_block_event_key, NewBlockEvent},
+    contract_event::ContractEvent,
+    event::EventKey,
+    proof::position::Position,
+    transaction::Version,
 };
 use schemadb::{schema::ValueCodec, ReadOptions, SchemaBatch, SchemaIterator, DB};
 use std::{

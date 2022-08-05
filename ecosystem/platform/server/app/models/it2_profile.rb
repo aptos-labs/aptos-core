@@ -55,20 +55,6 @@ class It2Profile < ApplicationRecord
     nhc_job_id.present?
   end
 
-  def enqueue_nhc_job(do_location)
-    return unless id.present?
-
-    if nhc_job_running?
-      errors.add :base, 'Node Health Checker Job already enqueued'
-      return
-    end
-
-    job = NhcJob.perform_later({ it2_profile_id: id, do_location: })
-    self.nhc_job_id = job.job_id&.presence || 'default-job-id'
-    self.nhc_output = nil
-    update_columns(nhc_job_id:, nhc_output: nil)
-  end
-
   def fullnode_network_key=(value)
     value = nil if value.blank?
     super(value)

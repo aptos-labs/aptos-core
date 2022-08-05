@@ -96,10 +96,8 @@ members = [
     "state-sync/inter-component/consensus-notifications",
     "state-sync/inter-component/event-notifications",
     "state-sync/inter-component/mempool-notifications",
-    "state-sync/state-sync-v1",
     "state-sync/state-sync-v2/data-streaming-service",
     "state-sync/state-sync-v2/state-sync-driver",
-    "state-sync/state-sync-v2/state-sync-multiplexer",
     "state-sync/storage-service/client",
     "state-sync/storage-service/server",
     "state-sync/storage-service/types",
@@ -152,6 +150,14 @@ default-members = [
 [profile.release]
 debug = true
 overflow-checks = true
+
+[profile.performance]
+inherits = "release"
+opt-level = 3
+debug = true
+overflow-checks = false
+lto = true
+codegen-units = 1
 
 [profile.cli]
 inherits = "release"

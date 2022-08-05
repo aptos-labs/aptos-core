@@ -5,7 +5,7 @@
 
 module Users
   class ConfirmationsController < Devise::ConfirmationsController
-    layout 'it2'
+    layout 'it3'
 
     # GET /resource/confirmation?confirmation_token=abcdef
     def show

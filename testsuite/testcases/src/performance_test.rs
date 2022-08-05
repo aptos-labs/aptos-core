@@ -8,7 +8,7 @@ pub struct PerformanceBenchmark;
 
 impl Test for PerformanceBenchmark {
     fn name(&self) -> &'static str {
-        "all up"
+        "performance benchmark"
     }
 }
 

@@ -22,8 +22,10 @@ use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
-    block_metadata::{new_block_event_key, BlockMetadata},
+    account_config::{
+        new_block_event_key, AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS,
+    },
+    block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
@@ -427,8 +429,9 @@ impl FakeExecutor {
             HashValue::zero(),
             0,
             0,
-            vec![false; validator_set.payload().count()],
             *validator_set.payload().next().unwrap().account_address(),
+            Some(0),
+            vec![false; validator_set.payload().count()],
             vec![],
             self.block_time,
         );

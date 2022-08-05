@@ -2,11 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::account_address::AccountAddress;
+use crate::{
+    account_config::CORE_CODE_ADDRESS,
+    event::{EventHandle, EventKey},
+};
 use anyhow::Result;
-use move_deps::move_core_types::{ident_str, identifier::IdentStr, move_resource::MoveStructType};
+use move_deps::move_core_types::{
+    ident_str,
+    identifier::IdentStr,
+    move_resource::{MoveResource, MoveStructType},
+};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 
 /// Struct that represents a NewBlockEvent.
+/// Should be kept in-sync with NewBlockEvent move struct in block.move.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NewBlockEvent {
     epoch: u64,
@@ -76,3 +86,40 @@ impl MoveStructType for NewBlockEvent {
     const MODULE_NAME: &'static IdentStr = ident_str!("block");
     const STRUCT_NAME: &'static IdentStr = ident_str!("NewBlockEvent");
 }
+
+pub fn new_block_event_key() -> EventKey {
+    EventKey::new(2, CORE_CODE_ADDRESS)
+}
+
+/// The path to the new block event handle under a Block::BlockMetadata resource.
+pub static NEW_BLOCK_EVENT_PATH: Lazy<Vec<u8>> = Lazy::new(|| {
+    let mut path = BlockResource::resource_path();
+    // it can be anything as long as it's referenced in AccountState::get_event_handle_by_query_path
+    path.extend_from_slice(b"/new_block_event/");
+    path
+});
+
+/// Should be kept in-sync with BlockMetadata move struct in block.move.
+#[derive(Deserialize, Serialize)]
+pub struct BlockResource {
+    height: u64,
+    epoch_interval: u64,
+    new_block_events: EventHandle,
+}
+
+impl BlockResource {
+    pub fn new_block_events(&self) -> &EventHandle {
+        &self.new_block_events
+    }
+
+    pub fn height(&self) -> u64 {
+        self.height
+    }
+}
+
+impl MoveStructType for BlockResource {
+    const MODULE_NAME: &'static IdentStr = ident_str!("block");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("BlockMetadata");
+}
+
+impl MoveResource for BlockResource {}

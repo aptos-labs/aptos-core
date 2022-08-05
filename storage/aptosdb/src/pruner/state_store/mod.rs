@@ -20,13 +20,15 @@ mod test;
 
 pub const STATE_STORE_PRUNER_NAME: &str = "state store pruner";
 
+#[derive(Debug)]
+/// Responsible for pruning the state tree.
 pub struct StateStorePruner {
     db: Arc<DB>,
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
     min_readable_version: AtomicVersion,
-    // Keeps track of if the target version has been fully pruned to see if there is pruning
-    // pending.
+    /// Keeps track of if the target version has been fully pruned to see if there is pruning
+    /// pending.
     pruned_to_the_end_of_target_version: AtomicBool,
 }
 
@@ -94,6 +96,11 @@ impl DBPruner for StateStorePruner {
                 .pruned_to_the_end_of_target_version
                 .load(Ordering::Relaxed)
     }
+
+    /// (For tests only.) Updates the minimal readable version kept by pruner.
+    fn testonly_update_min_version(&self, version: Version) {
+        self.min_readable_version.store(version, Ordering::Relaxed)
+    }
 }
 
 impl StateStorePruner {
@@ -134,11 +141,16 @@ impl StateStorePruner {
                 batch.delete::<JellyfishMerkleNodeSchema>(&index.node_key)?;
                 batch.delete::<StaleNodeIndexSchema>(&index)
             })?;
+
             // Delete the stale node indices.
             self.db.write_schemas(batch)?;
+
+            // TODO(zcc): recording progress after writing schemas might provide wrong answers to
+            // API calls when they query min_readable_version while the write_schemas are still in
+            // progress.
+            self.record_progress(new_min_readable_version);
             self.pruned_to_the_end_of_target_version
                 .store(is_end_of_target_version, Ordering::Relaxed);
-            self.record_progress(new_min_readable_version);
             Ok(new_min_readable_version)
         }
     }

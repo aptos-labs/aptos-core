@@ -27,6 +27,8 @@ class User < ApplicationRecord
   has_one :it1_profile, dependent: :destroy
   has_one :it2_profile, dependent: :destroy
   has_one :it2_survey, dependent: :destroy
+  has_one :it3_profile, dependent: :destroy
+  has_one :it3_survey, dependent: :destroy
 
   before_save :maybe_enqueue_forum_sync
 
@@ -69,15 +71,15 @@ class User < ApplicationRecord
   #   end
   # end
 
-  def maybe_send_ait2_registration_complete_email
-    return unless ait2_registration_complete?
+  def maybe_send_ait3_registration_complete_email
+    return unless ait3_registration_complete?
 
     SendRegistrationCompleteEmailJob.perform_now({ user_id: id })
-    DiscourseAddGroupJob.perform_later({ user_id: id, group_name: 'ait2_eligible' })
+    DiscourseAddGroupJob.perform_later({ user_id: id, group_name: 'ait3_eligible' })
   end
 
-  def ait2_registration_complete?
-    kyc_complete? && it2_profile&.validator_verified?
+  def ait3_registration_complete?
+    kyc_complete? && it3_profile&.validator_verified?
   end
 
   def kyc_complete?
