@@ -40,6 +40,8 @@ pub enum VoteReceptionResult {
     New2ChainTimeoutCertificate(Arc<TwoChainTimeoutCertificate>),
     /// There might be some issues adding a vote
     ErrorAddingVote(VerifyError),
+    /// Error happens when aggregating signature
+    ErrorAggregatingSignature(VerifyError),
     /// The vote is not for the current round.
     UnexpectedRound(u64, u64),
     /// Receive f+1 timeout to trigger a local timeout, return the amount of voting power TC currently has.
@@ -144,7 +146,7 @@ impl PendingVotes {
                                 ledger_info_with_sig,
                             )))
                         }
-                        Err(e) => VoteReceptionResult::ErrorAddingVote(e),
+                        Err(e) => VoteReceptionResult::ErrorAggregatingSignature(e),
                     }
                 }
 

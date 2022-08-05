@@ -32,7 +32,7 @@ fn generate_commit_ledger_info(
     )
 }
 
-fn get_verified_signatures(
+fn verify_signatures(
     unverified_signatures: &PartialSignatures,
     validator: &ValidatorVerifier,
     commit_ledger_info: &LedgerInfo,
@@ -53,14 +53,14 @@ fn get_verified_signatures(
 fn generate_executed_item_from_ordered(
     commit_info: BlockInfo,
     executed_blocks: Vec<ExecutedBlock>,
-    unverified_signatures: PartialSignatures,
+    verified_signatures: PartialSignatures,
     callback: StateComputerCommitCallBackType,
     ordered_proof: LedgerInfoWithSignatures,
 ) -> BufferItem {
     debug!("{} advance to executed from ordered", commit_info);
     let partial_commit_proof = LedgerInfoWithPartialSignatures::new(
         generate_commit_ledger_info(&commit_info, &ordered_proof),
-        unverified_signatures,
+        verified_signatures,
     );
     BufferItem::Executed(Box::new(ExecutedItem {
         executed_blocks,
@@ -195,20 +195,12 @@ impl BufferItem {
                         commit_proof,
                         callback,
                     }))
-                } else if validator
-                    .check_voting_power(unverified_signatures.signatures().keys())
-                    .is_ok()
-                {
+                } else {
                     let commit_ledger_info =
                         generate_commit_ledger_info(&commit_info, &ordered_proof);
 
-                    let verified_signatures = get_verified_signatures(
-                        &unverified_signatures,
-                        validator,
-                        &commit_ledger_info,
-                    );
-                    // We need to check for voting power again as some of the signatures might be
-                    // filtered out in the above step and the voting power might not be sufficient
+                    let verified_signatures =
+                        verify_signatures(&unverified_signatures, validator, &commit_ledger_info);
                     if (validator.check_voting_power(verified_signatures.signatures().keys()))
                         .is_ok()
                     {
@@ -230,19 +222,11 @@ impl BufferItem {
                         generate_executed_item_from_ordered(
                             commit_info,
                             executed_blocks,
-                            unverified_signatures,
+                            verified_signatures,
                             callback,
                             ordered_proof,
                         )
                     }
-                } else {
-                    generate_executed_item_from_ordered(
-                        commit_info,
-                        executed_blocks,
-                        unverified_signatures,
-                        callback,
-                        ordered_proof,
-                    )
                 }
             }
             _ => {
