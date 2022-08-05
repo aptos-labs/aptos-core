@@ -682,9 +682,9 @@ SUCCESS proving 1 modules from package `hello_prover` in 1.649s
 
 In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example)
 
-First, you need to include Move nursery in your Move.toml file [toml file](debug-move-example/Move.toml)
+First, you need to include Move nursery in your Move.toml file [toml file]([debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/Move.toml))
 
-Now, you can use `Debug::print` and `Debug::print_stack_trace` in your [move file](debug-move-example/sources/DebugDemo.move)
+Now, you can use `Debug::print` and `Debug::print_stack_trace` in your [move file]([debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/sources/DebugDemo.move))
 
 You can run the following command:
 ```bash
