@@ -3,7 +3,6 @@
 
 use crate::quorum_store::types::{Batch, PersistedValue};
 use crate::{
-    network::NetworkSender,
     quorum_store::{
         batch_reader::{BatchReader, BatchReaderCommand},
         quorum_store_db::QuorumStoreDB,
@@ -22,6 +21,7 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
+use crate::network::QuorumStoreSender;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PersistRequest {
@@ -56,21 +56,21 @@ pub(crate) enum BatchStoreCommand {
     Shutdown(oneshot::Sender<()>),
 }
 
-pub(crate) struct BatchStore {
+pub(crate) struct BatchStore<T> {
     epoch: u64,
     my_peer_id: PeerId,
-    network_sender: NetworkSender,
+    network_sender: T,
     batch_reader: Arc<BatchReader>,
     db: Arc<QuorumStoreDB>,
     validator_signer: Arc<ValidatorSigner>,
 }
 
-impl BatchStore {
+impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     pub fn new(
         epoch: u64,
         last_committed_round: Round,
         my_peer_id: PeerId,
-        network_sender: NetworkSender,
+        network_sender: T,
         batch_store_tx: Sender<BatchStoreCommand>,
         batch_reader_tx: Sender<BatchReaderCommand>,
         batch_reader_rx: Receiver<BatchReaderCommand>,

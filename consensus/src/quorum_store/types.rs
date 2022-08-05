@@ -172,13 +172,13 @@ impl Fragment {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct BatchInfo {
     pub(crate) epoch: u64,
     pub(crate) digest: HashValue,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct Batch {
     pub(crate) source: PeerId,
     // None is a request, Some(payload) is a response.

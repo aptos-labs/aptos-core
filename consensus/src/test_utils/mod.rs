@@ -19,6 +19,7 @@ use tokio::{runtime, time::timeout};
 mod mock_payload_manager;
 mod mock_state_computer;
 mod mock_storage;
+pub mod mock_quorum_store_sender;
 
 use crate::data_manager::DummyDataManager;
 use crate::util::mock_time_service::SimulatedTimeService;

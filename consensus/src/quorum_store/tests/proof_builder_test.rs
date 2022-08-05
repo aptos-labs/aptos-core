@@ -10,7 +10,6 @@ use aptos_types::validator_verifier::random_validator_verifier;
 use consensus_types::proof_of_store::{LogicalTime, SignedDigest};
 use futures::channel::oneshot;
 use std::sync::Arc;
-use tokio::runtime;
 use tokio::sync::mpsc::channel;
 use crate::quorum_store::quorum_store::QuorumStoreError;
 

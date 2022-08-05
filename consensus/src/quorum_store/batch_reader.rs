@@ -6,7 +6,6 @@ use crate::quorum_store::{
     utils::RoundExpirations,
 };
 use crate::{
-    network::NetworkSender,
     quorum_store::{batch_requester::BatchRequester, batch_store::BatchStoreCommand},
 };
 use anyhow::bail;
@@ -35,6 +34,7 @@ use tokio::{
     },
     time,
 };
+use crate::network::QuorumStoreSender;
 
 #[derive(Debug)]
 pub(crate) enum BatchReaderCommand {
@@ -352,10 +352,10 @@ impl BatchReader {
         rx
     }
 
-    pub(crate) async fn start(
+    pub(crate) async fn start<T: QuorumStoreSender + Clone>(
         &self,
         mut batch_reader_rx: Receiver<BatchReaderCommand>,
-        network_sender: NetworkSender,
+        network_sender: T,
         request_num_peers: usize,
         request_timeout_ms: usize,
     ) {
