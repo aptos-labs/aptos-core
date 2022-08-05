@@ -38,9 +38,11 @@ export default class extends Controller {
   }
 
   navGroupToggle(event: Event) {
-    if (!(event.target instanceof Element)) return;
-    const button = event.target?.closest('button');
+    if (!(event.currentTarget instanceof HTMLElement)) return;
+    const button = event.currentTarget.querySelector('button');
     if (!(button instanceof HTMLElement)) return;
+    if (button.offsetParent == null) return;
+    if (event.target instanceof HTMLAnchorElement && event.target.parentElement != event.currentTarget) return;
     button.classList.toggle('rotate-180');
     const navGroup = button.nextElementSibling;
     navGroup?.toggleAttribute("open");
@@ -50,5 +52,9 @@ export default class extends Controller {
     if (this.navTarget.hasAttribute('open')) {
       this.toggleNav();
     }
+  }
+
+  preventDefault(event: Event) {
+    event.preventDefault();
   }
 }
