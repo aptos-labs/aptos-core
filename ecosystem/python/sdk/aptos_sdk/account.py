@@ -7,19 +7,17 @@ import json
 import tempfile
 import unittest
 
-from . import ed25519
 from .account_address import AccountAddress
+from .ed25519 import PrivateKey, PublicKey
 
 
 class Account:
     """Represents an account as well as the private, public key-pair for the Aptos blockchain."""
 
     account_address: AccountAddress
-    private_key: ed25519.PrivateKey
+    private_key: PrivateKey
 
-    def __init__(
-        self, account_address: AccountAddress, private_key: ed25519.PrivateKey
-    ):
+    def __init__(self, account_address: AccountAddress, private_key: PrivateKey):
         self.account_address = account_address
         self.private_key = private_key
 
@@ -30,7 +28,7 @@ class Account:
         )
 
     def generate() -> Account:
-        private_key = ed25519.PrivateKey.random()
+        private_key = PrivateKey.random()
         account_address = AccountAddress.from_key(private_key.public_key())
         return Account(account_address, private_key)
 
@@ -39,7 +37,7 @@ class Account:
             data = json.load(file)
         return Account(
             AccountAddress.from_hex(data["account_address"]),
-            ed25519.PrivateKey.from_hex(data["private_key"]),
+            PrivateKey.from_hex(data["private_key"]),
         )
 
     def store(self, path: str):
@@ -60,10 +58,10 @@ class Account:
 
         return AccountAddress.from_key(self.private_key.public_key()).hex()
 
-    def sign(self, data: bytes) -> ed25519.Signature:
+    def sign(self, data: bytes) -> Signature:
         return self.private_key.sign(data)
 
-    def public_key(self) -> ed25519.PublicKey:
+    def public_key(self) -> PublicKey:
         """Returns the public key for the associated account"""
 
         return self.private_key.public_key()

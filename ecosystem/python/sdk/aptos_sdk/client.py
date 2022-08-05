@@ -8,16 +8,17 @@ import httpx
 
 from .account import Account
 from .account_address import AccountAddress
-from .authenticator import (Authenticator, Ed25519Authenticator,
-                            MultiAgentAuthenticator)
+from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
 from .bcs import Serializer
-from .transactions import (MultiAgentRawTransaction, RawTransaction,
-                           ScriptFunction, SignedTransaction,
-                           TransactionArgument, TransactionPayload)
+from .transactions import (
+    MultiAgentRawTransaction,
+    RawTransaction,
+    ScriptFunction,
+    SignedTransaction,
+    TransactionArgument,
+    TransactionPayload,
+)
 from .type_tag import StructTag, TypeTag
-
-TESTNET_URL = "https://fullnode.devnet.aptoslabs.com"
-FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
 
 U64_MAX = 18446744073709551615
 
@@ -117,21 +118,21 @@ class RestClient:
         txn_request = {
             "sender": f"{sender.address()}",
             "sequence_number": str(self.account_sequence_number(sender.address())),
-            "max_gas_amount": "2000",
+            "max_gas_amount": str(1_000_000),
             "gas_unit_price": "1",
             "expiration_timestamp_secs": str(int(time.time()) + 600),
             "payload": payload,
         }
 
         res = self.client.post(
-            f"{self.base_url}/transactions/signing_message", json=txn_request
+            f"{self.base_url}/transactions/encode_submission", json=txn_request
         )
         assert res.status_code == 200, res.text
 
-        to_sign = bytes.fromhex(res.json()["message"][2:])
+        to_sign = bytes.fromhex(res.json()[2:])
         signature = sender.sign(to_sign)
         txn_request["signature"] = {
-            "type": "ed25519_signature",
+            "type": "ed_25519_signature",
             "public_key": f"{sender.public_key()}",
             "signature": f"{signature}",
         }
@@ -144,7 +145,7 @@ class RestClient:
         return response.json()["hash"]
 
     def transaction_pending(self, txn_hash: str) -> bool:
-        response = self.client.get(f"{self.base_url}/transactions/{txn_hash}")
+        response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
         if response.status_code == 404:
             return True
         assert response.status_code == 200, f"{response.text} - {txn_hash}"
@@ -158,7 +159,7 @@ class RestClient:
             assert count < 10, f"transaction {txn_hash} timed out"
             time.sleep(1)
             count += 1
-        response = self.client.get(f"{self.base_url}/transactions/{txn_hash}")
+        response = self.client.get(f"{self.base_url}/transactions/by_hash/{txn_hash}")
         assert (
             "success" in response.json() and response.json()["success"]
         ), f"{response.text} - {txn_hash}"
@@ -178,7 +179,7 @@ class RestClient:
                 sender.address(),
                 self.account_sequence_number(sender.address()),
                 payload,
-                2000,
+                1_000_000,
                 1,
                 int(time.time()) + 600,
                 self.chain_id,
@@ -214,7 +215,7 @@ class RestClient:
             sender.address(),
             self.account_sequence_number(sender.address()),
             payload,
-            2000,
+            1_000_000,
             1,
             int(time.time()) + 600,
             self.chain_id,
@@ -236,7 +237,13 @@ class RestClient:
 
         payload = {
             "type": "script_function_payload",
-            "function": "0x1::coin::transfer",
+            "function": {
+                "module": {
+                    "address": "0x1",
+                    "name": "coin",
+                },
+                "name": "transfer",
+            },
             "type_arguments": ["0x1::aptos_coin::AptosCoin"],
             "arguments": [
                 f"{recipient}",

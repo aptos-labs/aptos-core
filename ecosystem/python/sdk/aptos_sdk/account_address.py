@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import hashlib
 
-from . import ed25519
 from .bcs import Deserializer, Serializer
+from .ed25519 import PublicKey
 
 
 class AccountAddress:
@@ -40,7 +40,7 @@ class AccountAddress:
 
         return AccountAddress(bytes.fromhex(addr))
 
-    def from_key(key: ed25519.PublicKey) -> AccountAddress:
+    def from_key(key: PublicKey) -> AccountAddress:
         hasher = hashlib.sha3_256()
         hasher.update(key.key.encode() + b"\x00")
         return AccountAddress(hasher.digest())

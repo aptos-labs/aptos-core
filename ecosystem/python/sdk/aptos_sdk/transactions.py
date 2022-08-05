@@ -11,11 +11,10 @@ import hashlib
 import typing
 import unittest
 
-from . import ed25519
 from .account_address import AccountAddress
-from .authenticator import (Authenticator, Ed25519Authenticator,
-                            MultiAgentAuthenticator)
+from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
 from .bcs import Deserializer, Serializer
+from .ed25519 import PrivateKey, PublicKey, Signature
 from .type_tag import StructTag, TypeTag
 
 
@@ -88,10 +87,10 @@ class RawTransaction:
         prehash.extend(ser.output())
         return bytes(prehash)
 
-    def sign(self, key: ed25519.PrivateKey) -> ed25519.Signature:
+    def sign(self, key: PrivateKey) -> Signature:
         return key.sign(self.keyed())
 
-    def verify(self, key: ed25519.PublicKey, signature: ed25519.Signature) -> bool:
+    def verify(self, key: PublicKey, signature: Signature) -> bool:
         return key.verify(self.keyed(), signature)
 
     def deserialize(deserializer: Deserializer) -> RawTransaction:
@@ -144,10 +143,10 @@ class MultiAgentRawTransaction:
         prehash.extend(serializer.output())
         return bytes(prehash)
 
-    def sign(self, key: ed25519.PrivateKey) -> ed25519.Signature:
+    def sign(self, key: PrivateKey) -> Signature:
         return key.sign(self.keyed())
 
-    def verify(self, key: ed25519.PublicKey, signature: ed25519.Signature) -> bool:
+    def verify(self, key: PublicKey, signature: Signature) -> bool:
         return key.verify(self.keyed(), signature)
 
 
@@ -375,11 +374,11 @@ class SignedTransaction:
 
 class Test(unittest.TestCase):
     def test_script_function(self):
-        private_key = ed25519.PrivateKey.random()
+        private_key = PrivateKey.random()
         public_key = private_key.public_key()
         account_address = AccountAddress.from_key(public_key)
 
-        another_private_key = ed25519.PrivateKey.random()
+        another_private_key = PrivateKey.random()
         another_public_key = another_private_key.public_key()
         recipient_address = AccountAddress.from_key(another_public_key)
 
@@ -429,11 +428,11 @@ class Test(unittest.TestCase):
         amount_input = 5000
 
         # Accounts and crypto
-        sender_private_key = ed25519.PrivateKey.from_hex(sender_key_input)
+        sender_private_key = PrivateKey.from_hex(sender_key_input)
         sender_public_key = sender_private_key.public_key()
         sender_account_address = AccountAddress.from_key(sender_public_key)
 
-        receiver_private_key = ed25519.PrivateKey.from_hex(receiver_key_input)
+        receiver_private_key = PrivateKey.from_hex(receiver_key_input)
         receiver_public_key = receiver_private_key.public_key()
         receiver_account_address = AccountAddress.from_key(receiver_public_key)
 
@@ -500,11 +499,11 @@ class Test(unittest.TestCase):
         chain_id_input = 4
 
         # Accounts and crypto
-        sender_private_key = ed25519.PrivateKey.from_hex(sender_key_input)
+        sender_private_key = PrivateKey.from_hex(sender_key_input)
         sender_public_key = sender_private_key.public_key()
         sender_account_address = AccountAddress.from_key(sender_public_key)
 
-        receiver_private_key = ed25519.PrivateKey.from_hex(receiver_key_input)
+        receiver_private_key = PrivateKey.from_hex(receiver_key_input)
         receiver_public_key = receiver_private_key.public_key()
         receiver_account_address = AccountAddress.from_key(receiver_public_key)
 

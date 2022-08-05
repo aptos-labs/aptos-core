@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import typing
 
-from . import ed25519
 from .account_address import AccountAddress
 from .bcs import Deserializer, Serializer
+from .ed25519 import PublicKey, Signature
 
 
 class Authenticator:
@@ -68,10 +68,10 @@ class Authenticator:
 
 
 class Ed25519Authenticator:
-    public_key: ed25519.PublicKey
-    signature: ed25519.Signature
+    public_key: PublicKey
+    signature: Signature
 
-    def __init__(self, public_key: ed25519.PublicKey, signature: ed25519.Signature):
+    def __init__(self, public_key: PublicKey, signature: Signature):
         self.public_key = public_key
         self.signature = signature
 
@@ -85,8 +85,8 @@ class Ed25519Authenticator:
         return self.public_key.verify(data, self.signature)
 
     def deserialize(deserializer: Deserializer) -> Ed25519Authenticator:
-        key = deserializer.struct(ed25519.PublicKey)
-        signature = deserializer.struct(ed25519.Signature)
+        key = deserializer.struct(PublicKey)
+        signature = deserializer.struct(Signature)
         return Ed25519Authenticator(key, signature)
 
     def serialize(self, serializer: Serializer):

@@ -1,12 +1,13 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
+from .common import NODE_URL, FAUCET_URL
 from aptos_sdk.account import Account
-from aptos_sdk.client import FaucetClient, RestClient, TESTNET_URL, FAUCET_URL
+from aptos_sdk.client import FaucetClient, RestClient
 
 
 if __name__ == "__main__":
-    rest_client = RestClient(TESTNET_URL)
+    rest_client = RestClient(NODE_URL)
     faucet_client = FaucetClient(FAUCET_URL, rest_client)
 
     alice = Account.generate()
@@ -16,7 +17,7 @@ if __name__ == "__main__":
     print(f"Alice: {alice.address()}")
     print(f"Bob: {bob.address()}")
 
-    faucet_client.fund_account(alice.address(), 20_000)
+    faucet_client.fund_account(alice.address(), 20_000_000_000)
     faucet_client.fund_account(bob.address(), 0)
 
     print("\n=== Initial Balances ===")
