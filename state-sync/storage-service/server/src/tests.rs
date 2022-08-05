@@ -820,7 +820,10 @@ async fn test_get_storage_server_summary() {
     db_reader
         .expect_get_state_prune_window()
         .times(1)
-        .return_once(move || Ok(Some(state_prune_window)));
+        .return_once(move || Ok(state_prune_window));
+    db_reader
+        .expect_is_state_pruner_enabled()
+        .return_once(move || Ok(true));
 
     // Create the storage client and server
     let (mut mock_client, service, mock_time) = MockClient::new(Some(db_reader));
@@ -1309,7 +1312,10 @@ fn create_mock_db_for_subscription(
         .return_once(move || Ok(Some(lowest_version)));
     db_reader
         .expect_get_state_prune_window()
-        .return_once(move || Ok(Some(100)));
+        .return_once(move || Ok(100));
+    db_reader
+        .expect_is_state_pruner_enabled()
+        .return_once(move || Ok(true));
     db_reader
 }
 
@@ -1669,6 +1675,8 @@ mock! {
             chunk_size: usize,
         ) -> Result<StateValueChunkWithProof>;
 
-        fn get_state_prune_window(&self) -> Result<Option<usize>>;
+        fn get_state_prune_window(&self) -> Result<usize>;
+
+        fn is_state_pruner_enabled(&self) -> Result<bool>;
     }
 }

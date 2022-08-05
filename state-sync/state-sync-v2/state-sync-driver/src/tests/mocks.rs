@@ -286,7 +286,7 @@ mock! {
             chunk_size: usize,
         ) -> Result<StateValueChunkWithProof>;
 
-        fn get_state_prune_window(&self) -> Result<Option<usize>>;
+        fn get_state_prune_window(&self) -> Result<usize>;
     }
 }
 
