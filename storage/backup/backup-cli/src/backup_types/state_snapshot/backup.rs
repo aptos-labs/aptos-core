@@ -59,7 +59,7 @@ impl StateSnapshotBackupController {
     }
 
     pub async fn run(self) -> Result<FileHandle> {
-        info!("State snapshot backup started, for epoch {}.", self.epoch,);
+        info!("State snapshot backup started, for epoch {}.", self.epoch);
         let ret = self
             .run_impl()
             .await

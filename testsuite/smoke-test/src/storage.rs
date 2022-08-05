@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::test_utils::reconfig;
 use crate::{
     smoke_test_environment::new_local_swarm_with_aptos,
     test_utils::{
@@ -14,7 +15,6 @@ use anyhow::{bail, Result};
 use aptos_temppath::TempPath;
 use aptos_types::{transaction::Version, waypoint::Waypoint};
 use backup_cli::metadata::view::BackupStorageState;
-use consensus::CONSENSUS_DB_NAME;
 use forge::{NodeExt, Swarm, SwarmExt};
 use std::{
     fs,
@@ -23,7 +23,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[ignore]
 #[tokio::test]
 async fn test_db_restore() {
     // pre-build tools
@@ -66,7 +65,23 @@ async fn test_db_restore() {
         swarm.chain_info().root_account,
         &mut account_0,
         &account_1,
-        20,
+        10,
+    )
+    .await;
+    // we are at least at epoch 2
+    reconfig(
+        &client_1,
+        &transaction_factory,
+        swarm.chain_info().root_account,
+    )
+    .await;
+    transfer_and_reconfig(
+        &client_1,
+        &transaction_factory,
+        swarm.chain_info().root_account,
+        &mut account_0,
+        &account_1,
+        10,
     )
     .await;
     assert_balance(&client_1, &account_0, expected_balance_0).await;
@@ -74,14 +89,8 @@ async fn test_db_restore() {
 
     // make a backup from node 1
     let node1_config = swarm.validator(validator_peer_ids[1]).unwrap().config();
-    let backup_path = db_backup(
-        node1_config.storage.backup_service_address.port(),
-        1,
-        50,
-        20,
-        40,
-        &[],
-    );
+    let port = node1_config.storage.backup_service_address.port();
+    let backup_path = db_backup(port, 2, 20, 10, 1, &[]);
 
     // take down node 0
     let node_to_restart = validator_peer_ids[0];
@@ -95,7 +104,6 @@ async fn test_db_restore() {
     node0_config.save(node0_config_path).unwrap();
     let db_dir = node0_config.storage.dir();
     fs::remove_dir_all(db_dir.clone()).unwrap();
-    fs::remove_dir_all(db_dir.join(CONSENSUS_DB_NAME)).unwrap();
 
     // restore db from backup
     db_restore(backup_path.path(), db_dir.as_path(), &[]);
