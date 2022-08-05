@@ -40,16 +40,16 @@ impl ProofOfPossession {
         self.pop.to_bytes()
     }
 
-    /// Group-check the PoP (i.e., verifies the PoP is a valid group element).
+    /// Subgroup-check the PoP (i.e., verifies the PoP is a valid group element).
     ///
-    /// WARNING: Group-checking is done implicitly in `verify` below, so this function need not be called
+    /// WARNING: Subgroup-checking is done implicitly in `verify` below, so this function need not be called
     /// separately for most use-cases, as it incurs a performance penalty. We leave it here just in case.
-    pub fn group_check(&self) -> Result<()> {
+    pub fn subgroup_check(&self) -> Result<()> {
         self.pop.validate(true).map_err(|e| anyhow!("{:?}", e))
     }
 
     /// Verifies the proof-of-possesion (PoP) of the private key corresponding to the specified
-    /// BLS public key. Implicitly, group checks the PoP and the specified public key, so
+    /// BLS public key. Implicitly, subgroup checks the PoP and the specified public key, so
     /// the caller is not responsible for doing it manually.
     pub fn verify(&self, pk: &PublicKey) -> Result<()> {
         // CRYPTONOTE(Alin): We call the signature verification function with pk_validate set to true
@@ -89,7 +89,7 @@ impl ProofOfPossession {
     /// corresponding public key as input, to avoid inefficiently recomputing it from the
     /// private key.
     ///
-    /// WARNING: Does not group-check the PK, since this function will be typically called on
+    /// WARNING: Does not subgroup-check the PK, since this function will be typically called on
     /// a freshly-generated key-pair or on a correctly-deserialized keypair.
     pub fn create_with_pubkey(sk: &PrivateKey, pk: &PublicKey) -> ProofOfPossession {
         // CRYPTONOTE(Alin): The standard does not detail how the PK should be serialized for hashing purposes; we just do the obvious.
@@ -122,7 +122,7 @@ impl TryFrom<&[u8]> for ProofOfPossession {
 
     /// Deserializes a BLS PoP from a sequence of bytes.
     ///
-    /// WARNING: Does NOT group-check the PoP! This is done implicitly when verifying the PoP in
+    /// WARNING: Does NOT subgroup-check the PoP! This is done implicitly when verifying the PoP in
     /// `ProofOfPossession::verify`
     fn try_from(bytes: &[u8]) -> std::result::Result<ProofOfPossession, CryptoMaterialError> {
         Ok(Self {

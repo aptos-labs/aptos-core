@@ -79,7 +79,7 @@ define_gas_parameters_for_transaction!(
     [
         max_transaction_size_in_bytes,
         "max_transaction_size_in_bytes",
-        8192
+        8192 * 16,
     ],
     [gas_unit_scaling_factor, "gas_unit_scaling_factor", 1000],
 );

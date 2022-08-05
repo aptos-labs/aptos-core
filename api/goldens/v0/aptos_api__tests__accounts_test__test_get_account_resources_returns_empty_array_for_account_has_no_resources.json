@@ -591,7 +591,7 @@
         },
         {
           "key": "txn.max_transaction_size_in_bytes",
-          "val": "8192"
+          "val": "131072"
         },
         {
           "key": "txn.gas_unit_scaling_factor",
@@ -674,7 +674,175 @@
           "val": "1"
         },
         {
+          "key": "aptos_framework.signature.bls12381_aggregate_pop_verified_pubkeys.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_aggregate_pop_verified_pubkeys.per_pubkey_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_aggregate_pop_verified_pubkeys.per_pubkey_aggregate",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_aggregate_signatures.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_aggregate_signatures.per_sig_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_aggregate_signatures.per_sig_aggregate",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_signature_subgroup_check.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_signature_subgroup_check.per_sig_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_signature_subgroup_check.per_sig_subgroup_check",
+          "val": "1"
+        },
+        {
           "key": "aptos_framework.signature.bls12381_validate_pubkey.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_validate_pubkey.per_pubkey_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_validate_pubkey.per_pubkey_subgroup_check",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_aggregate_signature.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_aggregate_signature.per_pubkey_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_aggregate_signature.per_sig_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_aggregate_signature.per_pairing",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_aggregate_signature.per_msg_hashing_base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_aggregate_signature.per_msg_byte_hashing",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_multisignature.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_multisignature.per_pubkey_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_multisignature.per_pubkey_subgroup_check",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_multisignature.per_sig_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_multisignature.per_sig_verify",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_multisignature.per_msg_hashing_base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_multisignature.per_msg_byte_hashing",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_normal_signature.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_normal_signature.per_pubkey_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_normal_signature.per_pubkey_subgroup_check",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_normal_signature.per_sig_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_normal_signature.per_sig_verify",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_normal_signature.per_msg_hashing_base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_normal_signature.per_msg_byte_hashing",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_proof_of_possession.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_proof_of_possession.per_pubkey_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_proof_of_possession.per_sig_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_proof_of_possession.per_sig_verify",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_signature_share.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_signature_share.per_pubkey_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_signature_share.per_pubkey_subgroup_check",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_signature_share.per_sig_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_signature_share.per_sig_verify",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_signature_share.per_msg_hashing_base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_verify_signature_share.per_msg_byte_hashing",
           "val": "1"
         },
         {
@@ -682,35 +850,39 @@
           "val": "1"
         },
         {
+          "key": "aptos_framework.signature.ed25519_validate_pubkey.per_pubkey_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.ed25519_validate_pubkey.per_pubkey_small_order_check",
+          "val": "1"
+        },
+        {
           "key": "aptos_framework.signature.ed25519_verify.base",
           "val": "1"
         },
         {
-          "key": "aptos_framework.signature.ed25519_verify.unit",
+          "key": "aptos_framework.signature.ed25519_verify.per_pubkey_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.ed25519_verify.per_sig_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.ed25519_verify.per_sig_strict_verify",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.ed25519_verify.per_msg_hashing_base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.ed25519_verify.per_msg_byte_hashing",
           "val": "1"
         },
         {
           "key": "aptos_framework.signature.secp256k1_ecdsa_recover.base",
-          "val": "1"
-        },
-        {
-          "key": "aptos_framework.signature.bls12381_verify_signature.base",
-          "val": "1"
-        },
-        {
-          "key": "aptos_framework.signature.bls12381_verify_signature.unit",
-          "val": "1"
-        },
-        {
-          "key": "aptos_framework.signature.bls12381_aggregate_pop_verified_pubkeys.base",
-          "val": "1"
-        },
-        {
-          "key": "aptos_framework.signature.bls12381_aggregate_pop_verified_pubkeys.per_pubkey",
-          "val": "1"
-        },
-        {
-          "key": "aptos_framework.signature.bls12381_verify_proof_of_possession.base",
           "val": "1"
         },
         {
