@@ -116,6 +116,7 @@ impl StateComputer for ExecutionProxy {
             parent_id = parent_block_id,
             "Executing block",
         );
+
         debug!(
             "QSE: trying to get data., round {}, epoch: {} ",
             block.round(),

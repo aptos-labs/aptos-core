@@ -116,12 +116,8 @@ impl DataManager for QuorumStoreDataManager {
             .map(|proof| proof.digest().clone())
             .collect();
 
-<<<<<<< HEAD
         let _ = self
             .quorum_store_wrapper_tx
-=======
-        let _ = self.quorum_store_wrapper_tx
->>>>>>> b2cf03de4f (shutdown and some fixes  (#2325))
             .load()
             .as_ref()
             .unwrap()

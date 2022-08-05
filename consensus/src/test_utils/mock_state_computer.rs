@@ -1,255 +1,188 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{batch_reader::BatchReader, utils::RoundExpirations};
+use crate::data_manager::{DataManager, DummyDataManager};
+use crate::{
+    error::StateSyncError,
+    state_replication::{StateComputer, StateComputerCommitCallBackType},
+    test_utils::mock_storage::MockStorage,
+};
+use anyhow::{format_err, Result};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
-use aptos_logger::debug;
-use aptos_types::transaction::SignedTransaction;
-use arc_swap::ArcSwapOption;
-use consensus_types::{
-    block::Block,
-    common::Payload,
-    proof_of_store::{LogicalTime, ProofOfStore},
-    request_response::WrapperCommand,
+use aptos_logger::prelude::*;
+use aptos_types::{
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
 };
-use dashmap::DashMap;
-use executor_types::*;
-use futures::channel::mpsc::Sender;
-use std::{ops::Deref, sync::Arc};
-use tokio::sync::oneshot;
+use consensus_types::{block::Block, common::Payload, executed_block::ExecutedBlock};
+use executor_types::{Error, StateComputeResult};
+use futures::channel::mpsc;
+use std::{collections::HashMap, sync::Arc};
+use termion::color::*;
 
-/// Notification of execution committed logical time for QuorumStore to clean.
+pub struct MockStateComputer {
+    state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
+    commit_callback: mpsc::UnboundedSender<LedgerInfoWithSignatures>,
+    consensus_db: Arc<MockStorage>,
+    block_cache: Mutex<HashMap<HashValue, Payload>>,
+    data_manager: Arc<dyn DataManager>,
+}
+
+impl MockStateComputer {
+    pub fn new(
+        state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
+        commit_callback: mpsc::UnboundedSender<LedgerInfoWithSignatures>,
+        consensus_db: Arc<MockStorage>,
+    ) -> Self {
+        MockStateComputer {
+            state_sync_client,
+            commit_callback,
+            consensus_db,
+            block_cache: Mutex::new(HashMap::new()),
+            data_manager: Arc::new(DummyDataManager::new()),
+        }
+    }
+}
+
 #[async_trait::async_trait]
-pub trait DataManager: Send + Sync {
-    /// Notification of committed logical time
-    async fn notify_commit(&self, logical_time: LogicalTime, payloads: Vec<Payload>);
-
-    fn new_epoch(
+impl StateComputer for MockStateComputer {
+    async fn compute(
         &self,
-        data_reader: Arc<BatchReader>,
-        quorum_store_wrapper_tx: Sender<WrapperCommand>,
-    );
+        block: &Block,
+        _parent_block_id: HashValue,
+    ) -> Result<StateComputeResult, Error> {
+        self.block_cache.lock().insert(
+            block.id(),
+            block.payload().unwrap_or(&Payload::new_empty()).clone(),
+        );
+        let result = StateComputeResult::new_dummy();
+        Ok(result)
+    }
 
-    async fn update_payload(&self, block: &Block);
+    async fn commit(
+        &self,
+        blocks: &[Arc<ExecutedBlock>],
+        commit: LedgerInfoWithSignatures,
+        call_back: StateComputerCommitCallBackType,
+    ) -> Result<(), Error> {
+        self.consensus_db
+            .commit_to_storage(commit.ledger_info().clone());
 
-    async fn get_data(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error>;
+        // mock sending commit notif to state sync
+        let mut txns = vec![];
+        for block in blocks {
+            let _payload = self
+                .block_cache
+                .lock()
+                .remove(&block.id())
+                .ok_or_else(|| format_err!("Cannot find block"))?;
+            let mut payload_txns = self.data_manager.get_data(block.block()).await?;
+            txns.append(&mut payload_txns);
+        }
+        // they may fail during shutdown
+        let _ = self.state_sync_client.unbounded_send(txns);
+
+        let _ = self.commit_callback.unbounded_send(commit.clone());
+
+        call_back(blocks, commit);
+
+        Ok(())
+    }
+
+    async fn sync_to(&self, commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        debug!(
+            "{}Fake sync{} to block id {}",
+            Fg(Blue),
+            Fg(Reset),
+            commit.ledger_info().consensus_block_id()
+        );
+        self.consensus_db
+            .commit_to_storage(commit.ledger_info().clone());
+        self.commit_callback
+            .unbounded_send(commit)
+            .expect("Fail to notify about sync");
+        Ok(())
+    }
+
+    fn new_epoch(&self, _: &EpochState) {}
 }
 
-enum DataStatus {
-    Cached(Vec<SignedTransaction>),
-    Requested(Vec<oneshot::Receiver<Result<Vec<SignedTransaction>, Error>>>),
-    Remote,
+pub struct EmptyStateComputer;
+
+#[async_trait::async_trait]
+impl StateComputer for EmptyStateComputer {
+    async fn compute(
+        &self,
+        _block: &Block,
+        _parent_block_id: HashValue,
+    ) -> Result<StateComputeResult, Error> {
+        Ok(StateComputeResult::new_dummy())
+    }
+
+    async fn commit(
+        &self,
+        _blocks: &[Arc<ExecutedBlock>],
+        _commit: LedgerInfoWithSignatures,
+        _call_back: StateComputerCommitCallBackType,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
+    async fn sync_to(&self, _commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        Ok(())
+    }
+
+    fn new_epoch(&self, _: &EpochState) {}
 }
 
-/// Execution -> QuorumStore notification of commits.
-pub struct QuorumStoreDataManager {
-    data_reader: ArcSwapOption<BatchReader>,
-    quorum_store_wrapper_tx: ArcSwapOption<Sender<WrapperCommand>>,
-    digest_status: DashMap<HashValue, DataStatus>,
-    expiration_status: Mutex<RoundExpirations<HashValue>>,
+/// Random Compute Result State Computer
+/// When compute(), if parent id is random_compute_result_root_hash, it returns Err(Error::BlockNotFound(parent_block_id))
+/// Otherwise, it returns a dummy StateComputeResult with root hash as random_compute_result_root_hash.
+pub struct RandomComputeResultStateComputer {
+    random_compute_result_root_hash: HashValue,
 }
 
-impl QuorumStoreDataManager {
-    /// new
+impl RandomComputeResultStateComputer {
     pub fn new() -> Self {
         Self {
-            data_reader: ArcSwapOption::from(None),
-            quorum_store_wrapper_tx: ArcSwapOption::from(None),
-            digest_status: DashMap::new(),
-            expiration_status: Mutex::new(RoundExpirations::new()),
+            random_compute_result_root_hash: HashValue::random(),
         }
     }
-}
-
-impl QuorumStoreDataManager {
-    async fn request_data(
-        &self,
-        poss: Vec<ProofOfStore>,
-        logical_time: LogicalTime,
-    ) -> Vec<oneshot::Receiver<Result<Vec<SignedTransaction>, executor_types::Error>>> {
-        let mut receivers = Vec::new();
-        for pos in poss {
-            debug!(
-                "QSE: requesting pos {:?}, digest {}, time = {:?}",
-                pos,
-                pos.digest(),
-                logical_time
-            );
-            if logical_time <= pos.expiration() {
-                receivers.push(
-                    self.data_reader
-                        .load()
-                        .as_ref()
-                        .unwrap() //TODO: can this be None? Need to make sure we call new_epoch() first.
-                        .get_batch(pos)
-                        .await,
-                );
-            } else {
-                debug!("QS: skipped expired pos");
-            }
-        }
-        receivers
+    pub fn get_root_hash(&self) -> HashValue {
+        self.random_compute_result_root_hash
     }
 }
 
 #[async_trait::async_trait]
-impl DataManager for QuorumStoreDataManager {
-    async fn notify_commit(&self, logical_time: LogicalTime, payloads: Vec<Payload>) {
-        self.data_reader
-            .load()
-            .as_ref()
-            .unwrap()
-            .update_certified_round(logical_time)
-            .await;
-
-        let digests: Vec<HashValue> = payloads
-            .into_iter()
-            .map(|payload| match payload {
-                Payload::DirectMempool(_) => {
-                    unreachable!()
-                }
-                Payload::InQuorumStore(proofs) => proofs,
-                Payload::Empty => Vec::new(),
-            })
-            .flatten()
-            .map(|proof| proof.digest().clone())
-            .collect();
-
-        let _ = self
-            .quorum_store_wrapper_tx
-            .load()
-            .as_ref()
-            .unwrap()
-            .as_ref()
-            .clone()
-            .try_send(WrapperCommand::CleanRequest(logical_time, digests));
-        let expired_set = self.expiration_status.lock().expire(logical_time.round());
-        for expired in expired_set {
-            self.digest_status.remove(&expired);
-        }
-    }
-
-    async fn update_payload(&self, block: &Block) {
-        if block.payload().is_some() {
-            match block.payload().unwrap() {
-                Payload::InQuorumStore(proofs) => {
-                    let receivers = self
-                        .request_data(
-                            proofs.clone(),
-                            LogicalTime::new(block.epoch(), block.round()),
-                        )
-                        .await;
-                    assert!(!self.digest_status.contains_key(&block.id()));
-                    self.digest_status
-                        .insert(block.id(), DataStatus::Requested(receivers));
-                    self.expiration_status
-                        .lock()
-                        .add_item(block.id(), block.round());
-                }
-                Payload::Empty => {}
-                Payload::DirectMempool(_) => {
-                    unreachable!()
-                }
-            }
-        }
-    }
-
-    async fn get_data(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
-        if block.payload().is_none() {
-            return Ok(Vec::new());
-        }
-        match block.payload().unwrap() {
-            Payload::Empty => {
-                debug!("QSE: empty Payload");
-                Ok(Vec::new())
-            }
-            Payload::DirectMempool(_) => unreachable!("Direct mempool should not be used."),
-            Payload::InQuorumStore(proofs) => {
-                match self.digest_status.get(&block.id()) {
-                    None => unreachable!("No status in Data Manager for digest {}", block.id()),
-                    Some(data_status) => {
-                        if let DataStatus::Cached(data) = data_status.deref() {
-                            return Ok(data.clone());
-                        }
-                    }
-                }
-                let (_, data_status) = self.digest_status.remove(&block.id()).unwrap();
-                let receivers = if let DataStatus::Requested(rec) = data_status {
-                    rec
-                } else {
-                    self.request_data(
-                        proofs.clone(),
-                        LogicalTime::new(block.epoch(), block.round()),
-                    )
-                        .await
-                };
-                let mut vec_ret = Vec::new();
-                debug!("QSE: waiting for data on {} receivers", receivers.len());
-                for rx in receivers {
-                    match rx
-                        .await
-                        .expect("Oneshot channel to get a batch was dropped")
-                    {
-                        Ok(data) => {
-                            debug!("QSE: got data, len {}", data.len());
-                            vec_ret.push(data);
-                        }
-                        Err(e) => {
-                            debug!("QS: got error from receiver {:?}", e);
-                            self.digest_status.insert(block.id(), DataStatus::Remote);
-                            return Err(e);
-                        }
-                    }
-                }
-                let ret: Vec<SignedTransaction> = vec_ret.into_iter().flatten().collect();
-                self.digest_status
-                    .insert(block.id(), DataStatus::Cached(ret.clone()));
-                Ok(ret)
-            }
-        }
-    }
-
-    fn new_epoch(
+impl StateComputer for RandomComputeResultStateComputer {
+    async fn compute(
         &self,
-        data_reader: Arc<BatchReader>,
-        quorum_store_wrapper_tx: Sender<WrapperCommand>,
-    ) {
-        // TODO: check race here.
-        self.data_reader.swap(Some(data_reader));
-        self.quorum_store_wrapper_tx
-            .swap(Some(Arc::from(quorum_store_wrapper_tx)));
-    }
-}
-
-pub struct DummyDataManager {}
-
-impl DummyDataManager {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-#[async_trait::async_trait]
-impl DataManager for DummyDataManager {
-    async fn notify_commit(&self, _: LogicalTime, _: Vec<Payload>) {}
-
-    fn new_epoch(&self, _: Arc<BatchReader>, _: Sender<WrapperCommand>) {}
-
-    async fn update_payload(&self, _: &Block) {}
-
-    async fn get_data(&self, block: &Block) -> Result<Vec<SignedTransaction>, Error> {
-        if block.payload().is_none() {
-            Ok(Vec::new())
+        _block: &Block,
+        parent_block_id: HashValue,
+    ) -> Result<StateComputeResult, Error> {
+        // trapdoor for Execution Error
+        if parent_block_id == self.random_compute_result_root_hash {
+            Err(Error::BlockNotFound(parent_block_id))
         } else {
-            let payload = block.payload().unwrap().clone();
-            match payload {
-                Payload::Empty => Ok(Vec::new()),
-                Payload::DirectMempool(txns) => Ok(txns),
-                Payload::InQuorumStore(_) => {
-                    unreachable!("Quorum store should not be used.")
-                }
-            }
+            Ok(StateComputeResult::new_dummy_with_root_hash(
+                self.random_compute_result_root_hash,
+            ))
         }
     }
+
+    async fn commit(
+        &self,
+        _blocks: &[Arc<ExecutedBlock>],
+        _commit: LedgerInfoWithSignatures,
+        _call_back: StateComputerCommitCallBackType,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
+    async fn sync_to(&self, _commit: LedgerInfoWithSignatures) -> Result<(), StateSyncError> {
+        Ok(())
+    }
+
+    fn new_epoch(&self, _: &EpochState) {}
 }
+Footer
