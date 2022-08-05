@@ -26,6 +26,7 @@ use move_deps::move_core_types::{
 fn failed_transaction_cleanup_test() {
     test_with_different_versions! {CURRENT_RELEASE_VERSIONS, |test_env| {
         let mut executor = test_env.executor;
+        // TODO(Gas): double check this
         let sender = executor.create_raw_account_data(1_000_000, 10);
         executor.add_account_data(&sender);
 
