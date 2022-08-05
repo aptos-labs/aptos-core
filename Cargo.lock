@@ -131,7 +131,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "aptos-config",
@@ -150,6 +150,7 @@ dependencies = [
  "aptos-telemetry",
  "aptos-temppath",
  "aptos-transaction-builder",
+ "aptos-transactional-test-harness",
  "aptos-types",
  "aptos-vm",
  "aptosdb",
@@ -167,6 +168,7 @@ dependencies = [
  "move-deps",
  "parse_duration",
  "rand 0.7.3",
+ "regex",
  "reqwest",
  "serde 1.0.141",
  "serde_json",
@@ -174,12 +176,14 @@ dependencies = [
  "short-hex-str",
  "storage-interface",
  "tempfile",
+ "termcolor",
  "thiserror",
  "tokio",
  "tokio-util 0.7.3",
  "toml",
  "uuid",
  "vm-genesis",
+ "walkdir",
 ]
 
 [[package]]
@@ -488,7 +492,6 @@ dependencies = [
  "safety-rules",
  "scratchpad",
  "sha-1 0.10.0",
- "state-sync-v1",
  "stats_alloc",
  "storage-interface",
  "structopt 0.3.26",
@@ -771,8 +774,7 @@ dependencies = [
  "network",
  "network-builder",
  "rand 0.7.3",
- "state-sync-multiplexer",
- "state-sync-v1",
+ "state-sync-driver",
  "storage-interface",
  "storage-service-client",
  "storage-service-server",
@@ -1159,7 +1161,6 @@ dependencies = [
  "serde 1.0.141",
  "serde_json",
  "state-sync-driver",
- "state-sync-v1",
  "sysinfo",
  "tokio",
  "tokio-stream",
@@ -4291,7 +4292,6 @@ name = "language-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos",
  "aptos-config",
  "aptos-crypto",
  "aptos-gas",
@@ -7940,6 +7940,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-data-client",
+ "aptos-genesis",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",
@@ -7969,85 +7970,6 @@ dependencies = [
  "storage-interface",
  "storage-service-client",
  "storage-service-types",
- "thiserror",
- "tokio",
- "tokio-stream",
- "vm-genesis",
-]
-
-[[package]]
-name = "state-sync-multiplexer"
-version = "0.1.0"
-dependencies = [
- "aptos-config",
- "aptos-crypto",
- "aptos-data-client",
- "aptos-genesis",
- "aptos-infallible",
- "aptos-temppath",
- "aptos-time-service",
- "aptos-types",
- "aptos-vm",
- "aptosdb",
- "consensus-notifications",
- "data-streaming-service",
- "event-notifications",
- "executor",
- "executor-test-helpers",
- "executor-types",
- "futures",
- "mempool-notifications",
- "network",
- "state-sync-driver",
- "state-sync-v1",
- "storage-interface",
- "storage-service-client",
- "tokio",
-]
-
-[[package]]
-name = "state-sync-v1"
-version = "0.1.0"
-dependencies = [
- "aptos-config",
- "aptos-crypto",
- "aptos-genesis",
- "aptos-infallible",
- "aptos-logger",
- "aptos-mempool",
- "aptos-metrics-core",
- "aptos-proptest-helpers",
- "aptos-temppath",
- "aptos-time-service",
- "aptos-transaction-builder",
- "aptos-types",
- "aptos-vm",
- "aptosdb",
- "async-trait",
- "bcs",
- "bytes 1.2.1",
- "channel",
- "claim",
- "consensus-notifications",
- "event-notifications",
- "executor",
- "executor-test-helpers",
- "executor-types",
- "fail 0.5.0",
- "futures",
- "itertools",
- "mempool-notifications",
- "memsocket",
- "move-deps",
- "netcore",
- "network",
- "network-builder",
- "once_cell",
- "proptest",
- "rand 0.7.3",
- "serde 1.0.141",
- "short-hex-str",
- "storage-interface",
  "thiserror",
  "tokio",
  "tokio-stream",

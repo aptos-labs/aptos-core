@@ -51,14 +51,10 @@ Rails.application.routes.draw do
   # Health check
   get 'health', to: 'health#health'
 
-  # IT2
-  resources :it2_profiles, except: %i[index destroy]
-  resources :it2_surveys, except: %i[index destroy]
-
-  # NFTs
-  resources :nfts, only: %i[show update]
-  resources :nft_offers, only: %i[show update]
-  get 'nft-nyc', to: 'nft_nyc#show'
+  # IT3
+  resource :it3, only: %i[show]
+  resources :it3_profiles, except: %i[index destroy]
+  resources :it3_surveys, except: %i[index destroy]
 
   # Leaderboards
   get 'leaderboard/it1', to: redirect('/it1')

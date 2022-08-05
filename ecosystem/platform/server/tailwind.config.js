@@ -36,6 +36,9 @@ module.exports = {
         mono: ["lft-etica-mono", ...defaultTheme.fontFamily.mono],
         display: ["apparat-semicond", ...defaultTheme.fontFamily.sans],
       },
+      screens: {
+        'max-sm': {'max': '639px'},
+      }
     },
     container: {
       padding: {

@@ -34,6 +34,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      APTOS_NODE_URL: http://127.0.0.1:8080/v1
+      APTOS_FAUCET_URL: http://127.0.0.1:8081
     steps:
       - uses: actions/checkout@v3
         with:
@@ -51,8 +54,8 @@ jobs:
 
       # Build the API specs.
       - run: mkdir -p /tmp/api_specs
-      - run: docker run --rm ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml > /tmp/api_specs/spec.yaml
-      - run: docker run --rm ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json > /tmp/api_specs/spec.json
+      - run: docker run --name=yaml-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml > /tmp/api_specs/spec.yaml
+      - run: docker run --name=json-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json > /tmp/api_specs/spec.json
 
       # Confirm that the specs we built here are the same as those checked in.
       - run: echo "If this lint fails, run the following commands locally to fix it:"
@@ -61,9 +64,11 @@ jobs:
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/api_specs/spec.yaml api/doc/v1/spec.yaml
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/api_specs/spec.json api/doc/v1/spec.json
 
-      # Set up dotenv file for tests.
+      # Set up dotenv file for tests (jest doesn't read env vars properly).
       - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
       - run: echo 'APTOS_FAUCET_URL="http://127.0.0.1:8081"' >> ./ecosystem/typescript/sdk/.env
+      - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/typescript/.env
+      - run: cp ./ecosystem/typescript/sdk/.env ./ecosystem/typescript/sdk/examples/javascript/.env
 
       # Run package install. If install fails, it probably means the lockfile
       # was not included in the commit.
@@ -74,7 +79,12 @@ jobs:
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ./ecosystem/typescript/sdk/src/generated/ /tmp/generated_client/
 
       # Run a local testnet built from the same commit.
-      - run: docker run --rm -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos node run-local-testnet --with-faucet
+      - run: docker run -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos node run-local-testnet --with-faucet
+
+      # Wait for the API and faucet to startup.
+      - run: npm install -g wait-port
+      - run: wait-port -t 60000 http://127.0.0.1:8080/v1
+      - run: wait-port -t 60000 http://127.0.0.1:8081/health
 
       # Test and build.
       - run: cd ./ecosystem/typescript/sdk && yarn test
@@ -96,7 +106,15 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}
 
-      - name: Print docker-compose testnet logs if previous steps failed
+      - name: Print spec generation logs on failure (YAML)
+        if: ${{ failure() }}
+        run: docker logs yaml-spec
+
+      - name: Print spec generation logs on failure (JSON)
+        if: ${{ failure() }}
+        run: docker logs json-spec
+
+      - name: Print docker-compose testnet logs on failure
         if: ${{ failure() }}
         working-directory: docker/compose/validator-testnet
         run: docker logs local-testnet

@@ -82,10 +82,12 @@
       "generic_type_params": []
     },
     "data": {
-      "missed_votes": [
-        "0"
-      ],
-      "num_blocks": "0"
+      "validators": [
+        {
+          "failed_proposals": "0",
+          "successful_proposals": "0"
+        }
+      ]
     }
   },
   {
@@ -99,22 +101,6 @@
       "mint_cap": {
         "dummy_field": false
       }
-    }
-  },
-  {
-    "type": {
-      "address": "0x1",
-      "module": "stake",
-      "name": "ValidatorSetConfiguration",
-      "generic_type_params": []
-    },
-    "data": {
-      "allow_validator_set_change": false,
-      "maximum_stake": "18446744073709551615",
-      "minimum_stake": "0",
-      "recurring_lockup_duration_secs": "86400",
-      "rewards_rate": "273972",
-      "rewards_rate_denominator": "1000000000"
     }
   },
   {
@@ -850,6 +836,22 @@
           "val": "1"
         }
       ]
+    }
+  },
+  {
+    "type": {
+      "address": "0x1",
+      "module": "staking_config",
+      "name": "StakingConfig",
+      "generic_type_params": []
+    },
+    "data": {
+      "allow_validator_set_change": false,
+      "maximum_stake": "18446744073709551615",
+      "minimum_stake": "0",
+      "recurring_lockup_duration_secs": "86400",
+      "rewards_rate": "273972",
+      "rewards_rate_denominator": "1000000000"
     }
   },
   {
