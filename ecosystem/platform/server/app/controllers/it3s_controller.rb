@@ -3,15 +3,15 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-class It2sController < ApplicationController
-  layout 'it2'
+class It3sController < ApplicationController
+  layout 'it3'
 
   before_action :ensure_confirmed!
 
   def show
     redirect_to root_path unless user_signed_in?
-    redirect_to root_path unless Flipper.enabled?(:it2_registration_open)
-    @it2_registration_closed = Flipper.enabled?(:it2_registration_closed, current_user)
+    redirect_to root_path unless Flipper.enabled?(:it3_registration_open)
+    @it3_registration_closed = Flipper.enabled?(:it3_registration_closed, current_user)
     @steps = [
       connect_discord_step,
       survey_step,
@@ -24,7 +24,7 @@ class It2sController < ApplicationController
     end
     first_incomplete = @steps.index { |step| !step.completed }
     @steps[first_incomplete + 1..].each { |step| step.disabled = true } if first_incomplete
-    @steps.each { |step| step.disabled = true } if @it2_registration_closed
+    @steps.each { |step| step.disabled = true } if @it3_registration_closed
   end
 
   private
@@ -39,22 +39,22 @@ class It2sController < ApplicationController
   end
 
   def survey_step
-    completed = !current_user.it2_survey.nil?
+    completed = !current_user.it3_survey.nil?
     {
       name: :survey,
-      disabled: Flipper.enabled?(:it2_node_registration_disabled, current_user),
+      disabled: Flipper.enabled?(:it3_node_registration_disabled, current_user),
       completed:,
-      href: completed ? edit_it2_survey_path(current_user.it2_survey) : new_it2_survey_path
+      href: completed ? edit_it3_survey_path(current_user.it3_survey) : new_it3_survey_path
     }
   end
 
   def node_registration_step
-    completed = !!current_user.it2_profile&.validator_verified?
+    completed = !!current_user.it3_profile&.validator_verified?
     {
       name: :node_registration,
       completed:,
-      disabled: Flipper.enabled?(:it2_node_registration_disabled, current_user),
-      href: completed ? edit_it2_profile_path(current_user.it2_profile) : new_it2_profile_path
+      disabled: Flipper.enabled?(:it3_node_registration_disabled, current_user),
+      href: completed ? edit_it3_profile_path(current_user.it3_profile) : new_it3_profile_path
     }
   end
 

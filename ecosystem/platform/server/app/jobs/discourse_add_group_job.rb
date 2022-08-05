@@ -37,4 +37,4 @@ class DiscourseAddGroupJob < DiscourseJob
   end
 end
 
-# DiscourseAddGroupJob.perform_now({ user_id: 4, group_name: "ait2_eligible" })
+# DiscourseAddGroupJob.perform_now({ user_id: 4, group_name: "ait3_eligible" })

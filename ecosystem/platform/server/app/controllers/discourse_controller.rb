@@ -33,7 +33,7 @@ class DiscourseController < ApplicationController
     sso.admin = current_user.is_root?
 
     add_groups = []
-    add_groups.append('ait2_eligible') if current_user.ait2_registration_complete?
+    add_groups.append('ait3_eligible') if current_user.ait3_registration_complete?
     sso.add_groups = add_groups if add_groups.present?
 
     redirect_to sso.to_url(DiscourseHelper.discourse_url('/session/sso_login')), allow_other_host: true

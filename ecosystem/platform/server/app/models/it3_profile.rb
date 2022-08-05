@@ -6,12 +6,13 @@
 require 'set'
 require 'resolv'
 
-class It2Profile < ApplicationRecord
+class It3Profile < ApplicationRecord
   belongs_to :user
   validates :user_id, uniqueness: true
 
   has_one :location, as: :item
 
+  validates :owner_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }
   validates :consensus_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }
   validates :account_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }
   validates :network_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }
@@ -53,6 +54,20 @@ class It2Profile < ApplicationRecord
 
   def nhc_job_running?
     nhc_job_id.present?
+  end
+
+  def enqueue_nhc_job(do_location)
+    return unless id.present?
+
+    if nhc_job_running?
+      errors.add :base, 'Node Health Checker Job already enqueued'
+      return
+    end
+
+    job = NhcJob.perform_later({ it3_profile_id: id, do_location: })
+    self.nhc_job_id = job.job_id&.presence || 'default-job-id'
+    self.nhc_output = nil
+    update_columns(nhc_job_id:, nhc_output: nil)
   end
 
   def fullnode_network_key=(value)
