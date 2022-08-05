@@ -189,6 +189,7 @@ impl RoundManager {
         self.onchain_config.back_pressure_limit()
     }
 
+    // TODO: Evaluate if creating a block retriever is slow and cache this if needed.
     fn create_block_retriever(&self, author: Author) -> BlockRetriever {
         BlockRetriever::new(
             self.network.clone(),

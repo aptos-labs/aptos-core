@@ -11,9 +11,7 @@ use serde::{Deserialize, Serialize};
 /// This struct represents the aggregated BLS signature representation that contains an aggregated
 /// BLS signature and a bit mask representing the set of validators participating in the signing
 /// process
-#[derive(
-    Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash,
-)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct MultiSignature {
     validator_bitmask: Vec<bool>,
     multi_sig: Option<bls12381::Signature>,
@@ -31,7 +29,10 @@ impl MultiSignature {
     }
 
     pub fn empty() -> Self {
-        Self::default()
+        Self {
+            validator_bitmask: vec![],
+            multi_sig: None,
+        }
     }
 
     pub fn get_voters_bitmap(&self) -> &Vec<bool> {
@@ -58,8 +59,8 @@ impl MultiSignature {
 }
 
 /// Partially aggregated signature from a set of validators, this data
-/// is only used during the aggregating the votes from different validators and is not persisted in
-/// DB.
+/// is only used during the aggregating the votes from different validators and is only used to keep
+/// in-memory and doesn't go through the network.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PartialSignatures {
     signatures: HashMap<AccountAddress, bls12381::Signature>,
