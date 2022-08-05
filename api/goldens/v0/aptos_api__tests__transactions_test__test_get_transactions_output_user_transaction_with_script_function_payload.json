@@ -15,7 +15,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "1",
