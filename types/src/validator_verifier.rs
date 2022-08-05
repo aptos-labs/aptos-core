@@ -217,9 +217,9 @@ impl ValidatorVerifier {
             aggregated_sig
                 .multi_sig()
                 .as_ref()
-                .ok_or(VerifyError::FailedToAggregateSignature)?
+                .expect("Failed to get multi signature")
                 .verify(message, &aggregated_key)
-                .expect("Failed to verify the aggregated bls signature")
+                .map_err(|_| VerifyError::FailedToAggregateKey)?
         }
         Ok(aggregated_sig)
     }
