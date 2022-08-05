@@ -151,6 +151,14 @@ default-members = [
 debug = true
 overflow-checks = true
 
+[profile.performance]
+inherits = "release"
+opt-level = 3
+debug = true
+overflow-checks = false
+lto = true
+codegen-units = 1
+
 [profile.cli]
 inherits = "release"
 debug = false
