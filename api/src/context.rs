@@ -402,6 +402,16 @@ impl Context {
             .map(|h| (txn, h, txn_output).into())
     }
 
+    pub fn get_event_latest_sequence_number(
+        &self,
+        event_key: &EventKey,
+        ledger_version: u64,
+    ) -> Result<u64> {
+        self.db
+            .get_event_latest_sequence_number(event_key, ledger_version)
+            .map(|o| o.unwrap_or(0))
+    }
+
     pub fn get_events(
         &self,
         event_key: &EventKey,

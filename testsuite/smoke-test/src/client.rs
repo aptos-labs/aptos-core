@@ -106,3 +106,21 @@ async fn test_concurrent_transfers_single_node() {
     // assert_balance(&client, &account_0, 79).await;
     assert_balance(&client, &account_1, 31).await;
 }
+
+#[tokio::test]
+async fn test_latest_events() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let client = swarm.validators().next().unwrap().rest_client();
+    let start_events = client
+        .get_new_block_events(None, Some(1))
+        .await
+        .unwrap()
+        .into_inner();
+    let _ = create_and_fund_account(&mut swarm, 100).await;
+    let cur_events = client
+        .get_new_block_events(None, Some(1))
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(start_events.first().unwrap().round() < cur_events.first().unwrap().round());
+}
