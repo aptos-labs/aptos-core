@@ -64,6 +64,9 @@ export function getMnemonicState(localStorage: LocalStorageState): MnemonicState
 export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
   return new Promise((resolve) => {
     Browser.storage()?.get([WALLET_STATE_LOCAL_STORAGE_KEY], (result: any) => {
+      if (!result[WALLET_STATE_LOCAL_STORAGE_KEY]) {
+        resolve(undefined);
+      }
       const localStorage: LocalStorageState = JSON.parse(result[WALLET_STATE_LOCAL_STORAGE_KEY]);
       if (localStorage) {
         const aptosAccount = getAptosAccountState(localStorage);
