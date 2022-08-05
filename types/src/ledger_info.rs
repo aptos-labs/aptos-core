@@ -326,13 +326,13 @@ impl LedgerInfoWithPartialSignatures {
         self.partial_sigs.signatures()
     }
 
-    pub fn aggregate_signatures<T: CryptoHash + Serialize>(
+    pub fn aggregate_signatures(
         &self,
         verifier: &ValidatorVerifier,
-        message: &T,
+        ledger_info: &LedgerInfo,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
         let aggregated_sig =
-            verifier.generate_and_verify_multi_signature(&self.partial_sigs, message)?;
+            verifier.generate_and_verify_multi_signature(&self.partial_sigs, ledger_info)?;
         Ok(LedgerInfoWithSignatures::new(
             self.ledger_info.clone(),
             aggregated_sig,
@@ -357,7 +357,6 @@ use crate::validator_verifier::generate_validator_verifier;
 use crate::validator_verifier::random_validator_verifier;
 #[cfg(any(test, feature = "fuzzing"))]
 use ::proptest::prelude::*;
-use aptos_crypto::hash::CryptoHash;
 use itertools::Itertools;
 
 #[cfg(any(test, feature = "fuzzing"))]
