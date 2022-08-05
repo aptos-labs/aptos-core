@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::NetworkSender;
+use crate::network::QuorumStoreSender;
 use crate::quorum_store::{types::Batch, utils::DigestTimeouts};
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
@@ -69,23 +69,23 @@ impl BatchRequesterState {
     }
 }
 
-pub(crate) struct BatchRequester {
+pub(crate) struct BatchRequester<T: QuorumStoreSender> {
     epoch: u64,
     my_peer_id: PeerId,
     request_num_peers: usize,
     request_timeout_ms: usize,
     digest_to_state: HashMap<HashValue, BatchRequesterState>,
     timeouts: DigestTimeouts,
-    network_sender: NetworkSender,
+    network_sender: T,
 }
 
-impl BatchRequester {
+impl<T: QuorumStoreSender> BatchRequester<T> {
     pub(crate) fn new(
         epoch: u64,
         my_peer_id: PeerId,
         request_num_peers: usize,
         request_timeout_ms: usize,
-        network_sender: NetworkSender,
+        network_sender: T,
     ) -> Self {
         Self {
             epoch,
@@ -99,10 +99,6 @@ impl BatchRequester {
     }
 
     async fn send_requests(&self, digest: HashValue, request_peers: Vec<PeerId>) {
-        // debug_assert!( // TODO: in case we loose the db it is possibile.
-        //     !request_peers.contains(&self.my_peer_id),
-        //     "Should never request from self over network"
-        // );
         let batch = Batch::new(self.epoch, self.my_peer_id, digest, None);
         self.network_sender.send_batch(batch, request_peers).await;
     }

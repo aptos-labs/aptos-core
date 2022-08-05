@@ -45,7 +45,7 @@ pub enum QuorumStoreCommand {
     Shutdown(oneshot::Sender<()>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum QuorumStoreError {
     Timeout(BatchId),
 }

@@ -59,7 +59,6 @@ pub struct SignedDigest {
 impl SignedDigest {
     pub fn new(
         epoch: u64,
-        peer_id: PeerId,
         digest: HashValue,
         expiration: LogicalTime,
         validator_signer: Arc<ValidatorSigner>,
@@ -69,7 +68,7 @@ impl SignedDigest {
 
         Self {
             epoch,
-            peer_id,
+            peer_id: validator_signer.author(),
             info,
             signature,
         }

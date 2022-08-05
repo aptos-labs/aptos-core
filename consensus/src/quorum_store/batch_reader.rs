@@ -1,13 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::network::QuorumStoreSender;
+use crate::quorum_store::{batch_requester::BatchRequester, batch_store::BatchStoreCommand};
 use crate::quorum_store::{
     types::{Batch, PersistedValue},
     utils::RoundExpirations,
-};
-use crate::{
-    network::NetworkSender,
-    quorum_store::{batch_requester::BatchRequester, batch_store::BatchStoreCommand},
 };
 use anyhow::bail;
 use aptos_crypto::HashValue;
@@ -153,11 +151,19 @@ impl BatchReader {
         };
 
         let mut expired_keys = Vec::new();
-        debug!("QS: Batchreader {} {} {}", db_content.len(), epoch, last_committed_round);
+        debug!(
+            "QS: Batchreader {} {} {}",
+            db_content.len(),
+            epoch,
+            last_committed_round
+        );
         for (digest, value) in db_content {
             let expiration = value.expiration;
 
-            debug!("QS: Batchreader recovery content exp {:?}, digest {}", expiration, digest);
+            debug!(
+                "QS: Batchreader recovery content exp {:?}, digest {}",
+                expiration, digest
+            );
             assert!(epoch >= expiration.epoch());
 
             if epoch > expiration.epoch()
@@ -171,7 +177,10 @@ impl BatchReader {
             }
         }
 
-        debug!("QS: Batchreader recovery expired keys len {}", expired_keys.len());
+        debug!(
+            "QS: Batchreader recovery expired keys len {}",
+            expired_keys.len()
+        );
         (self_ob, expired_keys)
     }
 
@@ -291,9 +300,11 @@ impl BatchReader {
             "Non-increasing executed rounds reported to BatchStore"
         );
         let expired_keys = self.clear_expired_payload(certified_time);
-        if let Err(e) = self.batch_store_tx
+        if let Err(e) = self
+            .batch_store_tx
             .send(BatchStoreCommand::Clean(expired_keys))
-            .await {
+            .await
+        {
             debug!("QS: Failed to send to BatchStore: {:?}", e);
         }
     }
@@ -339,10 +350,10 @@ impl BatchReader {
         rx
     }
 
-    pub(crate) async fn start(
+    pub(crate) async fn start<T: QuorumStoreSender + Clone>(
         &self,
         mut batch_reader_rx: Receiver<BatchReaderCommand>,
-        network_sender: NetworkSender,
+        network_sender: T,
         request_num_peers: usize,
         request_timeout_ms: usize,
     ) {
