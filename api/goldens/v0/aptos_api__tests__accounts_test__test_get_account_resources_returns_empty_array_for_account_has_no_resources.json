@@ -55,10 +55,12 @@
   {
     "type": "0x1::stake::ValidatorPerformance",
     "data": {
-      "missed_votes": [
-        "0"
-      ],
-      "num_blocks": "0"
+      "validators": [
+        {
+          "failed_proposals": "0",
+          "successful_proposals": "0"
+        }
+      ]
     }
   },
   {

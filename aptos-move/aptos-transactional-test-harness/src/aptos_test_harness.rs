@@ -868,8 +868,9 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     HashValue::zero(),
                     0,
                     block_cmd.time,
-                    vec![],
                     proposer,
+                    Some(0),
+                    vec![],
                     vec![],
                     block_cmd.time,
                 );

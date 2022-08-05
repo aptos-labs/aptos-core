@@ -686,8 +686,9 @@ mod tests {
             gen_block_id(index),
             0,
             index as u64,
-            vec![],
             validator_account,
+            Some(0),
+            vec![],
             vec![],
             (index as u64 + 1) * 100000010,
         ))

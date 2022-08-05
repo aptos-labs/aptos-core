@@ -31,10 +31,12 @@ BlockMetadata:
         TYPENAME: HashValue
     - epoch: U64
     - round: U64
-    - previous_block_votes:
-        SEQ: BOOL
     - proposer:
         TYPENAME: AccountAddress
+    - proposer_index:
+        OPTION: U32
+    - previous_block_votes:
+        SEQ: BOOL
     - failed_proposer_indices:
         SEQ: U32
     - timestamp_usecs: U64

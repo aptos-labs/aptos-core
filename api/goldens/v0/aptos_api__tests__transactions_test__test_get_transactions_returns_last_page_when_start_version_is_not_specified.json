@@ -181,10 +181,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "13"
-            ],
-            "num_blocks": "13"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "13"
+              }
+            ]
           }
         }
       },
@@ -410,10 +412,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "14"
-            ],
-            "num_blocks": "14"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "14"
+              }
+            ]
           }
         }
       },
@@ -639,10 +643,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "15"
-            ],
-            "num_blocks": "15"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "15"
+              }
+            ]
           }
         }
       },
@@ -868,10 +874,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "16"
-            ],
-            "num_blocks": "16"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "16"
+              }
+            ]
           }
         }
       },
@@ -1097,10 +1105,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "17"
-            ],
-            "num_blocks": "17"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "17"
+              }
+            ]
           }
         }
       },
@@ -1326,10 +1336,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "18"
-            ],
-            "num_blocks": "18"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "18"
+              }
+            ]
           }
         }
       },
@@ -1555,10 +1567,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "19"
-            ],
-            "num_blocks": "19"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "19"
+              }
+            ]
           }
         }
       },
@@ -1784,10 +1798,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "20"
-            ],
-            "num_blocks": "20"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "20"
+              }
+            ]
           }
         }
       },

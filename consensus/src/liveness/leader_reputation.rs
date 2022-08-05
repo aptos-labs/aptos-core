@@ -10,15 +10,15 @@ use crate::{
 };
 use aptos_infallible::{Mutex, MutexGuard};
 use aptos_logger::prelude::*;
-use aptos_types::{account_config::NewBlockEvent, block_metadata::new_block_event_key};
+use aptos_types::account_config::{new_block_event_key, NewBlockEvent};
 use consensus_types::common::{Author, Round};
 use short_hex_str::AsShortHexStr;
 use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, sync::Arc};
 use storage_interface::{DbReader, Order};
 
-/// Interface to query committed BlockMetadata.
+/// Interface to query committed NewBlockEvent.
 pub trait MetadataBackend: Send + Sync {
-    /// Return a contiguous BlockMetadata window in which last one is at target_round or
+    /// Return a contiguous NewBlockEvent window in which last one is at target_round or
     /// latest committed, return all previous one if not enough.
     fn get_block_metadata(&self, target_round: Round) -> Vec<NewBlockEvent>;
 }

@@ -1,18 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    account_address::AccountAddress,
-    account_config::CORE_CODE_ADDRESS,
-    event::{EventHandle, EventKey},
-};
 use aptos_crypto::HashValue;
-use move_deps::move_core_types::{
-    ident_str,
-    identifier::IdentStr,
-    move_resource::{MoveResource, MoveStructType},
-};
-use once_cell::sync::Lazy;
+use move_deps::move_core_types::{account_address::AccountAddress, value::MoveValue};
 use serde::{Deserialize, Serialize};
 
 /// Struct that will be persisted on chain to store the information of the current block.
@@ -31,8 +21,9 @@ pub struct BlockMetadata {
     id: HashValue,
     epoch: u64,
     round: u64,
-    previous_block_votes: Vec<bool>,
     proposer: AccountAddress,
+    proposer_index: Option<u32>,
+    previous_block_votes: Vec<bool>,
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
 }
@@ -42,8 +33,9 @@ impl BlockMetadata {
         id: HashValue,
         epoch: u64,
         round: u64,
-        previous_block_votes: Vec<bool>,
         proposer: AccountAddress,
+        proposer_index: Option<u32>,
+        previous_block_votes: Vec<bool>,
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
     ) -> Self {
@@ -51,8 +43,9 @@ impl BlockMetadata {
             id,
             epoch,
             round,
-            previous_block_votes,
             proposer,
+            proposer_index,
+            previous_block_votes,
             failed_proposer_indices,
             timestamp_usecs,
         }
@@ -62,15 +55,31 @@ impl BlockMetadata {
         self.id
     }
 
-    pub fn into_inner(self) -> (u64, u64, u64, Vec<bool>, AccountAddress, Vec<u32>) {
-        (
-            self.epoch,
-            self.round,
-            self.timestamp_usecs,
-            self.previous_block_votes.clone(),
-            self.proposer,
-            self.failed_proposer_indices,
-        )
+    pub fn get_prologue_move_args(self, signer: AccountAddress) -> Vec<MoveValue> {
+        vec![
+            MoveValue::Signer(signer),
+            MoveValue::U64(self.epoch),
+            MoveValue::U64(self.round),
+            MoveValue::Address(self.proposer),
+            MoveValue::Vector(
+                self.proposer_index
+                    .map_or_else(Vec::new, |index| vec![MoveValue::U64(u64::from(index))]),
+            ),
+            MoveValue::Vector(
+                self.failed_proposer_indices
+                    .into_iter()
+                    .map(u64::from)
+                    .map(MoveValue::U64)
+                    .collect(),
+            ),
+            MoveValue::Vector(
+                self.previous_block_votes
+                    .into_iter()
+                    .map(MoveValue::Bool)
+                    .collect(),
+            ),
+            MoveValue::U64(self.timestamp_usecs),
+        ]
     }
 
     pub fn timestamp_usecs(&self) -> u64 {
@@ -79,6 +88,10 @@ impl BlockMetadata {
 
     pub fn proposer(&self) -> AccountAddress {
         self.proposer
+    }
+
+    pub fn proposer_index(&self) -> Option<u32> {
+        self.proposer_index
     }
 
     pub fn previous_block_votes(&self) -> &Vec<bool> {
@@ -97,39 +110,3 @@ impl BlockMetadata {
         self.round
     }
 }
-
-pub fn new_block_event_key() -> EventKey {
-    EventKey::new(2, CORE_CODE_ADDRESS)
-}
-
-/// The path to the new block event handle under a Block::BlockMetadata resource.
-pub static NEW_BLOCK_EVENT_PATH: Lazy<Vec<u8>> = Lazy::new(|| {
-    let mut path = BlockResource::resource_path();
-    // it can be anything as long as it's referenced in AccountState::get_event_handle_by_query_path
-    path.extend_from_slice(b"/new_block_event/");
-    path
-});
-
-#[derive(Deserialize, Serialize)]
-pub struct BlockResource {
-    height: u64,
-    epoch_interval: u64,
-    new_block_events: EventHandle,
-}
-
-impl BlockResource {
-    pub fn new_block_events(&self) -> &EventHandle {
-        &self.new_block_events
-    }
-
-    pub fn height(&self) -> u64 {
-        self.height
-    }
-}
-
-impl MoveStructType for BlockResource {
-    const MODULE_NAME: &'static IdentStr = ident_str!("block");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("BlockMetadata");
-}
-
-impl MoveResource for BlockResource {}

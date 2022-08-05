@@ -10,9 +10,11 @@ use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{aptos_root_address, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
+    account_config::{
+        aptos_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
+        CORE_CODE_ADDRESS,
+    },
     account_view::AccountView,
-    block_metadata::new_block_event_key,
     contract_event::ContractEvent,
     event::EventHandle,
     on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},

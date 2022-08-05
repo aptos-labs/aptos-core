@@ -82,10 +82,12 @@
       "generic_type_params": []
     },
     "data": {
-      "missed_votes": [
-        "0"
-      ],
-      "num_blocks": "0"
+      "validators": [
+        {
+          "failed_proposals": "0",
+          "successful_proposals": "0"
+        }
+      ]
     }
   },
   {
