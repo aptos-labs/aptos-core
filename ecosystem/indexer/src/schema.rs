@@ -1,6 +1,3 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
 table! {
     block_metadata_transactions (hash) {
         hash -> Varchar,
@@ -22,7 +19,7 @@ table! {
         creator -> Varchar,
         name -> Varchar,
         description -> Varchar,
-        max_amount -> Nullable<Int8>,
+        max_amount -> Varchar,
         uri -> Varchar,
         created_at -> Timestamp,
         inserted_at -> Timestamp,
@@ -106,7 +103,7 @@ table! {
         collection -> Varchar,
         name -> Varchar,
         description -> Varchar,
-        max_amount -> Int8,
+        max_amount -> Varchar,
         supply -> Int8,
         uri -> Varchar,
         royalty_payee_address -> Varchar,

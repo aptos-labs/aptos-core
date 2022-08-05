@@ -16,7 +16,7 @@ pub struct TokenData {
     pub collection: String,
     pub name: String,
     pub description: String,
-    pub max_amount: i64,
+    pub max_amount: String,
     pub supply: i64,
     pub uri: String,
     pub royalty_payee_address: String,
@@ -75,8 +75,7 @@ pub struct DepositEventType {
 pub struct CreateTokenDataEventType {
     pub id: TokenDataId,
     pub description: String,
-    #[serde(deserialize_with = "types::deserialize_from_string")]
-    pub maximum: i64,
+    pub maximum: String,
     pub uri: String,
     pub royalty_payee_address: String,
     #[serde(deserialize_with = "types::deserialize_from_string")]
@@ -119,8 +118,7 @@ pub struct CreateCollectionEventType {
     pub collection_name: String,
     pub uri: String,
     pub description: String,
-    #[serde(deserialize_with = "types::deserialize_from_string")]
-    pub maximum: i64,
+    pub maximum: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
