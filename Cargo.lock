@@ -2235,6 +2235,7 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-infallible",
+ "aptos-keygen",
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
