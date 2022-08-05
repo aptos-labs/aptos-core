@@ -10,7 +10,7 @@ use crate::{
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
-use aptos_crypto::{hash::HashValue, test_utils::TestAptosCrypto};
+use aptos_crypto::hash::HashValue;
 use aptos_types::ledger_info::LedgerInfoWithPartialSignatures;
 use aptos_types::multi_signature::PartialSignatures;
 use aptos_types::{
@@ -197,16 +197,14 @@ fn test_block_metadata_bitmaps() {
     );
 
     let mut ledger_info_1 =
-        LedgerInfoWithPartialSignatures::new(ledger_info, PartialSignatures::empty());
+        LedgerInfoWithPartialSignatures::new(ledger_info.clone(), PartialSignatures::empty());
     let votes_1 = vec![true, false, true, true];
     votes_1
         .iter()
         .zip(
-            validators.iter().zip(
-                signers
-                    .iter()
-                    .map(|signer| signer.sign(&TestAptosCrypto("msg".to_string()))),
-            ),
+            validators
+                .iter()
+                .zip(signers.iter().map(|signer| signer.sign(&ledger_info))),
         )
         .for_each(|(&voted, (&address, signature))| {
             if voted {
@@ -216,7 +214,7 @@ fn test_block_metadata_bitmaps() {
     let qc_1 = QuorumCert::new(
         VoteData::new(BlockInfo::empty(), BlockInfo::empty()),
         ledger_info_1
-            .aggregate_signatures(&validator_verifier, &TestAptosCrypto("msg".to_string()))
+            .aggregate_signatures(&validator_verifier, &ledger_info)
             .unwrap(),
     );
 
