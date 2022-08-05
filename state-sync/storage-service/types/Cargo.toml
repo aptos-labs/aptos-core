@@ -15,7 +15,7 @@ num-traits = { version = "0.2.15", default-features = false }
 serde = { version = "1.0.137", default-features = false }
 thiserror = "1.0.31"
 
-aptos-compression = { path = "../../../crates/aptos-compression"}
+aptos-compression = { path = "../../../crates/aptos-compression" }
 aptos-config = { path = "../../../config" }
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-types = { path = "../../../types" }

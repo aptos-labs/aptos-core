@@ -476,13 +476,14 @@ impl AptosDB {
         db_root_path: P,
         readonly: bool,
         target_snapshot_size: usize,
+        enable_indexer: bool,
     ) -> Self {
         Self::open(
             db_root_path,
             readonly,
             NO_OP_STORAGE_PRUNER_CONFIG, /* pruner */
             RocksdbConfigs::default(),
-            false,
+            enable_indexer,
             target_snapshot_size,
         )
         .expect("Unable to open AptosDB")
@@ -491,7 +492,13 @@ impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_for_test<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false, TARGET_SNAPSHOT_SIZE)
+        Self::new_without_pruner(db_root_path, false, TARGET_SNAPSHOT_SIZE, false)
+    }
+
+    /// This opens db in non-readonly mode, without the pruner, and with the indexer
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_for_test_with_indexer<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
+        Self::new_without_pruner(db_root_path, false, TARGET_SNAPSHOT_SIZE, true)
     }
 
     /// This opens db in non-readonly mode, without the pruner.
@@ -500,13 +507,13 @@ impl AptosDB {
         db_root_path: P,
         target_snapshot_size: usize,
     ) -> Self {
-        Self::new_without_pruner(db_root_path, false, target_snapshot_size)
+        Self::new_without_pruner(db_root_path, false, target_snapshot_size, false)
     }
 
     /// This opens db in non-readonly mode, without the pruner.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_readonly_for_test<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, true, TARGET_SNAPSHOT_SIZE)
+        Self::new_without_pruner(db_root_path, true, TARGET_SNAPSHOT_SIZE, false)
     }
 
     /// This gets the current buffered_state in StateStore.

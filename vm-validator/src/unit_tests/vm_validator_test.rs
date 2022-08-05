@@ -3,6 +3,7 @@
 
 use crate::vm_validator::{get_account_sequence_number, TransactionValidation, VMValidator};
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     account_address, account_config,
@@ -13,10 +14,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
-use move_deps::move_core_types::{
-    account_address::AccountAddress,
-    gas_schedule::{GasAlgebra, GasConstants},
-};
+use move_deps::move_core_types::account_address::AccountAddress;
 use rand::SeedableRng;
 use storage_interface::state_view::LatestDbStateCheckpointView;
 use storage_interface::DbReaderWriter;
@@ -175,9 +173,9 @@ fn test_validate_max_gas_units_below_min() {
     // Calculate a size for the transaction script that will ensure
     // that the minimum transaction gas is at least 1 after scaling to the
     // external gas units.
-    let gas_constants = &GasConstants::default();
-    let txn_bytes = gas_constants.large_transaction_cutoff.get()
-        + (gas_constants.gas_unit_scaling_factor / gas_constants.intrinsic_gas_per_byte.get());
+    let txn_gas_params = TransactionGasParameters::initial();
+    let txn_bytes = txn_gas_params.large_transaction_cutoff
+        + (txn_gas_params.gas_unit_scaling_factor / txn_gas_params.intrinsic_gas_per_byte);
     let transaction = transaction_test_helpers::get_test_signed_transaction(
         address,
         1,

@@ -11,6 +11,7 @@
 
 !**/Cargo.toml
 !**/Cargo.lock
+!**/*.mv
 !**/*.rs
 !config/src/config/test_data
 !aptos-move/framework/

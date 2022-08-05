@@ -215,16 +215,17 @@ impl FullnodeNodeConfig {
         name: String,
         config_dir: &Path,
         fullnode_config: NodeConfig,
-        validator_config: &mut NodeConfig,
+        validator_config: &NodeConfig,
         waypoint: &Waypoint,
         genesis: &Transaction,
+        public_network: &NetworkConfig,
     ) -> anyhow::Result<Self> {
         let mut fullnode_config = Self::new(name, config_dir, fullnode_config)?;
 
         fullnode_config.insert_waypoint(waypoint);
         fullnode_config.insert_genesis(genesis)?;
         fullnode_config.config.randomize_ports();
-        fullnode_config.attach_to_validator(validator_config)?;
+        fullnode_config.attach_to_validator(public_network, validator_config)?;
         fullnode_config.save_config()?;
 
         Ok(fullnode_config)
@@ -282,24 +283,15 @@ impl FullnodeNodeConfig {
     }
 
     /// Attaches a Full node to a validator full node
-    fn attach_to_validator(&mut self, validator_config: &mut NodeConfig) -> anyhow::Result<()> {
+    fn attach_to_validator(
+        &mut self,
+        public_network: &NetworkConfig,
+        validator_config: &NodeConfig,
+    ) -> anyhow::Result<()> {
         ensure!(
             matches!(validator_config.base.role, RoleType::Validator),
             "Validator config must be a Validator config"
         );
-
-        // Grab the public network config from the validator and insert it into the VFN's config
-        // The validator's public network identity is the same as the VFN's public network identity
-        // We remove it from the validator so the VFN can hold it
-        let public_network = {
-            let (i, _) = validator_config
-                .full_node_networks
-                .iter()
-                .enumerate()
-                .find(|(_i, config)| config.network_id == NetworkId::Public)
-                .expect("Validator should have a public network");
-            validator_config.full_node_networks.remove(i)
-        };
 
         let fullnode_public_network = self
             .config
@@ -307,8 +299,8 @@ impl FullnodeNodeConfig {
             .iter_mut()
             .find(|config| config.network_id == NetworkId::Public)
             .expect("VFN should have a public network");
-        fullnode_public_network.identity = public_network.identity;
-        fullnode_public_network.listen_address = public_network.listen_address;
+        fullnode_public_network.identity = public_network.identity.clone();
+        fullnode_public_network.listen_address = public_network.listen_address.clone();
 
         // Grab the validator's vfn network information and configure it as a seed for the VFN's
         // vfn network
@@ -367,7 +359,6 @@ const ONE_DAY: u64 = 86400;
 
 #[derive(Clone)]
 pub struct GenesisConfigurations {
-    pub min_price_per_gas_unit: u64,
     pub epoch_duration_secs: u64,
     pub min_stake: u64,
     pub max_stake: u64,
@@ -440,6 +431,11 @@ impl Builder {
     where
         R: rand::RngCore + rand::CryptoRng,
     {
+        println!(
+            "Building genesis with {:?} validators. Directory of output: {:?}",
+            self.num_validators.get(),
+            self.config_dir
+        );
         let mut keygen = KeyGen::from_seed(rng.gen());
 
         // Generate root key
@@ -547,7 +543,6 @@ impl Builder {
         }
 
         let mut genesis_config = GenesisConfigurations {
-            min_price_per_gas_unit: 1,
             allow_new_validators: false,
             min_stake: 0,
             max_stake: u64::MAX,
@@ -564,7 +559,6 @@ impl Builder {
             root_key,
             configs,
             self.move_modules.clone(),
-            genesis_config.min_price_per_gas_unit,
             genesis_config.allow_new_validators,
             genesis_config.min_stake,
             genesis_config.max_stake,

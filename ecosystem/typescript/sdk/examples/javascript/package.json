@@ -1,5 +1,5 @@
 {
-  "name": "ts-test",
+  "name": "js-test",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -10,6 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "aptos": "*"
+    "aptos": "file:../../",
+    "dotenv": "^16.0.1",
+    "lodash": "^4.17.21"
   }
 }

@@ -107,7 +107,7 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           items: [
-            "nodes/full-node/fullnode-source-code-and-docker",
+            "nodes/full-node/fullnode-source-code-or-docker",
             "nodes/full-node/update-fullnode-with-new-releases",
             "nodes/full-node/network-identity-fullnode",
             "nodes/full-node/troubleshooting-fullnode",
@@ -146,16 +146,11 @@ const sidebars = {
     },
     {
       type: "category",
-      label: "APIs",
+      label: "API",
       collapsible: true,
       collapsed: true,
-      items: [
-        {
-          type: "link",
-          label: "REST API",
-          href: "https://fullnode.devnet.aptoslabs.com/spec.html#/",
-        },
-      ],
+      link: { type: "doc", id: "api/index" },
+      items: ["api/index"],
     },
     "reference/telemetry",
     "reference/glossary",

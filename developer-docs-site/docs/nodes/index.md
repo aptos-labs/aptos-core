@@ -40,7 +40,7 @@ This section contains the guides for the Aptos nodes. Topics covered include how
     <h2 class="card-title">FullNode for the Aptos devnet </h2>
     <p class="card-text">Pick your preferred FullNode installation method from below:</p>
         <ul class="list-group list-group-flush">
-          <li class="list-group-item"><a href="https://aptos.dev/nodes/full-node/fullnode-source-code-and-docker" class="card-link" target="_self">Using Aptos source or Docker</a></li>
+          <li class="list-group-item"><a href="https://aptos.dev/nodes/full-node/fullnode-source-code-or-docker" class="card-link" target="_self">Using Aptos source or Docker</a></li>
           <li class="list-group-item"><a href="https://aptos.dev/nodes/full-node/run-a-fullnode-on-gcp" class="card-link" target="_self">Using GCP</a></li>
         </ul>
     <p class="card-text"><a href="https://aptos.dev/nodes/full-node/fullnode-for-devnet" class="card-link" target="_self">Go to FullNode home ></a></p>

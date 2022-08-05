@@ -23,6 +23,8 @@ use poem::{
 use poem_openapi::{ContactObject, LicenseObject, OpenApiService};
 use tokio::runtime::Handle;
 
+const VERSION: &str = include_str!("../../doc/v1/.version");
+
 // TODOs regarding spec generation:
 // TODO: https://github.com/aptos-labs/aptos-core/issues/2280
 // TODO: https://github.com/poem-web/poem/issues/321
@@ -62,14 +64,14 @@ pub fn get_api_service(
         TransactionsApi { context },
     );
 
-    let version = std::env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.1.0".to_string());
+    let version = VERSION.to_string();
     let license =
         LicenseObject::new("Apache 2.0").url("https://www.apache.org/licenses/LICENSE-2.0.html");
     let contact = ContactObject::new()
         .name("Aptos Labs")
         .url("https://github.com/aptos-labs/aptos-core");
 
-    OpenApiService::new(apis, "Aptos Node API", version)
+    OpenApiService::new(apis, "Aptos Node API", version.trim())
         .description("The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.")
         .license(license)
         .contact(contact)

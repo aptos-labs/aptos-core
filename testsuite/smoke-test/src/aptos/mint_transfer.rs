@@ -20,7 +20,8 @@ impl AptosTest for MintTransfer {
         let account2 = ctx.random_account();
         ctx.create_user_account(account2.public_key()).await?;
 
-        ctx.mint(account1.address(), 10000).await?;
+        // TODO(Gas): double check this
+        ctx.mint(account1.address(), 100_000_000).await?;
 
         let transfer_txn = account1.sign_with_transaction_builder(
             ctx.aptos_transaction_factory()

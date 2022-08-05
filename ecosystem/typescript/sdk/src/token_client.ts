@@ -29,7 +29,7 @@ export class TokenClient {
    */
   async submitTransactionHelper(account: AptosAccount, payload: Gen.TransactionPayload) {
     const txnRequest = await this.aptosClient.generateTransaction(account.address(), payload, {
-      max_gas_amount: "4000",
+      max_gas_amount: "500000",
     });
     const signedTxn = await this.aptosClient.signTransaction(account, txnRequest);
     const res = await this.aptosClient.submitTransaction(signedTxn);
@@ -287,7 +287,7 @@ export class TokenClient {
       value_type: "0x3::token::CollectionData",
       key: Buffer.from(collectionName).toString("hex"),
     };
-    // eslint-disable-next-line no-unused-vars
+
     const collectionTable = await this.aptosClient.getTableItem(handle, getCollectionTableItemRequest);
     return collectionTable;
   }

@@ -333,10 +333,11 @@ mod test {
     pub fn wipe_database(conn: &PgPoolConnection) {
         for table in [
             "metadatas",
-            "ownerships",
             "token_activities",
-            "tokens",
+            "token_datas",
+            "token_propertys",
             "collections",
+            "ownerships",
             "write_set_changes",
             "events",
             "user_transactions",
@@ -365,7 +366,7 @@ mod test {
         tailer.run_migrations();
 
         let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
-        let token_transaction_processor = TokenTransactionProcessor::new(conn_pool.clone());
+        let token_transaction_processor = TokenTransactionProcessor::new(conn_pool.clone(), false);
         tailer.add_processor(Arc::new(pg_transaction_processor));
         tailer.add_processor(Arc::new(token_transaction_processor));
         Ok((conn_pool, tailer))
@@ -398,7 +399,6 @@ mod test {
                         "type":"0x1::account::Account",
                         "data":{
                            "authentication_key":"0x1e4dcad3d5d94307f30d51ff66d2ce784e0c2822d3138766907179bcb61f9edc",
-                           "self_address":"0x1",
                            "sequence_number":"0"
                         }
                      }
@@ -479,7 +479,6 @@ mod test {
                               "type":"0x1::account::Account",
                               "data":{
                                  "authentication_key":"0x1e4dcad3d5d94307f30d51ff66d2ce784e0c2822d3138766907179bcb61f9edc",
-                                 "self_address":"0x1",
                                  "sequence_number":"0"
                               }
                            }

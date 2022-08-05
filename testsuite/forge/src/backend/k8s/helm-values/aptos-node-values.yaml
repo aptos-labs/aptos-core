@@ -1,6 +1,12 @@
 # This file is loaded in by Forge test runner at runtime and templated
 
+# the number of validators to deploy
 numValidators: {num_validators}
+
+# the total number of fullnode groups to deploy
+# this number must be less than numValidators
+numFullnodeGroups: {num_fullnodes}
+
 imageTag: {image_tag}
 chain:
   era: {era}
@@ -12,9 +18,11 @@ validator:
 haproxy:
   enabled: {enable_haproxy}
 
-# no VFNs in forge for now
 fullnode:
-  groups: []
+  # at most one VFN per validator, depending on numFullnodeGroups
+  groups:
+  - name: fullnode
+    replicas: 1
   rust_log: debug
 
 # make all services internal ClusterIP and open all ports
