@@ -43,6 +43,10 @@ class Web3 {
     return this.message(MessageMethod.GET_ACCOUNT_ADDRESS, {});
   }
 
+  network() {
+    return this.message(MessageMethod.GET_NETWORK, {});
+  }
+
   chainId() {
     return this.message(MessageMethod.GET_CHAIN_ID, {});
   }

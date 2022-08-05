@@ -3,10 +3,12 @@
 
 import { AptosAccount } from 'aptos';
 import Browser from './browser';
+import { getLocalStorageNodeNetworkUrl, nodeUrlReverseMap } from './network';
 import Permissions from './permissions';
 
 export const ProviderEvent = Object.freeze({
   ACCOUNT_CHANGED: 'accountChanged',
+  NETWORK_CHANGED: 'networkChanged',
 } as const);
 
 async function sendToTabs(
@@ -45,6 +47,15 @@ export async function sendProviderEvent(event: string, account: AptosAccount | u
         },
       );
       break;
+    case ProviderEvent.NETWORK_CHANGED: {
+      const network = nodeUrlReverseMap[getLocalStorageNodeNetworkUrl()];
+      await sendToTabs(
+        account?.address().hex(),
+        { event, params: network },
+        { event, params: network },
+      );
+      break;
+    }
     default:
       break;
   }

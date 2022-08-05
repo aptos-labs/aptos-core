@@ -9,6 +9,8 @@ export enum NetworkType {
   TESTNET = 'Testnet',
 }
 
+export const defaultNetworkType = NetworkType.DEVNET;
+
 export const nodeUrlMap = Object.freeze({
   [NetworkType.DEVNET]: 'https://fullnode.devnet.aptoslabs.com',
   [NetworkType.LOCALHOST]: 'http://0.0.0.0:8080',
@@ -40,7 +42,7 @@ export function getLocalStorageNodeNetworkUrl(): NodeUrl {
   // Get network from local storage by key
   return (window.localStorage.getItem(
     WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY,
-  ) as NodeUrl | null) || nodeUrlMap.Devnet;
+  ) as NodeUrl | null) || nodeUrlMap[defaultNetworkType];
 }
 
 export function getFaucetUrlFromNodeUrl(

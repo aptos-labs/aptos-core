@@ -5,7 +5,7 @@ import { AptosClient, BCS, HexString } from 'aptos';
 import fetchAdapter from '@vespaiach/axios-fetch-adapter';
 import { sign } from 'tweetnacl';
 import { MessageMethod, PermissionType } from '../core/types/dappTypes';
-import { getBackgroundAptosAccountState, getBackgroundNodeUrl } from '../core/utils/account';
+import { getBackgroundAptosAccountState, getBackgroundNodeUrl, getBackgroundNetworkName } from '../core/utils/account';
 import Permissions from '../core/utils/permissions';
 import { DappErrorType } from '../core/types/errors';
 
@@ -51,6 +51,15 @@ async function getChainId(client, sendResponse) {
   try {
     const chainId = await client.getChainId();
     sendResponse({ chainId });
+  } catch (error) {
+    sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
+  }
+}
+
+async function getNetwork(sendResponse) {
+  try {
+    const network = await getBackgroundNetworkName();
+    sendResponse(network);
   } catch (error) {
     sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
   }
@@ -182,6 +191,9 @@ async function handleDappRequest(request, sendResponse) {
       break;
     case MessageMethod.GET_CHAIN_ID:
       getChainId(client, sendResponse);
+      break;
+    case MessageMethod.GET_NETWORK:
+      getNetwork(sendResponse);
       break;
     case MessageMethod.GET_SEQUENCE_NUMBER:
       getSequenceNumber(client, account, sendResponse);

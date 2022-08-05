@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 function App() {
   const [address, setAddress] = useState<string | undefined>(undefined);
   const [isConnected, setIsConnected] = useState<boolean | undefined>(undefined);
+  const [network, setNetwork] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     window.aptos.on('accountChanged', (account: any) => {
@@ -16,6 +17,10 @@ function App() {
       }
     });
 
+    window.aptos.on('networkChanged', (newNetwork: string) => {
+      setNetwork(newNetwork);
+    });
+
     const fetchStatus = async () => {
       const flag = await window.aptos.isConnected();
       if (flag) {
@@ -23,9 +28,10 @@ function App() {
         setAddress(account.address);
       }
       setIsConnected(flag);
+      setNetwork(await window.aptos.network());
     };
     fetchStatus();
-  });
+  }, []);
 
   const onConnectClick = async () => {
     if (isConnected) {
@@ -44,6 +50,9 @@ function App() {
       <header className="App-header">
         <p>
           {isConnected ? `Address: ${address}` : 'Not Connected'}
+        </p>
+        <p>
+          {`Network: ${network}`}
         </p>
         <button className="Button" type="button" onClick={onConnectClick}>{isConnected ? 'Disconnect' : 'Connect'}</button>
       </header>

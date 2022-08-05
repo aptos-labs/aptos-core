@@ -10,7 +10,9 @@ import * as bip39 from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 
 import Browser from 'core/utils/browser';
-import { nodeUrlMap } from './network';
+import {
+  defaultNetworkType, NodeUrl, nodeUrlMap, nodeUrlReverseMap,
+} from './network';
 
 export async function generateMnemonicObject(mnemonicString: string): Promise<Mnemonic> {
   const seed = await bip39.mnemonicToSeed(mnemonicString);
@@ -89,4 +91,12 @@ export function getBackgroundNodeUrl(): Promise<string> {
       }
     });
   });
+}
+
+export async function getBackgroundNetworkName(): Promise<string> {
+  const network = (await getBackgroundNodeUrl()) as NodeUrl;
+  if (network) {
+    return nodeUrlReverseMap[network];
+  }
+  return defaultNetworkType;
 }

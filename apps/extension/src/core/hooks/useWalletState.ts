@@ -150,10 +150,11 @@ export default function useWalletState() {
       setNodeUrl(network);
       window.localStorage.setItem(WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY, network);
       Browser.storage()?.set({ [WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY]: network });
+      sendProviderEvent(ProviderEvent.NETWORK_CHANGED, aptosAccount);
     } catch (error) {
       console.error(error);
     }
-  }, []);
+  }, [aptosAccount]);
 
   const removeAccount = useCallback(({
     accountAddress,

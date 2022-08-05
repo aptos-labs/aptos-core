@@ -6,6 +6,7 @@ export const MessageMethod = Object.freeze({
   DISCONNECT: 'disconnect',
   GET_ACCOUNT_ADDRESS: 'getAccountAddress',
   GET_CHAIN_ID: 'getChainID',
+  GET_NETWORK: 'getNetwork',
   GET_SEQUENCE_NUMBER: 'getSequenceNumber',
   IS_CONNECTED: 'is_connected',
   SIGN_MESSAGE: 'signMessage',
