@@ -83,7 +83,7 @@ A transaction that is successfully submitted but ultimately discarded may have n
 
 The submitter can try to increase the gas cost by a trivial amount to help make progress and adjust for whatever may have been causing the discarding of the transaction further downstream. 
 
-On the Aptos devnet, the finalization time for a transaction is within seconds. 
+On the Aptos devnet, the time between submission and confirmation is within seconds.
 
 :::tip Read more
 See [here for a comprehensive description of the transaction lifecycle](https://aptos.dev/guides/basics-life-of-txn).
@@ -110,7 +110,11 @@ JSON-encoded transactions allow for rapid development and support seamless ABI c
 
 BCS encoded transactions can be submitted to the `/transactions` endpoint but must specify `Content-Type: application/x.aptos.signed_transaction+bcs` in the HTTP headers. This will return back a transaction submission result that, if successful, contains a transaction hash in the `[hash` [field](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L138).
 
-#### Status of a transaction
+### Types of Transactions
+
+Within a given transaction, the target of execution can be one of two types: an entry point (formerly known as script function) and or a script (payload). Currently the SDKs ([Python](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/python/sdk/aptos_sdk/client.py#L248) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98)) only support the generation of transactions that target entry points and the entirety of this guide points out many of those entry points, such as `coin::transfer` and `account::create_account`. All operations on the blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. A script payload transaction can call any entry point or public function defined within any module. Currently there are no tutorials on script payloads, but the [Move book](https://move-language.github.io/move/modules-and-scripts.html?highlight=script#scripts) does go in some depth.
+
+### Status of a transaction
 
 Transaction status can be obtained by querying the API `/transactions/{hash}` with the hash returned during the submission of the transaction. 
 
@@ -132,8 +136,108 @@ See the following documentation for generating valid transactions:
 
 To facilitate evaluation of transactions, Aptos supports a simulation API that does not require and should not contain valid signatures on transactions. 
 
-The simulation API works identical to the transaction submission API, except that it executes the transaction and returns back the results along with the gas used. The simulation API can be accessed by submitting a transaction to [`/transactions/simulate`](. 
+The simulation API works identical to the transaction submission API, except that it executes the transaction and returns back the results along with the gas used. The simulation API can be accessed by submitting a transaction to [`/transactions/simulate`](https://aptos.dev/rest-api/#tag/transactions/operation/simulate_transaction). 
 
 :::tip Read more
 Here's an example showing how to use the simulation API in the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L413). Note that the gas use may change based upon the state of the account. We recommend that the maximum gas amount be larger than the amount quoted by this API.
 :::
+
+## Viewing Current and Historical State
+
+Most integrations into Aptos benefit from a holistic and comprehensive overview of the current and historical state of the blockchain. Aptos provides historical transactions, state, and events which are the result of transaction execution.
+
+* Historical transactions specify the execution status, output, and tie to related events. Each transaction has a unique version number associated with it that dictates its global sequential ordering in the history of the blockchain ledger.
+* The state is the representation of all transaction outputs up to a specific version. In otherwords, a state version is the accumulation of all transactions inclusive of that transaction version.
+* As transactions execute, they may emit events. [Events](../concepts/basics-events) are hints about changes in on-chain data.
+
+The storage service on a node employs two forms of pruning that erase data from nodes: 1) state and 2) events, transactions, and everything else. While either of these may be disabled, storing state versions is not particularly sustainable. Events and transactions pruning can be disabled via setting the [`ledger_prune_window`](https://github.com/aptos-labs/aptos-core/blob/b718154c93b3556658c8c06341be0cf47957188c/config/src/config/storage_config.rs#L106) to `None`. In the near future, Aptos will provide indexers that mitigate the need to directly query from a node. The REST API contains the following useful APIs for querying transactions and events:
+
+* [Transactions for an account](https://aptos.dev/rest-api/#tag/transactions/operation/get_account_transactions)
+* [Transactions by version](https://aptos.dev/rest-api/#tag/transactions/operation/get_transaction)
+* [Events by event handle](https://aptos.dev/rest-api/#tag/events/operation/get_events_by_event_handle)
+
+## Exchanging and Tracking Coins
+
+Aptos has a standard [Coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that represent the type parameter or generic for `Coin<T>`. Coins are stored within an account under the resource `CoinStore<T>`. At account creation, each user has the resource `CoinStore<0x1::aptos_coin::AptosCoin>` or `CoinStore<AptosCoin>`, for short. Within this resource is the Aptos coin: `Coin<AptosCoin>`.
+
+Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`account::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/account.move#L398) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist. It is important to note, that if an account has not registered a `CoinStore<T>` for a given `T`, then any transfer of type `T` to that account will fail.
+
+The current balance for a `Coin<T>` where T is the Aptos coin is available at the account resources url: `https://{rest_api_server}/accounts/{address}/resource/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`. The balance is stored within `coin::amount`. The resource also contains the total number of deposit and withdraw events, the `counter` value within `deposit_event` and `withdraw_event`, respectively.
+
+```
+{
+  "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+  "data": {
+    "coin": {
+      "value": "3927"
+    },
+    "deposit_events": {
+      "counter": "1",
+      "guid": {
+        "id": {
+          "addr": "0xcb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
+          "creation_num": "1"
+        }
+      }
+    },
+    "withdraw_events": {
+      "counter": "1",
+      "guid": {
+        "id": {
+          "addr": "0xcb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
+          "creation_num": "2"
+        }
+      }
+    }
+  }
+}
+```
+
+Events can be queried by the events by handle url: `https://{rest_api_server}/accounts/{address}/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`
+
+```
+[
+  {
+    "key": "0x0200000000000000cb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
+    "sequence_number": "0",
+    "type": "0x1::coin::WithdrawEvent",
+    "data": {
+      "amount": "1000"
+    }
+  }
+]
+```
+
+For most coins, adding all the deposit amounts and substracting all the withdraw amounts would suffice for computing the total balance for a user. However, for Aptos coins, they are also used for gas in transactions, as shown below from the query: `https://{rest_server_api}/accounts/{address}/transactions`:
+
+```
+[
+  {
+    "type": "user_transaction",
+    "version": "282269",
+    "hash": "0x29b742e17be140eff7f04b85cff599e26000558e4a20b9a12bd5d31b3f99c65d",
+    ...
+    "gas_used": "73",
+    "success": true,
+    "vm_status": "Executed successfully",
+    "sequence_number": "0",
+    "payload": {
+      "type": "script_function_payload",
+      "function": "0x1::coin::transfer",
+      "type_arguments": [
+        "0x1::aptos_coin::AptosCoin"
+      ],
+      "arguments": [
+        "0x62c48bd04cbb57444b4a15996f30b03a795ca866d0fd3adfca72dda66356943f",
+        "1000"
+      ]
+    },
+    ...
+    "timestamp": "1659677872988457"
+  }
+]
+```
+
+Transactions contain all relevant information to present to the user including the events, time executed, and changes made. Currently, there is no easy method to go from event to transaction from the REST API. This will be added shortly.
+
+To learn more about coin creation see ["Your First Coin"](../tutorials/your-first-coin).
