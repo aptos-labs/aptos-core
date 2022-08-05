@@ -1,11 +1,11 @@
-<%= form_with(model: it2_survey, builder: AptosFormBuilder) do |form| %>
-  <% if it2_survey.errors.any? %>
+<%= form_with(model: it3_survey, builder: AptosFormBuilder) do |form| %>
+  <% if it3_survey.errors.any? %>
     <div class="flex p-4 mb-4 bg-red-100 rounded-lg lg:w-96" role="alert">
       <div class="ml-3 text-sm font-medium text-red-700">
-        <h2><%= pluralize(it2_survey.errors.count, 'error') %> prohibited this from being saved:</h2>
+        <h2><%= pluralize(it3_survey.errors.count, 'error') %> prohibited this from being saved:</h2>
 
         <ul>
-          <% it2_survey.errors.each do |error| %>
+          <% it3_survey.errors.each do |error| %>
             <li><%= error.full_message %></li>
           <% end %>
         </ul>
@@ -25,7 +25,7 @@
   </div>
 
   <div class="mb-6">
-    <%= form.label :participate_reason, 'Why do you want to participate in AIT2?' %>
+    <%= form.label :participate_reason, 'Why do you want to participate in AIT3?' %>
     <%= form.text_area :participate_reason, required: true %>
   </div>
 

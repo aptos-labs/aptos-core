@@ -25,45 +25,45 @@ module GenesisHelper
     # @param [Array<Integer>] user_ids
     # @return [GenesisHelper::Creator]
     def self.from_user_ids(user_ids)
-      new(It2Profile.where(user_id: user_ids))
+      new(It3Profile.where(user_id: user_ids))
     end
 
-    # @param [It2Profile] it2_profile
-    def self.convert_profile_to_obj(it2_profile)
+    # @param [It3Profile] it3_profile
+    def self.convert_profile_to_obj(it3_profile)
       data = {
-        account_address: it2_profile.account_address.delete_prefix('0x'),
-        consensus_key: it2_profile.consensus_key,
-        account_key: it2_profile.account_key,
-        validator_network_key: it2_profile.network_key,
+        account_address: it3_profile.account_address.delete_prefix('0x'),
+        consensus_key: it3_profile.consensus_key,
+        account_key: it3_profile.account_key,
+        validator_network_key: it3_profile.network_key,
         validator_host: {
-          host: it2_profile.validator_address,
-          port: it2_profile.validator_port
+          host: it3_profile.validator_address,
+          port: it3_profile.validator_port
         },
         stake_amount: 1
       }
-      if it2_profile.fullnode_network_key.present?
-        data[:full_node_network_key] = it2_profile.fullnode_network_key
+      if it3_profile.fullnode_network_key.present?
+        data[:full_node_network_key] = it3_profile.fullnode_network_key
         data[:full_node_host] = {
-          host: it2_profile.fullnode_address,
-          port: it2_profile.fullnode_port
+          host: it3_profile.fullnode_address,
+          port: it3_profile.fullnode_port
         }
       else
         # Fallback
-        data[:full_node_network_key] = it2_profile.network_key
+        data[:full_node_network_key] = it3_profile.network_key
       end
       data
     end
 
-    def self.convert_profile_to_yaml(it2_profile)
-      convert_profile_to_obj(it2_profile).deep_stringify_keys.to_yaml
+    def self.convert_profile_to_yaml(it3_profile)
+      convert_profile_to_obj(it3_profile).deep_stringify_keys.to_yaml
     end
 
-    # @param [Array<It2Profile>] it2_profiles
-    def initialize(it2_profiles)
-      @it2_profiles = it2_profiles
+    # @param [Array<It3Profile>] it3_profiles
+    def initialize(it3_profiles)
+      @it3_profiles = it3_profiles
       @yamls = {}
-      @it2_profiles.each do |it2_profile|
-        @yamls[it2_profile.account_address] = self.class.convert_profile_to_yaml it2_profile
+      @it3_profiles.each do |it3_profile|
+        @yamls[it3_profile.account_address] = self.class.convert_profile_to_yaml it3_profile
       end
     end
 
