@@ -152,7 +152,7 @@ default-members = [
 [profile.release]
 opt-level = 3
 debug = true
-overflow-checks = true
+overflow-checks = false
 lto = true
 codegen-units = 16
 
