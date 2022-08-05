@@ -154,7 +154,7 @@ opt-level = 3
 debug = true
 overflow-checks = false
 lto = true
-codegen-units = 16
+codegen-units = 1
 
 [profile.cli]
 inherits = "release"
