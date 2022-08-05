@@ -24,7 +24,6 @@ pub trait MetadataBackend: Send + Sync {
 }
 
 pub struct AptosDBBackend {
-    epoch: u64,
     window_size: usize,
     seek_len: usize,
     aptos_db: Arc<dyn DbReader>,
@@ -32,14 +31,8 @@ pub struct AptosDBBackend {
 }
 
 impl AptosDBBackend {
-    pub fn new(
-        epoch: u64,
-        window_size: usize,
-        seek_len: usize,
-        aptos_db: Arc<dyn DbReader>,
-    ) -> Self {
+    pub fn new(window_size: usize, seek_len: usize, aptos_db: Arc<dyn DbReader>) -> Self {
         Self {
-            epoch,
             window_size,
             seek_len,
             aptos_db,
@@ -72,12 +65,10 @@ impl AptosDBBackend {
 
         let max_returned_version = events.first().map_or(0, |first| first.transaction_version);
 
-        let new_block_events: Vec<NewBlockEvent> = itertools::process_results(
-            events
-                .into_iter()
-                .map(|event| bcs::from_bytes::<NewBlockEvent>(event.event.event_data())),
-            |iter| iter.filter(|e| e.epoch() == self.epoch).collect(),
-        )?;
+        let new_block_events = events
+            .into_iter()
+            .map(|event| bcs::from_bytes::<NewBlockEvent>(event.event.event_data()))
+            .collect::<anyhow::Result<Vec<NewBlockEvent>, bcs::Error>>()?;
 
         let hit_end = new_block_events.len() < limit;
 
@@ -143,8 +134,12 @@ impl MetadataBackend for AptosDBBackend {
 /// Interface to calculate weights for proposers based on history.
 pub trait ReputationHeuristic: Send + Sync {
     /// Return the weights of all candidates based on the history.
-    fn get_weights(&self, epoch: u64, candidates: &[Author], history: &[NewBlockEvent])
-        -> Vec<u64>;
+    fn get_weights(
+        &self,
+        epoch: u64,
+        epoch_to_candidates: &HashMap<u64, Vec<Author>>,
+        history: &[NewBlockEvent],
+    ) -> Vec<u64>;
 }
 
 pub struct NewBlockEventAggregation {
@@ -202,11 +197,11 @@ impl NewBlockEventAggregation {
             .collect()
     }
 
-    fn history_iter(
-        history: &[NewBlockEvent],
-        epoch: u64,
+    fn history_iter<'a>(
+        history: &'a [NewBlockEvent],
+        epoch_to_candidates: &'a HashMap<u64, Vec<Author>>,
         window_size: usize,
-    ) -> impl Iterator<Item = &NewBlockEvent> {
+    ) -> impl Iterator<Item = &'a NewBlockEvent> {
         let start = if history.len() > window_size {
             history.len() - window_size
         } else {
@@ -215,24 +210,24 @@ impl NewBlockEventAggregation {
 
         (&history[start..])
             .iter()
-            .filter(move |&meta| meta.epoch() == epoch)
+            .filter(move |&meta| epoch_to_candidates.contains_key(&meta.epoch()))
     }
 
     pub fn get_aggregated_metrics(
         &self,
         epoch: u64,
-        candidates: &[Author],
+        epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> (
         HashMap<Author, u32>,
         HashMap<Author, u32>,
         HashMap<Author, u32>,
     ) {
-        let votes = self.count_votes(epoch, candidates, history);
-        let proposals = self.count_proposals(epoch, history);
-        let failed_proposals = self.count_failed_proposals(epoch, candidates, history);
+        let votes = self.count_votes(epoch_to_candidates, history);
+        let proposals = self.count_proposals(epoch_to_candidates, history);
+        let failed_proposals = self.count_failed_proposals(epoch_to_candidates, history);
 
-        for candidate in candidates {
+        for candidate in &epoch_to_candidates[&epoch] {
             COMMITTED_PROPOSALS_IN_WINDOW
                 .with_label_values(&[candidate.short_str().as_str()])
                 .set(*proposals.get(candidate).unwrap_or(&0) as i64);
@@ -252,14 +247,16 @@ impl NewBlockEventAggregation {
 
     pub fn count_votes(
         &self,
-        epoch: u64,
-        candidates: &[Author],
+        epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> HashMap<Author, u32> {
-        Self::history_iter(history, epoch, self.voter_window_size).fold(
+        Self::history_iter(history, epoch_to_candidates, self.voter_window_size).fold(
             HashMap::new(),
             |mut map, meta| {
-                match Self::bitmap_to_voters(candidates, meta.previous_block_votes()) {
+                match Self::bitmap_to_voters(
+                    &epoch_to_candidates[&meta.epoch()],
+                    meta.previous_block_votes(),
+                ) {
                     Ok(voters) => {
                         for &voter in voters {
                             let count = map.entry(voter).or_insert(0);
@@ -280,8 +277,12 @@ impl NewBlockEventAggregation {
         )
     }
 
-    pub fn count_proposals(&self, epoch: u64, history: &[NewBlockEvent]) -> HashMap<Author, u32> {
-        Self::history_iter(history, epoch, self.proposer_window_size).fold(
+    pub fn count_proposals(
+        &self,
+        epoch_to_candidates: &HashMap<u64, Vec<Author>>,
+        history: &[NewBlockEvent],
+    ) -> HashMap<Author, u32> {
+        Self::history_iter(history, epoch_to_candidates, self.proposer_window_size).fold(
             HashMap::new(),
             |mut map, meta| {
                 let count = map.entry(meta.proposer()).or_insert(0);
@@ -293,14 +294,13 @@ impl NewBlockEventAggregation {
 
     pub fn count_failed_proposals(
         &self,
-        epoch: u64,
-        candidates: &[Author],
+        epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> HashMap<Author, u32> {
-        Self::history_iter(history, epoch, self.proposer_window_size).fold(
+        Self::history_iter(history, epoch_to_candidates, self.proposer_window_size).fold(
             HashMap::new(),
             |mut map, meta| {
-                match Self::indices_to_validators(candidates, meta.failed_proposer_indices()) {
+                match Self::indices_to_validators(&epoch_to_candidates[&meta.epoch()], meta.failed_proposer_indices()) {
                     Ok(failed_proposers) => {
                         for &failed_proposer in failed_proposers {
                             let count = map.entry(failed_proposer).or_insert(0);
@@ -319,55 +319,6 @@ impl NewBlockEventAggregation {
                 map
             },
         )
-    }
-}
-
-/// If candidate appear in the history, it's assigned active_weight otherwise inactive weight.
-pub struct ActiveInactiveHeuristic {
-    #[allow(unused)]
-    author: Author,
-    active_weight: u64,
-    inactive_weight: u64,
-    aggregation: NewBlockEventAggregation,
-}
-
-impl ActiveInactiveHeuristic {
-    pub fn new(
-        author: Author,
-        active_weight: u64,
-        inactive_weight: u64,
-        window_size: usize,
-    ) -> Self {
-        Self {
-            author,
-            active_weight,
-            inactive_weight,
-            aggregation: NewBlockEventAggregation::new(window_size, window_size),
-        }
-    }
-}
-
-impl ReputationHeuristic for ActiveInactiveHeuristic {
-    fn get_weights(
-        &self,
-        epoch: u64,
-        candidates: &[Author],
-        history: &[NewBlockEvent],
-    ) -> Vec<u64> {
-        let (votes, proposals, _) = self
-            .aggregation
-            .get_aggregated_metrics(epoch, candidates, history);
-
-        candidates
-            .iter()
-            .map(|author| {
-                if votes.contains_key(author) || proposals.contains_key(author) {
-                    self.active_weight
-                } else {
-                    self.inactive_weight
-                }
-            })
-            .collect()
     }
 }
 
@@ -428,14 +379,14 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
     fn get_weights(
         &self,
         epoch: u64,
-        candidates: &[Author],
+        epoch_to_candidates: &HashMap<u64, Vec<Author>>,
         history: &[NewBlockEvent],
     ) -> Vec<u64> {
-        let (votes, proposals, failed_proposals) = self
-            .aggregation
-            .get_aggregated_metrics(epoch, candidates, history);
+        let (votes, proposals, failed_proposals) =
+            self.aggregation
+                .get_aggregated_metrics(epoch, epoch_to_candidates, history);
 
-        candidates
+        epoch_to_candidates[&epoch]
             .iter()
             .map(|author| {
                 let cur_votes = *votes.get(author).unwrap_or(&0);
@@ -460,7 +411,7 @@ impl ReputationHeuristic for ProposerAndVoterHeuristic {
 /// successful leaders to help improve performance.
 pub struct LeaderReputation {
     epoch: u64,
-    proposers: Vec<Author>,
+    epoch_to_proposers: HashMap<u64, Vec<Author>>,
     voting_powers: Vec<u64>,
     backend: Box<dyn MetadataBackend>,
     heuristic: Box<dyn ReputationHeuristic>,
@@ -470,23 +421,27 @@ pub struct LeaderReputation {
 impl LeaderReputation {
     pub fn new(
         epoch: u64,
-        proposers: Vec<Author>,
+        epoch_to_proposers: HashMap<u64, Vec<Author>>,
         voting_powers: Vec<u64>,
         backend: Box<dyn MetadataBackend>,
         heuristic: Box<dyn ReputationHeuristic>,
         exclude_round: u64,
     ) -> Self {
-        // assert!(proposers.is_sorted()) implementation from new api
-        assert!(proposers.windows(2).all(|w| {
-            PartialOrd::partial_cmp(&&w[0], &&w[1])
-                .map(|o| o != Ordering::Greater)
-                .unwrap_or(false)
-        }));
-        assert_eq!(proposers.len(), voting_powers.len());
+        for proposers in epoch_to_proposers.values() {
+            // assert!(proposers.is_sorted()) implementation from new api
+            assert!(proposers.windows(2).all(|w| {
+                PartialOrd::partial_cmp(&&w[0], &&w[1])
+                    .map(|o| o != Ordering::Greater)
+                    .unwrap_or(false)
+            }));
+        }
+
+        assert!(epoch_to_proposers.contains_key(&epoch));
+        assert_eq!(epoch_to_proposers[&epoch].len(), voting_powers.len());
 
         Self {
             epoch,
-            proposers,
+            epoch_to_proposers,
             voting_powers,
             backend,
             heuristic,
@@ -499,10 +454,11 @@ impl ProposerElection for LeaderReputation {
     fn get_valid_proposer(&self, round: Round) -> Author {
         let target_round = round.saturating_sub(self.exclude_round);
         let sliding_window = self.backend.get_block_metadata(target_round);
-        let mut weights = self
-            .heuristic
-            .get_weights(self.epoch, &self.proposers, &sliding_window);
-        assert_eq!(weights.len(), self.proposers.len());
+        let mut weights =
+            self.heuristic
+                .get_weights(self.epoch, &self.epoch_to_proposers, &sliding_window);
+        let proposers = &self.epoch_to_proposers[&self.epoch];
+        assert_eq!(weights.len(), proposers.len());
         // Multiply weights by voting power:
         weights
             .iter_mut()
@@ -514,6 +470,6 @@ impl ProposerElection for LeaderReputation {
             .to_vec();
 
         let chosen_index = choose_index(weights, state);
-        self.proposers[chosen_index]
+        proposers[chosen_index]
     }
 }

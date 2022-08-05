@@ -15,8 +15,7 @@ use crate::{
     liveness::{
         cached_proposer_election::CachedProposerElection,
         leader_reputation::{
-            ActiveInactiveHeuristic, AptosDBBackend, LeaderReputation, ProposerAndVoterHeuristic,
-            ReputationHeuristic,
+            AptosDBBackend, LeaderReputation, ProposerAndVoterHeuristic, ReputationHeuristic,
         },
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
@@ -67,6 +66,7 @@ use futures::{
 };
 use network::protocols::network::{ApplicationNetworkSender, Event};
 use safety_rules::SafetyRulesManager;
+use std::collections::HashMap;
 use std::{
     cmp::Ordering,
     mem::{discriminant, Discriminant},
@@ -205,24 +205,12 @@ impl EpochManager {
                 Box::new(RotatingProposer::new(vec![proposer], *contiguous_rounds))
             }
             ProposerElectionType::LeaderReputation(leader_reputation_type) => {
-                let (heuristic, window_size, weight_by_voting_power) = match &leader_reputation_type
-                {
-                    LeaderReputationType::ActiveInactive(active_inactive_config) => {
-                        let window_size = proposers.len()
-                            * active_inactive_config.window_num_validators_multiplier;
-                        let heuristic: Box<dyn ReputationHeuristic> =
-                            Box::new(ActiveInactiveHeuristic::new(
-                                self.author,
-                                active_inactive_config.active_weight,
-                                active_inactive_config.inactive_weight,
-                                window_size,
-                            ));
-                        (
-                            heuristic,
-                            window_size,
-                            active_inactive_config.weight_by_voting_power,
-                        )
-                    }
+                let (
+                    heuristic,
+                    window_size,
+                    weight_by_voting_power,
+                    use_history_from_previous_epoch,
+                ) = match &leader_reputation_type {
                     LeaderReputationType::ProposerAndVoter(proposer_and_voter_config) => {
                         let proposer_window_size = proposers.len()
                             * proposer_and_voter_config.proposer_window_num_validators_multiplier;
@@ -242,12 +230,12 @@ impl EpochManager {
                             heuristic,
                             std::cmp::max(proposer_window_size, voter_window_size),
                             proposer_and_voter_config.weight_by_voting_power,
+                            proposer_and_voter_config.use_history_from_previous_epoch,
                         )
                     }
                 };
 
                 let backend = Box::new(AptosDBBackend::new(
-                    epoch_state.epoch,
                     window_size,
                     onchain_config.leader_reputation_exclude_round() as usize
                         + onchain_config.max_failed_authors_to_store()
@@ -263,9 +251,48 @@ impl EpochManager {
                     vec![1; proposers.len()]
                 };
 
+                // First two epochs are immediatelly skipped after a few transactions, so we don't want to look at their history.
+                let epoch_to_proposers = if use_history_from_previous_epoch && epoch_state.epoch > 2
+                {
+                    self.storage
+                        .aptos_db()
+                        .get_epoch_ending_ledger_infos(epoch_state.epoch - 2, epoch_state.epoch)
+                        .and_then(|proof| {
+                            ensure!(proof.ledger_info_with_sigs.len() == 2);
+                            let prev_epoch_state = proof.ledger_info_with_sigs[0]
+                                .ledger_info()
+                                .next_epoch_state()
+                                .ok_or_else(|| anyhow::anyhow!("no prev_epoch_state"))?;
+                            let cur_epoch_state = proof.ledger_info_with_sigs[1]
+                                .ledger_info()
+                                .next_epoch_state()
+                                .ok_or_else(|| anyhow::anyhow!("no cur_epoch_state"))?;
+                            ensure!(cur_epoch_state.epoch == epoch_state.epoch, "fetched epoch_ending ledger_infos are for a wrong epoch {} vs {}", cur_epoch_state.epoch, epoch_state.epoch);
+                            let prev_epoch_proposers = prev_epoch_state
+                                .verifier
+                                .get_ordered_account_addresses_iter()
+                                .collect::<Vec<_>>();
+                            let cur_epoch_proposers = cur_epoch_state
+                                .verifier
+                                .get_ordered_account_addresses_iter()
+                                .collect::<Vec<_>>();
+                            ensure!(proposers == cur_epoch_proposers, "proposers from state and fetched epoch_ending ledger_infos are missaligned");
+                            Ok(HashMap::from([
+                                (prev_epoch_state.epoch, prev_epoch_proposers),
+                                (cur_epoch_state.epoch, cur_epoch_proposers),
+                            ]))
+                        })
+                        .unwrap_or_else(|err| {
+                            error!("Couldn't create leader reputation with history across epochs, {:?}", err);
+                            HashMap::from([(epoch_state.epoch, proposers)])
+                        })
+                } else {
+                    HashMap::from([(epoch_state.epoch, proposers)])
+                };
+
                 let proposer_election = Box::new(LeaderReputation::new(
                     epoch_state.epoch,
-                    proposers,
+                    epoch_to_proposers,
                     voting_powers,
                     backend,
                     heuristic,
