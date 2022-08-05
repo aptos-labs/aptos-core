@@ -275,9 +275,9 @@ class RestClient:
         """Creates a new collection within the specified account"""
 
         transaction_arguments = [
-            TransactionArgument(name, Serializer.str),
-            TransactionArgument(description, Serializer.str),
-            TransactionArgument(uri, Serializer.str),
+            name,
+            description,
+            uri,
             TransactionArgument(U64_MAX, Serializer.u64),
             TransactionArgument(
                 [False, False, False], Serializer.sequence_serializer(Serializer.bool)

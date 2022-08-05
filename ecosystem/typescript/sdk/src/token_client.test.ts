@@ -52,8 +52,8 @@ test(
     const tokenId = {
       token_data_id: {
         creator: alice.address().hex(),
-        collection: Buffer.from(collectionName).toString("hex"),
-        name: Buffer.from(tokenName).toString("hex"),
+        collection: collectionName,
+        name: tokenName,
       },
       property_version: "0",
     };

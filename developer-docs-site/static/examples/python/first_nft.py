@@ -26,9 +26,9 @@ class TokenClient(RestClient):
             "function": f"0x3::token::create_collection_script",
             "type_arguments": [],
             "arguments": [
-                name.encode("utf-8").hex(),
-                description.encode("utf-8").hex(),
-                uri.encode("utf-8").hex(),
+                name.encode("utf-8"),
+                description.encode("utf-8"),
+                uri.encode("utf-8"),
                 str(U64_MAX),
                 mutate_setting
             ]

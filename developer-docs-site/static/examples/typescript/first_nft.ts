@@ -24,9 +24,9 @@ async function createCollection(account: AptosAccount, name: string, description
       "create_collection_script",
       [],
       [
-        BCS.bcsSerializeStr(name),
-        BCS.bcsSerializeStr(description),
-        BCS.bcsSerializeStr(uri),
+        name,
+        description,
+        uri,
         BCS.bcsSerializeUint64(NUMBER_MAX),
         serializeVectorBool([false, false, false]),
       ],

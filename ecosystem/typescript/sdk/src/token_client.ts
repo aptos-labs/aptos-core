@@ -57,9 +57,9 @@ export class TokenClient {
       },
       type_arguments: [],
       arguments: [
-        Buffer.from(name).toString("hex"),
-        Buffer.from(description).toString("hex"),
-        Buffer.from(uri).toString("hex"),
+        name,
+        description,
+        uri,
         NUMBER_MAX.toString(),
         [false, false, false],
       ],
