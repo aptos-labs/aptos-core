@@ -18,14 +18,49 @@ The Aptos Incentivized Testnet-3 (AIT-3) is a rewards program for any Aptos comm
 
 ## Key AIT-3 dates
 
-:::tip **Key AIT-3 dates:** 
-*All dates and times shown are for Pacific Time, year 2022.*
+:::tip **Key AIT-3 dates:**
+_All dates and times shown are for Pacific Time, year 2022._
+
 - **August 19:** Registration starts. Node and identity verification begins.
 - ~~**July 7:** Registration ends. Only 48 hours left to complete identity verification.~~
 - ~~**July 11:** Selection process concludes. Email notifications are sent. If your node is selected, you will have 24 hours to join the AIT-3 Validator set.~~
 - **August 19:** AIT-3 goes live at noon. Validator score tracking begins.
 - **September 9:** AIT-3 concludes.
+
 :::
+
+<div class="docs-card-container">
+<div class="row row-cols-1 row-cols-md-3 g-4">
+  <div class="col">
+    <div class="card h-100">
+    <h3 class="card-header">1. See</h3>
+      <div class="card-body d-flex flex-column">
+        <a href="#whats-new-in-ait-3" class="card-title card-link"> <h2>What's New in AIT-3</h2></a>
+        <p class="card-text">See the new features that are up for testing by the AIT-3 participants. </p>
+      </div>
+    </div>
+  </div>
+  <div class="col" >
+    <div class="card h-100">
+     <h3 class="card-header">2. Read</h3>
+      <div class="card-body d-flex flex-column">
+      <a href="#ait-3-program" class="card-title card-link stretched-link"> <h2>Steps in AIT-3</h2></a>
+        <p class="card-text">Read the summary flowchart and the detailed steps of the AIT-3.</p>     
+      </div>
+    </div>
+  </div>
+  <div class="col" >
+    <div class="card h-100">
+     <h3 class="card-header">3. Participate</h3>
+      <div class="card-body d-flex flex-column">
+      <a href="#install-the-nodes-for-ait-3" class="card-title card-link stretched-link"> <h2>Install the nodes</h2></a>
+        <p class="card-text">Ready to dive in? Follow these guides to install your validator node.</p>     
+      </div>
+    </div>
+  </div>
+  
+</div>
+</div>
 
 ## What's new in AIT-3
 
@@ -47,12 +82,13 @@ Community to vote on proposals. The following proposals are being considered:
 
 #### Proposal to change the staking parameters
 
-The following staking parameters are being considered: 
-  - Minimum and maximum stake.
-  - Minimum and maximum lockup.
-  - Rewards rate.
-  - Limits on adding and withdrawing the stake.
-  - Epoch duration.
+The following staking parameters are being considered:
+
+- Minimum and maximum stake.
+- Minimum and maximum lockup.
+- Rewards rate.
+- Limits on adding and withdrawing the stake.
+- Epoch duration.
 
 #### Gas schedule
 
@@ -74,80 +110,48 @@ Proposals on AptosFramework modules, such as:
 
 ### Nodes
 
-- Nodes dynamically joining and leaving when the network is under load. Require the node to leave the network for at least X duration of time (in minutes). 
+- Nodes dynamically joining and leaving when the network is under load. Require the node to leave the network for at least X duration of time (in minutes).
 - Send all types of transactions to the Aptos blockchain to test for a consistent load on the network and monitor the cost.
 
 ### Disaster recovery
 
 - Conduct disaster recovery exercise in the simulation for:
-    - DDOS mitigation.
-    - Data corruption and data loss. 
-    - Operators to restore the node from the backup data.
+  - DDOS mitigation.
+  - Data corruption and data loss.
+  - Operators to restore the node from the backup data.
 - Other operational exercises
-    - Operator to rollback from version B to version A.
-    - Operator to update node configuration.
+  - Operator to rollback from version B to version A.
+  - Operator to update node configuration.
 - Manual writeset transaction.
-
-
-
-
-<div class="docs-card-container">
-<div class="row row-cols-1 row-cols-md-2 g-4">
-  <div class="col">
-    <div class="card h-100">
-    <h3 class="card-header">Step 1</h3>
-      <div class="card-body d-flex flex-column">
-        <a href="#ait-3-program" class="card-title card-link"> <h2>Read the AIT-3 program</h2></a>
-        <p class="card-text">Read the below AIT-3 steps thoroughly.</p>
-      </div>
-    </div>
-  </div>
-  <div class="col" >
-    <div class="card h-100">
-     <h3 class="card-header">Step 2</h3>
-      <div class="card-body d-flex flex-column">
-      <a href="#install-the-nodes-for-ait-3" class="card-title card-link stretched-link"> <h2>Install the nodes</h2></a>
-        <p class="card-text">Ready to dive in? Follow these guides to install the nodes.</p>     
-      </div>
-    </div>
-  </div>
-  
-</div>
-</div>
 
 ## AIT-3 program
 
-Participants in the AIT-3 program must demonstrate the ability to configure and deploy a node, and pass the sanctions screening requirements.
+Participants in the AIT-3 program must demonstrate the ability to configure and deploy a node, and pass the minimum performance requirements as reported by the [Node Health Checker](/nodes/node-health-checker). See below a flowchart showing the high-level steps you will execute while participating.
+
+### Accounts and keys
+
+Note the following definitions:
+
+- **Owner account**: The Owner account contains the validator settings and the coins. The coins are airdropped into the Owner account.
+- **Operator key**: If you are the Owner, then, using your Owner key, you will select the specific Operator key to:
+  - Manage the settings for the specific validator, and
+  - Delegate the stake pool to the validator.
+  - The Operator key is same key you (Owner) used while registering your validator node with the Aptos Community Platform. This is the private key from the `validator-identity.yaml` file.
+- You (participant) will use the Voter key to sign the governance votes in the transactions.
+
+:::tip Consensus key
+The Consensus key is generated by the Operator and is not associated with an on-chain account, i.e., there is no Aptos blockchain account address associated with Consensus key.
+:::
 
 ### Summary steps
 
 #### Install the validator node and register
 
 <ThemedImage
-  alt="Signed Transaction Flow"
-  sources={{
+alt="Signed Transaction Flow"
+sources={{
     light: useBaseUrl('/img/docs/install-node-and-register.svg'),
     dark: useBaseUrl('/img/docs/install-node-and-register.svg'),
-  }}
-/>
-
-#### Install the Wallet
-
-<ThemedImage
-  alt="Signed Transaction Flow"
-  sources={{
-    light: useBaseUrl('/img/docs/wallet-actions.svg'),
-    dark: useBaseUrl('/img/docs/wallet-actions.svg'),
-  }}
-/>
-
-#### Participate in staking and governance
-
-<ThemedImage
-  alt="Signed Transaction Flow"
-  sources={{
-    light: useBaseUrl('/img/docs/owner-staking-op-voter-actions.svg'),
-    dark: useBaseUrl('/img/docs/owner-staking-op-voter-actions.svg'),
   }}
 />
 
@@ -156,14 +160,14 @@ Participants in the AIT-3 program must demonstrate the ability to configure and 
 To participate in the AIT-3 program, follow the below steps. Use these steps as a checklist to keep track of your progress. Click on the links in each step for a detailed documentation.
 
 <div class="docs-card-container">
-
 <div class="step">
     <div>
         <div class="circle">1</div>
     </div>
     <div>
         <div class="step-title">Read the Node Requirements</div>
-        <div class="step-caption">Before you proceed, make sure that you satisfy the <a href="./node-requirements"><strong> Node Requirements</strong></a>.  </div>
+        <div class="step-caption">Before you proceed, make sure that your hardware, storage and network resources satisfy the <a href="./node-requirements"><strong> Node Requirements</strong></a>.  
+        </div>
     </div>
 </div>
 <div class="step">
@@ -177,60 +181,57 @@ To participate in the AIT-3 program, follow the below steps. Use these steps as 
 </div>
 <div class="step">
     <div>
+        <div class="circle">3</div>
+    </div>
+    <div>
+        <div class="step-title">Register your node in the Aptos Community Platform</div>
+        <div class="step-caption">Navigate to the <a href="https://aptoslabs.com/community">Aptos Community page</a> and register your node. Provide your account address, your owner public key, and your validator's network addresses. </div>
+    </div>
+</div>
+<div class="step">
+    <div>
         <div class="circle">4</div>
     </div>
     <div>
-        <div class="step-title">Provide your node details to the Aptos Discord community</div>
-        <div class="step-caption">Navigate to the <a href="https://community.aptoslabs.com/">Aptos Community page</a> and enter your Validator's information. Provide your account address, your public keys, and your Validator's network addresses. Optionally, you can also provide your FullNode details. </div>
-    </div>
-</div>
-<div class="step">
-    <div>
-        <div class="circle">5</div>
-    </div>
-    <div>
         <div class="step-title">If your node passes healthcheck, you will be prompted to complete the KYC process</div>
-        <div class="step-caption">When Aptos confirms that your node is healthy, you will be asked to complete the KYC process. </div>
+        <div class="step-caption">The Aptos team will perform a node health check on your validator, using the <a href="https://aptos.dev/nodes/node-health-checker">Node Health Checker</a>. When Aptos confirms that your node is healthy, you will be asked to complete the KYC process. </div>
+        <div class="step-caption">You will also be automatically enrolled in the Aptos notifications. This will enable you to receive all communication from Aptos Labs throughout the AIT-3 program. </div>
     </div>
 </div>
 <div class="step">
     <div>
-        <div class="circle">6</div>
+    <div class="step-active circle">5</div>
     </div>
     <div>
-        <div class="step-title">On July 11th, Aptos will inform you whether your node is selected</div>
-        <div class="step-caption">On July 11th, you will receive an email notification. If your node is selected, you will have 24 hours to join the AIT-3 Validator set. Follow the  instructions in <a href="https://aptos.dev/tutorials/validator-node/connect-to-testnet/">Connecting to Aptos Incentivized Testnet</a> to join the AIT-3 and the AIT-3 Validator set. </div>
-    </div>
-</div>
-<div class="step">
-    <div>
-        <div class="circle">7</div>
-    </div>
-    <div>
-        <div class="step-title">If selected, you must meet the minimum requirements for the continuous node performance</div>
-        <div class="step-caption">Minimum requirements for the node performance are detailed in <a href="https://aptos.dev/reference/node-liveness-criteria">Node Liveness Criteria</a>. </div>
-    </div>
-</div>
-<div class="step">
-    <div>
-        <div class="circle">8</div>
-    </div>
-    <div>
-        <div class="step-title">At the conclusion of AIT-3, follow the procedure to leave the Validator set and shutdown your node</div>
-        <div class="step-caption">Steps to properly leave the validator set and shutdown your node are detailed HERE. </div>
-    </div>
-</div>
-<div class="step">
-    <div>
-    <div class="step-active circle">9</div>
-    </div>
-    <div>
-    <div class="step-title">Done</div>
+    <div class="step-title">If you are selected, then proceed to Install the Wallet step</div>
     </div>
     </div>
     </div>
 <div>
+
+</div>
 <br />
+
+#### Install the Wallet
+
+<ThemedImage
+alt="Signed Transaction Flow"
+sources={{
+    light: useBaseUrl('/img/docs/wallet-actions.svg'),
+    dark: useBaseUrl('/img/docs/wallet-actions.svg'),
+  }}
+/>
+
+#### Participate in staking and governance
+
+<ThemedImage
+alt="Signed Transaction Flow"
+sources={{
+    light: useBaseUrl('/img/docs/owner-staking-op-voter-actions.svg'),
+    dark: useBaseUrl('/img/docs/owner-staking-op-voter-actions.svg'),
+  }}
+/>
+
 
 ## Install the nodes for AIT-3
 
@@ -252,6 +253,5 @@ To participate in the AIT-3 program, follow the below steps. Use these steps as 
       </div>
     </div>
   </div>
-</div>
 </div>
 </div>
