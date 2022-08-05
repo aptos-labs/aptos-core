@@ -26,8 +26,8 @@ This guide will overview the following core concepts for integrating with Aptos:
 
 An [account](https://aptos.dev/concepts/basics-accounts) represents a resource on the Aptos blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources. On Aptos, accounts must be created on-chain prior to any blockchain operations involving that account. The Aptos framework supports implicitly creating accounts when transferring Aptos coin via `account::transfer` or explicitly via `account::create_account`.
 
-At creation, an [Aptos account]() contains:
-* A [resource containing Aptos Coin]() and deposit and withdrawal of coins from that resource.
+At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L20) contains:
+* A [resource containing Aptos Coin](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/coin.move#L50) and deposit and withdrawal of coins from that resource.
 * An authentication key associated with their current public, private key(s).
 * A strictly increasing sequence number that represents the account's next transaction's sequence number to prevent replay attacks.
 * An event stream for all new types of coins added to the account.
@@ -132,7 +132,7 @@ See the following documentation for generating valid transactions:
 
 To facilitate evaluation of transactions, Aptos supports a simulation API that does not require and should not contain valid signatures on transactions. 
 
-The simulation API works identical to the transaction submission API, except that it executes the transaction and returns back the results along with the gas used. The simulation API can be accessed by submitting a transaction to `/transactions/simulate`. 
+The simulation API works identical to the transaction submission API, except that it executes the transaction and returns back the results along with the gas used. The simulation API can be accessed by submitting a transaction to [`/transactions/simulate`](. 
 
 :::tip Read more
 Here's an example showing how to use the simulation API in the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L413). Note that the gas use may change based upon the state of the account. We recommend that the maximum gas amount be larger than the amount quoted by this API.
