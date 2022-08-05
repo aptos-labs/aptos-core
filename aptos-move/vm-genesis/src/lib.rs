@@ -526,11 +526,12 @@ pub fn generate_test_genesis(
         OnChainConsensusConfig::default(),
         ChainId::test(),
         &GenesisConfigurations {
-            epoch_duration_secs: 86400,
+            epoch_duration_secs: 3600,
             min_stake: 0,
-            max_stake: 1000000,
-            recurring_lockup_duration_secs: 1,
-            allow_new_validators: false,
+            // 1M APTOS coins (with 8 decimals).
+            max_stake: 100_000_000_000_000,
+            recurring_lockup_duration_secs: 7200,
+            allow_new_validators: true,
         },
     );
     (genesis, test_validators)

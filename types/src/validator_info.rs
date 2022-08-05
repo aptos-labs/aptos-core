@@ -21,7 +21,7 @@ pub struct ValidatorInfo {
     // The validator's account address. AccountAddresses are initially derived from the account
     // auth pubkey; however, the auth key can be rotated, so one should not rely on this
     // initial property.
-    account_address: AccountAddress,
+    pub account_address: AccountAddress,
     // Voting power of this validator
     consensus_voting_power: u64,
     // Validator config

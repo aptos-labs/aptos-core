@@ -1,22 +1,31 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos::common::types::MovePackageDir;
-use aptos::move_tool::{BuiltPackage, MemberId};
-use aptos_types::access_path;
-use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{
-    ScriptFunction, SignedTransaction, TransactionPayload, TransactionStatus,
+use aptos::{
+    common::types::MovePackageDir,
+    move_tool::{BuiltPackage, MemberId},
 };
+use aptos_crypto::{bls12381, PrivateKey, Uniform};
+use aptos_types::{
+    access_path,
+    account_address::AccountAddress,
+    stake_pool::StakePool,
+    transaction::{ScriptFunction, SignedTransaction, TransactionPayload, TransactionStatus},
+};
+use aptos_types::{account_config::CORE_CODE_ADDRESS, on_chain_config::ValidatorSet};
 use cached_framework_packages::aptos_stdlib;
 use framework::natives::code::UpgradePolicy;
-use language_e2e_tests::account::{Account, AccountData};
-use language_e2e_tests::executor::FakeExecutor;
-use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
+use language_e2e_tests::{
+    account::{Account, AccountData},
+    executor::FakeExecutor,
+};
+use move_deps::move_core_types::{
+    language_storage::{StructTag, TypeTag},
+    parser::parse_struct_tag,
+};
 use project_root::get_project_root;
 use serde::de::DeserializeOwned;
-use std::collections::BTreeMap;
-use std::path::Path;
+use std::{collections::BTreeMap, path::Path};
 
 /// A simple test harness for defining Move e2e tests.
 ///
@@ -35,7 +44,7 @@ use std::path::Path;
 /// test infra we want to maintain and also which existing tests to preserve.
 pub struct MoveHarness {
     /// The executor being used.
-    executor: FakeExecutor,
+    pub executor: FakeExecutor,
     /// The current transaction sequence number, by account address.
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 }
@@ -61,7 +70,8 @@ impl MoveHarness {
     pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
-        let data = AccountData::with_account(acc, 1_000_000, 10);
+        // APTOS has 8 decimals so this is only 1000 coins.
+        let data = AccountData::with_account(acc, 100_000_000_000, 10);
         self.txn_seq_no.insert(addr, 10);
         self.executor.add_account_data(&data);
         data.account().clone()
@@ -166,7 +176,7 @@ impl MoveHarness {
         let code = package.extract_code();
         let metadata = package
             .extract_metadata(upgrade_policy)
-            .expect("extracting package metdata must succeed");
+            .expect("extracting package metadata must succeed");
         self.create_transaction_payload(
             account,
             aptos_stdlib::code_publish_package_txn(
@@ -185,6 +195,121 @@ impl MoveHarness {
     ) -> TransactionStatus {
         let txn = self.create_publish_package(account, path, upgrade_policy);
         self.run(txn)
+    }
+
+    pub fn setup_staking(&mut self, account: &Account, initial_stake_amount: u64) {
+        let address = *account.address();
+        self.initialize_staking(account, initial_stake_amount, address, address);
+        self.rotate_consensus_key(account, address);
+        self.join_validator_set(account, address);
+    }
+
+    pub fn initialize_staking(
+        &mut self,
+        account: &Account,
+        initial_stake_amount: u64,
+        operator_address: AccountAddress,
+        voter_address: AccountAddress,
+    ) -> TransactionStatus {
+        self.run_transaction_payload(
+            account,
+            aptos_stdlib::stake_initialize_owner_only(
+                initial_stake_amount,
+                operator_address,
+                voter_address,
+            ),
+        )
+    }
+
+    pub fn add_stake(&mut self, account: &Account, amount: u64) -> TransactionStatus {
+        self.run_transaction_payload(account, aptos_stdlib::stake_add_stake(amount))
+    }
+
+    pub fn unlock_stake(&mut self, account: &Account, amount: u64) -> TransactionStatus {
+        self.run_transaction_payload(account, aptos_stdlib::stake_unlock(amount))
+    }
+
+    pub fn withdraw_stake(&mut self, account: &Account, amount: u64) -> TransactionStatus {
+        self.run_transaction_payload(account, aptos_stdlib::stake_withdraw(amount))
+    }
+
+    pub fn join_validator_set(
+        &mut self,
+        account: &Account,
+        pool_address: AccountAddress,
+    ) -> TransactionStatus {
+        self.run_transaction_payload(
+            account,
+            aptos_stdlib::stake_join_validator_set(pool_address),
+        )
+    }
+
+    pub fn rotate_consensus_key(
+        &mut self,
+        account: &Account,
+        pool_address: AccountAddress,
+    ) -> TransactionStatus {
+        let consensus_key = bls12381::PrivateKey::generate_for_testing();
+        let consensus_pubkey = consensus_key.public_key().to_bytes().to_vec();
+        let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)
+            .to_bytes()
+            .to_vec();
+        self.run_transaction_payload(
+            account,
+            aptos_stdlib::stake_rotate_consensus_key(
+                pool_address,
+                consensus_pubkey,
+                proof_of_possession,
+            ),
+        )
+    }
+
+    pub fn leave_validator_set(
+        &mut self,
+        account: &Account,
+        pool_address: AccountAddress,
+    ) -> TransactionStatus {
+        self.run_transaction_payload(
+            account,
+            aptos_stdlib::stake_leave_validator_set(pool_address),
+        )
+    }
+
+    pub fn fast_forward(&mut self, seconds: u64) {
+        let current_time = self.executor.get_block_time();
+        self.executor
+            .set_block_time(current_time + seconds * 1_000_000)
+    }
+
+    pub fn new_epoch(&mut self) {
+        self.fast_forward(3600);
+        self.executor.new_block()
+    }
+
+    pub fn new_block_with_metadata(
+        &mut self,
+        proposer_index: Option<u32>,
+        failed_proposer_indices: Vec<u32>,
+    ) {
+        self.fast_forward(1);
+        self.executor
+            .new_block_with_metadata(proposer_index, failed_proposer_indices);
+    }
+
+    pub fn get_stake_pool(&mut self, pool_address: &AccountAddress) -> StakePool {
+        self.read_resource::<StakePool>(
+            pool_address,
+            parse_struct_tag("0x1::stake::StakePool").unwrap(),
+        )
+        .unwrap()
+    }
+
+    pub fn get_validator_set(&mut self) -> ValidatorSet {
+        self.read_resource::<ValidatorSet>(
+            &CORE_CODE_ADDRESS,
+            parse_struct_tag("0x1::stake::ValidatorSet").unwrap(),
+        )
+        .unwrap()
     }
 
     /// Reads the raw, serialized data of a resource.
