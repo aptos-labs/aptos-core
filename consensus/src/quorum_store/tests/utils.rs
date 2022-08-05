@@ -1,9 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::quorum_store::types::SerializedTransaction;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519Signature},
-    PrivateKey, Uniform,
+    hash::DefaultHasher,
+    HashValue, PrivateKey, Uniform,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -45,7 +47,20 @@ pub fn create_vec_signed_transactions(size: u64) -> Vec<SignedTransaction> {
         .collect()
 }
 
-pub fn size_of_signed_transaction() -> usize {
-    let signed_txns = create_vec_signed_transactions(1);
-    to_bytes(&signed_txns[0]).unwrap().len()
+pub fn create_vec_serialized_transactions(size: u64) -> Vec<SerializedTransaction> {
+    create_vec_signed_transactions(size)
+        .iter()
+        .map(|signed_txn| SerializedTransaction::from_signed_txn(signed_txn))
+        .collect()
+}
+
+pub fn compute_digest_from_signed_transaction(data: Vec<SignedTransaction>) -> HashValue {
+    let mut hasher = DefaultHasher::new(b"QuorumStoreTest");
+    let serialized_data: Vec<u8> = data
+        .iter()
+        .map(|txn| to_bytes(txn).unwrap())
+        .flatten()
+        .collect();
+    hasher.update(&serialized_data);
+    hasher.finish()
 }

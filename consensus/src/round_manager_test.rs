@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::data_manager::DummyDataManager;
 use crate::{
     block_storage::{BlockReader, BlockStore},
     liveness::{
@@ -195,6 +196,7 @@ impl NodeSetup {
             10, // max pruned blocks in mem
             time_service.clone(),
             10,
+            Arc::new(DummyDataManager::new()),
         ));
 
         let proposal_generator = ProposalGenerator::new(

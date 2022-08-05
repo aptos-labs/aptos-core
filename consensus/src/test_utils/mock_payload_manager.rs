@@ -17,6 +17,7 @@ use consensus_types::{
 use futures::{channel::mpsc, future::BoxFuture};
 use rand::Rng;
 
+#[allow(dead_code)]
 pub struct MockPayloadManager {
     // used non-mocked TxnManager to test interaction with shared mempool
     quorum_store_client: Option<QuorumStoreClient>,
@@ -33,6 +34,7 @@ impl MockPayloadManager {
 }
 
 // mock transaction status on the fly
+#[allow(dead_code)]
 fn mock_transaction_status(count: usize) -> Vec<TransactionStatus> {
     let mut statuses = vec![];
     // generate count + 1 status to mock the block metadata txn in mempool proxy

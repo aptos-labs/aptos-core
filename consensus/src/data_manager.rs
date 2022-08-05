@@ -116,7 +116,8 @@ impl DataManager for QuorumStoreDataManager {
             .map(|proof| proof.digest().clone())
             .collect();
 
-        let _ = self.quorum_store_wrapper_tx
+        let _ = self
+            .quorum_store_wrapper_tx
             .load()
             .as_ref()
             .unwrap()
@@ -181,7 +182,7 @@ impl DataManager for QuorumStoreDataManager {
                         proofs.clone(),
                         LogicalTime::new(block.epoch(), block.round()),
                     )
-                        .await
+                    .await
                 };
                 let mut vec_ret = Vec::new();
                 debug!("QSE: waiting for data on {} receivers", receivers.len());
@@ -195,7 +196,7 @@ impl DataManager for QuorumStoreDataManager {
                             vec_ret.push(data);
                         }
                         Err(e) => {
-                            debug!("QS: got error from receiver {:?}", e );
+                            debug!("QS: got error from receiver {:?}", e);
                             self.digest_status.insert(block.id(), DataStatus::Remote);
                             return Err(e);
                         }

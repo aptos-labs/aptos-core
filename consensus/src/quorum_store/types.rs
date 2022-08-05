@@ -12,9 +12,10 @@ use std::mem;
 
 pub(crate) type BatchId = u64;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct SerializedTransaction {
-    bytes: Vec<u8>,
+    // pub(crate) for testing purposes
+    pub(crate) bytes: Vec<u8>,
 }
 
 impl SerializedTransaction {
@@ -123,7 +124,6 @@ impl Fragment {
         fragment_payload: Vec<SerializedTransaction>,
         maybe_expiration: Option<LogicalTime>,
         peer_id: PeerId,
-        // validator_signer: Arc<ValidatorSigner>,
     ) -> Self {
         let fragment_info = FragmentInfo::new(
             epoch,
@@ -132,11 +132,9 @@ impl Fragment {
             fragment_payload,
             maybe_expiration,
         );
-        // let signature = validator_signer.sign(&fragment_info);
         Self {
             source: peer_id,
             fragment_info,
-            // signature,
         }
     }
 
@@ -175,13 +173,13 @@ impl Fragment {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct BatchInfo {
     pub(crate) epoch: u64,
     pub(crate) digest: HashValue,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct Batch {
     pub(crate) source: PeerId,
     // None is a request, Some(payload) is a response.
@@ -212,7 +210,7 @@ impl Batch {
         self.batch_info.epoch
     }
 
-    // TODO: do we need to check signatures
+    // If batch request, check the source == the sender. If batch response, check digest.
     pub fn verify(&self, peer_id: PeerId) -> anyhow::Result<()> {
         if self.maybe_payload.is_some() {
             let mut hasher = DefaultHasher::new(b"QuorumStoreBatch");

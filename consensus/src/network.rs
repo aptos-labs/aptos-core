@@ -59,6 +59,13 @@ pub struct NetworkReceivers {
     pub block_retrieval: aptos_channel::Receiver<AccountAddress, IncomingBlockRetrievalRequest>,
 }
 
+#[async_trait::async_trait]
+pub trait QuorumStoreSender {
+    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
+
+    async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>);
+}
+
 /// Implements the actual networking support for all consensus messaging.
 #[derive(Clone)]
 pub struct NetworkSender {
@@ -234,18 +241,6 @@ impl NetworkSender {
         self.send(msg, recipients).await
     }
 
-    pub async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
-        fail_point!("consensus::send_batch", |_| ());
-        let msg = ConsensusMsg::BatchMsg(Box::new(batch));
-        self.send(msg, recipients).await
-    }
-
-    pub async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>) {
-        fail_point!("consensus::send_signed_digest", |_| ());
-        let msg = ConsensusMsg::SignedDigestMsg(Box::new(signed_digest));
-        self.send(msg, recipients).await
-    }
-
     pub async fn notify_epoch_change(&mut self, proof: EpochChangeProof) {
         fail_point!("consensus::send_epoch_change", |_| ());
         let msg = ConsensusMsg::EpochChangeProof(Box::new(proof));
@@ -259,6 +254,21 @@ impl NetworkSender {
         // this requires re-verification of the ledger info we can probably optimize it later
         let msg = ConsensusMsg::CommitDecisionMsg(Box::new(CommitDecision::new(ledger_info)));
         self.send(msg, vec![self.author]).await
+    }
+}
+
+#[async_trait::async_trait]
+impl QuorumStoreSender for NetworkSender {
+    async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
+        fail_point!("consensus::send_batch", |_| ());
+        let msg = ConsensusMsg::BatchMsg(Box::new(batch));
+        self.send(msg, recipients).await
+    }
+
+    async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>) {
+        fail_point!("consensus::send_signed_digest", |_| ());
+        let msg = ConsensusMsg::SignedDigestMsg(Box::new(signed_digest));
+        self.send(msg, recipients).await
     }
 }
 

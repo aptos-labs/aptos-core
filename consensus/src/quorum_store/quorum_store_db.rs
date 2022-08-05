@@ -62,7 +62,10 @@ impl QuorumStoreDB {
         digest: HashValue,
         batch: PersistedValue,
     ) -> Result<(), DbError> {
-        debug!("QS: db persists digest {} expiration {:?}", digest, batch.expiration);
+        debug!(
+            "QS: db persists digest {} expiration {:?}",
+            digest, batch.expiration
+        );
         Ok(self.db.put::<BatchSchema>(&digest, &batch)?)
     }
 
@@ -85,6 +88,7 @@ impl BatchIdDB for QuorumStoreDB {
         let epoch_batch_id = iter.collect::<Result<HashMap<u64, Round>>>()?;
         let mut ret = None;
         for (epoch, batch_id) in epoch_batch_id {
+            assert!(current_epoch >= epoch);
             if epoch < current_epoch {
                 self.delete_batch_id(epoch)
                     .expect("Could not delete from db");

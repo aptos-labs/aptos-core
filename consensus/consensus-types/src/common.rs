@@ -3,6 +3,7 @@
 
 use crate::proof_of_store::ProofOfStore;
 use aptos_crypto::HashValue;
+use aptos_types::validator_verifier::ValidatorVerifier;
 use aptos_types::{account_address::AccountAddress, transaction::SignedTransaction};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -53,6 +54,19 @@ impl Payload {
             Payload::DirectMempool(_) => true,
             Payload::InQuorumStore(_) => false,
             Payload::Empty => false,
+        }
+    }
+
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
+        match self {
+            Payload::Empty => Ok(()),
+            Payload::DirectMempool(_) => Ok(()),
+            Payload::InQuorumStore(proofs) => {
+                for proof in proofs.into_iter() {
+                    proof.verify(validator)?;
+                }
+                Ok(())
+            }
         }
     }
 }

@@ -2,17 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::DbError;
-use crate::quorum_store::quorum_store_db::BatchIdDB;
-use crate::quorum_store::types::BatchId;
 use crate::quorum_store::{
-    quorum_store::QuorumStoreCommand,
+    quorum_store::{QuorumStoreCommand, QuorumStoreConfig},
+    quorum_store_db::BatchIdDB,
     quorum_store_wrapper::QuorumStoreWrapper,
-    tests::utils::{create_vec_signed_transactions, size_of_signed_transaction},
+    tests::utils::{create_vec_serialized_transactions, create_vec_signed_transactions},
+    types::{BatchId, SerializedTransaction},
 };
 use aptos_crypto::HashValue;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::transaction::SignedTransaction;
-use bcs::to_bytes;
 use consensus_types::{
     common::{Payload, PayloadFilter, TransactionSummary},
     proof_of_store::{LogicalTime, ProofOfStore, SignedDigestInfo},
@@ -25,8 +24,7 @@ use futures::{
     },
     StreamExt,
 };
-use std::sync::Arc;
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::{sync::mpsc::channel as TokioChannel, time::timeout};
 
 pub struct MockBatchIdDB {}
@@ -76,20 +74,44 @@ async fn test_batch_creation() {
     let (quorum_store_to_mempool_tx, mut quorum_store_to_mempool_rx) = channel(1_024);
     let (wrapper_quorum_store_tx, mut wrapper_quorum_store_rx) = TokioChannel(100);
 
+    let txn_size = 168;
+    create_vec_serialized_transactions(50)
+        .iter()
+        .for_each(|txn| assert_eq!(txn_size, txn.len()));
+
+    let config = QuorumStoreConfig {
+        channel_size: 100,
+        proof_timeout_ms: 1000,
+        batch_request_num_peers: 3,
+        end_batch_ms: 500,
+        max_batch_bytes: 9 * txn_size as u64,
+        batch_request_timeout_ms: 1000,
+        max_batch_expiry_round_gap: 20,
+        batch_expiry_grace_rounds: 5,
+        max_batch_size: 200000,
+        memory_quota: 100000000,
+        db_quota: 10000000000,
+        mempool_txn_pull_max_count: 100,
+    };
+
     let mut wrapper = QuorumStoreWrapper::new(
         0,
         Arc::new(MockBatchIdDB::new()),
         quorum_store_to_mempool_tx,
         wrapper_quorum_store_tx,
         10_000,
-        10,
-        9 * size_of_signed_transaction() as u64,
+        config.mempool_txn_pull_max_count,
+        config.max_batch_bytes,
+        config.max_batch_expiry_round_gap,
+        config.end_batch_ms,
     );
 
-    let signed_txns = create_vec_signed_transactions(500);
-    signed_txns
-        .iter()
-        .for_each(|txn| assert_eq!(168, to_bytes(txn).unwrap().len()));
+    let serialize = |signed_txns: &Vec<SignedTransaction>| -> Vec<SerializedTransaction> {
+        signed_txns
+            .iter()
+            .map(|signed_txn| SerializedTransaction::from_signed_txn(signed_txn))
+            .collect()
+    };
 
     let join_handle = tokio::spawn(async move {
         let mut num_txns = 0;
@@ -105,7 +127,7 @@ async fn test_batch_creation() {
         if let QuorumStoreCommand::AppendToBatch(data, batch_id) = quorum_store_command {
             assert_eq!(batch_id, 1);
             assert_eq!(data.len(), signed_txns.len());
-            assert_eq!(data, signed_txns);
+            assert_eq!(data, serialize(&signed_txns));
         } else {
             panic!("Unexpected variant")
         }
@@ -121,7 +143,7 @@ async fn test_batch_creation() {
         let quorum_store_command = wrapper_quorum_store_rx.recv().await.unwrap();
         if let QuorumStoreCommand::EndBatch(data, _, _, _) = quorum_store_command {
             assert_eq!(data.len(), signed_txns.len() - 1);
-            assert_eq!(data, signed_txns[0..8]);
+            assert_eq!(data, serialize(&signed_txns[0..8].to_vec()));
         } else {
             panic!("Unexpected variant")
         }
@@ -138,7 +160,7 @@ async fn test_batch_creation() {
         if let QuorumStoreCommand::AppendToBatch(data, batch_id) = quorum_store_command {
             assert_eq!(batch_id, 2);
             assert_eq!(data.len(), signed_txns.len());
-            assert_eq!(data, signed_txns);
+            assert_eq!(data, serialize(&signed_txns));
         } else {
             panic!("Unexpected variant")
         }
@@ -162,14 +184,31 @@ async fn test_block_request() {
     let (quorum_store_to_mempool_tx, mut _quorum_store_to_mempool_rx) = channel(1_024);
     let (wrapper_quorum_store_tx, mut _wrapper_quorum_store_rx) = TokioChannel(100);
 
+    let config = QuorumStoreConfig {
+        channel_size: 100,
+        proof_timeout_ms: 1000,
+        batch_request_num_peers: 3,
+        end_batch_ms: 500,
+        max_batch_bytes: 1000000,
+        batch_request_timeout_ms: 1000,
+        max_batch_expiry_round_gap: 20,
+        batch_expiry_grace_rounds: 5,
+        max_batch_size: 200000,
+        memory_quota: 100000000,
+        db_quota: 10000000000,
+        mempool_txn_pull_max_count: 100,
+    };
+
     let mut wrapper = QuorumStoreWrapper::new(
         0,
         Arc::new(MockBatchIdDB::new()),
         quorum_store_to_mempool_tx,
         wrapper_quorum_store_tx,
         10_000,
-        10,
-        10,
+        config.mempool_txn_pull_max_count,
+        config.max_batch_bytes,
+        config.max_batch_expiry_round_gap,
+        config.end_batch_ms,
     );
 
     let digest = HashValue::random();

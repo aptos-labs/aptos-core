@@ -7,7 +7,7 @@ use aptos_types::transaction::SignedTransaction;
 use bcs::from_bytes;
 use std::result::Result;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BatchAggregatorError {
     DeserializationError,
     SizeLimitExceeded,
@@ -105,7 +105,19 @@ impl BatchAggregator {
 
     fn outdated_fragment(&self, batch_id: BatchId, fragment_id: usize) -> bool {
         if let Some(self_batch_id) = self.batch_id {
-            (batch_id, fragment_id) < (self_batch_id, self.next_fragment_id())
+            let next_fragment_id = self.next_fragment_id();
+            if next_fragment_id == 0 {
+                // We always append transactions when we create a new state.
+                debug_assert!(
+                    self.batch_state.is_none(),
+                    "No fragments in batch aggregator state"
+                );
+
+                // In this case, the next fragment must start self_batch_id + 1
+                batch_id <= self_batch_id
+            } else {
+                (batch_id, fragment_id) < (self_batch_id, self.next_fragment_id())
+            }
         } else {
             false
         }
@@ -154,12 +166,13 @@ impl BatchAggregator {
             self.batch_state = None;
         }
 
+        // Fragment wasn't outdated, fast forward batch id.
+        self.batch_id = Some(batch_id);
         if fragment_id == 0 {
-            // Fragment wasn't outdated. If a fragment was missed, state should be cleared
+            // If a fragment was missed, state should be cleared
             // above, and otherwise, it must be cleared by end_batch.
             debug_assert!(self.batch_state.is_none(), "Batch state not cleared");
             self.batch_state = Some(IncrementalBatchState::new(self.max_batch_bytes));
-            self.batch_id = Some(batch_id);
         }
 
         if self.batch_state.is_some() {
@@ -181,10 +194,17 @@ impl BatchAggregator {
         fragment_id: usize,
         transactions: Vec<SerializedTransaction>,
     ) -> Result<(usize, Vec<SignedTransaction>, HashValue), BatchAggregatorError> {
-        self.append_transactions(batch_id, fragment_id, transactions)?;
-        self.batch_state
-            .take()
-            .expect("Batch state must exist")
-            .finalize_batch()
+        let append_res = self.append_transactions(batch_id, fragment_id, transactions);
+        if append_res.is_ok()
+            || (append_res == Err(BatchAggregatorError::MissedFragment)
+                && self.batch_state.is_some())
+        {
+            self.batch_state
+                .take()
+                .expect("Batch state must exist")
+                .finalize_batch()
+        } else {
+            Err(append_res.unwrap_err())
+        }
     }
 }
