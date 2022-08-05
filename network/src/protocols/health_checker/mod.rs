@@ -41,6 +41,7 @@ use aptos_types::PeerId;
 use async_trait::async_trait;
 use bytes::Bytes;
 use channel::{aptos_channel, message_queues::QueueStyle};
+use core::cell::RefCell;
 use futures::{
     channel::oneshot,
     stream::{FuturesUnordered, StreamExt},
@@ -129,10 +130,18 @@ pub enum HealthCheckerMsg {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Ping(u32);
+pub struct Ping {
+    nonce: u32,
+    raw_ts: u64,
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Pong(u32);
+pub struct Pong {
+    nonce: u32,
+    raw_ts: u64,
+}
+
+thread_local!(static QUANTA_CLOCK :RefCell<quanta::Clock> = RefCell::new(quanta::Clock::new()));
 
 /// The actor performing health checks by running the Ping protocol
 pub struct HealthChecker {
@@ -293,7 +302,10 @@ impl HealthChecker {
         protocol: ProtocolId,
         res_tx: oneshot::Sender<Result<Bytes, RpcError>>,
     ) {
-        let message = match protocol.to_bytes(&HealthCheckerMsg::Pong(Pong(ping.0))) {
+        let message = match protocol.to_bytes(&HealthCheckerMsg::Pong(Pong {
+            nonce: ping.nonce,
+            raw_ts: ping.raw_ts,
+        })) {
             Ok(msg) => msg,
             Err(e) => {
                 warn!(
@@ -309,7 +321,7 @@ impl HealthChecker {
             "{} Sending Pong response to peer: {} with nonce: {}",
             self.network_context,
             peer_id.short_str(),
-            ping.0,
+            ping.nonce,
         );
         let _ = res_tx.send(Ok(message.into()));
     }
@@ -323,14 +335,20 @@ impl HealthChecker {
     ) {
         match ping_result {
             Ok(pong) => {
-                if pong.0 == req_nonce {
+                if pong.nonce == req_nonce {
+                    let duration = QUANTA_CLOCK.with(|c| {
+                        let clock = c.borrow();
+                        clock.delta(pong.raw_ts, clock.raw())
+                    });
+
                     trace!(
                         NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                         rount = round,
-                        "{} Ping successful for peer: {} round: {}",
+                        "{} Ping successful for peer: {} round: {} rtt {:?}",
                         self.network_context,
                         peer_id.short_str(),
-                        round
+                        round,
+                        duration.as_millis(),
                     );
                     // Update last successful ping to current round.
                     // If it's not in storage, don't bother updating it
@@ -357,7 +375,7 @@ impl HealthChecker {
                         "{} Pong nonce doesn't match Ping nonce. Round: {}, Pong: {}, Ping: {}",
                         self.network_context,
                         round,
-                        pong.0,
+                        pong.nonce,
                         req_nonce
                     );
                     debug_assert!(false, "Pong nonce doesn't match our challenge Ping nonce");
@@ -449,8 +467,13 @@ impl HealthChecker {
             round,
             nonce
         );
+        let raw_ts = QUANTA_CLOCK.with(|c| c.borrow().raw());
         let res_pong_msg = network_tx
-            .send_rpc(peer_id, HealthCheckerMsg::Ping(Ping(nonce)), ping_timeout)
+            .send_rpc(
+                peer_id,
+                HealthCheckerMsg::Ping(Ping { nonce, raw_ts }),
+                ping_timeout,
+            )
             .await
             .and_then(|msg| match msg {
                 HealthCheckerMsg::Pong(res) => Ok(res),
