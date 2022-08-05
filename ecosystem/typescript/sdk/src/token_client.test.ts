@@ -41,6 +41,7 @@ test(
         "Alice's simple token",
         1,
         "https://aptos.dev/img/nyan.jpeg",
+        1000,
         alice.address(),
         0,
         0,

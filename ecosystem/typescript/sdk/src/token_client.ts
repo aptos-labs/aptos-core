@@ -56,9 +56,16 @@ export class TokenClient {
    * @param name Collection name
    * @param description Collection description
    * @param uri URL to additional info about collection
+   * @param maxAmount Maximum number of `token_data` allowed within this collection
    * @returns A hash of transaction
    */
-  async createCollection(account: AptosAccount, name: string, description: string, uri: string): Promise<string> {
+  async createCollection(
+    account: AptosAccount,
+    name: string,
+    description: string,
+    uri: string,
+    maxAmount: BCS.AnyNumber = MAX_U64_BIG_INT,
+  ): Promise<string> {
     const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
       TxnBuilderTypes.ScriptFunction.natural(
         "0x3::token",
@@ -68,7 +75,7 @@ export class TokenClient {
           BCS.bcsSerializeStr(name),
           BCS.bcsSerializeStr(description),
           BCS.bcsSerializeStr(uri),
-          BCS.bcsSerializeUint64(MAX_U64_BIG_INT),
+          BCS.bcsSerializeUint64(maxAmount),
           BCS.serializeVectorWithFunc([false, false, false], "serializeBool"),
         ],
       ),
@@ -85,6 +92,7 @@ export class TokenClient {
    * @param description Token description
    * @param supply Token supply
    * @param uri URL to additional info about token
+   * @param max The maxium of tokens can be minted from this token
    * @param royalty_payee_address the address to receive the royalty, the address can be a shared account address.
    * @param royalty_points_denominator the denominator for calculating royalty
    * @param royalty_points_numerator the numerator for calculating royalty
@@ -100,6 +108,7 @@ export class TokenClient {
     description: string,
     supply: number,
     uri: string,
+    max: BCS.AnyNumber = MAX_U64_BIG_INT,
     royalty_payee_address: MaybeHexString = account.address(),
     royalty_points_denominator: number = 0,
     royalty_points_numerator: number = 0,
@@ -117,7 +126,7 @@ export class TokenClient {
           BCS.bcsSerializeStr(name),
           BCS.bcsSerializeStr(description),
           BCS.bcsSerializeUint64(supply),
-          BCS.bcsSerializeUint64(MAX_U64_BIG_INT),
+          BCS.bcsSerializeUint64(max),
           BCS.bcsSerializeStr(uri),
           BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(royalty_payee_address)),
           BCS.bcsSerializeUint64(royalty_points_denominator),
