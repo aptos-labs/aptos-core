@@ -1,13 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::network::QuorumStoreSender;
 use crate::quorum_store::types::{Batch, PersistedValue};
-use crate::{
-    network::NetworkSender,
-    quorum_store::{
-        batch_reader::{BatchReader, BatchReaderCommand},
-        quorum_store_db::QuorumStoreDB,
-    },
+use crate::quorum_store::{
+    batch_reader::{BatchReader, BatchReaderCommand},
+    quorum_store_db::QuorumStoreDB,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
@@ -56,21 +54,21 @@ pub(crate) enum BatchStoreCommand {
     Shutdown(oneshot::Sender<()>),
 }
 
-pub(crate) struct BatchStore {
+pub(crate) struct BatchStore<T> {
     epoch: u64,
     my_peer_id: PeerId,
-    network_sender: NetworkSender,
+    network_sender: T,
     batch_reader: Arc<BatchReader>,
     db: Arc<QuorumStoreDB>,
     validator_signer: Arc<ValidatorSigner>,
 }
 
-impl BatchStore {
+impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
     pub fn new(
         epoch: u64,
         last_committed_round: Round,
         my_peer_id: PeerId,
-        network_sender: NetworkSender,
+        network_sender: T,
         batch_store_tx: Sender<BatchStoreCommand>,
         batch_reader_tx: Sender<BatchReaderCommand>,
         batch_reader_rx: Receiver<BatchReaderCommand>,
@@ -150,7 +148,6 @@ impl BatchStore {
                 }
                 Some(SignedDigest::new(
                     self.epoch,
-                    self.my_peer_id,
                     persist_request.digest,
                     expiration,
                     self.validator_signer.clone(),

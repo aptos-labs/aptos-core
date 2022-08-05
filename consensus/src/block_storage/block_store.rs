@@ -116,7 +116,10 @@ impl BlockStore {
     ) -> Self {
         let highest_2chain_tc = initial_data.highest_2chain_timeout_certificate();
         let (root, root_metadata, blocks, quorum_certs) = initial_data.take();
-        debug!("QS: number of block in storage in a new epoch {}", blocks.len());
+        debug!(
+            "QS: number of block in storage in a new epoch {}",
+            blocks.len()
+        );
         let block_store = block_on(Self::build(
             root,
             root_metadata,

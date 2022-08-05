@@ -3,6 +3,7 @@
 
 use crate::quorum_store::types::{BatchId, SerializedTransaction};
 use aptos_crypto::HashValue;
+use aptos_logger::debug;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_metrics_core::monitor;
 use aptos_types::transaction::SignedTransaction;
@@ -17,7 +18,6 @@ use std::{
     time::Duration,
 };
 use tokio::time::timeout;
-use aptos_logger::debug;
 
 pub(crate) struct BatchBuilder {
     id: BatchId,
@@ -100,7 +100,11 @@ impl DigestTimeouts {
 
     pub(crate) fn expire(&mut self) -> Vec<HashValue> {
         let cur_time = chrono::Utc::now().naive_utc().timestamp_millis();
-        debug!("QS: expire cur time {} timeouts len {}", cur_time, self.timeouts.len());
+        debug!(
+            "QS: expire cur time {} timeouts len {}",
+            cur_time,
+            self.timeouts.len()
+        );
         let num_expired = self
             .timeouts
             .iter()
