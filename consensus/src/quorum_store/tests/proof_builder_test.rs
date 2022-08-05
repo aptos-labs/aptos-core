@@ -93,7 +93,7 @@ async fn test_proof_builder_basic() {
         .send(ProofBuilderCommand::InitProof(signed_digest, 10, proof_tx))
         .await
         .is_ok());
-    for i in 1..arc_signers.len() {
+    for _ in 1..arc_signers.len() {
         let signed_digest =
             SignedDigest::new(1, digest, LogicalTime::new(1, 20), arc_signers[1].clone());
         assert!(proof_builder_tx

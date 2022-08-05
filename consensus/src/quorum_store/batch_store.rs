@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::network::QuorumStoreSender;
 use crate::quorum_store::types::{Batch, PersistedValue};
-use crate::{
-    quorum_store::{
-        batch_reader::{BatchReader, BatchReaderCommand},
-        quorum_store_db::QuorumStoreDB,
-    },
+use crate::quorum_store::{
+    batch_reader::{BatchReader, BatchReaderCommand},
+    quorum_store_db::QuorumStoreDB,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
@@ -21,7 +20,6 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
-use crate::network::QuorumStoreSender;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PersistRequest {

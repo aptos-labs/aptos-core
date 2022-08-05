@@ -59,14 +59,11 @@ pub struct NetworkReceivers {
     pub block_retrieval: aptos_channel::Receiver<AccountAddress, IncomingBlockRetrievalRequest>,
 }
 
-
 #[async_trait::async_trait]
-pub trait QuorumStoreSender: {
-
+pub trait QuorumStoreSender {
     async fn send_batch(&self, batch: Batch, recipients: Vec<Author>);
 
     async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>);
-
 }
 
 /// Implements the actual networking support for all consensus messaging.
@@ -243,7 +240,6 @@ impl NetworkSender {
         let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
         self.send(msg, recipients).await
     }
-
 
     pub async fn notify_epoch_change(&mut self, proof: EpochChangeProof) {
         fail_point!("consensus::send_epoch_change", |_| ());

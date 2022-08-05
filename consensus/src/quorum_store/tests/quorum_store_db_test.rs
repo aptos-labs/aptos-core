@@ -21,7 +21,6 @@ fn test_db_for_data() {
     let value_1 = PersistedValue::new(Some(signed_txns), LogicalTime::new(1, 20), source, 1000);
     assert!(db.save_batch(digest_1, value_1.clone()).is_ok());
 
-    let value_2 = PersistedValue::new(None, LogicalTime::new(1, 20), source, 1000);
     assert_eq!(
         db.get_batch(digest_1)
             .expect("could not read from db")

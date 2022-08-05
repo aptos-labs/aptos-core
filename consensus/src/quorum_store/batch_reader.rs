@@ -1,12 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::network::QuorumStoreSender;
+use crate::quorum_store::{batch_requester::BatchRequester, batch_store::BatchStoreCommand};
 use crate::quorum_store::{
     types::{Batch, PersistedValue},
     utils::RoundExpirations,
-};
-use crate::{
-    quorum_store::{batch_requester::BatchRequester, batch_store::BatchStoreCommand},
 };
 use anyhow::bail;
 use aptos_crypto::HashValue;
@@ -34,7 +33,6 @@ use tokio::{
     },
     time,
 };
-use crate::network::QuorumStoreSender;
 
 #[derive(Debug)]
 pub(crate) enum BatchReaderCommand {
