@@ -1,6 +1,6 @@
 import { MemoizeExpiring } from "typescript-memoize";
 import { HexString, MaybeHexString } from "./hex_string";
-import { moveStructTagToParam, sleep } from "./util";
+import { toMoveStructTagParam, sleep } from "./util";
 import { AptosAccount } from "./aptos_account";
 import * as Gen from "./generated/index";
 import { TxnBuilderTypes, TransactionBuilderEd25519 } from "./transaction_builder";
@@ -141,7 +141,7 @@ export class AptosClient {
   ): Promise<Gen.MoveResource> {
     return this.client.accounts.getAccountResource(
       HexString.ensure(accountAddress).hex(),
-      moveStructTagToParam(resourceType),
+      toMoveStructTagParam(resourceType),
       query?.ledgerVersion?.toString(),
     );
   }
@@ -278,7 +278,7 @@ export class AptosClient {
   ): Promise<Gen.Event[]> {
     return this.client.events.getEventsByEventHandle(
       HexString.ensure(address).hex(),
-      moveStructTagToParam(eventHandleStruct),
+      toMoveStructTagParam(eventHandleStruct),
       fieldName,
       query?.start?.toString(),
       query?.limit,

@@ -4,6 +4,10 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
+## 1.3.3 (2022-08-05)
+### Added
+- New helpers for working with the `MoveStructTag` type, `toMoveStructTagParam` and `fromMoveStructTagParam`.
+
 ## 1.3.2 (2022-08-04)
 This special entry does not conform to the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) as there are noteworthy breaking changes with necessary rationale. Future entries will follow this format.
 
