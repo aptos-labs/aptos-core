@@ -5,7 +5,7 @@ use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_infallible::RwLock;
 use aptos_logger::error;
 use aptos_types::chain_id::ChainId;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time;
 use url::Url;
 
@@ -27,7 +27,7 @@ impl ValidatorSetCacheUpdater {
         Self {
             cache,
             query_addresses: Arc::new(config.trusted_full_node_addresses.clone()),
-            update_interval: config.update_interval,
+            update_interval: Duration::from_secs(config.update_interval),
         }
     }
 

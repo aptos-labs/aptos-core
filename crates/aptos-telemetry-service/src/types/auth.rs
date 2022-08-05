@@ -32,7 +32,7 @@ pub struct Claims {
 }
 
 /// A useful struct for serialization a telemetry event
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TelemetryEvent {
     pub name: String,
     pub params: BTreeMap<String, String>,
