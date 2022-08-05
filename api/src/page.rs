@@ -19,6 +19,15 @@ pub(crate) struct Page {
 }
 
 impl Page {
+    pub fn compute_start(&self, limit: u16, max: u64) -> Result<u64, Error> {
+        let last_page_start = if max > (limit as u64) {
+            max - ((limit + 1) as u64)
+        } else {
+            0
+        };
+        self.start(last_page_start, max)
+    }
+
     pub fn start(&self, default: u64, max: u64) -> Result<u64, Error> {
         let version = self
             .start
