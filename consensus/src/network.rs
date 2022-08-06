@@ -228,7 +228,7 @@ impl NetworkSender {
     /// Sends the given sync info to the given author.
     /// The future is fulfilled as soon as the message is added to the internal network channel
     /// (does not indicate whether the message is delivered or sent out).
-    pub async fn send_sync_info(&self, sync_info: SyncInfo, recipient: Author) {
+    pub async fn _send_sync_info(&self, sync_info: SyncInfo, recipient: Author) {
         fail_point!("consensus::send_sync_info", |_| ());
         let msg = ConsensusMsg::SyncInfo(Box::new(sync_info));
         self.send(msg, vec![recipient]).await
@@ -246,18 +246,6 @@ impl NetworkSender {
         fail_point!("consensus::send::epoch_change", |_| ());
         let msg = ConsensusMsg::EpochChangeProof(Box::new(proof));
         self.send(msg, vec![self.author]).await
-    }
-
-    pub async fn send_batch(&self, batch: Batch, recipients: Vec<Author>) {
-        fail_point!("consensus::send_batch", |_| ());
-        let msg = ConsensusMsg::BatchMsg(Box::new(batch));
-        self.send(msg, recipients).await
-    }
-
-    pub async fn send_signed_digest(&self, signed_digest: SignedDigest, recipients: Vec<Author>) {
-        fail_point!("consensus::send_signed_digest", |_| ());
-        let msg = ConsensusMsg::SignedDigestMsg(Box::new(signed_digest));
-        self.send(msg, recipients).await
     }
 
     /// Sends the ledger info to self buffer manager

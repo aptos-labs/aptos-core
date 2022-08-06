@@ -146,13 +146,6 @@ impl fmt::Display for PayloadFilter {
                 }
                 write!(f, "{}", txns_str)
             }
-            PayloadFilter::InQuorumStore(exclided_proofs) => {
-                let mut txns_str = "".to_string();
-                for proof in exclided_proofs.iter() {
-                    txns_str += &format!("{} ", proof);
-                }
-                write!(f, "{}", txns_str)
-            }
             PayloadFilter::Empty => {
                 write!(f, "Empty filter")
             }

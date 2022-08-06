@@ -5,7 +5,6 @@ use crate::monitor;
 use crate::{error::QuorumStoreError, state_replication::PayloadManager};
 use anyhow::Result;
 use aptos_logger::prelude::*;
-use aptos_metrics_core::monitor;
 use aptos_types::block_info::Round;
 use consensus_types::{
     common::{Payload, PayloadFilter},

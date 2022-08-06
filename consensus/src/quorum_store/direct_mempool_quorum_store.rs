@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
 use crate::quorum_store::counters;
 use crate::quorum_store::utils::MempoolProxy;
 use anyhow::Result;
