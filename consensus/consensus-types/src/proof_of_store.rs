@@ -83,7 +83,6 @@ impl SignedDigest {
     }
 }
 
-
 #[derive(Debug, PartialEq)]
 pub enum SignedDigestError {
     WrongDigest,

@@ -18,8 +18,7 @@ pub(crate) enum ProofBuilderCommand {
     AppendSignature(SignedDigest),
 }
 
-pub(crate) type ProofReturnChannel =
-oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
+pub(crate) type ProofReturnChannel = oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
 pub(crate) struct ProofBuilder {
     // peer_id: PeerId,

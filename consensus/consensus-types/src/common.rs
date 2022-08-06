@@ -40,7 +40,6 @@ pub enum Payload {
 impl Payload {
     pub fn new_empty() -> Self {
         Payload::Empty
-
     }
 
     pub fn is_empty(&self) -> bool {

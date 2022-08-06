@@ -63,4 +63,8 @@ pub fn compute_digest_from_signed_transaction(data: Vec<SignedTransaction>) -> H
         .collect();
     hasher.update(&serialized_data);
     hasher.finish()
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> f888262640142bbe5c42442a05f39f3d390881d7

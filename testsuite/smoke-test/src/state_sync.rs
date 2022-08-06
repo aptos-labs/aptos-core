@@ -240,8 +240,7 @@ async fn test_validator_bootstrap_transactions() {
             config.state_sync.state_sync_driver.continuous_syncing_mode =
                 ContinuousSyncingMode::ExecuteTransactions;
         }))
-        .build()
-        .await;
+        .build().await;
 
     // Test the ability of the validators to sync
     test_validator_sync(swarm).await;

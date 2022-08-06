@@ -36,7 +36,7 @@ async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
         "expected = {}, err = {}",
         expected,
         err
-    )
+    );
 }
 
 #[async_trait::async_trait]

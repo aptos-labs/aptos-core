@@ -110,6 +110,7 @@ impl ExecutedBlock {
         txns: Vec<SignedTransaction>,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
+
         if self.is_reconfiguration_suffix() {
             return vec![];
         }

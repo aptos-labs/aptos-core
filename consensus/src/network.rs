@@ -241,6 +241,7 @@ impl NetworkSender {
         self.send(msg, recipients).await
     }
 
+
     pub async fn send_epoch_change(&mut self, proof: EpochChangeProof) {
         fail_point!("consensus::send::epoch_change", |_| ());
         let msg = ConsensusMsg::EpochChangeProof(Box::new(proof));
