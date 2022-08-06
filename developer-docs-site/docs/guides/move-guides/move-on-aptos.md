@@ -79,7 +79,7 @@ struct CoinStore has key {
 Instead prefer the approach that stores the coins in an account:
 ```rust
 struct CoinStore has key {
-    coins: Coin,
+    coin: Coin,
 }
 ```
 
