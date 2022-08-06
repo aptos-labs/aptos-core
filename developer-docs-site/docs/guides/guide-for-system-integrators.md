@@ -13,7 +13,8 @@ If you provide blockchain services to your customers and wish to add the Aptos b
 
 ## Overview
 
-This guide will overview the following core concepts for integrating with Aptos:
+This guide will overview the following topics for integrating with Aptos:
+- Preparing an environment for testing.
 - Create an account on the blockchain.
 - Exchange account identifiers with another entity on the blockchain, for example, to perform swaps.
 - Create a transaction.
@@ -21,6 +22,27 @@ This guide will overview the following core concepts for integrating with Aptos:
 - Submit the transaction to the blockchain.
 - Wait for the outcome of the transaction.
 - Query historical transactions and interactions for a given account with a specific account, i.e., withdraws and deposits.
+
+## Getting Started
+
+* Obtain the [Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli/) -- recommend by source and targeting the `main` branch as the codebase will be under many changes for the next couple of weeks.
+* Start a [local node with a Faucet](../cli-tools/aptos-cli-tool/use-aptos-cli#running-a-local-testnet): `aptos node run-local-testnet --with-faucet`.
+* Export the appropriate `FAUCET_URL`: `export FAUCET_URL=http://127.0.0.1:8081"`.
+* Export the appropriate `NODE_URL`: `export NODE_URL=http://127.0.0.1:8080"`.
+
+This will start a local testnet with a faucet and cause SDKs to automatically point toward this node as the default endpoint, if one is not specified.
+
+There are a plethora of ways to build on top of Aptos. This guide takes an opinionated approach to help onboard but this is not the only methodology or definitive route. The specific goals are to drive a level of ownership, understanding, and stability.
+
+Other areas worth being familiar with:
+* [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
+* [Typescript SDK](../transactions-with-ts-sdk)
+* [Python SDK](../sdks/python-sdk)
+* [REST API](../rest-api)
+
+:::tip
+Not all SDKs and tools respect those environment flags though they will in due time.
+:::
 
 ## Accounts on Aptos
 
