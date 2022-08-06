@@ -398,7 +398,7 @@ module aptos_framework::account {
     /// Coin management methods.
     ///////////////////////////////////////////////////////////////////////////
 
-    public(friend) fun register_coin<CoinType>(account_addr: address) acquires Account {
+    public fun register_coin<CoinType>(account_addr: address) acquires Account {
         let account = borrow_global_mut<Account>(account_addr);
         event::emit_event<CoinRegisterEvent>(
             &mut account.coin_register_events,

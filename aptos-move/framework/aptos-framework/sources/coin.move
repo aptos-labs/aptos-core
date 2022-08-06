@@ -6,6 +6,7 @@ module aptos_framework::coin {
     use std::signer;
     use aptos_std::event::{Self, EventHandle};
     use aptos_std::type_info;
+    use aptos_framework::account;
 
     friend aptos_framework::account;
     friend aptos_framework::aptos_coin;
@@ -183,10 +184,9 @@ module aptos_framework::coin {
 
     /// Deposit the coin balance into the recipient's account and emit an event.
     public fun deposit<CoinType>(account_addr: address, coin: Coin<CoinType>) acquires CoinStore {
-        assert!(
-            is_account_registered<CoinType>(account_addr),
-            error::not_found(ECOIN_STORE_NOT_PUBLISHED),
-        );
+        if (!is_account_registered<CoinType>(account_addr)){
+            account::register_coin<CoinType>(account_addr);
+        };
 
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
         event::emit_event<DepositEvent>(
