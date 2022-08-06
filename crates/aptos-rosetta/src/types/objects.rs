@@ -498,7 +498,7 @@ impl Display for TransactionType {
         f.write_str(match self {
             User => "User",
             Genesis => "Genesis",
-            BlockMetadata => "BlockMetadata",
+            BlockMetadata => "BlockResource",
             StateCheckpoint => "StateCheckpoint",
         })
     }

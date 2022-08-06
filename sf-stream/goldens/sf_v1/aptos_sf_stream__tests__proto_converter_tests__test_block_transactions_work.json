@@ -4,22 +4,22 @@
     "version": "1",
     "info": {
       "hash": "",
-      "stateRootHash": "HMrdtIsVJVa/+d7HWaNbMM/zS8BF7norqgbBkz3p2Ks=",
+      "stateRootHash": "iYEvhbkSNnNDiXT9ExB4W708VlkI884lDdkE1RxJJIc=",
       "eventRootHash": "YPVlJld+KeJV8TgWig4e7McIG/o+rxMn60yg554WVK8=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "DJwD1vywXfYH81YFO+4eRwl/8qx5qHRtX82owmq5Rhk=",
+      "accumulatorRootHash": "m4lzauYuuwhDykFv75nNX7/FiiJFmM7gQW9uUPfU7hk=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
           "writeResource": {
             "address": "0x1",
-            "stateKeyHash": "6sO7UL7trkAOL8sktJEcuvYWRdVuqkohPoNUZG7Xu+I=",
+            "stateKeyHash": "Xd9ATGDpbpSFvq/Ku5Vgn+2OOOlBpyXK5Nzsgpb7Mtc=",
             "data": {
               "type": {
                 "address": "0x1",
                 "module": "block",
-                "name": "BlockMetadata"
+                "name": "BlockResource"
               },
               "data": "{\"epoch_interval\":\"86400000000\",\"height\":\"1\",\"new_block_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"2\"}}}}"
             }
@@ -96,7 +96,7 @@
       "gasUsed": "42",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "TMZaCBXcKgrqISa6YT4QotC4Fcq+W7FrRk0fclVz0Qg=",
+      "accumulatorRootHash": "X+T6k/7VMNEQ043+qoB23+L5uYTspxLVsGyfzCUtElU=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -225,7 +225,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "U3v4joVAQjwf+Bl0H0uTqYMZuJWt/OWpljbFgPf0hok="
+      "accumulatorRootHash": "naBkzCBaGSG6pFoRkMhnWCsh/NH98K6PrvMOL2HpCPc="
     },
     "blockHeight": "1",
     "type": "STATE_CHECKPOINT",
