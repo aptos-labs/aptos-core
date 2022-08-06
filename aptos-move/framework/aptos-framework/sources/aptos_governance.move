@@ -230,6 +230,17 @@ module aptos_framework::aptos_governance {
         let voter_address = signer::address_of(voter);
         assert!(stake::get_delegated_voter(stake_pool) == voter_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
 
+        // Ensure the voter doesn't double vote with the same stake pool.
+        let voting_records = borrow_global_mut<VotingRecords>(@aptos_framework);
+        let record_key = RecordKey {
+            stake_pool,
+            proposal_id,
+        };
+        assert!(
+            !table::contains(&voting_records.votes, record_key),
+            error::invalid_argument(EALREADY_VOTED));
+        table::add(&mut voting_records.votes, record_key, true);
+
         // Voting power does not include pending_active or pending_inactive balances.
         // In general, the stake pool should not have pending_inactive balance if it still has lockup (required to vote)
         // And if pending_active will be added to active in the next epoch.
@@ -243,17 +254,6 @@ module aptos_framework::aptos_governance {
             stake::get_lockup_secs(stake_pool) >= proposal_expiration,
             error::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
         );
-
-        // Ensure the voter doesn't double vote.
-        let voting_records = borrow_global_mut<VotingRecords>(@aptos_framework);
-        let record_key = RecordKey {
-            stake_pool,
-            proposal_id,
-        };
-        assert!(
-            !table::contains(&voting_records.votes, record_key),
-            error::invalid_argument(EALREADY_VOTED));
-        table::add(&mut voting_records.votes, record_key, true);
 
         voting::vote<GovernanceProposal>(
             &governance_proposal::create_empty_proposal(),
