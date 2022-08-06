@@ -16,7 +16,6 @@ fn main() -> Result<()> {
             &GasCheck,
             &PackagePublish,
             &MintTransfer,
-            &StringArgs,
             &smoke_test::nft_transaction::NFTTransaction,
             // re-enable after delegation is enabled
             // &Staking,
