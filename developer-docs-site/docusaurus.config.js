@@ -89,9 +89,9 @@ const config = {
             position: "left",
             items: [
               {
-                label: "Move on Aptos",
+                label: "Move Guides",
                 type: "doc",
-                docId: "guides/move-guides/move-on-aptos",
+                docId: "guides/move-guides/index",
               },
               {
                 label: "Your First Move Module",
