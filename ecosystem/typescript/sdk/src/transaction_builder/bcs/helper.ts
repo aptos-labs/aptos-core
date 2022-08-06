@@ -17,6 +17,20 @@ export function serializeVector<T extends Serializable>(value: Seq<T>, serialize
 }
 
 /**
+ * Serializes a vector with specified item serializaiton function.
+ * Very dynamic function and bypasses static typechecking.
+ */
+export function serializeVectorWithFunc(value: any[], func: string): Bytes {
+  const serializer = new Serializer();
+  serializer.serializeU32AsUleb128(value.length);
+  const f = (serializer as any)[func];
+  value.forEach((item) => {
+    f.call(serializer, item);
+  });
+  return serializer.getBytes();
+}
+
+/**
  * Deserializes a vector of values.
  */
 export function deserializeVector(deserializer: Deserializer, cls: any): any[] {

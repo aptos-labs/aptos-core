@@ -44,6 +44,10 @@ impl MoveVmExt {
         extensions.add(NativeTransactionContext::new(script_hash));
         extensions.add(NativeCodeContext::default());
 
+        // The VM code loader has bugs around module upgrade. After a module upgrade, the internal
+        // cache needs to be flushed to work around those bugs.
+        self.inner.flush_loader_cache_if_invalidated();
+
         SessionExt::new(self.inner.new_session_with_extensions(remote, extensions))
     }
 }

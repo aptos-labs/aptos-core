@@ -30,10 +30,6 @@ resource "aws_eks_cluster" "aptos" {
     aws_iam_role_policy_attachment.cluster-service,
     aws_cloudwatch_log_group.eks,
   ]
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 data "aws_eks_cluster_auth" "aptos" {

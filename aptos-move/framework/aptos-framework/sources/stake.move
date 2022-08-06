@@ -262,6 +262,7 @@ module aptos_framework::stake {
         )
     }
 
+    /// Returns the validator's state.
     public fun get_validator_state(pool_address: address): u64 acquires ValidatorSet {
         let validator_set = borrow_global<ValidatorSet>(@aptos_framework);
         if (option::is_some(&find_validator(&validator_set.pending_active, pool_address))) {
@@ -275,15 +276,17 @@ module aptos_framework::stake {
         }
     }
 
-    /// Return the active staked balance of the stake pool at `pool_address`. Any pending_inactive and pending_active
-    /// stake are not considered.
-    ///
-    /// If the stake pool is not yet active, the voting power will be 0.
-    public fun get_active_staked_balance(pool_address: address): u64 acquires StakePool, ValidatorSet {
-        if (get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE) {
-            0
+    /// Return the voting power of the validator in the current epoch.
+    /// This is the same as the validator's total active and pending_inactive stake.
+    public fun get_current_epoch_voting_power(pool_address: address): u64 acquires StakePool, ValidatorSet {
+        let validator_state = get_validator_state(pool_address);
+        // Both active and pending inactive validators can still vote in the current epoch.
+        if (validator_state == VALIDATOR_STATUS_ACTIVE || validator_state == VALIDATOR_STATUS_PENDING_INACTIVE) {
+            let active_stake = coin::value<AptosCoin>(&borrow_global<StakePool>(pool_address).active);
+            let pending_inactive_stake = coin::value<AptosCoin>(&borrow_global<StakePool>(pool_address).pending_inactive);
+            active_stake + pending_inactive_stake
         } else {
-            coin::value<AptosCoin>(&borrow_global<StakePool>(pool_address).active)
+            0
         }
     }
 
@@ -1908,12 +1911,14 @@ module aptos_framework::stake {
     public fun create_stake_pool(
         account: &signer,
         active: Coin<AptosCoin>,
+        pending_inactive: Coin<AptosCoin>,
         locked_until_secs: u64,
     ) acquires OwnerCapability, StakePool {
         let account_address = signer::address_of(account);
         initialize_owner_only(account, account_address, account_address);
         let stake_pool = borrow_global_mut<StakePool>(account_address);
         coin::merge(&mut stake_pool.active, active);
+        coin::merge(&mut stake_pool.pending_inactive, pending_inactive);
         stake_pool.locked_until_secs = locked_until_secs;
     }
 }

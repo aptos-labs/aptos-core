@@ -1,21 +1,21 @@
 <%= content_tag :header, **@rest do %>
 
-  <a class="flex flex-nowrap gap-2 md:gap-4 h-16 mr-auto" href="/" title="Aptos - Building the safest and most scalable Layer 1 blockchain">
+  <a class="z-10 flex flex-nowrap gap-2 md:gap-4 h-16 mr-auto" href="/" title="Aptos - Building the safest and most scalable Layer 1 blockchain">
     <%= render IconComponent.new(:aptos, class: 'w-8') %>
   </a>
 
-  <nav class="hidden md:flex md:h-full items-center text-base flex-row flex-wrap md:justify-end mr-16 lg:mr-32 font-mono text-sm open:flex open:absolute open:max-h-[calc(100vh-4rem)] open:overflow-y-auto open:top-16 open:left-0 open:right-0 open:gap-2 open:p-10 open:bg-neutral-800 open:m-0" data-header-target="nav">
-    <ul class="flex flex-col md:flex-row md:gap-8 lg:gap-12 w-full md:h-full">
+  <nav class="shadow-2xl xl:absolute xl:left-0 xl:w-full xl:justify-center mr-10 lg:mr-16 hidden md:flex md:h-full items-center text-base flex-row flex-wrap font-mono text-sm open:flex open:absolute open:max-h-[calc(100vh-4rem)] open:overflow-y-auto open:top-16 open:left-0 open:right-0 open:gap-2 open:p-10 open:bg-neutral-800 open:m-0" data-header-target="nav">
+    <ul class="flex flex-col md:flex-row md:gap-12 lg:gap-16 xl:gap-24 w-full md:h-full md:w-auto">
     <% nav_groups.each do |group| %>
       <li class="group py-4 first:pt-0 last:pb-0 md:first:pt-4 md:last:pb-4 relative md:flex items-center border-b border-neutral-700 last:border-none md:border-none" data-action="mouseover->header#navGroupHover click->header#navGroupToggle">
-        <%= content_tag :a, group.item.name, href: group.item.url, title: group.item.title, class: 'text-base md:text-sm lg:text-base text-neutral-100 hover:text-teal-400 md:hover:text-white', target: group.item.url.starts_with?('http') ? '_blank' : '', data: { action: group.item.url == '#' ? 'click->header#preventDefault' : nil } %>
+        <%= content_tag :a, group.item.name, href: group.item.url, title: group.item.title, class: 'md:cursor-default text-base md:text-sm lg:text-base text-neutral-100 hover:text-teal-400 md:group-hover:text-neutral-400', target: group.item.url.starts_with?('http') ? '_blank' : '', data: { action: group.item.url == '#' ? 'click->header#preventDefault' : nil } %>
         <% if group.children.length > 0 %>
         <div class="absolute hidden md:group-focus-within:flex md:group-hover:flex h-[3px] bottom-0 left-0 right-0 rounded bg-teal-400"></div>
         <button class="md:hidden float-right mt-[5px] rotate-180">
           <%= render IconComponent.new(:accordion_arrow, size: :small) %>
         </button>
         <div class="hidden max-sm:open:flex md:group-focus-within:flex md:group-hover:flex md:absolute md:top-full md:-ml-8">
-          <ul class="flex-1 md:mt-[1px] md:bg-neutral-800 md:rounded md:p-8 md:min-w-[270px] md:shadow">
+          <ul class="flex-1 md:mt-[1px] md:bg-neutral-800 md:rounded-lg md:px-8 md:py-4 md:min-w-[270px] md:shadow-2xl">
             <% group.children.each do |item| %>
               <li class="my-4 md:py-4 md:my-0 last:mb-0 text-base ml-4 md:ml-0 md:border-b border-neutral-700 last:border-none">
                 <%= content_tag :a, item.name, href: item.url, title: item.title, class: 'text-neutral-100 hover:text-teal-400 block w-full', target: item.url.starts_with?('http') ? '_blank' : '' %>
@@ -31,7 +31,7 @@
 
   <% if @user %>
     <div class="relative">
-      <button data-action="click->header#toggleUser" class="w-8 h-8 bg-transparent border border-1 border-neutral-300 hover:bg-neutral-800 text-neutral-300 font-semibold rounded-lg inline-flex items-center justify-center hover:border-2 hover:border-teal-400 overflow-hidden">
+      <button data-action="click->header#toggleUser" class="w-8 h-8 bg-transparent border border-1 border-teal-400 ring-teal-400 hover:ring-1 hover:bg-neutral-800 text-teal-300 font-semibold rounded-lg inline-flex items-center justify-center overflow-hidden">
         <span>
         <% if @user&.username? %>
         <%= @user.username&.first&.upcase %>
@@ -41,24 +41,24 @@
         </span>
       </button>
       <div data-header-target="user" class="hidden open:flex absolute top-full right-0 mt-4 origin-top-right transition-opacity duration-150 cursor-default">
-        <div class="text-gray-700 p-2 bg-black/95 border-neutral-800 rounded-b-lg min-w-fit shadow whitespace-nowrap w-48 flex flex-col gap-2">
+        <div class="text-gray-700 p-2 bg-neutral-800 border-neutral-800 rounded-b-lg min-w-fit shadow whitespace-nowrap w-48 flex flex-col gap-2 shadow-2xl">
         <% if @user&.username? %>
-          <div class="text-teal-400 px-3 py-2 font-mono"><%= @user.username %></div>
+          <div class="text-neutral-50 px-3 py-2 font-mono"><%= @user.username %></div>
           <div class="block h-px bg-neutral-500"></div>
         <% end %>
           <ul>
             <% user_nav_items.each do |item| %>
-              <%= content_tag :a, item.name, href: item.url, title: item.title, class: 'rounded-lg py-2 px-4 block whitespace-no-wrap bg-transparent hover:bg-neutral-800 text-neutral-300 hover:text-white font-mono uppercase text-sm', target: item.url.starts_with?('http') ? '_blank' : '' %>
+              <%= content_tag :a, item.name, href: item.url, title: item.title, class: 'rounded-lg py-2 px-4 block whitespace-no-wrap bg-transparent text-neutral-300 hover:text-teal-400 font-mono capitalize text-sm', target: item.url.starts_with?('http') ? '_blank' : '' %>
             <% end %>
           </ul>
         </div>
       </div>
     </div>
   <% else %>
-    <a title="Sign in" href="<%= new_user_session_path %>" class="h-8 font-mono font-bold text-sm flex items-center justify-center leading-none py-1 px-8 rounded-lg bg-teal-400 hover:brightness-105 text-neutral-800 z-20">Sign in</a>
+    <a title="Sign in" href="<%= new_user_session_path %>" class="h-8 font-mono font-normal text-sm flex items-center justify-center leading-none py-1 px-8 rounded-lg border border-teal-400 text-teal-300 ring-teal-400 hover:ring-1 hover:bg-neutral-800 hover:text-teal-300 uppercase z-20">Sign in</a>
   <% end %>
 
-  <button class="md:hidden flex-nowrap hover:text-teal-400" aria-label="Toggle navigation" data-header-target="navButton" data-action="click->header#toggleNav">
+  <button class="md:hidden flex-nowrap hover:text-neutral-300" aria-label="Toggle navigation" data-header-target="navButton" data-action="click->header#toggleNav">
     <%= render IconComponent.new(:hamburger, size: :medium) %>
     <%= render IconComponent.new(:close, size: :medium, class: 'hidden') %>
   </button>

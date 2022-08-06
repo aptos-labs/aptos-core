@@ -20,10 +20,6 @@ FORGE_OUTPUT=${FORGE_OUTPUT:-$(mktemp)}
 FORGE_REPORT=${FORGE_REPORT:-$(mktemp)}
 FORGE_PRE_COMMENT=${FORGE_PRE_COMMENT:-$(mktemp)}
 FORGE_COMMENT=${FORGE_COMMENT:-$(mktemp)}
-echo "FORGE_OUTPUT: ${FORGE_OUTPUT}"
-echo "FORGE_REPORT: ${FORGE_REPORT}"
-echo "FORGE_PRE_COMMENT: ${FORGE_PRE_COMMENT}"
-echo "FORGE_COMMENT: ${FORGE_COMMENT}"
 
 # cluster auth
 AWS_ACCOUNT_NUM=${AWS_ACCOUNT_NUM:-$(aws sts get-caller-identity | jq -r .Account)}
@@ -49,6 +45,13 @@ FORGE_RUNNER_TPS_THRESHOLD=${FORGE_RUNNER_TPS_THRESHOLD:-400}
 [ "$FORGE_NAMESPACE_REUSE" = "true" ] && REUSE_ARGS="--reuse"
 [ "$FORGE_NAMESPACE_KEEP" = "true" ] && KEEP_ARGS="--keep"
 [ "$FORGE_ENABLE_HAPROXY" = "true" ] && ENABLE_HAPROXY_ARGS="--enable-haproxy"
+
+print_output_files() {
+    echo "FORGE_OUTPUT: ${FORGE_OUTPUT}"
+    echo "FORGE_REPORT: ${FORGE_REPORT}"
+    echo "FORGE_PRE_COMMENT: ${FORGE_PRE_COMMENT}"
+    echo "FORGE_COMMENT: ${FORGE_COMMENT}"
+}
 
 # Set variables for o11y resource locations depending on the type of cluster that is running Forge
 set_o11y_resources() {
@@ -85,8 +88,8 @@ set_image_tag() {
         for i in $(seq 0 $commit_threshold); do
             IMAGE_TAG_DEFAULT=$(git rev-parse HEAD~$i)
             echo "Trying tag: ${IMAGE_TAG_DEFAULT}"
-            git log --format=%B -n 1 $IMAGE_TAG_DEFAULT
-            img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG_DEFAULT)
+            git --no-pager log --format=%B -n 1 $IMAGE_TAG_DEFAULT
+            img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG_DEFAULT 2>/dev/null)
             if [ "$?" -eq 0 ]; then
                 echo "Image tag exists. Using tag: ${IMAGE_TAG_DEFAULT}"
                 IMAGE_TAG=$IMAGE_TAG_DEFAULT
@@ -145,6 +148,8 @@ get_dashboard_link() {
     FORGE_DASHBOARD_LINK="${GRAFANA_BASE_URL}&var-namespace=${FORGE_NAMESPACE}&var-chain_name=${FORGE_CHAIN_NAME}${GRAFANA_TIME_FILTER}"
 }
 
+print_output_files
+
 # determine cluster name from kubectl context and set o11y resources
 FORGE_CLUSTER_NAME=$(kubectl config current-context | grep -oE 'aptos.*')
 echo "Using cluster ${FORGE_CLUSTER_NAME} from current kubectl context"
@@ -186,7 +191,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     ulimit -n 1048576
 
     cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 5000 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
-        --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD --duration-secs $FORGE_RUNNER_DURATION_SECS  \
+        --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD --duration-secs $FORGE_RUNNER_DURATION_SECS \
         test k8s-swarm \
         --image-tag $IMAGE_TAG \
         --namespace $FORGE_NAMESPACE \
@@ -240,7 +245,7 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
 
     if [ "$forge_pod_status" = "Succeeded" ]; then # the current pod succeeded
         FORGE_EXIT_CODE=0
-    elif echo $forge_pod_status | grep -E "(not found)|(not found)"; then # the current test in this namespace was likely preempted and deleted
+    elif echo $forge_pod_status | grep -E "(not found)|(NotFound)"; then # the current test in this namespace was likely preempted and deleted
         FORGE_EXIT_CODE=10
     else # it did not succeed
         FORGE_EXIT_CODE=1
@@ -295,11 +300,9 @@ get_validator_logs_link
 if [ "$FORGE_EXIT_CODE" = "0" ]; then
     FORGE_COMMENT_HEADER="### :white_check_mark: Forge test success on \`${IMAGE_TAG}\`"
 elif [ "$FORGE_EXIT_CODE" = "2" ]; then
-    FORGE_COMMENT_HEADER"### :x: Forge test perf regression on \`${IMAGE_TAG}\`"
+    FORGE_COMMENT_HEADER="### :x: Forge test perf regression on \`${IMAGE_TAG}\`"
 elif [ "$FORGE_EXIT_CODE" = "10" ]; then
-    FORGE_COMMENT_HEADER"### :thought_balloon: Forge test preempted on \`${IMAGE_TAG}\`"
-    # don't actually fail if tests pre-empted
-    FORGE_EXIT_CODE=0
+    FORGE_COMMENT_HEADER="### :thought_balloon: Forge test preempted on \`${IMAGE_TAG}\`"
 else
     FORGE_COMMENT_HEADER="### :x: Forge test failure on \`${IMAGE_TAG}\`"
 fi
@@ -318,6 +321,8 @@ cat $FORGE_COMMENT
 echo "=====END FORGE COMMENT====="
 
 echo "Forge exit with: $FORGE_EXIT_CODE"
+
+print_output_files
 
 # report metrics to pushgateway
 echo "forge_job_status {FORGE_EXIT_CODE=\"$FORGE_EXIT_CODE\",FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\"} $GITHUB_RUN_ID" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge
