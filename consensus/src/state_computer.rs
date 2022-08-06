@@ -136,15 +136,6 @@ impl StateComputer for ExecutionProxy {
         )
         .expect("spawn_blocking failed")?;
 
-//             self.executor.execute_block(
-//                 (
-//                     block.id(),
-//                     block.transactions_to_execute(&self.validators.lock(), txns.clone())
-//                 ),
-//                 parent_block_id
-//             )
-//         )?;
-// >>>>>>> e844180ce0 (QuorumStore all squash)
         observe_block(block.timestamp_usecs(), BlockStage::EXECUTED);
 
         // notify mempool about failed transaction

@@ -5,14 +5,9 @@ use crate::error::MempoolError;
 use crate::monitor;
 use anyhow::{format_err, Result};
 use aptos_mempool::QuorumStoreRequest;
-// <<<<<<< HEAD
-// use aptos_types::transaction::TransactionStatus;
-// use consensus_types::{block::Block, common::TransactionSummary};
-// =======
 use aptos_metrics_core::monitor;
 use aptos_types::transaction::{SignedTransaction, TransactionStatus};
 use consensus_types::common::TransactionSummary;
-// >>>>>>> e844180ce0 (QuorumStore all squash)
 use executor_types::StateComputeResult;
 use futures::channel::{mpsc, oneshot};
 use itertools::Itertools;
