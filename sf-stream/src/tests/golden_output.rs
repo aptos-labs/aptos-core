@@ -10,8 +10,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+// TODO: Remove after we add back golden
+#[allow(dead_code)]
 pub const GOLDEN_DIR_PATH: &str = "goldens";
 
+// TODO: Remove after we add back golden
+#[allow(dead_code)]
 #[derive(Clone)]
 pub(crate) struct GoldenOutputs {
     #[allow(dead_code)]
@@ -19,6 +23,8 @@ pub(crate) struct GoldenOutputs {
     file: Arc<Mutex<File>>,
 }
 
+// TODO: Remove after we add back golden
+#[allow(dead_code)]
 fn golden_path(version_dir: &str) -> PathBuf {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push(GOLDEN_DIR_PATH);
@@ -26,6 +32,8 @@ fn golden_path(version_dir: &str) -> PathBuf {
     path
 }
 
+// TODO: Remove after we add back golden
+#[allow(dead_code)]
 impl GoldenOutputs {
     pub fn new(name: String, version_dir: &str) -> Self {
         let mut mint = Mint::new(golden_path(version_dir));
