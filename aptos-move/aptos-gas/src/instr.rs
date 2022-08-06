@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::gas_meter::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule};
-use move_binary_format::{
+use move_deps::move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format_common::Opcodes,
 };
-use move_core_types::vm_status::StatusCode;
+use move_deps::move_core_types::vm_status::StatusCode;
 use std::collections::BTreeMap;
 
 macro_rules! define_gas_parameters_for_instructions {

@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use move_stdlib::natives::GasParameters;
+use move_deps::move_stdlib::natives::GasParameters;
 
 crate::natives::define_gas_parameters_for_natives!(GasParameters, "move_stdlib", [
     [.bcs.to_bytes.input_unit_cost, "bcs.to_bytes.input_unit", 1],

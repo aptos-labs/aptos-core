@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{instr::InstructionGasParameters, transaction::TransactionGasParameters};
-use move_binary_format::{
+use move_deps::move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format_common::Opcodes,
 };
-use move_core_types::{
+use move_deps::move_core_types::{
     gas_schedule::{AbstractMemorySize, GasAlgebra, GasCarrier},
     vm_status::StatusCode,
 };
-use move_vm_types::gas::GasMeter;
+use move_deps::move_vm_types::gas::GasMeter;
 use std::collections::BTreeMap;
 
 pub trait FromOnChainGasSchedule: Sized {
@@ -27,7 +27,7 @@ pub trait InitialGasSchedule: Sized {
 
 #[derive(Debug, Clone)]
 pub struct NativeGasParameters {
-    pub move_stdlib: move_stdlib::natives::GasParameters,
+    pub move_stdlib: move_deps::move_stdlib::natives::GasParameters,
     pub aptos_framework: framework::natives::GasParameters,
 }
 
@@ -51,7 +51,7 @@ impl ToOnChainGasSchedule for NativeGasParameters {
 impl NativeGasParameters {
     pub fn zeros() -> Self {
         Self {
-            move_stdlib: move_stdlib::natives::GasParameters::zeros(),
+            move_stdlib: move_deps::move_stdlib::natives::GasParameters::zeros(),
             aptos_framework: framework::natives::GasParameters::zeros(),
         }
     }

@@ -502,10 +502,7 @@ name = "aptos-gas"
 version = "0.1.0"
 dependencies = [
  "framework",
- "move-binary-format",
- "move-core-types",
- "move-stdlib",
- "move-vm-types",
+ "move-deps",
 ]
 
 [[package]]
