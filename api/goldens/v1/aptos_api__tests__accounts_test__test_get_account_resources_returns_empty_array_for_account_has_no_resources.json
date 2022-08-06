@@ -959,8 +959,15 @@
       "generic_type_params": []
     },
     "data": {
-      "signer_cap": {
-        "account": "0x1"
+      "signer_caps": {
+        "data": [
+          {
+            "key": "0x1",
+            "value": {
+              "account": "0x1"
+            }
+          }
+        ]
       }
     }
   },

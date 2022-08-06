@@ -850,8 +850,15 @@
   {
     "type": "0x1::aptos_governance::GovernanceResponsbility",
     "data": {
-      "signer_cap": {
-        "account": "0x1"
+      "signer_caps": {
+        "data": [
+          {
+            "key": "0x1",
+            "value": {
+              "account": "0x1"
+            }
+          }
+        ]
       }
     }
   },
