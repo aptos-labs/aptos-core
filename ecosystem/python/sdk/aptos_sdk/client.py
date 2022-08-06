@@ -16,9 +16,6 @@ from .transactions import (MultiAgentRawTransaction, RawTransaction,
                            TransactionArgument, TransactionPayload)
 from .type_tag import StructTag, TypeTag
 
-TESTNET_URL = "https://fullnode.devnet.aptoslabs.com"
-FAUCET_URL = "https://faucet.devnet.aptoslabs.com"
-
 U64_MAX = 18446744073709551615
 
 

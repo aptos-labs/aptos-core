@@ -20,14 +20,14 @@ Currently this is still in development and is unsuitable for directly interfacin
 
 To run all unit tests:
 ```bash
-python3 -m unittest discover -s aptos_sdk/ -p '*.py'
+python3 -m unittest discover -s aptos_sdk/ -p '*.py' -t ..
 ```
 
 To run all end-to-end tests:
 ```bash
 ln -s `pwd`/aptos_sdk examples/
-python3 aptos_sdk/coin.py
-python3 aptos_sdk/token.py
+python3 -m examples.coin
+python3 -m examples.token
 ```
 
 Note: end-to-end tests rely on [Aptos Devnet](https://aptos.dev/guides/getting-started#aptos-devnet).
