@@ -276,7 +276,7 @@ impl SparseMerkleProof {
 /// attempt to extend their accumulator summary with an [`AccumulatorConsistencyProof`]
 /// to verifiably ratchet their trusted view of the accumulator to a newer state.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct TransactionAccumulatorSummary(InMemoryAccumulator<TransactionAccumulatorHasher>);
+pub struct TransactionAccumulatorSummary(pub InMemoryAccumulator<TransactionAccumulatorHasher>);
 
 impl TransactionAccumulatorSummary {
     pub fn new(accumulator: InMemoryAccumulator<TransactionAccumulatorHasher>) -> Result<Self> {

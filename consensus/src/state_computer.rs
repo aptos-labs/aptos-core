@@ -228,7 +228,7 @@ impl StateComputer for ExecutionProxy {
 
         // Similarly, after the state synchronization, we have to reset the cache
         // of BlockExecutor to guarantee the latest committed state is up to date.
-        self.executor.reset();
+        self.executor.reset()?;
 
         res.map_err(|error| {
             let anyhow_error: anyhow::Error = error.into();
