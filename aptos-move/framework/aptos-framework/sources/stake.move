@@ -300,6 +300,28 @@ module aptos_framework::stake {
         borrow_global<StakePool>(pool_address).operator_address
     }
 
+    /// Return the pool address in `owner_cap`.
+    public fun get_owned_pool_address(owner_cap: &OwnerCapability): address {
+        owner_cap.pool_address
+    }
+
+    /// Return the validator index for `pool_address`.
+    public fun get_validator_index(pool_address: address): u64 acquires ValidatorConfig {
+        borrow_global<ValidatorConfig>(pool_address).validator_index
+    }
+
+    /// Return the number of successful and failed proposals for the proposal at the given validator index.
+    public fun get_current_epoch_proposal_counts(validator_index: u64): (u64, u64) acquires ValidatorPerformance {
+        let validator_performances = &borrow_global<ValidatorPerformance>(@aptos_framework).validators;
+        let validator_performance = vector::borrow(validator_performances, validator_index);
+        (validator_performance.successful_proposals, validator_performance.failed_proposals)
+    }
+
+    /// Return the validator's config.
+    public fun get_validator_config(pool_address: address): (vector<u8>, vector<u8>, vector<u8>) acquires ValidatorConfig {
+        let validator_config = borrow_global<ValidatorConfig>(pool_address);
+        (validator_config.consensus_pubkey, validator_config.network_addresses, validator_config.fullnode_addresses)
+    }
 
     /// Initialize validator set to the core resource account.
     public fun initialize(aptos_framework: &signer) {
@@ -365,7 +387,6 @@ module aptos_framework::stake {
             validator_index: 0,
         });
     }
-
 
     fun initialize_owner(account: &signer) {
         let account_address = signer::address_of(account);
@@ -451,7 +472,7 @@ module aptos_framework::stake {
     }
 
     /// Allows an owner to change the delegated voter of the stake pool.
-    public entry fun set_delegated_voter_with_cap(
+    public fun set_delegated_voter_with_cap(
         pool_address: address,
         owner_cap: &OwnerCapability,
         new_delegated_voter: address,
