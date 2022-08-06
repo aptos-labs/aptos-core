@@ -11,8 +11,6 @@ This tutorial walks you through the steps for writing and running end-to-end Mov
 
 Compared to the Move unit tests, which are useful for verifying the intra-module code correctness, the Move transactional tests enable you to test a broader spectrum of use cases, such as publishing the Move modules and the inter-module interactions. 
 
-The Move transactional tests are used in combination with the Aptos Move Framework, the Aptos Move adapter, and an in-memory state store. See [`aptos-move`](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move).
-
 ## Overview
 
 See this `aptos_test_harness` [GitHub folder](https://github.com/aptos-labs/aptos-core/tree/main/aptos-move/aptos-transactional-test-harness/tests/aptos_test_harness) for how Move transactional tests look like. 
