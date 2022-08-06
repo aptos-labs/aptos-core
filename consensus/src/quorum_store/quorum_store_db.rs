@@ -42,7 +42,7 @@ impl QuorumStoreDB {
     }
 
     pub(crate) fn delete_batches(&self, digests: Vec<HashValue>) -> Result<(), DbError> {
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         for digest in digests.iter() {
             debug!("QS: db delete digest {}", digest);
             batch.delete::<BatchSchema>(digest)?;
@@ -74,7 +74,7 @@ impl QuorumStoreDB {
     }
 
     fn delete_batch_id(&self, epoch: u64) -> Result<(), DbError> {
-        let mut batch = SchemaBatch::new();
+        let batch = SchemaBatch::new();
         batch.delete::<BatchIdSchema>(&epoch)?;
         self.db.write_schemas(batch)?;
         Ok(())

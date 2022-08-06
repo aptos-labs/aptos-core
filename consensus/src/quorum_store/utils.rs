@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::monitor;
 use crate::quorum_store::types::{BatchId, SerializedTransaction};
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
-use aptos_metrics_core::monitor;
 use aptos_types::transaction::SignedTransaction;
 use chrono::Utc;
 use consensus_types::common::{Round, TransactionSummary};
