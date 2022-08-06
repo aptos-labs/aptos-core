@@ -10,8 +10,8 @@ use crate::{
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
     MoveResource, MoveScriptBytecode, MoveValue, PendingTransaction, ScriptFunctionId,
     ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
-    TransactionInfo, TransactionOnChainData, TransactionPayload, UserTransactionRequest, WriteSet,
-    WriteSetChange, WriteSetPayload,
+    TransactionInfo, TransactionOnChainData, TransactionPayload, UserTransactionRequest,
+    VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -20,7 +20,7 @@ use aptos_types::state_store::table::TableHandle;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, EventWithVersion},
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, ModuleBundle, RawTransaction, Script, ScriptFunction, SignedTransaction,
@@ -358,6 +358,20 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             let data = self
                 .inner
                 .view_value(event.type_tag(), event.event_data())?;
+            ret.push((event, MoveValue::try_from(data)?.json()?).into());
+        }
+        Ok(ret)
+    }
+
+    pub fn try_into_versioned_events(
+        &self,
+        events: &[EventWithVersion],
+    ) -> Result<Vec<VersionedEvent>> {
+        let mut ret = vec![];
+        for event in events {
+            let data = self
+                .inner
+                .view_value(event.event.type_tag(), event.event.event_data())?;
             ret.push((event, MoveValue::try_from(data)?.json()?).into());
         }
         Ok(ret)

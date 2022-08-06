@@ -46,7 +46,7 @@ pub use transaction::{
     ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction, TransactionData,
     TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
     TransactionSignature, TransactionSigningMessage, UserCreateSigningMessageRequest,
-    UserTransaction, UserTransactionRequest, WriteModule, WriteResource, WriteSet, WriteSetChange,
-    WriteSetPayload, WriteTableItem,
+    UserTransaction, UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet,
+    WriteSetChange, WriteSetPayload, WriteTableItem,
 };
 pub use wrappers::{IdentifierWrapper, MoveStructTagParam};
