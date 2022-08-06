@@ -34,8 +34,9 @@ The Aptos Move adapter features include:
 * [Tables](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/table.move) for storing key, value data within an account at scale
 * Parallelism via [Block-STM](https://medium.com/aptoslabs/block-stm-how-we-execute-over-160k-transactions-per-second-on-the-aptos-blockchain-3b003657e4ba) that enables concurrent execution of transactions without any input from the user
 
+
 The Aptos framework ships with many useful libraries:
-* A [Token standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/token.move) that makes it possible to create NFTs and other rich tokens without publishing a smart contract
+* A [Token standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move) that makes it possible to create NFTs and other rich tokens without publishing a smart contract
 * A [Coin standard](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move) that makes it possible to create type-safe Coins by publishing a trivial module
 * An [iterable Table](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-stdlib/sources/iterable_table.move) that allows for traversing all the entries within a table
 * A staking and delegation framework
