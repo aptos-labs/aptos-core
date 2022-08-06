@@ -36,9 +36,9 @@ module aptos_framework::aptos_governance {
     const EALREADY_VOTED: u64 = 4;
     const ENO_VOTING_POWER: u64 = 5;
 
-    /// Store the SignerCapability of the framework account (0x1) so AptosGovernance can have control over it.
+    /// Store the SignerCapabilities of accounts under the on-chain governance's control.
     struct GovernanceResponsbility has key {
-        signer_cap: SignerCapability,
+        signer_caps: Table<address, SignerCapability>,
     }
 
     /// Configurations of the AptosGovernance, set during Genesis and can be updated by the same process offered
@@ -95,10 +95,17 @@ module aptos_framework::aptos_governance {
     /// Stores the signer capability for 0x1.
     public fun store_signer_cap(
         aptos_framework: &signer,
+        signer_address: address,
         signer_cap: SignerCapability,
-    ) {
+    ) acquires GovernanceResponsbility {
         system_addresses::assert_aptos_framework(aptos_framework);
-        move_to(aptos_framework, GovernanceResponsbility { signer_cap });
+
+        if (!exists<GovernanceResponsbility>(@aptos_framework)) {
+            move_to(aptos_framework, GovernanceResponsbility{ signer_caps: table::new<address, SignerCapability>() });
+        };
+
+        let signer_caps = &mut borrow_global_mut<GovernanceResponsbility>(@aptos_framework).signer_caps;
+        table::add(signer_caps, signer_address, signer_cap);
     }
 
     /// Initializes the state for Aptos Governance. Can only be called during Genesis with a signer
@@ -277,9 +284,10 @@ module aptos_framework::aptos_governance {
     }
 
     /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
-    public fun get_framework_signer(_proposal: GovernanceProposal): signer acquires GovernanceResponsbility {
+    public fun get_signer(_proposal: GovernanceProposal, signer_address: address): signer acquires GovernanceResponsbility {
         let governance_responsibility = borrow_global<GovernanceResponsbility>(@aptos_framework);
-        create_signer_with_capability(&governance_responsibility.signer_cap)
+        let signer_cap = table::borrow(&governance_responsibility.signer_caps, signer_address);
+        create_signer_with_capability(signer_cap)
     }
 
     /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
