@@ -38,6 +38,7 @@ table! {
         type_ -> Text,
         data -> Jsonb,
         inserted_at -> Timestamp,
+        verylargenumber -> Numeric,
     }
 }
 

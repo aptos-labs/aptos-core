@@ -3,7 +3,8 @@
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{models::transactions::Transaction, schema::events};
 use aptos_rest_client::aptos_api_types::Event as APIEvent;
-use serde::Serialize;
+use diesel::{data_types::PgNumeric};
+use serde::{Serialize, Serializer};
 
 #[derive(Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
 #[diesel(table_name = "events")]
@@ -16,6 +17,7 @@ pub struct Event {
     #[diesel(column_name = type)]
     pub type_: String,
     pub data: serde_json::Value,
+    pub verylargenumber: PgNumeric,
 
     // Default time columns
     pub inserted_at: chrono::NaiveDateTime,
@@ -30,6 +32,11 @@ impl Event {
             type_: event.typ.to_string(),
             data: event.data.clone(),
             inserted_at: chrono::Utc::now().naive_utc(),
+            verylargenumber: PgNumeric::Positive {
+                weight: 20,
+                scale: 20,
+                digits: vec![111, 111, 111],
+            },
         }
     }
 
@@ -43,6 +50,15 @@ impl Event {
                 .map(|event| Self::from_event(transaction_hash.clone(), event))
                 .collect::<Vec<EventModel>>(),
         )
+    }
+}
+
+impl Serialize for PgNumeric {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        Ok("")
     }
 }
 
