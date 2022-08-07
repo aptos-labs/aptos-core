@@ -28,17 +28,13 @@ macro_rules! log {
 /// Log at the `trace` level
 #[macro_export]
 macro_rules! trace {
-    ($($arg:tt)+) => {
-        $crate::log!($crate::Level::Trace, $($arg)+)
-    };
+    ($($arg:tt)+) => { {()} };
 }
 
 /// Log at the `debug` level
 #[macro_export]
 macro_rules! debug {
-    ($($arg:tt)+) => {
-        $crate::log!($crate::Level::Debug, $($arg)+)
-    };
+    ($($arg:tt)+) => { {()} };
 }
 
 /// Log at the `info` level
