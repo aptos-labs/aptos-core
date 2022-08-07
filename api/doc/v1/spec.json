@@ -479,7 +479,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Event"
+                    "$ref": "#/components/schemas/VersionedEvent"
                   }
                 }
               },
@@ -633,7 +633,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Event"
+                    "$ref": "#/components/schemas/VersionedEvent"
                   }
                 }
               },
@@ -3608,6 +3608,31 @@
           "timestamp": {
             "$ref": "#/components/schemas/U64"
           }
+        }
+      },
+      "VersionedEvent": {
+        "type": "object",
+        "required": [
+          "version",
+          "key",
+          "sequence_number",
+          "type",
+          "data"
+        ],
+        "properties": {
+          "version": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "key": {
+            "$ref": "#/components/schemas/EventKey"
+          },
+          "sequence_number": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "type": {
+            "$ref": "#/components/schemas/MoveType"
+          },
+          "data": {}
         }
       },
       "WriteModule": {
