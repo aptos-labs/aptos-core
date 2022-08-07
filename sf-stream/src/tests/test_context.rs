@@ -81,6 +81,7 @@ pub fn new_test_context(test_name: &str, fake_start_time_usecs: u64) -> TestCont
     )
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct TestContext {
     pub context: Context,
@@ -96,6 +97,8 @@ pub struct TestContext {
     fake_time_usecs: u64,
 }
 
+// TODO: Remove after we add back golden
+#[allow(dead_code)]
 impl TestContext {
     pub fn new(
         context: Context,

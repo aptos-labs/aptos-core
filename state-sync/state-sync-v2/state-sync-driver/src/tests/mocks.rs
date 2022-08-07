@@ -38,7 +38,7 @@ use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;
 use std::sync::Arc;
 use storage_interface::{
-    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order, StartupInfo,
+    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order,
     StateSnapshotReceiver,
 };
 use tokio::task::JoinHandle;
@@ -226,8 +226,6 @@ mock! {
         fn get_latest_version(&self) -> Result<Version>;
 
         fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
-
-        fn get_startup_info(&self) -> Result<Option<StartupInfo>>;
 
         fn get_account_transaction(
             &self,

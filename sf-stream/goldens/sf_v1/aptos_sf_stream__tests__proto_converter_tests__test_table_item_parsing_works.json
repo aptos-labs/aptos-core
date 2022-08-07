@@ -4,22 +4,22 @@
     "version": "1",
     "info": {
       "hash": "",
-      "stateRootHash": "HMrdtIsVJVa/+d7HWaNbMM/zS8BF7norqgbBkz3p2Ks=",
+      "stateRootHash": "iYEvhbkSNnNDiXT9ExB4W708VlkI884lDdkE1RxJJIc=",
       "eventRootHash": "YPVlJld+KeJV8TgWig4e7McIG/o+rxMn60yg554WVK8=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "oOIH0kJLwOz4Fojgbwggc6H0gHiPjEi1XNVwS1gOnas=",
+      "accumulatorRootHash": "R6KyDDh+zwSKR3qcY+eTF8Ftio9f074CF6DKCMmxkUc=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
           "writeResource": {
             "address": "0x1",
-            "stateKeyHash": "6sO7UL7trkAOL8sktJEcuvYWRdVuqkohPoNUZG7Xu+I=",
+            "stateKeyHash": "Xd9ATGDpbpSFvq/Ku5Vgn+2OOOlBpyXK5Nzsgpb7Mtc=",
             "data": {
               "type": {
                 "address": "0x1",
                 "module": "block",
-                "name": "BlockMetadata"
+                "name": "BlockResource"
               },
               "data": "{\"epoch_interval\":\"86400000000\",\"height\":\"1\",\"new_block_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"2\"}}}}"
             }
@@ -93,10 +93,10 @@
       "hash": "",
       "stateRootHash": "YG7T1XbAbLw8rukc5IW1gXFV/pn3u9L0J6tanOnasJk=",
       "eventRootHash": "6llLf9EwoZ37+xJflmiRHF3KOw3ClFeYXcASEj/i/XA=",
-      "gasUsed": "41112",
+      "gasUsed": "42",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "PntUWjwOexjEQQwanSv9fKlxHNd+cOKzlnjx2SAKb6k=",
+      "accumulatorRootHash": "f//BcLmRLEdsIqSF8jPbl/sRV0RZV0TiIbRJXWmABgQ=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -225,7 +225,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "Mrh8bH0CcgBYQ+zGZLaEauKRinLDnC3TT+gyQwpvKwQ="
+      "accumulatorRootHash": "hLgWncFBf60gLOi50vJVl0Me8R+290+1iluwNup4Hww="
     },
     "blockHeight": "1",
     "type": "STATE_CHECKPOINT",
@@ -236,22 +236,22 @@
     "version": "4",
     "info": {
       "hash": "",
-      "stateRootHash": "IgXl5+mXAlNwsF1hdKotKiYyZNosBsSc8YfUXazO3fg=",
+      "stateRootHash": "m4ptjaw8oBdnUsyQK/vh6IPhHCLEkaGSWjG5lV037Ic=",
       "eventRootHash": "xQa4qACFHx4YpbLjBVf8UKi4CXw95t7b2M90GQXvP8Y=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "PkWNytNc8Uq5LBNVgLxpCkflfwtkE7e+tqOPdeu7XZI=",
+      "accumulatorRootHash": "79URpHVGxWiKJQswAA2NSArV7yNrmLb7jw8s3492QkY=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
           "writeResource": {
             "address": "0x1",
-            "stateKeyHash": "6sO7UL7trkAOL8sktJEcuvYWRdVuqkohPoNUZG7Xu+I=",
+            "stateKeyHash": "Xd9ATGDpbpSFvq/Ku5Vgn+2OOOlBpyXK5Nzsgpb7Mtc=",
             "data": {
               "type": {
                 "address": "0x1",
                 "module": "block",
-                "name": "BlockMetadata"
+                "name": "BlockResource"
               },
               "data": "{\"epoch_interval\":\"86400000000\",\"height\":\"2\",\"new_block_events\":{\"counter\":\"3\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"2\"}}}}"
             }
@@ -325,10 +325,10 @@
       "hash": "",
       "stateRootHash": "uUbfqPVcD0wmLXsmEN+OU7I0s9OJgAGUat0irSdNBMA=",
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
-      "gasUsed": "4496",
+      "gasUsed": "5",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "ize1Hyh2Eia/hbeI4bSNBkOemoiDXBS0eMg61IOriic=",
+      "accumulatorRootHash": "8U+NHsvO1tyBaDYufQ5xaM1Nl0/G2nIytxtkV4LQ/cc=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -947,7 +947,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "toXQK8x7iX65UeexD3/qkNTJ+wAWpp1LqS7HNMpDF6Q="
+      "accumulatorRootHash": "jqs3i4yVQK9Sfs3sOAkLg800d8UiUZS4zknJK7aHr2k="
     },
     "blockHeight": "2",
     "type": "STATE_CHECKPOINT",
@@ -958,22 +958,22 @@
     "version": "7",
     "info": {
       "hash": "",
-      "stateRootHash": "hXJt1jwPvTfGByMuduopjMo3l3jkiNLJGbPANEQcyMI=",
+      "stateRootHash": "XlsJd+Z95ooGG0U3uGoPafOOCeF0Zs/AWKLmF/ufipM=",
       "eventRootHash": "dliD7Dy093TZN3Zy5Vpvn9Jb7Q3dr30c4Jc4Sa/Z7Ew=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "aBUDmSV0ZNHrWEtKTClN4GIewZczwzibLuaZpM4yWRQ=",
+      "accumulatorRootHash": "oMDC5lZaArc+JH+1BxDf8ugj/+isAFPcphSPDZeNoxI=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
           "writeResource": {
             "address": "0x1",
-            "stateKeyHash": "6sO7UL7trkAOL8sktJEcuvYWRdVuqkohPoNUZG7Xu+I=",
+            "stateKeyHash": "Xd9ATGDpbpSFvq/Ku5Vgn+2OOOlBpyXK5Nzsgpb7Mtc=",
             "data": {
               "type": {
                 "address": "0x1",
                 "module": "block",
-                "name": "BlockMetadata"
+                "name": "BlockResource"
               },
               "data": "{\"epoch_interval\":\"86400000000\",\"height\":\"3\",\"new_block_events\":{\"counter\":\"4\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"2\"}}}}"
             }
@@ -1047,10 +1047,10 @@
       "hash": "",
       "stateRootHash": "hgU5GHSlMITe6kaSFqqBOS+j5mNWJ+rxUVMDEc1AAXE=",
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
-      "gasUsed": "28029",
+      "gasUsed": "29",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "OtK8xZ8TwRcEn29OHftffEjYPOABVemTulgsyzR1NcA=",
+      "accumulatorRootHash": "HDsfSVtZlm/x6p6I6atKRqLEBtOTzBDrr6yqllChV4A=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -1290,7 +1290,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "NjDSHBoxy2hKdcsCRp8qW52iJPmIAAzHHgPcniSmX7o="
+      "accumulatorRootHash": "IECaKYWbKo3nZ992pZpHeKokPQnHruybjuLb+Kf9KoE="
     },
     "blockHeight": "3",
     "type": "STATE_CHECKPOINT",

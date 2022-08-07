@@ -6,7 +6,7 @@ CREATE TABLE collections
     creator VARCHAR NOT NULL,
     name VARCHAR NOT NULL,
     description VARCHAR NOT NULL,
-    max_amount bigint,
+    max_amount VARCHAR NOT NULL,
     uri VARCHAR NOT NULL,
     created_at TIMESTAMP NOT NULL,
 

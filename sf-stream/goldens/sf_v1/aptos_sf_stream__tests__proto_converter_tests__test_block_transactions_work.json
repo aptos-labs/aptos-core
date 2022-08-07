@@ -4,22 +4,22 @@
     "version": "1",
     "info": {
       "hash": "",
-      "stateRootHash": "HMrdtIsVJVa/+d7HWaNbMM/zS8BF7norqgbBkz3p2Ks=",
+      "stateRootHash": "iYEvhbkSNnNDiXT9ExB4W708VlkI884lDdkE1RxJJIc=",
       "eventRootHash": "YPVlJld+KeJV8TgWig4e7McIG/o+rxMn60yg554WVK8=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "oOIH0kJLwOz4Fojgbwggc6H0gHiPjEi1XNVwS1gOnas=",
+      "accumulatorRootHash": "R6KyDDh+zwSKR3qcY+eTF8Ftio9f074CF6DKCMmxkUc=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
           "writeResource": {
             "address": "0x1",
-            "stateKeyHash": "6sO7UL7trkAOL8sktJEcuvYWRdVuqkohPoNUZG7Xu+I=",
+            "stateKeyHash": "Xd9ATGDpbpSFvq/Ku5Vgn+2OOOlBpyXK5Nzsgpb7Mtc=",
             "data": {
               "type": {
                 "address": "0x1",
                 "module": "block",
-                "name": "BlockMetadata"
+                "name": "BlockResource"
               },
               "data": "{\"epoch_interval\":\"86400000000\",\"height\":\"1\",\"new_block_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"2\"}}}}"
             }
@@ -93,10 +93,10 @@
       "hash": "",
       "stateRootHash": "YG7T1XbAbLw8rukc5IW1gXFV/pn3u9L0J6tanOnasJk=",
       "eventRootHash": "6llLf9EwoZ37+xJflmiRHF3KOw3ClFeYXcASEj/i/XA=",
-      "gasUsed": "41112",
+      "gasUsed": "42",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "PntUWjwOexjEQQwanSv9fKlxHNd+cOKzlnjx2SAKb6k=",
+      "accumulatorRootHash": "f//BcLmRLEdsIqSF8jPbl/sRV0RZV0TiIbRJXWmABgQ=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -225,7 +225,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "Mrh8bH0CcgBYQ+zGZLaEauKRinLDnC3TT+gyQwpvKwQ="
+      "accumulatorRootHash": "hLgWncFBf60gLOi50vJVl0Me8R+290+1iluwNup4Hww="
     },
     "blockHeight": "1",
     "type": "STATE_CHECKPOINT",

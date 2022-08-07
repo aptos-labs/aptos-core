@@ -51,66 +51,6 @@ use crate::state_delta::StateDelta;
 pub use executed_trees::ExecutedTrees;
 use scratchpad::SparseMerkleTree;
 
-#[derive(Clone, Debug)]
-pub struct StartupInfo {
-    /// The latest ledger info.
-    pub latest_ledger_info: LedgerInfoWithSignatures,
-    /// If the above ledger info doesn't carry a validator set, the latest validator set. Otherwise
-    /// `None`.
-    pub latest_epoch_state: Option<EpochState>,
-    pub committed_trees: ExecutedTrees,
-    pub synced_trees: Option<ExecutedTrees>,
-}
-
-impl StartupInfo {
-    pub fn new(
-        latest_ledger_info: LedgerInfoWithSignatures,
-        latest_epoch_state: Option<EpochState>,
-        committed_trees: ExecutedTrees,
-        synced_trees: Option<ExecutedTrees>,
-    ) -> Self {
-        Self {
-            latest_ledger_info,
-            latest_epoch_state,
-            committed_trees,
-            synced_trees,
-        }
-    }
-
-    #[cfg(any(feature = "fuzzing"))]
-    pub fn new_for_testing() -> Self {
-        use aptos_types::on_chain_config::ValidatorSet;
-
-        let latest_ledger_info =
-            LedgerInfoWithSignatures::genesis(HashValue::zero(), ValidatorSet::empty());
-        let latest_epoch_state = None;
-        let committed_trees = ExecutedTrees::new_empty();
-        let synced_trees = None;
-
-        Self {
-            latest_ledger_info,
-            latest_epoch_state,
-            committed_trees,
-            synced_trees,
-        }
-    }
-
-    pub fn get_epoch_state(&self) -> &EpochState {
-        self.latest_ledger_info
-            .ledger_info()
-            .next_epoch_state()
-            .unwrap_or_else(|| {
-                self.latest_epoch_state
-                    .as_ref()
-                    .expect("EpochState must exist")
-            })
-    }
-
-    pub fn into_latest_executed_trees(self) -> ExecutedTrees {
-        self.synced_trees.unwrap_or(self.committed_trees)
-    }
-}
-
 pub trait StateSnapshotReceiver<K, V>: Send {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()>;
 
@@ -349,15 +289,6 @@ pub trait DbReader: Send + Sync {
         let ledger_info_with_sig = self.get_latest_ledger_info()?;
         let ledger_info = ledger_info_with_sig.ledger_info();
         Ok((ledger_info.version(), ledger_info.timestamp_usecs()))
-    }
-
-    /// Gets information needed from storage during the main node startup.
-    /// See [AptosDB::get_startup_info].
-    ///
-    /// [AptosDB::get_startup_info]:
-    /// ../aptosdb/struct.AptosDB.html#method.get_startup_info
-    fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
-        unimplemented!()
     }
 
     /// Returns a transaction that is the `seq_num`-th one associated with the given account. If

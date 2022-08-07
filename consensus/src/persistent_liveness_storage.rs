@@ -6,6 +6,7 @@ use anyhow::{format_err, Context, Result};
 use aptos_config::config::NodeConfig;
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
+use aptos_types::proof::TransactionAccumulatorSummary;
 use aptos_types::{
     epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures, transaction::Version,
 };
@@ -141,21 +142,27 @@ pub struct RootMetadata {
 }
 
 impl RootMetadata {
-    pub fn new(num_leaves: u64, accu_hash: HashValue, frozen_root_hashes: Vec<HashValue>) -> Self {
-        Self {
-            accu_hash,
-            frozen_root_hashes,
-            num_leaves,
-        }
-    }
-
     pub fn version(&self) -> Version {
         max(self.num_leaves, 1) - 1
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_empty() -> Self {
-        Self::new(0, *aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH, vec![])
+        Self {
+            accu_hash: *aptos_crypto::hash::ACCUMULATOR_PLACEHOLDER_HASH,
+            frozen_root_hashes: vec![],
+            num_leaves: 0,
+        }
+    }
+}
+
+impl From<TransactionAccumulatorSummary> for RootMetadata {
+    fn from(summary: TransactionAccumulatorSummary) -> Self {
+        Self {
+            accu_hash: summary.0.root_hash,
+            frozen_root_hashes: summary.0.frozen_subtree_roots,
+            num_leaves: summary.0.num_leaves,
+        }
     }
 }
 
@@ -316,13 +323,11 @@ impl PersistentLivenessStorage for StorageWriteProxy {
     }
 
     fn recover_from_ledger(&self) -> LedgerRecoveryData {
-        let startup_info = self
+        let latest_ledger_info = self
             .aptos_db
-            .get_startup_info()
-            .expect("unable to read ledger info from storage")
-            .expect("startup info is None");
-
-        LedgerRecoveryData::new(startup_info.latest_ledger_info)
+            .get_latest_ledger_info()
+            .expect("Failed to get latest ledger info.");
+        LedgerRecoveryData::new(latest_ledger_info)
     }
 
     fn start(&self) -> LivenessStorageData {
@@ -356,26 +361,21 @@ impl PersistentLivenessStorage for StorageWriteProxy {
         );
 
         // find the block corresponding to storage latest ledger info
-        let startup_info = self
+        let latest_ledger_info = self
             .aptos_db
-            .get_startup_info()
-            .expect("unable to read ledger info from storage")
-            .expect("startup info is None");
-        let ledger_recovery_data = LedgerRecoveryData::new(startup_info.latest_ledger_info.clone());
-        let root_executed_trees = startup_info.committed_trees;
+            .get_latest_ledger_info()
+            .expect("Failed to get latest ledger info.");
+        let accumulator_summary = self
+            .aptos_db
+            .get_accumulator_summary(latest_ledger_info.ledger_info().version())
+            .expect("Failed to get accumulator summary.");
+        let ledger_recovery_data = LedgerRecoveryData::new(latest_ledger_info);
 
         match RecoveryData::new(
             last_vote,
             ledger_recovery_data.clone(),
             blocks,
-            RootMetadata::new(
-                root_executed_trees.txn_accumulator().num_leaves(),
-                root_executed_trees.state_id(),
-                root_executed_trees
-                    .txn_accumulator()
-                    .frozen_subtree_roots()
-                    .clone(),
-            ),
+            accumulator_summary.into(),
             quorum_certs,
             highest_2chain_timeout_cert,
         ) {

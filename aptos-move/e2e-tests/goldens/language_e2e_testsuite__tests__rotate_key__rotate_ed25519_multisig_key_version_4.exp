@@ -14,7 +14,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 1952,
+            gas_used: 2,
             status: Keep(
                 Success,
             ),
@@ -37,7 +37,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 1952,
+            gas_used: 2,
             status: Keep(
                 Success,
             ),
@@ -60,7 +60,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 1952,
+            gas_used: 2,
             status: Keep(
                 Success,
             ),

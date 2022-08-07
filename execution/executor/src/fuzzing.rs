@@ -14,7 +14,7 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
-use storage_interface::{state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, StartupInfo};
+use storage_interface::{state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter};
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {
     // setup fake db
@@ -74,10 +74,6 @@ impl DbReader for FakeDb {
         let ledger_info_with_sig = self.get_latest_ledger_info()?;
         let ledger_info = ledger_info_with_sig.ledger_info();
         Ok((ledger_info.version(), ledger_info.timestamp_usecs()))
-    }
-
-    fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
-        Ok(Some(StartupInfo::new_for_testing()))
     }
 }
 

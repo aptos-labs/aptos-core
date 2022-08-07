@@ -4,7 +4,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -187,7 +187,7 @@
           "type": {
             "address": "0x1",
             "module": "block",
-            "name": "BlockMetadata",
+            "name": "BlockResource",
             "generic_type_params": []
           },
           "data": {
@@ -278,7 +278,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -461,7 +461,7 @@
           "type": {
             "address": "0x1",
             "module": "block",
-            "name": "BlockMetadata",
+            "name": "BlockResource",
             "generic_type_params": []
           },
           "data": {
@@ -552,7 +552,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -735,7 +735,7 @@
           "type": {
             "address": "0x1",
             "module": "block",
-            "name": "BlockMetadata",
+            "name": "BlockResource",
             "generic_type_params": []
           },
           "data": {
@@ -826,7 +826,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1009,7 +1009,7 @@
           "type": {
             "address": "0x1",
             "module": "block",
-            "name": "BlockMetadata",
+            "name": "BlockResource",
             "generic_type_params": []
           },
           "data": {
@@ -1100,7 +1100,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1283,7 +1283,7 @@
           "type": {
             "address": "0x1",
             "module": "block",
-            "name": "BlockMetadata",
+            "name": "BlockResource",
             "generic_type_params": []
           },
           "data": {
@@ -1374,7 +1374,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1557,7 +1557,7 @@
           "type": {
             "address": "0x1",
             "module": "block",
-            "name": "BlockMetadata",
+            "name": "BlockResource",
             "generic_type_params": []
           },
           "data": {
@@ -1648,7 +1648,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1831,7 +1831,7 @@
           "type": {
             "address": "0x1",
             "module": "block",
-            "name": "BlockMetadata",
+            "name": "BlockResource",
             "generic_type_params": []
           },
           "data": {
@@ -1922,7 +1922,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -2105,7 +2105,7 @@
           "type": {
             "address": "0x1",
             "module": "block",
-            "name": "BlockMetadata",
+            "name": "BlockResource",
             "generic_type_params": []
           },
           "data": {
@@ -2196,7 +2196,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",

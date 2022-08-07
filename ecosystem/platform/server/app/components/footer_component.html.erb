@@ -2,8 +2,8 @@
   <div class="max-w-screen-2xl mx-auto">
     <div class="flex p-6 sm:px-12 py-12 flex-col lg:flex-row items-center lg:items-start text-center lg:text-left gap-10 lg:gap-0 lg:justify-between">
       <div class="flex flex-col lg:flex-row font-mono text-sm lg:items-center gap-3">
-        <a href="/" class="flex justify-center lg:justify-start">
-          <%= render IconComponent.new(:aptos_word, class: 'h-10') %>
+        <a href="/" class="flex justify-center lg:justify-start mr-4">
+          <%= render IconComponent.new(:aptos_word, class: 'w-32') %>
           <span class="sr-only">Aptos - Building the safest and most scalable Layer 1 blockchain</span>
         </a>
         <div class="flex flex-col">
@@ -14,7 +14,7 @@
 
       <div class="flex flex-col gap-2 font-mono text-sm whitespace-nowrap">
         <% nav_items.each do |item| %>
-          <%= content_tag :a, item.name, href: item.url, class: 'hover:text-teal-400 transition duration-150 ease-in-out', target: item.url.starts_with?('http') ? '_blank' : '' %>
+          <%= content_tag :a, item.name, href: item.url, class: 'text-base hover:text-teal-400 transition duration-150 ease-in-out', target: item.url.starts_with?('http') ? '_blank' : '' %>
         <% end %>
       </div>
 
@@ -28,12 +28,12 @@
       </div>
 
       <div>
-        <h5 class="text-xl font-mono block uppercase text-white mb-2">Subscribe</h5>
+        <h5 class="text-xl font-mono font-bold block uppercase text-white mb-2">Connect</h5>
         <%= render DividerComponent.new(class: 'mb-4') %>
         <div class="flex flex-col gap-8">
           <%= form_with url: 'https://aptoslabs.us18.list-manage.com/subscribe/post?u=5456bc936272125ed825d0218&amp;id=a15b523910', method: 'post', html: { target: '_blank' }, data: { turbo: false }, class: 'flex flex-col xl:flex-row gap-2 !text-sm', builder: AptosFormBuilder do |form| %>
-            <%= form.email_field :EMAIL, required: true, class: '!text-sm', placeholder: 'ENTER EMAIL' %>
-            <%= form.submit 'Sign Up', size: :small, class: 'whitespace-nowrap' %>
+            <%= form.email_field :EMAIL, required: true, class: '!text-sm', placeholder: 'Enter Email' %>
+            <%= form.submit 'Subscribe', size: :small, class: 'whitespace-nowrap bg-transparent border border-teal-400 text-teal-300 ring-teal-400 hover:ring-1 hover:bg-neutral-800 hover:text-teal-300 uppercase font-normal uppercase' %>
           <% end %>
           <div class="flex gap-4 items-center">
             <a href="https://github.com/aptos-labs" title="Git">

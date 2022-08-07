@@ -205,10 +205,16 @@ impl BlockTree {
     }
 
     fn root_from_db(block_lookup: &Arc<BlockLookup>, db: &Arc<dyn DbReader>) -> Result<Arc<Block>> {
-        let startup_info = db
-            .get_startup_info()?
-            .ok_or_else(|| anyhow!("DB not bootstrapped."))?;
-        let ledger_info = startup_info.latest_ledger_info.ledger_info();
+        let ledger_info_with_sigs = db.get_latest_ledger_info()?;
+        let ledger_info = ledger_info_with_sigs.ledger_info();
+        let ledger_view = db.get_latest_executed_trees()?;
+
+        ensure!(
+            ledger_view.version() == Some(ledger_info.version()),
+            "Missing ledger info at the end of the ledger. latest version {:?}, LI version {}",
+            ledger_view.version(),
+            ledger_info.version(),
+        );
 
         let id = if ledger_info.ends_epoch() {
             epoch_genesis_block_id(ledger_info)
@@ -216,8 +222,7 @@ impl BlockTree {
             ledger_info.consensus_block_id()
         };
 
-        let result_view = startup_info.committed_trees;
-        block_lookup.fetch_or_add_block(id, ExecutedChunk::new_empty(result_view), None)
+        block_lookup.fetch_or_add_block(id, ExecutedChunk::new_empty(ledger_view), None)
     }
 
     pub fn prune(&self, ledger_info: &LedgerInfo) -> Result<()> {
