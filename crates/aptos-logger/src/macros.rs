@@ -28,41 +28,31 @@ macro_rules! log {
 /// Log at the `trace` level
 #[macro_export]
 macro_rules! trace {
-    ($($arg:tt)+) => {
-        $crate::log!($crate::Level::Trace, $($arg)+)
-    };
+    ($($arg:tt)+) => { {()} };
 }
 
 /// Log at the `debug` level
 #[macro_export]
 macro_rules! debug {
-    ($($arg:tt)+) => {
-        $crate::log!($crate::Level::Debug, $($arg)+)
-    };
+    ($($arg:tt)+) => { {()} };
 }
 
 /// Log at the `info` level
 #[macro_export]
 macro_rules! info {
-    ($($arg:tt)+) => {
-        $crate::log!($crate::Level::Info, $($arg)+)
-    };
+    ($($arg:tt)+) => { {()} };
 }
 
 /// Log at the `warn` level
 #[macro_export]
 macro_rules! warn {
-    ($($arg:tt)+) => {
-        $crate::log!($crate::Level::Warn, $($arg)+)
-    };
+    ($($arg:tt)+) => { {()} };
 }
 
 /// Log at the `error` level
 #[macro_export]
 macro_rules! error {
-    ($($arg:tt)+) => {
-        $crate::log!($crate::Level::Error, $($arg)+)
-    };
+    ($($arg:tt)+) => { {()} };
 }
 
 #[doc(hidden)]
