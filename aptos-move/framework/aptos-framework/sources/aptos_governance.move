@@ -48,7 +48,7 @@ module aptos_framework::aptos_governance {
     struct GovernanceConfig has key {
         min_voting_threshold: u128,
         required_proposer_stake: u64,
-        voting_period_secs: u64,
+        voting_duration_secs: u64,
     }
 
     struct RecordKey has copy, drop, store {
@@ -91,7 +91,7 @@ module aptos_framework::aptos_governance {
     struct UpdateConfigEvent has drop, store {
         min_voting_threshold: u128,
         required_proposer_stake: u64,
-        voting_period_secs: u64,
+        voting_duration_secs: u64,
     }
 
     /// Stores the signer capability for 0x1.
@@ -117,13 +117,13 @@ module aptos_framework::aptos_governance {
         aptos_framework: &signer,
         min_voting_threshold: u128,
         required_proposer_stake: u64,
-        voting_period_secs: u64,
+        voting_duration_secs: u64,
     ) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         voting::register<GovernanceProposal>(aptos_framework);
         move_to(aptos_framework, GovernanceConfig {
-            voting_period_secs,
+            voting_duration_secs,
             min_voting_threshold,
             required_proposer_stake,
         });
@@ -143,10 +143,10 @@ module aptos_framework::aptos_governance {
         _proposal: GovernanceProposal,
         min_voting_threshold: u128,
         required_proposer_stake: u64,
-        voting_period_secs: u64,
+        voting_duration_secs: u64,
     ) acquires GovernanceConfig, GovernanceEvents {
         let governance_config = borrow_global_mut<GovernanceConfig>(@aptos_framework);
-        governance_config.voting_period_secs = voting_period_secs;
+        governance_config.voting_duration_secs = voting_duration_secs;
         governance_config.min_voting_threshold = min_voting_threshold;
         governance_config.required_proposer_stake = required_proposer_stake;
 
@@ -156,7 +156,7 @@ module aptos_framework::aptos_governance {
             UpdateConfigEvent {
                 min_voting_threshold,
                 required_proposer_stake,
-                voting_period_secs
+                voting_duration_secs
             },
         );
     }
@@ -184,7 +184,7 @@ module aptos_framework::aptos_governance {
 
         // The proposer's stake needs to be locked up at least as long as the proposal's voting period.
         let current_time = timestamp::now_seconds();
-        let proposal_expiration = current_time + governance_config.voting_period_secs;
+        let proposal_expiration = current_time + governance_config.voting_duration_secs;
         assert!(
             stake::get_lockup_secs(stake_pool) >= proposal_expiration,
             error::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
