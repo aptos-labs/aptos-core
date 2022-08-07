@@ -812,7 +812,7 @@
     "data": {
       "min_voting_threshold": "0",
       "required_proposer_stake": "0",
-      "voting_period_secs": "604800"
+      "voting_duration_secs": "3600"
     }
   },
   {

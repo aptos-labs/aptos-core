@@ -192,8 +192,9 @@ async fn test_join_and_leave_validator() {
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
-            genesis_config.epoch_duration_secs = 3600;
-            genesis_config.recurring_lockup_duration_secs = 2;
+            genesis_config.epoch_duration_secs = 5;
+            genesis_config.recurring_lockup_duration_secs = 10;
+            genesis_config.voting_duration_secs = 5;
         }))
         .build_with_cli(0)
         .await;
@@ -312,7 +313,7 @@ async fn test_join_and_leave_validator() {
     );
 
     // Conservatively wait until the recurring lockup is over.
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(10)).await;
 
     let withdraw_stake = 2;
     gas_used += get_gas(
