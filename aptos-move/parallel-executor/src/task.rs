@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::executor::MVHashMapView;
+use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use std::{fmt::Debug, hash::Hash};
 
 /// The execution result of a transaction
@@ -17,10 +18,25 @@ pub enum ExecutionStatus<T, E> {
     SkipRest(T),
 }
 
+pub trait ModulePath {
+    fn get_module_path(&self) -> Option<AccessPath>;
+}
+
+impl ModulePath for StateKey {
+    fn get_module_path(&self) -> Option<AccessPath> {
+        if let StateKey::AccessPath(ap) = self {
+            if ap.get_struct_tag().is_none() {
+                return Some(ap.clone());
+            }
+        }
+        None
+    }
+}
+
 /// Trait that defines a transaction that could be parallel executed by the scheduler. Each
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
-    type Key: PartialOrd + Send + Sync + Clone + Hash + Eq;
+    type Key: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath;
     type Value: Send + Sync;
 }
 

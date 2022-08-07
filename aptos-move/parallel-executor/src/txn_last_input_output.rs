@@ -4,10 +4,13 @@
 use crate::{
     errors::Error,
     scheduler::{Incarnation, TxnIndex, Version},
-    task::{ExecutionStatus, Transaction, TransactionOutput},
+    task::{ExecutionStatus, ModulePath, Transaction, TransactionOutput},
 };
+use anyhow::{bail, Result};
+use aptos_types::access_path::AccessPath;
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
+use dashmap::DashSet;
 use std::{collections::HashSet, sync::Arc};
 
 type TxnInput<K> = Vec<ReadDescriptor<K>>;
@@ -30,7 +33,7 @@ pub struct ReadDescriptor<K> {
     kind: ReadKind,
 }
 
-impl<K> ReadDescriptor<K> {
+impl<K: ModulePath> ReadDescriptor<K> {
     pub fn from(access_path: K, txn_idx: TxnIndex, incarnation: Incarnation) -> Self {
         Self {
             access_path,
@@ -43,6 +46,10 @@ impl<K> ReadDescriptor<K> {
             access_path,
             kind: ReadKind::Storage,
         }
+    }
+
+    fn module_path(&self) -> Option<AccessPath> {
+        self.access_path.get_module_path()
     }
 
     pub fn path(&self) -> &K {
@@ -65,9 +72,12 @@ pub struct TxnLastInputOutput<K, T, E> {
     inputs: Vec<CachePadded<ArcSwapOption<TxnInput<K>>>>, // txn_idx -> input.
 
     outputs: Vec<CachePadded<ArcSwapOption<TxnOutput<T, E>>>>, // txn_idx -> output.
+
+    written_module_paths: DashSet<AccessPath>,
+    read_module_paths: DashSet<AccessPath>,
 }
 
-impl<K, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K, T, E> {
+impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K, T, E> {
     pub fn new(num_txns: usize) -> Self {
         Self {
             inputs: (0..num_txns)
@@ -76,7 +86,25 @@ impl<K, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K, T, E> {
             outputs: (0..num_txns)
                 .map(|_| CachePadded::new(ArcSwapOption::empty()))
                 .collect(),
+            written_module_paths: DashSet::new(),
+            read_module_paths: DashSet::new(),
         }
+    }
+
+    fn append_module_paths(
+        paths: Vec<AccessPath>,
+        set_to_append: &DashSet<AccessPath>,
+        set_to_check: &DashSet<AccessPath>,
+    ) -> Result<()> {
+        for path in paths {
+            // Standard flags, first show, then look.
+            set_to_append.insert(path.clone());
+
+            if set_to_check.contains(&path) {
+                bail!("Module published and also read");
+            }
+        }
+        Ok(())
     }
 
     pub fn record(
@@ -84,9 +112,32 @@ impl<K, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K, T, E> {
         txn_idx: TxnIndex,
         input: Vec<ReadDescriptor<K>>,
         output: ExecutionStatus<T, Error<E>>,
-    ) {
+    ) -> Result<()> {
+        let read_modules: Vec<AccessPath> =
+            input.iter().filter_map(|desc| desc.module_path()).collect();
+        let written_modules: Vec<AccessPath> = match &output {
+            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => output
+                .get_writes()
+                .into_iter()
+                .filter_map(|(k, _)| k.get_module_path())
+                .collect(),
+            _ => Vec::new(),
+        };
+
+        Self::append_module_paths(
+            read_modules,
+            &self.read_module_paths,
+            &self.written_module_paths,
+        )?;
+        Self::append_module_paths(
+            written_modules,
+            &self.written_module_paths,
+            &self.read_module_paths,
+        )?;
+
         self.inputs[txn_idx].store(Some(Arc::new(input)));
         self.outputs[txn_idx].store(Some(Arc::new(output)));
+        Ok(())
     }
 
     pub fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<Vec<ReadDescriptor<K>>>> {
