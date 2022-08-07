@@ -22,8 +22,6 @@ The Aptos Incentivized Testnet-3 (AIT-3) is a rewards program for any Aptos comm
 _All dates and times shown are for Pacific Time, year 2022._
 
 - **August 19:** Registration starts. Node and identity verification begins.
-- ~~**July 7:** Registration ends. Only 48 hours left to complete identity verification.~~
-- ~~**July 11:** Selection process concludes. Email notifications are sent. If your node is selected, you will have 24 hours to join the AIT-3 Validator set.~~
 - **August 19:** AIT-3 goes live at noon. Validator score tracking begins.
 - **September 9:** AIT-3 concludes.
 
@@ -44,8 +42,8 @@ _All dates and times shown are for Pacific Time, year 2022._
     <div class="card h-100">
      <h3 class="card-header">2. Read</h3>
       <div class="card-body d-flex flex-column">
-      <a href="#ait-3-program" class="card-title card-link stretched-link"> <h2>Steps in AIT-3</h2></a>
-        <p class="card-text">Read the summary flowchart and the detailed steps of the AIT-3.</p>     
+      <a href="#steps-in-ait-3" class="card-title card-link stretched-link"> <h2>Steps in AIT-3</h2></a>
+        <p class="card-text">Read the summary flowchart and the detailed steps of the AIT-3 program.</p>     
       </div>
     </div>
   </div>
@@ -68,82 +66,66 @@ Several new features are up for testing by the AIT-3 participants. See below:
 
 ### Aptos Wallet
 
-- The new Aptos Wallet, available as a Chrome webapp extension.
+- The new Aptos Wallet, available as a Chrome webapp extension. You will use this Wallet to participate in staking and governance in AIT-3.
+
+### Owner, operator and voter personas
+
+- Participation in staking and governance is now enabled with three personas: an owner, an operator and a voter.  
+- The owner is the owner of the funds, typically an investor. For example, the owner Bob can assign his operator address to the account of Alice, a trusted validator operator. See [How a custodian can stake on Aptos](/nodes/staking#how-a-custodian-can-stake-on-aptos) for more details on owner and operator definitions.  
+- Voter is a new persona being introduced in AIT-3. An owner can designate a voter. This enables the voter to participate in governance.
 
 ### Staking
 
-- Separate accounts for the fund owner and the node operator.
-- Rotating the keys.
+- A new staking UI, making it easier to manage staking.
+<!--- TODO: Is rotating the keys supported in AIT-3 --->
+- Rotating the keys. 
 - Effects of changing the stake to weigh more on the proposer. **Hypothesis**: This better reflects the higher compute cost of the proposer.
+
 
 ### On-chain governance
 
-Community to vote on proposals. The following proposals are being considered:
+Community to vote on proposals. Proposals will be in the following areas:
 
-#### Proposal to change the staking parameters
+- Staking.
+<!--- TODO: What exactly is gas schedule? --->
+- Gas schedule.
+- Proposals for onchain upgrades of the AptosFramework modules, including:
+  - Deploy AptosFramework modules.
+  - Upgrade AptosFramework modules.
+  - Proposals on breaking changes.
+- Off-chain upgrades, such as:
+  - Changes to consensus.
+  - Upgrade the Move VM version.
+  - See the version of the software.
+- Nodes
+  - Nodes dynamically joining and leaving when the network is under load. Require the node to leave the network for at least X minutes duration.
+  - Send all types of transactions to the Aptos blockchain to test for a consistent load on the network and monitor the cost.
+  - Operator to rollback the software from version B to version A, for testing.
+  - Operator to update node configuration, for testing.
+  - Operator to restore the node from the backup data.
 
-The following staking parameters are being considered:
-
-- Minimum and maximum stake.
-- Minimum and maximum lockup.
-- Rewards rate.
-- Limits on adding and withdrawing the stake.
-- Epoch duration.
-
-#### Gas schedule
-
-- Proposal on the gas schedule.
-
-#### AptosFramework modules
-
-Proposals on AptosFramework modules, such as:
-
-- Deploy AptosFramework modules.
-- Upgrade AptosFramework modules.
-- Proposals on breaking changes.
-
-### Off-chain upgrades
-
-- Changes to consensus.
-- Upgrade the Move VM version.
-- See the version of the software.
-
-### Nodes
-
-- Nodes dynamically joining and leaving when the network is under load. Require the node to leave the network for at least X duration of time (in minutes).
-- Send all types of transactions to the Aptos blockchain to test for a consistent load on the network and monitor the cost.
-
-### Disaster recovery
-
-- Conduct disaster recovery exercise in the simulation for:
-  - DDOS mitigation.
-  - Data corruption and data loss.
-  - Operators to restore the node from the backup data.
-- Other operational exercises
-  - Operator to rollback from version B to version A.
-  - Operator to update node configuration.
-- Manual writeset transaction.
-
-## AIT-3 program
-
-Participants in the AIT-3 program must demonstrate the ability to configure and deploy a node, and pass the minimum performance requirements as reported by the [Node Health Checker](/nodes/node-health-checker). See below a flowchart showing the high-level steps you will execute while participating.
-
-### Accounts and keys
+## Accounts and keys
 
 Note the following definitions:
 
-- **Owner account**: The Owner account contains the validator settings and the coins. The coins are airdropped into the Owner account.
-- **Operator key**: If you are the Owner, then, using your Owner key, you will select the specific Operator key to:
+- **Owner account**: The owner account contains the validator settings and the coins. The coins are airdropped into the owner account.
+- **Operator key**: If you are the owner, then, using your owner key, you will select the specific operator key to:
   - Manage the settings for the specific validator, and
   - Delegate the stake pool to the validator.
-  - The Operator key is same key you (Owner) used while registering your validator node with the Aptos Community Platform. This is the private key from the `validator-identity.yaml` file.
+  - The Operator key is same key you (owner) used while registering your validator node with the Aptos Community Platform. This is the private key from the `validator-identity.yaml` file.
 - You (participant) will use the Voter key to sign the governance votes in the transactions.
 
 :::tip Consensus key
-The Consensus key is generated by the Operator and is not associated with an on-chain account, i.e., there is no Aptos blockchain account address associated with Consensus key.
+The consensus key is generated by the operator and is not associated with an on-chain account, i.e., there is no Aptos blockchain account address associated with consensus key.
 :::
 
-### Install the validator node and register 
+## Steps in AIT-3 
+
+See below the summary flowcharts and detailed steps you will execute while participating.
+
+### Deploy the validator node and register 
+
+Participants in the AIT-3 program must demonstrate the ability to configure and deploy a node, and pass the minimum performance requirements as reported by the [Node Health Checker](/nodes/node-health-checker). 
 
 #### Summary steps
 
@@ -212,7 +194,7 @@ To participate in the AIT-3 program, follow the below steps. Use these steps as 
 </div>
 <br />
 
-### Install the Wallet
+### Install the Wallet and receive airdropped coins
 
 #### Summary steps
 
@@ -224,7 +206,28 @@ sources={{
   }}
 />
 
-### Participate in staking and governance
+### Connect to AIT-3 and join the validator set
+
+#### Summary steps
+
+<ThemedImage
+alt="Signed Transaction Flow"
+sources={{
+    light: useBaseUrl('/img/docs/connect-to-ait3-and-join-validator-set.svg'),
+    dark: useBaseUrl('/img/docs/connect-to-ait3-and-join-validator-set.svg'),
+  }}
+/>
+
+#### Detailed steps
+
+See [Connecting to Aptos Incentivized Testnet](/nodes/ait/connect-to-testnet) for detailed steps.
+
+### Staking and voting
+
+:::tip Read the Staking document
+
+Make sure you read the [Staking](/nodes/staking) documentation before proceeding further. 
+:::
 
 #### Summary steps
 
