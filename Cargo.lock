@@ -878,11 +878,14 @@ dependencies = [
 name = "aptos-parallel-executor"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-infallible",
+ "aptos-types",
  "arc-swap",
  "criterion",
  "crossbeam",
  "crossbeam-queue",
+ "dashmap",
  "mvhashmap",
  "num_cpus",
  "once_cell",
