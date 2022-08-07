@@ -45,13 +45,13 @@ const { BCS, TransactionBuilderMultiEd25519 } = TransactionBuilder;
 
   // Derive the multisig account address and fund the address with 5000 AptosCoin.
   const mutisigAccountAddress = authKey.derivedAddress();
-  await faucetClient.fundAccount(mutisigAccountAddress, 100000000);
+  await faucetClient.fundAccount(mutisigAccountAddress, 100000);
 
   let resources = await client.getAccountResources(mutisigAccountAddress);
   let accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
   let balance = parseInt((accountResource?.data as any).coin.value);
-  assert(balance === 100000000);
-  console.log(`multisig account coins: ${balance}. Should be 100000000!`);
+  assert(balance === 100000);
+  console.log(`multisig account coins: ${balance}. Should be 100000!`);
 
   const account4 = new AptosAccount();
   // Creates a receiver account and fund the account with 0 AptosCoin
@@ -92,7 +92,7 @@ const { BCS, TransactionBuilderMultiEd25519 } = TransactionBuilder;
     BigInt(sequenceNumber),
     scriptFunctionPayload,
     // Max gas unit to spend
-    2000000n,
+    2000n,
     // Gas price per unit
     1n,
     // Expiration timestamp. Transaction is discarded if it is not executed within 10 seconds from now.
