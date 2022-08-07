@@ -96,15 +96,17 @@ jobs:
       - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install && yarn test
 
       # Ensure the version, changelog, etc. are valid.
-      - run: cd ./ecosystem/typescript/sdk && ./check.sh
+      # TODO: Reenable once we figure out SDK release strategy.
+      # - run: cd ./ecosystem/typescript/sdk && ./check.sh
 
       # Finally, if this is a push and the version in package.json is different,
       # publish a new version of the package to npm.js. For more details on how
       # this works, see ecosystem/typescript/sdk/checked_publish.sh.
-      - run: cd ./ecosystem/typescript/sdk && yarn checked-publish
-        if: github.event_name == 'push'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}
+      # TODO: Reenable once we figure out SDK release strategy.
+      # - run: cd ./ecosystem/typescript/sdk && yarn checked-publish
+      #   if: github.event_name == 'push'
+      #   env:
+      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}
 
       - name: Print spec generation logs on failure (YAML)
         if: ${{ failure() }}
