@@ -3,6 +3,7 @@
 
 use crate::smoke_test_environment::SwarmBuilder;
 use crate::test_utils::reconfig;
+use aptos::common::types::{GasOptions, DEFAULT_GAS_UNIT_PRICE, DEFAULT_MAX_GAS};
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{bls12381, x25519};
@@ -27,9 +28,20 @@ async fn test_account_flow() {
 
     // Transfer an amount between the accounts
     let transfer_amount = 100;
-    let response = cli.transfer_coins(0, 1, transfer_amount).await.unwrap();
+    let response = cli
+        .transfer_coins(
+            0,
+            1,
+            transfer_amount,
+            Some(GasOptions {
+                gas_unit_price: DEFAULT_GAS_UNIT_PRICE * 2,
+                max_gas: DEFAULT_MAX_GAS,
+            }),
+        )
+        .await
+        .unwrap();
     let expected_sender_amount =
-        DEFAULT_FUNDED_COINS - response.gas_used.unwrap() - transfer_amount;
+        DEFAULT_FUNDED_COINS - (response.gas_used * response.gas_unit_price) - transfer_amount;
     let expected_receiver_amount = DEFAULT_FUNDED_COINS + transfer_amount;
 
     assert_eq!(
@@ -47,7 +59,7 @@ async fn test_account_flow() {
 
     // Wait for faucet amount to be updated
     let expected_sender_amount = expected_sender_amount + DEFAULT_FUNDED_COINS;
-    let _ = cli.fund_account(0).await.unwrap();
+    let _ = cli.fund_account(0, None).await.unwrap();
     assert_eq!(
         expected_sender_amount,
         cli.wait_for_balance(0, expected_sender_amount)

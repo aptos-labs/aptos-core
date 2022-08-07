@@ -234,7 +234,7 @@ impl Context {
         let block_metadata_type = move_deps::move_core_types::language_storage::StructTag {
             address: CORE_CODE_ADDRESS,
             module: ident_str!("block").into(),
-            name: ident_str!("BlockMetadata").into(),
+            name: ident_str!("BlockResource").into(),
             type_params: vec![],
         };
 

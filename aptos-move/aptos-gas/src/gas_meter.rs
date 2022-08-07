@@ -119,6 +119,8 @@ pub struct AptosGasMeter {
 
 impl AptosGasMeter {
     pub fn new(gas_params: AptosGasParameters, balance: u64) -> Self {
+        let balance = gas_params.txn.to_internal_units(balance);
+
         Self {
             gas_params,
             balance,
@@ -126,7 +128,7 @@ impl AptosGasMeter {
     }
 
     pub fn balance(&self) -> u64 {
-        self.balance
+        self.gas_params.txn.to_external_units(self.balance)
     }
 }
 

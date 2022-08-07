@@ -29,7 +29,7 @@ Ok(
                 ContractEvent { key: EventKey { creation_number: 0, account_address: F5B9D6F01A99E74C790E2F330C092FA05455A8193F1DFC1B113ECC54D067AFE1 }, index: 0, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("coin"), name: Identifier("WithdrawEvent"), type_params: [] }), event_data: "e803000000000000" },
                 ContractEvent { key: EventKey { creation_number: 0, account_address: D88E78203E6688F0587D58AD01B0232DA2A4B23F5916B324C365BB9178680138 }, index: 0, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("coin"), name: Identifier("DepositEvent"), type_params: [] }), event_data: "e803000000000000" },
             ],
-            gas_used: 3848,
+            gas_used: 4,
             status: Keep(
                 Success,
             ),
@@ -63,7 +63,7 @@ Ok(
                 ContractEvent { key: EventKey { creation_number: 0, account_address: F5B9D6F01A99E74C790E2F330C092FA05455A8193F1DFC1B113ECC54D067AFE1 }, index: 1, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("coin"), name: Identifier("WithdrawEvent"), type_params: [] }), event_data: "e803000000000000" },
                 ContractEvent { key: EventKey { creation_number: 0, account_address: D88E78203E6688F0587D58AD01B0232DA2A4B23F5916B324C365BB9178680138 }, index: 1, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("coin"), name: Identifier("DepositEvent"), type_params: [] }), event_data: "e803000000000000" },
             ],
-            gas_used: 3848,
+            gas_used: 4,
             status: Keep(
                 Success,
             ),
@@ -97,7 +97,7 @@ Ok(
                 ContractEvent { key: EventKey { creation_number: 0, account_address: F5B9D6F01A99E74C790E2F330C092FA05455A8193F1DFC1B113ECC54D067AFE1 }, index: 2, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("coin"), name: Identifier("WithdrawEvent"), type_params: [] }), event_data: "e803000000000000" },
                 ContractEvent { key: EventKey { creation_number: 0, account_address: D88E78203E6688F0587D58AD01B0232DA2A4B23F5916B324C365BB9178680138 }, index: 2, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("coin"), name: Identifier("DepositEvent"), type_params: [] }), event_data: "e803000000000000" },
             ],
-            gas_used: 3848,
+            gas_used: 4,
             status: Keep(
                 Success,
             ),
@@ -131,7 +131,7 @@ Ok(
                 ContractEvent { key: EventKey { creation_number: 0, account_address: F5B9D6F01A99E74C790E2F330C092FA05455A8193F1DFC1B113ECC54D067AFE1 }, index: 3, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("coin"), name: Identifier("WithdrawEvent"), type_params: [] }), event_data: "e803000000000000" },
                 ContractEvent { key: EventKey { creation_number: 0, account_address: D88E78203E6688F0587D58AD01B0232DA2A4B23F5916B324C365BB9178680138 }, index: 3, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("coin"), name: Identifier("DepositEvent"), type_params: [] }), event_data: "e803000000000000" },
             ],
-            gas_used: 3848,
+            gas_used: 4,
             status: Keep(
                 Success,
             ),

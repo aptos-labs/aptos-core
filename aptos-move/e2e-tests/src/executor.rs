@@ -22,8 +22,10 @@ use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
-    block_metadata::{new_block_event_key, BlockMetadata},
+    account_config::{
+        new_block_event_key, AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS,
+    },
+    block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
@@ -75,6 +77,7 @@ pub struct FakeExecutor {
     executed_output: Option<GoldenOutputs>,
     trace_dir: Option<PathBuf>,
     rng: KeyGen,
+    no_parallel_exec: bool,
 }
 
 impl FakeExecutor {
@@ -86,9 +89,16 @@ impl FakeExecutor {
             executed_output: None,
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
+            no_parallel_exec: false,
         };
         executor.apply_write_set(write_set);
         executor
+    }
+
+    /// Configure this executor to not use parallel execution.
+    pub fn set_not_parallel(mut self) -> Self {
+        self.no_parallel_exec = true;
+        self
     }
 
     /// Create an executor from a saved genesis blob
@@ -115,6 +125,7 @@ impl FakeExecutor {
             executed_output: None,
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
+            no_parallel_exec: false,
         }
     }
 
@@ -343,8 +354,10 @@ impl FakeExecutor {
         }
 
         let output = AptosVM::execute_block(txn_block.clone(), &self.data_store);
-        let parallel_output = self.execute_transaction_block_parallel(txn_block);
-        assert_eq!(output, parallel_output);
+        if !self.no_parallel_exec {
+            let parallel_output = self.execute_transaction_block_parallel(txn_block);
+            assert_eq!(output, parallel_output);
+        }
 
         if let Some(logger) = &self.executed_output {
             logger.log(format!("{:#?}\n", output).as_str());
@@ -427,8 +440,9 @@ impl FakeExecutor {
             HashValue::zero(),
             0,
             0,
-            vec![false; validator_set.payload().count()],
             *validator_set.payload().next().unwrap().account_address(),
+            Some(0),
+            vec![false; validator_set.payload().count()],
             vec![],
             self.block_time,
         );

@@ -165,9 +165,14 @@ module aptos_framework::stake {
         mint_cap: MintCapability<AptosCoin>,
     }
 
+    // TODO change all types to u32 ?
+    struct IndividualValidatorPerformance has store, drop {
+        successful_proposals: u64,
+        failed_proposals: u64,
+    }
+
     struct ValidatorPerformance has key {
-        num_blocks: u64,
-        missed_votes: vector<u64>,
+        validators: vector<IndividualValidatorPerformance>,
     }
 
     struct RegisterValidatorCandidateEvent has drop, store {
@@ -257,6 +262,7 @@ module aptos_framework::stake {
         )
     }
 
+    /// Returns the validator's state.
     public fun get_validator_state(pool_address: address): u64 acquires ValidatorSet {
         let validator_set = borrow_global<ValidatorSet>(@aptos_framework);
         if (option::is_some(&find_validator(&validator_set.pending_active, pool_address))) {
@@ -270,15 +276,17 @@ module aptos_framework::stake {
         }
     }
 
-    /// Return the active staked balance of the stake pool at `pool_address`. Any pending_inactive and pending_active
-    /// stake are not considered.
-    ///
-    /// If the stake pool is not yet active, the voting power will be 0.
-    public fun get_active_staked_balance(pool_address: address): u64 acquires StakePool, ValidatorSet {
-        if (get_validator_state(pool_address) == VALIDATOR_STATUS_INACTIVE) {
-            0
+    /// Return the voting power of the validator in the current epoch.
+    /// This is the same as the validator's total active and pending_inactive stake.
+    public fun get_current_epoch_voting_power(pool_address: address): u64 acquires StakePool, ValidatorSet {
+        let validator_state = get_validator_state(pool_address);
+        // Both active and pending inactive validators can still vote in the current epoch.
+        if (validator_state == VALIDATOR_STATUS_ACTIVE || validator_state == VALIDATOR_STATUS_PENDING_INACTIVE) {
+            let active_stake = coin::value<AptosCoin>(&borrow_global<StakePool>(pool_address).active);
+            let pending_inactive_stake = coin::value<AptosCoin>(&borrow_global<StakePool>(pool_address).pending_inactive);
+            active_stake + pending_inactive_stake
         } else {
-            coin::value<AptosCoin>(&borrow_global<StakePool>(pool_address).active)
+            0
         }
     }
 
@@ -292,6 +300,28 @@ module aptos_framework::stake {
         borrow_global<StakePool>(pool_address).operator_address
     }
 
+    /// Return the pool address in `owner_cap`.
+    public fun get_owned_pool_address(owner_cap: &OwnerCapability): address {
+        owner_cap.pool_address
+    }
+
+    /// Return the validator index for `pool_address`.
+    public fun get_validator_index(pool_address: address): u64 acquires ValidatorConfig {
+        borrow_global<ValidatorConfig>(pool_address).validator_index
+    }
+
+    /// Return the number of successful and failed proposals for the proposal at the given validator index.
+    public fun get_current_epoch_proposal_counts(validator_index: u64): (u64, u64) acquires ValidatorPerformance {
+        let validator_performances = &borrow_global<ValidatorPerformance>(@aptos_framework).validators;
+        let validator_performance = vector::borrow(validator_performances, validator_index);
+        (validator_performance.successful_proposals, validator_performance.failed_proposals)
+    }
+
+    /// Return the validator's config.
+    public fun get_validator_config(pool_address: address): (vector<u8>, vector<u8>, vector<u8>) acquires ValidatorConfig {
+        let validator_config = borrow_global<ValidatorConfig>(pool_address);
+        (validator_config.consensus_pubkey, validator_config.network_addresses, validator_config.fullnode_addresses)
+    }
 
     /// Initialize validator set to the core resource account.
     public fun initialize(aptos_framework: &signer) {
@@ -305,8 +335,7 @@ module aptos_framework::stake {
         });
 
         move_to(aptos_framework, ValidatorPerformance {
-            num_blocks: 0,
-            missed_votes: vector::empty(),
+            validators: vector::empty(),
         });
     }
 
@@ -321,22 +350,30 @@ module aptos_framework::stake {
     /// except it leaves the ValidatorConfig to be set by another entity.
     /// Note: this triggers setting the operator and owner, set it to the account's address
     /// to set later.
-    public entry fun initialize_owner_only(account: &signer, operator: address, voter: address) acquires OwnerCapability, StakePool {
-        initialize_owner(account);
-
-        move_to(account, ValidatorConfig {
+    public entry fun initialize_owner_only(
+        owner: &signer,
+        initial_stake_amount: u64,
+        operator: address,
+        voter: address,
+    ) acquires OwnerCapability, StakePool, ValidatorSet {
+        initialize_owner(owner);
+        move_to(owner, ValidatorConfig {
             consensus_pubkey: vector::empty(),
             network_addresses: vector::empty(),
             fullnode_addresses: vector::empty(),
             validator_index: 0,
         });
 
-        let account_address = signer::address_of(account);
+        if (initial_stake_amount > 0) {
+            add_stake(owner, initial_stake_amount);
+        };
+
+        let account_address = signer::address_of(owner);
         if (account_address != operator) {
-            set_operator(account, operator)
+            set_operator(owner, operator)
         };
         if (account_address != voter) {
-            set_delegated_voter(account, voter)
+            set_delegated_voter(owner, voter)
         };
     }
 
@@ -359,35 +396,34 @@ module aptos_framework::stake {
         });
     }
 
+    fun initialize_owner(owner: &signer) {
+        let owner_address = signer::address_of(owner);
+        assert!(!exists<StakePool>(owner_address), error::invalid_argument(EALREADY_REGISTERED));
 
-    fun initialize_owner(account: &signer) {
-        let account_address = signer::address_of(account);
-        assert!(!exists<StakePool>(account_address), error::invalid_argument(EALREADY_REGISTERED));
-
-        move_to(account, StakePool {
+        move_to(owner, StakePool {
             active: coin::zero<AptosCoin>(),
             pending_active: coin::zero<AptosCoin>(),
             pending_inactive: coin::zero<AptosCoin>(),
             inactive: coin::zero<AptosCoin>(),
             locked_until_secs: 0,
-            operator_address: account_address,
-            delegated_voter: account_address,
-            initialize_validator_events: event::new_event_handle<RegisterValidatorCandidateEvent>(account),
-            set_operator_events: event::new_event_handle<SetOperatorEvent>(account),
-            add_stake_events: event::new_event_handle<AddStakeEvent>(account),
-            rotate_consensus_key_events: event::new_event_handle<RotateConsensusKeyEvent>(account),
-            update_network_and_fullnode_addresses_events: event::new_event_handle<UpdateNetworkAndFullnodeAddressesEvent>(account),
-            increase_lockup_events: event::new_event_handle<IncreaseLockupEvent>(account),
-            join_validator_set_events: event::new_event_handle<JoinValidatorSetEvent>(account),
-            distribute_rewards_events: event::new_event_handle<DistributeRewardsEvent>(account),
-            unlock_stake_events: event::new_event_handle<UnlockStakeEvent>(account),
-            withdraw_stake_events: event::new_event_handle<WithdrawStakeEvent>(account),
-            leave_validator_set_events: event::new_event_handle<LeaveValidatorSetEvent>(account),
+            operator_address: owner_address,
+            delegated_voter: owner_address,
+
+            // Events.
+            initialize_validator_events: event::new_event_handle<RegisterValidatorCandidateEvent>(owner),
+            set_operator_events: event::new_event_handle<SetOperatorEvent>(owner),
+            add_stake_events: event::new_event_handle<AddStakeEvent>(owner),
+            rotate_consensus_key_events: event::new_event_handle<RotateConsensusKeyEvent>(owner),
+            update_network_and_fullnode_addresses_events: event::new_event_handle<UpdateNetworkAndFullnodeAddressesEvent>(owner),
+            increase_lockup_events: event::new_event_handle<IncreaseLockupEvent>(owner),
+            join_validator_set_events: event::new_event_handle<JoinValidatorSetEvent>(owner),
+            distribute_rewards_events: event::new_event_handle<DistributeRewardsEvent>(owner),
+            unlock_stake_events: event::new_event_handle<UnlockStakeEvent>(owner),
+            withdraw_stake_events: event::new_event_handle<WithdrawStakeEvent>(owner),
+            leave_validator_set_events: event::new_event_handle<LeaveValidatorSetEvent>(owner),
         });
 
-        move_to(account, OwnerCapability {
-           pool_address: account_address,
-        });
+        move_to(owner, OwnerCapability { pool_address: owner_address });
     }
 
     /// Extract and return owner capability from the signing account.
@@ -444,7 +480,7 @@ module aptos_framework::stake {
     }
 
     /// Allows an owner to change the delegated voter of the stake pool.
-    public entry fun set_delegated_voter_with_cap(
+    public fun set_delegated_voter_with_cap(
         pool_address: address,
         owner_cap: &OwnerCapability,
         new_delegated_voter: address,
@@ -766,26 +802,35 @@ module aptos_framework::stake {
         validator_state == VALIDATOR_STATUS_ACTIVE || validator_state == VALIDATOR_STATUS_PENDING_INACTIVE
     }
 
-    /// Update the number of missed votes. This is only called by block::prologue().
+    /// Update the validator performance (proposal statistics). This is only called by block::prologue().
     /// This function cannot abort.
-    public(friend) fun update_performance_statistics(missed_votes: vector<u64>) acquires ValidatorPerformance {
-        // Validator set cannot change until the end of the epoch, so the validator index in list of missed votes should
-        // match with those of the missed vote counts in ValidatorPerformance resource.
+    public(friend) fun update_performance_statistics(proposer_index_optional: vector<u64>, failed_proposer_indices: vector<u64>) acquires ValidatorPerformance {
+        // Validator set cannot change until the end of the epoch, so the validator index in arguments should
+        // match with those of the validators in ValidatorPerformance resource.
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
-        let validator_missed_votes_counts = &mut validator_perf.missed_votes;
-        let i = 0;
-        let len = vector::length(&missed_votes);
-        while (i < len) {
-            let validator_index = *vector::borrow(&missed_votes, i);
-            // Skip any validator indices that are out of bounds, this ensures that this function doesn't abort if there
-            // are out of bounds errors.
-            if (validator_index < vector::length(validator_missed_votes_counts)) {
-                let missed_votes_count = vector::borrow_mut(validator_missed_votes_counts, validator_index);
-                *missed_votes_count = *missed_votes_count + 1;
+        let validator_len = vector::length(&validator_perf.validators);
+
+        // proposer_indices is a vector because it can be missing (for NilBlocks)
+        if (vector::length(&proposer_index_optional) >= 1) {
+            let proposer_index = *vector::borrow(&proposer_index_optional, 0);
+            // Here, and in all other vector::borrow, skip any validator indices that are out of bounds,
+            // this ensures that this function doesn't abort if there are out of bounds errors.
+            if (proposer_index < validator_len) {
+                let validator = vector::borrow_mut(&mut validator_perf.validators, proposer_index);
+                validator.successful_proposals = validator.successful_proposals + 1;
             };
-            i = i + 1;
         };
-        validator_perf.num_blocks = validator_perf.num_blocks + 1;
+
+        let f = 0;
+        let f_len = vector::length(&failed_proposer_indices);
+        while (f < f_len) {
+            let validator_index = *vector::borrow(&failed_proposer_indices, f);
+            if (validator_index < validator_len) {
+                let validator = vector::borrow_mut(&mut validator_perf.validators, validator_index);
+                validator.failed_proposals = validator.failed_proposals + 1;
+            };
+            f = f + 1;
+        };
     }
 
     /// Triggers at epoch boundary. This function shouldn't abort.
@@ -834,8 +879,7 @@ module aptos_framework::stake {
         let i = 0;
         let len = vector::length(&validator_set.active_validators);
         let next_epoch_validators = vector::empty();
-        validator_perf.num_blocks = 0;
-        validator_perf.missed_votes = vector::empty();
+        validator_perf.validators = vector::empty();
         while (i < len) {
             let old_validator_info = vector::borrow_mut(&mut validator_set.active_validators, i);
             let pool_address = old_validator_info.addr;
@@ -855,7 +899,10 @@ module aptos_framework::stake {
             };
 
             vector::push_back(&mut next_epoch_validators, new_validator_info);
-            vector::push_back(&mut validator_perf.missed_votes, 0);
+            vector::push_back(&mut validator_perf.validators, IndividualValidatorPerformance {
+                successful_proposals: 0,
+                failed_proposals: 0,
+            });
 
             // Automatically renew a validator's lockup for validators that will still be in the validator set in the
             // next epoch.
@@ -920,14 +967,14 @@ module aptos_framework::stake {
     ) acquires StakePool, AptosCoinCapabilities, ValidatorConfig {
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         let validator_config = borrow_global<ValidatorConfig>(pool_address);
-        let num_missed_votes = *vector::borrow(&validator_perf.missed_votes, validator_config.validator_index);
-        let num_blocks = validator_perf.num_blocks;
-        let num_successful_votes = num_blocks - num_missed_votes;
+        let cur_validator_perf = vector::borrow(&validator_perf.validators, validator_config.validator_index);
+        let num_successful_proposals = cur_validator_perf.successful_proposals;
+        let num_total_proposals = cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals;
 
         let rewards = mint_reward(
             validator.voting_power,
-            num_blocks,
-            num_successful_votes,
+            num_successful_proposals,
+            num_total_proposals,
             staking_config,
         );
         let rewards_amount = coin::value<AptosCoin>(&rewards);
@@ -962,8 +1009,8 @@ module aptos_framework::stake {
     /// Mint reward corresponding to current epoch's `voting_power` and `num_successful_votes`.
     fun mint_reward(
         voting_power: u64,
-        num_blocks: u64,
-        num_successful_votes: u64,
+        num_successful_proposals: u64,
+        num_total_proposals: u64,
         config: &StakingConfig,
     ): Coin<AptosCoin> acquires AptosCoinCapabilities {
         // Validators receive rewards based on their performance (number of successful votes) and how long is their
@@ -972,8 +1019,8 @@ module aptos_framework::stake {
         // Here we do multiplication before division to minimize rounding errors.
         let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(config);
         let base_rewards = voting_power * rewards_rate / rewards_rate_denominator;
-        let rewards_amount = base_rewards * num_successful_votes / num_blocks;
-        if (rewards_amount > 0) {
+        if (base_rewards > 0 && num_successful_proposals > 0) {
+            let rewards_amount = base_rewards * num_successful_proposals / num_total_proposals;
             let mint_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
             return coin::mint<AptosCoin>(rewards_amount, mint_cap)
         };
@@ -1644,30 +1691,34 @@ module aptos_framework::stake {
         join_validator_set(&validator_2, validator_2_address);
         end_epoch();
 
-        // Validator 2 missed votes.
-        let missed_votes = vector::empty<u64>();
+        // Validator 2 failed proposal.
+        let failed_proposer_indices = vector::empty<u64>();
+        let validator_1_index = borrow_global<ValidatorConfig>(validator_1_address).validator_index;
         let validator_2_index = borrow_global<ValidatorConfig>(validator_2_address).validator_index;
-        vector::push_back(&mut missed_votes, validator_2_index);
-        update_performance_statistics(missed_votes);
+        vector::push_back(&mut failed_proposer_indices, validator_2_index);
+        let proposer_indices = vector::empty<u64>();
+        vector::push_back(&mut proposer_indices, validator_1_index);
+        update_performance_statistics(proposer_indices, failed_proposer_indices);
         end_epoch();
 
-        // Validator 2 received no rewards. Validator 1 didn't miss votes so it still receives rewards.
+        // Validator 2 received no rewards. Validator 1 didn't fail proposals, so it still receives rewards.
         assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
         assert_validator_state(validator_2_address, 100, 0, 0, 0, 1);
 
-        // Validator 2 decides to leave. Both validators missed votes.
+        // Validator 2 decides to leave. Both validators failed proposals.
         unlock(&validator_2, 100);
         leave_validator_set(&validator_2, validator_2_address);
-        let missed_votes = vector::empty<u64>();
+        let failed_proposer_indices = vector::empty<u64>();
         let validator_1_index = borrow_global<ValidatorConfig>(validator_1_address).validator_index;
-        vector::push_back(&mut missed_votes, validator_1_index);
-        vector::push_back(&mut missed_votes, validator_2_index);
-        update_performance_statistics(missed_votes);
+        let validator_2_index = borrow_global<ValidatorConfig>(validator_2_address).validator_index;
+        vector::push_back(&mut failed_proposer_indices, validator_1_index);
+        vector::push_back(&mut failed_proposer_indices, validator_2_index);
+        update_performance_statistics(vector::empty<u64>(), failed_proposer_indices);
         // Fast forward so validator 2's stake is fully unlocked.
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_epoch();
 
-        // Validator 1 and 2 received no additional rewards due to missing votes.
+        // Validator 1 and 2 received no additional rewards due to failed proposals
         assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
         assert_validator_state(validator_2_address, 0, 100, 0, 0, 1);
     }
@@ -1688,17 +1739,24 @@ module aptos_framework::stake {
         join_validator_set(&validator, validator_address);
         end_epoch();
 
-        // Invalid validator index in the missed votes vector should not lead to abort.
-        let missed_votes = vector::empty<u64>();
         let valid_validator_index = borrow_global<ValidatorConfig>(validator_address).validator_index;
         let out_of_bounds_index = valid_validator_index + 100;
-        vector::push_back(&mut missed_votes, valid_validator_index);
-        vector::push_back(&mut missed_votes, out_of_bounds_index);
-        update_performance_statistics(missed_votes);
+
+        // Invalid validator index in the failed proposers vector should not lead to abort.
+        let failed_proposer_indices = vector::empty<u64>();
+        vector::push_back(&mut failed_proposer_indices, valid_validator_index);
+        vector::push_back(&mut failed_proposer_indices, out_of_bounds_index);
+        update_performance_statistics(vector::empty<u64>(), failed_proposer_indices);
         end_epoch();
 
-        // Validator received no rewards due to missing votes.
+        // Validator received no rewards due to failing to propose.
         assert_validator_state(validator_address, 100, 0, 0, 0, 0);
+
+        // Invalid validator index in the proposer should not lead to abort.
+        let proposer_index_optional = vector::empty<u64>();
+        vector::push_back(&mut proposer_index_optional, out_of_bounds_index);
+        update_performance_statistics(proposer_index_optional, vector::empty<u64>());
+        end_epoch();
     }
 
     #[test(aptos_framework = @aptos_framework, core_resources = @core_resources, validator = @0x123)]
@@ -1766,7 +1824,7 @@ module aptos_framework::stake {
         aptos_framework::coin::register_for_test<AptosCoin>(account);
         let address = signer::address_of(account);
         coin::deposit<AptosCoin>(address, coin::mint<AptosCoin>(1000, mint_cap));
-        initialize_owner_only(account, address, address);
+        initialize_owner_only(account, 0, address, address);
         add_stake(account, 100);
         assert_validator_state(signer::address_of(account), 100, 0, 0, 0, 0);
     }
@@ -1796,14 +1854,23 @@ module aptos_framework::stake {
     }
 
     #[test_only]
-    public fun set_validator_perf_num_blocks(num_blocks: u64) acquires ValidatorPerformance {
-        borrow_global_mut<ValidatorPerformance>(@aptos_framework).num_blocks = num_blocks;
+    public fun set_validator_perf_at_least_one_block() acquires ValidatorPerformance {
+        let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
+        let len = vector::length(&validator_perf.validators);
+        let i = 0;
+        while (i < len) {
+            let validator = vector::borrow_mut(&mut validator_perf.validators, i);
+            if (validator.successful_proposals + validator.failed_proposals < 1) {
+                validator.successful_proposals = 1;
+            };
+            i = i + 1;
+        };
     }
 
     #[test_only]
     fun end_epoch() acquires StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
-        // Set the number of blocks to 1 so reward distribution doesn't error out with division by zero.
-        set_validator_perf_num_blocks(1);
+        // Set the number of blocks to 1, to give out rewards to non-failing validators.
+        set_validator_perf_at_least_one_block();
         timestamp::fast_forward_seconds(EPOCH_DURATION);
         on_new_epoch();
     }
@@ -1873,12 +1940,14 @@ module aptos_framework::stake {
     public fun create_stake_pool(
         account: &signer,
         active: Coin<AptosCoin>,
+        pending_inactive: Coin<AptosCoin>,
         locked_until_secs: u64,
-    ) acquires OwnerCapability, StakePool {
+    ) acquires OwnerCapability, StakePool, ValidatorSet {
         let account_address = signer::address_of(account);
-        initialize_owner_only(account, account_address, account_address);
+        initialize_owner_only(account, 0, account_address, account_address);
         let stake_pool = borrow_global_mut<StakePool>(account_address);
         coin::merge(&mut stake_pool.active, active);
+        coin::merge(&mut stake_pool.pending_inactive, pending_inactive);
         stake_pool.locked_until_secs = locked_until_secs;
     }
 }

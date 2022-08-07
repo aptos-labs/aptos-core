@@ -17,7 +17,7 @@
     }
   },
   {
-    "type": "0x1::block::BlockMetadata",
+    "type": "0x1::block::BlockResource",
     "data": {
       "epoch_interval": "86400000000",
       "height": "0",
@@ -55,10 +55,12 @@
   {
     "type": "0x1::stake::ValidatorPerformance",
     "data": {
-      "missed_votes": [
-        "0"
-      ],
-      "num_blocks": "0"
+      "validators": [
+        {
+          "failed_proposals": "0",
+          "successful_proposals": "0"
+        }
+      ]
     }
   },
   {
@@ -848,8 +850,15 @@
   {
     "type": "0x1::aptos_governance::GovernanceResponsbility",
     "data": {
-      "signer_cap": {
-        "account": "0x1"
+      "signer_caps": {
+        "data": [
+          {
+            "key": "0x1",
+            "value": {
+              "account": "0x1"
+            }
+          }
+        ]
       }
     }
   },

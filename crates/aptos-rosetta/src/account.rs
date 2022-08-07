@@ -6,7 +6,10 @@
 //! See: [Account API Spec](https://www.rosetta-api.org/docs/AccountApi.html)
 //!
 
-use crate::types::coin_module_identifier;
+use crate::types::{
+    account_module_identifier, account_resource_identifier, coin_module_identifier,
+    AccountBalanceMetadata,
+};
 use crate::{
     common::{
         check_network, get_block_index_from_request, handle_request, native_coin, native_coin_tag,
@@ -20,6 +23,7 @@ use crate::{
     RosettaContext,
 };
 use aptos_logger::{debug, trace};
+use aptos_rest_client::aptos_api_types::AccountData;
 use aptos_rest_client::{
     aptos::{AptosCoin, Balance},
     aptos_api_types::U64,
@@ -77,7 +81,7 @@ async fn account_balance(
         .await?;
     let balance_version = block_info.end_version;
 
-    let balances = get_balances(
+    let (sequence_number, balances) = get_balances(
         &rest_client,
         request.account_identifier.account_address()?,
         balance_version,
@@ -99,6 +103,7 @@ async fn account_balance(
     Ok(AccountBalanceResponse {
         block_identifier,
         balances: amounts,
+        metadata: AccountBalanceMetadata { sequence_number },
     })
 }
 
@@ -154,14 +159,39 @@ async fn get_balances(
     rest_client: &aptos_rest_client::Client,
     address: AccountAddress,
     version: u64,
-) -> ApiResult<HashMap<TypeTag, Balance>> {
+) -> ApiResult<(u64, HashMap<TypeTag, Balance>)> {
     if let Ok(response) = rest_client
         .get_account_resources_at_version(address, version)
         .await
     {
-        // Retrieve balances
-        Ok(response
-            .inner()
+        let response = response.into_inner();
+
+        let maybe_sequence_number = if let Some(account_resource) =
+            response.iter().find(|resource| {
+                resource.resource_type.address == AccountAddress::ONE
+                    && resource.resource_type.module == account_module_identifier()
+                    && resource.resource_type.name == account_resource_identifier()
+            }) {
+            if let Ok(resource) =
+                serde_json::from_value::<AccountData>(account_resource.data.clone())
+            {
+                Some(resource.sequence_number.0)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let sequence_number = if let Some(sequence_number) = maybe_sequence_number {
+            sequence_number
+        } else {
+            return Err(ApiError::AptosError(Some(
+                "Failed to retrieve account sequence number".to_string(),
+            )));
+        };
+
+        let balances = response
             .iter()
             .filter(|resource| {
                 resource.resource_type.address == AccountAddress::ONE
@@ -180,7 +210,10 @@ async fn get_balances(
                     None
                 }
             })
-            .collect())
+            .collect();
+
+        // Retrieve balances
+        Ok((sequence_number, balances))
     } else {
         let mut currency_map = HashMap::new();
         currency_map.insert(
@@ -189,7 +222,7 @@ async fn get_balances(
                 coin: AptosCoin { value: U64(0) },
             },
         );
-        Ok(currency_map)
+        Ok((0, currency_map))
     }
 }
 

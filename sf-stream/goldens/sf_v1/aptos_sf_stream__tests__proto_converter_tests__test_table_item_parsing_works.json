@@ -4,22 +4,22 @@
     "version": "1",
     "info": {
       "hash": "",
-      "stateRootHash": "4oOF1OcQyZ44NUFP1sm2v3WbQUkBwccYk2TyPCwra6U=",
+      "stateRootHash": "iYEvhbkSNnNDiXT9ExB4W708VlkI884lDdkE1RxJJIc=",
       "eventRootHash": "YPVlJld+KeJV8TgWig4e7McIG/o+rxMn60yg554WVK8=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "kcazc29aWhpcssMGt9pj/aOhD6Tqn72ZMTXjDnD+vSM=",
+      "accumulatorRootHash": "R6KyDDh+zwSKR3qcY+eTF8Ftio9f074CF6DKCMmxkUc=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
           "writeResource": {
             "address": "0x1",
-            "stateKeyHash": "6sO7UL7trkAOL8sktJEcuvYWRdVuqkohPoNUZG7Xu+I=",
+            "stateKeyHash": "Xd9ATGDpbpSFvq/Ku5Vgn+2OOOlBpyXK5Nzsgpb7Mtc=",
             "data": {
               "type": {
                 "address": "0x1",
                 "module": "block",
-                "name": "BlockMetadata"
+                "name": "BlockResource"
               },
               "data": "{\"epoch_interval\":\"86400000000\",\"height\":\"1\",\"new_block_events\":{\"counter\":\"2\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"2\"}}}}"
             }
@@ -36,7 +36,7 @@
                 "module": "stake",
                 "name": "ValidatorPerformance"
               },
-              "data": "{\"missed_votes\":[\"1\"],\"num_blocks\":\"1\"}"
+              "data": "{\"validators\":[{\"failed_proposals\":\"0\",\"successful_proposals\":\"1\"}]}"
             }
           }
         },
@@ -93,10 +93,10 @@
       "hash": "",
       "stateRootHash": "YG7T1XbAbLw8rukc5IW1gXFV/pn3u9L0J6tanOnasJk=",
       "eventRootHash": "6llLf9EwoZ37+xJflmiRHF3KOw3ClFeYXcASEj/i/XA=",
-      "gasUsed": "41112",
+      "gasUsed": "42",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "mn/hS6vwxV7/ZXHf+sht20xqPWu/rWcqY2nULarhwUI=",
+      "accumulatorRootHash": "f//BcLmRLEdsIqSF8jPbl/sRV0RZV0TiIbRJXWmABgQ=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -225,7 +225,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "LXQc098xN5KmfFkaKgDF1kMoZ/dEvi108UQInZWxhWU="
+      "accumulatorRootHash": "hLgWncFBf60gLOi50vJVl0Me8R+290+1iluwNup4Hww="
     },
     "blockHeight": "1",
     "type": "STATE_CHECKPOINT",
@@ -236,22 +236,22 @@
     "version": "4",
     "info": {
       "hash": "",
-      "stateRootHash": "6HvKR8ZIxYeV3k5nldRFaOGKE6rV/s0g8i5GwLVkqpY=",
+      "stateRootHash": "m4ptjaw8oBdnUsyQK/vh6IPhHCLEkaGSWjG5lV037Ic=",
       "eventRootHash": "xQa4qACFHx4YpbLjBVf8UKi4CXw95t7b2M90GQXvP8Y=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "qjbopKOJdFGbpoDkq+PsFfGkLdwgn7d3zk3p9bAd/Hw=",
+      "accumulatorRootHash": "79URpHVGxWiKJQswAA2NSArV7yNrmLb7jw8s3492QkY=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
           "writeResource": {
             "address": "0x1",
-            "stateKeyHash": "6sO7UL7trkAOL8sktJEcuvYWRdVuqkohPoNUZG7Xu+I=",
+            "stateKeyHash": "Xd9ATGDpbpSFvq/Ku5Vgn+2OOOlBpyXK5Nzsgpb7Mtc=",
             "data": {
               "type": {
                 "address": "0x1",
                 "module": "block",
-                "name": "BlockMetadata"
+                "name": "BlockResource"
               },
               "data": "{\"epoch_interval\":\"86400000000\",\"height\":\"2\",\"new_block_events\":{\"counter\":\"3\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"2\"}}}}"
             }
@@ -268,7 +268,7 @@
                 "module": "stake",
                 "name": "ValidatorPerformance"
               },
-              "data": "{\"missed_votes\":[\"2\"],\"num_blocks\":\"2\"}"
+              "data": "{\"validators\":[{\"failed_proposals\":\"0\",\"successful_proposals\":\"2\"}]}"
             }
           }
         },
@@ -325,10 +325,10 @@
       "hash": "",
       "stateRootHash": "uUbfqPVcD0wmLXsmEN+OU7I0s9OJgAGUat0irSdNBMA=",
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
-      "gasUsed": "4496",
+      "gasUsed": "5",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "BuNr14UxJE0uIVV4bS3A1Flr69chvEeCQyCiLIechxY=",
+      "accumulatorRootHash": "8U+NHsvO1tyBaDYufQ5xaM1Nl0/G2nIytxtkV4LQ/cc=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -947,7 +947,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "5kXDyL49WvcvxmnJF01fG4TI1nqW6fphR4C3vKnj4Ro="
+      "accumulatorRootHash": "jqs3i4yVQK9Sfs3sOAkLg800d8UiUZS4zknJK7aHr2k="
     },
     "blockHeight": "2",
     "type": "STATE_CHECKPOINT",
@@ -958,22 +958,22 @@
     "version": "7",
     "info": {
       "hash": "",
-      "stateRootHash": "V7AZ+DDon9/xpIEs2cy0saLkKtNu4MEM586aZ2urxcg=",
+      "stateRootHash": "XlsJd+Z95ooGG0U3uGoPafOOCeF0Zs/AWKLmF/ufipM=",
       "eventRootHash": "dliD7Dy093TZN3Zy5Vpvn9Jb7Q3dr30c4Jc4Sa/Z7Ew=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "CoxNKzYGk+x0dzBQEHRn7dBltyEDIvg56NwqR3f2jBc=",
+      "accumulatorRootHash": "oMDC5lZaArc+JH+1BxDf8ugj/+isAFPcphSPDZeNoxI=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
           "writeResource": {
             "address": "0x1",
-            "stateKeyHash": "6sO7UL7trkAOL8sktJEcuvYWRdVuqkohPoNUZG7Xu+I=",
+            "stateKeyHash": "Xd9ATGDpbpSFvq/Ku5Vgn+2OOOlBpyXK5Nzsgpb7Mtc=",
             "data": {
               "type": {
                 "address": "0x1",
                 "module": "block",
-                "name": "BlockMetadata"
+                "name": "BlockResource"
               },
               "data": "{\"epoch_interval\":\"86400000000\",\"height\":\"3\",\"new_block_events\":{\"counter\":\"4\",\"guid\":{\"id\":{\"addr\":\"0x1\",\"creation_num\":\"2\"}}}}"
             }
@@ -990,7 +990,7 @@
                 "module": "stake",
                 "name": "ValidatorPerformance"
               },
-              "data": "{\"missed_votes\":[\"3\"],\"num_blocks\":\"3\"}"
+              "data": "{\"validators\":[{\"failed_proposals\":\"0\",\"successful_proposals\":\"3\"}]}"
             }
           }
         },
@@ -1047,10 +1047,10 @@
       "hash": "",
       "stateRootHash": "hgU5GHSlMITe6kaSFqqBOS+j5mNWJ+rxUVMDEc1AAXE=",
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
-      "gasUsed": "28029",
+      "gasUsed": "29",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "kaSVkGsJZvolWjyRcNVmXXDmkPC4IJ/RjjjLhXQA/Kg=",
+      "accumulatorRootHash": "HDsfSVtZlm/x6p6I6atKRqLEBtOTzBDrr6yqllChV4A=",
       "changes": [
         {
           "type": "WRITE_RESOURCE",
@@ -1290,7 +1290,7 @@
       "eventRootHash": "QUNDVU1VTEFUT1JfUExBQ0VIT0xERVJfSEFTSAAAAAA=",
       "success": true,
       "vmStatus": "Executed successfully",
-      "accumulatorRootHash": "8tkGGC4eBZFE0Z2+CD6srYbc1/dH2DbsARCVrz8ohMk="
+      "accumulatorRootHash": "IECaKYWbKo3nZ992pZpHeKokPQnHruybjuLb+Kf9KoE="
     },
     "blockHeight": "3",
     "type": "STATE_CHECKPOINT",

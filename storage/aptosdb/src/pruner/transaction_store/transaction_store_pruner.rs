@@ -5,6 +5,7 @@ use aptos_types::transaction::{Transaction, Version};
 use schemadb::SchemaBatch;
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub struct TransactionStorePruner {
     transaction_store: Arc<TransactionStore>,
 }

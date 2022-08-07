@@ -32,7 +32,7 @@
     "type": {
       "address": "0x1",
       "module": "block",
-      "name": "BlockMetadata",
+      "name": "BlockResource",
       "generic_type_params": []
     },
     "data": {
@@ -82,10 +82,12 @@
       "generic_type_params": []
     },
     "data": {
-      "missed_votes": [
-        "0"
-      ],
-      "num_blocks": "0"
+      "validators": [
+        {
+          "failed_proposals": "0",
+          "successful_proposals": "0"
+        }
+      ]
     }
   },
   {
@@ -957,8 +959,15 @@
       "generic_type_params": []
     },
     "data": {
-      "signer_cap": {
-        "account": "0x1"
+      "signer_caps": {
+        "data": [
+          {
+            "key": "0x1",
+            "value": {
+              "account": "0x1"
+            }
+          }
+        ]
       }
     }
   },

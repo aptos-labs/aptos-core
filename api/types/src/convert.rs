@@ -684,10 +684,10 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                             )
                         })
                         .unwrap_or_else(|| {
-                            format!("Move abort: code {} at {}", code, location)
+                            format!("Move abort: code {:#x} at {}", code, location)
                         })
                 }
-                AbortLocation::Script => format!("Move abort: code {}", code),
+                AbortLocation::Script => format!("Move abort: code {:#x}", code),
             },
             ExecutionStatus::Success => "Executed successfully".to_owned(),
             ExecutionStatus::OutOfGas => "Out of gas".to_owned(),

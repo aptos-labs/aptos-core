@@ -20,7 +20,7 @@ class HeaderComponent < ViewComponent::Base
     NavGroup.new(
       NavItem.new('#', 'Developers', 'Aptos Developers'),
       [
-        NavItem.new('/developers', 'Developer Resources', 'Aptos Developers'),
+        NavItem.new('/developers', 'Resources', 'Aptos Developers'),
         NavItem.new('https://aptos.dev/', 'Documentation', 'Aptos Documentation')
       ]
     ),
@@ -34,12 +34,9 @@ class HeaderComponent < ViewComponent::Base
     NavGroup.new(
       NavItem.new('#', 'About', 'About Aptos'),
       [
+        NavItem.new('/currents', 'Currents', 'Aptos Currents'),
         NavItem.new('/careers', 'Careers', 'Aptos Careers')
       ]
-    ),
-    NavGroup.new(
-      NavItem.new('/currents', 'Currents', 'Aptos Currents'),
-      []
     )
   ].freeze
 

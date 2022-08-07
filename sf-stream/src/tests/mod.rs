@@ -26,10 +26,14 @@ macro_rules! current_function_name {
     }};
 }
 
+// TODO: Remove after we add back golden
+#[allow(dead_code)]
 pub fn convert_protubuf_txn_to_serde_value(txn: &extractor::Transaction) -> serde_json::Value {
     serde_json::from_str(&protobuf_json_mapping::print_to_string(txn).unwrap()).unwrap()
 }
 
+// TODO: Remove after we add back golden
+#[allow(dead_code)]
 pub fn convert_protubuf_txn_arr_to_serde_value(
     txns: &[extractor::Transaction],
 ) -> serde_json::Value {

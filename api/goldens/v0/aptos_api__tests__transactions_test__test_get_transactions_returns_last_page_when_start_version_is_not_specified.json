@@ -5,7 +5,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -158,7 +158,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "13",
@@ -181,10 +181,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "13"
-            ],
-            "num_blocks": "13"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "13"
+              }
+            ]
           }
         }
       },
@@ -234,7 +236,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -387,7 +389,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "14",
@@ -410,10 +412,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "14"
-            ],
-            "num_blocks": "14"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "14"
+              }
+            ]
           }
         }
       },
@@ -463,7 +467,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -616,7 +620,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "15",
@@ -639,10 +643,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "15"
-            ],
-            "num_blocks": "15"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "15"
+              }
+            ]
           }
         }
       },
@@ -692,7 +698,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -845,7 +851,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "16",
@@ -868,10 +874,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "16"
-            ],
-            "num_blocks": "16"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "16"
+              }
+            ]
           }
         }
       },
@@ -921,7 +929,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1074,7 +1082,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "17",
@@ -1097,10 +1105,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "17"
-            ],
-            "num_blocks": "17"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "17"
+              }
+            ]
           }
         }
       },
@@ -1150,7 +1160,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1303,7 +1313,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "18",
@@ -1326,10 +1336,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "18"
-            ],
-            "num_blocks": "18"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "18"
+              }
+            ]
           }
         }
       },
@@ -1379,7 +1391,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1532,7 +1544,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "19",
@@ -1555,10 +1567,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "19"
-            ],
-            "num_blocks": "19"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "19"
+              }
+            ]
           }
         }
       },
@@ -1608,7 +1622,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1761,7 +1775,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "20",
@@ -1784,10 +1798,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "20"
-            ],
-            "num_blocks": "20"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "20"
+              }
+            ]
           }
         }
       },
@@ -1837,7 +1853,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "41112",
+    "gas_used": "42",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
