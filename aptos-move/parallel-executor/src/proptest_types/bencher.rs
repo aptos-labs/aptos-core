@@ -4,7 +4,7 @@
 use crate::{
     executor::ParallelTransactionExecutor,
     proptest_types::types::{
-        ExpectedOutput, Task, Transaction, TransactionGen, TransactionGenParams,
+        ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams,
     },
 };
 use criterion::{BatchSize, Bencher as CBencher};
@@ -27,8 +27,8 @@ pub struct Bencher<K, V> {
     phantom_value: PhantomData<V>,
 }
 
-pub(crate) struct BencherState<K, V> {
-    transactions: Vec<Transaction<K, V>>,
+pub(crate) struct BencherState<K: Hash + Clone + Debug + Eq + PartialOrd, V> {
+    transactions: Vec<Transaction<KeyType<K>, V>>,
     expected_output: ExpectedOutput<V>,
 }
 
@@ -91,7 +91,7 @@ where
 
         let transactions: Vec<_> = transaction_gens
             .into_iter()
-            .map(|txn_gen| txn_gen.materialize(&key_universe))
+            .map(|txn_gen| txn_gen.materialize(&key_universe, (false, false)))
             .collect();
 
         let expected_output = ExpectedOutput::generate_baseline(&transactions);
@@ -104,8 +104,10 @@ where
 
     pub(crate) fn run(self) {
         let output =
-            ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
-                .execute_transactions_parallel((), self.transactions.clone());
+            ParallelTransactionExecutor::<Transaction<KeyType<K>, V>, Task<KeyType<K>, V>>::new(
+                num_cpus::get(),
+            )
+            .execute_transactions_parallel((), self.transactions.clone());
 
         assert!(self.expected_output.check_output(&output));
     }
