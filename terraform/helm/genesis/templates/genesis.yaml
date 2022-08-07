@@ -13,12 +13,16 @@ data:
     - {{ printf "%s-%d" $.Values.genesis.username_prefix $i | squote }}
     {{- end }}
     chain_id: {{ .Values.chain.chain_id | int }}
-    min_stake: {{ .Values.chain.min_stake | int }}
-    max_stake: {{ .Values.chain.max_stake | int }}
-    recurring_lockup_duration_secs: {{ .Values.chain.recurring_lockup_duration_secs | int }}
+    allow_new_validators: {{ .Values.chain.allow_new_validators }}
     epoch_duration_secs: {{ .Values.chain.epoch_duration_secs | int }}
     min_price_per_gas_unit: {{ .Values.chain.min_price_per_gas_unit }}
-    allow_new_validators: {{ .Values.chain.allow_new_validators }}
+    min_stake: {{ .Values.chain.min_stake | int }}
+    min_voting_threshold: {{ .Values.chain.min_voting_threshold | int }}
+    max_stake: {{ .Values.chain.max_stake | int }}
+    recurring_lockup_duration_secs: {{ .Values.chain.recurring_lockup_duration_secs | int }}
+    required_proposer_stake: {{ .Values.chain.required_proposer_stake | int }}
+    rewards_apy_percentage: {{ .Values.chain.rewards_apy_percentage | int }}
+    voting_duration_secs: {{ .Values.chain.voting_duration_secs | int }}
 
 ---
 

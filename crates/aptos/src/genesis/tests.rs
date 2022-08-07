@@ -135,10 +135,14 @@ fn create_layout_file(
         users,
         chain_id,
         allow_new_validators: false,
+        epoch_duration_secs: 86400,
         min_stake: 0,
+        min_voting_threshold: 0,
         max_stake: u64::MAX,
-        recurring_lockup_duration_secs: 86400, // One day
-        epoch_duration_secs: 86400,            // One day
+        recurring_lockup_duration_secs: 86400,
+        required_proposer_stake: 0,
+        rewards_apy_percentage: 0,
+        voting_duration_secs: 1,
     };
     let file = TempPath::new();
     file.create_as_file().unwrap();
