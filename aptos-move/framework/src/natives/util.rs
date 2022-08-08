@@ -1,6 +1,3 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
 use move_deps::{
     move_binary_format::errors::{PartialVMError, PartialVMResult},
     move_core_types::vm_status::StatusCode,

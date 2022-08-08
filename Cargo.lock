@@ -3461,6 +3461,8 @@ dependencies = [
  "once_cell",
  "rayon",
  "serde 1.0.141",
+ "serde_bytes",
+ "serde_json",
  "sha2 0.9.9",
  "siphasher",
  "smallvec",
