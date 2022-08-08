@@ -50,7 +50,7 @@ use network::{
         network::NewNetworkEvents, rpc::InboundRpcRequest, wire::handshake::v1::ProtocolId,
     },
 };
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use storage_interface::{DbReader, ExecutedTrees, Order};
 use storage_service_types::requests::{
     DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
