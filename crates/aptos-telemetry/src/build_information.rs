@@ -1,8 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_telemetry_service::types::telemetry::TelemetryEvent;
+
 use crate as aptos_telemetry;
-use crate::{service::TelemetryEvent, utils};
+use crate::utils;
 use std::collections::BTreeMap;
 
 /// Build information event name
