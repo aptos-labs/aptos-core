@@ -279,6 +279,20 @@ impl NodeConfig {
         }
     }
 
+    pub fn identity_key(&self) -> Option<x25519::PrivateKey> {
+        match self.base.role {
+            RoleType::Validator => self
+                .validator_network
+                .as_ref()
+                .map(NetworkConfig::identity_key),
+            RoleType::FullNode => self
+                .full_node_networks
+                .iter()
+                .find(|config| config.network_id == NetworkId::Public)
+                .map(NetworkConfig::identity_key),
+        }
+    }
+
     /// Checks `NetworkConfig` setups so that they exist on proper networks
     /// Additionally, handles any strange missing default cases
     fn validate_network_configs(mut self) -> Result<NodeConfig, Error> {

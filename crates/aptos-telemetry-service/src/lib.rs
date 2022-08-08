@@ -7,6 +7,7 @@ use std::{
 
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::x25519;
+use aptos_logger::info;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
 use gcp_bigquery_client::Client;
@@ -28,7 +29,7 @@ mod jwt_auth;
 mod rest_client;
 #[cfg(any(test))]
 pub(crate) mod tests;
-pub(crate) mod types;
+pub mod types;
 mod validator_cache;
 
 #[derive(Clone, Debug, Parser)]
@@ -48,7 +49,7 @@ impl AptosTelemetryServiceArgs {
                     self.config_path, error
                 )
             });
-        println!("Using config {:?}", &config);
+        info!("Using config {:?}", &config);
 
         let cache = ValidatorSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
         let gcp_bigquery_client =

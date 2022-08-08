@@ -6,8 +6,7 @@ use std::time::Duration;
 use crate::{
     auth::with_auth,
     context::Context,
-    error,
-    types::auth::{Claims, TelemetryDump},
+    types::{auth::Claims, telemetry::TelemetryDump}, error,
 };
 use aptos_config::config::PeerRole;
 use aptos_logger::{error, info};
@@ -30,9 +29,13 @@ pub fn custom_event(context: Context) -> BoxedFilter<(impl Reply,)> {
 
 pub async fn handle_custom_event(
     context: Context,
-    _claims: Claims,
+    claims: Claims,
     body: TelemetryDump,
 ) -> anyhow::Result<impl Reply, Rejection> {
+    if body.user_id != claims.peer_id.to_string() {
+        return Err(reject::reject());
+    }
+
     let mut insert_request = TableDataInsertAllRequest::new();
 
     if body.events.is_empty() {

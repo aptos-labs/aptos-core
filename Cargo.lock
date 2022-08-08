@@ -1160,12 +1160,16 @@ dependencies = [
 name = "aptos-telemetry"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-api",
  "aptos-config",
+ "aptos-crypto",
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-telemetry-service",
+ "aptos-types",
  "aptosdb",
  "consensus",
  "futures",
