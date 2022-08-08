@@ -414,8 +414,8 @@ impl FakeExecutor {
     }
 
     /// Get the blob for the associated AccessPath
-    pub fn read_from_access_path(&self, path: &AccessPath) -> Option<Vec<u8>> {
-        StateView::get_state_value(&self.data_store, &StateKey::AccessPath(path.clone())).unwrap()
+    pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
+        StateView::get_state_value(&self.data_store, state_key).unwrap()
     }
 
     /// Verifies the given transaction by running it through the VM verifier.
