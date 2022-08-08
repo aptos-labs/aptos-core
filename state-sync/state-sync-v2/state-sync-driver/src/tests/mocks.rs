@@ -203,6 +203,7 @@ mock! {
             start: u64,
             order: Order,
             limit: u64,
+            ledger_version: Version,
         ) -> Result<Vec<EventWithVersion>>;
 
         fn get_block_timestamp(&self, version: u64) -> Result<u64>;

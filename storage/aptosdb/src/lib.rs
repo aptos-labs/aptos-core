@@ -1072,9 +1072,10 @@ impl DbReader for AptosDB {
         start: u64,
         order: Order,
         limit: u64,
+        ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
         gauged_api("get_events", || {
-            self.get_events_by_event_key(event_key, start, order, limit, self.get_latest_version()?)
+            self.get_events_by_event_key(event_key, start, order, limit, ledger_version)
         })
     }
 

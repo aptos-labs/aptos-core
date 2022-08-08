@@ -40,6 +40,7 @@ pub trait AptosValidatorInterface: Sync {
         key: &EventKey,
         start_seq: u64,
         limit: u64,
+        ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>>;
 
     fn get_committed_transactions(&self, start: Version, limit: u64) -> Result<Vec<Transaction>>;

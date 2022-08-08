@@ -409,13 +409,13 @@ impl Context {
         limit: u16,
         ledger_version: u64,
     ) -> Result<Vec<EventWithVersion>> {
-        let events = self
-            .db
-            .get_events(event_key, start, Order::Ascending, limit as u64)?;
-        Ok(events
-            .into_iter()
-            .filter(|event| event.transaction_version <= ledger_version)
-            .collect::<Vec<_>>())
+        self.db.get_events(
+            event_key,
+            start,
+            Order::Ascending,
+            limit as u64,
+            ledger_version,
+        )
     }
 
     pub fn health_check_route(&self) -> BoxedFilter<(impl Reply,)> {
