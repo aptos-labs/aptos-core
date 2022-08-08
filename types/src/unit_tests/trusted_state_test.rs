@@ -82,7 +82,7 @@ fn sign_ledger_info(
             .map(|s| (s.author(), s.sign(ledger_info)))
             .collect(),
     );
-    verifier.generate_multi_signature(&partial_sig).unwrap().0
+    verifier.aggregate_multi_signature(&partial_sig).unwrap().0
 }
 
 fn mock_ledger_info(

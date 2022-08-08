@@ -8,9 +8,9 @@ use std::collections::HashMap;
 use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
-/// This struct represents the aggregated BLS signature representation that contains an aggregated
-/// BLS signature and a bit mask representing the set of validators participating in the signing
-/// process
+/// This struct represents a BLS multi-signature: it stores a bit mask representing the set of
+/// validators participating in the signing process and the multi-signature itself, which was
+/// aggregated from these validators' partial BLS signatures.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct MultiSignature {
     validator_bitmask: Vec<bool>,
@@ -58,9 +58,8 @@ impl MultiSignature {
     }
 }
 
-/// Partially aggregated signature from a set of validators, this data
-/// is only used during the aggregating the votes from different validators and is only used to keep
-/// in-memory and doesn't go through the network.
+/// Partial signature from a set of validators. This struct is only used when aggregating the votes
+/// from different validators. It is only kept in memory and never sent through the network.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PartialSignatures {
     signatures: HashMap<AccountAddress, bls12381::Signature>,
