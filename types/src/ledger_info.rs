@@ -180,7 +180,7 @@ pub fn generate_ledger_info_with_sig(
     LedgerInfoWithSignatures::new(
         ledger_info,
         validator_verifier
-            .generate_multi_signature(&partial_sig)
+            .aggregate_multi_signature(&partial_sig)
             .unwrap()
             .0,
     )
@@ -332,7 +332,7 @@ impl LedgerInfoWithPartialSignatures {
         ledger_info: &LedgerInfo,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
         let aggregated_sig =
-            verifier.generate_and_verify_multi_signature(&self.partial_sigs, ledger_info)?;
+            verifier.aggregate_and_verify_multi_signature(&self.partial_sigs, ledger_info)?;
         Ok(LedgerInfoWithSignatures::new(
             self.ledger_info.clone(),
             aggregated_sig,
@@ -372,7 +372,7 @@ impl Arbitrary for LedgerInfoWithV0 {
                     let signature = dummy_signature.clone();
                     partial_sig.add_signature(signer.author(), signature);
                 }
-                let aggregated_sig = verifier.generate_multi_signature(&partial_sig).unwrap().0;
+                let aggregated_sig = verifier.aggregate_multi_signature(&partial_sig).unwrap().0;
                 Self {
                     ledger_info,
                     signatures: aggregated_sig,
@@ -417,7 +417,7 @@ mod tests {
                 .expect("Incorrect quorum size.");
 
         let mut aggregated_signature = validator_verifier
-            .generate_and_verify_multi_signature(&partial_sig, &ledger_info)
+            .aggregate_and_verify_multi_signature(&partial_sig, &ledger_info)
             .unwrap();
 
         let ledger_info_with_signatures =
@@ -430,7 +430,7 @@ mod tests {
         }
 
         aggregated_signature = validator_verifier
-            .generate_and_verify_multi_signature(&partial_sig, &ledger_info)
+            .aggregate_and_verify_multi_signature(&partial_sig, &ledger_info)
             .unwrap();
 
         let ledger_info_with_signatures_reversed =

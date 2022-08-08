@@ -39,7 +39,10 @@ fn verify_signatures(
 ) -> PartialSignatures {
     // Returns a valid partial signature from a set of unverified signatures.
     // TODO: Validating individual signatures in expensive. Replace this with optimistic signature
-    // verification for BLS.
+    // verification for BLS. Here, we can implement a tree-based batch verification technique that
+    // filters out invalid signature shares much faster when there are only a few of them
+    // (e.g., [LM07]: Finding Invalid Signatures in Pairing-Based Batches,
+    // by Law, Laurie and Matt, Brian J., in Cryptography and Coding, 2007).
     PartialSignatures::new(
         unverified_signatures
             .signatures()
@@ -77,7 +80,7 @@ fn aggregate_commit_proof(
     validator: &ValidatorVerifier,
 ) -> LedgerInfoWithSignatures {
     let aggregated_sig = validator
-        .generate_and_verify_multi_signature(verified_signatures, commit_ledger_info)
+        .aggregate_and_verify_multi_signature(verified_signatures, commit_ledger_info)
         .expect("Failed to generate aggregated signature");
     LedgerInfoWithSignatures::new(commit_ledger_info.clone(), aggregated_sig)
 }
