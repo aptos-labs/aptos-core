@@ -139,18 +139,28 @@ impl Context {
         self.db.get_latest_ledger_info()
     }
 
-    pub fn get_state_value(&self, state_key: &StateKey, version: u64) -> Result<Option<Vec<u8>>> {
-        self.db
-            .state_view_at_version(Some(version))?
-            .get_state_value(state_key)
+    pub async fn get_state_value(
+        &self,
+        state_key: &StateKey,
+        version: u64,
+    ) -> Result<Option<Vec<u8>>> {
+        let db = self.db.clone();
+        let state_key = state_key.clone();
+        tokio::task::spawn_blocking(move || {
+            db.state_view_at_version(Some(version))?
+                .get_state_value(&state_key)
+        })
+        .await
+        .map_err(anyhow::Error::from)?
     }
 
-    pub fn get_state_value_poem<E: InternalError>(
+    pub async fn get_state_value_poem<E: InternalError>(
         &self,
         state_key: &StateKey,
         version: u64,
     ) -> Result<Option<Vec<u8>>, E> {
         self.get_state_value(state_key, version)
+            .await
             .context("Failed to retrieve state value")
             .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))
     }

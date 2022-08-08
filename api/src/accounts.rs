@@ -71,7 +71,7 @@ async fn handle_get_account(
     context: Context,
 ) -> Result<impl Reply, Rejection> {
     fail_point("endpoint_get_account")?;
-    Ok(Account::new(None, address, context)?.account()?)
+    Ok(Account::new(None, address, context)?.account().await?)
 }
 
 async fn handle_get_account_resources(
@@ -126,7 +126,7 @@ impl Account {
         })
     }
 
-    pub fn account(self) -> Result<impl Reply, Error> {
+    pub async fn account(self) -> Result<impl Reply, Error> {
         let state_key = StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
             self.address.into(),
             AccountResource::struct_tag(),
@@ -134,7 +134,8 @@ impl Account {
 
         let state_value = self
             .context
-            .get_state_value(&state_key, self.ledger_version)?;
+            .get_state_value(&state_key, self.ledger_version)
+            .await?;
 
         let account_resource: AccountResource = state_value
             .map(|bytes| bcs::from_bytes(&bytes))
