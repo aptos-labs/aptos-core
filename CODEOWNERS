@@ -6,3 +6,9 @@
 /crates/aptos-crypto-derive/ @alinush
 # Owners for the `/api` directory and all its subdirectories.
 /api/ @banool @gregnazario
+# Owners for the `/state-sync` directory and all its subdirectories.
+/state-sync/ @joshlind
+# Owners for the `/consensus` directory and all its subdirectories.
+/consensus/ @zekun000
+# Owners for the `/storage` directory and all its subdirectories.
+/storage/ @msmouse
