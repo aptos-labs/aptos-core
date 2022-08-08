@@ -5,6 +5,7 @@ use crate::common::types::{
     account_address_from_public_key, AccountAddressWrapper, CliError, FaucetOptions, GasOptions,
     MoveManifestAccountWrapper, MovePackageDir, TransactionSummary,
 };
+use crate::common::utils::write_to_file;
 use crate::move_tool::{
     ArgWithType, CompilePackage, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
 };
@@ -46,9 +47,27 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::{str::FromStr, time::Duration};
+use thiserror::private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
 
 pub const INVALID_ACCOUNT: &str = "0xDEADBEEFCAFEBABE";
+
+pub const FIRST_MOVE_FILE: &str = "
+module NamedAddress0::store {
+    use std::string;
+    use aptos_framework::coin::{Self};
+
+    struct CoolCoin has key {}
+
+    public entry fun init(
+        account: &signer,
+        decimals: u64,
+        monitor_supply: bool
+    ) {
+        let (_, _) = coin::initialize<CoolCoin>(account, string::utf8(b\"CoolCoin\"), string::utf8(b\"COOL\"), decimals, monitor_supply);
+        coin::register<CoolCoin>(account);
+    }
+}";
 
 /// A framework for testing the CLI
 pub struct CliTestFramework {
@@ -418,16 +437,44 @@ impl CliTestFramework {
         self.move_dir = Some(move_dir.path().to_path_buf());
     }
 
+    pub fn add_move_files(&self) {
+        let move_dir = self.move_dir();
+        let sources_dir = move_dir.join("sources");
+
+        let hello_blockchain_contents = include_str!(
+            "../../../../aptos-move/move-examples/hello_blockchain/sources/HelloBlockchain.move"
+        );
+        let source_path = sources_dir.join("HelloBlockchain.move");
+        write_to_file(
+            source_path.as_path(),
+            &source_path.as_display().to_string(),
+            hello_blockchain_contents.as_bytes(),
+        )
+        .unwrap();
+
+        let hello_blockchain_test_contents = include_str!("../../../../aptos-move/move-examples/hello_blockchain/sources/HelloBlockchainTest.move");
+        let test_path = sources_dir.join("HelloBlockchainTest.move");
+        write_to_file(
+            test_path.as_path(),
+            &test_path.as_display().to_string(),
+            hello_blockchain_test_contents.as_bytes(),
+        )
+        .unwrap();
+    }
+
     pub fn move_dir(&self) -> PathBuf {
         assert!(self.move_dir.is_some(), "Must have initialized the temp move directory with `CliTestFramework::init_move_dir()` first");
         self.move_dir.as_ref().cloned().unwrap()
     }
 
-    pub async fn init_package(&self, name: String, account_strs: Vec<&str>) -> CliTypedResult<()> {
-        assert!(self.move_dir.is_some(), "Must have initialized the temp move directory with `CliTestFramework::init_move_dir()` first");
+    pub async fn init_package(
+        &self,
+        name: String,
+        account_strs: BTreeMap<&str, &str>,
+    ) -> CliTypedResult<()> {
         InitPackage {
             name,
-            package_dir: self.move_dir.clone(),
+            package_dir: Some(self.move_dir()),
             named_addresses: Self::move_manifest_named_addresses(account_strs),
             prompt_options: PromptOptions {
                 assume_yes: false,
@@ -438,7 +485,10 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn compile_package(&self, account_strs: Vec<&str>) -> CliTypedResult<Vec<String>> {
+    pub async fn compile_package(
+        &self,
+        account_strs: BTreeMap<&str, &str>,
+    ) -> CliTypedResult<Vec<String>> {
         CompilePackage {
             move_options: self.move_options(account_strs),
         }
@@ -448,7 +498,7 @@ impl CliTestFramework {
 
     pub async fn test_package(
         &self,
-        account_strs: Vec<&str>,
+        account_strs: BTreeMap<&str, &str>,
         filter: Option<&str>,
     ) -> CliTypedResult<&'static str> {
         TestPackage {
@@ -463,7 +513,7 @@ impl CliTestFramework {
         &self,
         index: usize,
         gas_options: Option<GasOptions>,
-        account_strs: Vec<&str>,
+        account_strs: BTreeMap<&str, &str>,
         legacy_flow: bool,
         upgrade_policy: Option<UpgradePolicy>,
     ) -> CliTypedResult<TransactionSummary> {
@@ -511,40 +561,40 @@ impl CliTestFramework {
         .await
     }
 
-    pub fn move_options(&self, account_strs: Vec<&str>) -> MovePackageDir {
-        assert!(self.move_dir.is_some(), "Must have initialized the temp move directory with `CliTestFramework::init_move_dir()` first");
-
+    pub fn move_options(&self, account_strs: BTreeMap<&str, &str>) -> MovePackageDir {
         MovePackageDir {
-            package_dir: self.move_dir.clone(),
+            package_dir: Some(self.move_dir()),
             output_dir: None,
             named_addresses: Self::named_addresses(account_strs),
         }
     }
 
     pub fn move_manifest_named_addresses(
-        account_strs: Vec<&str>,
+        account_strs: BTreeMap<&str, &str>,
     ) -> BTreeMap<String, MoveManifestAccountWrapper> {
-        let mut named_addresses = BTreeMap::new();
-        for (i, account_str) in account_strs.iter().enumerate() {
-            named_addresses.insert(
-                format!("NamedAddress{}", i),
-                MoveManifestAccountWrapper::from_str(account_str).unwrap(),
-            );
-        }
-
-        named_addresses
+        account_strs
+            .iter()
+            .map(|(key, value)| {
+                (
+                    key.to_string(),
+                    MoveManifestAccountWrapper::from_str(value).unwrap(),
+                )
+            })
+            .collect()
     }
 
-    pub fn named_addresses(account_strs: Vec<&str>) -> BTreeMap<String, AccountAddressWrapper> {
-        let mut named_addresses = BTreeMap::new();
-        for (i, account_str) in account_strs.iter().enumerate() {
-            named_addresses.insert(
-                format!("NamedAddress{}", i),
-                AccountAddressWrapper::from_str(account_str).unwrap(),
-            );
-        }
-
-        named_addresses
+    pub fn named_addresses(
+        account_strs: BTreeMap<&str, &str>,
+    ) -> BTreeMap<String, AccountAddressWrapper> {
+        account_strs
+            .iter()
+            .map(|(key, value)| {
+                (
+                    key.to_string(),
+                    AccountAddressWrapper::from_str(value).unwrap(),
+                )
+            })
+            .collect()
     }
 
     pub fn rest_options(&self) -> RestOptions {
