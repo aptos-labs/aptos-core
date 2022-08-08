@@ -242,6 +242,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             0,
             Order::Ascending,
             10,
+            current_version,
         )
         .unwrap();
     assert_eq!(account1_sent_events.len(), 2);
@@ -253,6 +254,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             0,
             Order::Ascending,
             10,
+            current_version,
         )
         .unwrap();
     assert_eq!(account2_sent_events.len(), 1);
@@ -264,6 +266,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             0,
             Order::Ascending,
             10,
+            current_version,
         )
         .unwrap();
     assert_eq!(account3_sent_events.len(), 0);
@@ -275,6 +278,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             0,
             Order::Ascending,
             10,
+            current_version,
         )
         .unwrap();
     // Account1 has one deposit event since AptosCoin was minted to it.
@@ -287,6 +291,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             0,
             Order::Ascending,
             10,
+            current_version,
         )
         .unwrap();
     // Account2 has two deposit events: from being minted to and from one transfer.
@@ -299,6 +304,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             0,
             Order::Ascending,
             10,
+            current_version,
         )
         .unwrap();
     // Account3 has three deposit events: from being minted to and from two transfers.
@@ -325,6 +331,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             0,
             Order::Ascending,
             10,
+            current_version,
         )
         .unwrap();
     assert!(account4_sent_events.is_empty());
@@ -391,6 +398,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             0,
             Order::Ascending,
             10,
+            current_version,
         )
         .unwrap();
     assert_eq!(account1_sent_events_batch1.len(), 10);
@@ -402,6 +410,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             10,
             Order::Ascending,
             10,
+            current_version,
         )
         .unwrap();
     assert_eq!(account1_sent_events_batch2.len(), 6);
@@ -413,6 +422,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             u64::MAX,
             Order::Descending,
             10,
+            current_version,
         )
         .unwrap();
     assert_eq!(account3_received_events_batch1.len(), 10);
@@ -429,6 +439,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             6,
             Order::Descending,
             10,
+            current_version,
         )
         .unwrap();
     assert_eq!(account3_received_events_batch2.len(), 7);

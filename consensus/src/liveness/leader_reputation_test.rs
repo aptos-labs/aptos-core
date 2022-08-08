@@ -592,6 +592,7 @@ impl DbReader for MockDbReader {
         start: u64,
         order: Order,
         limit: u64,
+        _ledger_version: Version,
     ) -> anyhow::Result<Vec<EventWithVersion>> {
         *self.fetched.lock() += 1;
         assert_eq!(start, u64::max_value());
