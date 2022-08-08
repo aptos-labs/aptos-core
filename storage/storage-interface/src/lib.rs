@@ -448,13 +448,23 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// Returns if the state store pruner is enabled.
+    fn is_state_pruner_enabled(&self) -> Result<bool> {
+        unimplemented!()
+    }
+
     /// Get the state prune window config value.
-    fn get_state_prune_window(&self) -> Result<Option<usize>> {
+    fn get_state_prune_window(&self) -> Result<usize> {
+        unimplemented!()
+    }
+
+    /// Returns if the ledger pruner is enabled.
+    fn is_ledger_pruner_enabled(&self) -> Result<bool> {
         unimplemented!()
     }
 
     /// Get the ledger prune window config value.
-    fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
+    fn get_ledger_prune_window(&self) -> Result<usize> {
         unimplemented!()
     }
 

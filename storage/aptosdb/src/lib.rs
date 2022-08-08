@@ -1279,15 +1279,27 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_state_prune_window(&self) -> Result<Option<usize>> {
-        gauged_api("get_state_prune_window", || {
-            Ok(self.state_pruner.get_pruner_window().map(|x| x as usize))
+    fn is_state_pruner_enabled(&self) -> Result<bool> {
+        gauged_api("is_state_pruner_enabled", || {
+            Ok(self.state_pruner.is_pruner_enabled())
         })
     }
 
-    fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
+    fn get_state_prune_window(&self) -> Result<usize> {
+        gauged_api("get_state_prune_window", || {
+            Ok(self.state_pruner.get_pruner_window() as usize)
+        })
+    }
+
+    fn is_ledger_pruner_enabled(&self) -> Result<bool> {
+        gauged_api("is_ledger_pruner_enabled", || {
+            Ok(self.ledger_pruner.is_pruner_enabled())
+        })
+    }
+
+    fn get_ledger_prune_window(&self) -> Result<usize> {
         gauged_api("get_ledger_prune_window", || {
-            Ok(self.ledger_pruner.get_pruner_window().map(|x| x as usize))
+            Ok(self.ledger_pruner.get_pruner_window() as usize)
         })
     }
 
