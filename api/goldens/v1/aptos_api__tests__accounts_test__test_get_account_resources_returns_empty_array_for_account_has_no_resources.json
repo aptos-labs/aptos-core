@@ -1,13 +1,6 @@
 [
   {
-    "type": {
-      "address": "0x1",
-      "module": "coin",
-      "name": "CoinInfo",
-      "generic_type_params": [
-        "0x1::aptos_coin::AptosCoin"
-      ]
-    },
+    "type": "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>",
     "data": {
       "decimals": "8",
       "name": "Aptos Coin",
@@ -18,23 +11,13 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "guid",
-      "name": "Generator",
-      "generic_type_params": []
-    },
+    "type": "0x1::guid::Generator",
     "data": {
       "counter": "10"
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "block",
-      "name": "BlockResource",
-      "generic_type_params": []
-    },
+    "type": "0x1::block::BlockResource",
     "data": {
       "epoch_interval": "86400000000",
       "height": "0",
@@ -50,12 +33,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "stake",
-      "name": "ValidatorSet",
-      "generic_type_params": []
-    },
+    "type": "0x1::stake::ValidatorSet",
     "data": {
       "active_validators": [
         {
@@ -75,12 +53,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "stake",
-      "name": "ValidatorPerformance",
-      "generic_type_params": []
-    },
+    "type": "0x1::stake::ValidatorPerformance",
     "data": {
       "validators": [
         {
@@ -91,12 +64,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "stake",
-      "name": "AptosCoinCapabilities",
-      "generic_type_params": []
-    },
+    "type": "0x1::stake::AptosCoinCapabilities",
     "data": {
       "mint_cap": {
         "dummy_field": false
@@ -104,14 +72,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "voting",
-      "name": "VotingForum",
-      "generic_type_params": [
-        "0x1::governance_proposal::GovernanceProposal"
-      ]
-    },
+    "type": "0x1::voting::VotingForum<0x1::governance_proposal::GovernanceProposal>",
     "data": {
       "events": {
         "create_proposal_events": {
@@ -158,12 +119,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "account",
-      "name": "Account",
-      "generic_type_params": []
-    },
+    "type": "0x1::account::Account",
     "data": {
       "authentication_key": "0x0000000000000000000000000000000000000000000000000000000000000001",
       "coin_register_events": {
@@ -179,12 +135,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "account",
-      "name": "ChainSpecificAccountInfo",
-      "generic_type_params": []
-    },
+    "type": "0x1::account::ChainSpecificAccountInfo",
     "data": {
       "module_addr": "0x1",
       "module_name": "0x6163636f756e74",
@@ -197,45 +148,25 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "version",
-      "name": "Version",
-      "generic_type_params": []
-    },
+    "type": "0x1::version::Version",
     "data": {
       "major": "4"
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "chain_id",
-      "name": "ChainId",
-      "generic_type_params": []
-    },
+    "type": "0x1::chain_id::ChainId",
     "data": {
       "id": 4
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "timestamp",
-      "name": "CurrentTimeMicroseconds",
-      "generic_type_params": []
-    },
+    "type": "0x1::timestamp::CurrentTimeMicroseconds",
     "data": {
       "microseconds": "0"
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "aptos_coin",
-      "name": "Capabilities",
-      "generic_type_params": []
-    },
+    "type": "0x1::aptos_coin::Capabilities",
     "data": {
       "mint_cap": {
         "dummy_field": false
@@ -243,12 +174,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "gas_schedule",
-      "name": "GasSchedule",
-      "generic_type_params": []
-    },
+    "type": "0x1::gas_schedule::GasSchedule",
     "data": {
       "entries": [
         {
@@ -839,12 +765,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "staking_config",
-      "name": "StakingConfig",
-      "generic_type_params": []
-    },
+    "type": "0x1::staking_config::StakingConfig",
     "data": {
       "allow_validator_set_change": false,
       "maximum_stake": "18446744073709551615",
@@ -855,12 +776,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "reconfiguration",
-      "name": "Configuration",
-      "generic_type_params": []
-    },
+    "type": "0x1::reconfiguration::Configuration",
     "data": {
       "epoch": "1",
       "events": {
@@ -876,12 +792,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "transaction_fee",
-      "name": "AptosCoinCapabilities",
-      "generic_type_params": []
-    },
+    "type": "0x1::transaction_fee::AptosCoinCapabilities",
     "data": {
       "burn_cap": {
         "dummy_field": false
@@ -889,12 +800,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "aptos_governance",
-      "name": "VotingRecords",
-      "generic_type_params": []
-    },
+    "type": "0x1::aptos_governance::VotingRecords",
     "data": {
       "votes": {
         "handle": "250572580766766989648150312918132283230"
@@ -902,12 +808,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "aptos_governance",
-      "name": "GovernanceConfig",
-      "generic_type_params": []
-    },
+    "type": "0x1::aptos_governance::GovernanceConfig",
     "data": {
       "min_voting_threshold": "0",
       "required_proposer_stake": "0",
@@ -915,12 +816,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "aptos_governance",
-      "name": "GovernanceEvents",
-      "generic_type_params": []
-    },
+    "type": "0x1::aptos_governance::GovernanceEvents",
     "data": {
       "create_proposal_events": {
         "counter": "0",
@@ -952,12 +848,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "aptos_governance",
-      "name": "GovernanceResponsbility",
-      "generic_type_params": []
-    },
+    "type": "0x1::aptos_governance::GovernanceResponsbility",
     "data": {
       "signer_caps": {
         "data": [
@@ -972,12 +863,7 @@
     }
   },
   {
-    "type": {
-      "address": "0x1",
-      "module": "consensus_config",
-      "name": "ConsensusConfig",
-      "generic_type_params": []
-    },
+    "type": "0x1::consensus_config::ConsensusConfig",
     "data": {
       "config": "0x00010a0000000000000014000000000000000201e8030000000000000a0000000000000001000000000000000a0000000a000000000000000100000000000000010a00000000000000"
     }

@@ -364,7 +364,7 @@ impl Serialize for MoveValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Object)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MoveStructTag {
     pub address: Address,
     pub module: IdentifierWrapper,
@@ -662,7 +662,7 @@ impl From<CompiledModule> for MoveModule {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Object)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MoveModuleId {
     pub address: Address,
     pub name: IdentifierWrapper,
@@ -797,6 +797,7 @@ impl<'de> Deserialize<'de> for MoveAbility {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MoveStructGenericTypeParam {
     pub constraints: Vec<MoveAbility>,
+    #[oai(skip)]
     pub is_phantom: bool,
 }
 
@@ -963,7 +964,7 @@ impl MoveScriptBytecode {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Object)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ScriptFunctionId {
     pub module: MoveModuleId,
     pub name: IdentifierWrapper,
