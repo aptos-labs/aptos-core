@@ -15,7 +15,7 @@ use structopt::StructOpt;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
 use testcases::network_latency_test::NetworkLatencyTest;
 use testcases::{
-    compatibility_test::SimpleValidatorUpgrade, generate_traffic,
+    compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
     network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
     reconfiguration_test::ReconfigurationTest, state_sync_performance::StateSyncPerformance,
 };
@@ -413,7 +413,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(30).unwrap());
     let single_test_suite = match test_name {
         "bench" => config.with_network_tests(&[&PerformanceBenchmark]),
-        "state_sync" => config.with_network_tests(&[&StateSyncPerformance]),
+        "state_sync" => config
+            .with_initial_fullnode_count(1)
+            .with_network_tests(&[&StateSyncPerformance]),
         "compat" => config.with_network_tests(&[&SimpleValidatorUpgrade]),
         "config" => config.with_network_tests(&[&ReconfigurationTest]),
         "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
@@ -422,7 +424,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "bench_with_fullnode" => config
             .with_network_tests(&[&PerformanceBenchmarkWithFN])
             .with_initial_fullnode_count(6),
-
+        "setup_test" => config
+            .with_initial_fullnode_count(1)
+            .with_network_tests(&[&ForgeSetupTest]),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)
@@ -570,7 +574,7 @@ impl NetworkTest for RestartValidator {
         runtime.block_on(async {
             let node = ctx.swarm().validators_mut().next().unwrap();
             node.health_check().await.expect("node health check failed");
-            node.stop().unwrap();
+            node.stop().await.unwrap();
             println!("Restarting node {}", node.peer_id());
             node.start().await.unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
