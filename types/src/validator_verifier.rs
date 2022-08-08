@@ -48,6 +48,8 @@ pub enum VerifyError {
     FailedToAggregatePubKey,
     #[error("Failed to aggregate signatures")]
     FailedToAggregateSignature,
+    #[error("Failed to verify multi-signature")]
+    FailedToVerifyMultiSignature,
 }
 
 /// Helper struct to manage validator information for validation
@@ -172,11 +174,7 @@ impl ValidatorVerifier {
     pub fn aggregate_multi_signature(
         &self,
         partial_signatures: &PartialSignatures,
-    ) -> Result<(MultiSignature, Option<PublicKey>), VerifyError> {
-        if partial_signatures.is_empty() {
-            // In case of empty signature list, we don't have anything to aggregate and verify
-            return Ok((MultiSignature::empty(), None));
-        }
+    ) -> Result<(MultiSignature, PublicKey), VerifyError> {
         let validator_bitmask = self
             .address_to_validator_info
             .iter()
@@ -188,7 +186,7 @@ impl ValidatorVerifier {
         )
         .map_err(|_| VerifyError::FailedToAggregateSignature)?;
 
-        // Verify the optimistically aggregated signature.
+        // Optimistically aggregated signature without verification
         let mut pub_keys_to_agg = vec![];
         for address in partial_signatures.signatures().keys() {
             pub_keys_to_agg.push(
@@ -203,7 +201,7 @@ impl ValidatorVerifier {
             .map_err(|_| VerifyError::FailedToAggregatePubKey)?;
         Ok((
             MultiSignature::new(validator_bitmask, Some(aggregated_sig)),
-            Some(aggregated_key),
+            aggregated_key,
         ))
     }
 
@@ -214,14 +212,13 @@ impl ValidatorVerifier {
     ) -> Result<MultiSignature, VerifyError> {
         let (aggregated_sig, aggregated_key) =
             self.aggregate_multi_signature(partial_signatures)?;
-        if let Some(aggregated_key) = aggregated_key {
-            aggregated_sig
-                .multi_sig()
-                .as_ref()
-                .expect("Failed to get multi signature")
-                .verify(message, &aggregated_key)
-                .map_err(|_| VerifyError::FailedToAggregatePubKey)?
-        }
+        // Verify the multi-signature
+        aggregated_sig
+            .multi_sig()
+            .as_ref()
+            .expect("Failed to get multi signature")
+            .verify(message, &aggregated_key)
+            .map_err(|_| VerifyError::FailedToVerifyMultiSignature)?;
         Ok(aggregated_sig)
     }
 
@@ -255,10 +252,6 @@ impl ValidatorVerifier {
             })
             .collect();
 
-        if self.quorum_voting_power == 0 {
-            // This should happen only in case of tests.
-            return Ok(());
-        }
         let aggregated_key = PublicKey::aggregate(pub_keys_to_agg)
             .map_err(|_| VerifyError::FailedToAggregatePubKey)?;
 

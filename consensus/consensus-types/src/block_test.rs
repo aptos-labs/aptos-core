@@ -138,7 +138,7 @@ fn test_same_qc_different_authors() {
     let genesis_qc_altered = QuorumCert::new(
         genesis_qc.vote_data().clone(),
         ledger_info_altered
-            .aggregate_signatures(&validators, genesis_qc.ledger_info().ledger_info())
+            .aggregate_signatures(&validators)
             .unwrap(),
     );
 
@@ -214,7 +214,7 @@ fn test_block_metadata_bitmaps() {
     let qc_1 = QuorumCert::new(
         VoteData::new(BlockInfo::empty(), BlockInfo::empty()),
         ledger_info_1
-            .aggregate_signatures(&validator_verifier, &ledger_info)
+            .aggregate_signatures(&validator_verifier)
             .unwrap(),
     );
 

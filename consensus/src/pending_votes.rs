@@ -137,9 +137,7 @@ impl PendingVotes {
             match validator_verifier.check_voting_power(li_with_sig.signatures().keys()) {
                 // a quorum of signature was reached, a new QC is formed
                 Ok(_) => {
-                    return match li_with_sig
-                        .aggregate_signatures(validator_verifier, vote.ledger_info())
-                    {
+                    return match li_with_sig.aggregate_signatures(validator_verifier) {
                         Ok(ledger_info_with_sig) => {
                             VoteReceptionResult::NewQuorumCertificate(Arc::new(QuorumCert::new(
                                 vote.vote_data().clone(),

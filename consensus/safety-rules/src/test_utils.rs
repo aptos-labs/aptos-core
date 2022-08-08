@@ -174,10 +174,7 @@ pub fn make_proposal_with_parent_and_overrides(
     let qc = QuorumCert::new(
         vote_data,
         ledger_info_with_signatures
-            .aggregate_signatures(
-                &generate_validator_verifier(&[validator_signer.clone()]),
-                vote.ledger_info(),
-            )
+            .aggregate_signatures(&generate_validator_verifier(&[validator_signer.clone()]))
             .unwrap(),
     );
 
