@@ -337,7 +337,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Event'
+                  $ref: '#/components/schemas/VersionedEvent'
             application/x-bcs:
               schema:
                 type: array
@@ -443,7 +443,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Event'
+                  $ref: '#/components/schemas/VersionedEvent'
             application/x-bcs:
               schema:
                 type: array
@@ -2582,6 +2582,24 @@ components:
             $ref: '#/components/schemas/Event'
         timestamp:
           $ref: '#/components/schemas/U64'
+    VersionedEvent:
+      type: object
+      required:
+      - version
+      - key
+      - sequence_number
+      - type
+      - data
+      properties:
+        version:
+          $ref: '#/components/schemas/U64'
+        key:
+          $ref: '#/components/schemas/EventKey'
+        sequence_number:
+          $ref: '#/components/schemas/U64'
+        type:
+          $ref: '#/components/schemas/MoveType'
+        data: {}
     WriteModule:
       type: object
       required:

@@ -240,7 +240,9 @@ impl AptosDebugger {
         start_seq: u64,
         limit: u64,
     ) -> Result<()> {
-        let events = self.debugger.get_events(event_key, start_seq, limit)?;
+        let events =
+            self.debugger
+                .get_events(event_key, start_seq, limit, self.get_latest_version()?)?;
         let events_data = self.annotate_events(events.as_slice())?;
         for (event, event_data) in events.iter().zip(events_data.iter()) {
             println!("Transaction Version: {}", event.transaction_version);

@@ -41,6 +41,7 @@ claim = "0.5.0"
 mockall = "0.11.0"
 
 aptos-crypto = { path = "../../../crates/aptos-crypto" }
+aptos-genesis = { path = "../../../crates/aptos-genesis", features = ["testing"] }
 aptos-temppath = { path = "../../../crates/aptos-temppath" }
 aptos-time-service = { path = "../../../crates/aptos-time-service", features = ["async", "testing"] }
 aptos-vm = { path = "../../../aptos-move/aptos-vm" }

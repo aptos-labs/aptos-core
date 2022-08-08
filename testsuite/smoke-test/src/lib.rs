@@ -25,8 +25,6 @@ mod rosetta;
 #[cfg(test)]
 mod state_sync;
 #[cfg(test)]
-mod state_sync_v2;
-#[cfg(test)]
 mod storage;
 #[cfg(test)]
 mod txn_broadcast;

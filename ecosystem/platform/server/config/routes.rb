@@ -4,6 +4,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 Rails.application.routes.draw do
+  # Redirect www to non-www
+  constraints(host: /www\.aptoslabs\.com/) do
+    match '/(*path)' => redirect { |params, _req| "https://aptoslabs.com/#{params[:path]}" }, via: %i[get post]
+  end
+
   # Redirect community.aptoslabs.com to aptoslabs.com
   constraints host: /community.aptoslabs.com/ do
     match '/*path' => redirect { |params, _req| "https://aptoslabs.com/#{params[:path]}" }, via: %i[get post]
@@ -51,9 +56,10 @@ Rails.application.routes.draw do
   # Health check
   get 'health', to: 'health#health'
 
-  # IT2
-  resources :it2_profiles, except: %i[index destroy]
-  resources :it2_surveys, except: %i[index destroy]
+  # IT3
+  resource :it3, only: %i[show]
+  resources :it3_profiles, except: %i[index destroy]
+  resources :it3_surveys, except: %i[index destroy]
 
   # Leaderboards
   get 'leaderboard/it1', to: redirect('/it1')

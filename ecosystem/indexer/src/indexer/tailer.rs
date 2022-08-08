@@ -622,7 +622,7 @@ mod test {
                   "address": "0xa550c18",
                   "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
                   "data": {
-                    "type": "0x1::block::BlockMetadata",
+                    "type": "0x1::block::BlockResource",
                     "data": {
                       "height": "1",
                       "new_block_events": {
@@ -734,7 +734,7 @@ mod test {
                   "address": "0xa550c18",
                   "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
                   "data": {
-                    "type": "0x1::block::BlockMetadata",
+                    "type": "0x1::block::BlockResource",
                     "data": {
                       "height": "1",
                       "new_block_events": {

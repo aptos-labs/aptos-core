@@ -8,7 +8,7 @@ module aptos_framework::consensus_config {
     use aptos_framework::system_addresses;
 
     /// Error with config
-    const ECONFIG: u64 = 0;
+    const ECONFIG: u64 = 1;
 
     struct ConsensusConfig has key {
         config: vector<u8>,

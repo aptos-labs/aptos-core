@@ -948,8 +948,9 @@ impl Arbitrary for BlockMetadata {
             any::<HashValue>(),
             any::<u64>(),
             any::<u64>(),
-            prop::collection::vec(any::<bool>(), num_validators_range.clone()),
             any::<AccountAddress>(),
+            any::<u32>(),
+            prop::collection::vec(any::<bool>(), num_validators_range.clone()),
             prop::collection::vec(any::<u32>(), num_validators_range),
             any::<u64>(),
         )
@@ -958,8 +959,9 @@ impl Arbitrary for BlockMetadata {
                     id,
                     epoch,
                     round,
-                    previous_block_votes,
                     proposer,
+                    proposer_index,
+                    previous_block_votes,
                     failed_proposer_indices,
                     timestamp,
                 )| {
@@ -967,8 +969,9 @@ impl Arbitrary for BlockMetadata {
                         id,
                         epoch,
                         round,
-                        previous_block_votes,
                         proposer,
+                        Some(proposer_index),
+                        previous_block_votes,
                         failed_proposer_indices,
                         timestamp,
                     )

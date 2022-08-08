@@ -13,9 +13,11 @@ use std::fmt::Debug;
 /// It creates a worker thread on construction and joins it on destruction. When destructed, it
 /// quits the worker thread eagerly without waiting for all pending work to be done.
 pub trait PrunerManager: Debug + Sync {
-    fn get_pruner_window(&self) -> Option<Version>;
+    fn is_pruner_enabled(&self) -> bool;
 
-    fn get_min_readable_version(&self) -> Option<Version>;
+    fn get_pruner_window(&self) -> Version;
+
+    fn get_min_readable_version(&self) -> Version;
 
     /// Sends pruning command to the worker thread when necessary.
     fn maybe_wake_pruner(&self, latest_version: Version);
@@ -26,12 +28,4 @@ pub trait PrunerManager: Debug + Sync {
     /// an internal counter.
     #[cfg(test)]
     fn wake_and_wait_pruner(&self, latest_version: Version) -> anyhow::Result<()>;
-
-    /// (For tests only.) Ensure a pruner is disabled.
-    #[cfg(test)]
-    fn ensure_disabled(&self) -> anyhow::Result<()>;
-
-    /// (For tests only.) Updates the minimal readable version kept by pruner.
-    #[cfg(test)]
-    fn testonly_update_min_version(&mut self, version: Option<Version>);
 }

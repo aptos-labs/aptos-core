@@ -104,14 +104,6 @@ module aptos_framework::account {
     native fun create_address(bytes: vector<u8>): address;
     native fun create_signer(addr: address): signer;
 
-    spec create_address { // TODO: temporary mockup.
-        pragma opaque;
-    }
-
-    spec create_signer { // TODO: temporary mockup.
-        pragma opaque;
-    }
-
     public fun initialize(account: &signer,
         module_addr: address,
         module_name: vector<u8>,
@@ -222,7 +214,7 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    fun verify_hashed<T: drop> (data: RotationProof, signature: vector<u8>, public_key: vector<u8>): bool {
+    fun verify_hashed<T: drop> (data: RotationProof, public_key: vector<u8>, signature: vector<u8>): bool {
         let encoded = Proof {
             type_info: type_info::type_of<T>(),
             inner:data,
@@ -260,7 +252,7 @@ module aptos_framework::account {
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@core_resources).address_map;
         let new_auth_key = hash::sha3_256(new_public_key) as address;
 
-        if (verify_hashed<RotationProof>(proof, signature, new_public_key)) {
+        if (verify_hashed<RotationProof>(proof, new_public_key, signature)) {
             let account_resource = borrow_global<Account>(signer::address_of(account));
             let originating_address = table::remove(address_map, account_resource.authentication_key as address);
             table::add(address_map, new_auth_key, originating_address);

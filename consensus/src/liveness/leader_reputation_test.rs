@@ -14,8 +14,7 @@ use crate::liveness::{
 use aptos_infallible::Mutex;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::NewBlockEvent,
-    block_metadata::new_block_event_key,
+    account_config::{new_block_event_key, NewBlockEvent},
     contract_event::{ContractEvent, EventWithVersion},
     event::EventKey,
     transaction::Version,
@@ -593,6 +592,7 @@ impl DbReader for MockDbReader {
         start: u64,
         order: Order,
         limit: u64,
+        _ledger_version: Version,
     ) -> anyhow::Result<Vec<EventWithVersion>> {
         *self.fetched.lock() += 1;
         assert_eq!(start, u64::max_value());

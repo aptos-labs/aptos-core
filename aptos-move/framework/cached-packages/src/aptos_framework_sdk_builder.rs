@@ -157,6 +157,24 @@ pub enum ScriptFunctionCall {
     /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
     StakeIncreaseLockup {},
 
+    /// Initialize the validator account and give ownership to the signing account
+    /// except it leaves the ValidatorConfig to be set by another entity.
+    /// Note: this triggers setting the operator and owner, set it to the account's address
+    /// to set later.
+    StakeInitializeOwnerOnly {
+        initial_stake_amount: u64,
+        operator: AccountAddress,
+        voter: AccountAddress,
+    },
+
+    /// Initialize the validator account and give ownership to the signing account.
+    StakeInitializeValidator {
+        consensus_pubkey: Bytes,
+        proof_of_possession: Bytes,
+        network_addresses: Bytes,
+        fullnode_addresses: Bytes,
+    },
+
     /// This can only called by the operator of the validator/staking pool.
     StakeJoinValidatorSet {
         pool_address: AccountAddress,
@@ -170,14 +188,6 @@ pub enum ScriptFunctionCall {
     /// Can only be called by the operator of the validator/staking pool.
     StakeLeaveValidatorSet {
         pool_address: AccountAddress,
-    },
-
-    /// Initialize the validator account and give ownership to the signing account.
-    StakeRegisterValidatorCandidate {
-        consensus_pubkey: Bytes,
-        proof_of_possession: Bytes,
-        network_addresses: Bytes,
-        fullnode_addresses: Bytes,
     },
 
     /// Rotate the consensus key of the validator, it'll take effect in next epoch.
@@ -289,19 +299,24 @@ impl ScriptFunctionCall {
             } => resource_account_create_resource_account(seed, optional_auth_key),
             StakeAddStake { amount } => stake_add_stake(amount),
             StakeIncreaseLockup {} => stake_increase_lockup(),
-            StakeJoinValidatorSet { pool_address } => stake_join_validator_set(pool_address),
-            StakeLeaveValidatorSet { pool_address } => stake_leave_validator_set(pool_address),
-            StakeRegisterValidatorCandidate {
+            StakeInitializeOwnerOnly {
+                initial_stake_amount,
+                operator,
+                voter,
+            } => stake_initialize_owner_only(initial_stake_amount, operator, voter),
+            StakeInitializeValidator {
                 consensus_pubkey,
                 proof_of_possession,
                 network_addresses,
                 fullnode_addresses,
-            } => stake_register_validator_candidate(
+            } => stake_initialize_validator(
                 consensus_pubkey,
                 proof_of_possession,
                 network_addresses,
                 fullnode_addresses,
             ),
+            StakeJoinValidatorSet { pool_address } => stake_join_validator_set(pool_address),
+            StakeLeaveValidatorSet { pool_address } => stake_leave_validator_set(pool_address),
             StakeRotateConsensusKey {
                 pool_address,
                 new_consensus_pubkey,
@@ -744,6 +759,59 @@ pub fn stake_increase_lockup() -> TransactionPayload {
     ))
 }
 
+/// Initialize the validator account and give ownership to the signing account
+/// except it leaves the ValidatorConfig to be set by another entity.
+/// Note: this triggers setting the operator and owner, set it to the account's address
+/// to set later.
+pub fn stake_initialize_owner_only(
+    initial_stake_amount: u64,
+    operator: AccountAddress,
+    voter: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("stake").to_owned(),
+        ),
+        ident_str!("initialize_owner_only").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&initial_stake_amount).unwrap(),
+            bcs::to_bytes(&operator).unwrap(),
+            bcs::to_bytes(&voter).unwrap(),
+        ],
+    ))
+}
+
+/// Initialize the validator account and give ownership to the signing account.
+pub fn stake_initialize_validator(
+    consensus_pubkey: Vec<u8>,
+    proof_of_possession: Vec<u8>,
+    network_addresses: Vec<u8>,
+    fullnode_addresses: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("stake").to_owned(),
+        ),
+        ident_str!("initialize_validator").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&consensus_pubkey).unwrap(),
+            bcs::to_bytes(&proof_of_possession).unwrap(),
+            bcs::to_bytes(&network_addresses).unwrap(),
+            bcs::to_bytes(&fullnode_addresses).unwrap(),
+        ],
+    ))
+}
+
 /// This can only called by the operator of the validator/staking pool.
 pub fn stake_join_validator_set(pool_address: AccountAddress) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -778,32 +846,6 @@ pub fn stake_leave_validator_set(pool_address: AccountAddress) -> TransactionPay
         ident_str!("leave_validator_set").to_owned(),
         vec![],
         vec![bcs::to_bytes(&pool_address).unwrap()],
-    ))
-}
-
-/// Initialize the validator account and give ownership to the signing account.
-pub fn stake_register_validator_candidate(
-    consensus_pubkey: Vec<u8>,
-    proof_of_possession: Vec<u8>,
-    network_addresses: Vec<u8>,
-    fullnode_addresses: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("stake").to_owned(),
-        ),
-        ident_str!("register_validator_candidate").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&consensus_pubkey).unwrap(),
-            bcs::to_bytes(&proof_of_possession).unwrap(),
-            bcs::to_bytes(&network_addresses).unwrap(),
-            bcs::to_bytes(&fullnode_addresses).unwrap(),
-        ],
     ))
 }
 
@@ -1177,6 +1219,31 @@ mod decoder {
         }
     }
 
+    pub fn stake_initialize_owner_only(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::StakeInitializeOwnerOnly {
+                initial_stake_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
+                operator: bcs::from_bytes(script.args().get(1)?).ok()?,
+                voter: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn stake_initialize_validator(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::StakeInitializeValidator {
+                consensus_pubkey: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proof_of_possession: bcs::from_bytes(script.args().get(1)?).ok()?,
+                network_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
+                fullnode_addresses: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn stake_join_validator_set(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::StakeJoinValidatorSet {
@@ -1191,21 +1258,6 @@ mod decoder {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::StakeLeaveValidatorSet {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn stake_register_validator_candidate(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeRegisterValidatorCandidate {
-                consensus_pubkey: bcs::from_bytes(script.args().get(0)?).ok()?,
-                proof_of_possession: bcs::from_bytes(script.args().get(1)?).ok()?,
-                network_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
-                fullnode_addresses: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
             None
@@ -1386,16 +1438,20 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
             Box::new(decoder::stake_increase_lockup),
         );
         map.insert(
+            "stake_initialize_owner_only".to_string(),
+            Box::new(decoder::stake_initialize_owner_only),
+        );
+        map.insert(
+            "stake_initialize_validator".to_string(),
+            Box::new(decoder::stake_initialize_validator),
+        );
+        map.insert(
             "stake_join_validator_set".to_string(),
             Box::new(decoder::stake_join_validator_set),
         );
         map.insert(
             "stake_leave_validator_set".to_string(),
             Box::new(decoder::stake_leave_validator_set),
-        );
-        map.insert(
-            "stake_register_validator_candidate".to_string(),
-            Box::new(decoder::stake_register_validator_candidate),
         );
         map.insert(
             "stake_rotate_consensus_key".to_string(),

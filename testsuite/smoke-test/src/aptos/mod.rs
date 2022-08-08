@@ -9,6 +9,8 @@ mod gas_check;
 pub use gas_check::*;
 mod error_report;
 pub use error_report::*;
+mod move_test_helpers;
+mod package_publish;
+pub use package_publish::*;
 mod staking;
-
 pub use staking::*;

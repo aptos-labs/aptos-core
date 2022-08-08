@@ -155,7 +155,7 @@ export class TransactionBuilderABI {
    * @param abis List of binary ABIs.
    * @param builderConfig Configs for creating a raw transaction.
    */
-  constructor(abis: Bytes[], builderConfig: ABIBuilderConfig) {
+  constructor(abis: Bytes[], builderConfig?: ABIBuilderConfig) {
     this.abiMap = new Map<string, ScriptABI>();
 
     abis.forEach((abi) => {
@@ -211,32 +211,16 @@ export class TransactionBuilderABI {
   }
 
   /**
-   * Builds a RawTransaction
+   * Builds a TransactionPayload. For dApps, chain ID and account sequence numbers are only known to the wallet.
+   * Instead of building a RawTransaction (requires chainID and sequenceNumber), dApps can build a TransactionPayload
+   * and pass the payload to the wallet for signing and sending.
    * @param func Fully qualified func names, e.g. 0x1::Coin::transfer
-   * @param ty_tags TypeTag strings.
-   * @example Below are valid value examples
-   * ```
-   * // Structs are in format `AccountAddress::ModuleName::StructName`
-   * 0x1::aptos_coin::AptosCoin
-   * // Vectors are in format `vector<other_tag_string>`
-   * vector<0x1::aptos_coin::AptosCoin>
-   * bool
-   * u8
-   * u64
-   * u128
-   * address
-   * ```
+   * @param ty_tags TypeTag strings
    * @param args Function arguments
-   * @returns RawTransaction
+   * @returns TransactionPayload
    */
-  build(func: string, ty_tags: string[], args: any[]): RawTransaction {
-    const { sender, sequenceNumber, gasUnitPrice, maxGasAmount, expSecFromNow, chainId } = this.builderConfig;
-
-    const senderAccount = sender instanceof HexString ? AccountAddress.fromHex(sender) : sender;
-
+  buildTransactionPayload(func: string, ty_tags: string[], args: any[]): TransactionPayload {
     const typeTags = ty_tags.map((ty_arg) => new TypeTagParser(ty_arg).parseTypeTag());
-
-    const expTimetampSec = BigInt(Math.floor(Date.now() / 1000) + Number(expSecFromNow));
 
     let payload: TransactionPayload;
 
@@ -261,6 +245,35 @@ export class TransactionBuilderABI {
       payload = new TransactionPayloadScript(new Script(funcABI.code, typeTags, scriptArgs));
     }
 
+    return payload;
+  }
+
+  /**
+   * Builds a RawTransaction
+   * @param func Fully qualified func names, e.g. 0x1::Coin::transfer
+   * @param ty_tags TypeTag strings.
+   * @example Below are valid value examples
+   * ```
+   * // Structs are in format `AccountAddress::ModuleName::StructName`
+   * 0x1::aptos_coin::AptosCoin
+   * // Vectors are in format `vector<other_tag_string>`
+   * vector<0x1::aptos_coin::AptosCoin>
+   * bool
+   * u8
+   * u64
+   * u128
+   * address
+   * ```
+   * @param args Function arguments
+   * @returns RawTransaction
+   */
+  build(func: string, ty_tags: string[], args: any[]): RawTransaction {
+    const { sender, sequenceNumber, gasUnitPrice, maxGasAmount, expSecFromNow, chainId } = this.builderConfig;
+
+    const senderAccount = sender instanceof HexString ? AccountAddress.fromHex(sender) : sender;
+    const expTimestampSec = BigInt(Math.floor(Date.now() / 1000) + Number(expSecFromNow));
+    const payload = this.buildTransactionPayload(func, ty_tags, args);
+
     if (payload) {
       return new RawTransaction(
         senderAccount,
@@ -268,7 +281,7 @@ export class TransactionBuilderABI {
         payload,
         BigInt(maxGasAmount),
         BigInt(gasUnitPrice),
-        expTimetampSec,
+        expTimestampSec,
         new ChainId(Number(chainId)),
       );
     }
