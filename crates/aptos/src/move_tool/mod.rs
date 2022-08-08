@@ -91,19 +91,19 @@ impl MoveTool {
 pub struct InitPackage {
     /// Name of the new move package
     #[clap(long)]
-    name: String,
+    pub(crate) name: String,
     /// Path to create the new move package
     #[clap(long, parse(from_os_str))]
-    package_dir: Option<PathBuf>,
+    pub(crate) package_dir: Option<PathBuf>,
     /// Named addresses for the move binary
     ///
     /// Example: alice=0x1234, bob=0x5678
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
-    named_addresses: BTreeMap<String, AccountAddressWrapper>,
+    pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
     #[clap(flatten)]
-    prompt_options: PromptOptions,
+    pub(crate) prompt_options: PromptOptions,
 }
 
 #[async_trait]
@@ -166,7 +166,7 @@ AptosFramework = {{ git = \"https://github.com/aptos-labs/aptos-core.git\", subd
 #[derive(Parser)]
 pub struct CompilePackage {
     #[clap(flatten)]
-    move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageDir,
 }
 
 #[async_trait]
@@ -201,7 +201,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
 #[derive(Parser)]
 pub struct TestPackage {
     #[clap(flatten)]
-    move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageDir,
 
     /// A filter string to determine which unit tests to run
     #[clap(long)]
@@ -318,16 +318,16 @@ fn compile_move(build_config: BuildConfig, package_dir: &Path) -> CliTypedResult
 #[derive(Parser)]
 pub struct PublishPackage {
     #[clap(flatten)]
-    move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageDir,
     #[clap(flatten)]
-    txn_options: TransactionOptions,
+    pub(crate) txn_options: TransactionOptions,
     /// Whether to use the legacy publishing flow. This will be soon removed.
     #[clap(long)]
-    legacy_flow: bool,
+    pub(crate) legacy_flow: bool,
     /// The upgrade policy used for the published package. One of
     /// `arbitrary`, `compatible`, or `immutable`. Defaults to `compatible`.
     #[clap(long)]
-    upgrade_policy: Option<UpgradePolicy>,
+    pub(crate) upgrade_policy: Option<UpgradePolicy>,
 }
 
 #[async_trait]
@@ -494,22 +494,22 @@ impl CliCommand<&'static str> for ListPackage {
 #[derive(Parser)]
 pub struct RunFunction {
     #[clap(flatten)]
-    txn_options: TransactionOptions,
+    pub(crate) txn_options: TransactionOptions,
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
     #[clap(long)]
-    function_id: MemberId,
+    pub(crate) function_id: MemberId,
     /// Hex encoded arguments separated by spaces.
     ///
     /// Example: `0x01 0x02 0x03`
     #[clap(long, multiple_values = true)]
-    args: Vec<ArgWithType>,
+    pub(crate) args: Vec<ArgWithType>,
     /// TypeTag arguments separated by spaces.
     ///
     /// Example: `u8 u64 u128 bool address vector true false signer`
     #[clap(long, multiple_values = true)]
-    type_args: Vec<MoveType>,
+    pub(crate) type_args: Vec<MoveType>,
 }
 
 #[async_trait]
