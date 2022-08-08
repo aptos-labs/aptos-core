@@ -3,7 +3,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { AptosClient, AptosAccount, FaucetClient, TransactionBuilder, TxnBuilderTypes } from "aptos";
+import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes } from "aptos";
 import { aptosCoin } from "./constants";
 import isEqual from "lodash/isEqual";
 import assert from "assert";
@@ -11,7 +11,6 @@ import assert from "assert";
 const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
 const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
 
-const { BCS } = TransactionBuilder;
 const {
   AccountAddress,
   TypeTagStruct,
