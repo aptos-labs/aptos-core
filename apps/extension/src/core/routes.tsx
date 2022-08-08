@@ -16,7 +16,7 @@ import React from 'react';
 import RecoveryPhrase from 'pages/RecoveryPhrase';
 import Transaction from 'pages/Transaction';
 import NoWallet from 'pages/NoWallet';
-import ImportWallet from 'pages/ImportWallet';
+import AddAccount from 'pages/AddAccount';
 import ImportAccountMnemonic from 'pages/ImportAccountMnemonic';
 import ImportAccountPrivateKey from 'pages/ImportAccountPrivateKey';
 
@@ -28,6 +28,10 @@ export const Routes = Object.freeze({
   activity: {
     element: <Activity />,
     routePath: '/activity',
+  },
+  addAccount: {
+    element: <AddAccount />,
+    routePath: '/add-account',
   },
   createWallet: {
     element: <CreateWallet />,
@@ -45,17 +49,13 @@ export const Routes = Object.freeze({
     element: <Help />,
     routePath: '/help',
   },
-  importWallet: {
-    element: <ImportWallet />,
-    routePath: '/import',
-  },
   importWalletMnemonic: {
     element: <ImportAccountMnemonic />,
     routePath: '/import/mnemonic',
   },
   importWalletPrivateKey: {
     element: <ImportAccountPrivateKey />,
-    routePath: 'import/private-key',
+    routePath: '/import/private-key',
   },
   login: {
     element: <NoWallet />,

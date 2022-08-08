@@ -10,6 +10,7 @@ import { RiFileListFill } from '@react-icons/all-files/ri/RiFileListFill';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import { SettingsIcon } from '@chakra-ui/icons';
+import Routes from 'core/routes';
 import ChakraLink from './ChakraLink';
 
 const secondaryFooterBgColor = {
@@ -39,9 +40,9 @@ export default function WalletFooter() {
     >
       <SimpleGrid width="100%" gap={4} columns={4}>
         <Center width="100%">
-          <ChakraLink to="/wallet">
+          <ChakraLink to={Routes.wallet.routePath}>
             <IconButton
-              color={(pathname.includes('/wallet'))
+              color={(pathname.includes(Routes.wallet.routePath))
                 ? secondaryIconUnpressedColor[colorMode]
                 : secondaryIconColor[colorMode]}
               variant="unstyled"
@@ -54,9 +55,9 @@ export default function WalletFooter() {
           </ChakraLink>
         </Center>
         <Center width="100%">
-          <ChakraLink to="/gallery">
+          <ChakraLink to={Routes.gallery.routePath}>
             <IconButton
-              color={(pathname.includes('/gallery') || pathname.includes('/tokens'))
+              color={(pathname.includes(Routes.gallery.routePath) || pathname.includes('/tokens'))
                 ? secondaryIconUnpressedColor[colorMode]
                 : secondaryIconColor[colorMode]}
               variant="unstyled"
@@ -69,9 +70,9 @@ export default function WalletFooter() {
           </ChakraLink>
         </Center>
         <Center width="100%">
-          <ChakraLink to="/activity">
+          <ChakraLink to={Routes.activity.routePath}>
             <IconButton
-              color={(pathname.includes('/activity'))
+              color={(pathname.includes(Routes.activity.routePath))
                 ? secondaryIconUnpressedColor[colorMode]
                 : secondaryIconColor[colorMode]}
               variant="unstyled"
@@ -84,9 +85,9 @@ export default function WalletFooter() {
           </ChakraLink>
         </Center>
         <Center width="100%">
-          <ChakraLink to="/settings">
+          <ChakraLink to={Routes.settings.routePath}>
             <IconButton
-              color={(pathname.includes('/settings'))
+              color={(pathname.includes(Routes.settings.routePath))
                 ? secondaryIconUnpressedColor[colorMode]
                 : secondaryIconColor[colorMode]}
               variant="unstyled"

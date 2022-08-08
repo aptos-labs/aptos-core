@@ -4,15 +4,15 @@
 import React from 'react';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
-import ImportWalletBody from 'core/components/ImportWalletBody';
-import ImportWalletLayout from 'core/layouts/ImportWalletLayout';
+import AddAccountBody from 'core/components/AddAccountBody';
+import ImportAccountLayout from 'core/layouts/ImportAccountLayout';
 
-export default function ImportWallet() {
+export default function AddAccount() {
   return (
     <AuthLayout routePath={PageRoutes.createWallet.routePath}>
-      <ImportWalletLayout backPage="/">
-        <ImportWalletBody />
-      </ImportWalletLayout>
+      <ImportAccountLayout backPage="/">
+        <AddAccountBody />
+      </ImportAccountLayout>
     </AuthLayout>
   );
 }

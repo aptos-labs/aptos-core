@@ -4,7 +4,7 @@
 import React from 'react';
 import { Box, Grid, useColorMode } from '@chakra-ui/react';
 import { secondaryBgColor } from 'core/colors';
-import ImportWalletHeader from 'core/components/ImportWalletHeader';
+import ImportAccountHeader from 'core/components/ImportAccountHeader';
 
 interface WalletLayoutProps {
   backPage?: string;
@@ -12,7 +12,7 @@ interface WalletLayoutProps {
   headerValue?: string;
 }
 
-export default function ImportWalletLayout({
+export default function ImportAccountLayout({
   backPage,
   children,
   headerValue = 'Import wallet',
@@ -27,7 +27,7 @@ export default function ImportWalletLayout({
       templateRows="64px 1fr"
       bgColor={secondaryBgColor[colorMode]}
     >
-      <ImportWalletHeader backPage={backPage} headerValue={headerValue} />
+      <ImportAccountHeader backPage={backPage} headerValue={headerValue} />
       <Box maxH="100%" overflowY="auto" pb={4}>
         {children}
       </Box>

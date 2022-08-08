@@ -137,7 +137,7 @@ function Login() {
                   </Center>
                 </Box>
               </Center>
-              <ChakraLink to="/create-wallet">
+              <ChakraLink to={PageRoutes.createWallet.routePath}>
                 <Button colorScheme="teal" variant="ghost">
                   Create a new wallet
                 </Button>

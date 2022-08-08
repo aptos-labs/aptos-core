@@ -3,16 +3,16 @@
 
 import React from 'react';
 import AuthLayout from 'core/layouts/AuthLayout';
-import { Routes as PageRoutes } from 'core/routes';
+import Routes, { Routes as PageRoutes } from 'core/routes';
 import ImportAccountMnemonicBody from 'core/components/ImportAccountMnemonicBody';
-import ImportWalletLayout from 'core/layouts/ImportWalletLayout';
+import ImportAccountLayout from 'core/layouts/ImportAccountLayout';
 
 export default function ImportWalletMnemonic() {
   return (
     <AuthLayout routePath={PageRoutes.createWallet.routePath}>
-      <ImportWalletLayout headerValue="Import mnemonic" backPage="/import">
+      <ImportAccountLayout headerValue="Import mnemonic" backPage={Routes.addAccount.routePath}>
         <ImportAccountMnemonicBody />
-      </ImportWalletLayout>
+      </ImportAccountLayout>
     </AuthLayout>
   );
 }

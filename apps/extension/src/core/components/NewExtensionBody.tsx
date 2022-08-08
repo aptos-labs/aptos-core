@@ -12,6 +12,7 @@ import {
   Button,
 } from '@chakra-ui/react';
 import { secondaryExtensionBodyTextColor } from 'core/colors';
+import Routes from 'core/routes';
 import React from 'react';
 import { AptosBlackLogo, AptosWhiteLogo } from './AptosLogo';
 import ChakraLink from './ChakraLink';
@@ -41,12 +42,12 @@ export default function NewExtensionBody() {
           An Aptos crypto wallet
         </Text>
         <VStack spacing={4}>
-          <ChakraLink to="/create-wallet" width="100%">
+          <ChakraLink to={Routes.createWallet.routePath} width="100%">
             <Button colorScheme="teal" variant="solid" width="100%">
               Create a new wallet
             </Button>
           </ChakraLink>
-          <ChakraLink to="/import" width="100%">
+          <ChakraLink to={Routes.addAccount.routePath} width="100%">
             <Button colorScheme="gray" variant="solid" width="100%">
               I already have a wallet
             </Button>
