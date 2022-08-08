@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::context::Context;
+use crate::error;
 use crate::jwt_auth::{authorize_jwt, create_jwt_token, jwt_from_header};
 use crate::types::auth::{AuthRequest, AuthResponse, Claims};
 use aptos_config::config::PeerRole;
@@ -31,9 +32,12 @@ pub async fn handle_auth(
 ) -> anyhow::Result<impl Reply, Rejection> {
     let client_init_message = &body.handshake_msg;
 
-    // verify that this is indeed our public key
+    // Check whether the client (validator) is using the correct server's public key, which the
+    // client includes in its request body.
+    // This is useful for returning a refined error response to the client if it is using an
+    // invalid server public key.
     if body.server_public_key != context.noise_config().public_key() {
-        return Err(reject::reject());
+        return Err(reject::custom(error::Error::WrongPublicKey));
     }
 
     // build the prologue (chain_id | peer_id | public_key)

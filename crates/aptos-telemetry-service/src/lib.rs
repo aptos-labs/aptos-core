@@ -21,6 +21,7 @@ use crate::{
 
 mod auth;
 mod context;
+mod error;
 mod index;
 mod jwt_auth;
 mod rest_client;
