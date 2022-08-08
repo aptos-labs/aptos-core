@@ -685,7 +685,7 @@ pub struct MovePackageDir {
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
-    named_addresses: BTreeMap<String, AccountAddressWrapper>,
+    pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
 }
 
 impl MovePackageDir {

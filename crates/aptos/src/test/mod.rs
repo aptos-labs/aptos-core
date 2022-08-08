@@ -1,7 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{account_address_from_public_key, FaucetOptions, GasOptions};
+use crate::common::types::{
+    account_address_from_public_key, AccountAddressWrapper, CliError, FaucetOptions, GasOptions,
+    MovePackageDir, TransactionSummary,
+};
+use crate::move_tool::{
+    ArgWithType, CompilePackage, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
+};
 use crate::node::{
     AddStake, IncreaseLockup, JoinValidatorSet, LeaveValidatorSet, OperatorArgs,
     RegisterValidatorCandidate, ShowValidatorConfig, ShowValidatorSet, ShowValidatorStake,
@@ -28,12 +34,17 @@ use aptos_crypto::{bls12381, x25519, PrivateKey};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
+use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_rest_client::Transaction;
 use aptos_sdk::move_types::account_address::AccountAddress;
+use aptos_temppath::TempPath;
 use aptos_types::validator_info::ValidatorInfo;
 use aptos_types::{on_chain_config::ConsensusScheme, validator_config::ValidatorConfig};
+use framework::natives::code::UpgradePolicy;
 use reqwest::Url;
 use serde_json::Value;
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::{str::FromStr, time::Duration};
 use tokio::time::{sleep, Instant};
 
@@ -44,6 +55,7 @@ pub struct CliTestFramework {
     account_keys: Vec<Ed25519PrivateKey>,
     endpoint: Url,
     faucet_endpoint: Url,
+    move_dir: Option<PathBuf>,
 }
 
 impl CliTestFramework {
@@ -52,6 +64,7 @@ impl CliTestFramework {
             account_keys: Vec::new(),
             endpoint,
             faucet_endpoint,
+            move_dir: None,
         };
         let mut keygen = KeyGen::from_os_rng();
 
@@ -378,6 +391,129 @@ impl CliTestFramework {
         }
 
         result
+    }
+
+    pub fn init_move_dir(&mut self) {
+        let move_dir = TempPath::new();
+        move_dir
+            .create_as_dir()
+            .expect("Expected to be able to create move temp dir");
+        self.move_dir = Some(move_dir.path().to_path_buf());
+    }
+
+    pub fn move_dir(&self) -> PathBuf {
+        assert!(self.move_dir.is_some(), "Must have initialized the temp move directory with `CliTestFramework::init_move_dir()` first");
+        self.move_dir.as_ref().cloned().unwrap()
+    }
+
+    pub async fn init_package(&self, name: String, account_strs: Vec<&str>) -> CliTypedResult<()> {
+        assert!(self.move_dir.is_some(), "Must have initialized the temp move directory with `CliTestFramework::init_move_dir()` first");
+        InitPackage {
+            name,
+            package_dir: self.move_dir.clone(),
+            named_addresses: Self::named_addresses(account_strs),
+            prompt_options: PromptOptions {
+                assume_yes: false,
+                assume_no: true,
+            },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn compile_package(&self, account_strs: Vec<&str>) -> CliTypedResult<Vec<String>> {
+        CompilePackage {
+            move_options: self.move_options(account_strs),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn test_package(
+        &self,
+        account_strs: Vec<&str>,
+        filter: Option<&str>,
+    ) -> CliTypedResult<&'static str> {
+        TestPackage {
+            move_options: self.move_options(account_strs),
+            filter: filter.map(|str| str.to_string()),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn publish_package(
+        &self,
+        index: usize,
+        gas_options: Option<GasOptions>,
+        account_strs: Vec<&str>,
+        legacy_flow: bool,
+        upgrade_policy: Option<UpgradePolicy>,
+    ) -> CliTypedResult<TransactionSummary> {
+        PublishPackage {
+            move_options: self.move_options(account_strs),
+            txn_options: self.transaction_options(index, gas_options),
+            legacy_flow,
+            upgrade_policy,
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn run_function(
+        &self,
+        index: usize,
+        gas_options: Option<GasOptions>,
+        function_id: MemberId,
+        args: Vec<&str>,
+        type_args: Vec<&str>,
+    ) -> CliTypedResult<TransactionSummary> {
+        let mut parsed_args = Vec::new();
+        for arg in args {
+            parsed_args.push(
+                ArgWithType::from_str(arg)
+                    .map_err(|err| CliError::UnexpectedError(err.to_string()))?,
+            )
+        }
+
+        let mut parsed_type_args = Vec::new();
+        for arg in type_args {
+            parsed_type_args.push(
+                MoveType::from_str(arg)
+                    .map_err(|err| CliError::UnexpectedError(err.to_string()))?,
+            )
+        }
+
+        RunFunction {
+            txn_options: self.transaction_options(index, gas_options),
+            function_id,
+            args: parsed_args,
+            type_args: parsed_type_args,
+        }
+        .execute()
+        .await
+    }
+
+    pub fn move_options(&self, account_strs: Vec<&str>) -> MovePackageDir {
+        assert!(self.move_dir.is_some(), "Must have initialized the temp move directory with `CliTestFramework::init_move_dir()` first");
+
+        MovePackageDir {
+            package_dir: self.move_dir.clone(),
+            output_dir: None,
+            named_addresses: Self::named_addresses(account_strs),
+        }
+    }
+
+    pub fn named_addresses(account_strs: Vec<&str>) -> BTreeMap<String, AccountAddressWrapper> {
+        let mut named_addresses = BTreeMap::new();
+        for (i, account_str) in account_strs.iter().enumerate() {
+            named_addresses.insert(
+                format!("NamedAddress{}", i),
+                AccountAddressWrapper::from_str(account_str).unwrap(),
+            );
+        }
+
+        named_addresses
     }
 
     pub fn rest_options(&self) -> RestOptions {
