@@ -52,7 +52,7 @@ impl AccountsApi {
     ) -> BasicResultWith404<AccountData> {
         fail_point_poem("endpoint_get_account")?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
-        account.account(&accept_type)
+        account.account(&accept_type).await
     }
 
     /// Get account resources
@@ -142,7 +142,7 @@ impl Account {
 
     // These functions map directly to endpoint functions.
 
-    pub fn account(self, accept_type: &AcceptType) -> BasicResultWith404<AccountData> {
+    pub async fn account(self, accept_type: &AcceptType) -> BasicResultWith404<AccountData> {
         let state_key = StateKey::AccessPath(AccessPath::resource_access_path(ResourceKey::new(
             self.address.into(),
             AccountResource::struct_tag(),
@@ -150,7 +150,8 @@ impl Account {
 
         let state_value = self
             .context
-            .get_state_value_poem(&state_key, self.ledger_version)?;
+            .get_state_value_poem(&state_key, self.ledger_version)
+            .await?;
 
         let state_value = match state_value {
             Some(state_value) => state_value,
