@@ -4,6 +4,9 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
+## 1.3.5 (2022-08-08)
+- Re-expose BCS and items from `transaction_builder/builder` from the root of the module.
+
 ## 1.3.4 (2022-08-07)
 - Downscaled default value for `max_gas`.
 

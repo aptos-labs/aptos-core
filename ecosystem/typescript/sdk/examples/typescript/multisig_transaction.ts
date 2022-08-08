@@ -3,15 +3,13 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { AptosClient, AptosAccount, FaucetClient, TransactionBuilder, TxnBuilderTypes } from "aptos";
+import { AptosClient, AptosAccount, FaucetClient, BCS, TransactionBuilderMultiEd25519, TxnBuilderTypes } from "aptos";
 import { aptosCoin } from "./constants";
 import isEqual from "lodash/isEqual";
 import assert from "assert";
 
 const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
 const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
-
-const { BCS, TransactionBuilderMultiEd25519 } = TransactionBuilder;
 
 /**
  * This code example demonstrates the process of moving test coins from one multisig
