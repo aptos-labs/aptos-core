@@ -11,7 +11,7 @@ pub struct Metadata {
     pub token_id: String,
     pub name: Option<String>,
     pub symbol: Option<String>,
-    pub seller_fee_basis_points: Option<i64>,
+    pub seller_fee_basis_points: Option<bigdecimal::BigDecimal>,
     pub description: Option<String>,
     pub image: String,
     pub external_url: Option<String>,
@@ -49,7 +49,7 @@ impl Metadata {
 pub struct TokenMetaFromURI {
     pub name: Option<String>,
     pub symbol: Option<String>,
-    pub seller_fee_basis_points: Option<i64>,
+    pub seller_fee_basis_points: Option<bigdecimal::BigDecimal>,
     pub description: Option<String>,
     pub image: Option<String>,
     pub external_url: Option<String>,
