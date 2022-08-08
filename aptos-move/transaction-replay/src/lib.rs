@@ -33,7 +33,7 @@ use move_deps::{
     move_core_types::{effects::ChangeSet as MoveChanges, language_storage::TypeTag},
     move_vm_runtime::session::{SerializedReturnValues, Session},
     move_vm_test_utils::DeltaStorage,
-    move_vm_types::gas_schedule::GasStatus,
+    move_vm_types::gas::UnmeteredGasMeter,
 };
 use std::{
     convert::TryFrom,
@@ -336,7 +336,8 @@ impl AptosDebugger {
             &mut Session<DeltaStorage<RemoteStorage<DebuggerStateView>>>,
         ) -> VMResult<SerializedReturnValues>,
     {
-        let move_vm = MoveVmExt::new().unwrap();
+        // TODO(Gas): we should probably fetch the gas schedule from that version, right?
+        let move_vm = MoveVmExt::new(aptos_gas::NativeGasParameters::zeros()).unwrap();
         let state_view = DebuggerStateView::new(&*self.debugger, version.checked_sub(1));
         let state_view_storage = RemoteStorage::new(&state_view);
         let move_changes = override_changeset.unwrap_or_else(MoveChanges::new);
@@ -364,12 +365,11 @@ impl AptosDebugger {
         let predicate = compile_move_script(code_path)?;
         let is_version_ok = |version| {
             self.run_session_at_version(version, override_changeset.clone(), |session| {
-                let mut gas_status = GasStatus::new_unmetered();
                 session.execute_script(
                     predicate.clone(),
                     vec![],
                     vec![aptos_root_address().to_vec(), sender.to_vec()],
-                    &mut gas_status,
+                    &mut UnmeteredGasMeter,
                 )
             })
             .map(|_| ())

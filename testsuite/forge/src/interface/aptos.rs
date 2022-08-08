@@ -172,7 +172,8 @@ impl<'t> AptosPublicInfo<'t> {
     pub fn transaction_factory(&self) -> TransactionFactory {
         TransactionFactory::new(self.chain_id)
             .with_gas_unit_price(1)
-            .with_max_gas_amount(1000)
+            // TODO(Gas): double check if this is correct
+            .with_max_gas_amount(4_000_000)
     }
 
     pub async fn get_balance(&self, address: AccountAddress) -> Option<u64> {

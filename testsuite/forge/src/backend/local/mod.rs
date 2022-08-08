@@ -5,6 +5,7 @@ use crate::{Factory, GenesisConfig, Result, Swarm, Version};
 use anyhow::{bail, Context};
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use rand::rngs::StdRng;
+use std::time::Duration;
 use std::{
     collections::HashMap,
     num::NonZeroUsize,
@@ -159,10 +160,13 @@ impl Factory for LocalFactory {
     async fn launch_swarm(
         &self,
         rng: &mut StdRng,
-        node_num: NonZeroUsize,
+        num_validators: NonZeroUsize,
+        // TODO: support fullnodes in local forge
+        _num_fullnodes: usize,
         version: &Version,
         _genesis_version: &Version,
         genesis_config: Option<&GenesisConfig>,
+        _cleanup_duration: Duration,
     ) -> Result<Box<dyn Swarm>> {
         let genesis_modules = match genesis_config {
             Some(config) => match config {
@@ -174,7 +178,7 @@ impl Factory for LocalFactory {
             None => None,
         };
         let swarm = self
-            .new_swarm_with_version(rng, node_num, version, genesis_modules, None, None)
+            .new_swarm_with_version(rng, num_validators, version, genesis_modules, None, None)
             .await?;
 
         Ok(Box::new(swarm))

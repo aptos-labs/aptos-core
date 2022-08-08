@@ -25,5 +25,9 @@ module CommunityPlatform
     # config.eager_load_paths << Rails.root.join("extras")
 
     # config.debug_exception_response_format = :api
+
+    # Enable gzip compression for HTTP responses.
+    # TODO: Remove when the CDN handles compression.
+    config.middleware.use Rack::Deflater
   end
 end

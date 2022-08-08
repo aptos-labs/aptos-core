@@ -8,6 +8,7 @@ use crate::requests::DataRequest::{
 };
 use crate::responses::Error::DegenerateRangeError;
 use crate::{Epoch, StorageServiceRequest, COMPRESSION_SUFFIX_LABEL};
+use aptos_compression::metrics::CompressionClient;
 use aptos_compression::{CompressedData, CompressionError};
 use aptos_config::config::StorageServiceConfig;
 use aptos_types::epoch_change::EpochChangeProof;
@@ -52,7 +53,8 @@ impl StorageServiceResponse {
         if perform_compression {
             let raw_data = bcs::to_bytes(&data_response)
                 .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
-            let compressed_data = aptos_compression::compress(raw_data)?;
+            let compressed_data =
+                aptos_compression::compress(raw_data, CompressionClient::StateSync)?;
             let label = data_response.get_label().to_string() + COMPRESSION_SUFFIX_LABEL;
             Ok(StorageServiceResponse::CompressedResponse(
                 label,
@@ -67,7 +69,8 @@ impl StorageServiceResponse {
     pub fn get_data_response(&self) -> Result<DataResponse, Error> {
         match self {
             StorageServiceResponse::CompressedResponse(_, compressed_data) => {
-                let raw_data = aptos_compression::decompress(compressed_data)?;
+                let raw_data =
+                    aptos_compression::decompress(compressed_data, CompressionClient::StateSync)?;
                 let data_response = bcs::from_bytes::<DataResponse>(&raw_data)
                     .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
                 Ok(data_response)

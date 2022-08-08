@@ -205,7 +205,8 @@ impl EpochManager {
                 Box::new(RotatingProposer::new(vec![proposer], *contiguous_rounds))
             }
             ProposerElectionType::LeaderReputation(leader_reputation_type) => {
-                let (heuristic, window_size) = match &leader_reputation_type {
+                let (heuristic, window_size, weight_by_voting_power) = match &leader_reputation_type
+                {
                     LeaderReputationType::ActiveInactive(active_inactive_config) => {
                         let window_size = proposers.len()
                             * active_inactive_config.window_num_validators_multiplier;
@@ -216,7 +217,11 @@ impl EpochManager {
                                 active_inactive_config.inactive_weight,
                                 window_size,
                             ));
-                        (heuristic, window_size)
+                        (
+                            heuristic,
+                            window_size,
+                            active_inactive_config.weight_by_voting_power,
+                        )
                     }
                     LeaderReputationType::ProposerAndVoter(proposer_and_voter_config) => {
                         let proposer_window_size = proposers.len()
@@ -236,6 +241,7 @@ impl EpochManager {
                         (
                             heuristic,
                             std::cmp::max(proposer_window_size, voter_window_size),
+                            proposer_and_voter_config.weight_by_voting_power,
                         )
                     }
                 };
@@ -248,9 +254,19 @@ impl EpochManager {
                         + PROPSER_ROUND_BEHIND_STORAGE_BUFFER,
                     self.storage.aptos_db(),
                 ));
+                let voting_powers: Vec<_> = if weight_by_voting_power {
+                    proposers
+                        .iter()
+                        .map(|p| epoch_state.verifier.get_voting_power(p).unwrap())
+                        .collect()
+                } else {
+                    vec![1; proposers.len()]
+                };
+
                 let proposer_election = Box::new(LeaderReputation::new(
                     epoch_state.epoch,
                     proposers,
+                    voting_powers,
                     backend,
                     heuristic,
                     onchain_config.leader_reputation_exclude_round(),

@@ -3,7 +3,7 @@ info:
   title: Aptos Node API
   description: The Aptos Node API is a RESTful API for client applications to interact
     with the Aptos blockchain.
-  version: 0.1.0
+  version: 1.0.0
   contact:
     name: Aptos Labs
     url: https://github.com/aptos-labs/aptos-core

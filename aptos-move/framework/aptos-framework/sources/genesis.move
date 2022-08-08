@@ -15,7 +15,7 @@ module aptos_framework::genesis {
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
-    use aptos_framework::vm_config;
+    use aptos_framework::gas_schedule;
 
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;
@@ -23,17 +23,14 @@ module aptos_framework::genesis {
     fun initialize(
         core_resource_account: &signer,
         core_resource_account_auth_key: vector<u8>,
-        instruction_schedule: vector<u8>,
-        native_schedule: vector<u8>,
+        gas_schedule: vector<u8>,
         chain_id: u8,
         initial_version: u64,
         consensus_config: vector<u8>,
-        min_price_per_gas_unit: u64,
         epoch_interval: u64,
         minimum_stake: u64,
         maximum_stake: u64,
-        min_lockup_duration_secs: u64,
-        max_lockup_duration_secs: u64,
+        recurring_lockup_duration_secs: u64,
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
@@ -74,18 +71,15 @@ module aptos_framework::genesis {
             &aptos_framework_account,
             minimum_stake,
             maximum_stake,
-            min_lockup_duration_secs,
-            max_lockup_duration_secs,
+            recurring_lockup_duration_secs,
             allow_validator_set_change,
             rewards_rate,
             rewards_rate_denominator,
         );
 
-        vm_config::initialize(
+        gas_schedule::initialize(
             &aptos_framework_account,
-            instruction_schedule,
-            native_schedule,
-            min_price_per_gas_unit,
+            gas_schedule
         );
 
         consensus_config::set(&aptos_framework_account, consensus_config);
@@ -125,7 +119,6 @@ module aptos_framework::genesis {
         validator_network_addresses: vector<vector<u8>>,
         full_node_network_addresses: vector<vector<u8>>,
         staking_distribution: vector<u64>,
-        initial_lockup_timestamp: u64,
     ) {
         let num_owners = vector::length(&owners);
         let num_validator_network_addresses = vector::length(&validator_network_addresses);
@@ -152,7 +145,7 @@ module aptos_framework::genesis {
                 cur_validator_network_addresses,
                 cur_full_node_network_addresses,
             );
-            stake::increase_lockup(&owner_account, initial_lockup_timestamp);
+            stake::increase_lockup(&owner_account);
             let amount = *vector::borrow(&staking_distribution, i);
             // Transfer coins from the root account to the validator, so they can stake and have non-zero voting power
             // and can complete consensus on the genesis block.
@@ -171,16 +164,13 @@ module aptos_framework::genesis {
         initialize(
             core_resource_account,
             x"0000000000000000000000000000000000000000000000000000000000000000",
-            x"", // instruction_schedule not needed for unit tests
-            x"", // native schedule not needed for unit tests
+            x"00", // empty gas schedule
             4u8, // TESTING chain ID
             0,
             x"",
             1,
-            1,
             0,
             1,
-            0,
             1,
             true,
             1,

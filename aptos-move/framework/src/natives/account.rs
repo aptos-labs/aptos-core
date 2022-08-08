@@ -3,20 +3,29 @@
 
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
-    move_core_types::{account_address::AccountAddress, gas_schedule::GasCost},
-    move_vm_runtime::native_functions::NativeContext,
+    move_core_types::account_address::AccountAddress,
+    move_vm_runtime::native_functions::{NativeContext, NativeFunction},
     move_vm_types::{
-        gas_schedule::NativeCostIndex,
-        loaded_data::runtime_types::Type,
-        natives::function::{native_gas, NativeResult},
-        pop_arg,
-        values::Value,
+        loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
     },
 };
 use smallvec::smallvec;
 use std::collections::VecDeque;
+use std::sync::Arc;
 
-pub fn native_create_address(
+/***************************************************************************************************
+ * native fun create_address
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct CreateAddressGasParameters {
+    pub base_cost: u64,
+}
+
+fn native_create_address(
+    gas_params: &CreateAddressGasParameters,
     _context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -24,7 +33,8 @@ pub fn native_create_address(
     debug_assert!(ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let cost = GasCost::new(super::cost::APTOS_CREATE_ADDRESS, 1).total();
+    let cost = gas_params.base_cost;
+
     let bytes = pop_arg!(arguments, Vec<u8>);
     let address = AccountAddress::from_bytes(bytes);
     if let Ok(address) = address {
@@ -37,8 +47,26 @@ pub fn native_create_address(
     }
 }
 
-pub fn native_create_signer(
-    context: &mut NativeContext,
+pub fn make_native_create_address(gas_params: CreateAddressGasParameters) -> NativeFunction {
+    Arc::new(move |context, ty_args, args| {
+        native_create_address(&gas_params, context, ty_args, args)
+    })
+}
+
+/***************************************************************************************************
+ * native fun create_signer
+ *
+ *   gas cost: base_cost
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct CreateSignerGasParameters {
+    pub base_cost: u64,
+}
+
+fn native_create_signer(
+    gas_params: &CreateSignerGasParameters,
+    _context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
@@ -46,6 +74,39 @@ pub fn native_create_signer(
     debug_assert!(arguments.len() == 1);
 
     let address = pop_arg!(arguments, AccountAddress);
-    let cost = native_gas(context.cost_table(), NativeCostIndex::CREATE_SIGNER, 0);
-    Ok(NativeResult::ok(cost, smallvec![Value::signer(address)]))
+    Ok(NativeResult::ok(
+        gas_params.base_cost,
+        smallvec![Value::signer(address)],
+    ))
+}
+
+pub fn make_native_create_signer(gas_params: CreateSignerGasParameters) -> NativeFunction {
+    Arc::new(move |context, ty_args, args| {
+        native_create_signer(&gas_params, context, ty_args, args)
+    })
+}
+
+/***************************************************************************************************
+ * module
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct GasParameters {
+    pub create_address: CreateAddressGasParameters,
+    pub create_signer: CreateSignerGasParameters,
+}
+
+pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+    let natives = [
+        (
+            "create_address",
+            make_native_create_address(gas_params.create_address),
+        ),
+        (
+            "create_signer",
+            make_native_create_signer(gas_params.create_signer),
+        ),
+    ];
+
+    crate::natives::helpers::make_module_natives(natives)
 }

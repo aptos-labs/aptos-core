@@ -168,7 +168,6 @@ async fn create_full_node(full_node_config: NodeConfig, swarm: &mut LocalSwarm) 
             full_node_config,
             validator_peer_id,
         )
-        .await
         .unwrap();
     for fullnode in swarm.full_nodes_mut() {
         fullnode

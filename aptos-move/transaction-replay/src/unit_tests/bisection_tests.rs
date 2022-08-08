@@ -44,7 +44,7 @@ fn test_changeset_override() {
         .publish_resource(
             address,
             AccountResource::struct_tag(),
-            bcs::to_bytes(&AccountResource::new(0, vec![], address, event)).unwrap(),
+            bcs::to_bytes(&AccountResource::new(0, vec![], event)).unwrap(),
         )
         .unwrap();
 

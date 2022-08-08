@@ -3,6 +3,7 @@
 
 use crate::*;
 use rand::{Rng, SeedableRng};
+use std::time::Duration;
 use std::{
     io::{self, Write},
     num::NonZeroUsize,
@@ -124,6 +125,9 @@ pub struct ForgeConfig<'cfg> {
     /// The initial number of validators to spawn when the test harness creates a swarm
     initial_validator_count: NonZeroUsize,
 
+    /// The initial number of fullnodes to spawn when the test harness creates a swarm
+    initial_fullnode_count: usize,
+
     /// The initial version to use when the test harness creates a swarm
     initial_version: InitialVersion,
 
@@ -153,6 +157,11 @@ impl<'cfg> ForgeConfig<'cfg> {
 
     pub fn with_initial_validator_count(mut self, initial_validator_count: NonZeroUsize) -> Self {
         self.initial_validator_count = initial_validator_count;
+        self
+    }
+
+    pub fn with_initial_fullnode_count(mut self, initial_fullnode_count: usize) -> Self {
+        self.initial_fullnode_count = initial_fullnode_count;
         self
     }
 
@@ -191,6 +200,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             admin_tests: &[],
             network_tests: &[],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
+            initial_fullnode_count: 0,
             initial_version: InitialVersion::Newest,
             genesis_config: None,
         }
@@ -277,9 +287,12 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             let mut swarm = runtime.block_on(self.factory.launch_swarm(
                 &mut rng,
                 self.tests.initial_validator_count,
+                self.tests.initial_fullnode_count,
                 &initial_version,
                 &genesis_version,
                 self.tests.genesis_config.as_ref(),
+                self.global_job_request.duration
+                    + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
             ))?;
 
             // Run AptosTests
