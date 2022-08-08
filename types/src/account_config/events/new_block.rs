@@ -37,6 +37,10 @@ impl NewBlockEvent {
         self.round
     }
 
+    pub fn height(&self) -> u64 {
+        self.height
+    }
+
     pub fn previous_block_votes(&self) -> &Vec<bool> {
         &self.previous_block_votes
     }

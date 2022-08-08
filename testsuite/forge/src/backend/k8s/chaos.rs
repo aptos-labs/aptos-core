@@ -7,7 +7,7 @@ use tempfile::TempDir;
 
 use crate::{
     dump_string_to_file, Result, SwarmChaos, SwarmNetworkBandwidth, SwarmNetworkDelay,
-    SwarmNetworkPartition, KUBECTL_BIN,
+    SwarmNetworkLoss, SwarmNetworkPartition, KUBECTL_BIN,
 };
 
 macro_rules! DELAY_NETWORK_CHAOS_TEMPLATE {
@@ -23,6 +23,12 @@ macro_rules! PARTITION_NETWORK_CHAOS_TEMPLATE {
 macro_rules! BANDWIDTH_NETWORK_CHAOS_TEMPLATE {
     () => {
         "chaos/network_bandwidth.yaml"
+    };
+}
+
+macro_rules! NETWORK_LOSS_CHAOS_TEMPLATE {
+    () => {
+        "chaos/network_loss.yaml"
     };
 }
 
@@ -75,11 +81,24 @@ fn create_network_bandwidth_template(
     )
 }
 
+fn create_network_loss_template(
+    kube_namespace: &str,
+    swarm_network_loss: &SwarmNetworkLoss,
+) -> String {
+    format!(
+        include_str!(NETWORK_LOSS_CHAOS_TEMPLATE!()),
+        namespace = kube_namespace,
+        loss_percentage = swarm_network_loss.loss_percentage,
+        correlation_percentage = swarm_network_loss.correlation_percentage,
+    )
+}
+
 fn create_chaos_template(kube_namespace: &str, chaos: &SwarmChaos) -> Result<String> {
     let template = match chaos {
         SwarmChaos::Delay(c) => create_network_delay_template(kube_namespace, c),
         SwarmChaos::Partition(c) => create_network_partition_template(kube_namespace, c),
         SwarmChaos::Bandwidth(c) => create_network_bandwidth_template(kube_namespace, c),
+        SwarmChaos::Loss(c) => create_network_loss_template(kube_namespace, c),
     };
     Ok(template)
 }

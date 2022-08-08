@@ -203,6 +203,7 @@ mock! {
             start: u64,
             order: Order,
             limit: u64,
+            ledger_version: Version,
         ) -> Result<Vec<EventWithVersion>>;
 
         fn get_block_timestamp(&self, version: u64) -> Result<u64>;
@@ -286,7 +287,7 @@ mock! {
             chunk_size: usize,
         ) -> Result<StateValueChunkWithProof>;
 
-        fn get_state_prune_window(&self) -> Result<Option<usize>>;
+        fn get_state_prune_window(&self) -> Result<usize>;
     }
 }
 

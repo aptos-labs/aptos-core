@@ -68,6 +68,7 @@ impl AptosDBBackend {
             u64::max_value(),
             Order::Descending,
             limit as u64,
+            lastest_db_version,
         )?;
 
         let max_returned_version = events.first().map_or(0, |first| first.transaction_version);

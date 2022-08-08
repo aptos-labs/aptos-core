@@ -356,6 +356,8 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+
     #[test]
     fn test_get_last_version_before_timestamp(new_block_events in arb_new_block_events()) {
         test_get_last_version_before_timestamp_impl(new_block_events)

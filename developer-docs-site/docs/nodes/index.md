@@ -59,7 +59,7 @@ This section contains the guides for the Aptos nodes. Topics covered include how
     <div class="card h-100" >
     <div class="card-body d-flex flex-column" >
     <h2 class="card-title">Validator for a local testnet </h2>
-    <p class="card-text"><a href="run-a-local-testnet" class="card-link">Using Aptos source or Docker.</a></p>
+    <p class="card-text"><a href="local-testnet/run-a-local-testnet" class="card-link">Using Aptos source or Docker.</a></p>
 </div>
 </div>
 </div>

@@ -101,6 +101,15 @@ pub static CORE_MEMPOOL_REMOVED_TXNS: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Counter tracking number of txns received that are idempotent duplicates
+pub static CORE_MEMPOOL_IDEMPOTENT_TXNS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_core_mempool_idempotent_txns_count",
+        "Number of txns received that are idempotent duplicates"
+    )
+    .unwrap()
+});
+
 /// Counter tracking latency of txns reaching various stages in committing
 /// (e.g. time from txn entering core mempool to being pulled in consensus block)
 pub static CORE_MEMPOOL_TXN_COMMIT_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {

@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::account_config::NewBlockEvent;
 use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     access_path::AccessPath,
@@ -193,6 +194,7 @@ pub trait DbReader: Send + Sync {
         start: u64,
         order: Order,
         limit: u64,
+        ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
         unimplemented!()
     }
@@ -201,15 +203,19 @@ pub trait DbReader: Send + Sync {
     ///
     /// [AptosDB::get_block_timestamp]:
     /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
-    fn get_block_timestamp(&self, version: u64) -> Result<u64> {
+    fn get_block_timestamp(&self, version: Version) -> Result<u64> {
         unimplemented!()
     }
 
-    /// See [AptosDB::get_block_boundaries].
-    ///
-    /// [AptosDB::get_block_boundaries]:
-    /// ../aptosdb/struct.AptosDB.html#method.get_block_boundaries
-    fn get_block_boundaries(&self, version: u64, latest_ledger_version: u64) -> Result<(u64, u64)> {
+    /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
+    /// transaction version.
+    fn get_block_info(&self, version: Version) -> Result<(Version, Version, NewBlockEvent)> {
+        unimplemented!()
+    }
+
+    /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
+    /// transaction version.
+    fn get_block_info_by_height(&self, height: u64) -> Result<(Version, Version, NewBlockEvent)> {
         unimplemented!()
     }
 
@@ -448,13 +454,23 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// Returns if the state store pruner is enabled.
+    fn is_state_pruner_enabled(&self) -> Result<bool> {
+        unimplemented!()
+    }
+
     /// Get the state prune window config value.
-    fn get_state_prune_window(&self) -> Result<Option<usize>> {
+    fn get_state_prune_window(&self) -> Result<usize> {
+        unimplemented!()
+    }
+
+    /// Returns if the ledger pruner is enabled.
+    fn is_ledger_pruner_enabled(&self) -> Result<bool> {
         unimplemented!()
     }
 
     /// Get the ledger prune window config value.
-    fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
+    fn get_ledger_prune_window(&self) -> Result<usize> {
         unimplemented!()
     }
 

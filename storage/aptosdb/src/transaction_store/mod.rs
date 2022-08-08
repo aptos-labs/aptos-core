@@ -16,7 +16,6 @@ use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     account_address::AccountAddress,
-    block_metadata::BlockMetadata,
     proof::position::Position,
     transaction::{Transaction, Version},
     write_set::WriteSet,
@@ -123,31 +122,6 @@ impl TransactionStore {
         let mut iter = self.db.iter::<TransactionSchema>(Default::default())?;
         iter.seek_to_first();
         iter.next().map(|res| res.map(|(v, _)| v)).transpose()
-    }
-
-    /// Returns the block metadata carried on the block metadata transaction at or preceding
-    /// `version`, together with the version of the block metadata transaction.
-    /// Returns None if there's no such transaction at or preceding `version` (it's likely the genesis
-    /// version 0).
-    pub fn get_block_metadata(&self, version: Version) -> Result<Option<(Version, BlockMetadata)>> {
-        // Must be larger than a block size, otherwise a NotFound error will be raised wrongly.
-        const MAX_VERSIONS_TO_SEARCH: usize = 1000 * 100;
-
-        // Linear search via `DB::rev_iter()` here, NOT expecting performance hit, due to the fact
-        // that the iterator caches data block and that there are limited number of transactions in
-        // each block.
-        let mut iter = self.db.rev_iter::<TransactionSchema>(Default::default())?;
-        iter.seek(&version)?;
-        for res in iter.take(MAX_VERSIONS_TO_SEARCH) {
-            let (v, txn) = res?;
-            if let Transaction::BlockMetadata(block_meta) = txn {
-                return Ok(Some((v, block_meta)));
-            } else if v == 0 {
-                return Ok(None);
-            }
-        }
-
-        Err(AptosDbError::NotFound(format!("BlockMetadata preceding version {}", version)).into())
     }
 
     /// Searches around the version to find the block's transactions
