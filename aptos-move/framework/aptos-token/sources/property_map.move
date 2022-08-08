@@ -14,6 +14,7 @@ module aptos_token::property_map {
 
     struct PropertyMap has drop, store {
         map: SimpleMap<String, PropertyValue>,
+        keys: vector<String>,
     }
 
     struct PropertyValue has store, copy, drop {
@@ -30,6 +31,7 @@ module aptos_token::property_map {
         assert!(vector::length(&keys) == vector::length(&types), EKEY_COUNT_NOT_MATCH_TYPE_COUNT);
         let properties = PropertyMap{
             map: simple_map::create<String, PropertyValue>(),
+            keys,
         };
         let i = 0;
         while (i < vector::length(&keys)) {
@@ -46,7 +48,21 @@ module aptos_token::property_map {
     public fun empty(): PropertyMap {
         PropertyMap{
             map: simple_map::create<String, PropertyValue>(),
+            keys: vector::empty<String>(),
         }
+    }
+
+    public fun copy_map(list: &PropertyMap): PropertyMap {
+        let keys = &list.keys;
+        let prop_map = empty();
+        let i = 0;
+        while ( i < vector::length(keys)) {
+            let k = vector::borrow(keys, i);
+            let val = *borrow(list, k);
+            add(&mut prop_map, *k, val);
+            i = i + 1;
+        };
+        prop_map
     }
 
     public fun contains_key(list: &PropertyMap, key: &String): bool {
@@ -57,6 +73,7 @@ module aptos_token::property_map {
         assert!(! simple_map::contains_key(&list.map, &key), EKEY_AREADY_EXIST_IN_PROPERTY_MAP);
         assert!(simple_map::length<String, PropertyValue>(&list.map) <= MAX_PROPERTY_MAP_SIZE, EPROPERTY_NUMBER_EXCEED_LIMIT);
         simple_map::add(&mut list.map, key, value);
+        vector::push_back(&mut list.keys, key);
     }
 
     public fun length(list: &PropertyMap): u64 {
@@ -83,8 +100,34 @@ module aptos_token::property_map {
     ): (String, PropertyValue) {
         let found = contains_key(list, key);
         assert!(found, EPROPERTY_NOT_EXIST);
-
+        let (found, ind) = vector::index_of(&mut list.keys, key);
+        assert!(found, EPROPERTY_NOT_EXIST);
+        vector::remove(&mut list.keys, ind);
         simple_map::remove(&mut list.map, key)
+    }
+
+    /// update the property in the existing property map
+    public fun update_property_map(
+        list: &mut PropertyMap,
+        keys: vector<String>,
+        values: vector<vector<u8>>,
+        types: vector<String>,
+    ) {
+        let key_len = vector::length(&keys);
+        let val_len = vector::length(&values);
+        let typ_len = vector::length(&types);
+        assert!(key_len == val_len, EKEY_COUNT_NOT_MATCH_VALUE_COUNT);
+        assert!(val_len == typ_len, EKEY_COUNT_NOT_MATCH_TYPE_COUNT);
+
+        let i = 0;
+        while ( i < vector::length(&keys)) {
+            let prop_val = PropertyValue {
+                value: *vector::borrow( &values, i),
+                type: *vector::borrow(&types, i),
+            };
+            update_property_value(list, vector::borrow(&keys, i), prop_val);
+            i = i + 1;
+        }
     }
 
     public fun update_property_value(
