@@ -59,10 +59,15 @@ const sidebars = {
       items: [
         "guides/basics-life-of-txn",
         "guides/sign-a-transaction",
-        "guides/move-guides/move-on-aptos",
         "guides/interacting-with-the-blockchain",
         "guides/building-wallet-extension",
         "guides/guide-for-system-integrators",
+        {
+          type: "category",
+          label: "Move Guides",
+          link: { type: "doc", id: "guides/move-guides/index" },
+          items: ["guides/move-guides/move-on-aptos", "guides/move-guides/guide-move-transactional-testing"],
+        },
       ],
     },
     {

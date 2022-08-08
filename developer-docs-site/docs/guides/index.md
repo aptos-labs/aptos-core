@@ -12,7 +12,7 @@ Start here to get into the core concepts of the Aptos Blockchain.
 
 - ### [Creating a Signed Transaction](sign-a-transaction.md)
 
-- ### [Move on Aptos](move-guides/move-on-aptos.md)
+- ### [Move Guides](./move-guides/index.md)
 
 - ### [Interacting with the Aptos Blockchain](interacting-with-the-blockchain.md)
 
