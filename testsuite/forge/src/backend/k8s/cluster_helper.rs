@@ -13,11 +13,11 @@ use aptos_sdk::types::PeerId;
 use async_trait::async_trait;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
-    batch::v1::Job,
+    batch::{v1::Job, v1beta1::CronJob},
     core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod},
 };
 use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, PostParams},
+    api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, Patch, PatchParams, PostParams},
     client::Client as K8sClient,
     Config, Error as KubeError,
 };
@@ -73,51 +73,54 @@ macro_rules! GENESIS_FORGE_HELM_VALUES {
         "helm-values/genesis-values.yaml"
     };
 }
-
 /// Gets a free port
 pub fn get_free_port() -> u32 {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     listener.local_addr().unwrap().port() as u32
 }
 
+/// Waits for the testnet's genesis job to complete, while tailing the job's logs
 async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &str) -> Result<()> {
     aptos_retrier::retry_async(k8s_wait_genesis_strategy(), || {
         let jobs: Api<Job> = Api::namespaced(kube_client.clone(), kube_namespace);
         Box::pin(async move {
             let job_name = format!("{}-aptos-genesis-e{}", GENESIS_HELM_RELEASE_NAME, era);
 
-            // try logging the genesis job
-            Command::new(KUBECTL_BIN)
-                .args([
-                    "-n",
-                    kube_namespace,
-                    "logs",
-                    "-f",
-                    format!("job/{}", &job_name).as_str(),
-                ])
-                .status()
-                .expect("Failed to tail genesis logs");
-
             let genesis_job = jobs.get_status(&job_name).await.unwrap();
-            info!("Genesis status: {:?}", genesis_job.status);
 
             let status = genesis_job.status.unwrap();
+            info!("Genesis status: {:?}", status);
             match status.active {
-                Some(_) => bail!("Genesis still running or pending"),
+                Some(_) => {
+                    // try tailing the logs of the genesis job
+                    // by the time this is done, we can re-evalulate its status
+                    Command::new(KUBECTL_BIN)
+                        .args([
+                            "-n",
+                            kube_namespace,
+                            "logs",
+                            "-f",
+                            format!("job/{}", &job_name).as_str(),
+                        ])
+                        .status()
+                        .expect("Failed to tail genesis logs");
+                }
                 None => info!("Genesis completed running"),
             }
+            info!("Genesis status: {:?}", status);
             match status.succeeded {
                 Some(_) => {
                     info!("Genesis done");
                     Ok(())
                 }
-                _ => bail!("Genesis did not succeed"),
+                None => bail!("Genesis did not succeed"),
             }
         })
     })
     .await
 }
 
+/// Waits for a given number of HAProxy K8s Deployments to be ready
 async fn wait_node_haproxy(
     kube_client: &K8sClient,
     kube_namespace: &str,
@@ -158,44 +161,65 @@ async fn wait_node_haproxy(
     .await
 }
 
-async fn wait_node_stateful_set(
+/// Waits for a single K8s StatefulSet to be ready
+async fn wait_stateful_set(
+    kube_client: &K8sClient,
+    kube_namespace: &str,
+    sts_name: &str,
+    desired_replicas: u64,
+) -> Result<()> {
+    aptos_retrier::retry_async(k8s_wait_nodes_strategy(), || {
+        let sts_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
+        let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), kube_namespace);
+        Box::pin(async move {
+            match sts_api.get_status(sts_name).await {
+                Ok(s) => {
+                    let sts_name = &s.name();
+                    // get the StatefulSet status
+                    if let Some(sts_status) = s.status {
+                        let ready_replicas = sts_status.ready_replicas.unwrap_or(0) as u64;
+                        let replicas = sts_status.replicas as u64;
+                        if ready_replicas == replicas && replicas == desired_replicas {
+                            info!(
+                                "StatefulSet {} has scaled to {}",
+                                sts_name, desired_replicas
+                            );
+                            return Ok(());
+                        }
+                    }
+                    // Get the StatefulSet's Pod status
+                    if let Some(status) = pod_api
+                        .get_status(format!("{}-0", sts_name).as_str())
+                        .await?
+                        .status
+                    {
+                        if let Some(phase) = status.phase.as_ref() {
+                            info!("StatefulSet {} not ready yet, at phase {}", sts_name, phase)
+                        }
+                    }
+                    bail!("STS not ready");
+                }
+                Err(e) => {
+                    info!("Failed to get sts: {}", e);
+                    bail!("Failed to get sts: {}", e);
+                }
+            }
+        })
+    })
+    .await
+}
+
+/// Waits for all given K8sNodes to be ready
+async fn wait_nodes_stateful_set(
     kube_client: &K8sClient,
     kube_namespace: &str,
     nodes: &HashMap<PeerId, K8sNode>,
 ) -> Result<()> {
-    aptos_retrier::retry_async(k8s_wait_nodes_strategy(), || {
-        let sts: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
-        Box::pin(async move {
-            // wait for all validators healthy
-            for node in nodes.values() {
-                match sts.get_status(node.stateful_set_name()).await {
-                    Ok(s) => {
-                        let sts_name = &s.name();
-                        if let Some(sts_status) = s.status {
-                            let ready_replicas = sts_status.ready_replicas.unwrap_or(0);
-                            let replicas = sts_status.replicas;
-                            info!(
-                                "StatefulSet {} has {}/{} ready_replicas",
-                                sts_name, ready_replicas, replicas
-                            );
-                            if ready_replicas == replicas && replicas > 0 {
-                                info!("StatefulSet {} ready", sts_name);
-                                continue;
-                            }
-                        }
-                        info!("StatefulSet {} has no status", sts_name);
-                        bail!("STS not ready");
-                    }
-                    Err(e) => {
-                        info!("Failed to get sts: {}", e);
-                        bail!("Failed to get sts: {}", e);
-                    }
-                }
-            }
-            Ok(())
-        })
-    })
-    .await
+    // wait for all validators healthy
+    for node in nodes.values() {
+        wait_stateful_set(kube_client, kube_namespace, node.stateful_set_name(), 1).await?
+    }
+    Ok(())
 }
 
 // TODO: set validator image tag by kube api rather than helm
@@ -236,18 +260,39 @@ async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
 pub(crate) async fn delete_k8s_resources(client: K8sClient, kube_namespace: &str) -> Result<()> {
     // selector for the helm chart
     let aptos_node_helm_selector = "app.kubernetes.io/part-of=aptos-node";
+    let testnet_addons_helm_selector = "app.kubernetes.io/part-of=testnet-addons";
+    let genesis_helm_selector = "app.kubernetes.io/part-of=aptos-genesis";
 
     // delete all deployments and statefulsets
     // cross this with all the compute resources created by aptos-node helm chart
     let deployments: Api<Deployment> = Api::namespaced(client.clone(), kube_namespace);
     let stateful_sets: Api<StatefulSet> = Api::namespaced(client.clone(), kube_namespace);
     let pvcs: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), kube_namespace);
-    delete_k8s_collection(deployments, "deployments", aptos_node_helm_selector).await?;
-    delete_k8s_collection(stateful_sets, "stateful_sets", aptos_node_helm_selector).await?;
-    delete_k8s_collection(pvcs, "pvcs", aptos_node_helm_selector).await?;
+    let jobs: Api<Job> = Api::namespaced(client.clone(), kube_namespace);
+    let cronjobs: Api<CronJob> = Api::namespaced(client.clone(), kube_namespace);
+    // service deletion by label selector is not supported in this version of k8s api
+    // let services: Api<Service> = Api::namespaced(client.clone(), kube_namespace);
+
+    for selector in &[
+        aptos_node_helm_selector,
+        testnet_addons_helm_selector,
+        genesis_helm_selector,
+    ] {
+        info!("Deleting k8s resources with selector: {}", selector);
+        delete_k8s_collection(deployments.clone(), "Deployments", selector).await?;
+        delete_k8s_collection(stateful_sets.clone(), "StatefulSets", selector).await?;
+        delete_k8s_collection(pvcs.clone(), "PersistentVolumeClaims", selector).await?;
+        delete_k8s_collection(jobs.clone(), "Jobs", selector).await?;
+        delete_k8s_collection(cronjobs.clone(), "CronJobs", selector).await?;
+        // delete_k8s_collection(services.clone(), "Services", selector).await?;
+    }
+
     Ok(())
 }
 
+/// Deletes all Forge resources from the given namespace. If the namespace is "default", delete the management configmap
+/// as well as all compute resources. If the namespace is a Forge namespace (has the "forge-*" prefix), then simply delete
+/// the entire namespace
 async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
     let client: K8sClient = create_k8s_client().await;
 
@@ -536,7 +581,7 @@ pub async fn collect_running_nodes(
     .unwrap();
 
     // wait for all validator STS to spin up
-    wait_node_stateful_set(kube_client, &kube_namespace, &validators).await?;
+    wait_nodes_stateful_set(kube_client, &kube_namespace, &validators).await?;
 
     if enable_haproxy {
         wait_node_haproxy(kube_client, &kube_namespace, validators.len()).await?;
@@ -552,7 +597,7 @@ pub async fn collect_running_nodes(
     .await
     .unwrap();
 
-    wait_node_stateful_set(kube_client, &kube_namespace, &fullnodes).await?;
+    wait_nodes_stateful_set(kube_client, &kube_namespace, &fullnodes).await?;
 
     let nodes = validators
         .values()
@@ -562,7 +607,7 @@ pub async fn collect_running_nodes(
     // start port-forward for each of the nodes
     if use_port_forward {
         for node in nodes.iter() {
-            node.spawn_port_forward()?;
+            node.port_forward_rest_api()?;
             // assume this will always succeed???
         }
     }
@@ -579,29 +624,32 @@ pub async fn create_k8s_client() -> K8sClient {
 }
 
 // TODO: replace this with rust kube api call
-pub fn scale_stateful_set_replicas(sts_name: &str, replica_num: u64) -> Result<()> {
-    let scale_sts_args = [
-        "scale",
-        "sts",
-        sts_name,
-        &format!("--replicas={}", replica_num),
-    ];
-    info!("{:?}", scale_sts_args);
-    let scale_output = Command::new(KUBECTL_BIN)
-        .stdout(Stdio::inherit())
-        .args(&scale_sts_args)
-        .output()
-        .expect("failed to scale sts replicas");
-    assert!(
-        scale_output.status.success(),
-        "{}",
-        String::from_utf8(scale_output.stderr).unwrap()
-    );
+pub async fn scale_stateful_set_replicas(
+    sts_name: &str,
+    kube_namespace: &str,
+    replica_num: u64,
+) -> Result<()> {
+    let kube_client = create_k8s_client().await;
+    let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
+    let pp = PatchParams::apply("forge").force();
+    let patch = serde_json::json!({
+        "apiVersion": "apps/v1",
+        "kind": "StatefulSet",
+        "metadata": {
+            "name": sts_name,
+        },
+        "spec": {
+            "replicas": replica_num,
+        }
+    });
+    let patch = Patch::Apply(&patch);
+    stateful_set_api.patch(sts_name, &pp, &patch).await?;
+    wait_stateful_set(&kube_client, kube_namespace, sts_name, replica_num).await?;
 
     Ok(())
 }
 
-// XXX: quick helpers around helm operation on the default namespace
+/// Gets the result of helm status command as JSON
 fn get_helm_status(helm_release_name: &str) -> Result<Value> {
     let status_args = [
         "status",
@@ -615,13 +663,19 @@ fn get_helm_status(helm_release_name: &str) -> Result<Value> {
     let raw_helm_values = Command::new(HELM_BIN)
         .args(&status_args)
         .output()
-        .unwrap_or_else(|_| panic!("failed to helm status {}", helm_release_name));
+        .unwrap_or_else(|_| panic!("Failed to helm status {}", helm_release_name));
 
     let helm_values = String::from_utf8(raw_helm_values.stdout).unwrap();
-    serde_json::from_str(&helm_values)
-        .map_err(|e| format_err!("failed to deserialize helm values: {}", e))
+    serde_json::from_str(&helm_values).map_err(|e| {
+        format_err!(
+            "Failed to deserialize helm values. Check if release {} exists: {}",
+            helm_release_name,
+            e
+        )
+    })
 }
 
+/// Dumps the given String contents into a file at the given temp directory
 pub fn dump_string_to_file(
     file_name: String,
     content: String,
