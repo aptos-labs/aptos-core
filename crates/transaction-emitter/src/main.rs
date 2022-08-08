@@ -3,12 +3,12 @@
 
 mod diag;
 
-use ::aptos_logger::{Level, Logger};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
-use diag::diag;
+use transaction_emitter_lib::{ClusterArgs, EmitArgs};
+
 use std::time::Duration;
-use transaction_emitter_lib::{emit_transactions, Cluster, ClusterArgs, EmitArgs};
+use tokio_metrics::TaskMonitor;
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -44,30 +44,35 @@ struct Diag {
 }
 
 #[tokio::main]
-pub async fn main() -> Result<()> {
-    Logger::builder().level(Level::Info).build();
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let metrics_monitor = tokio_metrics::TaskMonitor::new();
 
-    let args = Args::parse();
+    // print task metrics every 500ms
+    {
+        let metrics_monitor = metrics_monitor.clone();
+        tokio::spawn(async move {
+            for deltas in metrics_monitor.intervals() {
+                // pretty-print the metric deltas
+                println!("{:?}", deltas);
+                // wait 500ms
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+        });
+    }
 
-    // TODO: Check if I need DisplayChain here in the error case.
-    match args.command {
-        TxnEmitterCommand::EmitTx(args) => {
-            let stats = emit_transactions(&args.cluster_args, &args.emit_args)
-                .await
-                .context("Emit transactions failed")?;
-            println!("Total stats: {}", stats);
-            println!(
-                "Average rate: {}",
-                stats.rate(Duration::from_secs(args.emit_args.duration))
-            );
-            Ok(())
-        }
-        TxnEmitterCommand::Diag(args) => {
-            let cluster = Cluster::try_from_cluster_args(&args.cluster_args)
-                .await
-                .context("Failed to build cluster")?;
-            diag(&cluster).await.context("Diag failed")?;
-            Ok(())
-        }
+    // instrument some tasks and await them
+    tokio::join![
+        metrics_monitor.instrument(do_work()),
+        metrics_monitor.instrument(do_work()),
+        metrics_monitor.instrument(do_work())
+    ];
+
+    Ok(())
+}
+
+async fn do_work() {
+    for _ in 0..25 {
+        tokio::task::yield_now().await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
     }
 }
