@@ -4,17 +4,20 @@
 mod aptos_debug_natives;
 mod built_package;
 pub use built_package::*;
+mod manifest;
 pub mod stored_package;
 mod transactional_tests_runner;
 pub use stored_package::*;
 
+use crate::common::types::MoveManifestAccountWrapper;
 use crate::common::types::{ProfileOptions, RestOptions};
-use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
+use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current, write_to_file};
+use crate::move_tool::manifest::{Dependency, MovePackageManifest, PackageInfo};
 use crate::{
     common::{
         types::{
-            load_account_arg, AccountAddressWrapper, CliError, CliTypedResult, MovePackageDir,
-            PromptOptions, TransactionOptions, TransactionSummary,
+            load_account_arg, CliError, CliTypedResult, MovePackageDir, PromptOptions,
+            TransactionOptions, TransactionSummary,
         },
         utils::check_if_file_exists,
     },
@@ -48,7 +51,6 @@ use std::fmt::{Display, Formatter};
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
-    io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -101,7 +103,7 @@ pub struct InitPackage {
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
-    pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
+    pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
 }
@@ -121,44 +123,40 @@ impl CliCommand<()> for InitPackage {
                 .join(SourcePackageLayout::Sources.path())
                 .as_path(),
         )?;
-        let mut w = std::fs::File::create(move_toml.as_path()).map_err(|err| {
-            CliError::UnexpectedError(format!(
-                "Failed to create {}: {}",
-                package_dir.join(Path::new("Move.toml")).display(),
-                err
-            ))
-        })?;
 
-        let addresses: BTreeMap<String, String> = self
+        let addresses = self
             .named_addresses
             .clone()
             .into_iter()
-            .map(|(key, value)| (key, value.account_address.to_hex_literal()))
+            .map(|(key, value)| (key, value.account_address.into()))
             .collect();
+        let mut dependencies = BTreeMap::new();
+        dependencies.insert(
+            "AptosFramework".to_string(),
+            Dependency {
+                local: None,
+                git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
+                rev: Some("devnet".to_string()),
+                subdir: Some("aptos-move/framework/aptos-framework".to_string()),
+            },
+        );
+        let manifest = MovePackageManifest {
+            package: PackageInfo {
+                name: self.name,
+                version: "0.0.0".to_string(),
+                author: None,
+            },
+            addresses,
+            dependencies,
+        };
 
-        // TODO: Support Git as default when Github credentials are properly handled from GH CLI
-        writeln!(
-            &mut w,
-            "[package]
-name = \"{}\"
-version = \"0.0.0\"
-
-[dependencies]
-AptosFramework = {{ git = \"https://github.com/aptos-labs/aptos-core.git\", subdir = \"aptos-move/framework/aptos-framework/\", rev = \"devnet\" }}
-
-[addresses]
-{}
-",
-            self.name,
-            toml::to_string(&addresses).map_err(|err| CliError::UnexpectedError(err.to_string()))?
+        write_to_file(
+            move_toml.as_path(),
+            SourcePackageLayout::Manifest.location_str(),
+            toml::to_string_pretty(&manifest)
+                .map_err(|err| CliError::UnexpectedError(err.to_string()))?
+                .as_bytes(),
         )
-        .map_err(|err| {
-            CliError::UnexpectedError(format!(
-                "Failed to write {:?}: {}",
-                package_dir.join(Path::new("Move.toml")),
-                err
-            ))
-        })
     }
 }
 
