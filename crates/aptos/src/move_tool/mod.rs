@@ -4,8 +4,11 @@
 mod aptos_debug_natives;
 mod built_package;
 pub use built_package::*;
+pub mod stored_package;
 mod transactional_tests_runner;
+pub use stored_package::*;
 
+use crate::common::types::{ProfileOptions, RestOptions};
 use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
 use crate::{
     common::{
@@ -21,10 +24,12 @@ use aptos_gas::NativeGasParameters;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
+use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
 use async_trait::async_trait;
-use clap::{Parser, Subcommand};
+use clap::{ArgEnum, Parser, Subcommand};
 use framework::natives::code::UpgradePolicy;
+use itertools::Itertools;
 use move_deps::move_cli::base::test::UnitTestResult;
 use move_deps::{
     move_cli,
@@ -39,6 +44,7 @@ use move_deps::{
     move_prover,
     move_unit_test::UnitTestingConfig,
 };
+use std::fmt::{Display, Formatter};
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
@@ -56,6 +62,8 @@ pub enum MoveTool {
     Compile(CompilePackage),
     Init(InitPackage),
     Publish(PublishPackage),
+    Download(DownloadPackage),
+    List(ListPackage),
     Run(RunFunction),
     Test(TestPackage),
     Prove(ProvePackage),
@@ -68,6 +76,8 @@ impl MoveTool {
             MoveTool::Compile(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
             MoveTool::Publish(tool) => tool.execute_serialized().await,
+            MoveTool::Download(tool) => tool.execute_serialized().await,
+            MoveTool::List(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
@@ -362,6 +372,121 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 .await
                 .map(TransactionSummary::from)
         }
+    }
+}
+
+/// Downloads a package and stores it in a directory named after the package.
+#[derive(Parser)]
+pub struct DownloadPackage {
+    #[clap(flatten)]
+    rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+    /// Address of the account.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) account: AccountAddress,
+    /// Name of the package.
+    #[clap(long)]
+    package: String,
+    /// Where to store the downloaded packages. Defaults to the current directory.
+    #[clap(long)]
+    target: Option<String>,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for DownloadPackage {
+    fn command_name(&self) -> &'static str {
+        "DownloadPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let url = self.rest_options.url(&self.profile_options.profile)?;
+        let registry = CachedPackageRegistry::create(url, self.account).await?;
+        let path = if let Some(p) = self.target {
+            PathBuf::from(p)
+        } else {
+            PathBuf::from(".")
+        };
+        let package = registry
+            .get_package(self.package)
+            .await
+            .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+        let package_path = path.join(package.name());
+        package
+            .save_package_to_disk(package_path.clone(), true)
+            .map_err(|e| CliError::UnexpectedError(format!("cannot save package: {}", e)))?;
+        println!(
+            "saved package with {} module(s) to `{}`",
+            package.module_names().len(),
+            package_path.display()
+        );
+        Ok("download succeeded")
+    }
+}
+
+/// Lists information about packages and modules.
+#[derive(Parser)]
+pub struct ListPackage {
+    #[clap(flatten)]
+    rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+    /// Address of the account.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) account: AccountAddress,
+    #[clap(long, default_value_t = ListQuery::Packages)]
+    query: ListQuery,
+}
+
+#[derive(ArgEnum, Clone, Copy, Debug)]
+pub enum ListQuery {
+    Packages,
+}
+
+impl Display for ListQuery {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            ListQuery::Packages => "packages",
+        };
+        write!(f, "{}", str)
+    }
+}
+
+impl FromStr for ListQuery {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "packages" => Ok(ListQuery::Packages),
+            _ => Err("Invalid query. Valid values are modules, packages"),
+        }
+    }
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for ListPackage {
+    fn command_name(&self) -> &'static str {
+        "ListPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let url = self.rest_options.url(&self.profile_options.profile)?;
+        let registry = CachedPackageRegistry::create(url, self.account).await?;
+        match self.query {
+            ListQuery::Packages => {
+                for name in registry.package_names() {
+                    let data = registry.get_package(name).await?;
+                    println!("package {}", data.name());
+                    println!("  upgrade_policy: {}", data.upgrade_policy());
+                    println!("  modules: {}", data.module_names().into_iter().join(", "));
+                    println!(
+                        "  build_info:\n    {}",
+                        data.build_info().replace('\n', "\n    ")
+                    );
+                }
+            }
+        }
+        Ok("list succeeded")
     }
 }
 
