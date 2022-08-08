@@ -7,6 +7,7 @@ import {
   WALLET_ENCRYPTED_ACCOUNTS_KEY,
   WALLET_SESSION_ACCOUNTS_KEY,
   WALLET_STATE_ACCOUNT_ADDRESS_KEY,
+  WALLET_STATE_LOADED_KEY,
   WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY,
 } from 'core/constants';
 import {
@@ -104,20 +105,23 @@ export function getDecryptedAccounts(): AccountsState | null {
   return null;
 }
 
-export async function getBackgroundDecryptedAccounts(): Promise<AccountsState | null> {
+export async function getBackgroundDecryptedState(): Promise<DecryptedState | null> {
   const result = await Browser.sessionStorage()?.get([WALLET_SESSION_ACCOUNTS_KEY]);
   if (result && result[WALLET_SESSION_ACCOUNTS_KEY]) {
-    const decryptedState: DecryptedState = JSON.parse(result[WALLET_SESSION_ACCOUNTS_KEY]);
-    return decryptedState?.accounts ?? null;
+    return JSON.parse(result[WALLET_SESSION_ACCOUNTS_KEY]);
   }
   return null;
+}
+
+export async function getBackgroundDecryptedAccounts(): Promise<AccountsState | null> {
+  return (await getBackgroundDecryptedState())?.accounts ?? null;
 }
 
 export function getDecryptionKeyFromSession(): Uint8Array | null {
   const item = window.sessionStorage.getItem(WALLET_SESSION_ACCOUNTS_KEY);
   if (item) {
     const decryptedState: DecryptedState = JSON.parse(item);
-    return decryptedState?.decryptionKey ?? null;
+    return decryptedState ? bs58.decode(decryptedState.decryptionKey) : null;
   }
   return null;
 }
@@ -186,7 +190,7 @@ export async function storeEncryptedAccounts(
     nonce: bs58.encode(nonce),
     salt: bs58.encode(salt),
   };
-  const decryptedState: DecryptedState = { accounts, decryptionKey };
+  const decryptedState: DecryptedState = { accounts, decryptionKey: bs58.encode(decryptionKey) };
   const decryptedString = JSON.stringify(decryptedState);
   localStorage.setItem(WALLET_ENCRYPTED_ACCOUNTS_KEY, JSON.stringify(encryptedAccounts));
   window.sessionStorage.setItem(WALLET_SESSION_ACCOUNTS_KEY, decryptedString);
@@ -215,7 +219,7 @@ export async function unlockAccounts(
       }
       const decodedPlaintext = Buffer.from(result).toString();
       const accounts: AccountsState = JSON.parse(decodedPlaintext);
-      const decryptedState: DecryptedState = { accounts, decryptionKey: key };
+      const decryptedState: DecryptedState = { accounts, decryptionKey: bs58.encode(key) };
       const decryptedString = JSON.stringify(decryptedState);
       window.sessionStorage.setItem(WALLET_SESSION_ACCOUNTS_KEY, decryptedString);
       Browser.sessionStorage()?.set({ [WALLET_SESSION_ACCOUNTS_KEY]: decryptedString });
@@ -286,4 +290,13 @@ export async function getBackgroundNetworkName(): Promise<string> {
     return nodeUrlReverseMap[network];
   }
   return defaultNetworkType;
+}
+
+export async function loadBackgroundState(): Promise<boolean> {
+  if (!getDecryptedAccounts()) {
+    const state = await getBackgroundDecryptedState();
+    window.sessionStorage.setItem(WALLET_SESSION_ACCOUNTS_KEY, JSON.stringify(state));
+  }
+  sessionStorage.setItem(WALLET_STATE_LOADED_KEY, String(true));
+  return true;
 }

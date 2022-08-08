@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export const KEY_LENGTH: number = 64;
+export const WALLET_STATE_LOADED_KEY = 'aptosStateLoaded';
 export const WALLET_ENCRYPTED_ACCOUNTS_KEY = 'aptosEncryptedAccounts';
 export const WALLET_SESSION_ACCOUNTS_KEY = 'aptosSessionAccounts';
 export const WALLET_STATE_ACCOUNT_ADDRESS_KEY = 'accountAddress';

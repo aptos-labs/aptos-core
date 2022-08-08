@@ -22,7 +22,7 @@ export type AccountsState = {
 
 export type DecryptedState = {
   accounts: AccountsState,
-  decryptionKey: Uint8Array
+  decryptionKey: string
 } | null;
 
 export type PublicAccount = {

@@ -20,6 +20,7 @@ import AddAccount from 'pages/AddAccount';
 import ImportAccountMnemonic from 'pages/ImportAccountMnemonic';
 import ImportAccountPrivateKey from 'pages/ImportAccountPrivateKey';
 import CreateAccount from 'pages/CreateAccount';
+import LoadState from 'pages/LoadState';
 
 export const Routes = Object.freeze({
   account: {
@@ -61,6 +62,10 @@ export const Routes = Object.freeze({
   importWalletPrivateKey: {
     element: <ImportAccountPrivateKey />,
     routePath: '/import/private-key',
+  },
+  loadState: {
+    element: <LoadState />,
+    routePath: '/load-state',
   },
   login: {
     element: <NoWallet />,

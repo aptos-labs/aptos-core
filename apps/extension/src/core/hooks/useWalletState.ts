@@ -52,13 +52,16 @@ export interface RemoveAccountProps {
 }
 
 export default function useWalletStateRecorder() {
-  const currAccountAddress = getCurrentPublicAccount()?.address;
+  const [currAccountAddress, setCurrAccountAddress] = useState<string | undefined>(
+    getCurrentPublicAccount()?.address,
+  );
 
   const [activeAccounts, setActiveAccounts] = useState<AccountsState | null>(
     () => getDecryptedAccounts(),
   );
 
   const updateCurrentAccount = (publicAccount: PublicAccount | null) => {
+    setCurrAccountAddress(publicAccount?.address ?? undefined);
     const string = JSON.stringify(publicAccount);
     if (publicAccount) {
       window.localStorage.setItem(WALLET_STATE_ACCOUNT_ADDRESS_KEY, string);
@@ -100,7 +103,9 @@ export default function useWalletStateRecorder() {
     const newAccountAddress = account.address().hex();
 
     // check if account already exists
-    if (localStorageState.accounts !== null && newAccountAddress in localStorageState.accounts) {
+    if (activeAccounts
+      && activeAccounts.accounts
+      && newAccountAddress in activeAccounts.accounts) {
       importAccountErrorAccountAlreadyExistsToast();
       throw new Error('Account already exists');
     }
@@ -204,8 +209,8 @@ export default function useWalletStateRecorder() {
       toastMessage = `Using the same account with address: ${newAccountAddress?.substring(0, 6)}...`;
     }
     try {
-      const account = activeAccounts ? AptosAccount.fromAptosAccountObject(
-        activeAccounts[accountAddress].aptosAccount,
+      const account = activeAccounts && newAccountAddress ? AptosAccount.fromAptosAccountObject(
+        activeAccounts[newAccountAddress].aptosAccount,
       ) : null;
       await updateAccountsState(activeAccounts);
       updateCurrentAccount(account ? {
