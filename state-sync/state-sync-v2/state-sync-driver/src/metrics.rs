@@ -122,9 +122,7 @@ pub static STORAGE_SYNCHRONIZER_GAUGES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
-/// Gauges for the storage synchronizer operations.
-/// Note: we keep this named "aptos_state_sync_version" to maintain backward
-/// compatibility with the metrics used by state sync v1.
+/// Gauges for the storage synchronizer operations
 pub static STORAGE_SYNCHRONIZER_OPERATIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         "aptos_state_sync_version",

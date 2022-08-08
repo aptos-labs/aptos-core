@@ -4,6 +4,7 @@
 mod aptos_debug_natives;
 mod built_package;
 pub use built_package::*;
+mod transactional_tests_runner;
 
 use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
 use crate::{
@@ -19,6 +20,7 @@ use crate::{
 use aptos_gas::NativeGasParameters;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
+use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
@@ -45,6 +47,7 @@ use std::{
     str::FromStr,
 };
 use tokio::task;
+use transactional_tests_runner::TransactionalTestOpts;
 
 /// CLI tool for performing Move tasks
 ///
@@ -56,6 +59,7 @@ pub enum MoveTool {
     Run(RunFunction),
     Test(TestPackage),
     Prove(ProvePackage),
+    TransactionalTest(TransactionalTestOpts),
 }
 
 impl MoveTool {
@@ -67,6 +71,7 @@ impl MoveTool {
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
+            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
         }
     }
 }
@@ -228,6 +233,26 @@ impl CliCommand<&'static str> for TestPackage {
     }
 }
 
+#[async_trait]
+impl CliCommand<()> for TransactionalTestOpts {
+    fn command_name(&self) -> &'static str {
+        "TransactionalTest"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        let root_path = self.root_path.display().to_string();
+
+        let requirements = vec![transactional_tests_runner::Requirements::new(
+            run_aptos_test,
+            "tests".to_string(),
+            root_path,
+            self.pattern.clone(),
+        )];
+
+        transactional_tests_runner::runner(&self, &requirements)
+    }
+}
+
 /// Prove the Move package at the package path
 #[derive(Parser)]
 pub struct ProvePackage {
@@ -286,10 +311,10 @@ pub struct PublishPackage {
     move_options: MovePackageDir,
     #[clap(flatten)]
     txn_options: TransactionOptions,
-    /// Whether to use the new publishing flow.
+    /// Whether to use the legacy publishing flow. This will be soon removed.
     #[clap(long)]
-    new_flow: bool,
-    /// The upgrade policy used for the published package (new flow only). One of
+    legacy_flow: bool,
+    /// The upgrade policy used for the published package. One of
     /// `arbitrary`, `compatible`, or `immutable`. Defaults to `compatible`.
     #[clap(long)]
     upgrade_policy: Option<UpgradePolicy>,
@@ -305,15 +330,16 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         let PublishPackage {
             move_options,
             txn_options,
-            new_flow,
+            legacy_flow,
             upgrade_policy,
         } = self;
         let package = BuiltPackage::build(move_options, true, true)?;
         let compiled_units = package.extract_code();
-        if !new_flow {
+        if legacy_flow {
             if upgrade_policy.is_some() {
                 return Err(CliError::CommandArgumentError(
-                    "`--upgrade-policy` can only be used with the `--new-flow` option".to_owned(),
+                    "`--upgrade-policy` can only be used without the `--legacy-flow` option"
+                        .to_owned(),
                 ));
             }
             // Send the compiled module using a module bundle

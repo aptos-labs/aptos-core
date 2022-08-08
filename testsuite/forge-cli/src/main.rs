@@ -20,6 +20,7 @@ use testcases::{
     reconfiguration_test::ReconfigurationTest, state_sync_performance::StateSyncPerformance,
 };
 
+use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use tokio::runtime::Runtime;
 use url::Url;
 
@@ -418,6 +419,10 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
         "network_latency" => config.with_network_tests(&[&NetworkLatencyTest]),
         "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
+        "bench_with_fullnode" => config
+            .with_network_tests(&[&PerformanceBenchmarkWithFN])
+            .with_initial_fullnode_count(6),
+
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
     Ok(single_test_suite)

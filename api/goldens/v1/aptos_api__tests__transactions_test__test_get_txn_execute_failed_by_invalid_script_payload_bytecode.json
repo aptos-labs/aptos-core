@@ -3,7 +3,7 @@
   "hash": "",
   "state_root_hash": "",
   "event_root_hash": "",
-  "gas_used": "600",
+  "gas_used": "1",
   "success": false,
   "vm_status": "Transaction Executed and Committed with Error CODE_DESERIALIZATION_ERROR",
   "accumulator_root_hash": "",

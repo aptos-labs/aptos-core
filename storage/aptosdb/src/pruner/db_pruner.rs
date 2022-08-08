@@ -6,7 +6,7 @@ use aptos_types::transaction::Version;
 use std::{cmp::min, thread::sleep, time::Duration};
 
 /// Defines the trait for pruner for different DB
-pub trait DBPruner {
+pub trait DBPruner: Send + Sync {
     /// Find out the first undeleted item in the stale node index.
     ///
     /// Seeking from the beginning (version 0) is potentially costly, we do it once upon worker
@@ -68,12 +68,15 @@ pub trait DBPruner {
     fn is_pruning_pending(&self) -> bool {
         self.target_version() > self.min_readable_version()
     }
+
+    /// (For tests only.) Updates the minimal readable version kept by pruner.
+    fn testonly_update_min_version(&self, version: Version);
 }
 
 pub enum Command {
     Quit,
     Prune {
         /// The target DB version for the pruner.
-        target_db_version: Option<Version>,
+        target_db_version: Version,
     },
 }

@@ -573,8 +573,9 @@ impl TestContext {
             id,
             0,
             round,
-            vec![false],
             self.validator_owner,
+            Some(0),
+            vec![false],
             vec![],
             timestamp,
         )

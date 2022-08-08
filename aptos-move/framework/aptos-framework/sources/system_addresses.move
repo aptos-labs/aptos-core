@@ -12,23 +12,9 @@ module aptos_framework::system_addresses {
     public fun assert_core_resource(account: &signer) {
         assert_core_resource_address(signer::address_of(account))
     }
-    spec assert_core_resource {
-        pragma opaque;
-        include AbortsIfNotCoreResource {addr: signer::address_of(account) };
-    }
 
     public fun assert_core_resource_address(addr: address) {
         assert!(is_core_resource_address(addr), error::permission_denied(ENOT_CORE_RESOURCE_ADDRESS))
-    }
-    spec assert_core_resource_address {
-        pragma opaque;
-        include AbortsIfNotCoreResource;
-    }
-
-    /// Specifies that a function aborts if the account does not have the root address.
-    spec schema AbortsIfNotCoreResource {
-        addr: address;
-        aborts_if addr != @core_resources with error::PERMISSION_DENIED;
     }
 
     public fun is_core_resource_address(addr: address): bool {
@@ -38,29 +24,9 @@ module aptos_framework::system_addresses {
     public fun assert_aptos_framework(account: &signer) {
         assert!(signer::address_of(account) == @aptos_framework, error::permission_denied(ENOT_CORE_FRAMEWORK_ADDRESS))
     }
-    spec assert_aptos_framework {
-        pragma opaque;
-        include AbortsIfNotAptosFramework;
-    }
-
-    /// Specifies that a function aborts if the account does not have the aptos framework address.
-    spec schema AbortsIfNotAptosFramework {
-        account: signer;
-        aborts_if signer::address_of(account) != @aptos_framework with error::PERMISSION_DENIED;
-    }
 
     /// Assert that the signer has the VM reserved address.
     public fun assert_vm(account: &signer) {
         assert!(signer::address_of(account) == @vm_reserved, error::permission_denied(EVM))
-    }
-    spec assert_vm {
-        pragma opaque;
-        include AbortsIfNotVM;
-    }
-
-    /// Specifies that a function aborts if the account does not have the VM reserved address.
-    spec schema AbortsIfNotVM {
-        account: signer;
-        aborts_if signer::address_of(account) != @vm_reserved with error::PERMISSION_DENIED;
     }
 }

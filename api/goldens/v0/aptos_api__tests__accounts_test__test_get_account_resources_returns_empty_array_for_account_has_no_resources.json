@@ -17,7 +17,7 @@
     }
   },
   {
-    "type": "0x1::block::BlockMetadata",
+    "type": "0x1::block::BlockResource",
     "data": {
       "epoch_interval": "86400000000",
       "height": "0",
@@ -55,10 +55,12 @@
   {
     "type": "0x1::stake::ValidatorPerformance",
     "data": {
-      "missed_votes": [
-        "0"
-      ],
-      "num_blocks": "0"
+      "validators": [
+        {
+          "failed_proposals": "0",
+          "successful_proposals": "0"
+        }
+      ]
     }
   },
   {
@@ -67,17 +69,6 @@
       "mint_cap": {
         "dummy_field": false
       }
-    }
-  },
-  {
-    "type": "0x1::stake::ValidatorSetConfiguration",
-    "data": {
-      "allow_validator_set_change": false,
-      "maximum_stake": "18446744073709551615",
-      "minimum_stake": "0",
-      "recurring_lockup_duration_secs": "86400",
-      "rewards_rate": "273972",
-      "rewards_rate_denominator": "1000000000"
     }
   },
   {
@@ -774,6 +765,17 @@
     }
   },
   {
+    "type": "0x1::staking_config::StakingConfig",
+    "data": {
+      "allow_validator_set_change": false,
+      "maximum_stake": "18446744073709551615",
+      "minimum_stake": "0",
+      "recurring_lockup_duration_secs": "86400",
+      "rewards_rate": "273972",
+      "rewards_rate_denominator": "1000000000"
+    }
+  },
+  {
     "type": "0x1::reconfiguration::Configuration",
     "data": {
       "epoch": "1",
@@ -848,8 +850,15 @@
   {
     "type": "0x1::aptos_governance::GovernanceResponsbility",
     "data": {
-      "signer_cap": {
-        "account": "0x1"
+      "signer_caps": {
+        "data": [
+          {
+            "key": "0x1",
+            "value": {
+              "account": "0x1"
+            }
+          }
+        ]
       }
     }
   },

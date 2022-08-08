@@ -89,10 +89,5 @@ module aptos_framework::aggregator {
     public native fun read(aggregator: &Aggregator): u128;
 
     /// Destroys an aggregator and removes it from its `AggregatorFactory`.
-    public fun destroy(aggregator: Aggregator) {
-        let Aggregator { handle, key, limit: _, } = aggregator;
-        remove_aggregator(handle, key);
-    }
-
-    native fun remove_aggregator(handle: u128, key: u128);
+    public native fun destroy(aggregator: Aggregator);
 }

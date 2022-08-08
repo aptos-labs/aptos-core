@@ -146,6 +146,8 @@ impl Aggregator {
 #[derive(Default)]
 struct AggregatorData {
     // All aggregators that were created in the current context, stored as ids.
+    // Used to filter out aggregators that were created and destroyed in the
+    // same context (i.e. within a single transaction).
     new_aggregators: BTreeSet<AggregatorID>,
     // All aggregators that were destroyed in the current context, stored as ids.
     destroyed_aggregators: BTreeSet<AggregatorID>,
@@ -209,8 +211,8 @@ impl AggregatorData {
 pub enum AggregatorChange {
     // A value should be written to storage.
     Write(u128),
-    // A delta should be applied to storage.
-    Apply(DeltaOp),
+    // A delta should be merged with the value from storage.
+    Merge(DeltaOp),
     // A value should be deleted from the storage.
     Delete,
 }
@@ -269,7 +271,7 @@ impl<'a> NativeAggregatorContext<'a> {
                 AggregatorState::Data => AggregatorChange::Write(value),
                 AggregatorState::PositiveDelta => {
                     let delta_op = DeltaOp::Addition { value, limit };
-                    AggregatorChange::Apply(delta_op)
+                    AggregatorChange::Merge(delta_op)
                 }
             };
             changes.insert(id, change);
@@ -294,11 +296,7 @@ pub fn aggregator_natives(aggregator_addr: AccountAddress) -> NativeFunctionTabl
         &[
             ("aggregator", "add", Arc::new(native_add)),
             ("aggregator", "read", Arc::new(native_read)),
-            (
-                "aggregator",
-                "remove_aggregator",
-                Arc::new(native_remove_aggregator),
-            ),
+            ("aggregator", "destroy", Arc::new(native_destroy)),
             ("aggregator", "sub", Arc::new(native_sub)),
             (
                 "aggregator_factory",
@@ -460,8 +458,8 @@ fn native_sub(
 }
 
 /// Move signature:
-/// fun remove_aggregator(table_handle: u128, key: u128);
-fn native_remove_aggregator(
+/// fun destroy(aggregator: Aggregator);
+fn native_destroy(
     context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -469,18 +467,18 @@ fn native_remove_aggregator(
     if !cfg!(any(test, feature = "aggregator-extension")) {
         return Err(not_supported_error());
     }
-    assert!(args.len() == 2);
+    assert!(args.len() == 1);
 
-    // Get aggregator id for removal.
-    let key = pop_arg!(args, u128);
-    let handle = pop_arg!(args, u128);
-    let id = AggregatorID::new(handle, key);
+    // First, unpack the struct.
+    let aggregator_struct = pop_arg!(args, Struct);
+    let (handle, key, _) = unpack_aggregator_struct(aggregator_struct)?;
 
     // Get aggregator data.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
 
     // Actually remove the aggregator.
+    let id = AggregatorID::new(handle, key);
     aggregator_data.remove_aggregator(id);
 
     // TODO: charge gas properly.
@@ -520,12 +518,28 @@ fn get_aggregator_field(aggregator: &StructRef, index: usize) -> PartialVMResult
     field_ref.read_ref()
 }
 
-///  Given a reference to `Aggregator` Move struct, returns a tuple of its
-///  fields: (`handle`, `key`, `limit`).
+/// Given a reference to `Aggregator` Move struct, returns a tuple of its
+/// fields: (`handle`, `key`, `limit`).
 fn get_aggregator_fields(aggregator: &StructRef) -> PartialVMResult<(u128, u128, u128)> {
     let handle = get_aggregator_field(aggregator, HANDLE_FIELD_INDEX)?.value_as::<u128>()?;
     let key = get_aggregator_field(aggregator, KEY_FIELD_INDEX)?.value_as::<u128>()?;
     let limit = get_aggregator_field(aggregator, LIMIT_FIELD_INDEX)?.value_as::<u128>()?;
+    Ok((handle, key, limit))
+}
+
+/// Given an `Aggregator` Move struct, unpacks it into fields: (`handle`, `key`, `limit`).
+fn unpack_aggregator_struct(aggregator_struct: Struct) -> PartialVMResult<(u128, u128, u128)> {
+    let mut fields: Vec<Value> = aggregator_struct.unpack()?.collect();
+    assert!(fields.len() == 3);
+
+    let pop_with_err = |vec: &mut Vec<Value>, msg: &str| {
+        vec.pop()
+            .map_or(Err(extension_error(msg)), |v| v.value_as::<u128>())
+    };
+
+    let limit = pop_with_err(&mut fields, "unable to pop 'limit' field")?;
+    let key = pop_with_err(&mut fields, "unable to pop 'key' field")?;
+    let handle = pop_with_err(&mut fields, "unable to pop 'handle' field")?;
     Ok((handle, key, limit))
 }
 
@@ -650,14 +664,14 @@ mod test {
 
         assert_matches!(
             changes.get(&test_id(4)).unwrap(),
-            AggregatorChange::Apply(DeltaOp::Addition {
+            AggregatorChange::Merge(DeltaOp::Addition {
                 value: 0,
                 limit: 1000
             })
         );
         assert_matches!(
             changes.get(&test_id(5)).unwrap(),
-            AggregatorChange::Apply(DeltaOp::Addition {
+            AggregatorChange::Merge(DeltaOp::Addition {
                 value: 0,
                 limit: 10
             })

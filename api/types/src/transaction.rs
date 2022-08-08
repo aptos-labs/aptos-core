@@ -14,7 +14,7 @@ use aptos_crypto::{
 use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, EventWithVersion},
     transaction::{
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
@@ -427,6 +427,32 @@ impl From<(&ContractEvent, serde_json::Value)> for Event {
     fn from((event, data): (&ContractEvent, serde_json::Value)) -> Self {
         match event {
             ContractEvent::V0(v0) => Self {
+                key: (*v0.key()).into(),
+                sequence_number: v0.sequence_number().into(),
+                typ: v0.type_tag().clone().into(),
+                data,
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct VersionedEvent {
+    pub version: U64,
+    pub key: EventKey,
+    pub sequence_number: U64,
+    #[serde(rename = "type")]
+    #[oai(rename = "type")]
+    pub typ: MoveType,
+    // TODO: Use the real data here, not a JSON representation.
+    pub data: serde_json::Value,
+}
+
+impl From<(&EventWithVersion, serde_json::Value)> for VersionedEvent {
+    fn from((event, data): (&EventWithVersion, serde_json::Value)) -> Self {
+        match &event.event {
+            ContractEvent::V0(v0) => Self {
+                version: event.transaction_version.into(),
                 key: (*v0.key()).into(),
                 sequence_number: v0.sequence_number().into(),
                 typ: v0.type_tag().clone().into(),

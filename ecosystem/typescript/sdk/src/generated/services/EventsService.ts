@@ -2,11 +2,11 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { Address } from '../models/Address';
-import type { Event } from '../models/Event';
 import type { EventKey } from '../models/EventKey';
 import type { IdentifierWrapper } from '../models/IdentifierWrapper';
 import type { MoveStructTagParam } from '../models/MoveStructTagParam';
 import type { U64 } from '../models/U64';
+import type { VersionedEvent } from '../models/VersionedEvent';
 
 import type { CancelablePromise } from '../core/CancelablePromise';
 import type { BaseHttpRequest } from '../core/BaseHttpRequest';
@@ -22,14 +22,14 @@ export class EventsService {
      * @param eventKey
      * @param start
      * @param limit
-     * @returns Event
+     * @returns VersionedEvent
      * @throws ApiError
      */
     public getEventsByEventKey(
         eventKey: EventKey,
         start?: U64,
         limit?: number,
-    ): CancelablePromise<Array<Event>> {
+    ): CancelablePromise<Array<VersionedEvent>> {
         return this.httpRequest.request({
             method: 'GET',
             url: '/events/{event_key}',
@@ -53,7 +53,7 @@ export class EventsService {
      * @param fieldName
      * @param start
      * @param limit
-     * @returns Event
+     * @returns VersionedEvent
      * @throws ApiError
      */
     public getEventsByEventHandle(
@@ -62,7 +62,7 @@ export class EventsService {
         fieldName: IdentifierWrapper,
         start?: U64,
         limit?: number,
-    ): CancelablePromise<Array<Event>> {
+    ): CancelablePromise<Array<VersionedEvent>> {
         return this.httpRequest.request({
             method: 'GET',
             url: '/accounts/{address}/events/{event_handle}/{field_name}',
