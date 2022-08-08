@@ -13,11 +13,11 @@ module aptos_std::simple_map {
     const EKEY_ALREADY_EXISTS: u64 = 0;
     const EKEY_NOT_FOUND: u64 = 1;
 
-    struct SimpleMap<Key, Value> has drop, store {
+    struct SimpleMap<Key, Value> has copy, drop, store {
         data: vector<Element<Key, Value>>,
     }
 
-    struct Element<Key, Value> has drop, store {
+    struct Element<Key, Value> has copy, drop, store {
         key: Key,
         value: Value,
     }
