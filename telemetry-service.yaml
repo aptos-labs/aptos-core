@@ -1,0 +1,13 @@
+address: "0.0.0.0:8081"
+trusted_full_node_addresses:
+  4: "http://localhost:8080"
+  21: "https://devnet.aptoslabs.com/"
+server_private_key: 
+  key: "3854DB98BA2FEC68E805AB553BAC19E3AA584FF2847705321D4F053F1B901574"
+jwt_signing_key: "this_is_a_super_secret_for_jwt"
+update_interval: 60
+gcp_sa_key_file: "../../analytics-test-345723-9c525dbd7ca0.json"
+gcp_bq_config:
+  project_id: "analytics-test-345723"
+  dataset_id: "balaji_telemetry"
+  table_id: "telemetry"

@@ -10,6 +10,10 @@ publish = false
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.57"
+aptos-crypto = { path = "../../crates/aptos-crypto" }
+aptos-telemetry-service = { path = "../../crates/aptos-telemetry-service" }
+aptos-types = { path = "../../types" }
 futures = "0.3.21"
 once_cell = "1.10.0"
 prometheus = { version = "0.13.0", default-features = false }
