@@ -5,7 +5,6 @@ dotenv.config();
 
 import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes } from "aptos";
 import { aptosCoin } from "./constants";
-import isEqual from "lodash/isEqual";
 import assert from "assert";
 
 const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
@@ -32,7 +31,7 @@ const {
   const account1 = new AptosAccount();
   await faucetClient.fundAccount(account1.address(), 100000);
   let resources = await client.getAccountResources(account1.address());
-  let accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+  let accountResource = resources.find((r) => r.type === aptosCoin);
   let balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 100000);
   console.log(`account2 coins: ${balance}. Should be 100000!`);
@@ -41,7 +40,7 @@ const {
   // Creates the second account and fund the account with 0 AptosCoin
   await faucetClient.fundAccount(account2.address(), 0);
   resources = await client.getAccountResources(account2.address());
-  accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+  accountResource = resources.find((r) => r.type === aptosCoin);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 0);
   console.log(`account2 coins: ${balance}. Should be 0!`);
@@ -92,7 +91,7 @@ const {
   await client.waitForTransaction(transactionRes.hash);
 
   resources = await client.getAccountResources(account2.address());
-  accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+  accountResource = resources.find((r) => r.type === aptosCoin);
   balance = parseInt((accountResource?.data as any).coin.value);
   assert(balance === 717);
   console.log(`account2 coins: ${balance}. Should be 717!`);
