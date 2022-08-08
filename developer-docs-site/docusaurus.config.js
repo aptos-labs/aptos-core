@@ -8,7 +8,7 @@ const codeInjector = require("./src/remark/code-injector");
 
 /** @type {import("@docusaurus/types").Config} */
 const config = {
-  title: "Aptos Labs",
+  title: "Aptos Docs",
   tagline: "Developer Documentation",
   url: "https://aptos.dev",
   baseUrl: "/",
@@ -61,6 +61,7 @@ const config = {
   themeConfig:
     /** @type {import("@docusaurus/preset-classic").ThemeConfig} */
     ({
+      image: "img/aptos_meta_opengraph_051222.jpg",
       colorMode: {
         defaultMode: "dark",
       },
@@ -71,7 +72,6 @@ const config = {
         },
       },
       navbar: {
-        title: "| Developer Network",
         logo: {
           alt: "Aptos Labs Logo",
           src: "img/aptos_word.svg",
