@@ -209,7 +209,11 @@ impl AccountInfoUniverse {
             })
             .collect();
         accounts.sort_by(|a, b| a.address.cmp(&b.address));
-        let validator_set_by_epoch = vec![(0, Vec::new())].into_iter().collect();
+        let validator_signer = ValidatorSigner::new(
+            accounts[0].address,
+            accounts[0].consensus_private_key.clone(),
+        );
+        let validator_set_by_epoch = vec![(0, vec![validator_signer])].into_iter().collect();
 
         Self {
             accounts,
@@ -630,9 +634,9 @@ signature)
 }
 
 impl Arbitrary for LedgerInfoWithSignatures {
-    type Parameters = SizeRange;
-    fn arbitrary_with(num_validators_range: Self::Parameters) -> Self::Strategy {
-        (any::<LedgerInfo>(), Just(num_validators_range))
+    type Parameters = ();
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        (any::<LedgerInfo>(), (1usize..100))
             .prop_flat_map(|(ledger_info, num_validators_range)| {
                 (
                     Just(ledger_info.clone()),
@@ -1022,13 +1026,13 @@ impl ValidatorSetGen {
 
 impl Arbitrary for ValidatorSetGen {
     type Parameters = ();
-    type Strategy = BoxedStrategy<Self>;
-
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        vec(any::<Index>(), 3)
+        vec(any::<Index>(), 1..3)
             .prop_map(|validators| Self { validators })
             .boxed()
     }
+
+    type Strategy = BoxedStrategy<Self>;
 }
 
 #[derive(Debug)]
