@@ -370,26 +370,9 @@ impl TestContext {
             ))
             .await;
         let vals: Vec<serde_json::Value> = serde_json::from_value(resources).unwrap();
-        match self.api_specific_config {
-            ApiSpecificConfig::V0 => vals
-                .into_iter()
-                .find(|v| {
-                    v["type"] == format!("{}::{}::{}", resource_account_address, module, name,)
-                })
-                .unwrap(),
-            ApiSpecificConfig::V1(_) => vals
-                .into_iter()
-                .find(|v| {
-                    v["type"]
-                        == json!({
-                            "address": resource_account_address,
-                            "module": module,
-                            "name": name,
-                            "generic_type_params": []
-                        })
-                })
-                .unwrap(),
-        }
+        vals.into_iter()
+            .find(|v| v["type"] == format!("{}::{}::{}", resource_account_address, module, name,))
+            .unwrap()
     }
 
     pub async fn api_execute_script_function(
@@ -400,32 +383,16 @@ impl TestContext {
         type_args: serde_json::Value,
         args: serde_json::Value,
     ) {
-        let (typ, function) = match self.api_specific_config {
-            ApiSpecificConfig::V0 => (
-                "script_function_payload",
-                json!(format!(
+        self.api_execute_txn(
+            account,
+            json!({
+                "type": "script_function_payload",
+                "function": format!(
                     "{}::{}::{}",
                     account.address().to_hex_literal(),
                     module,
                     func
-                )),
-            ),
-            ApiSpecificConfig::V1(_) => (
-                "script_function_payload",
-                json!({
-                    "module": json!({
-                        "address": account.address().to_hex_literal(),
-                        "name": module,
-                    }),
-                    "name": func,
-                }),
-            ),
-        };
-        self.api_execute_txn(
-            account,
-            json!({
-                "type": typ,
-                "function": function,
+                ),
                 "type_arguments": type_args,
                 "arguments": args
             }),
