@@ -329,7 +329,7 @@ module aptos_token::token {
                 let new_token = Token {
                     id: new_token_id,
                     amount: 1,
-                    token_properties:property_map::empty(),
+                    token_properties: *&token_data.default_properties,
                 };
                 // update the token largest property_version
                 direct_deposit(token_owner, new_token);
@@ -354,8 +354,8 @@ module aptos_token::token {
         let tokens = &mut borrow_global_mut<TokenStore>(token_owner).tokens;
         assert!(table::contains(tokens, token_id), ENO_TOKEN_IN_TOKEN_STORE);
         let value = &mut table::borrow_mut(tokens, token_id).token_properties;
-        *value = property_map::new(keys, values, types);
 
+        property_map::update_property_map(value, keys, values, types);
         event::emit_event<MutateTokenPropertyMapEvent>(
             &mut borrow_global_mut<TokenStore>(token_owner).mutate_token_property_events,
             MutateTokenPropertyMapEvent {
@@ -1054,5 +1054,37 @@ module aptos_token::token {
         assert!(table::contains(props, new_id_1), 1);
         let token = table::borrow(props, new_id_1);
         assert!(property_map::length(&token.token_properties) == 2, property_map::length(&token.token_properties));
+    }
+
+    #[test(creator = @0xAF, owner = @0xBB)]
+    #[expected_failure(abort_code = 3)]
+    fun test_mutate_token_property_fail(creator: &signer) acquires Collections, TokenStore {
+        use std::string;
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(creator, 2, 4, 4);
+        assert!(token_id.property_version == 0, 1);
+        // only be able to mutate the attributed defined when creating the token
+        let new_keys = vector<String>[
+            string::utf8(b"attack"), string::utf8(b"num_of_use"), string::utf8(b"wrong_attribute")
+        ];
+        let new_vals = vector<vector<u8>>[
+            b"1", b"1", b"1"
+        ];
+        let new_types = vector<String>[
+            string::utf8(b"integer"), string::utf8(b"integer"), string::utf8(b"integer")
+        ];
+
+        mutate_token_properties(
+            creator,
+            token_id.token_data_id.creator,
+            token_id.token_data_id.creator,
+            token_id.token_data_id.collection,
+            token_id.token_data_id.name,
+            token_id.property_version,
+            2,
+            new_keys,
+            new_vals,
+            new_types,
+        );
     }
 }

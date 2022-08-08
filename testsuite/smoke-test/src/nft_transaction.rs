@@ -51,9 +51,9 @@ impl AptosTest for NFTTransaction {
                     0,
                     0,
                     vec![false, false, false, false, true],
-                    vec![Vec::new()],
-                    vec![Vec::new()],
-                    vec![Vec::new()],
+                    vec!["age".as_bytes().to_vec()],
+                    vec!["3".as_bytes().to_vec()],
+                    vec!["int".as_bytes().to_vec()],
                 ));
 
         let token_txn = creator.sign_with_transaction_builder(token_builder);
