@@ -5,6 +5,13 @@ slug: "guide-move-transactional-testing"
 
 # Guide for Move Transactional Testing
 
+:::caution Exploratory feature
+
+The Move transactional testing feature described in this document is in exploratory phase. Support for it will depend on its usage and adoption by the Aptos community. 
+:::
+
+
+
 If you are a smart contract developer using the Move language, then you can use the Move transactional tests to write and run end-to-end tests. 
 
 This tutorial walks you through the steps for writing and running end-to-end Move transactional tests using the [Aptos CLI](/cli-tools/aptos-cli-tool/index.md). 
