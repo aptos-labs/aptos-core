@@ -746,6 +746,45 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
     }
 }
 
+/// A wrapper around `AccountAddress` to allow for "_"
+#[derive(Clone, Copy, Debug)]
+pub struct MoveManifestAccountWrapper {
+    pub account_address: Option<AccountAddress>,
+}
+
+impl FromStr for MoveManifestAccountWrapper {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(MoveManifestAccountWrapper {
+            account_address: load_manifest_account_arg(s)?,
+        })
+    }
+}
+
+/// Loads an account arg and allows for naming based on profiles and "_"
+pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, CliError> {
+    if str == "_" {
+        Ok(None)
+    } else if str.starts_with("0x") {
+        AccountAddress::from_hex_literal(str)
+            .map(Some)
+            .map_err(|err| {
+                CliError::CommandArgumentError(format!("Failed to parse AccountAddress {}", err))
+            })
+    } else if let Ok(account_address) = AccountAddress::from_str(str) {
+        Ok(Some(account_address))
+    } else if let Some(Some(private_key)) = CliConfig::load_profile(str)?.map(|p| p.private_key) {
+        let public_key = private_key.public_key();
+        Ok(Some(account_address_from_public_key(&public_key)))
+    } else {
+        Err(CliError::CommandArgumentError(
+            "'--account-address' or '--profile' after using aptos init must be provided"
+                .to_string(),
+        ))
+    }
+}
+
 /// A common trait for all CLI commands to have consistent outputs
 #[async_trait]
 pub trait CliCommand<T: Serialize + Send>: Sized + Send {

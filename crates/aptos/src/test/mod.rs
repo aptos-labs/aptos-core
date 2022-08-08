@@ -3,7 +3,7 @@
 
 use crate::common::types::{
     account_address_from_public_key, AccountAddressWrapper, CliError, FaucetOptions, GasOptions,
-    MovePackageDir, TransactionSummary,
+    MoveManifestAccountWrapper, MovePackageDir, TransactionSummary,
 };
 use crate::move_tool::{
     ArgWithType, CompilePackage, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
@@ -59,6 +59,23 @@ pub struct CliTestFramework {
 }
 
 impl CliTestFramework {
+    pub fn local_new(num_accounts: usize) -> CliTestFramework {
+        let dummy_url = Url::parse("http://localhost").unwrap();
+        let mut framework = CliTestFramework {
+            account_keys: Vec::new(),
+            endpoint: dummy_url.clone(),
+            faucet_endpoint: dummy_url,
+            move_dir: None,
+        };
+        let mut keygen = KeyGen::from_seed([0; 32]);
+        for _ in 0..num_accounts {
+            framework
+                .account_keys
+                .push(keygen.generate_ed25519_private_key());
+        }
+        framework
+    }
+
     pub async fn new(endpoint: Url, faucet_endpoint: Url, num_accounts: usize) -> CliTestFramework {
         let mut framework = CliTestFramework {
             account_keys: Vec::new(),
@@ -66,7 +83,7 @@ impl CliTestFramework {
             faucet_endpoint,
             move_dir: None,
         };
-        let mut keygen = KeyGen::from_os_rng();
+        let mut keygen = KeyGen::from_seed([0; 32]);
 
         for _ in 0..num_accounts {
             framework
@@ -411,7 +428,7 @@ impl CliTestFramework {
         InitPackage {
             name,
             package_dir: self.move_dir.clone(),
-            named_addresses: Self::named_addresses(account_strs),
+            named_addresses: Self::move_manifest_named_addresses(account_strs),
             prompt_options: PromptOptions {
                 assume_yes: false,
                 assume_no: true,
@@ -502,6 +519,20 @@ impl CliTestFramework {
             output_dir: None,
             named_addresses: Self::named_addresses(account_strs),
         }
+    }
+
+    pub fn move_manifest_named_addresses(
+        account_strs: Vec<&str>,
+    ) -> BTreeMap<String, MoveManifestAccountWrapper> {
+        let mut named_addresses = BTreeMap::new();
+        for (i, account_str) in account_strs.iter().enumerate() {
+            named_addresses.insert(
+                format!("NamedAddress{}", i),
+                MoveManifestAccountWrapper::from_str(account_str).unwrap(),
+            );
+        }
+
+        named_addresses
     }
 
     pub fn named_addresses(account_strs: Vec<&str>) -> BTreeMap<String, AccountAddressWrapper> {
