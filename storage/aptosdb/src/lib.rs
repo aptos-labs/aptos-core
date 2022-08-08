@@ -644,7 +644,7 @@ impl AptosDB {
         ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
         error_if_too_many_requested(limit, MAX_LIMIT)?;
-        let get_latest = order == Order::Descending && start_seq_num == u64::max_value();
+        let get_latest = start_seq_num == u64::MAX;
 
         let cursor = if get_latest {
             // Caller wants the latest, figure out the latest seq_num.
