@@ -329,10 +329,9 @@ impl LedgerInfoWithPartialSignatures {
     pub fn aggregate_signatures(
         &self,
         verifier: &ValidatorVerifier,
-        ledger_info: &LedgerInfo,
     ) -> Result<LedgerInfoWithSignatures, VerifyError> {
         let aggregated_sig =
-            verifier.aggregate_and_verify_multi_signature(&self.partial_sigs, ledger_info)?;
+            verifier.aggregate_and_verify_multi_signature(&self.partial_sigs, &self.ledger_info)?;
         Ok(LedgerInfoWithSignatures::new(
             self.ledger_info.clone(),
             aggregated_sig,
@@ -364,7 +363,7 @@ impl Arbitrary for LedgerInfoWithV0 {
     type Parameters = ();
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         let dummy_signature = bls12381::Signature::dummy_signature();
-        (any::<LedgerInfo>(), (0usize..100))
+        (any::<LedgerInfo>(), (1usize..100))
             .prop_map(move |(ledger_info, num_validators)| {
                 let (signers, verifier) = random_validator_verifier(num_validators, None, true);
                 let mut partial_sig = PartialSignatures::new(HashMap::new());

@@ -226,9 +226,7 @@ fn test_2chain_timeout_certificate() {
         }
         QuorumCert::new(
             vote_data,
-            ledger_info
-                .aggregate_signatures(&validators, ledger_info.ledger_info())
-                .unwrap(),
+            ledger_info.aggregate_signatures(&validators).unwrap(),
         )
     };
     let generate_timeout =
