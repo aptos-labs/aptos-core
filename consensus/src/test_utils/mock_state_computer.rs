@@ -185,4 +185,3 @@ impl StateComputer for RandomComputeResultStateComputer {
 
     fn new_epoch(&self, _: &EpochState) {}
 }
-Footer

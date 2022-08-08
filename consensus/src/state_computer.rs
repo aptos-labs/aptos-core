@@ -126,7 +126,8 @@ impl StateComputer for ExecutionProxy {
 
         // TODO: figure out error handling for the prologue txn
         let executor = self.executor.clone();
-        let transactions_to_execute = block.transactions_to_execute(&self.validators.lock(), txns.clone());
+        let transactions_to_execute =
+            block.transactions_to_execute(&self.validators.lock(), txns.clone());
         let compute_result = monitor!(
             "execute_block",
             tokio::task::spawn_blocking(move || {

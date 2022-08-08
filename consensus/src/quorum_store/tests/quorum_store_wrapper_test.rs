@@ -57,8 +57,8 @@ async fn queue_mempool_batch_response(
         Duration::from_millis(1_000),
         quorum_store_to_mempool_receiver.select_next_some(),
     )
-        .await
-        .unwrap()
+    .await
+    .unwrap()
     {
         callback
             .send(Ok(QuorumStoreResponse::GetBatchResponse(txns)))
@@ -121,7 +121,7 @@ async fn test_batch_creation() {
             vec![signed_txns[0].clone()],
             &mut quorum_store_to_mempool_rx,
         )
-            .await;
+        .await;
         // Expect AppendToBatch for 1 txn
         let quorum_store_command = wrapper_quorum_store_rx.recv().await.unwrap();
         if let QuorumStoreCommand::AppendToBatch(data, batch_id) = quorum_store_command {

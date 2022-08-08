@@ -197,7 +197,7 @@ impl BatchAggregator {
         let append_res = self.append_transactions(batch_id, fragment_id, transactions);
         if append_res.is_ok()
             || (append_res == Err(BatchAggregatorError::MissedFragment)
-            && self.batch_state.is_some())
+                && self.batch_state.is_some())
         {
             self.batch_state
                 .take()

@@ -45,7 +45,10 @@ async fn test_batch_requester() {
     assert_eq!(signers.len(), 3);
 
     batch_requester.serve_request(digest, signed_transactions.clone());
-    assert_eq!(oneshot_rx.await.expect("sender dropped"), Ok(signed_transactions));
+    assert_eq!(
+        oneshot_rx.await.expect("sender dropped"),
+        Ok(signed_transactions)
+    );
 
     // test timeout logic
     let signed_transactions = create_vec_signed_transactions(200);
