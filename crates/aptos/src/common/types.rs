@@ -779,8 +779,7 @@ pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, Cl
         Ok(Some(account_address_from_public_key(&public_key)))
     } else {
         Err(CliError::CommandArgumentError(
-            "'--account-address' or '--profile' after using aptos init must be provided"
-                .to_string(),
+            "Invalid manifest account address".to_string(),
         ))
     }
 }
