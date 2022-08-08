@@ -38,7 +38,7 @@ pub trait AptosValidatorInterface: Sync {
     fn get_events(
         &self,
         key: &EventKey,
-        start_seq: u64,
+        start_seq: Option<u64>,
         limit: u64,
         ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>>;

@@ -1591,7 +1591,7 @@ mock! {
         fn get_events(
             &self,
             event_key: &EventKey,
-            start: u64,
+            start: Option<u64>,
             order: Order,
             limit: u64,
             ledger_version: Version,

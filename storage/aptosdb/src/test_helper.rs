@@ -401,8 +401,17 @@ fn get_events_by_event_key(
 
     let mut ret = Vec::new();
     loop {
-        let events =
-            db.get_events_by_event_key(event_key, cursor, order, LIMIT, ledger_info.version())?;
+        let events = db.get_events_by_event_key(
+            event_key,
+            if cursor == u64::MAX {
+                None
+            } else {
+                Some(cursor)
+            },
+            order,
+            LIMIT,
+            ledger_info.version(),
+        )?;
 
         let num_events = events.len() as u64;
         if cursor == u64::max_value() {

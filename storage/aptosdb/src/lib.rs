@@ -638,22 +638,21 @@ impl AptosDB {
     fn get_events_by_event_key(
         &self,
         event_key: &EventKey,
-        start_seq_num: u64,
+        start_seq_num: Option<u64>,
         order: Order,
         limit: u64,
         ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
         error_if_too_many_requested(limit, MAX_LIMIT)?;
-        let get_latest = start_seq_num == u64::MAX;
 
-        let cursor = if get_latest {
+        let cursor = if let Some(seq_num) = start_seq_num {
+            seq_num
+        } else {
             // Caller wants the latest, figure out the latest seq_num.
             // In the case of no events on that path, use 0 and expect empty result below.
             self.event_store
                 .get_latest_sequence_number(ledger_version, event_key)?
                 .unwrap_or(0)
-        } else {
-            start_seq_num
         };
 
         // Convert requested range and order to a range in ascending order.
@@ -1070,7 +1069,7 @@ impl DbReader for AptosDB {
     fn get_events(
         &self,
         event_key: &EventKey,
-        start: u64,
+        start: Option<u64>,
         order: Order,
         limit: u64,
         ledger_version: Version,

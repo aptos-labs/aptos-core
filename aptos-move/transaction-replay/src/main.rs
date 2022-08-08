@@ -162,7 +162,7 @@ fn main() -> Result<()> {
         Command::AnnotateEvents { key, start, limit } => {
             debugger.pretty_print_events(
                 &bcs::from_bytes(&hex::decode(key.as_str())?)?,
-                start,
+                Some(start),
                 limit,
             )?;
         }

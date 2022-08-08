@@ -99,7 +99,7 @@ impl AptosValidatorInterface for TestInterface {
     fn get_events(
         &self,
         _key: &EventKey,
-        _start_seq: u64,
+        _start_seq: Option<u64>,
         _limit: u64,
         _ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {

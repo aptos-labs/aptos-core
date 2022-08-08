@@ -65,7 +65,7 @@ impl AptosDBBackend {
         // we would incorrectly think that we have a newer version.
         let events = self.aptos_db.get_events(
             &new_block_event_key(),
-            u64::max_value(),
+            None,
             Order::Descending,
             limit as u64,
             lastest_db_version,

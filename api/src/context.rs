@@ -343,7 +343,7 @@ impl Context {
     ) -> Result<Vec<EventWithVersion>> {
         self.db.get_events(
             event_key,
-            start,
+            Some(start),
             Order::Ascending,
             limit as u64,
             ledger_version,

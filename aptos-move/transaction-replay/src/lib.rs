@@ -237,7 +237,7 @@ impl AptosDebugger {
     pub fn pretty_print_events(
         &self,
         event_key: &EventKey,
-        start_seq: u64,
+        start_seq: Option<u64>,
         limit: u64,
     ) -> Result<()> {
         let events =
