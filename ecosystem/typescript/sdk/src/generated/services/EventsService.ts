@@ -4,7 +4,7 @@
 import type { Address } from '../models/Address';
 import type { EventKey } from '../models/EventKey';
 import type { IdentifierWrapper } from '../models/IdentifierWrapper';
-import type { MoveStructTagParam } from '../models/MoveStructTagParam';
+import type { MoveStructTag } from '../models/MoveStructTag';
 import type { U64 } from '../models/U64';
 import type { VersionedEvent } from '../models/VersionedEvent';
 
@@ -58,7 +58,7 @@ export class EventsService {
      */
     public getEventsByEventHandle(
         address: Address,
-        eventHandle: MoveStructTagParam,
+        eventHandle: MoveStructTag,
         fieldName: IdentifierWrapper,
         start?: U64,
         limit?: number,

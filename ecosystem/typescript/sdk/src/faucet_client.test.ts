@@ -1,5 +1,3 @@
-import isEqual from "lodash/isEqual";
-
 import { AptosClient } from "./aptos_client";
 import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
@@ -8,12 +6,7 @@ import * as Gen from "./generated/index";
 
 import { NODE_URL, FAUCET_URL } from "./util.test";
 
-const aptosCoin = {
-  address: "0x1",
-  module: "coin",
-  name: "CoinStore",
-  generic_type_params: ["0x1::aptos_coin::AptosCoin"],
-};
+const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
 test(
   "full tutorial faucet flow",
@@ -26,24 +19,18 @@ test(
     const tx1 = await client.getTransactionByHash(txns[1]);
     expect(tx1.type).toBe("user_transaction");
     let resources = await client.getAccountResources(account1.address());
-    let accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+    let accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("1000000");
 
     const account2 = new AptosAccount();
     await faucetClient.fundAccount(account2.address(), 0);
     resources = await client.getAccountResources(account2.address());
-    accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+    accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("0");
 
     const payload: Gen.TransactionPayload_ScriptFunctionPayload = {
       type: "script_function_payload",
-      function: {
-        module: {
-          address: "0x1",
-          name: "coin",
-        },
-        name: "transfer",
-      },
+      function: "0x1::coin::transfer",
       type_arguments: ["0x1::aptos_coin::AptosCoin"],
       arguments: [account2.address().hex(), "717"],
     };
@@ -55,7 +42,7 @@ test(
     expect((txn as any)?.success).toBe(true);
 
     resources = await client.getAccountResources(account2.address());
-    accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+    accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("717");
 
     const res = await client.getAccountTransactions(account1.address(), { start: BigInt(0) });
