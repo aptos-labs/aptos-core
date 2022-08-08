@@ -205,7 +205,7 @@ export class AptosClient {
       signature: fakeSignature,
       sender: senderAddress.hex(),
       sequence_number: account.sequence_number,
-      max_gas_amount: "1000000",
+      max_gas_amount: "2000",
       gas_unit_price: "1",
       // Unix timestamp, in seconds + 10 seconds
       expiration_timestamp_secs: (Math.floor(Date.now() / 1000) + 10).toString(),

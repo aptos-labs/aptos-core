@@ -81,6 +81,7 @@ export type { TransactionSignature_MultiEd25519Signature } from './models/Transa
 export type { U128 } from './models/U128';
 export type { U64 } from './models/U64';
 export type { UserTransaction } from './models/UserTransaction';
+export type { VersionedEvent } from './models/VersionedEvent';
 export type { WriteModule } from './models/WriteModule';
 export type { WriteResource } from './models/WriteResource';
 export type { WriteSet } from './models/WriteSet';
@@ -168,6 +169,7 @@ export { $TransactionSignature_MultiEd25519Signature } from './schemas/$Transact
 export { $U128 } from './schemas/$U128';
 export { $U64 } from './schemas/$U64';
 export { $UserTransaction } from './schemas/$UserTransaction';
+export { $VersionedEvent } from './schemas/$VersionedEvent';
 export { $WriteModule } from './schemas/$WriteModule';
 export { $WriteResource } from './schemas/$WriteResource';
 export { $WriteSet } from './schemas/$WriteSet';

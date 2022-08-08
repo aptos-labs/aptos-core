@@ -156,6 +156,7 @@ pub enum ScriptFunctionCall {
     /// Note: this triggers setting the operator and owner, set it to the account's address
     /// to set later.
     StakeInitializeOwnerOnly {
+        initial_stake_amount: u64,
         operator: AccountAddress,
         voter: AccountAddress,
     },
@@ -287,9 +288,11 @@ impl ScriptFunctionCall {
             } => resource_account_create_resource_account(seed, optional_auth_key),
             StakeAddStake { amount } => stake_add_stake(amount),
             StakeIncreaseLockup {} => stake_increase_lockup(),
-            StakeInitializeOwnerOnly { operator, voter } => {
-                stake_initialize_owner_only(operator, voter)
-            }
+            StakeInitializeOwnerOnly {
+                initial_stake_amount,
+                operator,
+                voter,
+            } => stake_initialize_owner_only(initial_stake_amount, operator, voter),
             StakeInitializeValidator {
                 consensus_pubkey,
                 proof_of_possession,
@@ -728,6 +731,7 @@ pub fn stake_increase_lockup() -> TransactionPayload {
 /// Note: this triggers setting the operator and owner, set it to the account's address
 /// to set later.
 pub fn stake_initialize_owner_only(
+    initial_stake_amount: u64,
     operator: AccountAddress,
     voter: AccountAddress,
 ) -> TransactionPayload {
@@ -742,6 +746,7 @@ pub fn stake_initialize_owner_only(
         ident_str!("initialize_owner_only").to_owned(),
         vec![],
         vec![
+            bcs::to_bytes(&initial_stake_amount).unwrap(),
             bcs::to_bytes(&operator).unwrap(),
             bcs::to_bytes(&voter).unwrap(),
         ],
@@ -1170,8 +1175,9 @@ mod decoder {
     pub fn stake_initialize_owner_only(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::StakeInitializeOwnerOnly {
-                operator: bcs::from_bytes(script.args().get(0)?).ok()?,
-                voter: bcs::from_bytes(script.args().get(1)?).ok()?,
+                initial_stake_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
+                operator: bcs::from_bytes(script.args().get(1)?).ok()?,
+                voter: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
         } else {
             None

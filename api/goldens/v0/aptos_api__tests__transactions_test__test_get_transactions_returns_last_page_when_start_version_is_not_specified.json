@@ -158,7 +158,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "13",
@@ -389,7 +389,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "14",
@@ -620,7 +620,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "15",
@@ -851,7 +851,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "16",
@@ -1082,7 +1082,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "17",
@@ -1313,7 +1313,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "18",
@@ -1544,7 +1544,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "19",
@@ -1775,7 +1775,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "20",

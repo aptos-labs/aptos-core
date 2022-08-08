@@ -31,12 +31,12 @@ const {
 
   // Generates key pair for a new account
   const account1 = new AptosAccount();
-  await faucetClient.fundAccount(account1.address(), 100000000);
+  await faucetClient.fundAccount(account1.address(), 100000);
   let resources = await client.getAccountResources(account1.address());
   let accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
   let balance = parseInt((accountResource?.data as any).coin.value);
-  assert(balance === 100000000);
-  console.log(`account2 coins: ${balance}. Should be 100000000!`);
+  assert(balance === 100000);
+  console.log(`account2 coins: ${balance}. Should be 100000!`);
 
   const account2 = new AptosAccount();
   // Creates the second account and fund the account with 0 AptosCoin
@@ -77,7 +77,7 @@ const {
     BigInt(sequenceNumber),
     scriptFunctionPayload,
     // Max gas unit to spend
-    1000000n,
+    2000n,
     // Gas price per unit
     1n,
     // Expiration timestamp. Transaction is discarded if it is not executed within 10 seconds from now.

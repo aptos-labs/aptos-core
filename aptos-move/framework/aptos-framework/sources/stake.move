@@ -300,6 +300,28 @@ module aptos_framework::stake {
         borrow_global<StakePool>(pool_address).operator_address
     }
 
+    /// Return the pool address in `owner_cap`.
+    public fun get_owned_pool_address(owner_cap: &OwnerCapability): address {
+        owner_cap.pool_address
+    }
+
+    /// Return the validator index for `pool_address`.
+    public fun get_validator_index(pool_address: address): u64 acquires ValidatorConfig {
+        borrow_global<ValidatorConfig>(pool_address).validator_index
+    }
+
+    /// Return the number of successful and failed proposals for the proposal at the given validator index.
+    public fun get_current_epoch_proposal_counts(validator_index: u64): (u64, u64) acquires ValidatorPerformance {
+        let validator_performances = &borrow_global<ValidatorPerformance>(@aptos_framework).validators;
+        let validator_performance = vector::borrow(validator_performances, validator_index);
+        (validator_performance.successful_proposals, validator_performance.failed_proposals)
+    }
+
+    /// Return the validator's config.
+    public fun get_validator_config(pool_address: address): (vector<u8>, vector<u8>, vector<u8>) acquires ValidatorConfig {
+        let validator_config = borrow_global<ValidatorConfig>(pool_address);
+        (validator_config.consensus_pubkey, validator_config.network_addresses, validator_config.fullnode_addresses)
+    }
 
     /// Initialize validator set to the core resource account.
     public fun initialize(aptos_framework: &signer) {
@@ -328,22 +350,30 @@ module aptos_framework::stake {
     /// except it leaves the ValidatorConfig to be set by another entity.
     /// Note: this triggers setting the operator and owner, set it to the account's address
     /// to set later.
-    public entry fun initialize_owner_only(account: &signer, operator: address, voter: address) acquires OwnerCapability, StakePool {
-        initialize_owner(account);
-
-        move_to(account, ValidatorConfig {
+    public entry fun initialize_owner_only(
+        owner: &signer,
+        initial_stake_amount: u64,
+        operator: address,
+        voter: address,
+    ) acquires OwnerCapability, StakePool, ValidatorSet {
+        initialize_owner(owner);
+        move_to(owner, ValidatorConfig {
             consensus_pubkey: vector::empty(),
             network_addresses: vector::empty(),
             fullnode_addresses: vector::empty(),
             validator_index: 0,
         });
 
-        let account_address = signer::address_of(account);
+        if (initial_stake_amount > 0) {
+            add_stake(owner, initial_stake_amount);
+        };
+
+        let account_address = signer::address_of(owner);
         if (account_address != operator) {
-            set_operator(account, operator)
+            set_operator(owner, operator)
         };
         if (account_address != voter) {
-            set_delegated_voter(account, voter)
+            set_delegated_voter(owner, voter)
         };
     }
 
@@ -366,35 +396,34 @@ module aptos_framework::stake {
         });
     }
 
+    fun initialize_owner(owner: &signer) {
+        let owner_address = signer::address_of(owner);
+        assert!(!exists<StakePool>(owner_address), error::invalid_argument(EALREADY_REGISTERED));
 
-    fun initialize_owner(account: &signer) {
-        let account_address = signer::address_of(account);
-        assert!(!exists<StakePool>(account_address), error::invalid_argument(EALREADY_REGISTERED));
-
-        move_to(account, StakePool {
+        move_to(owner, StakePool {
             active: coin::zero<AptosCoin>(),
             pending_active: coin::zero<AptosCoin>(),
             pending_inactive: coin::zero<AptosCoin>(),
             inactive: coin::zero<AptosCoin>(),
             locked_until_secs: 0,
-            operator_address: account_address,
-            delegated_voter: account_address,
-            initialize_validator_events: event::new_event_handle<RegisterValidatorCandidateEvent>(account),
-            set_operator_events: event::new_event_handle<SetOperatorEvent>(account),
-            add_stake_events: event::new_event_handle<AddStakeEvent>(account),
-            rotate_consensus_key_events: event::new_event_handle<RotateConsensusKeyEvent>(account),
-            update_network_and_fullnode_addresses_events: event::new_event_handle<UpdateNetworkAndFullnodeAddressesEvent>(account),
-            increase_lockup_events: event::new_event_handle<IncreaseLockupEvent>(account),
-            join_validator_set_events: event::new_event_handle<JoinValidatorSetEvent>(account),
-            distribute_rewards_events: event::new_event_handle<DistributeRewardsEvent>(account),
-            unlock_stake_events: event::new_event_handle<UnlockStakeEvent>(account),
-            withdraw_stake_events: event::new_event_handle<WithdrawStakeEvent>(account),
-            leave_validator_set_events: event::new_event_handle<LeaveValidatorSetEvent>(account),
+            operator_address: owner_address,
+            delegated_voter: owner_address,
+
+            // Events.
+            initialize_validator_events: event::new_event_handle<RegisterValidatorCandidateEvent>(owner),
+            set_operator_events: event::new_event_handle<SetOperatorEvent>(owner),
+            add_stake_events: event::new_event_handle<AddStakeEvent>(owner),
+            rotate_consensus_key_events: event::new_event_handle<RotateConsensusKeyEvent>(owner),
+            update_network_and_fullnode_addresses_events: event::new_event_handle<UpdateNetworkAndFullnodeAddressesEvent>(owner),
+            increase_lockup_events: event::new_event_handle<IncreaseLockupEvent>(owner),
+            join_validator_set_events: event::new_event_handle<JoinValidatorSetEvent>(owner),
+            distribute_rewards_events: event::new_event_handle<DistributeRewardsEvent>(owner),
+            unlock_stake_events: event::new_event_handle<UnlockStakeEvent>(owner),
+            withdraw_stake_events: event::new_event_handle<WithdrawStakeEvent>(owner),
+            leave_validator_set_events: event::new_event_handle<LeaveValidatorSetEvent>(owner),
         });
 
-        move_to(account, OwnerCapability {
-           pool_address: account_address,
-        });
+        move_to(owner, OwnerCapability { pool_address: owner_address });
     }
 
     /// Extract and return owner capability from the signing account.
@@ -451,7 +480,7 @@ module aptos_framework::stake {
     }
 
     /// Allows an owner to change the delegated voter of the stake pool.
-    public entry fun set_delegated_voter_with_cap(
+    public fun set_delegated_voter_with_cap(
         pool_address: address,
         owner_cap: &OwnerCapability,
         new_delegated_voter: address,
@@ -1795,7 +1824,7 @@ module aptos_framework::stake {
         aptos_framework::coin::register_for_test<AptosCoin>(account);
         let address = signer::address_of(account);
         coin::deposit<AptosCoin>(address, coin::mint<AptosCoin>(1000, mint_cap));
-        initialize_owner_only(account, address, address);
+        initialize_owner_only(account, 0, address, address);
         add_stake(account, 100);
         assert_validator_state(signer::address_of(account), 100, 0, 0, 0, 0);
     }
@@ -1913,9 +1942,9 @@ module aptos_framework::stake {
         active: Coin<AptosCoin>,
         pending_inactive: Coin<AptosCoin>,
         locked_until_secs: u64,
-    ) acquires OwnerCapability, StakePool {
+    ) acquires OwnerCapability, StakePool, ValidatorSet {
         let account_address = signer::address_of(account);
-        initialize_owner_only(account, account_address, account_address);
+        initialize_owner_only(account, 0, account_address, account_address);
         let stake_pool = borrow_global_mut<StakePool>(account_address);
         coin::merge(&mut stake_pool.active, active);
         coin::merge(&mut stake_pool.pending_inactive, pending_inactive);

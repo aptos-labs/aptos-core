@@ -4,6 +4,9 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
+## 1.3.4 (2022-08-07)
+- Downscaled default value for `max_gas`.
+
 ## 1.3.3 (2022-08-05)
 
 - Update the token clients to submit transactions through BCS interface. The new token client doesn't hex-code "name", "decription" and "uri" any more. String properties are passed and saved just as strings.

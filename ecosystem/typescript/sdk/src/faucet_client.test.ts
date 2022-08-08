@@ -48,7 +48,7 @@ test(
       arguments: [account2.address().hex(), "717"],
     };
 
-    const txnRequest = await client.generateTransaction(account1.address(), payload, { max_gas_amount: "200000" });
+    const txnRequest = await client.generateTransaction(account1.address(), payload, { max_gas_amount: "2000" });
     const signedTxn = await client.signTransaction(account1, txnRequest);
     const transactionRes = await client.submitTransaction(signedTxn);
     const txn = await client.waitForTransactionWithResult(transactionRes.hash);

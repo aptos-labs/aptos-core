@@ -18,11 +18,11 @@ console.log("Faucet URL", FAUCET_URL);
   const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
   const account1 = new AptosAccount();
-  await faucetClient.fundAccount(account1.address(), 100000000);
+  await faucetClient.fundAccount(account1.address(), 100000);
   let resources = await client.getAccountResources(account1.address());
   let accountResource = resources.find((r) => isEqual(r.type, aptosCoin))!;
   let balance = (accountResource.data as { coin: { value: string } }).coin.value;
-  console.log(`account1 coins: ${balance}. Should be 100000000!`);
+  console.log(`account1 coins: ${balance}. Should be 100000!`);
 
   const account2 = new AptosAccount();
   await faucetClient.fundAccount(account2.address(), 0);

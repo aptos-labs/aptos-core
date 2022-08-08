@@ -130,6 +130,7 @@ module aptos_std::big_vector {
 
     /// Return true if `val` is in the vector `v`.
     public fun contains<T>(v: &BigVector<T>, val: &T): bool {
+        if (is_empty(v)) return false;
         let (exist, _) = index_of(v, val);
         exist
     }
@@ -298,6 +299,13 @@ module aptos_std::big_vector {
             i = i - 1;
         };
         shrink_to_fit(&mut v);
+        destroy_empty(v);
+    }
+
+    #[test]
+    fun big_vector_empty_contains() {
+        let v = new<u64> (10);
+        assert!(!contains<u64>(&v, &(1 as u64)), 0);
         destroy_empty(v);
     }
 }

@@ -113,8 +113,7 @@ use crate::pruner::state_pruner_manager::StatePrunerManager;
 use crate::pruner::state_store::StateStorePruner;
 use storage_interface::state_view::DbStateView;
 use storage_interface::{
-    state_delta::StateDelta, DbReader, DbWriter, ExecutedTrees, Order, StartupInfo,
-    StateSnapshotReceiver,
+    state_delta::StateDelta, DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver,
 };
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";
@@ -1144,56 +1143,6 @@ impl DbReader for AptosDB {
 
             self.state_store
                 .get_state_proof_by_version(state_key, version)
-        })
-    }
-
-    fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
-        gauged_api("get_startup_info", || {
-            let _lock = self.ledger_commit_lock.lock();
-            self.ledger_store
-                .get_startup_info()?
-                .map(
-                    |(latest_ledger_info, latest_epoch_state_if_not_in_li, synced_version_opt)| {
-                        let executed_trees = self.get_latest_executed_trees()?;
-                        let committed_version = latest_ledger_info.ledger_info().version();
-                        Ok(if synced_version_opt.is_none() {
-                            assert_eq!(
-                                Some(committed_version), executed_trees.version(),
-                                "ledger_info_version {:?} doesn't match with committed_executed_trees version {:?}",
-                                Some(committed_version),
-                                executed_trees.version()
-                            );
-                            StartupInfo::new(
-                                latest_ledger_info,
-                                latest_epoch_state_if_not_in_li,
-                                executed_trees,
-                                None
-                            )
-                        } else {
-                            let num_txns = committed_version + 1;
-                            let frozen_subtrees = self
-                                .ledger_store
-                                .get_frozen_subtree_hashes(num_txns)?;
-                            let transaction_accumulator = Arc::new(InMemoryAccumulator::new(
-                                frozen_subtrees,
-                                num_txns,
-                            )?);
-                            let committed_trees = ExecutedTrees::new(StateDelta::new(executed_trees.state().base.clone(),
-                                                                                     executed_trees.state().base_version,
-                                                                                     executed_trees.state().base.clone(),
-                                                                                     executed_trees.state().base_version,
-                                HashMap::new()
-                            ), transaction_accumulator);
-                            StartupInfo::new(
-                                latest_ledger_info,
-                                latest_epoch_state_if_not_in_li,
-                                committed_trees,
-                                Some(executed_trees)
-                            )
-                        })
-                    },
-                )
-                .transpose()
         })
     }
 

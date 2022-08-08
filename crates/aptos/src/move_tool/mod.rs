@@ -311,10 +311,10 @@ pub struct PublishPackage {
     move_options: MovePackageDir,
     #[clap(flatten)]
     txn_options: TransactionOptions,
-    /// Whether to use the new publishing flow.
+    /// Whether to use the legacy publishing flow. This will be soon removed.
     #[clap(long)]
-    new_flow: bool,
-    /// The upgrade policy used for the published package (new flow only). One of
+    legacy_flow: bool,
+    /// The upgrade policy used for the published package. One of
     /// `arbitrary`, `compatible`, or `immutable`. Defaults to `compatible`.
     #[clap(long)]
     upgrade_policy: Option<UpgradePolicy>,
@@ -330,15 +330,16 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         let PublishPackage {
             move_options,
             txn_options,
-            new_flow,
+            legacy_flow,
             upgrade_policy,
         } = self;
         let package = BuiltPackage::build(move_options, true, true)?;
         let compiled_units = package.extract_code();
-        if !new_flow {
+        if legacy_flow {
             if upgrade_policy.is_some() {
                 return Err(CliError::CommandArgumentError(
-                    "`--upgrade-policy` can only be used with the `--new-flow` option".to_owned(),
+                    "`--upgrade-policy` can only be used without the `--legacy-flow` option"
+                        .to_owned(),
                 ));
             }
             // Send the compiled module using a module bundle

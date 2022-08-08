@@ -13,7 +13,7 @@ use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     account_state::AccountState,
     chain_id::ChainId,
-    contract_event::ContractEvent,
+    contract_event::EventWithVersion,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
@@ -234,7 +234,7 @@ impl Context {
         let block_metadata_type = move_deps::move_core_types::language_storage::StructTag {
             address: CORE_CODE_ADDRESS,
             module: ident_str!("block").into(),
-            name: ident_str!("BlockMetadata").into(),
+            name: ident_str!("BlockResource").into(),
             type_params: vec![],
         };
 
@@ -408,14 +408,13 @@ impl Context {
         start: u64,
         limit: u16,
         ledger_version: u64,
-    ) -> Result<Vec<ContractEvent>> {
+    ) -> Result<Vec<EventWithVersion>> {
         let events = self
             .db
             .get_events(event_key, start, Order::Ascending, limit as u64)?;
         Ok(events
             .into_iter()
             .filter(|event| event.transaction_version <= ledger_version)
-            .map(|event| event.event)
             .collect::<Vec<_>>())
     }
 
