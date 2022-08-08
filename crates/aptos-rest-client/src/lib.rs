@@ -363,7 +363,6 @@ impl Client {
             struct_tag,
             field_name
         ))?;
-        println!("{}", url.clone());
         let mut request = self.inner.get(url);
         if let Some(start) = start {
             request = request.query(&[("start", start)])
@@ -392,7 +391,7 @@ impl Client {
             height: u64,
             previous_block_votes: Vec<bool>,
             proposer: String,
-            failed_proposer_indices: Vec<u64>,
+            failed_proposer_indices: Vec<String>,
             #[serde(deserialize_with = "deserialize_from_string")]
             time_microseconds: u64,
         }
@@ -400,7 +399,7 @@ impl Client {
         let response = self
             .get_account_events(
                 CORE_CODE_ADDRESS,
-                "0x1::block::BlockMetadata",
+                "0x1::block::BlockResource",
                 "new_block_events",
                 start,
                 limit,
@@ -411,7 +410,6 @@ impl Client {
             let new_events: Result<Vec<_>> = events
                 .into_iter()
                 .map(|event| {
-                    println!("{:?}", &event.data);
                     serde_json::from_value::<NewBlockEventResponse>(event.data)
                         .map_err(|e| anyhow!(e))
                         .and_then(|e| {
@@ -422,7 +420,10 @@ impl Client {
                                 e.previous_block_votes,
                                 AccountAddress::from_hex_literal(&e.proposer)
                                     .map_err(|e| anyhow!(e))?,
-                                e.failed_proposer_indices,
+                                e.failed_proposer_indices
+                                    .iter()
+                                    .map(|v| v.parse())
+                                    .collect::<Result<Vec<_>, _>>()?,
                                 e.time_microseconds,
                             ))
                         })
