@@ -1079,17 +1079,6 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_event_latest_sequence_number(
-        &self,
-        event_key: &EventKey,
-        ledger_version: Version,
-    ) -> Result<Option<u64>> {
-        gauged_api("get_event_latest_sequence_number", || {
-            self.event_store
-                .get_latest_sequence_number(ledger_version, event_key)
-        })
-    }
-
     /// Gets ledger info at specified version and ensures it's an epoch ending.
     fn get_epoch_ending_ledger_info(&self, version: u64) -> Result<LedgerInfoWithSignatures> {
         gauged_api("get_epoch_ending_ledger_info", || {

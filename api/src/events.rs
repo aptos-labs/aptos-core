@@ -134,14 +134,12 @@ impl Events {
 
     pub fn list(self, page: Page, accept_type: AcceptType) -> Result<impl Reply, Error> {
         let ledger_version = self.ledger_info.version();
-        let last_sequence_number = self
-            .context
-            .get_event_latest_sequence_number(&self.key, ledger_version)?;
-        let limit = page.limit()?;
-        let start = page.compute_start(limit, last_sequence_number)?;
-        let contract_events = self
-            .context
-            .get_events(&self.key, start, limit, ledger_version)?;
+        let events = self.context.get_events(
+            &self.key,
+            page.start_option()?,
+            page.limit()?,
+            ledger_version,
+        )?;
 
         match accept_type {
             AcceptType::Json => {

@@ -400,7 +400,7 @@ impl Client {
         let response = self
             .get_account_events(
                 CORE_CODE_ADDRESS,
-                "0x1::block::BlockMetadata",
+                "0x1::block::BlockResource",
                 "new_block_events",
                 start,
                 limit,

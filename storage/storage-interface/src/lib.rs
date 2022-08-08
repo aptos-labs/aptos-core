@@ -186,15 +186,6 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
-    /// Returns latest event sequence number for the given event key
-    fn get_event_latest_sequence_number(
-        &self,
-        event_key: &EventKey,
-        ledger_version: Version,
-    ) -> Result<Option<u64>> {
-        unimplemented!()
-    }
-
     /// Returns events by given event key
     fn get_events(
         &self,
