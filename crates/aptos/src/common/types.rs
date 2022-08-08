@@ -166,6 +166,7 @@ impl From<bcs::Error> for CliError {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
     /// Map of profile configs
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub profiles: Option<HashMap<String, ProfileConfig>>,
 }
 
@@ -177,14 +178,19 @@ pub const CONFIG_FOLDER: &str = ".aptos";
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
     /// Private key for commands.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub private_key: Option<Ed25519PrivateKey>,
     /// Public key for commands
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key: Option<Ed25519PublicKey>,
     /// Account for commands
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub account: Option<AccountAddress>,
     /// URL for the Aptos rest endpoint
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rest_url: Option<String>,
     /// URL for the Faucet endpoint (if applicable)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub faucet_url: Option<String>,
 }
 
