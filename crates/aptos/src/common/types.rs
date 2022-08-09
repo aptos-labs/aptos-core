@@ -1,17 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current, start_logger};
-use crate::config::GlobalConfig;
 use crate::{
     common::{
         init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
         utils::{
-            chain_id, check_if_file_exists, get_sequence_number, read_from_file, to_common_result,
+            chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
+            get_sequence_number, read_from_file, start_logger, to_common_result,
             to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
     },
+    config::GlobalConfig,
     genesis::git::from_yaml,
 };
 use aptos_crypto::{
@@ -19,10 +19,13 @@ use aptos_crypto::{
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::{
-    DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource, WriteTableItem,
+use aptos_rest_client::{
+    aptos_api_types::{
+        DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource, WriteSetChange,
+        WriteTableItem,
+    },
+    Client, Transaction,
 };
-use aptos_rest_client::{aptos_api_types::WriteSetChange, Client, Transaction};
 use aptos_sdk::{
     move_types::{
         ident_str,
@@ -401,9 +404,7 @@ impl EncodingType {
 #[derive(Clone, Debug, Parser)]
 pub struct RngArgs {
     /// The seed used for key generation, should be a 64 character hex string and mainly used for testing
-    ///
-    /// This field is hidden from the CLI input for now
-    #[clap(skip)]
+    #[clap(long)]
     random_seed: Option<String>,
 }
 
