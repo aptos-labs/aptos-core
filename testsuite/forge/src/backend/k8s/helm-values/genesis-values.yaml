@@ -1,4 +1,6 @@
 # This file is loaded in by Forge test runner at runtime and templated
+# These are meant to be Forge-specific overrides. If you have a new config, please add
+# it to the base helm values at terraform/helm/genesis/values.yaml
 
 imageTag: {image_tag}
 

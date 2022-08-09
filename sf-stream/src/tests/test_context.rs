@@ -30,11 +30,12 @@ use aptos_api::{context::Context, index};
 use aptos_api_types::HexEncodedBytes;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_types::multi_signature::MultiSignature;
 use bytes::Bytes;
 use hyper::Response;
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc, time::Duration};
+use std::{boxed::Box, iter::once, sync::Arc, time::Duration};
 use vm_validator::vm_validator::VMValidator;
 
 pub fn new_test_context(test_name: &str, fake_start_time_usecs: u64) -> TestContext {
@@ -262,7 +263,7 @@ impl TestContext {
             ),
             HashValue::zero(),
         );
-        LedgerInfoWithSignatures::new(info, BTreeMap::new())
+        LedgerInfoWithSignatures::new(info, MultiSignature::empty())
     }
 
     pub async fn api_execute_script_function(

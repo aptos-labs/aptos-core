@@ -88,8 +88,10 @@ fn test_error_if_version_is_pruned() {
     let state_pruner = StatePrunerManager::new(
         Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
-            state_store_prune_window: Some(0),
-            ledger_prune_window: Some(0),
+            enable_state_store_pruner: true,
+            enable_ledger_pruner: true,
+            state_store_prune_window: 0,
+            ledger_prune_window: 0,
             ledger_pruning_batch_size: 1,
             state_store_pruning_batch_size: 1,
         },
@@ -98,8 +100,10 @@ fn test_error_if_version_is_pruned() {
     let ledger_pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
         StoragePrunerConfig {
-            state_store_prune_window: Some(0),
-            ledger_prune_window: Some(0),
+            enable_state_store_pruner: true,
+            enable_ledger_pruner: true,
+            state_store_prune_window: 0,
+            ledger_prune_window: 0,
             ledger_pruning_batch_size: 1,
             state_store_pruning_batch_size: 1,
         },

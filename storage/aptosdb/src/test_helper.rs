@@ -6,6 +6,8 @@ use super::*;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, schema::state_value::StateValueSchema,
 };
+use aptos_types::ledger_info::generate_ledger_info_with_sig;
+
 use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_temppath::TempPath;
@@ -90,8 +92,8 @@ prop_compose! {
         let mut txn_accumulator = TxnAccumulator::new_empty();
         let mut result = Vec::new();
 
-    let mut in_memory_state = StateDelta::new_empty();
-    let _ancester = in_memory_state.current.clone().freeze();
+        let mut in_memory_state = StateDelta::new_empty();
+        let _ancester = in_memory_state.current.clone().freeze();
 
         for block_gen in block_gens {
             let (mut txns_to_commit, mut ledger_info) = block_gen.materialize(&mut universe);
@@ -128,11 +130,7 @@ prop_compose! {
             // updated ledger info with real root hash and sign
             ledger_info.set_executed_state_id(txn_accumulator.root_hash());
             let validator_set = universe.get_validator_set(ledger_info.epoch());
-            let signatures = validator_set
-                .iter()
-                .map(|signer| (signer.author(), signer.sign(&ledger_info)))
-                .collect();
-            let ledger_info_with_sigs = LedgerInfoWithSignatures::new(ledger_info, signatures);
+            let ledger_info_with_sigs = generate_ledger_info_with_sig(validator_set, ledger_info);
 
             result.push((txns_to_commit, ledger_info_with_sigs))
         }

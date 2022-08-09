@@ -34,14 +34,22 @@ pub struct Layout {
     /// Whether to allow new validators to join the set after genesis
     #[serde(default)]
     pub allow_new_validators: bool,
+    /// Duration of an epoch
+    pub epoch_duration_secs: u64,
     /// Minimum stake to be in the validator set
     pub min_stake: u64,
+    /// Minimum number of votes to consider a proposal valid.
+    pub min_voting_threshold: u128,
     /// Maximum stake to be in the validator set
     pub max_stake: u64,
     /// Minimum number of seconds to lockup staked coins
     pub recurring_lockup_duration_secs: u64,
-    /// Duration of an epoch
-    pub epoch_duration_secs: u64,
+    /// Required amount of stake to create proposals.
+    pub required_proposer_stake: u64,
+    /// Percentage of stake given out as rewards a year (0-100%).
+    pub rewards_apy_percentage: u64,
+    /// Voting duration for a proposal in seconds.
+    pub voting_duration_secs: u64,
 }
 
 impl Layout {

@@ -11,6 +11,7 @@ pub mod governance;
 pub mod move_tool;
 pub mod node;
 pub mod op;
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
 
 use crate::common::types::{CliCommand, CliResult, CliTypedResult};

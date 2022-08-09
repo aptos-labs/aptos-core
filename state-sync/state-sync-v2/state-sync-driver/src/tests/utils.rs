@@ -8,6 +8,7 @@ use aptos_crypto::{
     HashValue, PrivateKey, Uniform,
 };
 use aptos_data_client::GlobalDataSummary;
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::on_chain_config::ValidatorSet;
 use aptos_types::{
     account_address::AccountAddress,
@@ -37,7 +38,6 @@ use event_notifications::EventNotificationListener;
 use futures::StreamExt;
 use mempool_notifications::{CommittedTransaction, MempoolNotificationListener};
 use move_deps::move_core_types::language_storage::TypeTag;
-use std::collections::BTreeMap;
 use storage_service_types::responses::CompleteDataRange;
 
 /// Creates a new data stream listener and notification sender pair
@@ -52,7 +52,7 @@ pub fn create_data_stream_listener() -> (Sender<(), DataNotification>, DataStrea
 /// Creates a test epoch ending ledger info
 pub fn create_epoch_ending_ledger_info() -> LedgerInfoWithSignatures {
     let ledger_info = LedgerInfo::genesis(HashValue::zero(), ValidatorSet::empty());
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
 }
 
 /// Creates a single test event
@@ -87,7 +87,7 @@ pub fn create_global_summary(highest_ended_epoch: Epoch) -> GlobalDataSummary {
 pub fn create_ledger_info_at_version(version: Version) -> LedgerInfoWithSignatures {
     let block_info = BlockInfo::new(0, 0, HashValue::zero(), HashValue::zero(), version, 0, None);
     let ledger_info = LedgerInfo::new(block_info, HashValue::random());
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
 }
 
 /// Creates a test transaction output list with proof
@@ -116,7 +116,7 @@ pub fn create_random_epoch_ending_ledger_info(
         Some(EpochState::empty()),
     );
     let ledger_info = LedgerInfo::new(block_info, HashValue::random());
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
 }
 
 /// Returns an empty epoch state

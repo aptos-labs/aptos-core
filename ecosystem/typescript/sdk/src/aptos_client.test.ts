@@ -1,5 +1,3 @@
-import isEqual from "lodash/isEqual";
-
 import { AptosClient } from "./aptos_client";
 import * as Gen from "./generated/index";
 import { FAUCET_URL, NODE_URL } from "./util.test";
@@ -8,27 +6,11 @@ import { AptosAccount } from "./aptos_account";
 import { TxnBuilderTypes, TransactionBuilderMultiEd25519, BCS, TransactionBuilder } from "./transaction_builder";
 import { TokenClient } from "./token_client";
 
-const account = {
-  address: "0x1",
-  module: "account",
-  name: "Account",
-  generic_type_params: [] as string[],
-};
+const account = "0x1::account::Account";
 
-const aptosCoin = {
-  address: "0x1",
-  module: "coin",
-  name: "CoinStore",
-  generic_type_params: ["0x1::aptos_coin::AptosCoin"],
-};
+const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
-const coinTransferFunction = {
-  module: {
-    address: "0x1",
-    name: "coin",
-  },
-  name: "transfer",
-};
+const coinTransferFunction = "0x1::coin::transfer";
 
 test("gets genesis account", async () => {
   const client = new AptosClient(NODE_URL);
@@ -46,7 +28,7 @@ test("gets transactions", async () => {
 test("gets genesis resources", async () => {
   const client = new AptosClient(NODE_URL);
   const resources = await client.getAccountResources("0x1");
-  const accountResource = resources.find((r) => isEqual(r.type, account));
+  const accountResource = resources.find((r) => r.type == account);
   expect(accountResource).toBeDefined();
 });
 
@@ -85,13 +67,13 @@ test(
     const account1 = new AptosAccount();
     await faucetClient.fundAccount(account1.address(), 50000);
     let resources = await client.getAccountResources(account1.address());
-    let accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+    let accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("50000");
 
     const account2 = new AptosAccount();
     await faucetClient.fundAccount(account2.address(), 0);
     resources = await client.getAccountResources(account2.address());
-    accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+    accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("0");
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
@@ -126,7 +108,7 @@ test(
     await client.waitForTransaction(transactionRes.hash);
 
     resources = await client.getAccountResources(account2.address());
-    accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+    accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("717");
   },
   30 * 1000,
@@ -156,13 +138,13 @@ test(
     await faucetClient.fundAccount(mutisigAccountAddress, 5000000);
 
     let resources = await client.getAccountResources(mutisigAccountAddress);
-    let accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+    let accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("5000000");
 
     const account4 = new AptosAccount();
     await faucetClient.fundAccount(account4.address(), 0);
     resources = await client.getAccountResources(account4.address());
-    accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+    accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("0");
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
@@ -213,7 +195,7 @@ test(
     await client.waitForTransaction(transactionRes.hash);
 
     resources = await client.getAccountResources(account4.address());
-    accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+    accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("123");
   },
   30 * 1000,
@@ -236,8 +218,8 @@ test(
     const checkAptosCoin = async () => {
       const resources1 = await client.getAccountResources(account1.address());
       const resources2 = await client.getAccountResources(account2.address());
-      const account1Resource = resources1.find((r) => isEqual(r.type, aptosCoin));
-      const account2Resource = resources2.find((r) => isEqual(r.type, aptosCoin));
+      const account1Resource = resources1.find((r) => r.type === aptosCoin);
+      const account2Resource = resources2.find((r) => r.type === aptosCoin);
       expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("1000000");
       expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("1000000");
     };
@@ -261,7 +243,7 @@ test(
 
       return (
         write.address === account2.address().hex() &&
-        isEqual(write.data.type, aptosCoin) &&
+        write.data.type === aptosCoin &&
         (write.data.data as { coin: { value: string } }).coin.value === "1100000"
       );
     });
@@ -288,8 +270,8 @@ test(
     const checkAptosCoin = async () => {
       const resources1 = await client.getAccountResources(account1.address());
       const resources2 = await client.getAccountResources(account2.address());
-      const account1Resource = resources1.find((r) => isEqual(r.type, aptosCoin));
-      const account2Resource = resources2.find((r) => isEqual(r.type, aptosCoin));
+      const account1Resource = resources1.find((r) => r.type === aptosCoin);
+      const account2Resource = resources2.find((r) => r.type === aptosCoin);
       expect((account1Resource!.data as { coin: { value: string } }).coin.value).toBe("50000");
       expect((account2Resource!.data as { coin: { value: string } }).coin.value).toBe("10000");
     };
@@ -332,7 +314,7 @@ test(
 
       return (
         write.address === account2.address().toShortString() &&
-        isEqual(write.data.type, aptosCoin) &&
+        write.data.type === aptosCoin &&
         (write.data.data as { coin: { value: string } }).coin.value === "11000"
       );
     });
@@ -358,12 +340,12 @@ test.skip(
     await faucetClient.fundAccount(alice.address(), 50000);
 
     let resources = await client.getAccountResources(alice.address());
-    let accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+    let accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("50000");
 
     await faucetClient.fundAccount(bob.address(), 60000);
     resources = await client.getAccountResources(bob.address());
-    accountResource = resources.find((r) => isEqual(r.type, aptosCoin));
+    accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("60000");
 
     const collectionName = "AliceCollection";
@@ -460,12 +442,7 @@ test.skip(
 
     expect(aliceBalance.amount).toBe("0");
 
-    const bobTokenStore = await client.getAccountResource(bob.address(), {
-      address: "0x1",
-      module: "token",
-      name: "TokenStore",
-      generic_type_params: [],
-    });
+    const bobTokenStore = await client.getAccountResource(bob.address(), "0x1::token::TokenStore");
 
     const handle = (bobTokenStore.data as any).tokens?.handle;
 

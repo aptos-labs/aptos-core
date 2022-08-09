@@ -88,8 +88,10 @@ pub struct StorageConfig {
 }
 
 pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig {
-    state_store_prune_window: None,
-    ledger_prune_window: None,
+    enable_state_store_pruner: false,
+    enable_ledger_pruner: false,
+    state_store_prune_window: 0,
+    ledger_prune_window: 0,
     ledger_pruning_batch_size: 10_000,
     state_store_pruning_batch_size: 10_000,
 };
@@ -97,13 +99,18 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoragePrunerConfig {
-    /// None disables pruning. The size of the window should be calculated based on disk space
-    /// availability and system TPS.
-    pub state_store_prune_window: Option<u64>,
+    /// Boolean to enable/disable the state store pruner. The state pruner is responsible for
+    /// pruning state tree nodes.
+    pub enable_state_store_pruner: bool,
+    /// Boolean to enable/disable the ledger pruner. The ledger pruner is responsible for pruning
+    /// everything else except for states (e.g. transactions, events etc.)
+    pub enable_ledger_pruner: bool,
+    /// The size of the window should be calculated based on disk space availability and system TPS.
+    pub state_store_prune_window: u64,
     /// This is the default pruning window for any other store except for state store. State store
     /// being big in size, we might want to configure a smaller window for state store vs other
     /// store.
-    pub ledger_prune_window: Option<u64>,
+    pub ledger_prune_window: u64,
     /// Batch size of the versions to be sent to the ledger pruner - this is to avoid slowdown due to
     /// issuing too many DB calls and batch prune instead. For ledger pruner, this means the number
     /// of versions to prune a time.
@@ -115,12 +122,16 @@ pub struct StoragePrunerConfig {
 
 impl StoragePrunerConfig {
     pub fn new(
-        state_store_prune_window: Option<u64>,
-        ledger_store_prune_window: Option<u64>,
+        enable_state_store_pruner: bool,
+        enable_ledger_pruner: bool,
+        state_store_prune_window: u64,
+        ledger_store_prune_window: u64,
         ledger_pruning_batch_size: usize,
         state_store_pruning_batch_size: usize,
     ) -> Self {
         StoragePrunerConfig {
+            enable_state_store_pruner,
+            enable_ledger_pruner,
             state_store_prune_window,
             ledger_prune_window: ledger_store_prune_window,
             ledger_pruning_batch_size,
@@ -143,8 +154,10 @@ impl Default for StorageConfig {
             // conservatively safe minimal prune window. It'll take a few Gigabytes of disk space
             // depending on the size of an average account blob.
             storage_pruner_config: StoragePrunerConfig {
-                state_store_prune_window: Some(1_000_000),
-                ledger_prune_window: Some(10_000_000),
+                enable_state_store_pruner: true,
+                enable_ledger_pruner: true,
+                state_store_prune_window: 1_000_000,
+                ledger_prune_window: 10_000_000,
                 ledger_pruning_batch_size: 500,
                 // A 10k transaction block (touching 60k state values, in the case of the account
                 // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes

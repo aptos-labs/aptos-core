@@ -223,7 +223,7 @@ impl Node for LocalNode {
         self.start()
     }
 
-    fn stop(&mut self) -> Result<()> {
+    async fn stop(&mut self) -> Result<()> {
         self.stop();
         Ok(())
     }

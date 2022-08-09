@@ -1,163 +1,5 @@
 [
   {
-    "version": "35",
-    "hash": "",
-    "state_root_hash": "",
-    "event_root_hash": "",
-    "gas_used": "42",
-    "success": true,
-    "vm_status": "Executed successfully",
-    "accumulator_root_hash": "",
-    "changes": [
-      {
-        "address": "0xa550c18",
-        "state_key_hash": "",
-        "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
-          "data": {
-            "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
-            "coin_register_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0xa550c18",
-                  "creation_num": "0"
-                }
-              }
-            },
-            "sequence_number": "12"
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "state_key_hash": "",
-        "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
-          "data": {
-            "authentication_key": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-            "coin_register_events": {
-              "counter": "1",
-              "guid": {
-                "id": {
-                  "addr": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-                  "creation_num": "0"
-                }
-              }
-            },
-            "sequence_number": "0"
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "state_key_hash": "",
-        "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
-          "data": {
-            "coin": {
-              "value": "0"
-            },
-            "deposit_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-                  "creation_num": "1"
-                }
-              }
-            },
-            "withdraw_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-                  "creation_num": "2"
-                }
-              }
-            }
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "state_key_hash": "",
-        "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
-          "data": {
-            "counter": "3"
-          }
-        },
-        "type": "write_resource"
-      }
-    ],
-    "sender": "0xa550c18",
-    "sequence_number": "11",
-    "max_gas_amount": "4000000",
-    "gas_unit_price": "0",
-    "expiration_timestamp_secs": "18446744073709551615",
-    "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
-      "type_arguments": [],
-      "arguments": [
-        "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b"
-      ],
-      "type": "script_function_payload"
-    },
-    "signature": {
-      "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x468f634e4ae9c558fbe923d83cd337d5e5f5f0c46ac3c4b6acb6cc9b09e50ec95a5bfaba784fea94fd016d7ebbed0affe3cf40b7038ef4578de56d4806159207",
-      "type": "ed_25519_signature"
-    },
-    "events": [
-      {
-        "key": "0x00000000000000007ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "sequence_number": "0",
-        "type": "0x1::account::CoinRegisterEvent",
-        "data": {
-          "type_info": {
-            "account_address": "0x1",
-            "module_name": "0x6170746f735f636f696e",
-            "struct_name": "0x4170746f73436f696e"
-          }
-        }
-      }
-    ],
-    "timestamp": "12",
-    "type": "user_transaction"
-  },
-  {
     "version": "36",
     "hash": "",
     "state_root_hash": "",
@@ -184,12 +26,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockResource",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "13",
@@ -210,12 +47,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
               {
@@ -231,12 +63,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "13"
           }
@@ -287,12 +114,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -313,12 +135,7 @@
         "address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
             "coin_register_events": {
@@ -339,14 +156,7 @@
         "address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -377,12 +187,7 @@
         "address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -396,13 +201,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9"
@@ -458,12 +257,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockResource",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "14",
@@ -484,12 +278,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
               {
@@ -505,12 +294,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "14"
           }
@@ -561,12 +345,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -587,12 +366,7 @@
         "address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x095f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
             "coin_register_events": {
@@ -613,14 +387,7 @@
         "address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -651,12 +418,7 @@
         "address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -670,13 +432,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681"
@@ -732,12 +488,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockResource",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "15",
@@ -758,12 +509,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
               {
@@ -779,12 +525,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "15"
           }
@@ -835,12 +576,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -861,12 +597,7 @@
         "address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
             "coin_register_events": {
@@ -887,14 +618,7 @@
         "address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -925,12 +649,7 @@
         "address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -944,13 +663,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22"
@@ -1006,12 +719,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockResource",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "16",
@@ -1032,12 +740,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
               {
@@ -1053,12 +756,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "16"
           }
@@ -1109,12 +807,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -1135,12 +828,7 @@
         "address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
             "coin_register_events": {
@@ -1161,14 +849,7 @@
         "address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1199,12 +880,7 @@
         "address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -1218,13 +894,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e"
@@ -1280,12 +950,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockResource",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "17",
@@ -1306,12 +971,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
               {
@@ -1327,12 +987,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "17"
           }
@@ -1383,12 +1038,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -1409,12 +1059,7 @@
         "address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
             "coin_register_events": {
@@ -1435,14 +1080,7 @@
         "address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1473,12 +1111,7 @@
         "address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -1492,13 +1125,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06"
@@ -1554,12 +1181,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockResource",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "18",
@@ -1580,12 +1202,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
               {
@@ -1601,12 +1218,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "18"
           }
@@ -1657,12 +1269,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -1683,12 +1290,7 @@
         "address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x099acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
             "coin_register_events": {
@@ -1709,14 +1311,7 @@
         "address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1747,12 +1342,7 @@
         "address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -1766,13 +1356,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26"
@@ -1828,12 +1412,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockResource",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "19",
@@ -1854,12 +1433,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
               {
@@ -1875,12 +1449,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "19"
           }
@@ -1931,12 +1500,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -1957,12 +1521,7 @@
         "address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
             "coin_register_events": {
@@ -1983,14 +1542,7 @@
         "address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -2021,12 +1573,7 @@
         "address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -2040,13 +1587,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd"
@@ -2102,12 +1643,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockResource",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "20",
@@ -2128,12 +1664,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
               {
@@ -2149,12 +1680,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "20"
           }
@@ -2205,12 +1731,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -2231,12 +1752,7 @@
         "address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
             "coin_register_events": {
@@ -2257,14 +1773,7 @@
         "address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -2295,12 +1804,7 @@
         "address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -2314,13 +1818,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300"
@@ -2348,5 +1846,18 @@
     ],
     "timestamp": "20",
     "type": "user_transaction"
+  },
+  {
+    "version": "60",
+    "hash": "",
+    "state_root_hash": "",
+    "event_root_hash": "",
+    "gas_used": "0",
+    "success": true,
+    "vm_status": "Executed successfully",
+    "accumulator_root_hash": "",
+    "changes": [],
+    "timestamp": "20",
+    "type": "state_checkpoint_transaction"
   }
 ]

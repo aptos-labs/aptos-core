@@ -4,7 +4,6 @@ export * from "./hex_string";
 export * from "./aptos_client";
 export * from "./faucet_client";
 export * from "./token_client";
+export * from "./transaction_builder";
 export * as TokenTypes from "./token_types";
 export * as Types from "./generated/index";
-export * as TransactionBuilder from "./transaction_builder";
-export * as TxnBuilderTypes from "./transaction_builder/aptos_types";

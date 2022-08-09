@@ -23,6 +23,7 @@ impl Test for StateSyncPerformance {
 
 impl NetworkTest for StateSyncPerformance {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+        let runtime = Runtime::new().unwrap();
         let mut rng = StdRng::from_seed(OsRng.gen());
         let duration = Duration::from_secs(30);
         let all_validators = ctx
@@ -38,7 +39,7 @@ impl NetworkTest for StateSyncPerformance {
 
         // 1. pick one fullnode to stop
         let fullnode_id = all_fullnodes.iter().choose(&mut rng).unwrap();
-        ctx.swarm().full_node_mut(*fullnode_id).unwrap().stop()?;
+        runtime.block_on(ctx.swarm().full_node_mut(*fullnode_id).unwrap().stop())?;
 
         // 2. emit txn to validators
         generate_traffic(ctx, &all_validators, duration, 1)?;
@@ -65,7 +66,6 @@ impl NetworkTest for StateSyncPerformance {
         // do data cleanup
         fullnode.clear_storage()?;
         println!("The fullnode is going to restart");
-        let runtime = Runtime::new().unwrap();
         runtime.block_on(fullnode.start())?;
         println!(
             "The fullnode is now up. Waiting for it to state sync to the expected version: {}",

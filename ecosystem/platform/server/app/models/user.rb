@@ -29,6 +29,7 @@ class User < ApplicationRecord
   has_one :it2_survey, dependent: :destroy
   has_one :it3_profile, dependent: :destroy
   has_one :it3_survey, dependent: :destroy
+  has_many :notifications, as: :recipient
 
   before_save :maybe_enqueue_forum_sync
 

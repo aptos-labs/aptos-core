@@ -37,6 +37,10 @@ impl NewBlockEvent {
         self.round
     }
 
+    pub fn height(&self) -> u64 {
+        self.height
+    }
+
     pub fn previous_block_votes(&self) -> &Vec<bool> {
         &self.previous_block_votes
     }
@@ -60,7 +64,6 @@ impl NewBlockEvent {
         bcs::from_bytes(bytes).map_err(Into::into)
     }
 
-    #[cfg(any(test, feature = "fuzzing"))]
     pub fn new(
         epoch: u64,
         round: u64,

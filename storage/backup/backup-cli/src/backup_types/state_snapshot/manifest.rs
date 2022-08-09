@@ -31,6 +31,8 @@ pub struct StateSnapshotChunk {
 pub struct StateSnapshotBackup {
     /// Version at which this state snapshot is taken.
     pub version: Version,
+    /// Epoch in which this state snapshot is taken.
+    pub epoch: u64,
     /// Hash of the state tree root.
     pub root_hash: HashValue,
     /// All account blobs in chunks.

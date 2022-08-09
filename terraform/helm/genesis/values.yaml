@@ -3,15 +3,16 @@ chain:
   era: 1
   chain_id: 4
   root_key: '0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956'
-  min_stake: 0
-  max_stake: 100000
-  epoch_duration_secs: 86400 # 1 day
-  recurring_lockup_duration_secs: 86400 # 1 day
-  # instead of specifying "initial_lockup_timestamp", just take the delta between
-  # the current timestamp
-  initial_lockup_duration: 1d
-  min_price_per_gas_unit: 1
   allow_new_validators: false
+  epoch_duration_secs: 86400 # 1 day
+  min_price_per_gas_unit: 1
+  min_stake: 0
+  min_voting_threshold: 0
+  max_stake: 100000000000000000 # 1B APTOS coins with 8 decimals
+  recurring_lockup_duration_secs: 86400 # 1 day
+  required_proposer_stake: 100000000000 # 1M APTOS coins with 8 decimals
+  rewards_apy_percentage: 10
+  voting_duration_secs: 43200 # 12 hours
 
 imageTag: testnet
 

@@ -6,7 +6,7 @@ import type { Address } from '../models/Address';
 import type { IdentifierWrapper } from '../models/IdentifierWrapper';
 import type { MoveModuleBytecode } from '../models/MoveModuleBytecode';
 import type { MoveResource } from '../models/MoveResource';
-import type { MoveStructTagParam } from '../models/MoveStructTagParam';
+import type { MoveStructTag } from '../models/MoveStructTag';
 import type { U64 } from '../models/U64';
 
 import type { CancelablePromise } from '../core/CancelablePromise';
@@ -115,7 +115,7 @@ export class AccountsService {
      */
     public getAccountResource(
         address: Address,
-        resourceType: MoveStructTagParam,
+        resourceType: MoveStructTag,
         ledgerVersion?: U64,
     ): CancelablePromise<MoveResource> {
         return this.httpRequest.request({
