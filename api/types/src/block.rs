@@ -1,7 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::HashValue;
+use crate::{HashValue, Transaction};
+use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 
 // TODO: Consider including this in the API.
@@ -16,4 +17,12 @@ pub struct BlockInfo {
     pub start_version: u64,
     pub end_version: u64,
     pub num_transactions: u16,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Object)]
+pub struct Block {
+    pub block_height: u64,
+    pub block_hash: HashValue,
+    pub block_timestamp: u64,
+    pub transactions: Vec<Transaction>,
 }

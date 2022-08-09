@@ -7,6 +7,7 @@ mod accept_type;
 mod accounts;
 mod basic;
 mod bcs_payload;
+mod blocks;
 mod check_size;
 mod error_converter;
 mod events;
@@ -22,6 +23,8 @@ mod transactions;
 pub enum ApiTags {
     /// Access to account resources and modules
     Accounts,
+    /// Access to blocks
+    Blocks,
 
     /// Access to events
     Events,
@@ -39,6 +42,7 @@ pub enum ApiTags {
 pub use accept_type::AcceptType;
 pub use accounts::AccountsApi;
 pub use basic::BasicApi;
+pub use blocks::BlocksApi;
 pub use events::EventsApi;
 pub use index::IndexApi;
 pub use log::middleware_log;
