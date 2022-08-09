@@ -377,13 +377,7 @@ impl Transactions {
     pub fn list(self, page: Page, accept_type: AcceptType) -> Result<impl Reply, Error> {
         let ledger_version = self.ledger_info.version();
         let limit = page.limit()?;
-        let last_page_start = if ledger_version > (limit as u64) {
-            ledger_version - (limit as u64)
-        } else {
-            0
-        };
-        let start_version = page.start(last_page_start, ledger_version)?;
-
+        let start_version = page.compute_start(limit, ledger_version)?;
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)?;

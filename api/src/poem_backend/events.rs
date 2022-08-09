@@ -87,13 +87,14 @@ impl EventsApi {
         event_key: EventKey,
     ) -> BasicResultWith404<Vec<VersionedEvent>> {
         let latest_ledger_info = self.context.get_latest_ledger_info_poem()?;
+        let ledger_version = latest_ledger_info.version();
         let events = self
             .context
             .get_events(
                 &event_key.into(),
-                page.start(0, u64::MAX)?,
+                page.start_option(),
                 page.limit()?,
-                latest_ledger_info.version(),
+                ledger_version,
             )
             // TODO: Previously this was a 500, but I'm making this a 400. I suspect
             // both could be true depending on the error. Make this more specific.
