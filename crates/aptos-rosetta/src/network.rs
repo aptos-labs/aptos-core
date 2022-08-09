@@ -147,12 +147,10 @@ async fn network_status(
     let state = response.state();
 
     // Get the oldest block
-    let oldest_block_identifier = if let Some(version) = state.oldest_ledger_version {
-        let block_info = block_cache.get_block_info_by_version(version).await?;
-        Some(BlockIdentifier::from_block_info(block_info))
-    } else {
-        None
-    };
+    let oldest_block = block_cache
+        .get_block_info_by_version(state.oldest_ledger_version)
+        .await?;
+    let oldest_block_identifier = Some(BlockIdentifier::from_block_info(oldest_block));
 
     // Get the latest block
     let latest_version = state.version;
