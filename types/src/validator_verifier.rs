@@ -242,9 +242,14 @@ impl ValidatorVerifier {
             .collect();
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter())?;
-        if self.quorum_voting_power == 0 {
-            // This should happen only in case of tests
-            return Ok(());
+        #[cfg(any(test, feature = "fuzzing"))]
+        {
+            if self.quorum_voting_power == 0 {
+                // This should happen only in case of tests.
+                // TODO(skedia): Clean up the test behaviors to not rely on empty signature
+                // verification
+                return Ok(());
+            }
         }
         // Verify the optimistically aggregated signature.
         let pub_keys_to_agg: Vec<&PublicKey> = self
