@@ -13,10 +13,13 @@
  */
 module aptos_framework::aptos_governance {
     use std::error;
-    use aptos_std::event::{Self, EventHandle};
     use std::option;
     use std::signer;
     use std::string::utf8;
+
+    use aptos_std::event::{Self, EventHandle};
+    use aptos_std::simple_map::{Self, SimpleMap};
+    use aptos_std::table::{Self, Table};
 
     use aptos_framework::account::{SignerCapability, create_signer_with_capability};
     use aptos_framework::coin;
@@ -24,7 +27,6 @@ module aptos_framework::aptos_governance {
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
     use aptos_framework::system_addresses;
-    use aptos_std::table::{Self, Table};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::timestamp;
     use aptos_framework::voting;
@@ -36,9 +38,9 @@ module aptos_framework::aptos_governance {
     const EALREADY_VOTED: u64 = 4;
     const ENO_VOTING_POWER: u64 = 5;
 
-    /// Store the SignerCapability of the framework account (0x1) so AptosGovernance can have control over it.
+    /// Store the SignerCapabilities of accounts under the on-chain governance's control.
     struct GovernanceResponsbility has key {
-        signer_cap: SignerCapability,
+        signer_caps: SimpleMap<address, SignerCapability>,
     }
 
     /// Configurations of the AptosGovernance, set during Genesis and can be updated by the same process offered
@@ -46,7 +48,7 @@ module aptos_framework::aptos_governance {
     struct GovernanceConfig has key {
         min_voting_threshold: u128,
         required_proposer_stake: u64,
-        voting_period_secs: u64,
+        voting_duration_secs: u64,
     }
 
     struct RecordKey has copy, drop, store {
@@ -89,16 +91,23 @@ module aptos_framework::aptos_governance {
     struct UpdateConfigEvent has drop, store {
         min_voting_threshold: u128,
         required_proposer_stake: u64,
-        voting_period_secs: u64,
+        voting_duration_secs: u64,
     }
 
     /// Stores the signer capability for 0x1.
     public fun store_signer_cap(
         aptos_framework: &signer,
+        signer_address: address,
         signer_cap: SignerCapability,
-    ) {
+    ) acquires GovernanceResponsbility {
         system_addresses::assert_aptos_framework(aptos_framework);
-        move_to(aptos_framework, GovernanceResponsbility { signer_cap });
+
+        if (!exists<GovernanceResponsbility>(@aptos_framework)) {
+            move_to(aptos_framework, GovernanceResponsbility{ signer_caps: simple_map::create<address, SignerCapability>() });
+        };
+
+        let signer_caps = &mut borrow_global_mut<GovernanceResponsbility>(@aptos_framework).signer_caps;
+        simple_map::add(signer_caps, signer_address, signer_cap);
     }
 
     /// Initializes the state for Aptos Governance. Can only be called during Genesis with a signer
@@ -108,13 +117,13 @@ module aptos_framework::aptos_governance {
         aptos_framework: &signer,
         min_voting_threshold: u128,
         required_proposer_stake: u64,
-        voting_period_secs: u64,
+        voting_duration_secs: u64,
     ) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         voting::register<GovernanceProposal>(aptos_framework);
         move_to(aptos_framework, GovernanceConfig {
-            voting_period_secs,
+            voting_duration_secs,
             min_voting_threshold,
             required_proposer_stake,
         });
@@ -134,10 +143,10 @@ module aptos_framework::aptos_governance {
         _proposal: GovernanceProposal,
         min_voting_threshold: u128,
         required_proposer_stake: u64,
-        voting_period_secs: u64,
+        voting_duration_secs: u64,
     ) acquires GovernanceConfig, GovernanceEvents {
         let governance_config = borrow_global_mut<GovernanceConfig>(@aptos_framework);
-        governance_config.voting_period_secs = voting_period_secs;
+        governance_config.voting_duration_secs = voting_duration_secs;
         governance_config.min_voting_threshold = min_voting_threshold;
         governance_config.required_proposer_stake = required_proposer_stake;
 
@@ -147,7 +156,7 @@ module aptos_framework::aptos_governance {
             UpdateConfigEvent {
                 min_voting_threshold,
                 required_proposer_stake,
-                voting_period_secs
+                voting_duration_secs
             },
         );
     }
@@ -175,7 +184,7 @@ module aptos_framework::aptos_governance {
 
         // The proposer's stake needs to be locked up at least as long as the proposal's voting period.
         let current_time = timestamp::now_seconds();
-        let proposal_expiration = current_time + governance_config.voting_period_secs;
+        let proposal_expiration = current_time + governance_config.voting_duration_secs;
         assert!(
             stake::get_lockup_secs(stake_pool) >= proposal_expiration,
             error::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
@@ -230,6 +239,17 @@ module aptos_framework::aptos_governance {
         let voter_address = signer::address_of(voter);
         assert!(stake::get_delegated_voter(stake_pool) == voter_address, error::invalid_argument(ENOT_DELEGATED_VOTER));
 
+        // Ensure the voter doesn't double vote with the same stake pool.
+        let voting_records = borrow_global_mut<VotingRecords>(@aptos_framework);
+        let record_key = RecordKey {
+            stake_pool,
+            proposal_id,
+        };
+        assert!(
+            !table::contains(&voting_records.votes, record_key),
+            error::invalid_argument(EALREADY_VOTED));
+        table::add(&mut voting_records.votes, record_key, true);
+
         // Voting power does not include pending_active or pending_inactive balances.
         // In general, the stake pool should not have pending_inactive balance if it still has lockup (required to vote)
         // And if pending_active will be added to active in the next epoch.
@@ -243,17 +263,6 @@ module aptos_framework::aptos_governance {
             stake::get_lockup_secs(stake_pool) >= proposal_expiration,
             error::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
         );
-
-        // Ensure the voter doesn't double vote.
-        let voting_records = borrow_global_mut<VotingRecords>(@aptos_framework);
-        let record_key = RecordKey {
-            stake_pool,
-            proposal_id,
-        };
-        assert!(
-            !table::contains(&voting_records.votes, record_key),
-            error::invalid_argument(EALREADY_VOTED));
-        table::add(&mut voting_records.votes, record_key, true);
 
         voting::vote<GovernanceProposal>(
             &governance_proposal::create_empty_proposal(),
@@ -277,9 +286,10 @@ module aptos_framework::aptos_governance {
     }
 
     /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
-    public fun get_framework_signer(_proposal: GovernanceProposal): signer acquires GovernanceResponsbility {
+    public fun get_signer(_proposal: GovernanceProposal, signer_address: address): signer acquires GovernanceResponsbility {
         let governance_responsibility = borrow_global<GovernanceResponsbility>(@aptos_framework);
-        create_signer_with_capability(&governance_responsibility.signer_cap)
+        let signer_cap = simple_map::borrow(&governance_responsibility.signer_caps, &signer_address);
+        create_signer_with_capability(signer_cap)
     }
 
     /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.

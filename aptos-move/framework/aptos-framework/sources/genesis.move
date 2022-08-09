@@ -62,7 +62,7 @@ module aptos_framework::genesis {
         );
 
         // Give the decentralized on-chain governance control over the core framework account.
-        aptos_governance::store_signer_cap(&aptos_framework_account, framework_signer_cap);
+        aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, framework_signer_cap);
 
         // Consensus config setup
         consensus_config::initialize(&aptos_framework_account);

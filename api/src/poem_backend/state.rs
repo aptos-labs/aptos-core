@@ -11,8 +11,8 @@ use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag, MoveStructTagParam,
-    MoveValue, TableItemRequest, TransactionId, U128, U64,
+    Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag, MoveValue,
+    TableItemRequest, TransactionId, U128, U64,
 };
 use aptos_api_types::{LedgerInfo, MoveResource};
 use aptos_state_view::StateView;
@@ -53,7 +53,7 @@ impl StateApi {
         &self,
         accept_type: AcceptType,
         address: Path<Address>,
-        resource_type: Path<MoveStructTagParam>,
+        resource_type: Path<MoveStructTag>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveResource> {
         fail_point_poem("endpoint_get_account_resource")?;
@@ -147,10 +147,9 @@ impl StateApi {
         &self,
         accept_type: &AcceptType,
         address: Address,
-        resource_type: MoveStructTagParam,
+        resource_type: MoveStructTag,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveResource> {
-        let resource_type: MoveStructTag = resource_type.into();
         let resource_type: StructTag = resource_type
             .try_into()
             .context("Failed to parse given resource type")

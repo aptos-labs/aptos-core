@@ -14,7 +14,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 600,
+            gas_used: 1,
             status: Keep(
                 MiscellaneousError(
                     Some(

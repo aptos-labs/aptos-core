@@ -13,7 +13,9 @@ use std::fmt::Debug;
 /// It creates a worker thread on construction and joins it on destruction. When destructed, it
 /// quits the worker thread eagerly without waiting for all pending work to be done.
 pub trait PrunerManager: Debug + Sync {
-    fn get_pruner_window(&self) -> Option<Version>;
+    fn is_pruner_enabled(&self) -> bool;
+
+    fn get_pruner_window(&self) -> Version;
 
     fn get_min_readable_version(&self) -> Version;
 

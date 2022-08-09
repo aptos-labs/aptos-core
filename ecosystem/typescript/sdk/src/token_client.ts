@@ -1,12 +1,11 @@
-import isEqual from "lodash/isEqual";
-
 import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
 import * as TokenTypes from "./token_types";
 import * as Gen from "./generated/index";
 import { HexString, MaybeHexString } from "./hex_string";
+import { BCS, TxnBuilderTypes } from "./transaction_builder";
+import { MAX_U64_BIG_INT } from "./transaction_builder/bcs/consts";
 
-const NUMBER_MAX: number = 9007199254740991;
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
  */
@@ -27,14 +26,26 @@ export class TokenClient {
    * @param payload Transaction payload. It depends on transaction type you want to send
    * @returns Promise that resolves to transaction hash
    */
-  async submitTransactionHelper(account: AptosAccount, payload: Gen.TransactionPayload) {
-    const txnRequest = await this.aptosClient.generateTransaction(account.address(), payload, {
-      max_gas_amount: "500000",
-    });
-    const signedTxn = await this.aptosClient.signTransaction(account, txnRequest);
-    const res = await this.aptosClient.submitTransaction(signedTxn);
-    await this.aptosClient.waitForTransaction(res.hash);
-    return Promise.resolve(res.hash);
+  async submitTransactionHelper(account: AptosAccount, payload: TxnBuilderTypes.TransactionPayload) {
+    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
+      this.aptosClient.getAccount(account.address()),
+      this.aptosClient.getChainId(),
+    ]);
+
+    const rawTxn = new TxnBuilderTypes.RawTransaction(
+      TxnBuilderTypes.AccountAddress.fromHex(account.address()),
+      BigInt(sequnceNumber),
+      payload,
+      500000n,
+      1n,
+      BigInt(Math.floor(Date.now() / 1000) + 20),
+      new TxnBuilderTypes.ChainId(chainId),
+    );
+
+    const bcsTxn = AptosClient.generateBCSTransaction(account, rawTxn);
+    const transactionRes = await this.aptosClient.submitSignedBCSTransaction(bcsTxn);
+
+    return transactionRes.hash;
   }
 
   /**
@@ -43,29 +54,32 @@ export class TokenClient {
    * @param name Collection name
    * @param description Collection description
    * @param uri URL to additional info about collection
+   * @param maxAmount Maximum number of `token_data` allowed within this collection
    * @returns A hash of transaction
    */
-  async createCollection(account: AptosAccount, name: string, description: string, uri: string): Promise<string> {
-    const payload: Gen.TransactionPayload = {
-      type: "script_function_payload",
-      function: {
-        module: {
-          address: "0x3",
-          name: "token",
-        },
-        name: "create_collection_script",
-      },
-      type_arguments: [],
-      arguments: [
-        Buffer.from(name).toString("hex"),
-        Buffer.from(description).toString("hex"),
-        Buffer.from(uri).toString("hex"),
-        NUMBER_MAX.toString(),
-        [false, false, false],
-      ],
-    };
-    const transactionHash = await this.submitTransactionHelper(account, payload);
-    return transactionHash;
+  async createCollection(
+    account: AptosAccount,
+    name: string,
+    description: string,
+    uri: string,
+    maxAmount: BCS.AnyNumber = MAX_U64_BIG_INT,
+  ): Promise<string> {
+    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+      TxnBuilderTypes.ScriptFunction.natural(
+        "0x3::token",
+        "create_collection_script",
+        [],
+        [
+          BCS.bcsSerializeStr(name),
+          BCS.bcsSerializeStr(description),
+          BCS.bcsSerializeStr(uri),
+          BCS.bcsSerializeUint64(maxAmount),
+          BCS.serializeVectorWithFunc([false, false, false], "serializeBool"),
+        ],
+      ),
+    );
+
+    return this.submitTransactionHelper(account, payload);
   }
 
   /**
@@ -76,6 +90,7 @@ export class TokenClient {
    * @param description Token description
    * @param supply Token supply
    * @param uri URL to additional info about token
+   * @param max The maxium of tokens can be minted from this token
    * @param royalty_payee_address the address to receive the royalty, the address can be a shared account address.
    * @param royalty_points_denominator the denominator for calculating royalty
    * @param royalty_points_numerator the numerator for calculating royalty
@@ -91,6 +106,7 @@ export class TokenClient {
     description: string,
     supply: number,
     uri: string,
+    max: BCS.AnyNumber = MAX_U64_BIG_INT,
     royalty_payee_address: MaybeHexString = account.address(),
     royalty_points_denominator: number = 0,
     royalty_points_numerator: number = 0,
@@ -98,34 +114,30 @@ export class TokenClient {
     property_values: Array<string> = [],
     property_types: Array<string> = [],
   ): Promise<Gen.HexEncodedBytes> {
-    const payload: Gen.TransactionPayload = {
-      type: "script_function_payload",
-      function: {
-        module: {
-          address: "0x3",
-          name: "token",
-        },
-        name: "create_token_script",
-      },
-      type_arguments: [],
-      arguments: [
-        Buffer.from(collectionName).toString("hex"),
-        Buffer.from(name).toString("hex"),
-        Buffer.from(description).toString("hex"),
-        supply.toString(),
-        NUMBER_MAX.toString(),
-        Buffer.from(uri).toString("hex"),
-        royalty_payee_address.toString(),
-        royalty_points_denominator.toString(),
-        royalty_points_numerator.toString(),
-        [false, false, false, false, false],
-        property_keys.map((key) => Buffer.from(key).toString("hex")),
-        property_values.map((val) => Buffer.from(val).toString("hex")),
-        property_types.map((typ) => Buffer.from(typ).toString("hex")),
-      ],
-    };
-    const transactionHash = await this.submitTransactionHelper(account, payload);
-    return transactionHash;
+    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+      TxnBuilderTypes.ScriptFunction.natural(
+        "0x3::token",
+        "create_token_script",
+        [],
+        [
+          BCS.bcsSerializeStr(collectionName),
+          BCS.bcsSerializeStr(name),
+          BCS.bcsSerializeStr(description),
+          BCS.bcsSerializeUint64(supply),
+          BCS.bcsSerializeUint64(max),
+          BCS.bcsSerializeStr(uri),
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(royalty_payee_address)),
+          BCS.bcsSerializeUint64(royalty_points_denominator),
+          BCS.bcsSerializeUint64(royalty_points_numerator),
+          BCS.serializeVectorWithFunc([false, false, false, false, false], "serializeBool"),
+          BCS.serializeVectorWithFunc(property_keys, "serializeStr"),
+          BCS.serializeVectorWithFunc(property_values, "serializeStr"),
+          BCS.serializeVectorWithFunc(property_types, "serializeStr"),
+        ],
+      ),
+    );
+
+    return this.submitTransactionHelper(account, payload);
   }
 
   /**
@@ -148,27 +160,23 @@ export class TokenClient {
     amount: number,
     property_version: number = 0,
   ): Promise<string> {
-    const payload: Gen.TransactionPayload = {
-      type: "script_function_payload",
-      function: {
-        module: {
-          address: "0x3",
-          name: "token_transfers",
-        },
-        name: "offer_script",
-      },
-      type_arguments: [],
-      arguments: [
-        receiver,
-        creator,
-        Buffer.from(collectionName).toString("hex"),
-        Buffer.from(name).toString("hex"),
-        property_version.toString(),
-        amount.toString(),
-      ],
-    };
-    const transactionHash = await this.submitTransactionHelper(account, payload);
-    return transactionHash;
+    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+      TxnBuilderTypes.ScriptFunction.natural(
+        "0x3::token_transfers",
+        "offer_script",
+        [],
+        [
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver)),
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(creator)),
+          BCS.bcsSerializeStr(collectionName),
+          BCS.bcsSerializeStr(name),
+          BCS.bcsSerializeUint64(property_version),
+          BCS.bcsSerializeUint64(amount),
+        ],
+      ),
+    );
+
+    return this.submitTransactionHelper(account, payload);
   }
 
   /**
@@ -189,26 +197,22 @@ export class TokenClient {
     name: string,
     property_version: number = 0,
   ): Promise<string> {
-    const payload: Gen.TransactionPayload = {
-      type: "script_function_payload",
-      function: {
-        module: {
-          address: "0x3",
-          name: "token_transfers",
-        },
-        name: "claim_script",
-      },
-      type_arguments: [],
-      arguments: [
-        sender,
-        creator,
-        Buffer.from(collectionName).toString("hex"),
-        Buffer.from(name).toString("hex"),
-        property_version.toString(),
-      ],
-    };
-    const transactionHash = await this.submitTransactionHelper(account, payload);
-    return transactionHash;
+    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+      TxnBuilderTypes.ScriptFunction.natural(
+        "0x3::token_transfers",
+        "claim_script",
+        [],
+        [
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(sender)),
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(creator)),
+          BCS.bcsSerializeStr(collectionName),
+          BCS.bcsSerializeStr(name),
+          BCS.bcsSerializeUint64(property_version),
+        ],
+      ),
+    );
+
+    return this.submitTransactionHelper(account, payload);
   }
 
   /**
@@ -229,26 +233,22 @@ export class TokenClient {
     name: string,
     property_version: number = 0,
   ): Promise<string> {
-    const payload: Gen.TransactionPayload = {
-      type: "script_function_payload",
-      function: {
-        module: {
-          address: "0x3",
-          name: "token_transfers",
-        },
-        name: "cancel_offer_script",
-      },
-      type_arguments: [],
-      arguments: [
-        receiver,
-        creator,
-        Buffer.from(collectionName).toString("hex"),
-        Buffer.from(name).toString("hex"),
-        property_version.toString(),
-      ],
-    };
-    const transactionHash = await this.submitTransactionHelper(account, payload);
-    return transactionHash;
+    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+      TxnBuilderTypes.ScriptFunction.natural(
+        "0x3::token_transfers",
+        "cancel_offer_script",
+        [],
+        [
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver)),
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(creator)),
+          BCS.bcsSerializeStr(collectionName),
+          BCS.bcsSerializeStr(name),
+          BCS.bcsSerializeUint64(property_version),
+        ],
+      ),
+    );
+
+    return this.submitTransactionHelper(account, payload);
   }
 
   /**
@@ -273,19 +273,14 @@ export class TokenClient {
    */
   async getCollectionData(creator: MaybeHexString, collectionName: string): Promise<any> {
     const resources = await this.aptosClient.getAccountResources(creator);
-    const accountResource: { type: Gen.MoveStructTag; data: any } = resources.find((r) =>
-      isEqual(r.type, {
-        address: "0x3",
-        module: "token",
-        name: "Collections",
-        generic_type_params: [],
-      }),
+    const accountResource: { type: Gen.MoveStructTag; data: any } = resources.find(
+      (r) => r.type === "0x3::token::Collections",
     )!;
     const { handle }: { handle: string } = accountResource.data.collection_data;
     const getCollectionTableItemRequest: Gen.TableItemRequest = {
       key_type: "0x1::string::String",
       value_type: "0x3::token::CollectionData",
-      key: Buffer.from(collectionName).toString("hex"),
+      key: collectionName,
     };
 
     const collectionTable = await this.aptosClient.getTableItem(handle, getCollectionTableItemRequest);
@@ -320,17 +315,15 @@ export class TokenClient {
     collectionName: string,
     tokenName: string,
   ): Promise<TokenTypes.TokenData> {
-    const collection: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(creator, {
-      address: "0x3",
-      module: "token",
-      name: "Collections",
-      generic_type_params: [],
-    });
+    const collection: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(
+      creator,
+      "0x3::token::Collections",
+    );
     const { handle } = collection.data.token_data;
     const tokenDataId = {
       creator,
-      collection: Buffer.from(collectionName).toString("hex"),
-      name: Buffer.from(tokenName).toString("hex"),
+      collection: collectionName,
+      name: tokenName,
     };
 
     const getTokenTableItemRequest: Gen.TableItemRequest = {
@@ -355,8 +348,8 @@ export class TokenClient {
   ): Promise<TokenTypes.Token> {
     const tokenDataId: TokenTypes.TokenDataId = {
       creator: creator instanceof HexString ? creator.hex() : creator,
-      collection: Buffer.from(collectionName).toString("hex"),
-      name: Buffer.from(tokenName).toString("hex"),
+      collection: collectionName,
+      name: tokenName,
     };
     return this.getTokenBalanceForAccount(creator, {
       token_data_id: tokenDataId,
@@ -388,12 +381,10 @@ export class TokenClient {
    * ```
    */
   async getTokenBalanceForAccount(account: MaybeHexString, tokenId: TokenTypes.TokenId): Promise<TokenTypes.Token> {
-    const tokenStore: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(account, {
-      address: "0x3",
-      module: "token",
-      name: "TokenStore",
-      generic_type_params: [],
-    });
+    const tokenStore: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(
+      account,
+      "0x3::token::TokenStore",
+    );
     const { handle } = tokenStore.data.tokens;
 
     const getTokenTableItemRequest: Gen.TableItemRequest = {

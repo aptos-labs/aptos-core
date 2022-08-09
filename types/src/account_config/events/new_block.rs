@@ -37,6 +37,10 @@ impl NewBlockEvent {
         self.round
     }
 
+    pub fn height(&self) -> u64 {
+        self.height
+    }
+
     pub fn previous_block_votes(&self) -> &Vec<bool> {
         &self.previous_block_votes
     }
@@ -91,7 +95,7 @@ pub fn new_block_event_key() -> EventKey {
     EventKey::new(2, CORE_CODE_ADDRESS)
 }
 
-/// The path to the new block event handle under a Block::BlockMetadata resource.
+/// The path to the new block event handle under a Block::BlockResource resource.
 pub static NEW_BLOCK_EVENT_PATH: Lazy<Vec<u8>> = Lazy::new(|| {
     let mut path = BlockResource::resource_path();
     // it can be anything as long as it's referenced in AccountState::get_event_handle_by_query_path
@@ -99,7 +103,7 @@ pub static NEW_BLOCK_EVENT_PATH: Lazy<Vec<u8>> = Lazy::new(|| {
     path
 });
 
-/// Should be kept in-sync with BlockMetadata move struct in block.move.
+/// Should be kept in-sync with BlockResource move struct in block.move.
 #[derive(Deserialize, Serialize)]
 pub struct BlockResource {
     height: u64,
@@ -119,7 +123,7 @@ impl BlockResource {
 
 impl MoveStructType for BlockResource {
     const MODULE_NAME: &'static IdentStr = ident_str!("block");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("BlockMetadata");
+    const STRUCT_NAME: &'static IdentStr = ident_str!("BlockResource");
 }
 
 impl MoveResource for BlockResource {}

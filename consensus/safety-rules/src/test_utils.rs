@@ -7,6 +7,9 @@ use crate::{
 };
 use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
 use aptos_secure_storage::{InMemoryStorage, Storage};
+use aptos_types::ledger_info::LedgerInfoWithPartialSignatures;
+use aptos_types::multi_signature::{MultiSignature, PartialSignatures};
+use aptos_types::validator_verifier::generate_validator_verifier;
 use aptos_types::{
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
@@ -27,7 +30,6 @@ use consensus_types::{
     vote_data::VoteData,
     vote_proposal::VoteProposal,
 };
-use std::collections::BTreeMap;
 
 pub type Proof = AccumulatorExtensionProof<TransactionAccumulatorHasher>;
 
@@ -42,7 +44,7 @@ pub fn make_genesis(signer: &ValidatorSigner) -> (EpochChangeProof, QuorumCert) 
     let li = LedgerInfo::mock_genesis(Some(validator_set));
     let block = Block::make_genesis_block_from_ledger_info(&li);
     let qc = QuorumCert::certificate_for_genesis_from_ledger_info(&li, block.id());
-    let lis = LedgerInfoWithSignatures::new(li, BTreeMap::new());
+    let lis = LedgerInfoWithSignatures::new(li, MultiSignature::empty());
     let proof = EpochChangeProof::new(vec![lis], false);
     (proof, qc)
 }
@@ -162,12 +164,19 @@ pub fn make_proposal_with_parent_and_overrides(
         validator_signer,
     );
 
-    let mut ledger_info_with_signatures =
-        LedgerInfoWithSignatures::new(vote.ledger_info().clone(), BTreeMap::new());
+    let mut ledger_info_with_signatures = LedgerInfoWithPartialSignatures::new(
+        vote.ledger_info().clone(),
+        PartialSignatures::empty(),
+    );
 
     ledger_info_with_signatures.add_signature(vote.author(), vote.signature().clone());
 
-    let qc = QuorumCert::new(vote_data, ledger_info_with_signatures);
+    let qc = QuorumCert::new(
+        vote_data,
+        ledger_info_with_signatures
+            .aggregate_signatures(&generate_validator_verifier(&[validator_signer.clone()]))
+            .unwrap(),
+    );
 
     make_proposal_with_qc_and_proof(payload, round, proof, qc, validator_signer)
 }

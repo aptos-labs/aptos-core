@@ -358,16 +358,20 @@ fn write_yaml<T: Serialize>(path: &Path, object: &T) -> anyhow::Result<()> {
 const ONE_DAY: u64 = 86400;
 
 #[derive(Clone)]
-pub struct GenesisConfigurations {
+pub struct GenesisConfiguration {
+    pub allow_new_validators: bool,
     pub epoch_duration_secs: u64,
     pub min_stake: u64,
     pub max_stake: u64,
+    pub min_voting_threshold: u128,
     pub recurring_lockup_duration_secs: u64,
-    pub allow_new_validators: bool,
+    pub required_proposer_stake: u64,
+    pub rewards_apy_percentage: u64,
+    pub voting_duration_secs: u64,
 }
 
 pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut u64) + Send + Sync>;
-pub type InitGenesisConfigFn = Arc<dyn Fn(&mut GenesisConfigurations) + Send + Sync>;
+pub type InitGenesisConfigFn = Arc<dyn Fn(&mut GenesisConfiguration) + Send + Sync>;
 
 /// Builder that builds a network of validator nodes that can run locally
 #[derive(Clone)]
@@ -542,12 +546,16 @@ impl Builder {
             configs.push(validator.try_into()?);
         }
 
-        let mut genesis_config = GenesisConfigurations {
+        let mut genesis_config = GenesisConfiguration {
             allow_new_validators: false,
+            epoch_duration_secs: ONE_DAY,
             min_stake: 0,
+            min_voting_threshold: 0,
             max_stake: u64::MAX,
             recurring_lockup_duration_secs: ONE_DAY,
-            epoch_duration_secs: ONE_DAY,
+            required_proposer_stake: 0,
+            rewards_apy_percentage: 10,
+            voting_duration_secs: ONE_DAY / 24,
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
             (init_genesis_config)(&mut genesis_config);
@@ -560,10 +568,14 @@ impl Builder {
             configs,
             self.move_modules.clone(),
             genesis_config.allow_new_validators,
+            genesis_config.epoch_duration_secs,
             genesis_config.min_stake,
+            genesis_config.min_voting_threshold,
             genesis_config.max_stake,
             genesis_config.recurring_lockup_duration_secs,
-            genesis_config.epoch_duration_secs,
+            genesis_config.required_proposer_stake,
+            genesis_config.rewards_apy_percentage,
+            genesis_config.voting_duration_secs,
         )?;
         let waypoint = genesis_info.generate_waypoint()?;
         let genesis = genesis_info.get_genesis();

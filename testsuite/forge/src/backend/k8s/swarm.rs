@@ -353,6 +353,7 @@ fn get_k8s_node_from_stateful_set(
         rest_api_port = get_free_port();
     }
     let index = parse_node_index(stateful_set_name).expect("error to parse node index");
+    let node_type = parse_node_type(stateful_set_name);
 
     // Extract the image tag from the StatefulSet spec
     let image_tag = sts
@@ -371,7 +372,7 @@ fn get_k8s_node_from_stateful_set(
         .collect::<Vec<&str>>()[1];
 
     K8sNode {
-        name: stateful_set_name.clone(),
+        name: format!("{}-{}", &node_type, index),
         stateful_set_name: stateful_set_name.clone(),
         // TODO: fetch this from running node
         peer_id: PeerId::random(),
@@ -423,6 +424,14 @@ pub(crate) async fn get_fullnodes(
     Ok(fullnodes)
 }
 
+/// Given a string like the StatefulSet name or Service name, parse the node type,
+/// whether it's a validator or fullnode
+fn parse_node_type(s: &str) -> String {
+    let re = Regex::new(r"(validator|fullnode)").unwrap();
+    let cap = re.captures(s).unwrap();
+    cap[1].to_string()
+}
+
 // gets the node index based on its associated statefulset name
 // e.g. aptos-node-<idx>-validator
 // e.g. aptos-node-<idx>-fullnode-e<era>
@@ -451,17 +460,16 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
         let node_name = node.name().to_string();
         let check = aptos_retrier::retry_async(k8s_wait_nodes_strategy(), || {
             Box::pin(async move {
-                info!("Attempting health check: {:?}", node);
                 match node.rest_client().get_ledger_information().await {
                     Ok(res) => {
                         let version = res.inner().version;
-                        info!("Node {} @ version {}", node.name(), version);
                         // ensure a threshold liveness for each node
                         // we want to guarantee node is making progress without spinning too long
                         if version > 100 {
                             info!("Node {} healthy @ version {} > 100", node.name(), version);
                             return Ok(());
                         }
+                        info!("Node {} @ version {}", node.name(), version);
                         bail!(
                             "Node {} unhealthy: REST API returned version 0",
                             node.name()

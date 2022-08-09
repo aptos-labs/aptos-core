@@ -956,29 +956,33 @@ impl StorageReader {
         latest_version: Version,
         transactions_range: &Option<CompleteDataRange<Version>>,
     ) -> Result<Option<CompleteDataRange<Version>>, Error> {
+        let pruner_enabled = self
+            .storage
+            .is_state_pruner_enabled()
+            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+        if !pruner_enabled {
+            return Ok(*transactions_range);
+        }
         let pruning_window = self
             .storage
             .get_state_prune_window()
-            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?
-            .map(|window| window as u64);
-        if let Some(pruning_window) = pruning_window {
-            if latest_version > pruning_window {
-                // lowest_state_version = latest_version - pruning_window + 1;
-                let mut lowest_state_version =
-                    latest_version.checked_sub(pruning_window).ok_or_else(|| {
-                        Error::UnexpectedErrorEncountered(
-                            "Lowest state version has overflown!".into(),
-                        )
-                    })?;
-                lowest_state_version = lowest_state_version.checked_add(1).ok_or_else(|| {
+            .map_err(|error| Error::StorageErrorEncountered(error.to_string()))?;
+
+        if latest_version > pruning_window as Version {
+            // lowest_state_version = latest_version - pruning_window + 1;
+            let mut lowest_state_version = latest_version
+                .checked_sub(pruning_window as Version)
+                .ok_or_else(|| {
                     Error::UnexpectedErrorEncountered("Lowest state version has overflown!".into())
                 })?;
+            lowest_state_version = lowest_state_version.checked_add(1).ok_or_else(|| {
+                Error::UnexpectedErrorEncountered("Lowest state version has overflown!".into())
+            })?;
 
-                // Create the state range
-                let state_range = CompleteDataRange::new(lowest_state_version, latest_version)
-                    .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
-                return Ok(Some(state_range));
-            }
+            // Create the state range
+            let state_range = CompleteDataRange::new(lowest_state_version, latest_version)
+                .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?;
+            return Ok(Some(state_range));
         }
 
         // No pruning has occurred. Return the transactions range.
