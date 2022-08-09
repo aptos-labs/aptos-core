@@ -95,7 +95,7 @@ export class TransactionsService {
     ): CancelablePromise<Transaction> {
         return this.httpRequest.request({
             method: 'GET',
-            url: '/transactions/by_hash/{txn_hash}',
+            url: '/transactions/{txn_hash}',
             path: {
                 'txn_hash': txnHash,
             },
