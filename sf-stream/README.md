@@ -74,3 +74,13 @@ When `sf_stream.enabled` is set to `true`, the SF-Stream will be enabled, and tr
    ```
 
    This will generate the requisite .rs files in src/protos directory
+
+5. To test with firehose, we need to build aptos-node
+   ```
+   cd ../aptos-node
+   cargo install --path .
+   ```
+   If necessary, set path to aptos-node
+   ```
+   export PATH={path to directory containing aptos-core repo}:$PATH
+   ```
