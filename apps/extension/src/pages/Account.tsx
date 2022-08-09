@@ -64,7 +64,7 @@ function Account() {
   const transactions = useOtherAccountTransactions(address!);
 
   return (
-    <AuthLayout routePath={PageRoutes.account.routePath}>
+    <AuthLayout routePath={PageRoutes.account.path}>
       <WalletLayout showBackButton>
         <VStack width="100%" paddingTop={8} px={4} spacing={4}>
           <Box w={20}>

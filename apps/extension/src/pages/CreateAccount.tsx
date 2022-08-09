@@ -46,7 +46,7 @@ function CreateAccount() {
         }
 
         createAccountToast();
-        navigate(Routes.wallet.routePath);
+        navigate(Routes.wallet.path);
       } catch (err) {
         createAccountErrorToast();
         // eslint-disable-next-line no-console
@@ -56,10 +56,10 @@ function CreateAccount() {
   };
 
   return (
-    <AuthLayout routePath={PageRoutes.createAccount.routePath}>
+    <AuthLayout routePath={PageRoutes.createAccount.path}>
       <CreateAccountLayout
         headerValue="Create account"
-        backPage={Routes.addAccount.routePath}
+        backPage={Routes.addAccount.path}
         defaultValues={{
           mnemonic: newMnemonic.split(' '),
           mnemonicString: newMnemonic,

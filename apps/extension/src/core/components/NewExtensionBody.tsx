@@ -42,7 +42,7 @@ export default function NewExtensionBody() {
           An Aptos crypto wallet
         </Text>
         <VStack spacing={4}>
-          <ChakraLink to={Routes.createWallet.routePath} width="100%">
+          <ChakraLink to={Routes.createWallet.path} width="100%">
             <Button colorScheme="teal" variant="solid" width="100%">
               Get started
             </Button>

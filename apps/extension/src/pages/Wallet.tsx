@@ -18,7 +18,7 @@ function Wallet() {
   const { faucetClient } = useGlobalStateContext();
 
   return (
-    <AuthLayout routePath={PageRoutes.wallet.routePath}>
+    <AuthLayout routePath={PageRoutes.wallet.path}>
       <WalletLayout>
         <VStack width="100%" paddingTop={8}>
           <WalletAccountBalance />

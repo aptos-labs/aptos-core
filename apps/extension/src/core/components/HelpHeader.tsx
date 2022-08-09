@@ -21,7 +21,7 @@ export default function HelpHeader() {
       bgColor={secondaryHeaderBgColor[colorMode]}
     >
       <Grid templateColumns="32px 1fr 32px" px={4} width="100%" gap={4}>
-        <ChakraLink to={Routes.login.routePath}>
+        <ChakraLink to={Routes.wallet.path}>
           <IconButton size="xs" borderRadius="full" aria-label="go back" icon={<ChevronLeftIcon fontSize="md" />} />
         </ChakraLink>
         <Text

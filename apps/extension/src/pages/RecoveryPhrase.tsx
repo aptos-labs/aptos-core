@@ -13,7 +13,7 @@ import RecoveryPhraseBox from 'core/components/RecoveryPhraseBox';
 
 function RecoveryPhrase() {
   return (
-    <AuthLayout routePath={PageRoutes.recovery_phrase.routePath}>
+    <AuthLayout routePath={PageRoutes.recovery_phrase.path}>
       <WalletLayout showBackButton>
         <VStack width="100%" height="100%" spacing={8} paddingTop={8} paddingStart={8} paddingEnd={8}>
           <Heading fontSize="2xl">Recovery Phrase</Heading>

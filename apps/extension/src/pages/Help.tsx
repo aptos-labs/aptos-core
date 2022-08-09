@@ -14,7 +14,7 @@ import { secondaryBgColor } from 'core/colors';
 function Help() {
   const { colorMode } = useColorMode();
   return (
-    <AuthLayout routePath={PageRoutes.help.routePath}>
+    <AuthLayout routePath={PageRoutes.help.path}>
       <VStack
         bgColor={secondaryBgColor[colorMode]}
         spacing={4}

@@ -41,17 +41,17 @@ export default function ImportAccountPrivateKey() {
       });
 
       importAccountToast();
-      navigate(Routes.wallet.routePath);
+      navigate(Routes.wallet.path);
     } catch (err) {
       importAccountErrorToast();
     }
   }, [addAccount, navigate]);
 
   return (
-    <AuthLayout routePath={PageRoutes.importWalletPrivateKey.routePath}>
+    <AuthLayout routePath={PageRoutes.importWalletPrivateKey.path}>
       <ImportAccountPrivateKeyLayout
         headerValue="Import private key"
-        backPage={Routes.addAccount.routePath}
+        backPage={Routes.addAccount.path}
         defaultValues={{
           privateKey: '',
         }}

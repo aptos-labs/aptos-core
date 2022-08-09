@@ -46,7 +46,7 @@ export default function ImportWalletMnemonic() {
       });
 
       importAccountToast();
-      navigate(Routes.wallet.routePath);
+      navigate(Routes.wallet.path);
     } catch (err) {
       importAccountErrorToast();
       // eslint-disable-next-line no-console
@@ -55,10 +55,10 @@ export default function ImportWalletMnemonic() {
   }, [addAccount, navigate]);
 
   return (
-    <AuthLayout routePath={PageRoutes.importWalletMnemonic.routePath}>
+    <AuthLayout routePath={PageRoutes.importWalletMnemonic.path}>
       <ImportAccountMnemonicLayout
         headerValue="Import mnemonic"
-        backPage={Routes.addAccount.routePath}
+        backPage={Routes.addAccount.path}
         defaultValues={{}}
         onSubmit={onSubmit}
       >

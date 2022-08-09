@@ -12,7 +12,7 @@ import ChakraLink from './ChakraLink';
 export default function AddAccountBody() {
   return (
     <VStack px={4} spacing={4} width="100%" pt={4}>
-      <ChakraLink to={Routes.createAccount.routePath} width="100%">
+      <ChakraLink to={Routes.createAccount.path} width="100%">
         <Button
           width="100%"
           height={16}
@@ -22,7 +22,7 @@ export default function AddAccountBody() {
           Create new account
         </Button>
       </ChakraLink>
-      <ChakraLink to={Routes.importWalletPrivateKey.routePath} width="100%">
+      <ChakraLink to={Routes.importWalletPrivateKey.path} width="100%">
         <Button
           width="100%"
           height={16}
@@ -32,7 +32,7 @@ export default function AddAccountBody() {
           Import private key
         </Button>
       </ChakraLink>
-      <ChakraLink to={Routes.importWalletMnemonic.routePath} width="100%">
+      <ChakraLink to={Routes.importWalletMnemonic.path} width="100%">
         <Button
           width="100%"
           height={16}

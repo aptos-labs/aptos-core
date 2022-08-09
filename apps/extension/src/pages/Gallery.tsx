@@ -28,7 +28,7 @@ function Gallery() {
   } = useGalleryItems();
 
   return (
-    <AuthLayout routePath={PageRoutes.gallery.routePath}>
+    <AuthLayout routePath={PageRoutes.gallery.path}>
       <WalletLayout>
         <VStack width="100%" paddingTop={8} px={4}>
           <Grid pb={4} templateColumns="1fr 72px" width="100%">

@@ -1,6 +1,8 @@
+/* eslint-disable sort-keys-fix/sort-keys-fix,sort-keys */
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import { Navigate } from 'react-router-dom';
 import Account from 'pages/Account';
 import Activity from 'pages/Activity';
 import CreateWallet from 'pages/CreateWallet';
@@ -8,7 +10,7 @@ import Credentials from 'pages/Credentials';
 import Gallery from 'pages/Gallery';
 import Help from 'pages/Help';
 import Network from 'pages/Network';
-import { NavigationPassword } from 'pages/Password';
+import Password from 'pages/Password';
 import Settings from 'pages/Settings';
 import Token from 'pages/Token';
 import Wallet from 'pages/Wallet';
@@ -20,91 +22,125 @@ import AddAccount from 'pages/AddAccount';
 import ImportAccountMnemonic from 'pages/ImportAccountMnemonic';
 import ImportAccountPrivateKey from 'pages/ImportAccountPrivateKey';
 import CreateAccount from 'pages/CreateAccount';
-import LoadState from 'pages/LoadState';
+
+// TODO: have a single representation for routes
 
 export const Routes = Object.freeze({
   account: {
     element: <Account />,
-    routePath: '/accounts/:address',
+    path: '/accounts/:address',
   },
   activity: {
     element: <Activity />,
-    routePath: '/activity',
+    path: '/activity',
   },
   addAccount: {
     element: <AddAccount />,
-    routePath: '/add-account',
+    path: '/add-account',
   },
   createAccount: {
     element: <CreateAccount />,
-    routePath: '/create-account',
+    path: '/create-account',
   },
   createWallet: {
     element: <CreateWallet />,
-    routePath: '/create-wallet',
+    path: '/create-wallet',
   },
   credentials: {
     element: <Credentials />,
-    routePath: '/settings/credentials',
+    path: '/settings/credentials',
   },
   gallery: {
     element: <Gallery />,
-    routePath: '/gallery',
+    path: '/gallery',
   },
   help: {
     element: <Help />,
-    routePath: '/help',
+    path: '/help',
   },
   importWalletMnemonic: {
     element: <ImportAccountMnemonic />,
-    routePath: '/import/mnemonic',
+    path: '/import/mnemonic',
   },
   importWalletPrivateKey: {
     element: <ImportAccountPrivateKey />,
-    routePath: '/import/private-key',
-  },
-  loadState: {
-    element: <LoadState />,
-    routePath: '/load-state',
+    path: '/import/private-key',
   },
   login: {
     element: <NoWallet />,
-    routePath: '/',
+    path: '/',
   },
   network: {
     element: <Network />,
-    routePath: '/settings/network',
+    path: '/settings/network',
   },
   noWallet: {
     element: <NoWallet />,
-    routePath: '/no-wallet',
+    path: '/no-wallet',
   },
   password: {
-    element: <NavigationPassword />,
-    routePath: '/password',
+    element: <Password />,
+    path: '/password',
   },
   recovery_phrase: {
     element: <RecoveryPhrase />,
-    routePath: '/settings/recovery_phrase',
+    path: '/settings/recovery_phrase',
   },
   settings: {
     element: <Settings />,
-    routePath: '/settings',
+    path: '/settings',
   },
   token: {
     element: <Token />,
-    routePath: '/tokens/:id',
+    path: '/tokens/:id',
   },
   transaction: {
     element: <Transaction />,
-    routePath: '/transactions/:version',
+    path: '/transactions/:version',
   },
   wallet: {
     element: <Wallet />,
-    routePath: '/wallet',
+    path: '/wallet',
   },
 } as const);
 
-export type RoutePaths = typeof Routes[keyof typeof Routes]['routePath'];
+export type RoutePaths = typeof Routes[keyof typeof Routes]['path'];
 
 export default Routes;
+
+export const mainRoutes = Object.freeze([
+  Routes.wallet,
+  Routes.gallery,
+  Routes.token,
+  Routes.activity,
+  Routes.transaction,
+  Routes.account,
+  Routes.settings,
+  Routes.credentials,
+  Routes.network,
+  Routes.recovery_phrase,
+  Routes.createAccount,
+  Routes.addAccount,
+  Routes.importWalletMnemonic,
+  Routes.importWalletPrivateKey,
+  Routes.help,
+  // this needs to be here to prevent force redirect on last screen of wallet creation
+  Routes.createWallet,
+  { path: '*', element: <Navigate to={Routes.wallet.path} replace /> },
+]);
+
+export const noAccountsRoutes = Object.freeze([
+  Routes.createAccount,
+  { path: '*', element: <Navigate to={Routes.createAccount.path} replace /> },
+]);
+
+export const lockedWalletRoutes = Object.freeze([
+  Routes.password,
+  { path: '*', element: <Navigate to={Routes.password.path} replace /> },
+]);
+
+export const uninitializedRoutes = Object.freeze([
+  Routes.noWallet,
+  Routes.createWallet,
+  { path: '*', element: <Navigate to={Routes.noWallet.path} replace /> },
+]);

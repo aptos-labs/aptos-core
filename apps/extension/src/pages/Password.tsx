@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   Box,
   Button,
@@ -9,41 +10,36 @@ import {
   VStack,
   Text,
 } from '@chakra-ui/react';
-import { AptosBlackLogo, AptosWhiteLogo } from 'core/components/AptosLogo';
-import { secondaryBgColor } from 'core/colors';
-import React, { useState } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
-import { unlockAccounts } from 'core/utils/account';
-import { useNavigate } from 'react-router-dom';
-import Routes from 'core/routes';
+import { secondaryBgColor } from 'core/colors';
+import { AptosBlackLogo, AptosWhiteLogo } from 'core/components/AptosLogo';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 interface FormValues {
   password: string;
 }
 
-interface Props {
-  isBackground: boolean
-  onUnlock: () => void
-}
-
-function Password({ isBackground, onUnlock }: Props) {
+function Password() {
   const { colorMode } = useColorMode();
-  const [error, setError] = useState<string | undefined>(undefined);
-  const { handleSubmit, register } = useForm<FormValues>({
-    defaultValues: {
-      password: '',
-    },
+  const { unlockAccounts } = useGlobalStateContext();
+
+  const {
+    formState: { errors },
+    handleSubmit,
+    register,
+    setError,
+  } = useForm<FormValues>({
+    defaultValues: { password: '' },
+    reValidateMode: 'onSubmit',
   });
 
-  const onSubmit: SubmitHandler<Record<string, any>> = async (data, event) => {
+  const onSubmit: SubmitHandler<FormValues> = async ({ password }, event) => {
     event?.preventDefault();
-    const accounts = await unlockAccounts(data.password, isBackground ?? false);
-    if (accounts) {
-      if (onUnlock) {
-        onUnlock();
-      }
-    } else {
-      setError('Incorrect password');
+    try {
+      await unlockAccounts!(password);
+      // Note: redirection occurs automatically, see routing
+    } catch (error: any) {
+      setError('password', { message: 'Incorrect password', type: 'validate' });
     }
   };
 
@@ -64,7 +60,7 @@ function Password({ isBackground, onUnlock }: Props) {
           }
         </Box>
       </Center>
-      <form onChange={() => setError(undefined)} onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={handleSubmit(onSubmit)}>
         <VStack gap={4}>
           <FormControl display="flex" flexDir="column" isRequired alignItems="center">
             <FormLabel requiredIndicator={<span />} fontSize="lg" fontWeight={500} pb={2}>
@@ -78,29 +74,21 @@ function Password({ isBackground, onUnlock }: Props) {
               type="password"
               {...register('password')}
             />
-            {error
-              ? (
+            {
+              errors.password && (
                 <Text fontSize="sm" color="red.400">
-                  {error}
+                  {errors.password.message}
                 </Text>
               )
-              : null}
+            }
           </FormControl>
 
           <Button width="100%" type="submit" colorScheme="teal">
-            Login
+            Unlock
           </Button>
         </VStack>
       </form>
     </VStack>
-  );
-}
-
-// Used for password in main navigation stack
-export function NavigationPassword() {
-  const navigate = useNavigate();
-  return (
-    <Password isBackground={false} onUnlock={() => { navigate(Routes.wallet.routePath); }} />
   );
 }
 

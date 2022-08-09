@@ -9,8 +9,8 @@ import ImportAccountLayout from 'core/layouts/ImportAccountLayout';
 
 export default function AddAccount() {
   return (
-    <AuthLayout routePath={PageRoutes.addAccount.routePath}>
-      <ImportAccountLayout backPage={Routes.wallet.routePath}>
+    <AuthLayout routePath={PageRoutes.addAccount.path}>
+      <ImportAccountLayout backPage={Routes.wallet.path}>
         <AddAccountBody />
       </ImportAccountLayout>
     </AuthLayout>

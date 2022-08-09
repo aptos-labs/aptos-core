@@ -1,20 +1,29 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { StrictMode } from 'react';
+import React, { StrictMode, useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   QueryClientProvider,
   QueryClient,
 } from 'react-query';
-import { Route, MemoryRouter, Routes } from 'react-router-dom';
+import {
+  MemoryRouter,
+  useRoutes,
+} from 'react-router-dom';
 import { ChakraProvider, extendTheme, type ThemeConfig } from '@chakra-ui/react';
-import { Routes as PageRoutes } from 'core/routes';
 import { WalletStateProvider } from 'core/hooks/useWalletState';
-import { GlobalStateProvider } from 'core/hooks/useGlobalState';
+import { GlobalStateProvider, useGlobalStateContext } from 'core/hooks/useGlobalState';
 import { createStandaloneToast } from '@chakra-ui/toast';
 import SimulatedExtensionContainer from 'core/layouts/SimulatedExtensionContainer';
 import { StepsStyleConfig as Steps } from 'chakra-ui-steps';
+
+import {
+  lockedWalletRoutes,
+  mainRoutes,
+  noAccountsRoutes,
+  uninitializedRoutes,
+} from 'core/routes';
 
 const { ToastContainer } = createStandaloneToast();
 
@@ -53,6 +62,44 @@ const queryClient = new QueryClient({
   },
 });
 
+function useAppRoutes() {
+  const {
+    activeAccountAddress,
+    areAccountsInitialized,
+    areAccountsReady,
+    areAccountsUnlocked,
+  } = useGlobalStateContext();
+  const hasActiveAccount = activeAccountAddress !== undefined;
+
+  return useMemo(() => {
+    if (!areAccountsReady) {
+      return [
+        { element: null, path: '*' },
+      ];
+    }
+
+    if (areAccountsUnlocked) {
+      return hasActiveAccount
+        ? mainRoutes
+        : noAccountsRoutes;
+    }
+
+    return areAccountsInitialized
+      ? lockedWalletRoutes
+      : uninitializedRoutes;
+  }, [
+    areAccountsReady,
+    areAccountsInitialized,
+    areAccountsUnlocked,
+    hasActiveAccount,
+  ]);
+}
+
+function App() {
+  const appRoutes = useAppRoutes();
+  return useRoutes([...appRoutes]);
+}
+
 const root = createRoot(document.getElementById('root') as Element);
 
 root.render(
@@ -63,13 +110,7 @@ root.render(
           <WalletStateProvider>
             <SimulatedExtensionContainer>
               <MemoryRouter>
-                <Routes>
-                  {
-                    Object.values(PageRoutes).map(({ element, routePath }) => (
-                      <Route key={routePath} path={routePath} element={element} />
-                    ))
-                  }
-                </Routes>
+                <App />
               </MemoryRouter>
             </SimulatedExtensionContainer>
           </WalletStateProvider>

@@ -16,7 +16,7 @@ import NewExtensionBody from 'core/components/NewExtensionBody';
  */
 function NewExtension() {
   return (
-    <AuthLayout routePath={PageRoutes.noWallet.routePath}>
+    <AuthLayout routePath={PageRoutes.noWallet.path}>
       <WalletLayout hasWalletFooter={false} hasWalletHeader={false}>
         <VStack width="100%" paddingTop={8}>
           <Box px={4} pb={4} width="100%">

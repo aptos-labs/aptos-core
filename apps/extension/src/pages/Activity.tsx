@@ -25,7 +25,7 @@ function Activity() {
     : undefined;
 
   return (
-    <AuthLayout routePath={PageRoutes.activity.routePath}>
+    <AuthLayout routePath={PageRoutes.activity.path}>
       <WalletLayout>
         <VStack width="100%" paddingTop={8} px={4} alignItems="start">
           <Heading fontSize="xl" mb={4}>Activity</Heading>

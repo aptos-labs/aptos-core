@@ -55,7 +55,7 @@ function Account() {
   const explorerAddress = `https://explorer.devnet.aptos.dev/account/${address}`;
 
   return (
-    <AuthLayout routePath={PageRoutes.settings.routePath}>
+    <AuthLayout routePath={PageRoutes.settings.path}>
       <WalletLayout>
         <VStack width="100%" paddingTop={8}>
           <Box px={4} pb={4} width="100%">

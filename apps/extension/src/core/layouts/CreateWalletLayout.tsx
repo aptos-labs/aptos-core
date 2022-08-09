@@ -88,7 +88,7 @@ const NextButton = () => {
       setIsLoading(false);
       nextStep();
     } else if (activeStep === 2) {
-      navigate(Routes.wallet.routePath);
+      navigate(Routes.wallet.path);
     }
   }, [activeStep, initAccounts, confirmPassword, fundAccount, mnemonicString, navigate, nextStep]);
 
@@ -179,7 +179,7 @@ const PrevButton = () => {
 
   const prevOnClick = useCallback(() => {
     if (activeStep === 0) {
-      navigate(Routes.noWallet.routePath);
+      navigate(Routes.noWallet.path);
     }
     prevStep();
   }, [activeStep, navigate, prevStep]);

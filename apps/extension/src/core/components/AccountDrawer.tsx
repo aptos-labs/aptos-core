@@ -71,7 +71,7 @@ export default function AccountDrawer({ isOpen, onClose }: AccountDrawerProps) {
       removeAccountToast(toastMessage);
 
       onClose();
-      navigate('/wallet');
+      navigate(Routes.wallet.path);
     } catch {
       removeAccountErrorToast();
     }
@@ -85,7 +85,7 @@ export default function AccountDrawer({ isOpen, onClose }: AccountDrawerProps) {
           <Grid templateColumns="1fr 136px">
             <Text>Accounts</Text>
             <ChakraLink
-              to={Routes.addAccount.routePath}
+              to={Routes.addAccount.path}
               display="flex"
               justifyContent="flex-end"
             >

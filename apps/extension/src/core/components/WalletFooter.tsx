@@ -40,9 +40,9 @@ export default function WalletFooter() {
     >
       <SimpleGrid width="100%" gap={4} columns={4}>
         <Center width="100%">
-          <ChakraLink to={Routes.wallet.routePath}>
+          <ChakraLink to={Routes.wallet.path}>
             <IconButton
-              color={(pathname.includes(Routes.wallet.routePath))
+              color={(pathname.includes(Routes.wallet.path))
                 ? secondaryIconUnpressedColor[colorMode]
                 : secondaryIconColor[colorMode]}
               variant="unstyled"
@@ -55,9 +55,9 @@ export default function WalletFooter() {
           </ChakraLink>
         </Center>
         <Center width="100%">
-          <ChakraLink to={Routes.gallery.routePath}>
+          <ChakraLink to={Routes.gallery.path}>
             <IconButton
-              color={(pathname.includes(Routes.gallery.routePath) || pathname.includes('/tokens'))
+              color={(pathname.includes(Routes.gallery.path) || pathname.includes('/tokens'))
                 ? secondaryIconUnpressedColor[colorMode]
                 : secondaryIconColor[colorMode]}
               variant="unstyled"
@@ -70,9 +70,9 @@ export default function WalletFooter() {
           </ChakraLink>
         </Center>
         <Center width="100%">
-          <ChakraLink to={Routes.activity.routePath}>
+          <ChakraLink to={Routes.activity.path}>
             <IconButton
-              color={(pathname.includes(Routes.activity.routePath))
+              color={(pathname.includes(Routes.activity.path))
                 ? secondaryIconUnpressedColor[colorMode]
                 : secondaryIconColor[colorMode]}
               variant="unstyled"
@@ -85,9 +85,9 @@ export default function WalletFooter() {
           </ChakraLink>
         </Center>
         <Center width="100%">
-          <ChakraLink to={Routes.settings.routePath}>
+          <ChakraLink to={Routes.settings.path}>
             <IconButton
-              color={(pathname.includes(Routes.settings.routePath))
+              color={(pathname.includes(Routes.settings.path))
                 ? secondaryIconUnpressedColor[colorMode]
                 : secondaryIconColor[colorMode]}
               variant="unstyled"

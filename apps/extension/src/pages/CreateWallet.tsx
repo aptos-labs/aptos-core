@@ -31,7 +31,7 @@ function NewWalletBody() {
 
 function CreateWallet() {
   return (
-    <AuthLayout routePath={PageRoutes.createWallet.routePath}>
+    <AuthLayout routePath={PageRoutes.createWallet.path}>
       <OnboardingStateProvider>
         <CreateWalletLayout>
           <NewWalletBody />
