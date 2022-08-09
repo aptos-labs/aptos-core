@@ -149,7 +149,6 @@ impl Fragment {
         } else {
             bail!("wrong sender");
         }
-        // Ok(validator.verify(self.source, &self.fragment_info, &self.signature)?)
     }
 
     pub(crate) fn epoch(&self) -> u64 {

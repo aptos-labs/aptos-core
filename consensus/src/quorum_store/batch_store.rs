@@ -20,6 +20,7 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
+use crate::quorum_store::proof_builder::ProofBuilderCommand;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PersistRequest {
@@ -44,7 +45,7 @@ impl PersistRequest {
 
 #[derive(Debug)]
 pub(crate) enum BatchStoreCommand {
-    Persist(PersistRequest, Option<oneshot::Sender<SignedDigest>>),
+    Persist(PersistRequest),
     BatchRequest(
         HashValue,
         PeerId,
@@ -161,7 +162,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         }
     }
 
-    pub async fn start(self, mut batch_store_rx: Receiver<BatchStoreCommand>) {
+    pub async fn start(self, mut batch_store_rx: Receiver<BatchStoreCommand>, proof_builder_tx: Sender<ProofBuilderCommand>) {
         debug!(
             "[QS worker] BatchStore worker for epoch {} starting",
             self.epoch
@@ -176,18 +177,14 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                         .expect("Failed to send shutdown ack to QuorumStore");
                     break;
                 }
-                BatchStoreCommand::Persist(persist_request, maybe_tx) => {
+                BatchStoreCommand::Persist(persist_request) => {
                     let author = persist_request.value.author;
                     if let Some(signed_digest) = self.store(persist_request) {
-                        if let Some(ack_tx) = maybe_tx {
-                            debug_assert!(
-                                self.my_peer_id == author,
-                                "Persist request with return channel must be from self"
-                            );
-                            ack_tx
-                                .send(signed_digest)
-                                .expect("Failed to send signed digest");
-                            debug!("QS: sent signed digest back to quorum store");
+                        if self.my_peer_id == author {
+                            proof_builder_tx
+                                .send(ProofBuilderCommand::AppendSignature(signed_digest))
+                                .await.expect("Failed to send to ProofBuilder");
+                            debug!("QS: sent signed digest to ProofBuilder");
                         } else {
                             self.network_sender
                                 .send_signed_digest(signed_digest, vec![author])

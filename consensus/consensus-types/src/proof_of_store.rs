@@ -115,8 +115,9 @@ impl ProofOfStore {
         self.info.expiration
     }
 
-    pub fn ready(&self, validator_verifier: &ValidatorVerifier) -> bool {
-        validator_verifier
+    pub fn ready(&self, validator_verifier: &ValidatorVerifier, my_peer_id: PeerId) -> bool {
+        self.aggregated_signature.contains_key(&my_peer_id) &&
+            validator_verifier
             .check_voting_power(self.aggregated_signature.keys())
             .is_ok()
     }

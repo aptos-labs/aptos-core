@@ -66,8 +66,7 @@ impl NetworkListener {
                 ) {
                     Ok((num_bytes, payload, digest)) => {
                         let persist_cmd = BatchStoreCommand::Persist(
-                            PersistRequest::new(source, payload, digest, num_bytes, expiration),
-                            None,
+                            PersistRequest::new(source, payload, digest, num_bytes, expiration)
                         );
                         self.batch_store_tx
                             .send(persist_cmd)

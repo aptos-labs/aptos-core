@@ -13,7 +13,6 @@ use crate::quorum_store::{
     types::{BatchId, Fragment, SerializedTransaction},
 };
 use crate::round_manager::VerifiedEvent;
-use aptos_crypto::HashValue;
 use aptos_logger::debug;
 use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
@@ -21,17 +20,14 @@ use aptos_types::{
 use channel::aptos_channel;
 use consensus_types::{
     common::Round,
-    proof_of_store::{LogicalTime, SignedDigest},
+    proof_of_store::LogicalTime,
 };
-use futures::{
-    future::BoxFuture,
-    stream::{futures_unordered::FuturesUnordered, StreamExt as _},
-};
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
     oneshot,
 };
+use consensus_types::proof_of_store::SignedDigestInfo;
 
 #[derive(Debug)]
 pub enum QuorumStoreCommand {
@@ -59,7 +55,6 @@ pub struct QuorumStore {
     batch_aggregator: BatchAggregator,
     batch_store_tx: Sender<BatchStoreCommand>,
     proof_builder_tx: Sender<ProofBuilderCommand>,
-    digest_end_batch: HashMap<HashValue, (Fragment, ProofReturnChannel)>,
 }
 
 // TODO: change to appropriately signed integers.
@@ -116,7 +111,7 @@ impl QuorumStore {
             proof_builder_tx.clone(),
             config.max_batch_size,
         );
-        let proof_builder = ProofBuilder::new(config.proof_timeout_ms);
+        let proof_builder = ProofBuilder::new(config.proof_timeout_ms, my_peer_id);
         let (batch_store, batch_reader) = BatchStore::new(
             epoch,
             last_committed_round,
@@ -135,9 +130,9 @@ impl QuorumStore {
             config.db_quota,
         );
 
-        tokio::spawn(proof_builder.start(proof_builder_rx, validator_verifier.clone()));
+        tokio::spawn(proof_builder.start(proof_builder_rx, validator_verifier));
         tokio::spawn(net.start());
-        tokio::spawn(batch_store.start(batch_store_rx));
+        tokio::spawn(batch_store.start(batch_store_rx, proof_builder_tx.clone()));
 
         debug!("QS: QuorumStore created");
         (
@@ -150,8 +145,6 @@ impl QuorumStore {
                 batch_aggregator: BatchAggregator::new(config.max_batch_size),
                 batch_store_tx,
                 proof_builder_tx,
-                // validator_signer,
-                digest_end_batch: HashMap::new(),
             },
             batch_reader,
         )
@@ -189,20 +182,18 @@ impl QuorumStore {
     }
 
     /// Finalize the batch & digest, synchronously by worker.
-    fn handle_end_batch(
+    async fn handle_end_batch(
         &mut self,
         fragment_payload: Vec<SerializedTransaction>,
         batch_id: BatchId,
         expiration: LogicalTime,
         proof_tx: ProofReturnChannel,
-    ) -> (BatchStoreCommand, oneshot::Receiver<SignedDigest>) {
+    ) -> (BatchStoreCommand, Fragment) {
         match self
             .batch_aggregator
             .end_batch(batch_id, self.fragment_id, fragment_payload.clone())
         {
-            Ok((num_bytes, payload, digest_hash)) => {
-                let (persist_request_tx, persist_request_rx) = oneshot::channel();
-
+            Ok((num_bytes, payload, digest)) => {
                 let fragment = Fragment::new(
                     self.epoch,
                     batch_id,
@@ -211,20 +202,20 @@ impl QuorumStore {
                     Some(expiration.clone()),
                     self.my_peer_id,
                 );
-                self.digest_end_batch
-                    .insert(digest_hash, (fragment, proof_tx));
+
+                self.proof_builder_tx
+                    .send(ProofBuilderCommand::InitProof(SignedDigestInfo::new(digest, expiration), fragment.batch_id(), proof_tx))
+                    .await
+                    .expect("Failed to send to ProofBuilder");
 
                 let persist_request = PersistRequest::new(
                     self.my_peer_id,
                     payload.clone(),
-                    digest_hash,
+                    digest,
                     num_bytes,
                     expiration,
                 );
-                (
-                    BatchStoreCommand::Persist(persist_request, Some(persist_request_tx)),
-                    persist_request_rx,
-                )
+                (BatchStoreCommand::Persist(persist_request), fragment)
             }
             Err(e) => {
                 unreachable!(
@@ -241,75 +232,54 @@ impl QuorumStore {
             self.epoch
         );
 
-        let mut futures: FuturesUnordered<BoxFuture<'_, _>> = FuturesUnordered::new();
+        while let Some(command) = self.command_rx.recv().await {
+            match command {
+                QuorumStoreCommand::Shutdown(ack_tx) => {
+                    let (batch_store_shutdown_tx, batch_store_shutdown_rx) = oneshot::channel();
+                    self.batch_store_tx
+                        .send(BatchStoreCommand::Shutdown(batch_store_shutdown_tx))
+                        .await
+                        .expect("Failed to send to BatchStore");
+                    let (proof_builder_shutdown_tx, proof_builder_shutdown_rx) = oneshot::channel();
+                    self.proof_builder_tx.send(ProofBuilderCommand::Shutdown(proof_builder_shutdown_tx))
+                        .await
+                        .expect("Failed to send to ProofBuilder");
 
-        loop {
-            tokio::select! {
-                Some(command) = self.command_rx.recv() => {
-                    match command {
-                        QuorumStoreCommand::Shutdown(ack_tx) => {
-                            let (batch_store_shutdown_tx, batch_store_shutdown_rx) = oneshot::channel();
-                            self.batch_store_tx
-                                .send(BatchStoreCommand::Shutdown(batch_store_shutdown_tx))
-                                .await
-                                .expect("Failed to send to BatchStore");
-                            let (proof_builder_shutdown_tx, proof_builder_shutdown_rx) = oneshot::channel();
-                            self.proof_builder_tx.send(ProofBuilderCommand::Shutdown(proof_builder_shutdown_tx))
-                                .await
-                                .expect("Failed to send to BatchStore");
+                    batch_store_shutdown_rx.await.expect("Failed to stop BatchStore");
+                    proof_builder_shutdown_rx.await.expect("Failed to stop ProofBuilder");
 
-                            batch_store_shutdown_rx.await.expect("Failed to stop BatchStore");
-                            proof_builder_shutdown_rx.await.expect("Failed to stop ProofBuilder");
+                    ack_tx
+                        .send(())
+                        .expect("Failed to send shutdown ack from QuorumStore");
+                    break;
+                }
+                QuorumStoreCommand::AppendToBatch(fragment_payload, batch_id) => {
+                    debug!("QS: end batch cmd received, batch id {}", batch_id);
+                    let msg = self.handle_append_to_batch(fragment_payload, batch_id);
+                    self.network_sender.broadcast_without_self(msg).await;
 
-                            ack_tx
-                                .send(())
-                                .expect("Failed to send shutdown ack from QuorumStore");
-                            break;
-                        }
-                        QuorumStoreCommand::AppendToBatch(fragment_payload, batch_id) => {
-                            debug!("QS: end batch cmd received, batch id {}", batch_id);
-                            let msg = self.handle_append_to_batch(fragment_payload, batch_id);
-                            self.network_sender.broadcast_without_self(msg).await;
+                    self.fragment_id = self.fragment_id + 1;
+                }
 
-                            self.fragment_id = self.fragment_id + 1;
-                        }
+                QuorumStoreCommand::EndBatch(fragment_payload, batch_id, logical_time, proof_tx) => {
+                    debug!("QS: end batch cmd received, batch id = {}", batch_id);
+                    let (batch_store_command, fragment) =
+                        self.handle_end_batch(fragment_payload, batch_id, logical_time, proof_tx).await;
 
-                        QuorumStoreCommand::EndBatch(fragment_payload, batch_id, logical_time, proof_tx) => {
-                            debug!("QS: end batch cmd received, batch id = {}", batch_id);
-                            let (batch_store_command, response_rx) =
-                                self.handle_end_batch(fragment_payload, batch_id, logical_time, proof_tx);
-                            self.batch_store_tx
-                                .send(batch_store_command)
-                                .await
-                                .expect("Failed to send to BatchStore");
-                            futures.push(Box::pin(response_rx));
+                    self.network_sender
+                        .broadcast_without_self(ConsensusMsg::FragmentMsg(Box::new(fragment)))
+                        .await;
 
-                            self.fragment_id = 0;
-                        }
-                    }
-                },
+                    self.batch_store_tx
+                        .send(batch_store_command)
+                        .await
+                        .expect("Failed to send to BatchStore");
 
-                Some(result) = futures.next() => match result {
-                    Ok(signed_digest) => {
-                        debug!("QS: got back local signed digest");
-                        let (last_fragment, proof_tx) =
-                            self.digest_end_batch.remove(&signed_digest.info.digest).unwrap();
-                        self.proof_builder_tx
-                            .send(ProofBuilderCommand::InitProof(signed_digest, last_fragment.batch_id(), proof_tx))
-                            .await
-                            .expect("Failed to send to ProofBuilder");
-
-                        // TODO: consider waiting until proof_builder processes the command.
-                        self.network_sender
-                            .broadcast_without_self(ConsensusMsg::FragmentMsg(Box::new(last_fragment)))
-                            .await;
-                    },
-                    Err(_) => {
-
-                    }
+                    self.fragment_id = 0;
                 }
             }
         }
+
 
         debug!(
             "[QS worker] QuorumStore worker for epoch {} stopping",
