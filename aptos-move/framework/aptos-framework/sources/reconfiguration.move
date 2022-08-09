@@ -8,6 +8,7 @@ module aptos_framework::reconfiguration {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::stake;
+    use aptos_framework::state_storage_config;
 
     friend aptos_framework::aptos_governance;
     friend aptos_framework::block;
@@ -99,6 +100,7 @@ module aptos_framework::reconfiguration {
     /// Signal validators to start using new configuration. Must be called from friend config modules.
     public(friend) fun reconfigure() acquires Configuration {
         stake::on_new_epoch();
+        state_storage_config::on_epoch_ending();
         reconfigure_();
     }
 
