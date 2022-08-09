@@ -112,7 +112,7 @@ impl ProofOfStore {
     }
 
     pub fn expiration(&self) -> LogicalTime {
-        self.info.expiration.clone()
+        self.info.expiration
     }
 
     pub fn ready(&self, validator_verifier: &ValidatorVerifier) -> bool {
@@ -143,7 +143,7 @@ impl ProofOfStore {
         }
 
         self.aggregated_signature.insert(signer_id, signature);
-        return Ok(());
+        Ok(())
     }
 
     pub fn epoch(&self) -> u64 {

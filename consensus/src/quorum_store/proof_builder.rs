@@ -10,16 +10,17 @@ use futures::channel::oneshot;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
-use tokio::time;
+use tokio::{time, sync::oneshot as TokioOneshot};
 
 #[derive(Debug)]
 pub(crate) enum ProofBuilderCommand {
     InitProof(SignedDigest, BatchId, ProofReturnChannel),
     AppendSignature(SignedDigest),
+    Shutdown(TokioOneshot::Sender<()>),
 }
 
 pub(crate) type ProofReturnChannel =
-    oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
+oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
 pub(crate) struct ProofBuilder {
     // peer_id: PeerId,
@@ -90,6 +91,7 @@ impl ProofBuilder {
     fn expire(&mut self) {
         for digest in self.timeouts.expire() {
             if let Some((_, batch_id, tx)) = self.digest_to_proof.remove(&digest) {
+                // panic!();
                 tx.send(Err(QuorumStoreError::Timeout(batch_id)))
                     .expect("Unable to send the timeout a proof of store");
             }
@@ -98,14 +100,20 @@ impl ProofBuilder {
 
     pub async fn start(
         mut self,
-        mut network_rx: Receiver<ProofBuilderCommand>,
+        mut rx: Receiver<ProofBuilderCommand>,
         validator_verifier: ValidatorVerifier,
     ) {
         let mut interval = time::interval(Duration::from_millis(100));
         loop {
             tokio::select! {
-             Some(command) = network_rx.recv() => {
+             Some(command) = rx.recv() => {
                 match command {
+                        ProofBuilderCommand::Shutdown(ack_tx) => {
+                    ack_tx
+                        .send(())
+                        .expect("Failed to send shutdown ack to QuorumStore");
+                    break;
+                }
                     ProofBuilderCommand::InitProof(signed_digest, batch_id, tx) => {
                         self.init_proof(signed_digest, batch_id, &validator_verifier, tx)
                             .expect("Error initializing proof of store");

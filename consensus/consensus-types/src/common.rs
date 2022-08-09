@@ -63,7 +63,7 @@ impl Payload {
             Payload::Empty => Ok(()),
             Payload::DirectMempool(_) => Ok(()),
             Payload::InQuorumStore(proofs) => {
-                for proof in proofs.into_iter() {
+                for proof in proofs.iter() {
                     proof.verify(validator)?;
                 }
                 Ok(())
@@ -120,7 +120,7 @@ impl From<&Vec<&Payload>> for PayloadFilter {
             for payload in exclude_payloads {
                 if let Payload::InQuorumStore(proofs) = payload {
                     for proof in proofs {
-                        exclude_proofs.insert(proof.digest().clone());
+                        exclude_proofs.insert(*proof.digest());
                     }
                 }
             }
@@ -139,10 +139,10 @@ impl fmt::Display for PayloadFilter {
                 }
                 write!(f, "{}", txns_str)
             }
-            PayloadFilter::InQuorumStore(exclided_proofs) => {
+            PayloadFilter::InQuorumStore(excluded_proofs) => {
                 let mut txns_str = "".to_string();
-                for proof in exclided_proofs.iter() {
-                    txns_str += &format!("{} ", proof);
+                for proof in excluded_proofs.iter() {
+                    write!(txns_str, "{} ", proof)?;
                 }
                 write!(f, "{}", txns_str)
             }
