@@ -11,6 +11,7 @@ import { Route, MemoryRouter, Routes } from 'react-router-dom';
 import { ChakraProvider, extendTheme, type ThemeConfig } from '@chakra-ui/react';
 import { Routes as PageRoutes } from 'core/routes';
 import { WalletStateProvider } from 'core/hooks/useWalletState';
+import { GlobalStateProvider } from 'core/hooks/useGlobalState';
 import { createStandaloneToast } from '@chakra-ui/toast';
 import SimulatedExtensionContainer from 'core/layouts/SimulatedExtensionContainer';
 import { StepsStyleConfig as Steps } from 'chakra-ui-steps';
@@ -56,23 +57,25 @@ const root = createRoot(document.getElementById('root') as Element);
 
 root.render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <ChakraProvider theme={theme}>
-        <WalletStateProvider>
-          <SimulatedExtensionContainer>
-            <MemoryRouter>
-              <Routes>
-                {
-                  Object.values(PageRoutes).map(({ element, routePath }) => (
-                    <Route key={routePath} path={routePath} element={element} />
-                  ))
-                }
-              </Routes>
-            </MemoryRouter>
-          </SimulatedExtensionContainer>
-        </WalletStateProvider>
-      </ChakraProvider>
-    </QueryClientProvider>
+    <GlobalStateProvider>
+      <QueryClientProvider client={queryClient}>
+        <ChakraProvider theme={theme}>
+          <WalletStateProvider>
+            <SimulatedExtensionContainer>
+              <MemoryRouter>
+                <Routes>
+                  {
+                    Object.values(PageRoutes).map(({ element, routePath }) => (
+                      <Route key={routePath} path={routePath} element={element} />
+                    ))
+                  }
+                </Routes>
+              </MemoryRouter>
+            </SimulatedExtensionContainer>
+          </WalletStateProvider>
+        </ChakraProvider>
+      </QueryClientProvider>
+    </GlobalStateProvider>
     <ToastContainer />
   </StrictMode>,
 );

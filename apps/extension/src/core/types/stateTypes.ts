@@ -25,7 +25,13 @@ export type DecryptedState = {
   decryptionKey: string
 } | null;
 
-export type PublicAccount = {
+export interface PublicAccount {
   address: string,
-  pubKey: string
+  publicKey: string
+}
+
+export type Account = PublicAccount & {
+  mnemonic?: string;
+  name: string;
+  privateKey: string;
 };

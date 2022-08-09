@@ -124,7 +124,7 @@ export default function useWalletStateRecorder() {
       }, password);
       updateCurrentAccount({
         address: account.address().hex(),
-        pubKey: account.pubKey().hex(),
+        publicKey: account.pubKey().hex(),
       });
       sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED, account);
       if (isImport) {
@@ -157,7 +157,7 @@ export default function useWalletStateRecorder() {
     try {
       updateCurrentAccount({
         address: accountAddress,
-        pubKey: account.pubKey().hex(),
+        publicKey: account.pubKey().hex(),
       });
       switchAccountToast(accountAddress);
       sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED, account);
@@ -215,7 +215,7 @@ export default function useWalletStateRecorder() {
       await updateAccountsState(activeAccounts);
       updateCurrentAccount(account ? {
         address: account.address().hex(),
-        pubKey: account.pubKey().hex(),
+        publicKey: account.pubKey().hex(),
       } : null);
       removeAccountToast(toastMessage);
     } catch (err) {

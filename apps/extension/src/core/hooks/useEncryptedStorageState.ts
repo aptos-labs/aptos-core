@@ -1,0 +1,151 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
+import { usePersistentStorageState, useSessionStorageState } from 'core/hooks/useStorageState';
+import { useState } from 'react';
+import bs58 from 'bs58';
+import { randomBytes, secretbox } from 'tweetnacl';
+import pbkdf2 from 'pbkdf2';
+import { Account } from 'core/types/stateTypes';
+
+const pbkdf2Iterations = 10000;
+const pbkdf2Digest = 'sha256';
+const pbkdf2SaltSize = 16;
+
+const accountsStorageKey = 'accounts';
+
+export type Accounts = Record<string, Account>;
+
+export interface EncryptedState {
+  ciphertext: string;
+  nonce: string;
+  salt: string;
+}
+
+async function deriveEncryptionKey(password: string, salt: Uint8Array) {
+  return new Promise<Uint8Array>((resolve, reject) => {
+    pbkdf2.pbkdf2(
+      password,
+      salt,
+      pbkdf2Iterations,
+      secretbox.keyLength,
+      pbkdf2Digest,
+      (error, key) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(key);
+        }
+      },
+    );
+  });
+}
+
+/**
+ * Create a state synced with an encrypted representation in persistent storage.
+ */
+export default function useEncryptedStorageState() {
+  const [
+    encryptedState,
+    setEncryptedState,
+    isEncryptedStateReady,
+  ] = usePersistentStorageState<EncryptedState>(`${accountsStorageKey}.encryptedState`);
+  const [
+    encryptionKey,
+    setEncryptionKey,
+    isEncryptionKeyReady,
+  ] = useSessionStorageState<string | undefined>(`${accountsStorageKey}.encryptionKey`);
+  const [value, setValue] = useState<Accounts>();
+
+  const isReady = isEncryptedStateReady && isEncryptionKeyReady;
+  const isInitialized = encryptedState !== undefined;
+  const isUnlocked = isInitialized && encryptionKey !== undefined && value !== undefined;
+
+  // Try to automatically unlock as soon as the storage states are ready
+  if (isReady && isInitialized && !isUnlocked && encryptionKey) {
+    const ciphertext = bs58.decode(encryptedState.ciphertext);
+    const nonce = bs58.decode(encryptedState.nonce);
+    const plaintext = secretbox.open(ciphertext, nonce, bs58.decode(encryptionKey))!;
+    const decodedPlaintext = Buffer.from(plaintext).toString();
+    const newValue = JSON.parse(decodedPlaintext) as Accounts;
+    setValue(newValue);
+  }
+
+  async function initialize(password: string, initialValue: Accounts) {
+    // generate salt and nonce
+    const salt = randomBytes(pbkdf2SaltSize);
+    const nonce = randomBytes(secretbox.nonceLength);
+
+    // Generate encryption key from password + salt
+    const newEncryptionKey = await deriveEncryptionKey(password, salt);
+
+    // Initialize encrypted data
+    const newValue = initialValue;
+    setValue(newValue);
+
+    const plaintext = JSON.stringify(newValue);
+    const ciphertext = secretbox(Buffer.from(plaintext), nonce, newEncryptionKey);
+
+    // persist encrypted state
+    const newEncryptedState = {
+      ciphertext: bs58.encode(ciphertext),
+      nonce: bs58.encode(nonce),
+      salt: bs58.encode(salt),
+    };
+
+    await Promise.all([
+      setEncryptedState(newEncryptedState),
+      setEncryptionKey(bs58.encode(newEncryptionKey)),
+    ]);
+  }
+
+  const unlock = async (password: string) => {
+    const ciphertext = bs58.decode(encryptedState!.ciphertext);
+    const salt = bs58.decode(encryptedState!.salt);
+    const nonce = bs58.decode(encryptedState!.nonce);
+
+    // use password + salt to retrieve encryption key
+    const newEncryptionKey = await deriveEncryptionKey(password, salt);
+
+    const plaintext = secretbox.open(ciphertext, nonce, newEncryptionKey)!;
+    const decodedPlaintext = Buffer.from(plaintext).toString();
+
+    // check that data is unencrypted correctly
+    const newValue = JSON.parse(decodedPlaintext) as Accounts;
+    setValue(newValue);
+
+    // save decryption key to session
+    await setEncryptionKey(bs58.encode(newEncryptionKey));
+  };
+
+  const update = async (newValue: Accounts) => {
+    const plaintext = JSON.stringify(newValue);
+    const nonce = randomBytes(secretbox.nonceLength);
+    const ciphertext = secretbox(Buffer.from(plaintext), nonce, bs58.decode(encryptionKey!));
+
+    const newEncryptedState = {
+      ...encryptedState!,
+      ciphertext: bs58.encode(ciphertext),
+      nonce: bs58.encode(nonce),
+    };
+
+    await setEncryptedState(newEncryptedState);
+    setValue(newValue);
+  };
+
+  const lock = async () => {
+    await setEncryptionKey(undefined);
+    setValue(undefined);
+  };
+
+  return {
+    initialize,
+    isInitialized,
+    isReady,
+    isUnlocked,
+    lock,
+    unlock,
+    update,
+    value,
+  };
+}
