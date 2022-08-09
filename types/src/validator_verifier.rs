@@ -4,7 +4,6 @@
 use crate::{account_address::AccountAddress, on_chain_config::ValidatorSet};
 use aptos_crypto::{bls12381, hash::CryptoHash, Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::{collections::BTreeMap, fmt};
 use thiserror::Error;
 
@@ -41,6 +40,9 @@ pub enum VerifyError {
         num_of_signatures: usize,
         num_of_authors: usize,
     },
+    #[error("Signature is empty")]
+    /// The signature is empty
+    EmptySignature,
     #[error("Signature is invalid")]
     /// The signature is invalid
     InvalidSignature,
@@ -236,10 +238,8 @@ impl ValidatorVerifier {
     ) -> std::result::Result<(), VerifyError> {
         // Verify the number of signature is not greater than expected.
         self.check_num_of_signatures(multi_signature)?;
-        let authors: HashSet<AccountAddress> = multi_signature
-            .get_voter_addresses(&self.get_ordered_account_addresses_iter().collect_vec())
-            .into_iter()
-            .collect();
+        let authors = multi_signature
+            .get_voter_addresses(&self.get_ordered_account_addresses_iter().collect_vec());
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter())?;
         #[cfg(any(test, feature = "fuzzing"))]
@@ -252,15 +252,12 @@ impl ValidatorVerifier {
             }
         }
         // Verify the optimistically aggregated signature.
-        let pub_keys_to_agg: Vec<&PublicKey> = self
-            .address_to_validator_info
+        let pub_keys_to_agg: Vec<&PublicKey> = authors
             .iter()
-            .filter_map(|(address, consensus_info)| {
-                if authors.contains(address) {
-                    Some(&consensus_info.public_key)
-                } else {
-                    None
-                }
+            .filter_map(|author| {
+                self.address_to_validator_info
+                    .get(author)
+                    .map(|info| &info.public_key)
             })
             .collect();
         let aggregated_key = PublicKey::aggregate(pub_keys_to_agg)
@@ -269,7 +266,7 @@ impl ValidatorVerifier {
         multi_signature
             .multi_sig()
             .as_ref()
-            .unwrap()
+            .ok_or(VerifyError::EmptySignature)?
             .verify(message, &aggregated_key)
             .map_err(|_| VerifyError::InvalidSignature)?;
         Ok(())
