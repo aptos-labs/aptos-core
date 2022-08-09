@@ -124,8 +124,8 @@ pub fn get_transaction_type(t: TransactionType) -> String {
 
 pub fn get_signature_type(t: SignatureType) -> String {
     match t {
-        SignatureType::Ed255198 => String::from("ed25519_signature"),
-        SignatureType::MultiEd255198 => String::from("multi_ed25519_signature"),
+        SignatureType::Ed25519 => String::from("ed25519_signature"),
+        SignatureType::MultiEd25519 => String::from("multi_ed25519_signature"),
         SignatureType::MultiAgent => String::from("multi_agent_signature"),
     }
 }
@@ -136,10 +136,10 @@ pub fn get_signature_outputs(
     info: &TransactionInfoOutput,
 ) -> Result<Vec<SignatureOutput>> {
     match s {
-        Signature::Ed255198(sig) => Ok(vec![parse_single_signature(
+        Signature::Ed25519(sig) => Ok(vec![parse_single_signature(
             sig, request, info, true, 0, None,
         )?]),
-        Signature::MultiEd255198(sig) => {
+        Signature::MultiEd25519(sig) => {
             Ok(parse_multi_signature(sig, request, info, true, 0, None)?)
         }
         Signature::MultiAgent(sig) => Ok(parse_multi_agent_signature(sig, request, info)?),
@@ -162,7 +162,7 @@ fn parse_single_signature(
         transaction_hash: info.hash.clone(),
         signer,
         is_sender_primary,
-        signature_type: get_signature_type(SignatureType::Ed255198),
+        signature_type: get_signature_type(SignatureType::Ed25519),
         public_key: s.public_key.clone(),
         signature: s.signature.clone(),
         threshold: 1,
@@ -194,7 +194,7 @@ fn parse_multi_signature(
             transaction_hash: info.hash.clone(),
             signer: signer.clone(),
             is_sender_primary,
-            signature_type: get_signature_type(SignatureType::MultiEd255198),
+            signature_type: get_signature_type(SignatureType::MultiEd25519),
             public_key: key.clone(),
             signature: signature.clone(),
             threshold: s.threshold,
@@ -255,7 +255,7 @@ fn parse_multi_agent_signature_helper(
     override_address: Option<&String>,
 ) -> Result<Vec<SignatureOutput>> {
     match s {
-        AccountSignature::Ed255198(sig) => Ok(vec![parse_single_signature(
+        AccountSignature::Ed25519(sig) => Ok(vec![parse_single_signature(
             sig,
             request,
             info,
@@ -263,7 +263,7 @@ fn parse_multi_agent_signature_helper(
             multi_agent_index,
             override_address,
         )?]),
-        AccountSignature::MultiEd255198(sig) => Ok(parse_multi_signature(
+        AccountSignature::MultiEd25519(sig) => Ok(parse_multi_signature(
             sig,
             request,
             info,
