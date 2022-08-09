@@ -1168,6 +1168,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-telemetry-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-rest-client",
+ "aptos-types",
+ "bcs",
+ "chrono",
+ "clap 3.2.16",
+ "hex",
+ "jsonwebtoken",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "reqwest",
+ "serde 1.0.141",
+ "serde_json",
+ "serde_repr",
+ "serde_yaml 0.8.26",
+ "thiserror",
+ "tokio",
+ "tokio_schedule",
+ "url",
+ "warp",
+]
+
+[[package]]
 name = "aptos-temppath"
 version = "0.1.0"
 dependencies = [
@@ -4234,6 +4265,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonwebtoken"
+version = "8.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aa4b4af834c6cfd35d8763d359661b90f2e45d8f750a0849156c7f4671af09c"
+dependencies = [
+ "base64 0.13.0",
+ "pem 1.1.0",
+ "ring",
+ "serde 1.0.141",
+ "serde_json",
+ "simple_asn1",
+]
+
+[[package]]
 name = "k8s-openapi"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4274,7 +4319,7 @@ dependencies = [
  "k8s-openapi",
  "log",
  "openssl",
- "pem",
+ "pem 0.8.3",
  "pin-project",
  "serde 1.0.141",
  "serde_json",
@@ -6164,6 +6209,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pem"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03c64931a1a212348ec4f3b4362585eca7159d0d09cbdf4a7f74f02173596fd4"
+dependencies = [
+ "base64 0.13.0",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7617,6 +7671,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_repr"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2ad84e47328a31223de7fed7a4f5087f2d6ddfe586cf3ca25b7a165bc0a5aed"
+dependencies = [
+ "proc-macro2 1.0.42",
+ "quote 1.0.20",
+ "syn 1.0.98",
+]
+
+[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7794,6 +7859,18 @@ checksum = "16ff59182528fddecac72799b8348f6b6768e10989e33b24483ed361809bfd7b"
 dependencies = [
  "console",
  "similar",
+]
+
+[[package]]
+name = "simple_asn1"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adc4e5204eb1910f40f9cfa375f6f05b68c3abac4b6fd879c8ff5e7ae8a0a085"
+dependencies = [
+ "num-bigint 0.4.3",
+ "num-traits 0.2.15",
+ "thiserror",
+ "time 0.3.12",
 ]
 
 [[package]]
@@ -8612,6 +8689,16 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "tokio_schedule"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b91f371e5032da918342685fde2ca040710d38aaec985378e121055fbf031e9"
+dependencies = [
+ "chrono",
+ "tokio",
 ]
 
 [[package]]

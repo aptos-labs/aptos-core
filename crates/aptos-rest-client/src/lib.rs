@@ -23,7 +23,7 @@ pub mod faucet;
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
-mod state;
+pub mod state;
 pub mod types;
 use crate::aptos::{AptosVersion, Balance};
 pub use types::{Account, Resource, RestError};
