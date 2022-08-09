@@ -1,13 +1,20 @@
 /// This module provides an interface to aggregate integers either via
 /// aggregator (parallelizable) or via normal integers.
 module aptos_std::optional_aggregator {
+    use std::error;
     use std::option::{Self, Option};
 
     use aptos_std::aggregator_factory;
     use aptos_std::aggregator::{Self, Aggregator};
 
-    /// Wrapper around integer to have a custom overflow limit. Note that Move has no traits (and trait bounds),
-    /// so integer value must be u128.
+    // These error codes are produced by `Aggregator` and used by `Integer` for
+    // consistency.
+    const EAGGREGATOR_OVERFLOW: u64 = 1;
+    const EAGGREGATOR_UNDERFLOW: u64 = 2;
+
+    /// Wrapper around integer to have a custom overflow limit. Note that
+    /// Move has no traits (and trait bounds), so integer value must be u128.
+    /// `Integer` provides API to add/subtract and read, just like `Aggregator`.
     struct Integer has store {
         value: u128,
         limit: u128,
@@ -20,15 +27,16 @@ module aptos_std::optional_aggregator {
         }
     }
 
-    // TODO: make error messages consistent with aggregator.
     fun add_integer(base: &mut Integer, value: u128) {
-        assert!(base.limit < base.value || value > (base.limit - base.value), 0);
+        assert!(
+            base.limit >= base.value && value < (base.limit - base.value),
+            error::out_of_range(EAGGREGATOR_OVERFLOW)
+        );
         base.value = base.value + value;
     }
 
-    // TODO: make error messages consistent with aggregator.
     fun sub_integer(base: &mut Integer, value: u128) {
-        assert!(value > base.value, 0);
+        assert!(value <= base.value, error::out_of_range(EAGGREGATOR_UNDERFLOW));
         base.value = base.value - value;
     }
 
