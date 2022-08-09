@@ -207,7 +207,8 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
 
         // Apply deltas.
         // TODO: while `into_transaction_output_with_status()` should never fail
-        // to apply deltas, we should propagate errors properly.
+        // to apply deltas, we should propagate errors properly. Fix when VM
+        // error handling is fixed.
         let (status, output) = output_ext.into_transaction_output_with_status(&data_cache);
         debug_assert!(status == VMStatus::Executed);
 

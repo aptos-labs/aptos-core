@@ -540,7 +540,8 @@ impl TransactionsApi {
 
         // Apply deltas.
         // TODO: while `into_transaction_output_with_status()` should never fail
-        // to apply deltas, we should propagate errors properly.
+        // to apply deltas, we should propagate errors properly. Fix this when
+        // VM error handling is fixed.
         let (vm_status, output) = output_ext.into_transaction_output_with_status(&move_resolver);
         debug_assert!(vm_status == VMStatus::Executed);
 

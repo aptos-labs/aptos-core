@@ -93,7 +93,7 @@ impl TransactionOutputExt {
                 // Also, it is worth mentioning that current VM error handling is
                 // rather ugly and has a lot of legacy code. This makes proper error
                 // handling quite challenging.
-                panic!("something terrible happened when applying aggregator deltas")
+                panic!("something terrible happened when applying aggregator deltas");
             }
             Ok(mut materialized_deltas) => {
                 let (write_set, events, gas_used, status) = txn_output.unpack();
