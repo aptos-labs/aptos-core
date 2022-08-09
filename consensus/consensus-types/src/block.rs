@@ -22,7 +22,6 @@ use aptos_types::{
 use mirai_annotations::debug_checked_verify_eq;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::{
-    collections::BTreeMap,
     convert::TryFrom,
     fmt::{self, Display, Formatter},
     iter::once,
@@ -331,7 +330,7 @@ impl Block {
     }
 
     pub fn transactions_to_execute(&self, validators: &[AccountAddress]) -> Vec<Transaction> {
-        std::iter::once(Transaction::BlockMetadata(
+        once(Transaction::BlockMetadata(
             self.new_block_metadata(validators),
         ))
         .chain(
@@ -366,7 +365,7 @@ impl Block {
                 .unwrap()
             }),
             // A bitmap of voters
-            Self::voters_to_bitmap(validators, self.quorum_cert().ledger_info().signatures()),
+            self.quorum_cert().ledger_info().get_voters_bitmap().clone(),
             // For nil block, we use 0x0 which is convention for nil address in move.
             self.block_data()
                 .failed_authors()
@@ -375,16 +374,6 @@ impl Block {
                 }),
             self.timestamp_usecs(),
         )
-    }
-
-    fn voters_to_bitmap<T>(
-        validators: &[AccountAddress],
-        voters: &BTreeMap<AccountAddress, T>,
-    ) -> Vec<bool> {
-        validators
-            .iter()
-            .map(|address| voters.contains_key(address))
-            .collect()
     }
 
     fn failed_authors_to_indices(
@@ -406,33 +395,6 @@ impl Block {
             })
             .map(|index| u32::try_from(index).unwrap())
             .collect()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::block::Block;
-    use aptos_types::account_address::AccountAddress;
-    use std::collections::BTreeMap;
-
-    #[test]
-    fn test_voters_to_bitmap() {
-        let validators: Vec<_> = (0..4)
-            .into_iter()
-            .map(|_| AccountAddress::random())
-            .collect();
-        let expected_voter_bitmap = vec![true, true, false, true];
-
-        let voters: BTreeMap<_, _> = validators
-            .iter()
-            .zip(expected_voter_bitmap.iter())
-            .filter_map(|(&validator, &voted)| if voted { Some((validator, 0)) } else { None })
-            .collect();
-
-        assert_eq!(
-            expected_voter_bitmap,
-            Block::voters_to_bitmap(&validators, &voters)
-        );
     }
 }
 

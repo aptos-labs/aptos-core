@@ -44,6 +44,7 @@ pub use account_address::AccountAddress as PeerId;
 pub use utility_coin::*;
 
 pub mod account_view;
+pub mod multi_signature;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;

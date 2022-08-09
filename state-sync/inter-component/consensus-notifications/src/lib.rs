@@ -272,6 +272,7 @@ impl ConsensusSyncNotification {
 mod tests {
     use crate::{ConsensusNotification, ConsensusNotificationSender, Error};
     use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
+    use aptos_types::multi_signature::MultiSignature;
     use aptos_types::{
         account_address::AccountAddress,
         block_info::BlockInfo,
@@ -284,7 +285,7 @@ mod tests {
     use claim::{assert_err, assert_matches, assert_ok};
     use futures::{executor::block_on, FutureExt, StreamExt};
     use move_deps::move_core_types::language_storage::TypeTag;
-    use std::{collections::BTreeMap, time::Duration};
+    use std::time::Duration;
     use tokio::runtime::{Builder, Runtime};
 
     const CONSENSUS_NOTIFICATION_TIMEOUT: u64 = 1000;
@@ -448,7 +449,7 @@ mod tests {
     fn create_ledger_info() -> LedgerInfoWithSignatures {
         LedgerInfoWithSignatures::new(
             LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
-            BTreeMap::new(),
+            MultiSignature::empty(),
         )
     }
 
