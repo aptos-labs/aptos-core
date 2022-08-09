@@ -61,9 +61,12 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         key: &EventKey,
         start_seq: u64,
         limit: u64,
+        ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
-        self.0.get_events(key, start_seq, Order::Ascending, limit)
+        self.0
+            .get_events(key, start_seq, Order::Ascending, limit, ledger_version)
     }
+
     fn get_committed_transactions(&self, start: Version, limit: u64) -> Result<Vec<Transaction>> {
         Ok(self
             .0

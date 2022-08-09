@@ -6,6 +6,7 @@ pub enum SwarmChaos {
     Delay(SwarmNetworkDelay),
     Partition(SwarmNetworkPartition),
     Bandwidth(SwarmNetworkBandwidth),
+    Loss(SwarmNetworkLoss),
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]
@@ -30,6 +31,12 @@ pub struct SwarmNetworkBandwidth {
     pub rate: u64,
     pub limit: u64,
     pub buffer: u64,
+}
+
+#[derive(Eq, Hash, PartialEq, Debug, Clone)]
+pub struct SwarmNetworkLoss {
+    pub loss_percentage: u64,
+    pub correlation_percentage: u64,
 }
 
 #[derive(Eq, Hash, PartialEq, Debug, Clone)]

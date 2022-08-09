@@ -89,9 +89,9 @@ const config = {
             position: "left",
             items: [
               {
-                label: "Move on Aptos",
+                label: "Move Guides",
                 type: "doc",
-                docId: "guides/move-guides/move-on-aptos",
+                docId: "guides/move-guides/index",
               },
               {
                 label: "Your First Move Module",
@@ -151,7 +151,7 @@ const config = {
               {
                 label: "Local Testnet",
                 type: "doc",
-                docId: "nodes/run-a-local-testnet",
+                docId: "nodes/local-testnet/index",
               },
               {
                 label: "Node Health Checker",
@@ -299,6 +299,10 @@ const config = {
               "/basics/basics-validator-nodes",
               "/basics/basics-node-networks-sync",
             ],
+          },
+          {
+            to: "/nodes/local-testnet/run-a-local-testnet",
+            from: "/nodes/run-a-local-testnet",
           },
         ],
       },

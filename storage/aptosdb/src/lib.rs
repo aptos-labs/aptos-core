@@ -65,6 +65,7 @@ use aptos_config::config::{
 use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_types::account_config::{new_block_event_key, NewBlockEvent};
 use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     account_address::AccountAddress,
@@ -569,7 +570,7 @@ impl AptosDB {
             lis.len() == (paging_epoch - start_epoch) as usize,
             "DB corruption: missing epoch ending ledger info for epoch {}",
             lis.last()
-                .map(|li| li.ledger_info().next_block_epoch())
+                .map(|li| li.ledger_info().next_block_epoch() - 1)
                 .unwrap_or(start_epoch),
         );
         Ok((lis, more))
@@ -1072,9 +1073,10 @@ impl DbReader for AptosDB {
         start: u64,
         order: Order,
         limit: u64,
+        ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
         gauged_api("get_events", || {
-            self.get_events_by_event_key(event_key, start, order, limit, self.get_latest_version()?)
+            self.get_events_by_event_key(event_key, start, order, limit, ledger_version)
         })
     }
 
@@ -1192,19 +1194,55 @@ impl DbReader for AptosDB {
 
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
-            let ts = match self.transaction_store.get_block_metadata(version)? {
-                Some((_v, block_meta)) => block_meta.timestamp_usecs(),
-                // genesis timestamp is 0
-                None => 0,
-            };
-            Ok(ts)
+            error_if_version_is_pruned(&self.ledger_pruner, "NewBlockEvent", version)?;
+            ensure!(version <= self.get_latest_version()?);
+
+            let (_first_version, new_block_event) = self.event_store.get_block_metadata(version)?;
+            Ok(new_block_event.proposed_time())
         })
     }
 
-    fn get_block_boundaries(&self, version: u64, latest_ledger_version: u64) -> Result<(u64, u64)> {
-        gauged_api("get_block_boundaries", || {
-            self.transaction_store
-                .get_block_boundaries(version, latest_ledger_version)
+    fn get_block_info(&self, version: Version) -> Result<(Version, Version, NewBlockEvent)> {
+        gauged_api("get_block_info", || {
+            let latest_li = self.get_latest_ledger_info()?;
+            let committed_version = latest_li.ledger_info().version();
+            ensure!(
+                version <= committed_version,
+                "Requested version {} > committed version {}",
+                version,
+                committed_version
+            );
+
+            let (first_version, new_block_event) = self.event_store.get_block_metadata(version)?;
+
+            let last_version = self
+                .event_store
+                .lookup_event_after_version(&new_block_event_key(), version)?
+                .map_or(committed_version, |(v, _, _)| v - 1);
+
+            Ok((first_version, last_version, new_block_event))
+        })
+    }
+
+    fn get_block_info_by_height(&self, height: u64) -> Result<(Version, Version, NewBlockEvent)> {
+        gauged_api("get_block_info_by_height", || {
+            let latest_li = self.get_latest_ledger_info()?;
+            let committed_version = latest_li.ledger_info().version();
+
+            let event_key = new_block_event_key();
+            let (first_version, new_block_event) =
+                self.event_store
+                    .get_event_by_key(&event_key, height, committed_version)?;
+            let last_version = self
+                .event_store
+                .lookup_event_after_version(&event_key, first_version)?
+                .map_or(committed_version, |(v, _, _)| v - 1);
+
+            Ok((
+                first_version,
+                last_version,
+                bcs::from_bytes(new_block_event.event_data())?,
+            ))
         })
     }
 
@@ -1279,15 +1317,27 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_state_prune_window(&self) -> Result<Option<usize>> {
-        gauged_api("get_state_prune_window", || {
-            Ok(self.state_pruner.get_pruner_window().map(|x| x as usize))
+    fn is_state_pruner_enabled(&self) -> Result<bool> {
+        gauged_api("is_state_pruner_enabled", || {
+            Ok(self.state_pruner.is_pruner_enabled())
         })
     }
 
-    fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
+    fn get_state_prune_window(&self) -> Result<usize> {
+        gauged_api("get_state_prune_window", || {
+            Ok(self.state_pruner.get_pruner_window() as usize)
+        })
+    }
+
+    fn is_ledger_pruner_enabled(&self) -> Result<bool> {
+        gauged_api("is_ledger_pruner_enabled", || {
+            Ok(self.ledger_pruner.is_pruner_enabled())
+        })
+    }
+
+    fn get_ledger_prune_window(&self) -> Result<usize> {
         gauged_api("get_ledger_prune_window", || {
-            Ok(self.ledger_pruner.get_pruner_window().map(|x| x as usize))
+            Ok(self.ledger_pruner.get_pruner_window() as usize)
         })
     }
 

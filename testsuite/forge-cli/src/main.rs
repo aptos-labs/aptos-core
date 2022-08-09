@@ -14,6 +14,7 @@ use std::{env, num::NonZeroUsize, process, thread, time::Duration};
 use structopt::StructOpt;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
 use testcases::network_latency_test::NetworkLatencyTest;
+use testcases::network_loss_test::NetworkLossTest;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, generate_traffic,
     network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
@@ -379,6 +380,7 @@ fn get_test_suite(suite_name: &str) -> Result<ForgeConfig<'static>> {
         "run_forever" => Ok(run_forever()),
         // TODO(rustielin): verify each test suite
         "k8s_suite" => Ok(k8s_test_suite()),
+        "chaos" => Ok(chaos_test_suite()),
         single_test => single_test_suite(single_test),
     }
 }
@@ -439,6 +441,12 @@ fn pre_release_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
         .with_network_tests(&[&NetworkBandwidthTest])
+}
+
+fn chaos_test_suite() -> ForgeConfig<'static> {
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+        .with_network_tests(&[&NetworkBandwidthTest, &NetworkLatencyTest, &NetworkLossTest])
 }
 
 /// A simple test that runs the swarm forever. This is useful for
