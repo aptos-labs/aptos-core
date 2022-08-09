@@ -53,19 +53,6 @@ See the [installation instructions here](https://docs.buf.build/installation).
 brew install streamingfast/tap/substreams
 ```
 
-### From pre-compiled binary
-
-- Download the binary
-
-```bash
-# Use correct binary for your platform
-wget https://github.com/streamingfast/substreams/releases/download/v0.0.12/substreams_0.0.12_linux_x86_64.tar.gz
-tar -xzvf substreams_0.0.12_linux_x86_64.tar.gz
-export PATH="`pwd`:$PATH"
-```
-
-> Check https://github.com/streamingfast/substreams/releases and use the latest release available
-
 ### Validation
 
 Ensure that `substreams` CLI works as expected:
@@ -78,18 +65,19 @@ version (...)
 ## Generating Protobuf
 
 ```bash
-substreams protogen ./substreams.yaml --exclude-paths="sf/aptos,sf/substreams,google"
+make codegen
 ```
+Note, you'll see an underscore generated protobuf rust file in src/pb that you'll need to copy into aptos.block_output.v1.rs for now. 
 
 ## Compile
 
 At this point, we're ready to build our WASM binary and Protobuf definitions.
 
 ```bash
-cargo build --target wasm32-unknown-unknown --release
+make build
 ```
 
-The resulting WASM artifact will be found at `./target/wasm32-unknown-unknown/release/substreams_aptos_stats.wasm`
+The resulting WASM artifact will be found at `./target/wasm32-unknown-unknown/release/`
 
 ## Run your Substream
 
@@ -98,9 +86,10 @@ We're now ready to run our example Substream!
 > Don't forget to be at the root of the project to run the following commands
 
 ```bash
-substreams run -p -e localhost:18015 substreams.yaml block_to_block_output --stop-block +100
+make codegen
 ```
 
+Note, you can change the make commands in ./Makefile
 ## Next Steps
 
 Congratulations! You've successfully run a Substream.
