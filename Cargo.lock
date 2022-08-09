@@ -1080,6 +1080,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-sf-indexer"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-rest-client",
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "clap 3.2.16",
+ "diesel",
+ "diesel_migrations",
+ "futures",
+ "http",
+ "once_cell",
+ "prost",
+ "prost-types",
+ "reqwest",
+ "reqwest-middleware",
+ "reqwest-retry",
+ "serde 1.0.141",
+ "serde_json",
+ "tokio",
+ "tokio-retry",
+ "tonic",
+ "url",
+]
+
+[[package]]
 name = "aptos-sf-stream"
 version = "0.1.0"
 dependencies = [
@@ -7269,6 +7300,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls-native-certs"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0167bac7a9f490495f3c33013e7722b53cb087ecbe082fb0c6387c96f634ea50"
+dependencies = [
+ "openssl-probe",
+ "rustls-pemfile",
+ "schannel",
+ "security-framework",
+]
+
+[[package]]
 name = "rustls-pemfile"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8644,7 +8687,10 @@ dependencies = [
  "pin-project",
  "prost",
  "prost-derive",
+ "rustls-native-certs",
+ "rustls-pemfile",
  "tokio",
+ "tokio-rustls 0.23.4",
  "tokio-stream",
  "tokio-util 0.7.3",
  "tower",

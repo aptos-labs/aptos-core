@@ -403,7 +403,7 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
             }
         }
         WriteSetChange::WriteModule(write_module) => extractor::WriteSetChange {
-            type_: EnumOrUnknown::new(extractor::write_set_change::Type::DELETE_MODULE),
+            type_: EnumOrUnknown::new(extractor::write_set_change::Type::WRITE_MODULE),
             change: Some(extractor::write_set_change::Change::WriteModule(
                 extractor::WriteModule {
                     address: write_module.address.to_string(),

@@ -45,7 +45,6 @@ members = [
     "crates/aptos-id-generator",
     "crates/aptos-infallible",
     "crates/aptos-keygen",
-    "crates/aptos-substreams",
     "crates/aptos-log-derive",
     "crates/aptos-logger",
     "crates/aptos-metrics-core",
@@ -121,6 +120,10 @@ members = [
     "testsuite/testcases",
     "types",
     "vm-validator",
+]
+
+exclude=[
+    "crates/aptos-substreams",
 ]
 
 # NOTE: default-members is the complete list of binaries that form the "production Aptos codebase". These members should
