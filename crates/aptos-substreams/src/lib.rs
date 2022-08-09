@@ -82,7 +82,7 @@ fn store_count(transaction: aptos::Transaction, store: store::StoreAddInt64) {
 }
 
 fn generate_trx_key() -> String {
-    return format!("total");
+    String::from("total")
 }
 
 fn generate_trx_type_key(trx_type: aptos::transaction::TransactionType) -> String {
