@@ -13,6 +13,11 @@
 //! For potential future improvements here, see:
 //! https://github.com/aptos-labs/aptos-core/issues/2319.
 
+// READ ME: You'll see that some of the examples (specifically those for hex
+// strings) have a space at the end. This is necessary to make sure the UI
+// displays the example value correctly. See more here:
+// https://github.com/aptos-labs/aptos-core/pull/2703
+
 use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use serde_json::json;
 
@@ -28,7 +33,7 @@ impl_poem_type!(
     "string",
     (
         example = Some(serde_json::Value::String(
-            "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1".to_string()
+            "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 ".to_string()
         )),
         format = Some("hex"),
         description = Some("Hex encoded 32 byte Aptos account address")
@@ -40,7 +45,7 @@ impl_poem_type!(
     "string",
     (
         example = Some(serde_json::Value::String(
-            "0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+            "0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 "
                 .to_string()
         )),
         format = Some("hex"),
@@ -65,7 +70,7 @@ impl_poem_type!(
     "string",
     (
         example = Some(serde_json::Value::String(
-            "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1".to_string()
+            "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 ".to_string()
         )),
         format = Some("hex"),
         description = Some(indoc! {"
