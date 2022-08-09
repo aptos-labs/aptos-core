@@ -164,9 +164,7 @@ impl BlockCache {
             versions: RwLock::new(versions),
             rest_client,
         };
-        if let Some(oldest_ledger_version) = state.oldest_ledger_version {
-            block_cache.add_block(oldest_ledger_version).await?;
-        }
+        block_cache.add_block(state.oldest_ledger_version).await?;
         block_cache.add_block(state.version).await?;
 
         Ok(block_cache)
