@@ -1,6 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+//! This module defines all the gas parameters and formulae for instructions, along with their
+//! initial values in the genesis and a mapping between the Rust representation and the on-chain
+//! gas schedule.
+
 use crate::gas_meter::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule};
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
