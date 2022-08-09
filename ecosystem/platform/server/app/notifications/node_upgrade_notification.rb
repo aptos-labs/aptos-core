@@ -5,10 +5,10 @@
 
 # To deliver this notification:
 #
-# NodeMaintenanceNotification.with(node_maintenance: @node_maintenance).deliver_later(current_user)
-# NodeMaintenanceNotification.with(node_maintenance: @node_maintenance).deliver(current_user)
+# NodeUpgradeNotification.with(network_operation: @network_operation).deliver_later(current_user)
+# NodeUpgradeNotification.with(network_operation: @network_operation).deliver(current_user)
 
-class NodeMaintenanceNotification < Noticed::Base
+class NodeUpgradeNotification < Noticed::Base
   # Add your delivery methods
   #
   deliver_by :database
@@ -18,10 +18,10 @@ class NodeMaintenanceNotification < Noticed::Base
 
   # Add required params
   #
-  param :node_maintenance
+  param :network_operation
 
   # Define helper methods to make rendering easier.
   def url
-    node_maintenance_path(params[:node_maintenance])
+    network_operation_path(params[:network_operation])
   end
 end

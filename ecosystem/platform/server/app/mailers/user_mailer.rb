@@ -4,9 +4,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class UserMailer < ApplicationMailer
-  def node_maintenance_notification
+  def node_upgrade_notification
     @user = params[:recipient]
-    @node_maintenance = params[:node_maintenance]
-    mail(to: @user.email, subject: @node_maintenance.title)
+    @network_operation = params[:network_operation]
+    mail(to: @user.email, subject: @network_operation.title)
+  end
+
+  def governance_proposal_notification
+    @user = params[:recipient]
+    @network_operation = params[:network_operation]
+    mail(to: @user.email, subject: @network_operation.title)
   end
 end

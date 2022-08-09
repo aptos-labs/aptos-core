@@ -3,5 +3,5 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 
-class NodeMaintenance < ApplicationRecord
+class NetworkOperation < ApplicationRecord
 end
