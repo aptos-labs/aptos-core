@@ -9,6 +9,7 @@ use std::{collections::BTreeMap, fmt};
 use thiserror::Error;
 
 use crate::multi_signature::{MultiSignature, PartialSignatures};
+#[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_signer::ValidatorSigner;
 use anyhow::{ensure, Result};
 use aptos_crypto::bls12381::PublicKey;
@@ -41,7 +42,7 @@ pub enum VerifyError {
         num_of_authors: usize,
     },
     #[error("Signature is invalid")]
-    /// The signature does not match the hash.
+    /// The signature is invalid
     InvalidSignature,
     #[error("Inconsistent Block Info")]
     InconsistentBlockInfo,
@@ -233,11 +234,6 @@ impl ValidatorVerifier {
         message: &T,
         multi_signature: &MultiSignature,
     ) -> std::result::Result<(), VerifyError> {
-        // Verify the multi signature is not empty
-        multi_signature
-            .multi_sig()
-            .as_ref()
-            .ok_or(VerifyError::InvalidSignature)?;
         // Verify the number of signature is not greater than expected.
         self.check_num_of_signatures(multi_signature)?;
         let authors: HashSet<AccountAddress> = multi_signature
@@ -246,6 +242,10 @@ impl ValidatorVerifier {
             .collect();
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter())?;
+        if self.quorum_voting_power == 0 {
+            // This should happen only in case of tests
+            return Ok(());
+        }
         // Verify the optimistically aggregated signature.
         let pub_keys_to_agg: Vec<&PublicKey> = self
             .address_to_validator_info

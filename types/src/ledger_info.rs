@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_signer::ValidatorSigner;
 use crate::{
     account_address::AccountAddress,
