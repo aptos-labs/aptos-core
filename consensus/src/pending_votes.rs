@@ -9,9 +9,9 @@
 
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
-use aptos_types::multi_signature::PartialSignatures;
 use aptos_types::{
     ledger_info::LedgerInfoWithPartialSignatures,
+    multi_signature::PartialSignatures,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use consensus_types::{
@@ -29,7 +29,7 @@ use std::{
 pub enum VoteReceptionResult {
     /// The vote has been added but QC has not been formed yet. Return the amount of voting power
     /// QC currently has.
-    VoteAdded(u64),
+    VoteAdded(u128),
     /// The very same vote message has been processed in past.
     DuplicateVote,
     /// The very same author has already voted for another proposal in this round (equivocation).
@@ -45,7 +45,7 @@ pub enum VoteReceptionResult {
     /// The vote is not for the current round.
     UnexpectedRound(u64, u64),
     /// Receive f+1 timeout to trigger a local timeout, return the amount of voting power TC currently has.
-    EchoTimeout(u64),
+    EchoTimeout(u128),
 }
 
 /// A PendingVotes structure keep track of votes
