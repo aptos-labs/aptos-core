@@ -37,6 +37,7 @@ module aptos_std::aggregator_factory {
     friend aptos_std::aggregator_tests;
 
     // TODO: only certain modules are allowed to create a aggregator.
+    friend aptos_std::optional_aggregator;
     friend aptos_std::table_with_aggregator_length;
 
     /// When aggregator factory has already been published.
