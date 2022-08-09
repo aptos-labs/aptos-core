@@ -1,5 +1,5 @@
 [[redirects]]
   from = "/docs"
-  to = "/docs/aptos-wallet-intro"
+  to = "/docs/petra-intro"
   status = 302
   force = false

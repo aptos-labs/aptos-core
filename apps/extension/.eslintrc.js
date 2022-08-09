@@ -6,7 +6,7 @@ module.exports = {
     webextensions: true,
   },
   extends: [
-    '@aptos-wallet/eslint-config',
+    '@petra/eslint-config',
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {

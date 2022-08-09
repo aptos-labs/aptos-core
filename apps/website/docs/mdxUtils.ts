@@ -11,8 +11,8 @@ export const docsFilePaths = fs
   .filter((value) => /\.mdx?$/.test(value));
 
 export const docsSlugOrdering = Object.freeze([
-  'aptos-wallet-intro',
-  'connect-to-aptos-wallet',
+  'petra-intro',
+  'connect-to-petra',
   'sending-a-transaction',
   'signing-a-message',
   'errors',

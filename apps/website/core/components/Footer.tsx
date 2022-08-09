@@ -1,6 +1,5 @@
 import {
   Box,
-  Center,
   Divider,
   Flex,
   Grid,
@@ -24,11 +23,11 @@ export default function Footer() {
     <Flex width="100%" bgColor={secondaryBgColor[colorMode]} justifyContent="center" py={8}>
       <VStack as="footer" maxW="800px" width="100%" divider={<Divider />} spacing={4} px={4}>
         <Grid templateColumns="107px 1fr" width="100%">
-          <Center>
+          <Flex>
             <ChakraLink href="/" fontSize="lg" fontWeight={600} verticalAlign="middle">
               {COMPANY_NAME}
             </ChakraLink>
-          </Center>
+          </Flex>
           <HStack justifyContent="flex-end" spacing={[4, 4, 8]}>
             <ChakraLink color={secondaryTextColor[colorMode]} href="/about" target="_blank">
               About
@@ -37,10 +36,10 @@ export default function Footer() {
               Legal
             </ChakraLink>
             <ChakraLink color={secondaryTextColor[colorMode]} href="/privacy-policy" target="_blank">
-              Privacy policy
+              Privacy
             </ChakraLink>
             <ChakraLink color={secondaryTextColor[colorMode]} href="/press-kit" target="_blank">
-              Press kit
+              Press
             </ChakraLink>
           </HStack>
         </Grid>

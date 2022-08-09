@@ -1,4 +1,4 @@
-# Aptos Wallet Website
+# Petra Website
 ## Getting Started
 
 ### Development

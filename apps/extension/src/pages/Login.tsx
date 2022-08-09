@@ -102,7 +102,7 @@ function Login() {
             }
             </Box>
           </Center>
-          <Heading textAlign="center">Wallet</Heading>
+          <Heading textAlign="center">Petra</Heading>
           <Text
             textAlign="center"
             pb={8}

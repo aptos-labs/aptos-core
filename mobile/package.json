@@ -1,5 +1,5 @@
 {
-  "name": "@aptos-wallet/mobile",
+  "name": "@petra/mobile",
   "version": "0.0.1",
   "private": true,
   "scripts": {

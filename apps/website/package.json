@@ -1,5 +1,5 @@
 {
-  "name": "@aptos-wallet/website",
+  "name": "@petra/website",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,7 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@aptos-wallet/web-ui": "*",
+    "@petra/web-ui": "*",
     "@chakra-ui/icons": "^2.0.2",
     "@chakra-ui/react": "^2.2.1",
     "@emotion/react": "^11",
@@ -34,7 +34,7 @@
     "remark-html": "^15.0.1"
   },
   "devDependencies": {
-    "@aptos-wallet/eslint-config": "*",
+    "@petra/eslint-config": "*",
     "@types/node": "18.0.0",
     "@types/react": "18.0.14",
     "@types/react-dom": "18.0.5",

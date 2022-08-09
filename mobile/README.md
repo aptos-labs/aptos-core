@@ -1,4 +1,4 @@
-# Aptos Wallet - Android / iOS (React Native)
+# Petra Wallet - Android / iOS (React Native)
 
 ## Setup React Native Enviroment
 **You can follow the react native setup guide [here](https://reactnative.dev/docs/environment-setup)**

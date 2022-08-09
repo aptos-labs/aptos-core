@@ -1,4 +1,4 @@
-# Aptos Wallet - Browser Extension
+# Petra - Browser Extension
 
 ## Setup
 

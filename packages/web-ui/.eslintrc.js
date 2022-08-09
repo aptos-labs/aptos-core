@@ -5,7 +5,7 @@ module.exports = {
     jest: true
   },
   extends: [
-    '@aptos-wallet/eslint-config'
+    '@petra/eslint-config'
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {

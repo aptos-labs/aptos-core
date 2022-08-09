@@ -4,7 +4,7 @@ import {
   useColorMode,
 } from '@chakra-ui/react';
 import { secondaryLinkColor } from 'core/colors';
-import { COMPANY_NAME } from 'core/constants';
+import { COMPANY_NAME_WITH_WALLET } from 'core/constants';
 import dynamic from 'next/dynamic';
 import ChakraLink from './ChakraLink';
 import Info from './Info';
@@ -28,7 +28,7 @@ const DynamicCodeBlock = dynamic(() => import('./CodeBlock'), {
   suspense: true,
 });
 
-const CompanyName = () => <span>{COMPANY_NAME}</span>;
+const CompanyName = () => <span>{COMPANY_NAME_WITH_WALLET}</span>;
 
 const Heading1 = (props: any) => {
   const marginBottom = `calc(${ifmH1VerticalRhythmBottom} * ${ifmLeading})`;

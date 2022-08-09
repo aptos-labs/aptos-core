@@ -1,4 +1,4 @@
-import { AptosBlackLogo, AptosWhiteLogo } from '@aptos-wallet/web-ui';
+import { AptosBlackLogo, AptosWhiteLogo } from '@petra/web-ui';
 import {
   Box,
   Button,
@@ -49,7 +49,7 @@ export default function LoginDemo() {
             }
             </Box>
           </Center>
-          <Heading textAlign="center">Wallet</Heading>
+          <Heading textAlign="center">Petra</Heading>
           <Text
             textAlign="center"
             pb={8}

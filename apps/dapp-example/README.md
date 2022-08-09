@@ -1,4 +1,4 @@
-# Aptos Wallet - Example dApp
+# Petra - Example dApp
 A major function of a web3 wallet is providing an API for dApps. To help partners and us test this we made a simple dApp to show all the APIs. View the dApp documentation [here.](https://aptos.dev/guides/building-wallet-extension)
 
 ## Setup

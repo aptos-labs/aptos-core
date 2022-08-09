@@ -7,7 +7,7 @@ const nextConfig = {
     return [
       {
         source: '/docs',
-        destination: '/docs/aptos-wallet-intro',
+        destination: '/docs/petra-intro',
         permanent: true,
       }
     ]

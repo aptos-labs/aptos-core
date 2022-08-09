@@ -1,6 +1,6 @@
 import { MoonIcon, SunIcon } from '@chakra-ui/icons';
 import {
-  Button, Center, Grid, HStack, IconButton, useColorMode,
+  Button, Flex, Grid, HStack, IconButton, useColorMode,
 } from '@chakra-ui/react';
 import { FaDiscord } from 'react-icons/fa';
 import { useMemo } from 'react';
@@ -21,11 +21,11 @@ const Header = () => {
       templateColumns="107px 1fr"
       px={4}
     >
-      <Center>
+      <Flex alignItems="center">
         <ChakraLink href="/" fontSize="lg" fontWeight={600} verticalAlign="middle">
           {COMPANY_NAME}
         </ChakraLink>
-      </Center>
+      </Flex>
       <HStack justifyContent="flex-end" spacing={[2, 4, 4]}>
         <ChakraLinkBare href="/docs" passHref>
           <Button variant="ghost" as="a">
@@ -33,7 +33,7 @@ const Header = () => {
           </Button>
         </ChakraLinkBare>
         <ChakraLinkBare
-          href="https://discord.com/channels/945856774056083548/990744308850253904"
+          href="https://discord.gg/rt2tQSFd"
         >
           <IconButton
             as="a"

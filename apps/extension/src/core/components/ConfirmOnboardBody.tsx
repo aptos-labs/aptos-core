@@ -14,7 +14,7 @@ import { FaDiscord } from '@react-icons/all-files/fa/FaDiscord';
 import React from 'react';
 
 const aptosDevWalletExtensionUrl = 'https://aptos.dev/guides/building-wallet-extension';
-const aptosWalletDiscordUrl = 'https://discord.com/channels/945856774056083548/990744308850253904';
+const aptosWalletDiscordUrl = 'https://discord.gg/rt2tQSFd';
 
 export default function ConfirmOnboardBody() {
   return (

@@ -1,5 +1,5 @@
 {
-  "name": "@aptos-wallet/web-ui",
+  "name": "@petra/web-ui",
   "version": "0.0.0",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -10,8 +10,8 @@
     "lint": "eslint ./src"
   },
   "devDependencies": {
-    "@aptos-wallet/eslint-config": "*",
-    "@aptos-wallet/tsconfig": "*",
+    "@petra/eslint-config": "*",
+    "@petra/tsconfig": "*",
     "@types/react": "^17.0.37",
     "@types/react-dom": "^17.0.11",
     "eslint": "^7.32.0",

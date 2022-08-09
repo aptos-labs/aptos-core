@@ -4,7 +4,7 @@ module.exports = {
     es2021: true,
   },
   extends: [
-    '@aptos-wallet/eslint-config',
+    '@petra/eslint-config',
   ],
   rules: {
     "react/function-component-definition": 0,

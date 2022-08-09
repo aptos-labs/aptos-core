@@ -1,5 +1,5 @@
 {
-  "name": "@aptos-wallet/dapp-example",
+  "name": "@petra/dapp-example",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -23,7 +23,7 @@
     ]
   },
   "devDependencies": {
-    "@aptos-wallet/eslint-config": "*",
+    "@petra/eslint-config": "*",
     "@types/node": "18.0.0",
     "@types/react": "18.0.14",
     "@types/react-dom": "18.0.5",
