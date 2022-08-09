@@ -9,6 +9,18 @@
 # if the necessary environment variables are set.
 #
 
+# Calculate a shard for cutting over cleanly
+SHARD_KEY="${GITHUB_USER:-$USER}"
+SHARD="$(echo $SHARD_KEY | PYTHONHASHSEED=1 python3 -c "print(abs(hash(input())) % 100)")"
+MAX_SHARD="${MAX_SHARD:-0}"
+
+if [[ $SHARD -lt $MAX_SHARD ]]; then
+    echo "Running new forge wrapper"
+    exec python3 testsuite/forge.py test "$@"
+else
+    echo "Using current forge wrapper"
+fi
+
 # ensure the script is run from project root
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
