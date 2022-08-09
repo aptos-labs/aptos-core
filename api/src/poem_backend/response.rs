@@ -209,6 +209,14 @@ macro_rules! generate_error_response {
                 }
             }
         }
+
+        impl std::error::Error for $enum_name {}
+
+        impl std::fmt::Display for $enum_name {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "{:?}", self)
+            }
+        }
     };
 }
 
