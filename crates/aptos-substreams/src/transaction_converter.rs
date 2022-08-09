@@ -7,16 +7,15 @@ use crate::{
     },
     pb::{
         aptos::{
-            Ed25519Signature, Event, MultiAgentSignature, MultiEd25519Signature,
-            TransactionInfo, UserTransaction, UserTransactionRequest,
+            Ed25519Signature, Event, MultiAgentSignature, MultiEd25519Signature, TransactionInfo,
+            UserTransaction, UserTransactionRequest,
         },
-        block_output::{self, SignatureOutput, EventKeyOutput},
+        block_output::{self, EventKeyOutput, SignatureOutput},
     },
 };
 use anyhow::{bail, Context, Result};
 use block_output::{
-    BlockMetadataTransactionOutput,
-    EventOutput, TransactionInfoOutput, UserTransactionOutput,
+    BlockMetadataTransactionOutput, EventOutput, TransactionInfoOutput, UserTransactionOutput,
     WriteSetChangeOutput,
 };
 
@@ -89,19 +88,16 @@ pub fn get_user_transaction_output(
 }
 
 pub fn get_events_output(
-    events: &Vec<Event>,
+    events: &[Event],
     transaction_info: &TransactionInfoOutput,
 ) -> Result<Vec<EventOutput>> {
     Ok(events
         .iter()
         .map(|event| {
-            let key = match &event.key {
-                None => None,
-                Some(k) => Some(EventKeyOutput {
-                    creation_number: k.creation_number.clone(),
-                    account_address: k.account_address.clone(),
-                })
-            };
+            let key = event.key.as_ref().map(|k| EventKeyOutput {
+                creation_number: k.creation_number,
+                account_address: k.account_address.clone(),
+            });
             EventOutput {
                 transaction_hash: transaction_info.hash.clone(),
                 key,
@@ -222,12 +218,7 @@ fn parse_multi_agent_signature(
             None => {}
             Some(sender_sig) => {
                 signatures.append(&mut parse_multi_agent_signature_helper(
-                    sender_sig,
-                    request,
-                    info,
-                    true,
-                    0,
-                    None,
+                    sender_sig, request, info, true, 0, None,
                 )?);
             }
         }
