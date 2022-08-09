@@ -5,10 +5,12 @@ slug: "your-first-nft"
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import ThemedImage from '@theme/ThemedImage';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
 :::caution
 
-The following tutorial is a work in progress. Furthermore, the Aptos' (Non-Fungible) Token specification has not been formalized.
+The following tutorial is a work in progress. The Aptos (Non-Fungible) Token specification has not been formalized.
 
 :::
 
@@ -29,7 +31,7 @@ Additionally, most NFTs are part of a collection or a set of NFTs with a common 
 
 ## Aptos digital asset token standard
 
-When we work on Aptos token standard, we hold the following principles:
+The Aptos token standard is developed following the below principles:
 
 - Provide a standard implementation to improve interoperability across ecosystem projects.
 
@@ -39,13 +41,23 @@ When we work on Aptos token standard, we hold the following principles:
 
 - Reduce the cost of minting large amounts of NFT tokens. We support `lazy` on-chain mint through semi-fungible token
 
+:::tip Aptos implementation for core NFT
+
 The Aptos implementation for core NFTs or Tokens can be found in [Token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move).
+
+:::
 
 ## Aptos token definitions
 
-### The Token Data Model
+### The Token Data model
 
-![TokenDataModel](/img/token_data.png)
+<ThemedImage
+  alt="Signed Transaction Flow"
+  sources={{
+    light: useBaseUrl('/img/docs/token-standard-light-mode.svg'),
+    dark: useBaseUrl('/img/docs/token-standard-dark-mode.svg'),
+  }}
+/>
 
 The token related data are stored at both creator’s account and owner’s account.
 
@@ -53,31 +65,31 @@ The token related data are stored at both creator’s account and owner’s acco
 
 | Field                      | Description                                                                                                                                                                                                                     |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Collections                | maintains a table called `collection_data`, which maps the collection name to the `CollectionData`. It also stores all the TokenData that this creator creates.                                                                 |
-| CollectionData             | store the collection metadata. The `supply` is the number of tokens created for the current collection. `maxium` is the upper bound of tokens in this collection                                                                |
+| Collections                | Maintains a table called `collection_data`, which maps the collection name to the `CollectionData`. It also stores all the TokenData that this creator creates.                                                                 |
+| CollectionData             | Store the collection metadata. The `supply` is the number of tokens created for the current collection. `maxium` is the upper bound of tokens in this collection                                                                |
 | CollectionMutabilityConfig | specify which field is mutable.                                                                                                                                                                                                 |
-| TokenData                  | main struct for holding the token metadata. Properties is a where user can add their own properties that are not defined in the token data. User can mint more tokens based on the TokenData and they share the same TokenData. |
+| TokenData                  | The main struct for holding the token metadata. Properties is a where user can add their own properties that are not defined in the token data. User can mint more tokens based on the TokenData and they share the same TokenData. |
 | TokenMutabilityConfig      | control which fields are mutable                                                                                                                                                                                                |
-| TokenDataId                | an id used for representing and querying TokenData on-chain. This id mainly contains 3 fields including creator address, collection name and token name.                                                                        |
-| Royalty                    | specify the denominator and numerator for calculating the royalty fee. It also has payee account address for depositing the Royalty.                                                                                            |
-| PropertyValue              | contain both value of a property and type of property.                                                                                                                                                                          |
+| TokenDataId                | An id used for representing and querying TokenData on-chain. This id mainly contains 3 fields including creator address, collection name and token name.                                                                        |
+| Royalty                    | Specify the denominator and numerator for calculating the royalty fee. It also has payee account address for depositing the Royalty.                                                                                            |
+| PropertyValue              | Contains both value of a property and type of property.                                                                                                                                                                          |
 
 **Resource stored at owner’s address:**
 
 | Field      | Description                                                                                                                                                        |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| TokenStore | main struct for storing the token owned by this address. It maps TokenId to the actual token.                                                                      |
+| TokenStore | The main struct for storing the token owned by this address. It maps TokenId to the actual token.                                                                      |
 | Token      | `amount` is the number of tokens.                                                                                                                                  |
 | TokenId    | `TokenDataId` points to the metadata of this token. The `property_version` represents a token with mutated PropertyMap from `default_properties` in the TokenData. |
 
-## Tokens
+## Tokens tutorial
 
-This tutorial will walk you through the process of
+This tutorial will walk you through the process of:
 
-- creating your own Token collection,
-- a Token of our favorite cat,
-- and giving that token to someone else.
-- on-chain lazy mint token through mutation
+- Creating your own token collection.
+- Creating a token of our favorite cat.
+- Giving that token to someone else.
+- The on-chain lazy mint token through mutation.
 
 This tutorial builds on [Your first transaction](/tutorials/your-first-transaction) as a library for this example. The following tutorial contains example code that can be downloaded in its entirety below:
 
@@ -86,7 +98,7 @@ This tutorial builds on [Your first transaction](/tutorials/your-first-transacti
 
 For this tutorial, will be focusing on `first_nft.ts` and re-using the `first_transaction.ts` library from the previous tutorial.
 
-You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
+You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript).
 
   </TabItem>
   <TabItem value="python" label="Python">
@@ -95,14 +107,14 @@ For this tutorial, will be focusing on `first_nft.py` and re-using the `first_tr
 
   </TabItem>
   <TabItem value="rust" label="Rust">
-  TODO
+  Under construction.
   </TabItem>
 
 </Tabs>
 
 ### Creating a Collection
 
-The Aptos Token enables creators to create collections. The maximum is the total number of tokens that can be created for this collection.
+The Aptos token enables creators to create collections. The `maximum` is the total number of tokens that can be created for this collection.
 
 ```rust
 public(script) fun create_collection_script (
@@ -115,7 +127,7 @@ public(script) fun create_collection_script (
 )
 ```
 
-These script functions can be called via the REST API. The following demonstrates how to call the as demonstrated in the following:
+These script functions can be called via the REST API. See below: 
 
 <Tabs>
 <TabItem value="typescript" label="Typescript" default>
@@ -134,11 +146,11 @@ These script functions can be called via the REST API. The following demonstrate
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-TODO
+Under construction.
 </TabItem>
 </Tabs>
 
-### Creating a Token
+### Creating a token
 
 Tokens can be created after collection creation. To do so, the token must specify the same `collection` as specified as the name of a previously created collection `name`. The Move script function is:
 
@@ -161,13 +173,14 @@ public entry fun create_token_script(
 )
 ```
 
-The `balance` field is the initial amount to be created for this token. `maximum` dictates the maximal number of tokens to be minted for this created `TokenData`.
-`royalty_payee_address` is address that royalty is paid to. `royalty_points_numerator` / `royalty_points_denominator` is the percentage of sale price (`Royalty`) should be paid to the payee address.
-It can be a single owner's account address or an address of a shared account owned by a group of creators.
-`token_mutate_setting` describes whether a field is `TokenData` is mutable.
-`property_keys`, `property_values` and `property_types` are the property key value pairs that can be stored, read and write on-chain.
+- The `balance` field is the initial amount to be created for this token.
+- The `maximum` dictates the maximal number of tokens to be minted for this created `TokenData`.
+- The `royalty_payee_address` is address that royalty is paid to.
+- The quantity `royalty_points_numerator` / `royalty_points_denominator` is the percentage of sale price (`Royalty`) should be paid to the payee address. It can be a single owner's account address or an address of a shared account owned by a group of creators.
+- The `token_mutate_setting` describes whether a field is `TokenData` is mutable.
+- The `property_keys`, `property_values` and `property_types` are the property key value pairs that can be stored, read and write on-chain.
 
-These script functions can be called via the REST API. The following demonstrates how to call the as demonstrated in the following:
+These script functions can be called via the REST API. See below:
 
 <Tabs>
 <TabItem value="typescript" label="Typescript" default>
@@ -186,15 +199,15 @@ These script functions can be called via the REST API. The following demonstrate
   </TabItem>
   <TabItem value="rust" label="Rust" >
 
-TODO
+Under construction.
 </TabItem>
 </Tabs>
 
-### Giving Away a Token
+### Giving away a token
 
 In Aptos and Move, each token occupies space and has ownership. Because of this, token transfers are not unilateral and require two phase process similar to a bulletin board. The sender must first register that a token is available for the recipient to claim, the recipient must then claim this token. This has been implemented in a proof of concept move module called [`TokenTransfer`](https://github.com/aptos-labs/aptos-core/blob/nft/aptos-move/framework/aptos-framework/sources/TokenTransfers.move). `SimpleToken` provides a few wrapper functions to support transferring to another account, claiming that transfer, or stopping that transfer.
 
-#### Obtaining the Token ID
+#### Obtaining the token ID
 
 In order to transfer the token, the sender must first identify the token id based upon knowing the creator's account, the collection name, and the token name. This can be obtained by querying REST:
 
@@ -215,11 +228,11 @@ In order to transfer the token, the sender must first identify the token id base
   </TabItem>
   <TabItem value="rust" label="Rust" >
 
-TODO
+Under construction.
 </TabItem>
 </Tabs>
 
-#### Offering the Token
+#### Offering the token
 
 The following Move script function in `Token` supports transferring a token to another account, effectively registering that the other account can claim the token:
 
@@ -252,11 +265,11 @@ public entry fun offer_script(
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-TODO
+Under construction.
 </TabItem>
 </Tabs>
 
-#### Claiming the Token
+#### Claiming the token
 
 The following Move script function in `SimpleToken` supports receiving a token provided by the previous function, effectively claiming a token:
 
@@ -287,16 +300,13 @@ public entry fun claim_script(
 
   </TabItem>
   <TabItem value="rust" label="Rust">
-TODO
+Under construction.
   </TabItem>
 </Tabs>
 
 #### On-chain Lazy Mint
 
-When Alice becomes a celebrity in her community. Her cat NFTs are in high demand. However, Alice doesn't want to pay the cost
-of minting 10 million NFTs initially. She wants to only pay the cost when someone wants the NFT.
-
-She can mint 10 million uninitialized fungible cat token in one transaction.
+When Alice becomes a celebrity in her community, her cat NFTs are in high demand. However, Alice doesn't want to pay the cost of minting 10 million NFTs initially. She wants to only pay the cost when someone wants the NFT. She can mint 10 million uninitialized fungible cat token in one transaction.
 
 When Jack wants to buy an NFT from Alice, she can mutate one fungible token.
 
@@ -315,12 +325,11 @@ When Jack wants to buy an NFT from Alice, she can mutate one fungible token.
     )
 ```
 
-This will create a new property_version and create a new `TokenId` for the previous uninitialized fungible token (`property_version` = 0) to become an NFT.
-Alice can then transfer the NFT to Jack. Alice only pay the cost for creating NFT from the fungbile token when someone wants to buy.
+This will create a new `property_version` and create a new `TokenId` for the previous uninitialized fungible token (`property_version` = 0) to become an NFT. Alice can then transfer the NFT to Jack. Alice only need to pay the cost for creating NFT from the fungbile token when someone wants to buy.
 
 <Tabs>
   <TabItem value="typescript" label="Typescript" default>
-TODO
+Under construction.
   </TabItem>
   <TabItem value="python" label="Python">
 
@@ -330,10 +339,11 @@ TODO
 
   </TabItem>
   <TabItem value="rust" label="Rust">
-TODO
+Under construction.
   </TabItem>
 </Tabs>
 
+<!--- 
 ## Todos for Tokens
 
 - Add ability for additional mints
@@ -343,3 +353,4 @@ TODO
 - Enable burning in a safe way
 - Provide SDK, APIs and Indexing for tokens with better UX
 - Add marketplace and auction contracts to our token standard
+--->
