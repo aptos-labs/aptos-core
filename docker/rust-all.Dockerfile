@@ -224,3 +224,23 @@ ARG GIT_SHA
 ENV GIT_SHA ${GIT_SHA}
 
 ENTRYPOINT ["/tini", "--", "forge"]
+
+### Telemetry Service Image ###
+
+FROM debian-base AS telemetry-service
+
+RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+COPY --link --from=builder /aptos/dist/aptos-telemetry-service /usr/local/bin/aptos-telemetry-service
+
+EXPOSE 8000
+ENV RUST_LOG_FORMAT=json
+
+# add build info
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
