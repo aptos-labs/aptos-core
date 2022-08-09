@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-// Here are some macros to help implement the mapping between the on-chain gas schedule and its
-// rust representation.
+//! This module defines some macros to help implement the mapping between the on-chain gas schedule
+//! and its rust representation.
 
 macro_rules! expand_get {
     (test_only $(.$field: ident)+, $key: literal, $initial_val: expr, $param_ty: ty, $package_name: literal, $params: ident, $gas_schedule: ident) => {
