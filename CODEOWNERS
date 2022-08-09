@@ -10,3 +10,9 @@
 /terraform/ @aptos-labs/prod-eng
 # Owners for the `/docker` directory and all its subdirectories.
 /docker/ @aptos-labs/prod-eng
+# Owners for the `/state-sync` directory and all its subdirectories.
+/state-sync/ @joshlind
+# Owners for the `/consensus` directory and all its subdirectories.
+/consensus/ @zekun000
+# Owners for the `/storage` directory and all its subdirectories.
+/storage/ @msmouse

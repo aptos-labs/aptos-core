@@ -16,6 +16,7 @@ impl Test for PartialNodesDown {
 
 impl NetworkTest for PartialNodesDown {
     fn run<'t>(&self, ctx: &mut NetworkContext<'t>) -> Result<()> {
+        let runtime = Runtime::new()?;
         let duration = Duration::from_secs(120);
         let all_validators = ctx
             .swarm()
@@ -27,7 +28,7 @@ impl NetworkTest for PartialNodesDown {
         for n in &down_nodes {
             let node = ctx.swarm().validator_mut(*n).unwrap();
             println!("Node {} is going to stop", node.name());
-            node.stop()?;
+            runtime.block_on(node.stop())?;
         }
         thread::sleep(Duration::from_secs(5));
 
@@ -35,7 +36,6 @@ impl NetworkTest for PartialNodesDown {
         let txn_stat = generate_traffic(ctx, &up_nodes, duration, 1)?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
-        let runtime = Runtime::new()?;
         for n in &down_nodes {
             let node = ctx.swarm().validator_mut(*n).unwrap();
             println!("Node {} is going to restart", node.name());

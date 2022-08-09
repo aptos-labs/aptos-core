@@ -590,7 +590,7 @@
           {
             "name": "event_handle",
             "schema": {
-              "$ref": "#/components/schemas/MoveStructTagParam"
+              "$ref": "#/components/schemas/MoveStructTag"
             },
             "in": "path",
             "required": true,
@@ -837,7 +837,7 @@
           {
             "name": "resource_type",
             "schema": {
-              "$ref": "#/components/schemas/MoveStructTagParam"
+              "$ref": "#/components/schemas/MoveStructTag"
             },
             "in": "path",
             "required": true,
@@ -2727,19 +2727,9 @@
         }
       },
       "MoveModuleId": {
-        "type": "object",
-        "required": [
-          "address",
-          "name"
-        ],
-        "properties": {
-          "address": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "name": {
-            "$ref": "#/components/schemas/IdentifierWrapper"
-          }
-        }
+        "type": "string",
+        "description": "Move module id is a string representation of Move module.\n\nFormat: `{address}::{module name}`\n\n`address` should be hex-encoded 32 byte account address that is prefixed with `0x`.\n\nModule name is case-sensitive.\n",
+        "example": "0x1::aptos_coin"
       },
       "MoveResource": {
         "type": "object",
@@ -2824,8 +2814,7 @@
       "MoveStructGenericTypeParam": {
         "type": "object",
         "required": [
-          "constraints",
-          "is_phantom"
+          "constraints"
         ],
         "properties": {
           "constraints": {
@@ -2833,39 +2822,10 @@
             "items": {
               "$ref": "#/components/schemas/MoveAbility"
             }
-          },
-          "is_phantom": {
-            "type": "boolean"
           }
         }
       },
       "MoveStructTag": {
-        "type": "object",
-        "required": [
-          "address",
-          "module",
-          "name",
-          "generic_type_params"
-        ],
-        "properties": {
-          "address": {
-            "$ref": "#/components/schemas/Address"
-          },
-          "module": {
-            "$ref": "#/components/schemas/IdentifierWrapper"
-          },
-          "name": {
-            "$ref": "#/components/schemas/IdentifierWrapper"
-          },
-          "generic_type_params": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MoveType"
-            }
-          }
-        }
-      },
-      "MoveStructTagParam": {
         "type": "string",
         "description": "String representation of a MoveStructTag (on-chain Move struct type). This exists so you\ncan specify MoveStructTags as path / query parameters, e.g. for get_events_by_event_handle.\n\nIt is a combination of:\n  1. `move_module_address`, `module_name` and `struct_name`, all joined by `::`\n  2. `struct generic type parameters` joined by `, `\n\nExamples:\n  * `0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`\n  * `0x1::account::Account`\n\nNote:\n  1. Empty chars should be ignored when comparing 2 struct tag ids.\n  2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).\n\nSee [doc](https://aptos.dev/concepts/basics-accounts) for more details.\n",
         "example": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
@@ -3031,19 +2991,9 @@
         ]
       },
       "ScriptFunctionId": {
-        "type": "object",
-        "required": [
-          "module",
-          "name"
-        ],
-        "properties": {
-          "module": {
-            "$ref": "#/components/schemas/MoveModuleId"
-          },
-          "name": {
-            "$ref": "#/components/schemas/IdentifierWrapper"
-          }
-        }
+        "type": "string",
+        "description": "Script function id is string representation of a script function defined on-chain.\n\nFormat: `{address}::{module name}::{function name}`\n\nBoth `module name` and `function name` are case-sensitive.\n",
+        "example": "0x1::aptos_coin::transfer"
       },
       "ScriptFunctionPayload": {
         "type": "object",

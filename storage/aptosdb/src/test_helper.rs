@@ -90,8 +90,8 @@ prop_compose! {
         let mut txn_accumulator = TxnAccumulator::new_empty();
         let mut result = Vec::new();
 
-    let mut in_memory_state = StateDelta::new_empty();
-    let _ancester = in_memory_state.current.clone().freeze();
+        let mut in_memory_state = StateDelta::new_empty();
+        let _ancester = in_memory_state.current.clone().freeze();
 
         for block_gen in block_gens {
             let (mut txns_to_commit, mut ledger_info) = block_gen.materialize(&mut universe);

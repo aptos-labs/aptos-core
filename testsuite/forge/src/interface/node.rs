@@ -55,7 +55,7 @@ pub trait Node: Send + Sync {
 
     /// Stop this Node.
     /// This should be a noop if the Node isn't running.
-    fn stop(&mut self) -> Result<()>;
+    async fn stop(&mut self) -> Result<()>;
 
     /// Clears this Node's Storage
     fn clear_storage(&mut self) -> Result<()>;
@@ -143,7 +143,7 @@ pub trait NodeExt: Node {
 
     /// Restarts this Node by calling Node::Stop followed by Node::Start
     async fn restart(&mut self) -> Result<()> {
-        self.stop()?;
+        self.stop().await?;
         self.start().await
     }
 
