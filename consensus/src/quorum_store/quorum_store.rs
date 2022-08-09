@@ -121,6 +121,7 @@ impl QuorumStore {
             batch_reader_tx,
             batch_reader_rx,
             db,
+            validator_verifier.clone(),
             validator_signer.clone(),
             config.max_batch_expiry_round_gap,
             config.batch_expiry_grace_rounds,

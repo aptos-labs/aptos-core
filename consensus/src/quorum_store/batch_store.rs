@@ -20,6 +20,7 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
+use aptos_types::validator_verifier::ValidatorVerifier;
 use crate::quorum_store::proof_builder::ProofBuilderCommand;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -74,6 +75,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         batch_reader_tx: Sender<BatchReaderCommand>,
         batch_reader_rx: Receiver<BatchReaderCommand>,
         db: Arc<QuorumStoreDB>,
+        validator_verifier: ValidatorVerifier,
         validator_signer: Arc<ValidatorSigner>,
         max_batch_expiry_round_gap: Round,
         batch_expiry_grace_rounds: Round,
@@ -110,6 +112,7 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                     net,
                     batch_request_num_peers,
                     batch_request_timeout_ms,
+                    validator_verifier,
                 )
                 .await
         });

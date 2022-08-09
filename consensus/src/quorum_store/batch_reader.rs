@@ -33,6 +33,7 @@ use tokio::{
     },
     time,
 };
+use aptos_types::validator_verifier::ValidatorVerifier;
 
 #[derive(Debug)]
 pub(crate) enum BatchReaderCommand {
@@ -356,6 +357,7 @@ impl BatchReader {
         network_sender: T,
         request_num_peers: usize,
         request_timeout_ms: usize,
+        verifier: ValidatorVerifier,
     ) {
         debug!(
             "[QS worker] BatchReader worker for epoch {} starting",
@@ -413,7 +415,7 @@ impl BatchReader {
             }
                         BatchReaderCommand::GetBatchForSelf(proof, ret_tx) => {
                             batch_requester
-                                .add_request(proof.digest().clone(), proof.shuffled_signers(), ret_tx)
+                                .add_request(proof.digest().clone(), proof.shuffled_signers(&verifier), ret_tx)
                                 .await;
                         }
                         BatchReaderCommand::BatchResponse(digest, payload) => {

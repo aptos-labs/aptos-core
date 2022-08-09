@@ -226,6 +226,10 @@ impl ValidatorVerifier {
         Ok(aggregated_sig)
     }
 
+    pub fn validator_addresses(&self) -> Vec<AccountAddress> {
+        self.get_ordered_account_addresses_iter().collect_vec()
+    }
+
     /// This function will successfully return when at least quorum_size signatures of known authors
     /// are successfully verified. It creates an aggregated public key using the voter bitmask passed
     /// in the multi-signature and verifies the message passed in the multi-signature using the aggregated
@@ -239,7 +243,7 @@ impl ValidatorVerifier {
         // Verify the number of signature is not greater than expected.
         self.check_num_of_signatures(multi_signature)?;
         let authors = multi_signature
-            .get_voter_addresses(&self.get_ordered_account_addresses_iter().collect_vec());
+            .get_voter_addresses(&self.validator_addresses());
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter())?;
         #[cfg(any(test, feature = "fuzzing"))]

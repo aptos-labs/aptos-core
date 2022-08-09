@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::quorum_store::{quorum_store::QuorumStoreError, types::BatchId, utils::DigestTimeouts};
-use aptos_crypto::HashValue;
+use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::{debug, info};
 use aptos_types::validator_verifier::ValidatorVerifier;
 use consensus_types::proof_of_store::{ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo};
@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
 use tokio::{time, sync::oneshot as TokioOneshot};
+use aptos_types::multi_signature::PartialSignatures;
 use aptos_types::PeerId;
 
 #[derive(Debug)]
@@ -23,10 +24,60 @@ pub(crate) enum ProofBuilderCommand {
 pub(crate) type ProofReturnChannel =
 oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
+struct IncrementalProofState {
+    info: SignedDigestInfo,
+    aggregated_signature: HashMap<PeerId, bls12381::Signature>,
+    batch_id: BatchId,
+    ret_tx: ProofReturnChannel,
+}
+
+impl IncrementalProofState {
+    fn new(info: SignedDigestInfo, batch_id: BatchId, ret_tx: ProofReturnChannel) -> Self {
+        Self {
+            info,
+            aggregated_signature: HashMap::new(),
+            batch_id,
+            ret_tx,
+        }
+    }
+
+    fn add_signature(
+        &mut self,
+        signer_id: PeerId,
+        signature: bls12381::Signature,
+    ) -> Result<(), SignedDigestError> {
+        if self.aggregated_signature.contains_key(&signer_id) {
+            return Err(SignedDigestError::DuplicatedSignature);
+        }
+
+        self.aggregated_signature.insert(signer_id, signature);
+        Ok(())
+    }
+
+    fn ready(&self, validator_verifier: &ValidatorVerifier, my_peer_id: PeerId) -> bool {
+        self.aggregated_signature.contains_key(&my_peer_id) &&
+            validator_verifier
+                .check_voting_power(self.aggregated_signature.keys())
+                .is_ok()
+    }
+
+    fn take(self, validator_verifier: &ValidatorVerifier) -> (ProofOfStore, BatchId, ProofReturnChannel) {
+        let proof = match validator_verifier.aggregate_multi_signature(&PartialSignatures::new(self.aggregated_signature)) {
+            Ok((sig, _)) => ProofOfStore::new(self.info, sig),
+            Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
+        };
+        (proof, self.batch_id, self.ret_tx)
+    }
+
+    fn send_timeout(self) {
+        self.ret_tx.send(Err(QuorumStoreError::Timeout(self.batch_id))).expect("Unable to send the timeout a proof of store");
+    }
+}
+
 pub(crate) struct ProofBuilder {
     peer_id: PeerId,
     proof_timeout_ms: usize,
-    digest_to_proof: HashMap<HashValue, (ProofOfStore, BatchId, ProofReturnChannel)>,
+    digest_to_proof: HashMap<HashValue, IncrementalProofState>,
     timeouts: DigestTimeouts,
 }
 
@@ -49,7 +100,7 @@ impl ProofBuilder {
     ) -> Result<(), SignedDigestError> {
         self.timeouts.add_digest(info.digest, self.proof_timeout_ms);
         self.digest_to_proof
-            .insert(info.digest, (ProofOfStore::new(info), batch_id, tx));
+            .insert(info.digest, IncrementalProofState::new(info, batch_id, tx));
         Ok(())
     }
 
@@ -70,14 +121,15 @@ impl ProofBuilder {
         let my_id = self.peer_id;
         self.digest_to_proof
             .entry(signed_digest.info.digest)
-            .and_modify(|(proof, _, _)| {
-                ret = proof.add_signature(signed_digest.peer_id, signed_digest.signature);
+            .and_modify(|state| {
+                ret = state.add_signature(signed_digest.peer_id, signed_digest.signature);
                 if ret.is_ok() {
-                    ready = proof.ready(validator_verifier, my_id);
+                    ready = state.ready(validator_verifier, my_id);
                 }
             });
         if ready {
-            let (proof, batch_id, tx) = self.digest_to_proof.remove(&digest).unwrap();
+            let (proof, batch_id, tx) =
+                self.digest_to_proof.remove(&digest).unwrap().take(validator_verifier);
             tx.send(Ok((proof, batch_id)))
                 .expect("Unable to send the proof of store");
         }
@@ -86,9 +138,8 @@ impl ProofBuilder {
 
     fn expire(&mut self) {
         for digest in self.timeouts.expire() {
-            if let Some((_, batch_id, tx)) = self.digest_to_proof.remove(&digest) {
-                tx.send(Err(QuorumStoreError::Timeout(batch_id)))
-                    .expect("Unable to send the timeout a proof of store");
+            if let Some(state) = self.digest_to_proof.remove(&digest) {
+                state.send_timeout();
             }
         }
     }

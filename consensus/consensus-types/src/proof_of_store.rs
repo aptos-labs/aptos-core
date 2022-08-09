@@ -10,8 +10,8 @@ use aptos_types::validator_signer::ValidatorSigner;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use rand::{seq::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 use std::sync::Arc;
+use aptos_types::multi_signature::MultiSignature;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize, Hash)]
 pub struct LogicalTime {
@@ -89,21 +89,19 @@ pub enum SignedDigestError {
     DuplicatedSignature,
 }
 
-//TODO: sign hashValue and expiration - make ProofOfStoreInfo and sign it
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 #[allow(dead_code)]
 pub struct ProofOfStore {
     info: SignedDigestInfo,
-    aggregated_signature: BTreeMap<PeerId, bls12381::Signature>,
-    // TODO: should we add sender + signature(digest + sender)?
+    multi_signature: MultiSignature,
 }
 
 #[allow(dead_code)]
 impl ProofOfStore {
-    pub fn new(info: SignedDigestInfo) -> Self {
+    pub fn new(info: SignedDigestInfo, multi_signature: MultiSignature) -> Self {
         Self {
             info,
-            aggregated_signature: BTreeMap::new(),
+            multi_signature,
         }
     }
 
@@ -115,36 +113,16 @@ impl ProofOfStore {
         self.info.expiration
     }
 
-    pub fn ready(&self, validator_verifier: &ValidatorVerifier, my_peer_id: PeerId) -> bool {
-        self.aggregated_signature.contains_key(&my_peer_id) &&
-            validator_verifier
-            .check_voting_power(self.aggregated_signature.keys())
-            .is_ok()
-    }
-
     pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         validator
-            .verify_aggregated_struct_signature(&self.info, &self.aggregated_signature)
+            .verify_multi_signatures(&self.info, &self.multi_signature)
             .context("Failed to verify ProofOfStore")
     }
 
-    pub fn shuffled_signers(&self) -> Vec<PeerId> {
-        let mut ret: Vec<PeerId> = self.aggregated_signature.keys().cloned().collect();
+    pub fn shuffled_signers(&self, validator: &ValidatorVerifier) -> Vec<PeerId> {
+        let mut ret: Vec<PeerId> = self.multi_signature.get_voter_addresses(&validator.validator_addresses());
         ret.shuffle(&mut thread_rng());
         ret
-    }
-
-    pub fn add_signature(
-        &mut self,
-        signer_id: PeerId,
-        signature: bls12381::Signature,
-    ) -> Result<(), SignedDigestError> {
-        if self.aggregated_signature.contains_key(&signer_id) {
-            return Err(SignedDigestError::DuplicatedSignature);
-        }
-
-        self.aggregated_signature.insert(signer_id, signature);
-        Ok(())
     }
 
     pub fn epoch(&self) -> u64 {
