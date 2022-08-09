@@ -178,10 +178,8 @@ async fn test_join_and_leave_validator() {
 
     assert_validator_set_sizes(&cli, 1, 0, 0).await;
 
-    assert_eq!(
-        DEFAULT_FUNDED_COINS - gas_used,
-        cli.account_balance(validator_cli_index).await.unwrap()
-    );
+    cli.assert_account_balance_now(validator_cli_index, DEFAULT_FUNDED_COINS - gas_used)
+        .await;
 
     let stake_coins = 7;
     gas_used += get_gas(
@@ -190,10 +188,11 @@ async fn test_join_and_leave_validator() {
             .unwrap(),
     );
 
-    assert_eq!(
+    cli.assert_account_balance_now(
+        validator_cli_index,
         DEFAULT_FUNDED_COINS - stake_coins - gas_used,
-        cli.account_balance(validator_cli_index).await.unwrap()
-    );
+    )
+    .await;
 
     reconfig(
         &rest_client,
@@ -246,10 +245,12 @@ async fn test_join_and_leave_validator() {
 
     assert_validator_set_sizes(&cli, 1, 0, 0).await;
 
-    assert_eq!(
+    cli.assert_account_balance_now(
+        validator_cli_index,
         DEFAULT_FUNDED_COINS - stake_coins - gas_used,
-        cli.account_balance(validator_cli_index).await.unwrap()
-    );
+    )
+    .await;
+
     let unlock_stake = 3;
 
     // Unlock stake.
@@ -269,10 +270,11 @@ async fn test_join_and_leave_validator() {
             .unwrap(),
     );
 
-    assert_eq!(
+    cli.assert_account_balance_now(
+        validator_cli_index,
         DEFAULT_FUNDED_COINS - stake_coins + withdraw_stake - gas_used,
-        cli.account_balance(validator_cli_index).await.unwrap()
-    );
+    )
+    .await;
 }
 
 fn dns_name(addr: &str) -> DnsName {
@@ -312,10 +314,9 @@ async fn init_validator_account(
         .add_cli_account(validator_node_keys.account_private_key.clone())
         .await
         .unwrap();
-    assert_eq!(
-        DEFAULT_FUNDED_COINS,
-        cli.account_balance(validator_cli_index).await.unwrap()
-    );
+
+    cli.assert_account_balance_now(validator_cli_index, DEFAULT_FUNDED_COINS)
+        .await;
     (validator_cli_index, validator_node_keys)
 }
 
