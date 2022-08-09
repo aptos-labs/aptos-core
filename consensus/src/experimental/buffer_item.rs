@@ -33,7 +33,7 @@ fn generate_commit_ledger_info(
 }
 
 fn verify_signatures(
-    unverified_signatures: &PartialSignatures,
+    unverified_signatures: PartialSignatures,
     validator: &ValidatorVerifier,
     commit_ledger_info: &LedgerInfo,
 ) -> PartialSignatures {
@@ -203,7 +203,7 @@ impl BufferItem {
                         generate_commit_ledger_info(&commit_info, &ordered_proof);
 
                     let verified_signatures =
-                        verify_signatures(&unverified_signatures, validator, &commit_ledger_info);
+                        verify_signatures(unverified_signatures, validator, &commit_ledger_info);
                     if (validator.check_voting_power(verified_signatures.signatures().keys()))
                         .is_ok()
                     {

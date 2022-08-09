@@ -164,6 +164,7 @@ impl LedgerInfoWithSignatures {
 }
 
 /// Helper function to generate LedgerInfoWithSignature from a set of validator signers used for testing
+#[cfg(any(test, feature = "fuzzing"))]
 pub fn generate_ledger_info_with_sig(
     validators: &[ValidatorSigner],
     ledger_info: LedgerInfo,
@@ -337,6 +338,7 @@ impl LedgerInfoWithPartialSignatures {
             aggregated_sig,
         ))
     }
+
     pub fn ledger_info(&self) -> &LedgerInfo {
         &self.ledger_info
     }
@@ -351,6 +353,7 @@ impl LedgerInfoWithPartialSignatures {
 //
 
 use crate::multi_signature::{MultiSignature, PartialSignatures};
+#[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_verifier::generate_validator_verifier;
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_verifier::random_validator_verifier;
