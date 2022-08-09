@@ -982,14 +982,14 @@ impl DbReader for AptosDB {
     /// Get the first version that txn starts existent.
     fn get_first_txn_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_txn_version", || {
-            self.transaction_store.get_first_txn_version()
+            Ok(Some(self.ledger_pruner.get_min_readable_version()))
         })
     }
 
     /// Get the first version that write set starts existent.
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_write_set_version", || {
-            self.transaction_store.get_first_write_set_version()
+            Ok(Some(self.ledger_pruner.get_min_readable_version()))
         })
     }
 
