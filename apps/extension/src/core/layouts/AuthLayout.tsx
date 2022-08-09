@@ -26,6 +26,7 @@ export default function AuthLayout({
       case '/help':
       case '/no-wallet':
       case '/add-account':
+      case '/create-account':
       case '/import/private-key':
       case '/import/mnemonic':
         return '/wallet';
@@ -49,9 +50,6 @@ export default function AuthLayout({
     case '/create-wallet':
     case '/help':
     case '/no-wallet':
-    case '/add-account':
-    case '/import/private-key':
-    case '/import/mnemonic':
       return aptosAccount ? redirect : page;
     case '/gallery':
     case '/password':
@@ -61,6 +59,11 @@ export default function AuthLayout({
     case '/tokens/:id':
     case '/wallet':
       return aptosAccount ? page : redirect;
+    case '/add-account':
+    case '/create-account':
+    case '/import/private-key':
+    case '/import/mnemonic':
+      return page;
     default:
       return page;
   }

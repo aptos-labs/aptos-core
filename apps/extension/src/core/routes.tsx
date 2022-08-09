@@ -19,6 +19,7 @@ import NoWallet from 'pages/NoWallet';
 import AddAccount from 'pages/AddAccount';
 import ImportAccountMnemonic from 'pages/ImportAccountMnemonic';
 import ImportAccountPrivateKey from 'pages/ImportAccountPrivateKey';
+import CreateAccount from 'pages/CreateAccount';
 
 export const Routes = Object.freeze({
   account: {
@@ -32,6 +33,10 @@ export const Routes = Object.freeze({
   addAccount: {
     element: <AddAccount />,
     routePath: '/add-account',
+  },
+  createAccount: {
+    element: <CreateAccount />,
+    routePath: '/create-account',
   },
   createWallet: {
     element: <CreateWallet />,

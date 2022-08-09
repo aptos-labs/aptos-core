@@ -4,7 +4,6 @@
 import {
   Box,
   Button,
-  ButtonGroup,
   Center,
   Drawer,
   DrawerBody,
@@ -35,11 +34,10 @@ import {
   secondaryHeaderInputHoverBgColor,
 } from 'core/colors';
 import { IoIosWallet } from '@react-icons/all-files/io/IoIosWallet';
-import { AptosAccount } from 'aptos';
 import { useNavigate } from 'react-router-dom';
 import Routes from 'core/routes';
-import { createNewMnemonic } from 'core/utils/account';
 import WalletDrawerBody from './WalletDrawerBody';
+import ChakraLink from './ChakraLink';
 
 interface WalletHeaderProps {
   showBackButton?: boolean;
@@ -48,23 +46,14 @@ interface WalletHeaderProps {
 export default function WalletHeader({
   showBackButton,
 }: WalletHeaderProps) {
-  const { addAccount, aptosAccount } = useWalletState();
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const { aptosAccount } = useWalletState();
+  const [isLoading] = useState<boolean>(false);
   const navigate = useNavigate();
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { colorMode } = useColorMode();
   const { hasCopied, onCopy } = useClipboard(
     aptosAccount?.address().hex() || '',
   );
-
-  const newWalletOnClick = async () => {
-    setIsLoading(true);
-    const mnemonic = await createNewMnemonic();
-    const account = new AptosAccount(mnemonic.seed);
-    await addAccount({ account, mnemonic });
-    setIsLoading(false);
-    navigate(Routes.login.routePath);
-  };
 
   return (
     <Grid
@@ -139,19 +128,22 @@ export default function WalletHeader({
                 px={4}
                 borderBottomWidth="1px"
               >
-                <Grid templateColumns="1fr 150px">
-                  <Text>Wallets</Text>
-                  <ButtonGroup justifyContent="flex-end">
+                <Grid templateColumns="1fr 136px">
+                  <Text>Accounts</Text>
+                  <ChakraLink
+                    to={Routes.addAccount.routePath}
+                    display="flex"
+                    justifyContent="flex-end"
+                  >
                     <Button
                       colorScheme="teal"
                       size="sm"
                       leftIcon={<AddIcon />}
-                      onClick={newWalletOnClick}
                       isLoading={isLoading}
                     >
-                      New Wallet
+                      New Account
                     </Button>
-                  </ButtonGroup>
+                  </ChakraLink>
                 </Grid>
               </DrawerHeader>
               <DrawerBody px={4} maxH="400px">

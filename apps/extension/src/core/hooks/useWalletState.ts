@@ -23,6 +23,7 @@ import {
   removeAccountErrorToast,
   importAccountErrorToast,
   importAccountToast,
+  importAccountErrorAccountAlreadyExistsToast,
 } from 'core/components/Toast';
 import { ProviderEvent, sendProviderEvent } from 'core/utils/providerEvents';
 
@@ -73,6 +74,14 @@ export default function useWalletState() {
   const addAccount = useCallback(async ({
     account, isImport = false, mnemonic,
   }: AddAccountProps) => {
+    const newAccountAddress = account.address().hex();
+    console.log('hi');
+
+    // check if account already exists
+    if (localStorageState.accounts !== null && newAccountAddress in localStorageState.accounts) {
+      importAccountErrorAccountAlreadyExistsToast();
+      throw new Error('Account already exists');
+    }
     const newAccount: WalletAccount = {
       aptosAccount: account.toPrivateKeyObject(),
       mnemonic,
@@ -81,9 +90,9 @@ export default function useWalletState() {
     localStorageStateCopy = {
       accounts: {
         ...localStorageStateCopy.accounts,
-        [account.address().hex()]: newAccount,
+        [newAccountAddress]: newAccount,
       },
-      currAccountAddress: account.address().hex(),
+      currAccountAddress: newAccountAddress,
     };
     try {
       if (faucetNetwork) {
@@ -187,7 +196,7 @@ export default function useWalletState() {
       newAccountAddress = currAccountAddress || null;
       toastMessage = `Using the same account with address: ${newAccountAddress?.substring(0, 6)}...`;
     }
-
+    console.log('hi');
     localStorageStateCopy = {
       ...localStorageStateCopy,
       currAccountAddress: newAccountAddress,

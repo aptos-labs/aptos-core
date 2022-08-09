@@ -14,6 +14,11 @@ import {
   defaultNetworkType, NodeUrl, nodeUrlMap, nodeUrlReverseMap,
 } from './network';
 
+export function generateMnemonic() {
+  const mnemonic = bip39.generateMnemonic(wordlist);
+  return mnemonic;
+}
+
 export async function generateMnemonicObject(mnemonicString: string): Promise<Mnemonic> {
   const seed = await bip39.mnemonicToSeed(mnemonicString);
   const bufferSeed = new Uint8Array(seed.buffer);

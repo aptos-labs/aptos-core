@@ -44,6 +44,22 @@ export const importAccountErrorToast = () => {
   });
 };
 
+export const importAccountErrorAccountAlreadyExistsToast = () => {
+  toast({
+    description: 'Account already exists in wallet',
+    status: 'error',
+    title: 'Error importing account',
+  });
+};
+
+export const importAccountNotFoundToast = () => {
+  toast({
+    description: 'Account does not exist on-chain (please note devnet is wiped every 2 weeks)',
+    status: 'error',
+    title: 'Error importing account',
+  });
+};
+
 // Switch Account
 
 export const switchAccountToast = (accountAddress: string) => {

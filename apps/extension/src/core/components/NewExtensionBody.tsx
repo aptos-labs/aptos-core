@@ -44,12 +44,7 @@ export default function NewExtensionBody() {
         <VStack spacing={4}>
           <ChakraLink to={Routes.createWallet.routePath} width="100%">
             <Button colorScheme="teal" variant="solid" width="100%">
-              Create a new wallet
-            </Button>
-          </ChakraLink>
-          <ChakraLink to={Routes.addAccount.routePath} width="100%">
-            <Button colorScheme="gray" variant="solid" width="100%">
-              I already have a wallet
+              Get started
             </Button>
           </ChakraLink>
         </VStack>

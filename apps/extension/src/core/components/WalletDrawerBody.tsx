@@ -67,7 +67,7 @@ function WalletDrawerBodyListItem(
   const { data: coinBalance } = useAccountCoinBalance({ address, refetchInterval: 4000 });
   const coinBalanceString = numeral(coinBalance).format('0,0');
 
-  const walletAddressFormatted = `Wallet: ${address.substring(0, 15)}...`;
+  const accountAddressFormatted = `Account: ${address.substring(0, 15)}...`;
 
   return useMemo(() => {
     const deleteOnClick = () => {
@@ -105,7 +105,7 @@ function WalletDrawerBodyListItem(
           >
             <VStack alignItems="flex-start">
               <Heading fontSize="lg" fontWeight={500} noOfLines={1} maxW={80}>
-                {walletAddressFormatted}
+                {accountAddressFormatted}
               </Heading>
             </VStack>
             <DeleteIcon
@@ -167,7 +167,7 @@ function WalletDrawerBodyListItem(
         </Box>
       </Box>
     );
-  }, [input, checkbox, colorMode, isChecked, walletAddressFormatted,
+  }, [input, checkbox, colorMode, isChecked, accountAddressFormatted,
     onOpen, isOpen, onClose, address, coinBalanceString,
     latestTransactionTimestamp, removeAccount, navigate]);
 }
