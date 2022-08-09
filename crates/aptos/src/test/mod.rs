@@ -178,6 +178,7 @@ impl CliTestFramework {
             account: self.account_id(index),
             faucet_options: self.faucet_options(),
             num_coins: amount.unwrap_or(DEFAULT_FUNDED_COINS),
+            rest_options: self.rest_options(),
         }
         .execute()
         .await
@@ -388,45 +389,64 @@ impl CliTestFramework {
         result
     }
 
-    pub async fn account_balance(&self, index: usize) -> CliTypedResult<u64> {
-        Ok(u64::from_str(
-            self.wait_for_account(index)
-                .await?
-                .get(0)
-                .unwrap()
-                .as_object()
-                .unwrap()
-                .get("coin")
-                .unwrap()
-                .as_object()
-                .unwrap()
-                .get("value")
-                .unwrap()
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap())
+    pub async fn account_balance_now(&self, index: usize) -> CliTypedResult<u64> {
+        let result = self.list_account(index, ListQuery::Balance).await?;
+        Ok(json_account_to_balance(result.get(0).unwrap()))
     }
 
-    pub async fn wait_for_balance(
-        &self,
-        index: usize,
-        expected_balance: u64,
-    ) -> CliTypedResult<u64> {
-        let mut result = self.account_balance(index).await;
-        let start = Instant::now();
-        while start.elapsed() < Duration::from_secs(10) {
-            if let Ok(balance) = result {
-                if balance == expected_balance {
-                    return result;
-                }
-            }
+    pub async fn assert_account_balance_now(&self, index: usize, expected: u64) {
+        let result = self.list_account(index, ListQuery::Balance).await;
+        assert!(
+            result.is_ok(),
+            "Account {} not yet created, {}, last 10 transactions: {}",
+            self.account_id(index),
+            result.unwrap_err(),
+            self.last_n_transactions_details(10).await
+        );
+        let accounts = result.unwrap();
+        let account = accounts.get(0).unwrap();
+        let coin = json_account_to_balance(account);
+        assert_eq!(
+            coin,
+            expected,
+            "Account {} with state: {:?}, last 10 transactions: {}",
+            self.account_id(index),
+            account,
+            self.last_n_transactions_details(10).await
+        );
+    }
 
-            sleep(Duration::from_millis(500)).await;
-            result = self.account_balance(index).await;
+    async fn last_n_transactions_details(&self, count: u16) -> String {
+        let result = aptos_rest_client::Client::new(self.endpoint.clone())
+            .get_transactions(None, Some(count))
+            .await;
+        if let Err(e) = result {
+            return format!("Err({:?})", e);
         }
-
-        result
+        let lines = result
+            .unwrap()
+            .inner()
+            .iter()
+            .map(|t| {
+                if let Transaction::UserTransaction(u) = t {
+                    format!(
+                        " * [{}] {}: sender={}, payload={:?}",
+                        t.version().unwrap_or(0),
+                        t.vm_status(),
+                        u.request.sender,
+                        u.request.payload
+                    )
+                } else {
+                    format!(
+                        " * [{}] {}: {}",
+                        t.version().unwrap_or(0),
+                        t.vm_status(),
+                        t.type_str()
+                    )
+                }
+            })
+            .collect::<Vec<_>>();
+        format!("\n{}\n", lines.join("\n"))
     }
 
     pub fn init_move_dir(&mut self) {
@@ -694,4 +714,21 @@ fn to_validator_set(value: &serde_json::Value) -> ValidatorSet {
         pending_inactive: to_validator_info_vec(value.get("pending_inactive").unwrap()),
         pending_active: to_validator_info_vec(value.get("pending_active").unwrap()),
     }
+}
+
+fn json_account_to_balance(value: &Value) -> u64 {
+    u64::from_str(
+        value
+            .as_object()
+            .unwrap()
+            .get("coin")
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .get("value")
+            .unwrap()
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap()
 }
