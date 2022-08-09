@@ -47,35 +47,35 @@ When `sf_stream.enabled` is set to `true`, the SF-Stream will be enabled, and tr
 
 ## Installing Protobuf Compiler
 
-1. Install the protobuf compiler `protoc`:
-   On OS X [Homebrew](https://github.com/Homebrew/brew) can be used:
-   
-   ```sh
-   brew install protobuf
-   ```
+#### Install `protoc`
 
-   On Ubuntu the `protobuf-compiler` package can be installed like so:
-   
-   ```sh
-   apt-get install protobuf-compiler
-   ```
-2. Install the `protoc` plugin `protoc-gen-rust` with `cargo install protobuf-codegen`
+protoc is a Protocol Buffer compiler. It is needed to generate code for Rust and other languages, out of the protobuf definitions you will create or get through third-party Substreams packages.
 
-3. Add the `protoc-gen-rust` plugin to your $PATH
+There are multiple ways on how to do it. Here is the official documentation of [protocol buffer compiler](https://grpc.io/docs/protoc-installation/).
 
-   ```sh
-   PATH="$HOME/.cargo/bin:$PATH"
-   ```
+#### Install `protoc-gen-prost`
 
-4. Run `protoc` to generate the .rs files:
+This tool helps you render Rust structures out of protobuf definitions, for use in your Substreams modules. It is called by protoc following their plugin system.
+Install it with:
 
-   ```sh
-   protoc --rust_out src/protos src/protos/*.proto
-   ```
+```bash
+  cargo install protoc-gen-prost
+```
 
-   This will generate the requisite .rs files in src/protos directory
+> If you forget to install `protoc`, when generating the definitions, you might see error about `cmake` not defined, this is a fallback when `protoc` is not found.
 
-5. To test with firehose, we need to build aptos-node
+### Install `buf`
+
+[https://buf.build](https://buf.build) is a tool used to simplify the generation of typed structures in any language. It invokes `protoc` and simplifies a good number of things. Substreams packages are compatible with [buf Images](https://docs.buf.build/reference/images).
+
+See the [installation instructions here](https://docs.buf.build/installation).
+
+### Build proto
+cargo build
+
+## Testing
+### Connect to Firehose
+To test with firehose, we need to build aptos-node
    ```
    cd ../aptos-node
    cargo install --path .
@@ -84,3 +84,4 @@ When `sf_stream.enabled` is set to `true`, the SF-Stream will be enabled, and tr
    ```
    export PATH={path to directory containing aptos-core repo}:$PATH
    ```
+Then follow instructions in https://github.com/streamingfast/firehose-aptos

@@ -5,7 +5,7 @@ pub mod convert;
 pub mod metrics;
 pub mod runtime;
 
-pub mod protos;
+pub mod pb;
 
 #[cfg(any(test))]
 pub(crate) mod tests;
