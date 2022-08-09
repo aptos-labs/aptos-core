@@ -1,13 +1,13 @@
 [package]
 name = "aptos-substreams"
-version = "0.1.0"
+version = "0.0.1"
 description = "Substreams for Aptos Chain"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-edition = "2018"
 repository = "https://github.com/aptos-labs/aptos-core"
-
-[lib]
-crate-type = ["cdylib"]
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
 
 [dependencies]
 anyhow = "1.0.57"

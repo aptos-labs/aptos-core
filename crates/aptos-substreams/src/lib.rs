@@ -1,4 +1,4 @@
-mod pb;
+pub mod pb;
 mod transaction_converter;
 
 use pb::aptos::{self, transaction::TxnData as TxnDataInput, Event};
