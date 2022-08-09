@@ -425,7 +425,7 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
         "bench_with_fullnode" => config
             .with_network_tests(&[&PerformanceBenchmarkWithFN])
-            .with_initial_fullnode_count(6),
+            .with_initial_fullnode_count(7),
         "setup_test" => config
             .with_initial_fullnode_count(1)
             .with_network_tests(&[&ForgeSetupTest]),
