@@ -566,6 +566,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-rest-client",
  "async-trait",
+ "bigdecimal",
  "chrono",
  "clap 3.2.16",
  "diesel",
@@ -1745,6 +1746,7 @@ dependencies = [
  "num-bigint 0.2.6",
  "num-integer",
  "num-traits 0.2.15",
+ "serde 1.0.141",
 ]
 
 [[package]]
@@ -2852,8 +2854,7 @@ checksum = "850878694b7933ca4c9569d30a34b55031b9b139ee1fc7b94a527c4ef960d690"
 [[package]]
 name = "diesel"
 version = "1.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b28135ecf6b7d446b43e27e225622a038cc4e2930a1022f51cdb97ada19b8e4d"
+source = "git+https://github.com/aptos-labs/diesel?branch=1.4.x#1346b2087fb11ba2feca1153a88a598a17da0d38"
 dependencies = [
  "bigdecimal",
  "bitflags",
@@ -2862,7 +2863,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.2.15",
+ "num-traits 0.1.43",
  "pq-sys",
  "r2d2",
  "serde_json",

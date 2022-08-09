@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::util::bigdecimal_to_u64;
 use crate::{
     counters::{
         GOT_CONNECTION, PROCESSOR_ERRORS, PROCESSOR_INVOCATIONS, PROCESSOR_SUCCESSES,
@@ -86,7 +87,7 @@ pub trait TransactionProcessor: Send + Sync + Debug {
             self.name(),
             version
         );
-        let psm = ProcessorStatusModel::for_mark_started(self.name(), version as i64);
+        let psm = ProcessorStatusModel::for_mark_started(self.name(), version);
         self.apply_processor_status(&psm);
     }
 
@@ -140,10 +141,10 @@ pub trait TransactionProcessor: Send + Sync + Debug {
                     .eq(false)
                     .and(dsl::name.eq(self.name().to_string())),
             )
-            .load::<i64>(&conn)
+            .load::<bigdecimal::BigDecimal>(&conn)
             .expect("Error loading the error versions only query")
             .iter()
-            .map(|v| *v as u64)
+            .map(bigdecimal_to_u64)
             .collect()
     }
 
@@ -152,11 +153,12 @@ pub trait TransactionProcessor: Send + Sync + Debug {
     fn get_max_version(&self) -> Option<u64> {
         let conn = self.get_conn();
 
-        dsl::processor_statuses
+        let res = dsl::processor_statuses
             .select(diesel::dsl::max(dsl::version))
             .filter(dsl::name.eq(self.name().to_string()))
-            .first::<Option<i64>>(&conn)
-            .expect("Error loading the max version query")
-            .map(|v| v as u64)
+            .first::<Option<bigdecimal::BigDecimal>>(&conn);
+
+        res.expect("Error loading the max version query")
+            .map(|v| bigdecimal_to_u64(&v))
     }
 }
