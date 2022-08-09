@@ -21,12 +21,18 @@
 #[macro_use]
 mod natives;
 
+mod algebra;
 mod aptos_framework;
 mod gas_meter;
 mod instr;
 mod move_stdlib;
 mod transaction;
 
+pub use algebra::{
+    AbstractMemorySize, AbstractMemoryUnit, Byte, Fee, FeePerGasUnit, Gas, GasQuantity, GasUnit,
+    InternalGas, InternalGasPerAbstractMemoryUnit, InternalGasPerByte, InternalGasUnit, NumBytes,
+    Octa, UnitDiv,
+};
 pub use gas_meter::{
     AptosGasMeter, AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule,
     NativeGasParameters, ToOnChainGasSchedule,

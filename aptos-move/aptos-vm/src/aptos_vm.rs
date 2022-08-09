@@ -516,7 +516,7 @@ impl AptosVM {
         };
 
         let gas_usage = txn_data.max_gas_amount() - gas_meter.balance();
-        TXN_GAS_USAGE.observe(gas_usage as f64);
+        TXN_GAS_USAGE.observe(u64::from(gas_usage) as f64);
 
         match result {
             Ok(output) => output,
@@ -670,7 +670,7 @@ impl AptosVM {
 
         let txn_data = TransactionMetadata {
             sender: account_config::reserved_vm_address(),
-            max_gas_amount: 0,
+            max_gas_amount: 0.into(),
             ..Default::default()
         };
         let mut gas_meter = UnmeteredGasMeter;
@@ -693,8 +693,13 @@ impl AptosVM {
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let output =
-            get_transaction_output(&mut (), session, 0, &txn_data, ExecutionStatus::Success)?;
+        let output = get_transaction_output(
+            &mut (),
+            session,
+            0.into(),
+            &txn_data,
+            ExecutionStatus::Success,
+        )?;
         Ok((VMStatus::Executed, output))
     }
 

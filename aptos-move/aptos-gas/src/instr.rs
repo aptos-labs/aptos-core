@@ -5,7 +5,10 @@
 //! initial values in the genesis and a mapping between the Rust representation and the on-chain
 //! gas schedule.
 
-use crate::gas_meter::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule};
+use crate::{
+    algebra::{AbstractMemorySize, InternalGas, InternalGasPerAbstractMemoryUnit},
+    gas_meter::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule},
+};
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format_common::Opcodes,
@@ -14,32 +17,32 @@ use move_core_types::vm_status::StatusCode;
 use std::collections::BTreeMap;
 
 macro_rules! define_gas_parameters_for_instructions {
-    ($([$name: ident, $key: literal $(,)?, $initial: expr $(,)?]),* $(,)?) => {
+    ($([$name: ident : $ty: ty, $key: literal $(,)?, $initial: expr $(,)?]),* $(,)?) => {
         /// Gas parameters for all bytecode instructions.
         ///
         /// Note: due to performance considerations, this is represented as a fixed struct instead of
         /// some other data structures that require complex lookups.
         #[derive(Debug, Clone)]
         pub struct InstructionGasParameters {
-            $(pub $name : u64),*
+            $(pub $name : $ty),*
         }
 
         impl FromOnChainGasSchedule for InstructionGasParameters {
             fn from_on_chain_gas_schedule(gas_schedule: &BTreeMap<String, u64>) -> Option<Self> {
-                Some(InstructionGasParameters { $($name: gas_schedule.get(&format!("instr.{}", $key)).cloned()?),* })
+                Some(InstructionGasParameters { $($name: gas_schedule.get(&format!("instr.{}", $key)).cloned()?.into()),* })
             }
         }
 
         impl ToOnChainGasSchedule for InstructionGasParameters {
             fn to_on_chain_gas_schedule(&self) -> Vec<(String, u64)> {
-                vec![$((format!("instr.{}", $key), self.$name)),*]
+                vec![$((format!("instr.{}", $key), self.$name.into())),*]
             }
         }
 
         impl InstructionGasParameters {
             pub fn zeros() -> Self {
                 Self {
-                    $($name: 0),*
+                    $($name: 0.into()),*
                 }
             }
         }
@@ -47,7 +50,7 @@ macro_rules! define_gas_parameters_for_instructions {
         impl InitialGasSchedule for InstructionGasParameters {
             fn initial() -> Self {
                 Self {
-                    $($name: $initial),*
+                    $($name: $initial.into()),*
                 }
             }
         }
@@ -65,137 +68,241 @@ macro_rules! define_gas_parameters_for_instructions {
 
 define_gas_parameters_for_instructions!(
     // nop
-    [nop, "nop", 1],
+    [nop: InternalGas, "nop", 1],
     // control flow
-    [ret, "ret", 1],
-    [abort, "abort", 1],
-    [br_true, "br_true", 1],
-    [br_false, "br_false", 1],
-    [branch, "branch", 1],
+    [ret: InternalGas, "ret", 1],
+    [abort: InternalGas, "abort", 1],
+    [br_true: InternalGas, "br_true", 1],
+    [br_false: InternalGas, "br_false", 1],
+    [branch: InternalGas, "branch", 1],
     // stack
-    [pop, "pop", 1],
-    [ld_u8, "ld_u8", 1],
-    [ld_u64, "ld_u64", 1],
-    [ld_u128, "ld_u128", 1],
-    [ld_true, "ld_true", 1],
-    [ld_false, "ld_false", 1],
-    [ld_const_base, "ld_const.base", 1],
-    [ld_const_unit, "ld_const.unit", 1],
-    // borrow
-    [imm_borrow_loc, "imm_borrow_loc", 1],
-    [mut_borrow_loc, "mut_borrow_loc", 1],
-    [imm_borrow_field, "imm_borrow_field", 1],
-    [mut_borrow_field, "mut_borrow_field", 1],
-    [imm_borrow_field_generic, "imm_borrow_field_generic", 1],
-    [mut_borrow_field_generic, "mut_borrow_field_generic", 1],
-    // locals
-    [copy_loc_base, "copy_loc.base", 1],
-    [copy_loc_unit, "copy_loc.unit", 1],
-    [move_loc_base, "move_loc.base", 1],
-    [move_loc_unit, "move_loc.unit", 1],
-    [st_loc_base, "st_loc.base", 1],
-    [st_loc_unit, "st_loc.unit", 1],
-    // call
-    [call_base, "call.base", 1],
-    [call_unit, "call.unit", 1],
-    [call_generic_base, "call_generic.base", 1],
-    [call_generic_unit, "call_generic.unit", 1],
-    // struct
-    [pack_base, "pack.base", 1],
-    [pack_unit, "pack.unit", 1],
-    [pack_generic_base, "pack_generic.base", 1],
-    [pack_generic_unit, "pack_generic.unit", 1],
-    [unpack_base, "unpack.base", 1],
-    [unpack_unit, "unpack.unit", 1],
-    [unpack_generic_base, "unpack_generic.base", 1],
-    [unpack_generic_unit, "unpack_generic.unit", 1],
-    // ref
-    [read_ref_base, "read_ref.base", 1],
-    [read_ref_unit, "read_ref.unit", 1],
-    [write_ref_base, "write_ref.base", 1],
-    [write_ref_unit, "write_ref.unit", 1],
-    [freeze_ref, "freeze_ref", 1],
-    // casting
-    [cast_u8, "cast_u8", 1],
-    [cast_u64, "cast_u64", 1],
-    [cast_u128, "cast_u128", 1],
-    // arithmetic
-    [add, "add", 1],
-    [sub, "sub", 1],
-    [mul, "mul", 1],
-    [mod_, "mod", 1],
-    [div, "div", 1],
-    // bitwise
-    [bit_or, "bit_or", 1],
-    [bit_and, "bit_and", 1],
-    [xor, "bit_xor", 1],
-    [shl, "bit_shl", 1],
-    [shr, "bit_shr", 1],
-    // boolean
-    [or, "or", 1],
-    [and, "and", 1],
-    [not, "not", 1],
-    // comparison
-    [lt, "lt", 1],
-    [gt, "gt", 1],
-    [le, "le", 1],
-    [ge, "ge", 1],
-    [eq_base, "eq.base", 1],
-    [eq_unit, "eq.unit", 1],
-    [neq_base, "neq.base", 1],
-    [neq_unit, "neq.unit", 1],
-    // global
-    [imm_borrow_global_base, "imm_borrow_global.base", 10],
-    [imm_borrow_global_unit, "imm_borrow_global.unit", 10],
+    [pop: InternalGas, "pop", 1],
+    [ld_u8: InternalGas, "ld_u8", 1],
+    [ld_u64: InternalGas, "ld_u64", 1],
+    [ld_u128: InternalGas, "ld_u128", 1],
+    [ld_true: InternalGas, "ld_true", 1],
+    [ld_false: InternalGas, "ld_false", 1],
+    [ld_const_base: InternalGas, "ld_const.base", 1],
     [
-        imm_borrow_global_generic_base,
+        ld_const_unit: InternalGasPerAbstractMemoryUnit,
+        "ld_const.unit",
+        1
+    ],
+    // borrow
+    [imm_borrow_loc: InternalGas, "imm_borrow_loc", 1],
+    [mut_borrow_loc: InternalGas, "mut_borrow_loc", 1],
+    [imm_borrow_field: InternalGas, "imm_borrow_field", 1],
+    [mut_borrow_field: InternalGas, "mut_borrow_field", 1],
+    [
+        imm_borrow_field_generic: InternalGas,
+        "imm_borrow_field_generic",
+        1
+    ],
+    [
+        mut_borrow_field_generic: InternalGas,
+        "mut_borrow_field_generic",
+        1
+    ],
+    // locals
+    [copy_loc_base: InternalGas, "copy_loc.base", 1],
+    [
+        copy_loc_unit: InternalGasPerAbstractMemoryUnit,
+        "copy_loc.unit",
+        1
+    ],
+    [move_loc_base: InternalGas, "move_loc.base", 1],
+    [
+        move_loc_unit: InternalGasPerAbstractMemoryUnit,
+        "move_loc.unit",
+        1
+    ],
+    [st_loc_base: InternalGas, "st_loc.base", 1],
+    [
+        st_loc_unit: InternalGasPerAbstractMemoryUnit,
+        "st_loc.unit",
+        1
+    ],
+    // call
+    [call_base: InternalGas, "call.base", 1],
+    [call_unit: InternalGasPerAbstractMemoryUnit, "call.unit", 1],
+    [call_generic_base: InternalGas, "call_generic.base", 1],
+    [
+        call_generic_unit: InternalGasPerAbstractMemoryUnit,
+        "call_generic.unit",
+        1
+    ],
+    // struct
+    [pack_base: InternalGas, "pack.base", 1],
+    [pack_unit: InternalGasPerAbstractMemoryUnit, "pack.unit", 1],
+    [pack_generic_base: InternalGas, "pack_generic.base", 1],
+    [
+        pack_generic_unit: InternalGasPerAbstractMemoryUnit,
+        "pack_generic.unit",
+        1
+    ],
+    [unpack_base: InternalGas, "unpack.base", 1],
+    [
+        unpack_unit: InternalGasPerAbstractMemoryUnit,
+        "unpack.unit",
+        1
+    ],
+    [unpack_generic_base: InternalGas, "unpack_generic.base", 1],
+    [
+        unpack_generic_unit: InternalGasPerAbstractMemoryUnit,
+        "unpack_generic.unit",
+        1
+    ],
+    // ref
+    [read_ref_base: InternalGas, "read_ref.base", 1],
+    [
+        read_ref_unit: InternalGasPerAbstractMemoryUnit,
+        "read_ref.unit",
+        1
+    ],
+    [write_ref_base: InternalGas, "write_ref.base", 1],
+    [
+        write_ref_unit: InternalGasPerAbstractMemoryUnit,
+        "write_ref.unit",
+        1
+    ],
+    [freeze_ref: InternalGas, "freeze_ref", 1],
+    // casting
+    [cast_u8: InternalGas, "cast_u8", 1],
+    [cast_u64: InternalGas, "cast_u64", 1],
+    [cast_u128: InternalGas, "cast_u128", 1],
+    // arithmetic
+    [add: InternalGas, "add", 1],
+    [sub: InternalGas, "sub", 1],
+    [mul: InternalGas, "mul", 1],
+    [mod_: InternalGas, "mod", 1],
+    [div: InternalGas, "div", 1],
+    // bitwise
+    [bit_or: InternalGas, "bit_or", 1],
+    [bit_and: InternalGas, "bit_and", 1],
+    [xor: InternalGas, "bit_xor", 1],
+    [shl: InternalGas, "bit_shl", 1],
+    [shr: InternalGas, "bit_shr", 1],
+    // boolean
+    [or: InternalGas, "or", 1],
+    [and: InternalGas, "and", 1],
+    [not: InternalGas, "not", 1],
+    // comparison
+    [lt: InternalGas, "lt", 1],
+    [gt: InternalGas, "gt", 1],
+    [le: InternalGas, "le", 1],
+    [ge: InternalGas, "ge", 1],
+    [eq_base: InternalGas, "eq.base", 1],
+    [eq_unit: InternalGasPerAbstractMemoryUnit, "eq.unit", 1],
+    [neq_base: InternalGas, "neq.base", 1],
+    [neq_unit: InternalGasPerAbstractMemoryUnit, "neq.unit", 1],
+    // global
+    [
+        imm_borrow_global_base: InternalGas,
+        "imm_borrow_global.base",
+        10
+    ],
+    [
+        imm_borrow_global_unit: InternalGasPerAbstractMemoryUnit,
+        "imm_borrow_global.unit",
+        10
+    ],
+    [
+        imm_borrow_global_generic_base: InternalGas,
         "imm_borrow_global_generic.base",
         10
     ],
     [
-        imm_borrow_global_generic_unit,
+        imm_borrow_global_generic_unit: InternalGasPerAbstractMemoryUnit,
         "imm_borrow_global_generic.unit",
         10
     ],
-    [mut_borrow_global_base, "mut_borrow_global.base", 100],
-    [mut_borrow_global_unit, "mut_borrow_global.unit", 100],
     [
-        mut_borrow_global_generic_base,
+        mut_borrow_global_base: InternalGas,
+        "mut_borrow_global.base",
+        100
+    ],
+    [
+        mut_borrow_global_unit: InternalGasPerAbstractMemoryUnit,
+        "mut_borrow_global.unit",
+        100
+    ],
+    [
+        mut_borrow_global_generic_base: InternalGas,
         "mut_borrow_global_generic.base",
         100
     ],
     [
-        mut_borrow_global_generic_unit,
+        mut_borrow_global_generic_unit: InternalGasPerAbstractMemoryUnit,
         "mut_borrow_global_generic.unit",
         100
     ],
-    [exists_base, "exists.base", 10],
-    [exists_unit, "exists.unit", 10],
-    [exists_generic_base, "exists_generic.base", 10],
-    [exists_generic_unit, "exists_generic.unit", 10],
-    [move_from_base, "move_from.base", 100],
-    [move_from_unit, "move_from.unit", 100],
-    [move_from_generic_base, "move_from_generic.base", 100],
-    [move_from_generic_unit, "move_from_generic.unit", 100],
-    [move_to_base, "move_to.base", 100],
-    [move_to_unit, "move_to.unit", 100],
-    [move_to_generic_base, "move_to_generic.base", 100],
-    [move_to_generic_unit, "move_to_generic.unit", 100],
+    [exists_base: InternalGas, "exists.base", 10],
+    [
+        exists_unit: InternalGasPerAbstractMemoryUnit,
+        "exists.unit",
+        10
+    ],
+    [exists_generic_base: InternalGas, "exists_generic.base", 10],
+    [
+        exists_generic_unit: InternalGasPerAbstractMemoryUnit,
+        "exists_generic.unit",
+        10
+    ],
+    [move_from_base: InternalGas, "move_from.base", 100],
+    [
+        move_from_unit: InternalGasPerAbstractMemoryUnit,
+        "move_from.unit",
+        100
+    ],
+    [
+        move_from_generic_base: InternalGas,
+        "move_from_generic.base",
+        100
+    ],
+    [
+        move_from_generic_unit: InternalGasPerAbstractMemoryUnit,
+        "move_from_generic.unit",
+        100
+    ],
+    [move_to_base: InternalGas, "move_to.base", 100],
+    [
+        move_to_unit: InternalGasPerAbstractMemoryUnit,
+        "move_to.unit",
+        100
+    ],
+    [
+        move_to_generic_base: InternalGas,
+        "move_to_generic.base",
+        100
+    ],
+    [
+        move_to_generic_unit: InternalGasPerAbstractMemoryUnit,
+        "move_to_generic.unit",
+        100
+    ],
     // vec
-    [vec_len, "vec_len", 1],
-    [vec_imm_borrow, "vec_imm_borrow", 1],
-    [vec_mut_borrow, "vec_mut_borrow", 1],
-    [vec_push_back, "vec_push_back", 1],
-    [vec_pop_back, "vec_pop_back", 1],
-    [vec_swap, "vec_swap", 1],
-    [vec_pack_base, "vec_pack.base", 1],
-    [vec_pack_unit, "vec_pack.unit", 1],
-    [vec_unpack_base, "vec_unpack.base", 1],
-    [vec_unpack_unit, "vec_unpack.unit", 1],
+    [vec_len: InternalGas, "vec_len", 1],
+    [vec_imm_borrow: InternalGas, "vec_imm_borrow", 1],
+    [vec_mut_borrow: InternalGas, "vec_mut_borrow", 1],
+    [vec_push_back: InternalGas, "vec_push_back", 1],
+    [vec_pop_back: InternalGas, "vec_pop_back", 1],
+    [vec_swap: InternalGas, "vec_swap", 1],
+    [vec_pack_base: InternalGas, "vec_pack.base", 1],
+    [
+        vec_pack_unit: InternalGasPerAbstractMemoryUnit,
+        "vec_pack.unit",
+        1
+    ],
+    [vec_unpack_base: InternalGas, "vec_unpack.base", 1],
+    [
+        vec_unpack_unit: InternalGasPerAbstractMemoryUnit,
+        "vec_unpack.unit",
+        1
+    ],
 );
 
 impl InstructionGasParameters {
-    pub(crate) fn instr_cost(&self, op: Opcodes) -> PartialVMResult<u64> {
+    pub(crate) fn instr_cost(&self, op: Opcodes) -> PartialVMResult<InternalGas> {
         use Opcodes::*;
 
         Ok(match op {
@@ -263,7 +370,11 @@ impl InstructionGasParameters {
         })
     }
 
-    pub(crate) fn instr_cost_with_size(&self, op: Opcodes, size: u64) -> PartialVMResult<u64> {
+    pub(crate) fn instr_cost_with_size(
+        &self,
+        op: Opcodes,
+        size: AbstractMemorySize,
+    ) -> PartialVMResult<InternalGas> {
         use Opcodes::*;
 
         Ok(match op {

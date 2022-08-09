@@ -337,7 +337,7 @@ fn verify_simple_payment() {
         // Test for a max_gas_amount that is insufficient to pay the minimum fee.
         // Find the minimum transaction gas units and subtract 1.
         let mut gas_limit = txn_gas_params
-            .to_external_units(txn_gas_params.min_transaction_gas_units)
+            .to_external_units_round_down(txn_gas_params.min_transaction_gas_units)
             ;
         if gas_limit > 0 {
             gas_limit -= 1;

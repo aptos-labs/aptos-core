@@ -4,7 +4,11 @@
 //! This module contains the official gas meter implementation, along with some top-level gas
 //! parameters and traits to help manipulate them.
 
-use crate::{instr::InstructionGasParameters, transaction::TransactionGasParameters};
+use crate::{
+    algebra::{Gas, InternalGas},
+    instr::InstructionGasParameters,
+    transaction::TransactionGasParameters,
+};
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format_common::Opcodes,
@@ -133,12 +137,12 @@ impl InitialGasSchedule for AptosGasParameters {
 /// consisting all the gas parameters, which it can lookup when performing gas calcuations.
 pub struct AptosGasMeter {
     gas_params: AptosGasParameters,
-    balance: u64,
+    balance: InternalGas,
 }
 
 impl AptosGasMeter {
-    pub fn new(gas_params: AptosGasParameters, balance: u64) -> Self {
-        let balance = gas_params.txn.to_internal_units(balance);
+    pub fn new(gas_params: AptosGasParameters, balance: impl Into<Gas>) -> Self {
+        let balance = gas_params.txn.to_internal_units(balance.into());
 
         Self {
             gas_params,
@@ -146,15 +150,27 @@ impl AptosGasMeter {
         }
     }
 
-    pub fn balance(&self) -> u64 {
-        self.gas_params.txn.to_external_units(self.balance)
+    pub fn balance(&self) -> Gas {
+        self.gas_params
+            .txn
+            .to_external_units_round_down(self.balance)
+    }
+
+    fn charge(&mut self, amount: InternalGas) -> PartialVMResult<()> {
+        if amount > self.balance {
+            self.balance = InternalGas::zero();
+            Err(PartialVMError::new(StatusCode::OUT_OF_GAS))
+        } else {
+            self.balance -= amount;
+            Ok(())
+        }
     }
 }
 
 impl GasMeter for AptosGasMeter {
     fn charge_instr(&mut self, opcode: Opcodes) -> PartialVMResult<()> {
         let cost = self.gas_params.instr.instr_cost(opcode)?;
-        self.charge_in_native_unit(cost)
+        self.charge_in_native_unit(cost.into())
     }
 
     fn charge_instr_with_size(
@@ -165,25 +181,18 @@ impl GasMeter for AptosGasMeter {
         let cost = self
             .gas_params
             .instr
-            .instr_cost_with_size(opcode, size.get())?;
-        self.charge_in_native_unit(cost)
+            .instr_cost_with_size(opcode, size.get().into())?;
+        self.charge(cost)
     }
 
     fn charge_in_native_unit(&mut self, amount: u64) -> PartialVMResult<()> {
-        if amount > self.balance {
-            self.balance = 0;
-            Err(PartialVMError::new(StatusCode::OUT_OF_GAS))
-        } else {
-            self.balance -= amount;
-            Ok(())
-        }
+        self.charge(InternalGas::new(amount))
     }
 }
 
 impl AptosGasMeter {
-    pub fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: u64) -> VMResult<()> {
+    pub fn charge_intrinsic_gas_for_transaction(&mut self, txn_size: usize) -> VMResult<()> {
         let cost = self.gas_params.txn.calculate_intrinsic_gas(txn_size);
-        self.charge_in_native_unit(cost)
-            .map_err(|e| e.finish(Location::Undefined))
+        self.charge(cost).map_err(|e| e.finish(Location::Undefined))
     }
 }

@@ -506,6 +506,7 @@ dependencies = [
  "move-core-types",
  "move-stdlib",
  "move-vm-types",
+ "serde 1.0.141",
 ]
 
 [[package]]
