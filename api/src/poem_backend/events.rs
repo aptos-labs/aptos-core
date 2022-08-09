@@ -13,7 +13,7 @@ use super::{
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{Address, EventKey, IdentifierWrapper, MoveStructTagParam, U64};
+use aptos_api_types::{Address, EventKey, IdentifierWrapper, MoveStructTag, U64};
 use aptos_api_types::{AsConverter, VersionedEvent};
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
@@ -63,7 +63,7 @@ impl EventsApi {
         &self,
         accept_type: AcceptType,
         address: Path<Address>,
-        event_handle: Path<MoveStructTagParam>,
+        event_handle: Path<MoveStructTag>,
         field_name: Path<IdentifierWrapper>,
         start: Query<Option<U64>>,
         limit: Query<Option<u16>>,
@@ -73,7 +73,7 @@ impl EventsApi {
         let page = Page::new(start.0.map(|v| v.0), limit.0);
         let account = Account::new(self.context.clone(), address.0, None)?;
         let key = account
-            .find_event_key(event_handle.0.into(), field_name.0.into())?
+            .find_event_key(event_handle.0, field_name.0.into())?
             .into();
         self.list(accept_type, page, key)
     }

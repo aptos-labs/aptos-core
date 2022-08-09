@@ -3,7 +3,7 @@ title: "System Integrators' Guide"
 slug: "guide-for-system-integrators"
 ---
 
-:::tip 
+:::tip
 This is documentation is currently under construction with more being added on a regular basis.
 :::
 
@@ -40,6 +40,9 @@ Other areas worth being familiar with:
 * [Python SDK](../sdks/python-sdk)
 * [REST API](../rest-api)
 
+Useful guides:
+* [Local testnet development flow](./local-testnet-dev-flow)
+
 :::tip
 Not all SDKs and tools respect those environment flags though they will in due time.
 :::
@@ -68,13 +71,13 @@ This is covered in depth in the [Accounts](https://aptos.dev/concepts/basics-acc
 
 ### Rotating the keys
 
-An Account on Aptos has the ability to rotate keys so that potentially compromised keys cannot be used to access the accounts. 
+An Account on Aptos has the ability to rotate keys so that potentially compromised keys cannot be used to access the accounts.
 
 :::tip Read more
 See more in [Account address](http://aptos.dev/concepts/basics-accounts#account-address).
 :::
 
-Refreshing the keys is generally regarded as good hygiene in the security field. However, this presents a challenge for system integrators who are used to using a mnemonic to represent both a private key and its associated account. To simplify this for the system integrators, Aptos will provide an on-chain mapping, before the launch of the mainnet. The on-chain data maps an effective account address as defined by the current mnemonic to the actual account address. 
+Refreshing the keys is generally regarded as good hygiene in the security field. However, this presents a challenge for system integrators who are used to using a mnemonic to represent both a private key and its associated account. To simplify this for the system integrators, Aptos will provide an on-chain mapping, before the launch of the mainnet. The on-chain data maps an effective account address as defined by the current mnemonic to the actual account address.
 
 ### Preventing replay attacks
 
@@ -97,13 +100,13 @@ A transaction may end in one of the following states:
 3. Discarded during transaction submission due to a validation check such as insufficient gas, invalid transaction format, or incorrect key.
 4. Discarded after transaction submission but before attempted execution. This could be due to timeouts or insufficient gas due to other transactions affecting the account.
 
-The sender’s account will be charged gas for any committed transactions. 
+The sender’s account will be charged gas for any committed transactions.
 
-During transaction submission, the submitter is notified of successful submission or a reason for failing validations otherwise. 
+During transaction submission, the submitter is notified of successful submission or a reason for failing validations otherwise.
 
-A transaction that is successfully submitted but ultimately discarded may have no visible state in any accessible Aptos node or within the Aptos network. A user can attempt to resubmit the same transaction to re-validate the transaction. If the submitting node believes that this transaction is still valid, this will return an error stating that there exists an identical transaction already submitted. 
+A transaction that is successfully submitted but ultimately discarded may have no visible state in any accessible Aptos node or within the Aptos network. A user can attempt to resubmit the same transaction to re-validate the transaction. If the submitting node believes that this transaction is still valid, this will return an error stating that there exists an identical transaction already submitted.
 
-The submitter can try to increase the gas cost by a trivial amount to help make progress and adjust for whatever may have been causing the discarding of the transaction further downstream. 
+The submitter can try to increase the gas cost by a trivial amount to help make progress and adjust for whatever may have been causing the discarding of the transaction further downstream.
 
 On the Aptos devnet, the time between submission and confirmation is within seconds.
 
@@ -126,7 +129,7 @@ JSON-encoded transactions can be generated via the [REST API](https://aptos.dev
 - The output of the above contains an object containing a `message` and this must be signed with the sender’s private key locally.
 - Finally, the original JSON payload is extended with the signature information and posted to the `/transactions` [endpoint](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L127). This will return back a transaction submission result that, if successful, contains a transaction hash in the `hash` [field](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L138).
 
-JSON-encoded transactions allow for rapid development and support seamless ABI conversions of transaction arguments to native types. However, most system integrators prefer to generate transactions within their own tech stack. Both the [TypeScript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L259) and [Python SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L202) support generating BCS transactions. 
+JSON-encoded transactions allow for rapid development and support seamless ABI conversions of transaction arguments to native types. However, most system integrators prefer to generate transactions within their own tech stack. Both the [TypeScript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L259) and [Python SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L202) support generating BCS transactions.
 
 #### BCS-encoded transactions
 
@@ -138,7 +141,7 @@ Within a given transaction, the target of execution can be one of two types: an 
 
 ### Status of a transaction
 
-Transaction status can be obtained by querying the API `/transactions/{hash}` with the hash returned during the submission of the transaction. 
+Transaction status can be obtained by querying the API `/transactions/{hash}` with the hash returned during the submission of the transaction.
 
 A reasonable strategy for submitting transactions is to limit their lifetime to 30 to 60 seconds, and polling that API at regular intervals until success or a several seconds after that time has elapsed. If there is no commitment on-chain, the transaction was likely discarded.
 
@@ -156,9 +159,9 @@ See the following documentation for generating valid transactions:
 
 ### Evaluating transactions
 
-To facilitate evaluation of transactions, Aptos supports a simulation API that does not require and should not contain valid signatures on transactions. 
+To facilitate evaluation of transactions, Aptos supports a simulation API that does not require and should not contain valid signatures on transactions.
 
-The simulation API works identical to the transaction submission API, except that it executes the transaction and returns back the results along with the gas used. The simulation API can be accessed by submitting a transaction to [`/transactions/simulate`](https://aptos.dev/rest-api/#tag/transactions/operation/simulate_transaction). 
+The simulation API works identical to the transaction submission API, except that it executes the transaction and returns back the results along with the gas used. The simulation API can be accessed by submitting a transaction to [`/transactions/simulate`](https://aptos.dev/rest-api/#tag/transactions/operation/simulate_transaction).
 
 :::tip Read more
 Here's an example showing how to use the simulation API in the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L413). Note that the gas use may change based upon the state of the account. We recommend that the maximum gas amount be larger than the amount quoted by this API.

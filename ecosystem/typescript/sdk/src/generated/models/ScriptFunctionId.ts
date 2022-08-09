@@ -2,11 +2,12 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { IdentifierWrapper } from './IdentifierWrapper';
-import type { MoveModuleId } from './MoveModuleId';
-
-export type ScriptFunctionId = {
-    module: MoveModuleId;
-    name: IdentifierWrapper;
-};
-
+/**
+ * Script function id is string representation of a script function defined on-chain.
+ *
+ * Format: `{address}::{module name}::{function name}`
+ *
+ * Both `module name` and `function name` are case-sensitive.
+ *
+ */
+export type ScriptFunctionId = string;

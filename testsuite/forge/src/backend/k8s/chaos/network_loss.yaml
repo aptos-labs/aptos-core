@@ -1,0 +1,25 @@
+
+kind: NetworkChaos
+apiVersion: chaos-mesh.org/v1alpha1
+metadata:
+  namespace: {namespace}
+  name: forge-namespace-{loss_percentage}loss-{correlation_percentage}correlation
+spec:
+  selector:
+    namespaces:
+      - {namespace}
+    labelSelectors:
+      app.kubernetes.io/name: validator
+  mode: all
+  action: loss
+  loss:
+    loss: "{loss_percentage}"
+    correlation: "{correlation_percentage}"
+  direction: both
+  target:
+    selector:
+      namespaces:
+        - {namespace}
+      labelSelectors:
+        app.kubernetes.io/name: validator
+    mode: all

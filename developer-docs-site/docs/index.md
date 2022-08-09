@@ -1,5 +1,5 @@
 ---
-title: "Welcome"
+title: "Aptos Developer Documentation"
 slug: "/"
 hidden: false
 sidebar_position: 0

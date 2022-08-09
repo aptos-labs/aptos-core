@@ -5,7 +5,7 @@ slug: "move-on-aptos"
 
 # Move on Aptos
 
-The Aptos blockchain consists of validator nodes that run a consensus protocol. The consensus protocol agrees upon the ordering of transactions and their output when executed on the Move Virtual Machine (MoveVM). Each validator node translates transactions along with the current blockchain ledger state as input into the VM. The MoveMV processes this input to produce a changeset or storage delta as output. Once consensus agrees and commits to the output, it becomes publicly visible. In this guide, we will introduce you to core Move concepts and how they apply to developing on Aptos.
+The Aptos blockchain consists of validator nodes that run a consensus protocol. The consensus protocol agrees upon the ordering of transactions and their output when executed on the Move Virtual Machine (MoveVM). Each validator node translates transactions along with the current blockchain ledger state as input into the VM. The MoveVM processes this input to produce a changeset or storage delta as output. Once consensus agrees and commits to the output, it becomes publicly visible. In this guide, we will introduce you to core Move concepts and how they apply to developing on Aptos.
 
 ## What is Move?
 

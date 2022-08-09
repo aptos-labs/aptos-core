@@ -235,9 +235,9 @@ module aptos_framework::account {
         );
 
         let account_resource = borrow_global<Account>(addr);
-        let current_auth_key = account_resource.authentication_key as address;
+        let current_addr = create_address(account_resource.authentication_key);
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@core_resources).address_map;
-        let originating_address = table::borrow(address_map, current_auth_key);
+        let originating_address = table::borrow(address_map, current_addr);
         let new_auth_key = hash::sha3_256(new_public_key);
 
         let proof= RotationProof {
@@ -250,12 +250,14 @@ module aptos_framework::account {
 
     fun rotate_authentication_key_ed25519_internal(account: &signer, proof: RotationProof, new_public_key: vector<u8>, signature: vector<u8>) acquires Account, OriginatingAddress {
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@core_resources).address_map;
-        let new_auth_key = hash::sha3_256(new_public_key) as address;
+        let new_auth_key = hash::sha3_256(new_public_key);
+        let new_address = create_address(new_auth_key);
 
         if (verify_hashed<RotationProof>(proof, new_public_key, signature)) {
-            let account_resource = borrow_global<Account>(signer::address_of(account));
-            let originating_address = table::remove(address_map, account_resource.authentication_key as address);
-            table::add(address_map, new_auth_key, originating_address);
+            let account_resource = borrow_global_mut<Account>(signer::address_of(account));
+            let current_address = create_address(account_resource.authentication_key);
+            let originating_address = table::remove(address_map, current_address);
+            table::add(address_map, new_address, originating_address);
             account_resource.authentication_key = new_auth_key;
         };
     }

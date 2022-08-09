@@ -62,6 +62,7 @@ const sidebars = {
         "guides/interacting-with-the-blockchain",
         "guides/building-wallet-extension",
         "guides/guide-for-system-integrators",
+        "guides/local-testnet-dev-flow",
         {
           type: "category",
           label: "Move Guides",
@@ -119,7 +120,14 @@ const sidebars = {
             "nodes/full-node/run-a-fullnode-on-gcp",
           ],
         },
-        "nodes/run-a-local-testnet",
+        {
+          type: "category",
+          label: "Local Testnet",
+          link: { type: "doc", id: "nodes/local-testnet/index" },
+          collapsible: true,
+          collapsed: true,
+          items: ["nodes/local-testnet/using-cli-to-run-a-local-testnet", "nodes/local-testnet/run-a-local-testnet"],
+        },
         "nodes/node-health-checker",
         "nodes/node-health-checker-faq",
         "nodes/staking",
