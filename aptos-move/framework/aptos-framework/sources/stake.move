@@ -1013,20 +1013,21 @@ module aptos_framework::stake {
             return 0
         };
 
-        // Validators receive rewards based on their performance (number of successful votes) and how long is their
-        // remaining lockup time.
-        // The total rewards = base rewards * performance multiplier * lockup multiplier.
-        // Here we do multiplication before division to minimize rounding errors.
+        // Validators receive rewards based on their performance (number of successful votes).
+        // The rewards amount is equal to (stake amount * rewards rate * performance multiplier).
+        // We do multiplication in u128 before division to avoid the overflow and minimize the rounding error.
         let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(config);
-        let base_rewards = stake_amount * rewards_rate / rewards_rate_denominator;
-        if (base_rewards > 0 && num_successful_proposals > 0) {
-            let rewards_amount = base_rewards * num_successful_proposals / num_total_proposals;
+        let rewards_numerator = (stake_amount as u128) * (rewards_rate as u128) * (num_successful_proposals as u128);
+        let rewards_denominator = (rewards_rate_denominator as u128) * (num_total_proposals as u128);
+        let rewards_amount =
+            if (rewards_denominator > 0) { ((rewards_numerator / rewards_denominator) as u64) }
+            else { 0 };
+        if (rewards_amount > 0) {
             let mint_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
             let rewards = coin::mint<AptosCoin>(rewards_amount, mint_cap);
             coin::merge(stake, rewards);
-            return rewards_amount
         };
-        0
+        rewards_amount
     }
 
     fun append<T>(v1: &mut vector<T>, v2: &mut vector<T>) {
