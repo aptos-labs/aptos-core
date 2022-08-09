@@ -388,8 +388,10 @@ async fn test_block_transactions() {
     let chain_id = swarm.chain_id();
 
     // Make sure first that there's money to transfer
-    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(0).await.unwrap());
-    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(1).await.unwrap());
+    cli.assert_account_balance_now(0, DEFAULT_FUNDED_COINS)
+        .await;
+    cli.assert_account_balance_now(1, DEFAULT_FUNDED_COINS)
+        .await;
 
     // Now let's see some transfers
     const TRANSFER_AMOUNT: u64 = 5000;
@@ -507,7 +509,8 @@ async fn test_invalid_transaction_gas_charged() {
     let chain_id = swarm.chain_id();
 
     // Make sure first that there's money to transfer
-    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(0).await.unwrap());
+    cli.assert_account_balance_now(0, DEFAULT_FUNDED_COINS)
+        .await;
 
     // Now let's see some transfers
     const TRANSFER_AMOUNT: u64 = 5000;

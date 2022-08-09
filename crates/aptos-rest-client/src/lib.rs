@@ -34,7 +34,7 @@ pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG
 #[derive(Clone, Debug)]
 pub struct Client {
     inner: ReqwestClient,
-    base_url: Url,
+    pub base_url: Url,
 }
 
 impl Client {
