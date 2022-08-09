@@ -43,8 +43,8 @@ pub(crate) fn enabled(metadata: &Metadata) -> bool {
 /// Sets the global `Logger` exactly once
 pub fn set_global_logger(logger: Arc<dyn Logger>, console_port: Option<u16>) {
     if LOGGER.set(logger).is_err() {
-        eprintln!("Global logger has already been set");
-        error!("Global logger has already been set");
+        eprintln!("Global logger has already been set!");
+        error!("Global logger has already been set!");
         return;
     }
 
