@@ -37,6 +37,19 @@ pub fn output(out: &mut dyn Write, abis: &[ScriptABI], local_types: bool) -> Res
     emitter.output_preamble()?;
     writeln!(emitter.out, "#![allow(unused_imports)]")?;
 
+    // Filter out all ABIs which have struct parameters, as those aren't yet supported
+    // TODO: teach the builder to support structs
+    let filtered_abis = abis
+        .iter()
+        .filter(|s| {
+            s.args()
+                .iter()
+                .all(|a| !matches!(a.type_tag(), TypeTag::Struct(_)))
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let abis = filtered_abis.as_slice();
+
     emitter.output_script_call_enum_with_imports(abis)?;
 
     let txn_script_abis = common::transaction_script_abis(abis);

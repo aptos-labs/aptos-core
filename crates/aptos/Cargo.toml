@@ -63,3 +63,7 @@ move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "tes
 short-hex-str = { path = "../short-hex-str" }
 storage-interface = { path = "../../storage/storage-interface" }
 vm-genesis = { path = "../../aptos-move/vm-genesis" }
+
+[features]
+default = []
+fuzzing = []

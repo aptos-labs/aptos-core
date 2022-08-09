@@ -263,15 +263,10 @@ impl TransactionsApi {
     fn list(&self, accept_type: &AcceptType, page: Page) -> BasicResultWith404<Vec<Transaction>> {
         let latest_ledger_info = self.context.get_latest_ledger_info_poem()?;
         let ledger_version = latest_ledger_info.version();
+
         let limit = page.limit()?;
         // TODO: https://github.com/aptos-labs/aptos-core/issues/2286
-        let last_page_start = if ledger_version > (limit as u64) {
-            ledger_version - (limit as u64)
-        } else {
-            0
-        };
-        let start_version = page.start(last_page_start, ledger_version)?;
-
+        let start_version = page.compute_start(limit, ledger_version)?;
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)

@@ -95,4 +95,6 @@ yarn fmt
 
 3. Bump the version in `package.json` according to [semver](https://semver.org/).
 4. Add an entry in the CHANGELOG for the version. We adhere to [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
-5. Once you're confident everything is correct, submit your PR. The CI will ensure that you have followed all the previous steps, specifically ensuring that the API, API spec, and SDK client are all compatible, that you've updated the changelog, that the tests pass, etc. Once it is approved and lands in main, CI will detect that the version has changed, build a new package, and upload it automatically to npmjs.
+5. Once you're confident everything is correct, submit your PR. The CI will ensure that you have followed all the previous steps, specifically ensuring that the API, API spec, and SDK client are all compatible, that you've updated the changelog, that the tests pass, etc.
+6. Land the PR on main.
+7. Apply the changes to the devnet branch. CI will detect that the version has changed, build a new package, and upload it automatically to npmjs.

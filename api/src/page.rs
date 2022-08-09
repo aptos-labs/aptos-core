@@ -19,6 +19,11 @@ pub(crate) struct Page {
 }
 
 impl Page {
+    pub fn compute_start(&self, limit: u16, max: u64) -> Result<u64, Error> {
+        let last_page_start = max.saturating_sub((limit.saturating_sub(1)) as u64);
+        self.start(last_page_start, max)
+    }
+
     pub fn start(&self, default: u64, max: u64) -> Result<u64, Error> {
         let version = self
             .start
@@ -33,6 +38,15 @@ impl Page {
             ));
         }
         Ok(version)
+    }
+
+    pub fn start_option(&self) -> Result<Option<u64>, Error> {
+        if let Some(start) = self.start.clone() {
+            let version = start.parse("start")?;
+            Ok(Some(version))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn limit(&self) -> Result<u16, Error> {

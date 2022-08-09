@@ -7,6 +7,7 @@ use crate::models::token::{
 };
 use crate::schema::token_datas::dsl::token_datas;
 use crate::schema::token_datas::{last_minted_at, supply};
+use crate::util::{ensure_not_negative, u64_to_bigdecimal};
 use crate::{
     database::{execute_with_better_error, PgDbPool, PgPoolConnection},
     indexer::{
@@ -121,8 +122,8 @@ fn insert_token_data(
         collection: event_data.id.collection,
         name: event_data.id.name,
         description: event_data.description,
-        max_amount: event_data.maximum,
-        supply: 0, // supply only updated with mint event
+        max_amount: u64_to_bigdecimal(event_data.maximum),
+        supply: u64_to_bigdecimal(0), // supply only updated with mint event
         uri: event_data.uri,
         royalty_payee_address: event_data.royalty_payee_address,
         royalty_points_denominator: event_data.royalty_points_denominator,
@@ -148,22 +149,23 @@ fn update_token_ownership(
     conn: &PgPoolConnection,
     token_id: String,
     txn: &UserTransaction,
-    amount_update: i64,
+    amount_update: bigdecimal::BigDecimal,
 ) {
     let ownership = Ownership::new(
         token_id,
         txn.sender.clone(),
-        amount_update,
+        ensure_not_negative(amount_update.clone()),
         txn.timestamp,
         chrono::Utc::now().naive_utc(),
     );
+    let new_ownership_amount = ownership_amount + amount_update;
     execute_with_better_error(
         conn,
         diesel::insert_into(schema::ownerships::table)
             .values(&ownership)
             .on_conflict(ownership_id)
             .do_update()
-            .set(ownership_amount.eq(ownership_amount + ownership.amount)),
+            .set(ownership_amount.eq(new_ownership_amount)),
     )
     .expect("Error update token ownership");
 }

@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::ledger_info::generate_ledger_info_with_sig;
+use crate::multi_signature::PartialSignatures;
+use crate::validator_verifier::ValidatorVerifier;
 use crate::{
     access_path::AccessPath,
     account_address::{self, AccountAddress},
@@ -24,6 +27,7 @@ use crate::{
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
+    validator_verifier::ValidatorConsensusInfo,
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -205,7 +209,11 @@ impl AccountInfoUniverse {
             })
             .collect();
         accounts.sort_by(|a, b| a.address.cmp(&b.address));
-        let validator_set_by_epoch = vec![(0, Vec::new())].into_iter().collect();
+        let validator_signer = ValidatorSigner::new(
+            accounts[0].address,
+            accounts[0].consensus_private_key.clone(),
+        );
+        let validator_set_by_epoch = vec![(0, vec![validator_signer])].into_iter().collect();
 
         Self {
             accounts,
@@ -613,31 +621,47 @@ impl Arbitrary for Module {
 }
 
 prop_compose! {
-    fn arb_validator_signature_for_ledger_info(ledger_info: LedgerInfo)(
+    fn arb_validator_for_ledger_info(ledger_info: LedgerInfo)(
         ledger_info in Just(ledger_info),
         account_keypair in ed25519::keypair_strategy(),
         consensus_keypair in bls12381_keys::keypair_strategy(),
-    ) -> (AccountAddress, bls12381::Signature) {
+    ) -> (AccountAddress, ValidatorConsensusInfo,  bls12381::Signature) {
         let signature = consensus_keypair.private_key.sign(&ledger_info);
-        (account_address::from_public_key(&account_keypair.public_key), signature)
+        (account_address::from_public_key(&account_keypair.public_key),
+                            ValidatorConsensusInfo::new(consensus_keypair.public_key, 1),
+signature)
     }
 }
 
 impl Arbitrary for LedgerInfoWithSignatures {
-    type Parameters = SizeRange;
-    fn arbitrary_with(num_validators_range: Self::Parameters) -> Self::Strategy {
-        (any::<LedgerInfo>(), Just(num_validators_range))
+    type Parameters = ();
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        (any::<LedgerInfo>(), (1usize..100))
             .prop_flat_map(|(ledger_info, num_validators_range)| {
                 (
                     Just(ledger_info.clone()),
-                    prop::collection::vec(
-                        arb_validator_signature_for_ledger_info(ledger_info),
+                    vec(
+                        arb_validator_for_ledger_info(ledger_info),
                         num_validators_range,
                     ),
                 )
             })
-            .prop_map(|(ledger_info, signatures)| {
-                LedgerInfoWithSignatures::new(ledger_info, signatures.into_iter().collect())
+            .prop_map(|(ledger_info, validator_infos)| {
+                let validator_verifier = ValidatorVerifier::new_with_quorum_voting_power(
+                    validator_infos.iter().map(|x| (x.0, x.1.clone())).collect(),
+                    validator_infos.len() as u64 / 2,
+                )
+                .unwrap();
+                let partial_sig = PartialSignatures::new(
+                    validator_infos.iter().map(|x| (x.0, x.2.clone())).collect(),
+                );
+                LedgerInfoWithSignatures::new(
+                    ledger_info,
+                    validator_verifier
+                        .aggregate_multi_signature(&partial_sig)
+                        .unwrap()
+                        .0,
+                )
             })
             .boxed()
     }
@@ -1002,13 +1026,13 @@ impl ValidatorSetGen {
 
 impl Arbitrary for ValidatorSetGen {
     type Parameters = ();
-    type Strategy = BoxedStrategy<Self>;
-
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        vec(any::<Index>(), 3)
+        vec(any::<Index>(), 1..3)
             .prop_map(|validators| Self { validators })
             .boxed()
     }
+
+    type Strategy = BoxedStrategy<Self>;
 }
 
 #[derive(Debug)]
@@ -1184,13 +1208,7 @@ impl LedgerInfoWithSignaturesGen {
         block_size: usize,
     ) -> LedgerInfoWithSignatures {
         let ledger_info = self.ledger_info_gen.materialize(universe, block_size);
-        let signatures = universe
-            .get_validator_set(ledger_info.epoch())
-            .iter()
-            .map(|signer| (signer.author(), signer.sign(&ledger_info)))
-            .collect();
-
-        LedgerInfoWithSignatures::new(ledger_info, signatures)
+        generate_ledger_info_with_sig(universe.get_validator_set(ledger_info.epoch()), ledger_info)
     }
 }
 

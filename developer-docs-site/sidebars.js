@@ -62,6 +62,7 @@ const sidebars = {
         "guides/interacting-with-the-blockchain",
         "guides/building-wallet-extension",
         "guides/guide-for-system-integrators",
+        "guides/local-testnet-dev-flow",
         {
           type: "category",
           label: "Move Guides",

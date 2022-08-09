@@ -105,7 +105,10 @@ impl SwarmBuilder {
             num_cli_accounts,
         )
         .await;
-
+        println!(
+            "Created CLI with {} accounts for LocalSwarm",
+            num_cli_accounts
+        );
         (swarm, tool, faucet)
     }
 }

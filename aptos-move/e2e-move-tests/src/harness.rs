@@ -6,8 +6,9 @@ use aptos::{
     move_tool::{BuiltPackage, MemberId},
 };
 use aptos_types::{
-    access_path,
+    access_path::AccessPath,
     account_address::AccountAddress,
+    state_store::state_key::StateKey,
     transaction::{ScriptFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
 use cached_framework_packages::aptos_stdlib;
@@ -16,7 +17,7 @@ use language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
 };
-use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
+use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
 use project_root::get_project_root;
 use serde::de::DeserializeOwned;
 use std::collections::BTreeMap;
@@ -213,19 +214,24 @@ impl MoveHarness {
             .new_block_with_metadata(proposer_index, failed_proposer_indices);
     }
 
+    pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
+        self.executor.read_state_value(state_key).and_then(|bytes| {
+            if bytes.is_empty() {
+                None
+            } else {
+                Some(bytes)
+            }
+        })
+    }
+
     /// Reads the raw, serialized data of a resource.
     pub fn read_resource_raw(
         &self,
         addr: &AccountAddress,
         struct_tag: StructTag,
     ) -> Option<Vec<u8>> {
-        let path = access_path::AccessPath::new(
-            *addr,
-            bcs::to_bytes(&access_path::Path::Resource(struct_tag)).unwrap(),
-        );
-        self.executor
-            .read_from_access_path(&path)
-            .and_then(|bytes| if bytes.is_empty() { None } else { Some(bytes) })
+        let path = AccessPath::resource_access_path(ResourceKey::new(*addr, struct_tag));
+        self.read_state_value(&StateKey::AccessPath(path))
     }
 
     /// Reads the resource data `T`.

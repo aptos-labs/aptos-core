@@ -1,5 +1,3 @@
-import isEqual from "lodash/isEqual";
-
 import { AptosAccount } from "./aptos_account";
 import { AptosClient } from "./aptos_client";
 import * as TokenTypes from "./token_types";
@@ -275,13 +273,8 @@ export class TokenClient {
    */
   async getCollectionData(creator: MaybeHexString, collectionName: string): Promise<any> {
     const resources = await this.aptosClient.getAccountResources(creator);
-    const accountResource: { type: Gen.MoveStructTag; data: any } = resources.find((r) =>
-      isEqual(r.type, {
-        address: "0x3",
-        module: "token",
-        name: "Collections",
-        generic_type_params: [],
-      }),
+    const accountResource: { type: Gen.MoveStructTag; data: any } = resources.find(
+      (r) => r.type === "0x3::token::Collections",
     )!;
     const { handle }: { handle: string } = accountResource.data.collection_data;
     const getCollectionTableItemRequest: Gen.TableItemRequest = {
@@ -322,12 +315,10 @@ export class TokenClient {
     collectionName: string,
     tokenName: string,
   ): Promise<TokenTypes.TokenData> {
-    const collection: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(creator, {
-      address: "0x3",
-      module: "token",
-      name: "Collections",
-      generic_type_params: [],
-    });
+    const collection: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(
+      creator,
+      "0x3::token::Collections",
+    );
     const { handle } = collection.data.token_data;
     const tokenDataId = {
       creator,
@@ -390,12 +381,10 @@ export class TokenClient {
    * ```
    */
   async getTokenBalanceForAccount(account: MaybeHexString, tokenId: TokenTypes.TokenId): Promise<TokenTypes.Token> {
-    const tokenStore: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(account, {
-      address: "0x3",
-      module: "token",
-      name: "TokenStore",
-      generic_type_params: [],
-    });
+    const tokenStore: { type: Gen.MoveStructTag; data: any } = await this.aptosClient.getAccountResource(
+      account,
+      "0x3::token::TokenStore",
+    );
     const { handle } = tokenStore.data.tokens;
 
     const getTokenTableItemRequest: Gen.TableItemRequest = {

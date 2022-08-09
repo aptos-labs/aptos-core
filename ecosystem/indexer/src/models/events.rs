@@ -3,6 +3,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{models::transactions::Transaction, schema::events};
 use aptos_rest_client::aptos_api_types::Event as APIEvent;
+use bigdecimal::{BigDecimal, FromPrimitive};
 use serde::Serialize;
 
 #[derive(Associations, Debug, Identifiable, Insertable, Queryable, Serialize)]
@@ -12,7 +13,7 @@ use serde::Serialize;
 pub struct Event {
     pub transaction_hash: String,
     pub key: String,
-    pub sequence_number: i64,
+    pub sequence_number: bigdecimal::BigDecimal,
     #[diesel(column_name = type)]
     pub type_: String,
     pub data: serde_json::Value,
@@ -26,7 +27,7 @@ impl Event {
         Event {
             transaction_hash,
             key: event.key.to_string(),
-            sequence_number: event.sequence_number.0 as i64,
+            sequence_number: BigDecimal::from_u64(event.sequence_number.0).unwrap(),
             type_: event.typ.to_string(),
             data: event.data.clone(),
             inserted_at: chrono::Utc::now().naive_utc(),

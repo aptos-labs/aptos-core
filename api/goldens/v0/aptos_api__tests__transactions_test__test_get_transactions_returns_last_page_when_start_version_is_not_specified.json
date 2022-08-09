@@ -1,135 +1,5 @@
 [
   {
-    "type": "user_transaction",
-    "version": "35",
-    "hash": "",
-    "state_root_hash": "",
-    "event_root_hash": "",
-    "gas_used": "42",
-    "success": true,
-    "vm_status": "Executed successfully",
-    "accumulator_root_hash": "",
-    "changes": [
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "",
-        "data": {
-          "type": "0x1::account::Account",
-          "data": {
-            "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
-            "coin_register_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0xa550c18",
-                  "creation_num": "0"
-                }
-              }
-            },
-            "sequence_number": "12"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "state_key_hash": "",
-        "data": {
-          "type": "0x1::account::Account",
-          "data": {
-            "authentication_key": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-            "coin_register_events": {
-              "counter": "1",
-              "guid": {
-                "id": {
-                  "addr": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-                  "creation_num": "0"
-                }
-              }
-            },
-            "sequence_number": "0"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "state_key_hash": "",
-        "data": {
-          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
-          "data": {
-            "coin": {
-              "value": "0"
-            },
-            "deposit_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-                  "creation_num": "1"
-                }
-              }
-            },
-            "withdraw_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-                  "creation_num": "2"
-                }
-              }
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "state_key_hash": "",
-        "data": {
-          "type": "0x1::guid::Generator",
-          "data": {
-            "counter": "3"
-          }
-        }
-      }
-    ],
-    "sender": "0xa550c18",
-    "sequence_number": "11",
-    "max_gas_amount": "4000000",
-    "gas_unit_price": "0",
-    "expiration_timestamp_secs": "18446744073709551615",
-    "payload": {
-      "type": "script_function_payload",
-      "function": "0x1::account::create_account",
-      "type_arguments": [],
-      "arguments": [
-        "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b"
-      ]
-    },
-    "signature": {
-      "type": "ed25519_signature",
-      "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x468f634e4ae9c558fbe923d83cd337d5e5f5f0c46ac3c4b6acb6cc9b09e50ec95a5bfaba784fea94fd016d7ebbed0affe3cf40b7038ef4578de56d4806159207"
-    },
-    "events": [
-      {
-        "key": "0x00000000000000007ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "sequence_number": "0",
-        "type": "0x1::account::CoinRegisterEvent",
-        "data": {
-          "type_info": {
-            "account_address": "0x1",
-            "module_name": "0x6170746f735f636f696e",
-            "struct_name": "0x4170746f73436f696e"
-          }
-        }
-      }
-    ],
-    "timestamp": "12"
-  },
-  {
     "type": "state_checkpoint_transaction",
     "version": "36",
     "hash": "",
@@ -1975,6 +1845,19 @@
         }
       }
     ],
+    "timestamp": "20"
+  },
+  {
+    "type": "state_checkpoint_transaction",
+    "version": "60",
+    "hash": "",
+    "state_root_hash": "",
+    "event_root_hash": "",
+    "gas_used": "0",
+    "success": true,
+    "vm_status": "Executed successfully",
+    "accumulator_root_hash": "",
+    "changes": [],
     "timestamp": "20"
   }
 ]

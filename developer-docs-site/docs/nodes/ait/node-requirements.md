@@ -23,10 +23,39 @@ In test mode, you will be running a local network with one single node, and it s
 
 ## Hardware requirements
 
-For running an Aptos node we recommend the following hardware resources:
+For running an Aptos **Validator node** we recommend the following hardware resources:
 
-  - **CPU**: 4 cores (Intel Xeon Skylake or newer).
-  - **Memory**: 8GiB RAM.
+  - **CPU**:
+      - 8 cores, 16 threads 
+      - 2.8GHz, or faster
+      - Intel Xeon Skylake or newer
+  - **Memory**: 32GiB RAM.
+
+Example machine types on various clouds:
+  - AWS
+      - c5.4xlarge
+      - c6i.4xlarge
+  - GCP
+      - c2-standard-16
+  - Azure
+      - Standard_B8ms
+
+For running an Aptos **Fullnode** we recommend the following hardware resources:
+
+  - **CPU**:
+      - 4 cores, 8 threads 
+      - 2.8GHz, or faster
+      - Intel Xeon Skylake or newer
+  - **Memory**: 16GiB RAM.
+
+Example machine types on various clouds:
+  - AWS
+      - c5.2xlarge
+      - c6i.2xlarge
+  - GCP
+      - c2-standard-8
+  - Azure
+      - Standard_B4ms
 
 ## Storage requirements
 
@@ -34,7 +63,9 @@ The amount of data stored by the Aptos Blockhain depends on the ledger history (
 
 We recommend nodes have at least 300GB of disk space to ensure adequate storage space for load testing. You have the option to start with a smaller size and adjust based upon demands. You will be responsible for monitoring your node's disk usage and adjusting appropriately to ensure node uptime.
 
-## Networking configuration requirements
+## Networking requirements
+
+Bandwidth requirement: 1 Gbps
 
 For the Validator:
 

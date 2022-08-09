@@ -1,10 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::SystemTime;
+
 use crate::{
     account::create::DEFAULT_FUNDED_COINS,
     common::{
-        types::{CliCommand, CliTypedResult, FaucetOptions, ProfileOptions},
+        types::{CliCommand, CliError, CliTypedResult, FaucetOptions, ProfileOptions, RestOptions},
         utils::fund_account,
     },
 };
@@ -26,6 +28,9 @@ pub struct FundAccount {
     /// Coins to fund when using the faucet
     #[clap(long, default_value_t = DEFAULT_FUNDED_COINS)]
     pub(crate) num_coins: u64,
+    /// if passed, rest endpoint to wait for transaction to complete
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
 }
 
 #[async_trait]
@@ -35,13 +40,25 @@ impl CliCommand<String> for FundAccount {
     }
 
     async fn execute(self) -> CliTypedResult<String> {
-        fund_account(
+        let hashes = fund_account(
             self.faucet_options
                 .faucet_url(&self.profile_options.profile)?,
             self.num_coins,
             self.account,
         )
-        .await
-        .map(|_| format!("Added {} coins to account {}", self.num_coins, self.account))
+        .await?;
+        let sys_time = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .map_err(|e| CliError::UnexpectedError(e.to_string()))?
+            .as_secs()
+            + 10;
+        let client = self.rest_options.client(&self.profile_options.profile)?;
+        for hash in hashes {
+            client.wait_for_transaction_by_hash(hash, sys_time).await?;
+        }
+        return Ok(format!(
+            "Added {} coins to account {}",
+            self.num_coins, self.account
+        ));
     }
 }
