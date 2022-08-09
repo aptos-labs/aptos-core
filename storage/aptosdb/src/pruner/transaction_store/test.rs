@@ -14,7 +14,9 @@ use aptos_types::{
     transaction::{SignedTransaction, Transaction},
 };
 
+use accumulator::HashReader;
 use aptos_config::config::StoragePrunerConfig;
+use aptos_types::proof::position::Position;
 use aptos_types::{
     transaction::{TransactionInfo, Version},
     write_set::WriteSet,
@@ -24,7 +26,6 @@ use proptest::{collection::vec, prelude::*};
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
-    #[ignore]
     #[test]
     fn test_txn_store_pruner(txns in vec(
         prop_oneof![
@@ -143,6 +144,7 @@ fn verify_txn_store_pruner(
                 ledger_version,
             );
         }
+        verify_transaction_accumulator_pruned(&ledger_store, i as u64);
     }
 }
 
@@ -189,6 +191,25 @@ fn verify_txn_in_store(
     assert!(ledger_store
         .get_transaction_proof(index, ledger_version)
         .is_ok());
+}
+
+// Ensure that transaction accumulator has been pruned as well. The idea to verify is get the
+// inorder position of the left child of the accumulator root and ensure that all lower index
+// position from the DB should be deleted. We need to make several conversion between inorder and
+// postorder transaction because the DB stores the indices in postorder, while the APIs for the
+// accumulator deals with inorder.
+fn verify_transaction_accumulator_pruned(ledger_store: &LedgerStore, least_readable_version: u64) {
+    let least_readable_position = if least_readable_version > 0 {
+        Position::root_from_leaf_index(least_readable_version).left_child()
+    } else {
+        Position::root_from_leaf_index(least_readable_version)
+    };
+    let least_readable_position_postorder = least_readable_position.to_postorder_index();
+    for i in 0..least_readable_position_postorder {
+        assert!(ledger_store
+            .get(Position::from_postorder_index(i).unwrap())
+            .is_err())
+    }
 }
 
 fn put_txn_in_store(

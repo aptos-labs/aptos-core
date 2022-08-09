@@ -3,6 +3,7 @@
 
 //! This file defines transaction store APIs that are related to committed signed transactions.
 
+use crate::transaction_accumulator::TransactionAccumulatorSchema;
 use crate::{
     change_set::ChangeSet,
     errors::AptosDbError,
@@ -314,6 +315,73 @@ impl TransactionStore {
             db_batch.delete::<TransactionInfoSchema>(&version)?;
         }
         Ok(())
+    }
+
+    /// Prune the transaction accumulator between a range of version in [begin, end).
+    /// The naive algorithm finds the node with the minimal in-order sequence number that is
+    /// required by getting the proof of the begin version and that of the last version to be pruned
+    /// and delete them as well as all the nodes added in between, which always deletes a full left
+    /// sub tree and could blow the memory.
+    ///
+    /// To avoid always pruning a full left subtree, we uses the following algorithm.
+    /// For each leaf with an odd leaf index.
+    /// 1. From the bottom upwards, find the first ancestor that's a left child of its parent.
+    /// (the position of which can be got by popping "1"s from the right of the leaf address).
+    /// Note that this node DOES NOT become non-useful.
+    /// 2. From the node found from the previous step, delete both its children non-useful, and go
+    /// to the right child to repeat the process until we reach a leaf node.
+    /// More details are in this issue https://github.com/aptos-labs/aptos-core/issues/1288.
+    pub fn prune_transaction_accumulator(
+        &self,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        for version_to_delete in begin..end {
+            if version_to_delete % 2 == 0 {
+                continue;
+            }
+
+            let mut first_ancestor_that_is_a_left_child =
+                self.find_first_ancestor_that_is_a_left_child(version_to_delete);
+
+            // This assertion is true because we skip the leaf nodes with address which is a
+            // a multiple of 2.
+            assert!(!first_ancestor_that_is_a_left_child.is_leaf());
+
+            while !first_ancestor_that_is_a_left_child.is_leaf() {
+                db_batch.delete::<TransactionAccumulatorSchema>(
+                    &first_ancestor_that_is_a_left_child.left_child(),
+                )?;
+                db_batch.delete::<TransactionAccumulatorSchema>(
+                    &first_ancestor_that_is_a_left_child.right_child(),
+                )?;
+                first_ancestor_that_is_a_left_child =
+                    first_ancestor_that_is_a_left_child.right_child();
+            }
+        }
+        Ok(())
+    }
+
+    /// Finds the first ancestor that is a child of its parent.
+    fn find_first_ancestor_that_is_a_left_child(&self, mut version: Version) -> Position {
+        let mut first_ancestor_that_is_a_left_child_level = 0;
+        // We can get the first ancestor's position based on the two observations:
+        // - floor(level position of a node / 2) = level position of its parent.
+        // - if a node is a left child of its parent, its level position should be a multiple of 2.
+        // - level position means the position counted from 0 of a single tree level. For example,
+        //                a (level position = 0)
+        //         /                                \
+        //    b (level position = 0)      c(level position = 1)
+        //
+        // To find the first ancestor which is a left child of its parent, we can keep diving the
+        // level position by 2 (to find the ancestor) until we get a level position which is a
+        // multiple of 2 (to make sure the ancestor is a left child of its parent).
+        while version & 1 != 0 {
+            version >>= 1;
+            first_ancestor_that_is_a_left_child_level += 1;
+        }
+        Position::from_level_and_pos(first_ancestor_that_is_a_left_child_level, version)
     }
 
     /// Prune the transaction schema store between a range of version in [begin, end)
