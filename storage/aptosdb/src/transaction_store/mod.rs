@@ -117,13 +117,6 @@ impl TransactionStore {
         })
     }
 
-    /// Get the first version that txn starts existent.
-    pub fn get_first_txn_version(&self) -> Result<Option<Version>> {
-        let mut iter = self.db.iter::<TransactionSchema>(Default::default())?;
-        iter.seek_to_first();
-        iter.next().map(|res| res.map(|(v, _)| v)).transpose()
-    }
-
     /// Searches around the version to find the block's transactions
     pub fn get_block_boundaries(
         &self,
@@ -258,13 +251,6 @@ impl TransactionStore {
         }
 
         Ok(ret)
-    }
-
-    /// Get the first version that write set starts existent.
-    pub fn get_first_write_set_version(&self) -> Result<Option<Version>> {
-        let mut iter = self.db.iter::<WriteSetSchema>(Default::default())?;
-        iter.seek_to_first();
-        iter.next().map(|res| res.map(|(v, _)| v)).transpose()
     }
 
     /// Save executed transaction vm output given `version`
