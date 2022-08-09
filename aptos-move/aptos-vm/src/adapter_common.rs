@@ -206,7 +206,7 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
         )?;
 
         // Apply deltas.
-        let output = if output_ext.status().is_discarded() {
+        let output = if !output_ext.status().is_discarded() {
             // TODO: while `into_transaction_output_with_status()` should never fail
             // to apply deltas, we should propagate errors properly. Fix when VM
             // error handling is fixed.
