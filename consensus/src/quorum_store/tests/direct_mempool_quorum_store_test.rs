@@ -15,6 +15,7 @@ use std::time::Duration;
 use tokio::time::timeout;
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_block_request_no_txns() {
     let (quorum_store_to_mempool_sender, mut quorum_store_to_mempool_receiver) =
         mpsc::channel(1_024);

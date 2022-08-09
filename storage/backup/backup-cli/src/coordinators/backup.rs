@@ -152,6 +152,7 @@ impl BackupCoordinator {
 }
 
 impl BackupCoordinator {
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn try_refresh_db_state(&self, db_state_broadcast: &watch::Sender<Option<DbState>>) {
         match self.client.get_db_state().await {
             Ok(s) => {
@@ -172,6 +173,7 @@ impl BackupCoordinator {
         };
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn backup_epoch_endings(
         &self,
         mut last_epoch_ending_epoch_in_backup: Option<u64>,
@@ -210,6 +212,7 @@ impl BackupCoordinator {
         Ok(last_epoch_ending_epoch_in_backup)
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn backup_state_snapshot(
         &self,
         last_snapshot_epoch_in_backup: Option<Version>,
@@ -242,6 +245,7 @@ impl BackupCoordinator {
         Ok(Some(epoch))
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn backup_transactions(
         &self,
         mut last_transaction_version_in_backup: Option<Version>,

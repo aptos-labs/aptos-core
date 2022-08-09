@@ -150,6 +150,7 @@ mod test {
         ]
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_proposals_evaluator(
         previous_target_proposals: Option<u64>,
         latest_target_proposals: Option<u64>,
@@ -190,21 +191,25 @@ mod test {
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_progressing() {
         test_proposals_evaluator(Some(500), Some(600), 100).await;
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_not_progressing() {
         test_proposals_evaluator(Some(500), Some(500), 50).await;
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_missing_metric() {
         test_proposals_evaluator(Some(500), None, 0).await;
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_both_missing_metrics() {
         test_proposals_evaluator(None, None, 0).await;
     }

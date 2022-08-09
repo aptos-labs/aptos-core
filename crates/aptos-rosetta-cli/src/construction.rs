@@ -151,6 +151,7 @@ impl TransferCommand {
 }
 
 /// Retrieves the account address from the derivation path if there isn't an overriding account specified
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_account_address(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
@@ -171,6 +172,7 @@ async fn get_account_address(
 }
 
 /// Submits the operations to the blockchain
+#[tracing::instrument(skip_all, level = "trace")]
 async fn submit_operations(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
@@ -209,6 +211,7 @@ async fn submit_operations(
 }
 
 /// Derives an [`AccountAddress`] from the [`PublicKey`]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn derive_account(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
@@ -230,6 +233,7 @@ async fn derive_account(
 }
 
 /// Retrieves the metadata for the set of operations
+#[tracing::instrument(skip_all, level = "trace")]
 async fn metadata(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
@@ -281,6 +285,7 @@ async fn metadata(
 }
 
 /// Build an unsigned transaction
+#[tracing::instrument(skip_all, level = "trace")]
 async fn unsigned_transaction(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
@@ -321,6 +326,7 @@ async fn unsigned_transaction(
 }
 
 /// Signs a transaction and combines it with an unsigned transaction
+#[tracing::instrument(skip_all, level = "trace")]
 async fn sign_transaction(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,
@@ -404,6 +410,7 @@ async fn sign_transaction(
 }
 
 /// Submit a transaction to the blockchain
+#[tracing::instrument(skip_all, level = "trace")]
 async fn submit_transaction(
     client: &RosettaClient,
     network_identifier: NetworkIdentifier,

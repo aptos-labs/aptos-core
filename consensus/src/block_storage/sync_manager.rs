@@ -124,6 +124,7 @@ impl BlockStore {
     /// updating the consensus state(with qc) and deciding whether to vote(with block)
     /// The missing ancestors are going to be retrieved from the given peer. If a given peer
     /// fails to provide the missing ancestors, the qc is not going to be added.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn fetch_quorum_cert(
         &self,
         qc: QuorumCert,
@@ -159,6 +160,7 @@ impl BlockStore {
     /// 2. We persist the gap blocks to storage before start sync to ensure we could restart if we
     /// crash in the middle of the sync.
     /// 3. We prune the old tree and replace with a new tree built with the 3-chain.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn sync_to_highest_ordered_cert(
         &self,
         highest_ordered_cert: QuorumCert,
@@ -323,6 +325,7 @@ impl BlockStore {
     }
 
     /// Fast forward in the decoupled-execution pipeline if the block exists there
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn sync_to_highest_commit_cert(
         &self,
         ledger_info: &LedgerInfoWithSignatures,
@@ -411,6 +414,7 @@ impl BlockRetriever {
     /// leader to drive quorum certificate creation The other peers from the quorum certificate
     /// will be randomly tried next.  If all members of the quorum certificate are exhausted, an
     /// error is returned
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn retrieve_block_for_id(
         &mut self,
         block_id: HashValue,
@@ -501,6 +505,7 @@ impl BlockRetriever {
     }
 
     /// Retrieve chain of n blocks for given QC
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn retrieve_block_for_qc<'a>(
         &'a mut self,
         qc: &'a QuorumCert,

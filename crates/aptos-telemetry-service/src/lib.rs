@@ -57,6 +57,7 @@ impl AptosTelemetryServiceArgs {
         Self::serve(&config, routes(context)).await;
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn serve<F>(config: &AptosTelemetryServiceConfig, routes: F)
     where
         F: Filter<Error = Infallible> + Clone + Sync + Send + 'static,

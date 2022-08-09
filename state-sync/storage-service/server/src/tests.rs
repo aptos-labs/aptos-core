@@ -69,6 +69,7 @@ const MAX_RESPONSE_TIMEOUT_SECS: u64 = 30;
 const PROTOCOL_VERSION: u64 = 1;
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_cachable_requests_compression() {
     // Create test data
     let start_version = 0;
@@ -137,6 +138,7 @@ async fn test_cachable_requests_compression() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_cachable_requests_eviction() {
     // Create test data
     let max_lru_cache_size = StorageServiceConfig::default().max_lru_cache_size;
@@ -208,6 +210,7 @@ async fn test_cachable_requests_eviction() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_cachable_requests_data_versions() {
     // Create test data
     let start_versions = [0, 76, 101, 230, 300, 454];
@@ -282,6 +285,7 @@ async fn test_cachable_requests_data_versions() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_server_protocol_version() {
     // Create the storage client and server
     let (mut mock_client, service, _) = MockClient::new(None);
@@ -304,6 +308,7 @@ async fn test_get_server_protocol_version() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_states_with_proof() {
     // Test small and large chunk requests
     for chunk_size in [1, 100, StorageServiceConfig::default().max_state_chunk_size] {
@@ -357,6 +362,7 @@ async fn test_get_states_with_proof() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_states_with_proof_invalid() {
     // Create the storage client and server
     let (mut mock_client, service, _) = MockClient::new(None);
@@ -383,6 +389,7 @@ async fn test_get_states_with_proof_invalid() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_new_transactions() {
     // Test small and large chunk sizes
     for chunk_size in [
@@ -450,6 +457,7 @@ async fn test_get_new_transactions() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_new_transactions_epoch_change() {
     // Test event inclusion
     for include_events in [true, false] {
@@ -521,6 +529,7 @@ async fn test_get_new_transactions_epoch_change() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_new_transactions_max_chunk() {
     // Test event inclusion
     for include_events in [true, false] {
@@ -579,6 +588,7 @@ async fn test_get_new_transactions_max_chunk() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_new_transaction_outputs() {
     // Test small and large chunk sizes
     for chunk_size in [
@@ -633,6 +643,7 @@ async fn test_get_new_transaction_outputs() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_new_transaction_outputs_epoch_change() {
     // Create test data
     let highest_version = 10000;
@@ -687,6 +698,7 @@ async fn test_get_new_transaction_outputs_epoch_change() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_new_transaction_outputs_max_chunk() {
     // Create test data
     let highest_version = 65660;
@@ -735,6 +747,7 @@ async fn test_get_new_transaction_outputs_max_chunk() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_number_of_states_at_version() {
     // Create test data
     let version = 101;
@@ -766,6 +779,7 @@ async fn test_get_number_of_states_at_version() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_number_of_states_at_version_invalid() {
     // Create test data
     let version = 1;
@@ -795,6 +809,7 @@ async fn test_get_number_of_states_at_version_invalid() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_storage_server_summary() {
     // Create test data
     let highest_version = 506;
@@ -886,6 +901,7 @@ async fn test_get_storage_server_summary() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_transactions_with_proof() {
     // Test small and large chunk requests
     for chunk_size in [
@@ -949,6 +965,7 @@ async fn test_get_transactions_with_proof() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_transactions_with_proof_invalid() {
     // Create the storage client and server
     let (mut mock_client, service, _) = MockClient::new(None);
@@ -976,6 +993,7 @@ async fn test_get_transactions_with_proof_invalid() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_transaction_outputs_with_proof() {
     // Test small and large chunk requests
     for chunk_size in [
@@ -1033,6 +1051,7 @@ async fn test_get_transaction_outputs_with_proof() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_transaction_outputs_with_proof_invalid() {
     // Create the storage client and server
     let (mut mock_client, service, _) = MockClient::new(None);
@@ -1060,6 +1079,7 @@ async fn test_get_transaction_outputs_with_proof_invalid() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_epoch_ending_ledger_infos() {
     // Test small and large chunk requests
     for chunk_size in [1, 100, StorageServiceConfig::default().max_epoch_chunk_size] {
@@ -1108,6 +1128,7 @@ async fn test_get_epoch_ending_ledger_infos() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_epoch_ending_ledger_infos_invalid() {
     // Create the storage client and server
     let (mut mock_client, service, _) = MockClient::new(None);
@@ -1172,6 +1193,7 @@ impl MockClient {
     }
 
     /// Send the given storage request and wait for a response
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn process_request(
         &mut self,
         request: StorageServiceRequest,
@@ -1182,6 +1204,7 @@ impl MockClient {
 
     /// Send the specified storage request and return the receiver on which to
     /// expect a result.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn send_request(
         &mut self,
         request: StorageServiceRequest,
@@ -1209,6 +1232,7 @@ impl MockClient {
     }
 
     /// Helper method to wait for and deserialize a response on the specified receiver
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn wait_for_response(
         &mut self,
         receiver: Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>>,
@@ -1230,6 +1254,7 @@ impl MockClient {
 }
 
 /// Waits until the storage summary has refreshed for the first time
+#[tracing::instrument(skip_all, level = "trace")]
 async fn wait_for_storage_to_refresh(mock_client: &mut MockClient, mock_time: &MockTimeService) {
     let storage_request = StorageServiceRequest::new(DataRequest::GetStorageServerSummary, true);
     while mock_client
@@ -1247,6 +1272,7 @@ async fn wait_for_storage_to_refresh(mock_client: &mut MockClient, mock_time: &M
 }
 
 /// Advances enough time that the subscription service is able to refresh
+#[tracing::instrument(skip_all, level = "trace")]
 async fn wait_for_subscription_service_to_refresh(
     mock_client: &mut MockClient,
     mock_time: &MockTimeService,
@@ -1259,6 +1285,7 @@ async fn wait_for_subscription_service_to_refresh(
 }
 
 /// Advances the given timer by the amount of time it takes to refresh storage
+#[tracing::instrument(skip_all, level = "trace")]
 async fn advance_storage_refresh_time(mock_time: &MockTimeService) {
     let default_storage_config = StorageServiceConfig::default();
     let cache_update_freq_ms = default_storage_config.storage_summary_refresh_interval_ms;
@@ -1266,6 +1293,7 @@ async fn advance_storage_refresh_time(mock_time: &MockTimeService) {
 }
 
 /// Creates and sends a request for new transaction outputs
+#[tracing::instrument(skip_all, level = "trace")]
 async fn send_new_transaction_output_request(
     mock_client: &mut MockClient,
     known_version: u64,
@@ -1281,6 +1309,7 @@ async fn send_new_transaction_output_request(
 }
 
 /// Creates and sends a request for new transactions
+#[tracing::instrument(skip_all, level = "trace")]
 async fn send_new_transaction_request(
     mock_client: &mut MockClient,
     known_version: u64,
@@ -1481,6 +1510,7 @@ fn create_transaction_list_with_proof(
 
 /// Verifies that a new transaction outputs with proof response is received
 /// and that the response contains the correct data.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn verify_new_transaction_outputs_with_proof(
     mock_client: &mut MockClient,
     receiver: Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>>,
@@ -1507,6 +1537,7 @@ async fn verify_new_transaction_outputs_with_proof(
 
 /// Verifies that a new transactions with proof response is received
 /// and that the response contains the correct data.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn verify_new_transactions_with_proof(
     mock_client: &mut MockClient,
     receiver: Receiver<Result<bytes::Bytes, network::protocols::network::RpcError>>,

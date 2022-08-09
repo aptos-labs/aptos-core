@@ -76,6 +76,7 @@ impl AptosTest for Staking {
     }
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn stake_pool_from_addr(ctx: &AptosContext<'_>, addr: AccountAddress) -> serde_json::Value {
     ctx.client()
         .get_account_resource(addr, "0x1::Stake::StakePool")
@@ -86,6 +87,7 @@ async fn stake_pool_from_addr(ctx: &AptosContext<'_>, addr: AccountAddress) -> s
         .data
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn validator_set(ctx: &AptosContext<'_>) -> serde_json::Value {
     ctx.client()
         .get_account_resource(CORE_CODE_ADDRESS, "0x1::Stake::ValidatorSet")

@@ -176,6 +176,7 @@ mod tests {
     use futures::io::AsyncReadExt;
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_async_read() {
         let source: &[u8] = b"12345678901234567890123456";
         let rate_limiter = Arc::new(Mutex::new(Bucket::new(

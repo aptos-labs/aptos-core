@@ -78,6 +78,7 @@ pub async fn validator_set_validator_addresses(
     .await
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn validator_set_addresses<F: Fn(ValidatorInfo) -> Result<Vec<NetworkAddress>, Error>>(
     client: RestClient,
     account_address: Option<AccountAddress>,

@@ -205,6 +205,7 @@ mod test {
         metric_string
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_state_sync_metrics_evaluator(
         previous_target_version: u64,
         latest_baseline_version: u64,
@@ -254,26 +255,31 @@ mod test {
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_in_sync_and_progressing() {
         test_state_sync_metrics_evaluator(1000, 2000, 1700, 100, false, false).await;
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_progressing_but_lagging() {
         test_state_sync_metrics_evaluator(1000, 5000, 3000, 70, false, false).await;
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_not_progressing() {
         test_state_sync_metrics_evaluator(1000, 5000, 1000, 50, false, false).await;
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_missing_metric() {
         test_state_sync_metrics_evaluator(1000, 5000, 1000, 0, true, false).await;
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_both_missing_metrics() {
         test_state_sync_metrics_evaluator(1000, 5000, 1000, 0, true, true).await;
     }

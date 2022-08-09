@@ -85,6 +85,7 @@ impl StateSnapshotRestoreController {
         format!("state snapshot {}", self.run_mode.name())
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn run_impl(self) -> Result<()> {
         if self.version > self.target_version {
             warn!(
@@ -147,6 +148,7 @@ impl StateSnapshotRestoreController {
         Ok(())
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn read_state_value(
         &self,
         file_handle: FileHandle,

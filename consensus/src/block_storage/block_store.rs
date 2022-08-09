@@ -129,6 +129,7 @@ impl BlockStore {
         block_store
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn try_commit(&self) {
         // reproduce the same batches (important for the commit phase)
 
@@ -150,6 +151,7 @@ impl BlockStore {
         }
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn build(
         root: RootInfo,
         root_metadata: RootMetadata,
@@ -378,6 +380,7 @@ impl BlockStore {
         self.inner.write().insert_block(executed_block)
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn execute_block(&self, block: Block) -> anyhow::Result<ExecutedBlock, Error> {
         // Although NIL blocks don't have a payload, we still send a T::default() to compute
         // because we may inject a block prologue transaction.

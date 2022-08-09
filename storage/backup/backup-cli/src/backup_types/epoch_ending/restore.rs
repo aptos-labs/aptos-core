@@ -77,6 +77,7 @@ impl EpochEndingRestoreController {
         format!("epoch ending {}", self.run_mode.name())
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn preheat_impl(&self) -> Result<EpochEndingRestorePreheatData> {
         let manifest: EpochEndingBackup =
             self.storage.load_json_file(&self.manifest_handle).await?;
@@ -157,6 +158,7 @@ impl EpochEndingRestoreController {
         })
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn read_chunk(
         &self,
         file_handle: &FileHandleRef,
@@ -202,6 +204,7 @@ impl PreheatedEpochEndingRestore {
 }
 
 impl PreheatedEpochEndingRestore {
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn run_impl(
         self,
         previous_epoch_ending_ledger_info: Option<&LedgerInfo>,
@@ -336,6 +339,7 @@ impl EpochHistoryRestoreController {
         format!("epoch history {}", self.global_opt.run_mode.name())
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn run_impl(self) -> Result<EpochHistory> {
         let timer = Instant::now();
         if self.manifest_handles.is_empty() {

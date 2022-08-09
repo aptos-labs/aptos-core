@@ -98,6 +98,7 @@ pub(crate) async fn coordinator<V>(
 }
 
 /// Spawn a task for processing `MempoolClientRequest`s from a client such as API service
+#[tracing::instrument(skip_all, level = "trace")]
 async fn handle_client_request<V>(
     smp: &mut SharedMempool<V>,
     bounded_executor: &BoundedExecutor,
@@ -199,6 +200,7 @@ fn handle_commit_notification<V>(
 }
 
 /// Spawn a task to restart the transaction validator with the new reconfig data.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn handle_mempool_reconfig_event<V>(
     smp: &mut SharedMempool<V>,
     bounded_executor: &BoundedExecutor,
@@ -226,6 +228,7 @@ async fn handle_mempool_reconfig_event<V>(
 /// - LostPeer events disable the upstream peer, which will cancel ongoing broadcasts.
 /// - Network messages follow a simple Request/Response framework to accept new transactions
 /// TODO: Move to RPC off of DirectSend
+#[tracing::instrument(skip_all, level = "trace")]
 async fn handle_network_event<V>(
     executor: &Handle,
     bounded_executor: &BoundedExecutor,

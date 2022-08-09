@@ -10,6 +10,7 @@ use clap::Parser;
 use std::process::exit;
 
 #[tokio::main]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn main() {
     // Run the corresponding tools
     let result = Tool::parse().execute().await;

@@ -75,6 +75,7 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
 impl<M: MetricCollector, R: Runner> Api<M, R> {
     /// Check the health of a given target node. You may specify a baseline node configuration to use for the evaluation. If you don't specify a baseline node configuration, we will attempt to determine the appropriate baseline based on your target node.
     #[oai(path = "/check_node", method = "get")]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn check_node(
         &self,
         /// The URL of the node to check. e.g. http://44.238.19.217 or http://fullnode.mysite.com
@@ -127,6 +128,7 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
 
     /// Check the health of the preconfigured node. If none was specified when this instance of the node checker was started, this will return an error. You may specify a baseline node configuration to use for the evaluation. If you don't specify a baseline node configuration, we will attempt to determine the appropriate baseline based on your target node.
     #[oai(path = "/check_preconfigured_node", method = "get")]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn check_preconfigured_node(
         &self,
         baseline_configuration_name: Query<Option<String>>,
@@ -167,6 +169,7 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
     /// derive (or even represent) some fields of the spec via OpenAPI,
     /// so note that some fields will be missing from the response.
     #[oai(path = "/get_configurations", method = "get")]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn get_configurations(&self) -> Json<Vec<NodeConfiguration>> {
         Json(
             self.configurations_manager
@@ -180,6 +183,7 @@ impl<M: MetricCollector, R: Runner> Api<M, R> {
     /// Get just the keys for the configurations, i.e. the configuration_name
     /// field.
     #[oai(path = "/get_configuration_keys", method = "get")]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn get_configuration_keys(&self) -> Json<Vec<String>> {
         Json(
             self.configurations_manager

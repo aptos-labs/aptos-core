@@ -134,6 +134,7 @@ impl Transport for TcpTransport {
 }
 
 /// Try to lookup the dns name, then filter addrs according to the `IpFilter`.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn resolve_with_filter(
     ip_filter: IpFilter,
     dns_name: &str,
@@ -181,6 +182,7 @@ pub async fn resolve_and_connect(addr: NetworkAddress) -> io::Result<TcpStream> 
     }
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn connect_via_proxy(proxy_addr: String, addr: NetworkAddress) -> io::Result<TcpStream> {
     let protos = addr.as_slice();
 
@@ -331,6 +333,7 @@ mod test {
     use tokio::runtime::Runtime;
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn simple_listen_and_dial() -> Result<(), ::std::io::Error> {
         let t = TcpTransport::default().and_then(|mut out, _addr, origin| async move {
             match origin {

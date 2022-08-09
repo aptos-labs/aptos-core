@@ -176,6 +176,7 @@ impl MockNetwork {
     }
 
     /// Get the next request sent from the client.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn next_request(&mut self) -> Option<NetworkRequest> {
         match self.peer_mgr_reqs_rx.next().await {
             Some(PeerManagerRequest::SendRpc(peer_id, network_request)) => {
@@ -199,6 +200,7 @@ impl MockNetwork {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn request_works_only_when_data_available() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, mock_time, client, poller) = MockNetwork::new(None, None, None);
@@ -273,6 +275,7 @@ async fn request_works_only_when_data_available() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn fetch_peers_frequency() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, _, client, poller) = MockNetwork::new(None, None, None);
@@ -314,6 +317,7 @@ async fn fetch_peers_frequency() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn fetch_peers_ordering() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, _, client, _) = MockNetwork::new(None, None, None);
@@ -397,6 +401,7 @@ async fn fetch_peers_ordering() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn fetch_peers_disconnect() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, _, client, _) = MockNetwork::new(None, None, None);
@@ -463,6 +468,7 @@ async fn fetch_peers_disconnect() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn fetch_peers_reconnect() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, _, client, _) = MockNetwork::new(None, None, None);
@@ -545,6 +551,7 @@ async fn fetch_peers_reconnect() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn fetch_peers_max_in_flight() {
     ::aptos_logger::Logger::init_for_testing();
 
@@ -610,6 +617,7 @@ async fn fetch_peers_max_in_flight() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn in_flight_error_handling() {
     ::aptos_logger::Logger::init_for_testing();
 
@@ -648,6 +656,7 @@ async fn in_flight_error_handling() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn prioritized_peer_request_selection() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, _, client, _) = MockNetwork::new(None, None, None);
@@ -719,6 +728,7 @@ async fn prioritized_peer_request_selection() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn all_peer_request_selection() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, _, client, _) = MockNetwork::new(None, None, None);
@@ -789,6 +799,7 @@ async fn all_peer_request_selection() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn validator_peer_prioritization() {
     ::aptos_logger::Logger::init_for_testing();
 
@@ -813,6 +824,7 @@ async fn validator_peer_prioritization() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn vfn_peer_prioritization() {
     ::aptos_logger::Logger::init_for_testing();
 
@@ -837,6 +849,7 @@ async fn vfn_peer_prioritization() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn pfn_peer_prioritization() {
     ::aptos_logger::Logger::init_for_testing();
 
@@ -867,6 +880,7 @@ async fn pfn_peer_prioritization() {
 //    bad peer) should lower bad peer's score
 // 4. eventually bad peer score should hit threshold and we err with no available
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn bad_peer_is_eventually_banned_internal() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, _, client, _) = MockNetwork::new(None, None, None);
@@ -946,6 +960,7 @@ async fn bad_peer_is_eventually_banned_internal() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn bad_peer_is_eventually_banned_callback() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, _, client, _) = MockNetwork::new(None, None, None);
@@ -1009,6 +1024,7 @@ async fn bad_peer_is_eventually_banned_callback() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn compression_mismatch_disabled() {
     ::aptos_logger::Logger::init_for_testing();
 
@@ -1060,6 +1076,7 @@ async fn compression_mismatch_disabled() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn compression_mismatch_enabled() {
     ::aptos_logger::Logger::init_for_testing();
 
@@ -1109,6 +1126,7 @@ async fn compression_mismatch_enabled() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn disable_compression() {
     ::aptos_logger::Logger::init_for_testing();
 
@@ -1178,6 +1196,7 @@ async fn disable_compression() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn bad_peer_is_eventually_added_back() {
     ::aptos_logger::Logger::init_for_testing();
     let (mut mock_network, mock_time, client, poller) = MockNetwork::new(None, None, None);
@@ -1261,6 +1280,7 @@ async fn bad_peer_is_eventually_added_back() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn optimal_chunk_size_calculations() {
     // Create a test storage service config
     let max_epoch_chunk_size = 600;

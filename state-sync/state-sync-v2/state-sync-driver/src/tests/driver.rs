@@ -38,6 +38,7 @@ use storage_service_client::StorageServiceClient;
 // TODO(joshlind): extend these tests to cover more functionality!
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_auto_bootstrapping() {
     // Create a driver for a validator with a waypoint at version 0
     let (validator_driver, _, _, _, _) = create_validator_driver(None).await;
@@ -48,6 +49,7 @@ async fn test_auto_bootstrapping() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_consensus_commit_notification() {
     // Create a driver for a full node
     let (_full_node_driver, consensus_notifier, _, _, _) = create_full_node_driver(None).await;
@@ -69,6 +71,7 @@ async fn test_consensus_commit_notification() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_mempool_commit_notifications() {
     // Create a driver for a validator with a waypoint at version 0
     let subscription_event_key = EventKey::random();
@@ -110,6 +113,7 @@ async fn test_mempool_commit_notifications() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_reconfiguration_notifications() {
     // Create a driver for a validator with a waypoint at version 0
     let (validator_driver, consensus_notifier, mut mempool_listener, mut reconfig_listener, _) =
@@ -160,6 +164,7 @@ async fn test_reconfiguration_notifications() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_consensus_sync_request() {
     // Create a driver for a full node
     let (_full_node_driver, consensus_notifier, _, _, _) = create_full_node_driver(None).await;
@@ -181,6 +186,7 @@ async fn test_consensus_sync_request() {
 }
 
 /// Creates a state sync driver for a validator node
+#[tracing::instrument(skip_all, level = "trace")]
 async fn create_validator_driver(
     event_key_subscriptions: Option<Vec<EventKey>>,
 ) -> (
@@ -197,6 +203,7 @@ async fn create_validator_driver(
 }
 
 /// Creates a state sync driver for a full node
+#[tracing::instrument(skip_all, level = "trace")]
 async fn create_full_node_driver(
     event_key_subscriptions: Option<Vec<EventKey>>,
 ) -> (
@@ -213,6 +220,7 @@ async fn create_full_node_driver(
 }
 
 /// Creates a state sync driver using the given node config and waypoint
+#[tracing::instrument(skip_all, level = "trace")]
 async fn create_driver_for_tests(
     node_config: NodeConfig,
     waypoint: Waypoint,

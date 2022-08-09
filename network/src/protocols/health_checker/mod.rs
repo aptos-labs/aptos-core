@@ -314,6 +314,7 @@ impl HealthChecker {
         let _ = res_tx.send(Ok(message.into()));
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn handle_ping_response(
         &mut self,
         peer_id: PeerId,
@@ -432,6 +433,7 @@ impl HealthChecker {
         }
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn ping_peer(
         network_context: NetworkContext,
         network_tx: HealthCheckerNetworkSender,

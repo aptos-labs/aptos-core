@@ -294,6 +294,7 @@ impl TryFrom<Service> for KubeService {
     }
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn list_stateful_sets(client: K8sClient, kube_namespace: &str) -> Result<Vec<StatefulSet>> {
     let stateful_set_api: Api<StatefulSet> = Api::namespaced(client, kube_namespace);
     let lp = ListParams::default();

@@ -60,6 +60,7 @@ impl ReqwestMetricCollector {
         url
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn get_data_from_node(&self, path: &str) -> Result<String, MetricCollectorError> {
         let url = self.get_url(path);
         debug!("Connecting to {}", url);

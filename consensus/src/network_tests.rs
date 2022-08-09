@@ -116,6 +116,7 @@ impl NetworkPlayground {
     ///
     /// Rpc messages are immediately sent to the destination for handling, so
     /// they don't block.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn start_node_outbound_handler(
         drop_config: Arc<RwLock<DropConfig>>,
         src_twin_id: TwinId,
@@ -213,6 +214,7 @@ impl NetworkPlayground {
     /// Deliver a `PeerManagerRequest` from peer `src` to the destination peer.
     /// Returns a copy of the delivered message and the sending peer id, and
     /// whether the message was successfully delivered
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn deliver_message(
         &mut self,
         src_twin_id: TwinId,

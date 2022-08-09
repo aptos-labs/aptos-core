@@ -411,6 +411,7 @@ where
     /// For instance, a validator might leave the validator set after a
     /// reconfiguration. If we are currently connected to this validator, calling
     /// this function will close our connection to it.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn close_stale_connections(&mut self) {
         let eligible = self.eligible.read().clone();
         let stale_connections: Vec<_> = self
@@ -458,6 +459,7 @@ where
     /// For instance, a validator might leave the validator set after a
     /// reconfiguration. If there is a pending dial to this validator, calling
     /// this function will remove it from the dial queue.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn cancel_stale_dials(&mut self) {
         let eligible = self.eligible.read().clone();
         let stale_dials: Vec<_> = self
@@ -611,6 +613,7 @@ where
     // Note: We do not check that the connections to older incarnations of a node are broken, and
     // instead rely on the node moving to a new epoch to break connections made from older
     // incarnations.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn check_connectivity<'a>(
         &'a mut self,
         pending_dials: &'a mut FuturesUnordered<BoxFuture<'static, PeerId>>,

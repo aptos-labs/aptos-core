@@ -80,6 +80,7 @@ struct LoadedChunk {
 }
 
 impl LoadedChunk {
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn load(
         manifest: TransactionChunk,
         storage: &Arc<dyn BackupStorage>,
@@ -206,6 +207,7 @@ impl TransactionRestoreBatchController {
         format!("transaction {}", self.global_opt.run_mode.name())
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn run_impl(self) -> Result<()> {
         if self.manifest_handles.is_empty() {
             return Ok(());
@@ -290,6 +292,7 @@ impl TransactionRestoreBatchController {
             .peekable()
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn confirm_or_save_frozen_subtrees(
         &self,
         loaded_chunk_stream: &mut Peekable<impl Unpin + Stream<Item = Result<LoadedChunk>>>,
@@ -311,6 +314,7 @@ impl TransactionRestoreBatchController {
         Ok(first_chunk.manifest.first_version)
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn save_before_replay_version(
         &self,
         global_first_version: Version,
@@ -398,6 +402,7 @@ impl TransactionRestoreBatchController {
         Ok(first_txn_to_replay.map(|_| txns_to_execute_stream))
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn replay_transactions(
         &self,
         restore_handler: &RestoreHandler,
@@ -447,6 +452,7 @@ impl TransactionRestoreBatchController {
             .await
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn go_through_verified_chunks(
         loaded_chunk_stream: impl Stream<Item = Result<LoadedChunk>>,
         first_version: Version,

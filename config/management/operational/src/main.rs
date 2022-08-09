@@ -7,6 +7,7 @@ use std::process::exit;
 use structopt::StructOpt;
 
 #[tokio::main]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn main() {
     let result = Command::from_args().execute().await;
 

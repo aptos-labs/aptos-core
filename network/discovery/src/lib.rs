@@ -99,6 +99,7 @@ impl DiscoveryChangeListener {
         executor.spawn(Box::pin(self).run());
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn run(mut self: Pin<Box<Self>>) {
         let network_context = self.network_context;
         let discovery_source = self.discovery_source;

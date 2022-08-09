@@ -128,6 +128,7 @@ impl TimeService for ClockTimeService {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_time_service_abort() {
     use futures::StreamExt;
 

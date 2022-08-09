@@ -753,6 +753,7 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
     })
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_states_values_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: StateValuesWithProofRequest,
@@ -767,6 +768,7 @@ async fn get_states_values_with_proof<T: AptosDataClient + Send + Clone + 'stati
         .map(|response| response.map(ResponsePayload::from))
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_epoch_ending_ledger_infos<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: EpochEndingLedgerInfosRequest,
@@ -778,6 +780,7 @@ async fn get_epoch_ending_ledger_infos<T: AptosDataClient + Send + Clone + 'stat
         .map(|response| response.map(ResponsePayload::from))
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_new_transaction_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: NewTransactionOutputsWithProofRequest,
@@ -789,6 +792,7 @@ async fn get_new_transaction_outputs_with_proof<T: AptosDataClient + Send + Clon
         .map(|response| response.map(ResponsePayload::from))
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_new_transactions_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: NewTransactionsWithProofRequest,
@@ -803,6 +807,7 @@ async fn get_new_transactions_with_proof<T: AptosDataClient + Send + Clone + 'st
         .map(|response| response.map(ResponsePayload::from))
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_number_of_states<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: NumberOfStatesRequest,
@@ -813,6 +818,7 @@ async fn get_number_of_states<T: AptosDataClient + Send + Clone + 'static>(
         .map(|response| response.map(ResponsePayload::from))
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_transaction_outputs_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: TransactionOutputsWithProofRequest,
@@ -827,6 +833,7 @@ async fn get_transaction_outputs_with_proof<T: AptosDataClient + Send + Clone + 
         .map(|response| response.map(ResponsePayload::from))
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_transactions_with_proof<T: AptosDataClient + Send + Clone + 'static>(
     aptos_data_client: T,
     request: TransactionsWithProofRequest,

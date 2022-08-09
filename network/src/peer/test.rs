@@ -152,6 +152,7 @@ fn build_network_sink_stream(
     (sink, stream)
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn assert_disconnected_event(
     peer_id: PeerId,
     reason: DisconnectReason,
@@ -176,6 +177,7 @@ impl PeerHandle {
             .unwrap()
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn send_rpc_request(
         &mut self,
         protocol_id: ProtocolId,

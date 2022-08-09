@@ -241,6 +241,7 @@ fn gen_rng_for_reusable_account(count: usize) -> Vec<StdRng> {
 
 /// Create `num_new_accounts` by transferring coins from `source_account`. Return Vec of created
 /// accounts
+#[tracing::instrument(skip_all, level = "trace")]
 async fn create_and_fund_new_accounts<R>(
     mut source_account: LocalAccount,
     num_new_accounts: usize,
@@ -288,6 +289,7 @@ where
     Ok(accounts)
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn gen_reusable_accounts<R>(
     client: &RestClient,
     num_accounts: usize,
@@ -305,6 +307,7 @@ where
     Ok(vasp_accounts)
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn gen_reusable_account<R>(client: &RestClient, rng: &mut R) -> Result<LocalAccount>
 where
     R: ::rand_core::RngCore + ::rand_core::CryptoRng,

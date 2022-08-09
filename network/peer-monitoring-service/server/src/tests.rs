@@ -39,6 +39,7 @@ use std::{
 };
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_server_protocol_version() {
     // Create the peer monitoring client and server
     let (mut mock_client, service, _) = MockClient::new();
@@ -57,6 +58,7 @@ async fn test_get_server_protocol_version() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_connected_peers() {
     // Create the peer monitoring client and server
     let (mut mock_client, service, peer_metadata_storage) = MockClient::new();
@@ -167,6 +169,7 @@ impl MockClient {
         (mock_client, peer_monitoring_server, peer_metadata_storage)
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn send_request(
         &mut self,
         request: PeerMonitoringServiceRequest,

@@ -81,6 +81,7 @@ pub fn get_all_metrics() -> HashMap<String, String> {
     get_metrics(all_metric_families)
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn serve_requests(
     req: Request<Body>,
     node_config: NodeConfig,

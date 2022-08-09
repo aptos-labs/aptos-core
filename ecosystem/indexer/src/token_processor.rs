@@ -74,6 +74,7 @@ fn update_mint_token(
     }
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_all_metadata(uris: &Vec<(String, String)>, res: &mut Vec<Metadata>) {
     let fetcher = MetaDataFetcher::new();
     for (tid, uri) in uris {

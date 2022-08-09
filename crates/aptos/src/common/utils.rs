@@ -77,6 +77,7 @@ pub async fn to_common_result<T: Serialize>(
 }
 
 /// Sends a telemetry event about the CLI build, command and result
+#[tracing::instrument(skip_all, level = "trace")]
 async fn send_telemetry_event(
     command: &str,
     latency: Duration,

@@ -56,6 +56,7 @@ impl LatencyEvaluator {
         Self { args }
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn get_latency_datapoint(&self, target_url: Url) -> Result<Duration> {
         let client = reqwest::ClientBuilder::new()
             .timeout(std::time::Duration::from_millis(

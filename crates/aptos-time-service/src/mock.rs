@@ -410,6 +410,7 @@ mod test {
     };
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_sleep() {
         let time = MockTimeService::new();
 
@@ -463,6 +464,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_sleep_until() {
         let time = MockTimeService::new();
 
@@ -501,6 +503,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_many_sleep() {
         let time = MockTimeService::new();
 
@@ -549,6 +552,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_interval() {
         let time = MockTimeService::new();
 
@@ -576,6 +580,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_timeout() {
         // Timeout with a future that's immediately ready.
         let time = MockTimeService::new();
@@ -609,6 +614,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_auto_advance() {
         let time = MockTimeService::new_auto_advance_for(ms(100));
         assert_eq!(time.now_unix_time(), ms(0));

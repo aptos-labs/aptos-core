@@ -32,6 +32,7 @@ impl BoundedExecutor {
         }
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn acquire_permit(&self) -> OwnedSemaphorePermit {
         self.semaphore.clone().acquire_owned().await.unwrap()
     }

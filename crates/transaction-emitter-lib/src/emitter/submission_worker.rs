@@ -157,6 +157,7 @@ impl SubmissionWorker {
     /// Note, the latency values are not accurate if --check-stats-at-end
     /// is used. There is no easy way around this accurately. As such, we
     /// don't update latency at all if that flag is set.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn update_stats(
         &mut self,
         start_time: Instant,

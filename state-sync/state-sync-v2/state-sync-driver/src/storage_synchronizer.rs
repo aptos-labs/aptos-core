@@ -754,6 +754,7 @@ fn decrement_pending_data_chunks(atomic_u64: Arc<AtomicU64>) {
 }
 
 /// Sends an error notification to the notification listener
+#[tracing::instrument(skip_all, level = "trace")]
 async fn send_storage_synchronizer_error(
     mut error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     notification_id: NotificationId,

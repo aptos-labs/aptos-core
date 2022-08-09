@@ -311,6 +311,7 @@ mod test {
             self.chain_id = version as u8;
         }
 
+        #[tracing::instrument(skip_all, level = "trace")]
         async fn fetch_ledger_info(&mut self) -> State {
             State {
                 chain_id: self.chain_id,
@@ -321,10 +322,12 @@ mod test {
             }
         }
 
+        #[tracing::instrument(skip_all, level = "trace")]
         async fn fetch_next(&mut self) -> Transaction {
             unimplemented!();
         }
 
+        #[tracing::instrument(skip_all, level = "trace")]
         async fn fetch_version(&self, _version: u64) -> Transaction {
             unimplemented!();
         }
@@ -373,6 +376,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn test_parsing_and_writing() {
         if crate::should_skip_pg_tests() {
             return;

@@ -177,6 +177,7 @@ impl BufferManager {
 
     /// Set the execution root to the first not executed item (Ordered) and send execution request
     /// Set to None if not exist
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn advance_execution_root(&mut self) {
         let cursor = self.execution_root;
         self.execution_root = self
@@ -205,6 +206,7 @@ impl BufferManager {
 
     /// Set the signing root to the first not signed item (Executed) and send execution request
     /// Set to None if not exist
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn advance_signing_root(&mut self) {
         let cursor = self.signing_root;
         self.signing_root = self
@@ -237,6 +239,7 @@ impl BufferManager {
 
     /// Pop the prefix of buffer items until (including) target_block_id
     /// Send persist request.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn advance_head(&mut self, target_block_id: HashValue) {
         let mut blocks_to_persist: Vec<Arc<ExecutedBlock>> = vec![];
 
@@ -290,6 +293,7 @@ impl BufferManager {
     /// Reset any request in buffer manager, this is important to avoid race condition with state sync.
     /// Internal requests are managed with ongoing_tasks.
     /// Incoming ordered blocks are pulled, it should only have existing blocks but no new blocks until reset finishes.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn reset(&mut self) {
         self.buffer = Buffer::new();
         self.execution_root = None;
@@ -303,6 +307,7 @@ impl BufferManager {
     }
 
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, stop } = request;
         debug!("Receive reset");
@@ -313,6 +318,7 @@ impl BufferManager {
     }
 
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn process_execution_response(&mut self, response: ExecutionResponse) {
         let ExecutionResponse { block_id, inner } = response;
         // find the corresponding item, may not exist if a reset or aggregated happened
@@ -343,6 +349,7 @@ impl BufferManager {
     }
 
     /// If the signing response is successful, advance the item to Signed and broadcast commit votes.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn process_signing_response(&mut self, response: SigningResponse) {
         let SigningResponse {
             signature_result,
@@ -437,6 +444,7 @@ impl BufferManager {
 
     /// this function retries all the items until the signing root
     /// note that there might be other signed items after the signing root
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn retry_broadcasting_commit_votes(&mut self) {
         let mut cursor = *self.buffer.head_cursor();
         while cursor.is_some() {

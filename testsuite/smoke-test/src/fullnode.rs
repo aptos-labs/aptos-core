@@ -29,6 +29,7 @@ impl NetworkTest for LaunchFullnode {
 }
 
 impl LaunchFullnode {
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn async_run(&self, ctx: &mut NetworkContext<'_>) -> Result<()> {
         let version = ctx.swarm().versions().max().unwrap();
         let fullnode_peer_id = ctx
@@ -80,6 +81,7 @@ impl LaunchFullnode {
     }
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn wait_for_account(client: &RestClient, address: AccountAddress) -> Result<()> {
     const DEFAULT_WAIT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
     let start = std::time::Instant::now();

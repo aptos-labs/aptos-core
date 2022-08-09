@@ -293,6 +293,7 @@ impl AptosNetDataClient {
     }
 
     /// Sends a request (to an undecided peer) and decodes the response
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn send_request_and_decode<T, E>(
         &self,
         request: StorageServiceRequest,
@@ -315,6 +316,7 @@ impl AptosNetDataClient {
     }
 
     /// Sends a request to a specific peer and decodes the response
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn send_request_to_peer_and_decode<T, E>(
         &self,
         peer: PeerNetworkId,
@@ -355,6 +357,7 @@ impl AptosNetDataClient {
     }
 
     /// Sends a request to a specific peer
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn send_request_to_peer(
         &self,
         peer: PeerNetworkId,

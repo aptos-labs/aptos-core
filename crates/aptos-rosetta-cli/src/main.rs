@@ -29,6 +29,7 @@ use clap::Parser;
 use std::process::exit;
 
 #[tokio::main]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn main() {
     let mut logger = aptos_logger::Logger::new();
     logger

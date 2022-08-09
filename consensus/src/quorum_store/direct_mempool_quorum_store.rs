@@ -40,6 +40,7 @@ impl DirectMempoolQuorumStore {
         }
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn pull_internal(
         &self,
         max_size: u64,
@@ -72,6 +73,7 @@ impl DirectMempoolQuorumStore {
         }
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn handle_block_request(
         &self,
         max_size: u64,
@@ -115,6 +117,7 @@ impl DirectMempoolQuorumStore {
         );
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn handle_clean_request(&self, callback: oneshot::Sender<Result<ConsensusResponse>>) {
         match callback.send(Ok(ConsensusResponse::CleanResponse())) {
             Err(_) => {
@@ -125,6 +128,7 @@ impl DirectMempoolQuorumStore {
         };
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn handle_consensus_request(&self, req: ConsensusRequest) {
         match req {
             ConsensusRequest::GetBlockRequest(max_size, payload_filter, callback) => {

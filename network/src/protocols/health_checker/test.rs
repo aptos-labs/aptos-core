@@ -76,10 +76,12 @@ impl TestHarness {
         Self::new_permissive(0 /* ping_failures_tolerated */)
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn trigger_ping(&self) {
         self.mock_time.advance_async(PING_INTERVAL).await;
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn expect_ping(&mut self) -> (Ping, oneshot::Sender<Result<Bytes, RpcError>>) {
         let req = self.peer_mgr_reqs_rx.next().await.unwrap();
         let rpc_req = match req {
@@ -99,18 +101,21 @@ impl TestHarness {
         }
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn expect_ping_send_ok(&mut self) {
         let (ping, res_tx) = self.expect_ping().await;
         let res_data = bcs::to_bytes(&HealthCheckerMsg::Pong(Pong(ping.0))).unwrap();
         res_tx.send(Ok(res_data.into())).unwrap();
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn expect_ping_send_not_ok(&mut self) {
         let (_ping_msg, res_tx) = self.expect_ping().await;
         // This mock ping request must fail.
         res_tx.send(Err(RpcError::TimedOut)).unwrap();
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn send_inbound_ping(
         &mut self,
         peer_id: PeerId,
@@ -139,6 +144,7 @@ impl TestHarness {
         res_rx
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn expect_disconnect(&mut self, expected_peer_id: PeerId) {
         let req = self.connection_reqs_rx.next().await.unwrap();
         let (peer_id, res_tx) = match req {
@@ -149,6 +155,7 @@ impl TestHarness {
         res_tx.send(Ok(())).unwrap();
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn send_new_peer_notification(&mut self, peer_id: PeerId) {
         let (delivered_tx, delivered_rx) = oneshot::channel();
         let notif = peer_manager::ConnectionNotification::NewPeer(
@@ -162,6 +169,7 @@ impl TestHarness {
     }
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn expect_pong(res_rx: oneshot::Receiver<Result<Bytes, RpcError>>) {
     let res_data = res_rx.await.unwrap().unwrap();
     match bcs::from_bytes(&res_data).unwrap() {

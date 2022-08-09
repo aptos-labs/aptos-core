@@ -87,6 +87,7 @@ fn fetch_peer_id(node_config: &NodeConfig) -> String {
 }
 
 /// Spawns the dedicated telemetry service that operates periodically
+#[tracing::instrument(skip_all, level = "trace")]
 async fn spawn_telemetry_service(peer_id: String, chain_id: String, node_config: NodeConfig) {
     // Send build information once (only on startup)
     send_build_information(peer_id.clone(), chain_id.clone()).await;
@@ -126,24 +127,28 @@ async fn spawn_telemetry_service(peer_id: String, chain_id: String, node_config:
 }
 
 /// Collects and sends the build information via telemetry
+#[tracing::instrument(skip_all, level = "trace")]
 async fn send_build_information(peer_id: String, chain_id: String) {
     let telemetry_event = create_build_info_telemetry_event(chain_id).await;
     let _join_handle = send_telemetry_event_with_ip(peer_id, telemetry_event).await;
 }
 
 /// Collects and sends the core node metrics via telemetry
+#[tracing::instrument(skip_all, level = "trace")]
 async fn send_node_core_metrics(peer_id: String, node_config: &NodeConfig) {
     let telemetry_event = create_core_metric_telemetry_event(node_config).await;
     let _join_handle = send_telemetry_event_with_ip(peer_id, telemetry_event).await;
 }
 
 /// Collects and sends the node network metrics via telemetry
+#[tracing::instrument(skip_all, level = "trace")]
 async fn send_node_network_metrics(peer_id: String) {
     let telemetry_event = create_network_metric_telemetry_event().await;
     let _join_handle = send_telemetry_event_with_ip(peer_id, telemetry_event).await;
 }
 
 /// Collects and sends the system information via telemetry
+#[tracing::instrument(skip_all, level = "trace")]
 async fn send_system_information(peer_id: String) {
     let telemetry_event = create_system_info_telemetry_event().await;
     let _join_handle = send_telemetry_event_with_ip(peer_id, telemetry_event).await;
@@ -168,6 +173,7 @@ pub(crate) async fn send_telemetry_event_with_ip(
 
 /// Gets the IP origin of the machine by pinging a url.
 /// If none is found, returns UNKNOWN.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_origin_ip() -> String {
     let resp = reqwest::get(HTTPBIN_URL).await;
     match resp {
@@ -180,6 +186,7 @@ async fn get_origin_ip() -> String {
 }
 
 /// Sends the given event and params to the telemetry endpoint
+#[tracing::instrument(skip_all, level = "trace")]
 async fn send_telemetry_event(peer_id: String, telemetry_event: TelemetryEvent) -> JoinHandle<()> {
     // Parse the Google analytics env variables
     let api_secret =

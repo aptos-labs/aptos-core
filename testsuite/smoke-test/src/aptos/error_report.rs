@@ -16,6 +16,7 @@ impl Test for ErrorReport {
     }
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
     local_account: &LocalAccount,
     ctx: &mut AptosContext<'_>,

@@ -186,6 +186,7 @@ impl<
     }
 
     /// Handles a notification sent by consensus
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn handle_consensus_notification(&mut self, notification: ConsensusNotification) {
         // Verify the notification: full nodes shouldn't receive notifications
         // and consensus should only send notifications after bootstrapping!
@@ -246,6 +247,7 @@ impl<
     }
 
     /// Handles a commit notification sent by consensus
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn handle_consensus_commit_notification(
         &mut self,
         consensus_commit_notification: ConsensusCommitNotification,
@@ -319,6 +321,7 @@ impl<
     }
 
     /// Handles a consensus notification to sync to a specified target
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn handle_consensus_sync_notification(
         &mut self,
         sync_notification: ConsensusSyncNotification,
@@ -369,6 +372,7 @@ impl<
 
     /// Handles a commit notification sent by the storage synchronizer for new
     /// state values.
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn handle_commit_notification(&mut self, commit_notification: CommitNotification) {
         let CommitNotification::CommittedStates(committed_states) = commit_notification;
         info!(
@@ -382,6 +386,7 @@ impl<
     }
 
     /// Handles a notification sent by the storage synchronizer for committed states
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn handle_committed_states(&mut self, committed_states: CommittedStates) {
         // Forward the notification to the bootstrapper
         if let Err(error) = self
@@ -413,6 +418,7 @@ impl<
     }
 
     /// Handles an error notification sent by the storage synchronizer
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn handle_error_notification(&mut self, error_notification: ErrorNotification) {
         error!(LogSchema::new(LogEntry::SynchronizerNotification)
             .error_notification(error_notification.clone())
@@ -445,6 +451,7 @@ impl<
     }
 
     /// Checks if the node has successfully reached the sync target
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn check_sync_request_progress(&mut self) -> Result<(), Error> {
         if !self.active_sync_request() {
             return Ok(());
@@ -532,6 +539,7 @@ impl<
     }
 
     /// Checks that state sync is making progress
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn drive_progress(&mut self) {
         // Fetch the global data summary and verify we have active peers
         let global_data_summary = self.aptos_data_client.get_global_data_summary();

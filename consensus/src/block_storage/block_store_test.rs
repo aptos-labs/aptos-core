@@ -28,6 +28,7 @@ use proptest::prelude::*;
 use std::{cmp::min, collections::HashSet};
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_highest_block_and_quorum_cert() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
@@ -80,6 +81,7 @@ async fn test_highest_block_and_quorum_cert() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_qc_ancestry() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
@@ -152,6 +154,7 @@ proptest! {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_block_store_prune() {
     let (blocks, block_store) = build_simple_tree().await;
     // Attempt to prune genesis block (should be no-op)
@@ -211,6 +214,7 @@ async fn test_block_store_prune() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_block_tree_gc() {
     // build a tree with 100 nodes, max_pruned_nodes_in_mem = 10
     let mut inserter = TreeInserter::default();
@@ -238,6 +242,7 @@ async fn test_block_tree_gc() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_path_from_root() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
@@ -269,6 +274,7 @@ async fn test_path_from_root() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_insert_vote() {
     ::aptos_logger::Logger::init_for_testing();
     // Set up enough different authors to support different votes for the same block.
@@ -342,6 +348,7 @@ async fn test_insert_vote() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_illegal_timestamp() {
     let signer = ValidatorSigner::random(None);
     let block_store = build_empty_tree();
@@ -362,6 +369,7 @@ async fn test_illegal_timestamp() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_highest_qc() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
@@ -380,6 +388,7 @@ async fn test_highest_qc() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_need_fetch_for_qc() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();

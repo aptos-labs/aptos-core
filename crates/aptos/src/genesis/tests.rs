@@ -30,6 +30,7 @@ use std::{
 
 /// Test the E2E genesis flow since it doesn't require a node to run
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_genesis_e2e_flow() {
     const NUM_USERS: u8 = 2;
     let chain_id = ChainId::test();
@@ -71,6 +72,7 @@ async fn test_genesis_e2e_flow() {
 }
 
 /// Generate genesis and waypoint
+#[tracing::instrument(skip_all, level = "trace")]
 async fn generate_genesis(git_options: GitOptions, output_dir: PathBuf) {
     let command = GenerateGenesis {
         prompt_options: PromptOptions::yes(),
@@ -81,6 +83,7 @@ async fn generate_genesis(git_options: GitOptions, output_dir: PathBuf) {
 }
 
 /// Setup a temporary repo location and add all required pieces
+#[tracing::instrument(skip_all, level = "trace")]
 async fn setup_git_dir(
     root_private_key: &Ed25519PrivateKey,
     users: Vec<String>,
@@ -153,6 +156,7 @@ fn create_layout_file(
 }
 
 /// Generate keys for a "user"
+#[tracing::instrument(skip_all, level = "trace")]
 async fn generate_keys(dir: &Path, index: u8) -> PathBuf {
     let output_dir = dir.join(index.to_string());
     let command = GenerateKeys {
@@ -166,6 +170,7 @@ async fn generate_keys(dir: &Path, index: u8) -> PathBuf {
 }
 
 /// Set validator configuration for a user
+#[tracing::instrument(skip_all, level = "trace")]
 async fn add_public_keys(username: String, git_options: GitOptions, keys_dir: &Path) {
     let command = SetValidatorConfiguration {
         username,

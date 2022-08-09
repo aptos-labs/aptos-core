@@ -70,6 +70,7 @@ impl EpochEndingBackupController {
 }
 
 impl EpochEndingBackupController {
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn run_impl(self) -> Result<FileHandle> {
         let backup_handle = self
             .storage
@@ -148,6 +149,7 @@ impl EpochEndingBackupController {
         Waypoint::new_epoch_boundary(li.ledger_info())
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn write_chunk(
         &self,
         backup_handle: &BackupHandleRef,
@@ -168,6 +170,7 @@ impl EpochEndingBackupController {
         })
     }
 
+    #[tracing::instrument(skip_all, level = "trace")]
     async fn write_manifest(
         &self,
         backup_handle: &BackupHandleRef,
