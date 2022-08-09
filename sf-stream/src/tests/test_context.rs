@@ -17,6 +17,7 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{Transaction, TransactionStatus},
 };
+use crate::pb::extractor::Transaction as TransactionPB;
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::{block_executor::BlockExecutor, db_bootstrapper};
@@ -356,7 +357,7 @@ impl TestContext {
         body
     }
 
-    pub fn check_golden_output(&mut self, msg: Value) {
+    pub fn check_golden_output(&mut self, txns: &[TransactionPB]) {
         if self.golden_output.is_none() {
             self.golden_output = Some(GoldenOutputs::new(
                 self.test_name.replace(':', "_"),
@@ -364,7 +365,7 @@ impl TestContext {
             ));
         }
 
-        let msg = pretty(&msg);
+        let msg = pretty(&txns);
         let re = regex::Regex::new("hash\": \".*\"").unwrap();
         let msg = re.replace_all(&msg, "hash\": \"\"");
 
