@@ -346,17 +346,23 @@ impl Transactions {
         let state_view = &*self.context.move_resolver()?;
         let (status, output_ext) = AptosVM::simulate_signed_transaction(&txn, state_view);
         let version = self.ledger_info.version();
-        let exe_status = match status.into() {
-            TransactionStatus::Keep(exec_status) => exec_status,
-            _ => ExecutionStatus::MiscellaneousError(None),
-        };
+        let (output, exe_status) = match status.into() {
+            TransactionStatus::Keep(exec_status) => {
+                // Apply deltas.
+                // TODO: while `into_transaction_output_with_status()` should never fail
+                // to apply deltas, we should propagate errors properly. Fix this when
+                // VM error handling is fixed.
+                let (vm_status, output) =
+                    output_ext.into_transaction_output_with_status(state_view);
+                debug_assert!(vm_status == VMStatus::Executed);
 
-        // Apply deltas.
-        // TODO: while `into_transaction_output_with_status()` should never fail
-        // to apply deltas, we should propagate errors properly. Fix this when
-        // VM error handling is fixed.
-        let (vm_status, output) = output_ext.into_transaction_output_with_status(state_view);
-        debug_assert!(vm_status == VMStatus::Executed);
+                (output, exec_status)
+            }
+            _ => {
+                let (_, output) = output_ext.into();
+                (output, ExecutionStatus::MiscellaneousError(None))
+            }
+        };
 
         let zero_hash = HashValue::zero();
         let info = TransactionInfo::new(
@@ -382,7 +388,13 @@ impl Transactions {
     pub fn list(self, page: Page, accept_type: AcceptType) -> Result<impl Reply, Error> {
         let ledger_version = self.ledger_info.version();
         let limit = page.limit()?;
-        let start_version = page.compute_start(limit, ledger_version)?;
+        let last_page_start = if ledger_version > (limit as u64) {
+            ledger_version - (limit as u64)
+        } else {
+            0
+        };
+        let start_version = page.start(last_page_start, ledger_version)?;
+
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)?;

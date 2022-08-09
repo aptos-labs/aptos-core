@@ -528,17 +528,23 @@ impl TransactionsApi {
         let move_resolver = self.context.move_resolver_poem()?;
         let (status, output_ext) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
         let version = ledger_info.version();
-        let exe_status = match status.into() {
-            TransactionStatus::Keep(exec_status) => exec_status,
-            _ => ExecutionStatus::MiscellaneousError(None),
-        };
+        let (output, exe_status) = match status.into() {
+            TransactionStatus::Keep(exec_status) => {
+                // Apply deltas.
+                // TODO: while `into_transaction_output_with_status()` should never fail
+                // to apply deltas, we should propagate errors properly. Fix this when
+                // VM error handling is fixed.
+                let (vm_status, output) =
+                    output_ext.into_transaction_output_with_status(&move_resolver);
+                debug_assert!(vm_status == VMStatus::Executed);
 
-        // Apply deltas.
-        // TODO: while `into_transaction_output_with_status()` should never fail
-        // to apply deltas, we should propagate errors properly. Fix this when
-        // VM error handling is fixed.
-        let (vm_status, output) = output_ext.into_transaction_output_with_status(&move_resolver);
-        debug_assert!(vm_status == VMStatus::Executed);
+                (output, exec_status)
+            }
+            _ => {
+                let (_, output) = output_ext.into();
+                (output, ExecutionStatus::MiscellaneousError(None))
+            }
+        };
 
         let zero_hash = aptos_crypto::HashValue::zero();
         let info = aptos_types::transaction::TransactionInfo::new(
