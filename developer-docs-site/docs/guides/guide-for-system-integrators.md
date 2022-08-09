@@ -1,10 +1,10 @@
 ---
-title: "System Integrators' Guide"
+title: "System Integrators Guide"
 slug: "guide-for-system-integrators"
 ---
 
-:::tip
-This is documentation is currently under construction with more being added on a regular basis.
+:::tip 
+This documentation is currently under construction with more being added on a regular basis.
 :::
 
 # System Integrators Guide
@@ -25,16 +25,29 @@ This guide will overview the following topics for integrating with Aptos:
 
 ## Getting Started
 
-* Obtain the [Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli/) -- recommend by source and targeting the `main` branch as the codebase will be under many changes for the next couple of weeks.
-* Start a [local node with a Faucet](../cli-tools/aptos-cli-tool/use-aptos-cli#running-a-local-testnet): `aptos node run-local-testnet --with-faucet`.
-* Export the appropriate `FAUCET_URL`: `export FAUCET_URL=http://127.0.0.1:8081"`.
-* Export the appropriate `NODE_URL`: `export NODE_URL=http://127.0.0.1:8080"`.
+To get started, you will need:
+
+1. The Aptos CLI tool.
+2. A local testnet with a validator node that has the faucet service turned on, and
+3. The correct version of the Aptos SDK. The version is important to ensure that the SDK code builds the clients that talk to the local tesnet. 
+
+Follow the below steps to set up the above three:
+
+1. Follow the instructions for Aptos CLI in [Install with cargo](/cli-tools/aptos-cli-tool/install-aptos-cli#install-with-cargo) and install the CLI tool. Make sure you that when you execute Step 2, you use `--branch main` to target the `main` branch, and not the `--branch devnet` as the codebase is undergoing many changes during the next 2-3 weeks.
+2. Start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet): `aptos node run-local-testnet --with-faucet`. This will See the [Starting a local testnet with a faucet, using CLI](https://aptos.dev/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet) for more.
+3. Install the SDK from the `aptos-core`. Follow the steps described in [Use the SDK from aptos-core](/guides/local-testnet-dev-flow#typescript-use-the-sdk-from-aptos-core). 
 
 This will start a local testnet with a faucet and cause SDKs to automatically point toward this node as the default endpoint, if one is not specified.
 
-There are a plethora of ways to build on top of Aptos. This guide takes an opinionated approach to help onboard but this is not the only methodology or definitive route. The specific goals are to drive a level of ownership, understanding, and stability.
+There are a plethora of ways to build on top of the Aptos blockchain. This guide takes an opinionated approach to help onboard the developer. However, the approach described here is not the only methodology or a definitive route. The specific goals for this approach are to drive a level of ownership, understanding, and stability.
+
+:::caution Source of truth for local testnet development
+
+When in doubt, consider the document [Local testnet development flow](/guides/local-testnet-dev-flow) as the source of truth.
+:::
 
 Other areas worth being familiar with:
+
 * [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
 * [Typescript SDK](../transactions-with-ts-sdk)
 * [Python SDK](../sdks/python-sdk)
@@ -167,7 +180,7 @@ The simulation API works identical to the transaction submission API, except tha
 Here's an example showing how to use the simulation API in the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L413). Note that the gas use may change based upon the state of the account. We recommend that the maximum gas amount be larger than the amount quoted by this API.
 :::
 
-## Viewing Current and Historical State
+## Viewing current and historical state
 
 Most integrations into Aptos benefit from a holistic and comprehensive overview of the current and historical state of the blockchain. Aptos provides historical transactions, state, and events which are the result of transaction execution.
 
@@ -181,7 +194,7 @@ The storage service on a node employs two forms of pruning that erase data from 
 * [Transactions by version](https://aptos.dev/rest-api/#tag/transactions/operation/get_transaction)
 * [Events by event handle](https://aptos.dev/rest-api/#tag/events/operation/get_events_by_event_handle)
 
-## Exchanging and Tracking Coins
+## Exchanging and tracking coins
 
 Aptos has a standard [Coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that represent the type parameter or generic for `Coin<T>`. Coins are stored within an account under the resource `CoinStore<T>`. At account creation, each user has the resource `CoinStore<0x1::aptos_coin::AptosCoin>` or `CoinStore<AptosCoin>`, for short. Within this resource is the Aptos coin: `Coin<AptosCoin>`.
 
