@@ -29,7 +29,7 @@ module aptos_std::optional_aggregator {
 
     fun add_integer(base: &mut Integer, value: u128) {
         assert!(
-            base.limit >= base.value && value < (base.limit - base.value),
+            base.limit >= base.value && value <= (base.limit - base.value),
             error::out_of_range(EAGGREGATOR_OVERFLOW)
         );
         base.value = base.value + value;
@@ -111,5 +111,80 @@ module aptos_std::optional_aggregator {
             let integer = option::borrow(&optional_aggregator.integer);
             read_integer(integer)
         }
+    }
+
+    #[test(account = @aptos_framework)]
+    fun optional_aggregator_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+
+        let aggregator = new(15, false);
+        add(&mut aggregator, 12);
+        add(&mut aggregator, 3);
+        assert!(read(&aggregator) == 15, 0);
+
+        sub(&mut aggregator, 15);
+        assert!(read(&aggregator) == 0, 0);
+        destroy(aggregator);
+
+        // Repate with parallelizable aggregator.
+        let aggregator = new(15, true);
+        add(&mut aggregator, 12);
+        add(&mut aggregator, 3);
+        assert!(read(&aggregator) == 15, 0);
+
+        sub(&mut aggregator, 15);
+        assert!(read(&aggregator) == 0, 0);
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x020001)]
+    fun non_parallelizable_aggregator_overflow_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(15, false);
+
+        // Overflow!
+        add(&mut aggregator, 16);
+
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x020002)]
+    fun non_parallelizable_aggregator_underflow_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(100, false);
+
+        // Underflow!
+        sub(&mut aggregator, 100);
+        add(&mut aggregator, 100);
+
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x020001)]
+    fun parallelizable_aggregator_overflow_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(15, true);
+
+        // Overflow!
+        add(&mut aggregator, 16);
+
+        destroy(aggregator);
+    }
+
+    #[test(account = @aptos_framework)]
+    #[expected_failure(abort_code = 0x020002)]
+    fun parallelizable_aggregator_underflow_test(account: signer) {
+        aggregator_factory::initialize_aggregator_factory(&account);
+        let aggregator = new(100, true);
+
+        // Underflow!
+        add(&mut aggregator, 99);
+        sub(&mut aggregator, 100);
+        add(&mut aggregator, 100);
+
+        destroy(aggregator);
     }
 }
