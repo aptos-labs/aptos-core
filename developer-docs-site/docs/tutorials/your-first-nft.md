@@ -66,10 +66,10 @@ The token related data are stored at both creator’s account and owner’s acco
 | Field                      | Description                                                                                                                                                                                                                     |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Collections                | Maintains a table called `collection_data`, which maps the collection name to the `CollectionData`. It also stores all the TokenData that this creator creates.                                                                 |
-| CollectionData             | Store the collection metadata. The `supply` is the number of tokens created for the current collection. `maxium` is the upper bound of tokens in this collection                                                                |
-| CollectionMutabilityConfig | specify which field is mutable.                                                                                                                                                                                                 |
+| CollectionData             | Store the collection metadata. The `supply` is the number of tokens created for the current collection. `maxium` is the upper bound of tokens in this collection.                                                                |
+| CollectionMutabilityConfig | Specify which field is mutable.                                                                                                                                                                                                 |
 | TokenData                  | The main struct for holding the token metadata. Properties is a where user can add their own properties that are not defined in the token data. User can mint more tokens based on the TokenData and they share the same TokenData. |
-| TokenMutabilityConfig      | control which fields are mutable                                                                                                                                                                                                |
+| TokenMutabilityConfig      | Control which fields are mutable.                                                                                                                                                                                                |
 | TokenDataId                | An id used for representing and querying TokenData on-chain. This id mainly contains 3 fields including creator address, collection name and token name.                                                                        |
 | Royalty                    | Specify the denominator and numerator for calculating the royalty fee. It also has payee account address for depositing the Royalty.                                                                                            |
 | PropertyValue              | Contains both value of a property and type of property.                                                                                                                                                                          |
@@ -205,7 +205,9 @@ Under construction.
 
 ### Giving away a token
 
-In Aptos and Move, each token occupies space and has ownership. Because of this, token transfers are not unilateral and require two phase process similar to a bulletin board. The sender must first register that a token is available for the recipient to claim, the recipient must then claim this token. This has been implemented in a proof of concept move module called [`TokenTransfer`](https://github.com/aptos-labs/aptos-core/blob/nft/aptos-move/framework/aptos-framework/sources/TokenTransfers.move). `SimpleToken` provides a few wrapper functions to support transferring to another account, claiming that transfer, or stopping that transfer.
+In Aptos and Move, each token occupies space and has ownership. Because of this, token transfers are not unilateral and require two phase process similar to a bulletin board. The sender must first register that a token is available for the recipient to claim, the recipient must then claim this token. This is implemented in a proof of concept Move module called [`TokenTransfer`](https://github.com/aptos-labs/aptos-core/blob/nft/aptos-move/framework/aptos-framework/sources/TokenTransfers.move). 
+
+The `SimpleToken` provides a few wrapper functions to support transferring to another account, claiming that transfer, or stopping that transfer.
 
 #### Obtaining the token ID
 
