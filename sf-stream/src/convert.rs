@@ -537,7 +537,7 @@ pub fn convert_transaction_info(transaction_info: &TransactionInfo) -> extractor
     }
 }
 
-pub fn convert_ed255198_signature(sig: &Ed25519Signature) -> extractor::Ed25519Signature {
+pub fn convert_ed25519_signature(sig: &Ed25519Signature) -> extractor::Ed25519Signature {
     extractor::Ed25519Signature {
         public_key: sig.public_key.0.clone(),
         signature: sig.signature.0.clone(),
@@ -545,7 +545,7 @@ pub fn convert_ed255198_signature(sig: &Ed25519Signature) -> extractor::Ed25519S
     }
 }
 
-pub fn convert_multi_ed255198_signature(
+pub fn convert_multi_ed25519_signature(
     sig: &MultiEd25519Signature,
 ) -> extractor::MultiEd25519Signature {
     extractor::MultiEd25519Signature {
@@ -561,18 +561,18 @@ pub fn convert_account_signature(
     account_signature: &AccountSignature,
 ) -> extractor::AccountSignature {
     let type_ = match account_signature {
-        AccountSignature::Ed25519Signature(_) => extractor::account_signature::Type::ED255198,
+        AccountSignature::Ed25519Signature(_) => extractor::account_signature::Type::ED25519,
         AccountSignature::MultiEd25519Signature(_) => {
-            extractor::account_signature::Type::MULTI_ED255198
+            extractor::account_signature::Type::MULTI_ED25519
         }
     };
     let signature = match account_signature {
         AccountSignature::Ed25519Signature(s) => {
-            extractor::account_signature::Signature::Ed255198(convert_ed255198_signature(s))
+            extractor::account_signature::Signature::Ed25519(convert_ed25519_signature(s))
         }
         AccountSignature::MultiEd25519Signature(s) => {
-            extractor::account_signature::Signature::MultiEd255198(
-                convert_multi_ed255198_signature(s),
+            extractor::account_signature::Signature::MultiEd25519(
+                convert_multi_ed25519_signature(s),
             )
         }
     };
@@ -591,19 +591,19 @@ pub fn convert_transaction_signature(
         Some(s) => s,
     };
     let type_ = match signature {
-        TransactionSignature::Ed25519Signature(_) => extractor::signature::Type::ED255198,
+        TransactionSignature::Ed25519Signature(_) => extractor::signature::Type::ED25519,
         TransactionSignature::MultiEd25519Signature(_) => {
-            extractor::signature::Type::MULTI_ED255198
+            extractor::signature::Type::MULTI_ED25519
         }
         TransactionSignature::MultiAgentSignature(_) => extractor::signature::Type::MULTI_AGENT,
     };
 
     let signature = match signature {
         TransactionSignature::Ed25519Signature(s) => {
-            extractor::signature::Signature::Ed255198(convert_ed255198_signature(s))
+            extractor::signature::Signature::Ed25519(convert_ed25519_signature(s))
         }
         TransactionSignature::MultiEd25519Signature(s) => {
-            extractor::signature::Signature::MultiEd255198(convert_multi_ed255198_signature(s))
+            extractor::signature::Signature::MultiEd25519(convert_multi_ed25519_signature(s))
         }
         TransactionSignature::MultiAgentSignature(s) => {
             extractor::signature::Signature::MultiAgent(extractor::MultiAgentSignature {

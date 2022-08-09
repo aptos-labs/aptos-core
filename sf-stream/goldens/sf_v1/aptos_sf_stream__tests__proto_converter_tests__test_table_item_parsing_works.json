@@ -192,7 +192,7 @@
           }
         },
         "signature": {
-          "ed255198": {
+          "ed25519": {
             "publicKey": "FEGPhnoL1tQquy2qUM1opahpziCCgkgfV1BPYwUQ0NM=",
             "signature": "BPHZ/DDkp2fqrjdDD4O/mZmfV8WJZ35LrM5vHLo7LUvknlNL1asMUHZqU8UpqO2YYEWu6IS9N2fWHu7eu3noAw=="
           }
@@ -930,7 +930,7 @@
           }
         },
         "signature": {
-          "ed255198": {
+          "ed25519": {
             "publicKey": "1aeBSU0r8aF03f/eHgLLiIHP9tq3DmHL3vOT3qwM5jk=",
             "signature": "0OL9GuxvahjDoYfNbHx1jnlVsRWhwEj7I3J533qEq2Kzebl8bTwQ26VD+cVp+HxBYD7Rir4LajwZ/orRSrO9Ag=="
           }
@@ -1273,7 +1273,7 @@
           }
         },
         "signature": {
-          "ed255198": {
+          "ed25519": {
             "publicKey": "1aeBSU0r8aF03f/eHgLLiIHP9tq3DmHL3vOT3qwM5jk=",
             "signature": "z9/5je7/UcKJ32nYqYzW55SHYBfUHd+NeBvP8nyv01hOG+hQijSA+hRzEEr3JRU9sXDMpyDb5yT8oFY5VSMBCQ=="
           }
