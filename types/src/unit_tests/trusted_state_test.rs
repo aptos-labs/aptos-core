@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::multi_signature::{MultiSignature, PartialSignatures};
 use crate::{
-    account_address::AccountAddress,
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -14,17 +14,13 @@ use crate::{
     validator_verifier::{random_validator_verifier, ValidatorConsensusInfo, ValidatorVerifier},
     waypoint::Waypoint,
 };
-use aptos_crypto::{
-    bls12381,
-    hash::{CryptoHash, CryptoHasher, HashValue},
-};
+use aptos_crypto::hash::{CryptoHash, CryptoHasher, HashValue};
 use bcs::test_helpers::assert_canonical_encode_decode;
 use proptest::{
     collection::{size_range, vec, SizeRange},
     prelude::*,
     sample::Index,
 };
-use std::collections::BTreeMap;
 
 // hack strategy to generate a length from `impl Into<SizeRange>`
 fn arb_length(size_range: impl Into<SizeRange>) -> impl Strategy<Value = usize> {
@@ -37,7 +33,7 @@ fn arb_length(size_range: impl Into<SizeRange>) -> impl Strategy<Value = usize> 
 fn arb_validator_sets(
     epoch_changes: impl Into<SizeRange>,
     validators_per_epoch: impl Into<SizeRange>,
-) -> impl Strategy<Value = Vec<Vec<ValidatorSigner>>> {
+) -> impl Strategy<Value = Vec<(Vec<ValidatorSigner>, ValidatorVerifier)>> {
     vec(arb_length(validators_per_epoch), epoch_changes.into() + 1).prop_map(
         |validators_per_epoch_vec| {
             validators_per_epoch_vec
@@ -47,9 +43,7 @@ fn arb_validator_sets(
                     let voting_power = None;
                     // human readable incrementing account addresses
                     let int_account_addrs = true;
-                    let (signers, _verifier) =
-                        random_validator_verifier(num_validators, voting_power, int_account_addrs);
-                    signers
+                    random_validator_verifier(num_validators, voting_power, int_account_addrs)
                 })
                 .collect::<Vec<_>>()
         },
@@ -79,12 +73,16 @@ fn into_epoch_state(epoch: u64, signers: &[ValidatorSigner]) -> EpochState {
 /// and a `LedgerInfo`.
 fn sign_ledger_info(
     signers: &[ValidatorSigner],
+    verifier: &ValidatorVerifier,
     ledger_info: &LedgerInfo,
-) -> BTreeMap<AccountAddress, bls12381::Signature> {
-    signers
-        .iter()
-        .map(|s| (s.author(), s.sign(ledger_info)))
-        .collect()
+) -> MultiSignature {
+    let partial_sig = PartialSignatures::new(
+        signers
+            .iter()
+            .map(|s| (s.author(), s.sign(ledger_info)))
+            .collect(),
+    );
+    verifier.aggregate_multi_signature(&partial_sig).unwrap().0
 }
 
 fn mock_ledger_info(
@@ -175,14 +173,15 @@ fn arb_update_proof(
             // generate n version deltas
             vec(arb_length(version_delta.clone()), epoch_changes),
         )
-            .prop_map(move |(mut vsets, version_deltas)| {
+            .prop_map(move |(mut signers_and_verifier, version_deltas)| {
                 // if generating from genesis, then there is no validator set to
                 // sign the genesis block.
                 if start_epoch == 0 {
                     // this will always succeed, since
                     // n >= 0, |vsets| = n + 1 ==> |vsets| >= 1
-                    let pre_genesis_vset = vsets.first_mut().unwrap();
-                    *pre_genesis_vset = vec![];
+                    let (signers, verifier) = signers_and_verifier.first_mut().unwrap();
+                    *signers = vec![];
+                    *verifier = random_validator_verifier(0, None, true).1;
                 }
 
                 // build a mock accumulator with fake txn hashes up to the last
@@ -193,38 +192,40 @@ fn arb_update_proof(
 
                 let mut epoch = start_epoch;
                 let mut version = start_version;
-                let num_epoch_changes = vsets.len() - 1;
+                let num_epoch_changes = signers_and_verifier.len() - 1;
 
-                let signers = vsets.iter().take(num_epoch_changes);
-                let next_sets = vsets.iter().skip(1);
+                let signers = signers_and_verifier.iter().take(num_epoch_changes);
+                let next_sets = signers_and_verifier.iter().skip(1);
 
                 let ledger_infos_with_sigs = signers
                     .zip(next_sets)
                     .zip(version_deltas)
                     .map(|((curr_vset, next_vset), version_delta)| {
-                        let next_vset = into_epoch_state(epoch + 1, next_vset);
+                        let next_vset = into_epoch_state(epoch + 1, &next_vset.0);
                         let root_hash = accumulator.get_root_hash(version);
                         let ledger_info =
                             mock_ledger_info(epoch, version, root_hash, Some(next_vset));
-                        let signatures = sign_ledger_info(&curr_vset[..], &ledger_info);
+                        let aggregated_sig =
+                            sign_ledger_info(&curr_vset.0, &curr_vset.1, &ledger_info);
 
                         epoch += 1;
                         version += version_delta as u64;
 
-                        LedgerInfoWithSignatures::new(ledger_info, signatures)
+                        LedgerInfoWithSignatures::new(ledger_info, aggregated_sig)
                     })
                     .collect::<Vec<_>>();
 
                 // this will always succeed, since
                 // n >= 0, |vsets| = n + 1 ==> |vsets| >= 1
-                let last_vset = vsets.last().unwrap();
+                let last_vset = signers_and_verifier.last().unwrap();
                 let root_hash = accumulator.get_root_hash(version);
                 let latest_ledger_info = mock_ledger_info(epoch, version, root_hash, None);
-                let signatures = sign_ledger_info(&last_vset[..], &latest_ledger_info);
+                let aggregated_sig =
+                    sign_ledger_info(&last_vset.0, &last_vset.1, &latest_ledger_info);
                 let latest_ledger_info_with_sigs =
-                    LedgerInfoWithSignatures::new(latest_ledger_info, signatures);
+                    LedgerInfoWithSignatures::new(latest_ledger_info, aggregated_sig);
                 (
-                    vsets,
+                    signers_and_verifier.into_iter().map(|x| x.0).collect(),
                     ledger_infos_with_sigs,
                     latest_ledger_info_with_sigs,
                     accumulator,
@@ -427,7 +428,7 @@ proptest! {
         let li_with_sigs = bad_li_idx.get(&lis_with_sigs);
         let bad_li_with_sigs = LedgerInfoWithSignatures::new(
             li_with_sigs.ledger_info().clone(),
-            BTreeMap::new(), /* empty signatures */
+            MultiSignature::empty(), /* empty signatures */
         );
         *bad_li_idx.get_mut(&mut lis_with_sigs) = bad_li_with_sigs;
 
@@ -486,18 +487,13 @@ proptest! {
             mock_ledger_info(good_li.epoch(), 999, good_li.transaction_accumulator_hash(), None),
             sigs.clone(),
         );
-        let bad_li_5 = LedgerInfoWithSignatures::new(good_li.clone(), BTreeMap::new());
-
-        let mut bad_sigs = sigs.clone();
-        *bad_sigs.values_mut().next().unwrap() = bls12381::Signature::dummy_signature();
-        let bad_li_6 = LedgerInfoWithSignatures::new(good_li.clone(), bad_sigs);
+        let bad_li_5 = LedgerInfoWithSignatures::new(good_li.clone(), MultiSignature::empty());
 
         trusted_state.verify_and_ratchet_inner(&bad_li_1, &change_proof).unwrap_err();
         trusted_state.verify_and_ratchet_inner(&bad_li_2, &change_proof).unwrap_err();
         trusted_state.verify_and_ratchet_inner(&bad_li_3, &change_proof).unwrap_err();
         trusted_state.verify_and_ratchet_inner(&bad_li_4, &change_proof).unwrap_err();
         trusted_state.verify_and_ratchet_inner(&bad_li_5, &change_proof).unwrap_err();
-        trusted_state.verify_and_ratchet_inner(&bad_li_6, &change_proof).unwrap_err();
     }
 }
 

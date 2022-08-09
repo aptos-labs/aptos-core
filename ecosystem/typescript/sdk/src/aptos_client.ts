@@ -1,6 +1,6 @@
 import { MemoizeExpiring } from "typescript-memoize";
 import { HexString, MaybeHexString } from "./hex_string";
-import { moveStructTagToParam, sleep } from "./util";
+import { sleep } from "./util";
 import { AptosAccount } from "./aptos_account";
 import * as Gen from "./generated/index";
 import { TxnBuilderTypes, TransactionBuilderEd25519 } from "./transaction_builder";
@@ -141,7 +141,7 @@ export class AptosClient {
   ): Promise<Gen.MoveResource> {
     return this.client.accounts.getAccountResource(
       HexString.ensure(accountAddress).hex(),
-      moveStructTagToParam(resourceType),
+      resourceType,
       query?.ledgerVersion?.toString(),
     );
   }
@@ -205,7 +205,7 @@ export class AptosClient {
       signature: fakeSignature,
       sender: senderAddress.hex(),
       sequence_number: account.sequence_number,
-      max_gas_amount: "1000000",
+      max_gas_amount: "2000",
       gas_unit_price: "1",
       // Unix timestamp, in seconds + 10 seconds
       expiration_timestamp_secs: (Math.floor(Date.now() / 1000) + 10).toString(),
@@ -278,7 +278,7 @@ export class AptosClient {
   ): Promise<Gen.Event[]> {
     return this.client.events.getEventsByEventHandle(
       HexString.ensure(address).hex(),
-      moveStructTagToParam(eventHandleStruct),
+      eventHandleStruct,
       fieldName,
       query?.start?.toString(),
       query?.limit,

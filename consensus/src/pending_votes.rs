@@ -9,8 +9,9 @@
 
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
+use aptos_types::multi_signature::PartialSignatures;
 use aptos_types::{
-    ledger_info::LedgerInfoWithSignatures,
+    ledger_info::LedgerInfoWithPartialSignatures,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use consensus_types::{
@@ -39,6 +40,8 @@ pub enum VoteReceptionResult {
     New2ChainTimeoutCertificate(Arc<TwoChainTimeoutCertificate>),
     /// There might be some issues adding a vote
     ErrorAddingVote(VerifyError),
+    /// Error happens when aggregating signature
+    ErrorAggregatingSignature(VerifyError),
     /// The vote is not for the current round.
     UnexpectedRound(u64, u64),
     /// Receive f+1 timeout to trigger a local timeout, return the amount of voting power TC currently has.
@@ -50,7 +53,8 @@ pub struct PendingVotes {
     /// Maps LedgerInfo digest to associated signatures (contained in a partial LedgerInfoWithSignatures).
     /// This might keep multiple LedgerInfos for the current round: either due to different proposals (byzantine behavior)
     /// or due to different NIL proposals (clients can have a different view of what block to extend).
-    li_digest_to_votes: HashMap<HashValue /* LedgerInfo digest */, LedgerInfoWithSignatures>,
+    li_digest_to_votes:
+        HashMap<HashValue /* LedgerInfo digest */, LedgerInfoWithPartialSignatures>,
     /// Tracks all the signatures of the 2-chain timeout for the given round.
     maybe_partial_2chain_tc: Option<TwoChainTimeoutCertificate>,
     /// Map of Author to vote. This is useful to discard multiple votes.
@@ -119,7 +123,10 @@ impl PendingVotes {
         // obtain the ledger info with signatures associated to the vote's ledger info
         let li_with_sig = self.li_digest_to_votes.entry(li_digest).or_insert_with(|| {
             // if the ledger info with signatures doesn't exist yet, create it
-            LedgerInfoWithSignatures::new(vote.ledger_info().clone(), BTreeMap::new())
+            LedgerInfoWithPartialSignatures::new(
+                vote.ledger_info().clone(),
+                PartialSignatures::empty(),
+            )
         });
 
         // add this vote to the ledger info with signatures
@@ -130,10 +137,15 @@ impl PendingVotes {
             match validator_verifier.check_voting_power(li_with_sig.signatures().keys()) {
                 // a quorum of signature was reached, a new QC is formed
                 Ok(_) => {
-                    return VoteReceptionResult::NewQuorumCertificate(Arc::new(QuorumCert::new(
-                        vote.vote_data().clone(),
-                        li_with_sig.clone(),
-                    )));
+                    return match li_with_sig.aggregate_signatures(validator_verifier) {
+                        Ok(ledger_info_with_sig) => {
+                            VoteReceptionResult::NewQuorumCertificate(Arc::new(QuorumCert::new(
+                                vote.vote_data().clone(),
+                                ledger_info_with_sig,
+                            )))
+                        }
+                        Err(e) => VoteReceptionResult::ErrorAggregatingSignature(e),
+                    }
                 }
 
                 // not enough votes
@@ -315,9 +327,7 @@ mod tests {
         let vote_data_2_author_2 = Vote::new(vote_data_2, signers[2].author(), li2, &signers[2]);
         match pending_votes.insert_vote(&vote_data_2_author_2, &validator) {
             VoteReceptionResult::NewQuorumCertificate(qc) => {
-                assert!(validator
-                    .check_voting_power(qc.ledger_info().signatures().keys())
-                    .is_ok());
+                assert!(qc.ledger_info().check_voting_power(&validator).is_ok());
             }
             _ => {
                 panic!("No QC formed.");

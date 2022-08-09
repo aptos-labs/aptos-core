@@ -8,13 +8,13 @@ use crate::{
 };
 use aptos_crypto::hash::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use mirai_annotations::*;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum BlockType {
@@ -155,7 +155,7 @@ impl BlockData {
             VoteData::new(ancestor.clone(), ancestor.clone()),
             LedgerInfoWithSignatures::new(
                 LedgerInfo::new(ancestor, HashValue::zero()),
-                BTreeMap::new(),
+                MultiSignature::empty(),
             ),
         );
 
@@ -259,7 +259,7 @@ fn test_reconfiguration_suffix() {
                 BlockInfo::genesis(HashValue::random(), ValidatorSet::empty()),
                 HashValue::zero(),
             ),
-            BTreeMap::new(),
+            MultiSignature::empty(),
         ),
     );
     let reconfig_suffix_block = BlockData::new_proposal(

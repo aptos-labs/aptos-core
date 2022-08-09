@@ -10,11 +10,13 @@ use crate::{
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
-use aptos_crypto::{hash::HashValue, test_utils::TestAptosCrypto};
+use aptos_crypto::hash::HashValue;
+use aptos_types::ledger_info::LedgerInfoWithPartialSignatures;
+use aptos_types::multi_signature::PartialSignatures;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::{BlockInfo, Round},
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::LedgerInfo,
     on_chain_config::ValidatorSet,
     validator_signer::ValidatorSigner,
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
@@ -54,7 +56,7 @@ fn test_nil_block() {
     let signer = ValidatorSigner::random(None);
     let parent_block_info = nil_block.quorum_cert().certified_block();
     let nil_block_qc = gen_test_certificate(
-        vec![&signer],
+        &[signer.clone()],
         nil_block.gen_block_info(
             parent_block_info.executed_state_id(),
             parent_block_info.version(),
@@ -112,7 +114,8 @@ fn test_block_relation() {
 // have different block ids.
 #[test]
 fn test_same_qc_different_authors() {
-    let signer = ValidatorSigner::random(None);
+    let (signers, validators) = random_validator_verifier(1, None, false);
+    let signer = signers.get(0).unwrap();
     let genesis_qc = certificate_for_genesis();
     let round = 1;
     let payload = Payload::new_empty();
@@ -122,21 +125,29 @@ fn test_same_qc_different_authors() {
         round,
         current_timestamp,
         genesis_qc.clone(),
-        &signer,
+        signer,
         Vec::new(),
     );
 
     let signature = signer.sign(genesis_qc.ledger_info().ledger_info());
-    let mut ledger_info_altered = genesis_qc.ledger_info().clone();
+    let mut ledger_info_altered = LedgerInfoWithPartialSignatures::new(
+        genesis_qc.ledger_info().ledger_info().clone(),
+        PartialSignatures::empty(),
+    );
     ledger_info_altered.add_signature(signer.author(), signature);
-    let genesis_qc_altered = QuorumCert::new(genesis_qc.vote_data().clone(), ledger_info_altered);
+    let genesis_qc_altered = QuorumCert::new(
+        genesis_qc.vote_data().clone(),
+        ledger_info_altered
+            .aggregate_signatures(&validators)
+            .unwrap(),
+    );
 
     let block_round_1_altered = Block::new_proposal(
         payload.clone(),
         round,
         current_timestamp,
         genesis_qc_altered,
-        &signer,
+        signer,
         Vec::new(),
     );
 
@@ -145,11 +156,11 @@ fn test_same_qc_different_authors() {
         round,
         current_timestamp,
         genesis_qc,
-        &signer,
+        signer,
         Vec::new(),
     );
 
-    assert!(block_round_1.id() != block_round_1_altered.id());
+    assert_ne!(block_round_1.id(), block_round_1_altered.id());
     assert_eq!(block_round_1.id(), block_round_1_same.id());
 }
 
@@ -185,16 +196,15 @@ fn test_block_metadata_bitmaps() {
         block_metadata_1.previous_block_votes().len()
     );
 
-    let mut ledger_info_1 = LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new());
+    let mut ledger_info_1 =
+        LedgerInfoWithPartialSignatures::new(ledger_info.clone(), PartialSignatures::empty());
     let votes_1 = vec![true, false, true, true];
     votes_1
         .iter()
         .zip(
-            validators.iter().zip(
-                signers
-                    .iter()
-                    .map(|signer| signer.sign(&TestAptosCrypto("msg".to_string()))),
-            ),
+            validators
+                .iter()
+                .zip(signers.iter().map(|signer| signer.sign(&ledger_info))),
         )
         .for_each(|(&voted, (&address, signature))| {
             if voted {
@@ -203,7 +213,9 @@ fn test_block_metadata_bitmaps() {
         });
     let qc_1 = QuorumCert::new(
         VoteData::new(BlockInfo::empty(), BlockInfo::empty()),
-        ledger_info_1,
+        ledger_info_1
+            .aggregate_signatures(&validator_verifier)
+            .unwrap(),
     );
 
     let block_2 = Block::new_proposal(

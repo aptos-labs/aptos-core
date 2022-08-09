@@ -102,7 +102,7 @@ set_image_tag() {
             exit 1
         fi
     else
-        img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG)
+        img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG 2>/dev/null)
         if [ "$?" -ne 0 ]; then
             echo "IMAGE_TAG does not exist in ECR: ${IMAGE_TAG}. Make sure your commit has been pushed to GitHub previously."
             echo "If you're trying to run the code from your PR, apply the label 'CICD:build-images' and wait for the builds to finish."
@@ -190,6 +190,10 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # more file descriptors for heavy txn generation
     ulimit -n 1048576
 
+    # port-forward prometheus
+    kubectl port-forward -n default svc/aptos-node-mon-aptos-monitoring-prometheus 9090:9090 >/dev/null 2>&1 &
+    prometheus_port_forward_pid=$!
+
     cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 5000 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
         --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD --duration-secs $FORGE_RUNNER_DURATION_SECS \
         test k8s-swarm \
@@ -202,6 +206,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # try to kill orphaned port-forwards
     if [ -z "$KEEP_ARGS" ]; then
         ps -A | grep "kubectl port-forward -n $FORGE_NAMESPACE" | awk '{ print $1 }' | xargs -I{} kill -9 {}
+        kill -9 $prometheus_port_forward_pid
     fi
 
 elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then

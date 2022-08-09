@@ -13,6 +13,7 @@ use crate::{
     },
 };
 
+use aptos_types::event::EventKey;
 pub use aptos_types::*;
 
 #[derive(Debug)]
@@ -116,6 +117,14 @@ impl LocalAccount {
 
     pub fn rotate_key<T: Into<AccountKey>>(&mut self, new_key: T) -> AccountKey {
         std::mem::replace(&mut self.key, new_key.into())
+    }
+
+    pub fn received_event_key(&self) -> EventKey {
+        EventKey::new(1, self.address)
+    }
+
+    pub fn sent_event_key(&self) -> EventKey {
+        EventKey::new(2, self.address)
     }
 }
 

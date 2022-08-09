@@ -4,6 +4,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 Rails.application.routes.draw do
+  # Redirect www to non-www
+  constraints(host: /www\.aptoslabs\.com/) do
+    match '/(*path)' => redirect { |params, _req| "https://aptoslabs.com/#{params[:path]}" }, via: %i[get post]
+  end
+
   # Redirect community.aptoslabs.com to aptoslabs.com
   constraints host: /community.aptoslabs.com/ do
     match '/*path' => redirect { |params, _req| "https://aptoslabs.com/#{params[:path]}" }, via: %i[get post]
