@@ -6,7 +6,7 @@ hidden: false
 
 # Guides
 
-Start here to get into the core concepts of the Aptos Blockchain. 
+Start here to get into the core concepts of the Aptos Blockchain.
 
 - ### [Life of a Transaction](basics-life-of-txn.md)
 
@@ -19,5 +19,7 @@ Start here to get into the core concepts of the Aptos Blockchain.
 - ### [Building the Wallet Extension](building-wallet-extension.md)
 
 - ### [Guide for System Integrators](guide-for-system-integrators.md)
+
+- ### [Local testnet development flow](local-testnet-dev-flow.md)
 
 

@@ -41,7 +41,7 @@ Aptos is running, press ctrl-c to exit
 Faucet is running.  Faucet endpoint: 0.0.0.0:8081
 ```
 
-The above command will use the default configuration for the validator node.  
+The above command will use the default configuration for the validator node.
 
 :::caution Do not use two instances of the same command at the same time
 Note that two instances of the same command cannot run at the same time. This will result in a conflict on ports for the validator node.
@@ -81,7 +81,7 @@ Aptos is now set up for account 7100C5295ED4F9F39DCC28D309654E291845984518307D3E
 
 From now on you should add `--profile local` to the commands to run them on the local testnet.
 
-## Creating and funding accounts 
+## Creating and funding accounts
 
 To create new accounts on the local testnet, we recommend using the above instructions with different profile names:
 
@@ -145,7 +145,7 @@ If you updated your codebase with backwards incompatible changes, or just want t
 the command with the `--force-restart` flag:
 
 ```bash
-aptos node run-local-testnet --with-faucet
+aptos node run-local-testnet --with-faucet --force-restart
 ```
 
 It will then prompt you if you really want to restart the chain, to ensure that you do not delete your work by accident.
