@@ -9,17 +9,29 @@
 # if the necessary environment variables are set.
 #
 
+# Default to off
+WRAPPER_KILLSWITCH="${WRAPPER_KILLSWITCH:-true}"
+
+# output files
+FORGE_OUTPUT="${FORGE_OUTPUT:-$(mktemp)}"
+FORGE_REPORT="${FORGE_REPORT:-$(mktemp)}"
+FORGE_PRE_COMMENT="${FORGE_PRE_COMMENT:-$(mktemp)}"
+FORGE_COMMENT="${FORGE_COMMENT:-$(mktemp)}"
+
+if [[ $WRAPPER_KILLSWITCH = true ]]; then
+    echo "Using current forge wrapper"
+else
+    echo "Running new forge wrapper"
+    export FORGE_INSTALL_DEPENDENCIES=yeet
+    exec python3 testsuite/forge.py test "$@"
+fi
+
 # ensure the script is run from project root
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
 # for calculating regression in local mode
 LOCAL_P99_LATENCY_MS_THRESHOLD=60000
 
-# output files
-FORGE_OUTPUT=${FORGE_OUTPUT:-$(mktemp)}
-FORGE_REPORT=${FORGE_REPORT:-$(mktemp)}
-FORGE_PRE_COMMENT=${FORGE_PRE_COMMENT:-$(mktemp)}
-FORGE_COMMENT=${FORGE_COMMENT:-$(mktemp)}
 
 # cluster auth
 AWS_ACCOUNT_NUM=${AWS_ACCOUNT_NUM:-$(aws sts get-caller-identity | jq -r .Account)}
