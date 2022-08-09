@@ -18,7 +18,7 @@ use aptos_types::{
 };
 use consensus_types::common::{Author, Round};
 use short_hex_str::AsShortHexStr;
-use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 use storage_interface::{DbReader, Order};
 
 /// Interface to query committed NewBlockEvent.
@@ -435,15 +435,6 @@ impl LeaderReputation {
         heuristic: Box<dyn ReputationHeuristic>,
         exclude_round: u64,
     ) -> Self {
-        for proposers in epoch_to_proposers.values() {
-            // assert!(proposers.is_sorted()) implementation from new api
-            assert!(proposers.windows(2).all(|w| {
-                PartialOrd::partial_cmp(&&w[0], &&w[1])
-                    .map(|o| o != Ordering::Greater)
-                    .unwrap_or(false)
-            }));
-        }
-
         assert!(epoch_to_proposers.contains_key(&epoch));
         assert_eq!(epoch_to_proposers[&epoch].len(), voting_powers.len());
 

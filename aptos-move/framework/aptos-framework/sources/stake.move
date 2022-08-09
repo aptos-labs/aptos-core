@@ -1659,6 +1659,79 @@ module aptos_framework::stake {
         leave_validator_set(&validator, validator_address);
     }
 
+    #[test(
+        aptos_framework = @0x1,
+        core_resources = @core_resources,
+        validator_1 = @0x1,
+        validator_2 = @0x2,
+        validator_3 = @0x3,
+        validator_4 = @0x4,
+        validator_5 = @0x5
+    )]
+    public entry fun test_staking_validator_index(
+        aptos_framework: signer,
+        core_resources: signer,
+        validator_1: signer,
+        validator_2: signer,
+        validator_3: signer,
+        validator_4: signer,
+        validator_5: signer,
+    ) acquires OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        let v1_addr = signer::address_of(&validator_1);
+        let v2_addr = signer::address_of(&validator_2);
+        let v3_addr = signer::address_of(&validator_3);
+        let v4_addr = signer::address_of(&validator_4);
+        let v5_addr = signer::address_of(&validator_5);
+
+        test_setup(&aptos_framework);
+
+        let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework, &core_resources);
+        register_mint_stake(&validator_1, &mint_cap);
+        register_mint_stake(&validator_2, &mint_cap);
+        register_mint_stake(&validator_3, &mint_cap);
+        register_mint_stake(&validator_4, &mint_cap);
+        register_mint_stake(&validator_5, &mint_cap);
+
+        store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
+        coin::destroy_burn_cap<AptosCoin>(burn_cap);
+
+        join_validator_set(&validator_3, v3_addr);
+        end_epoch();
+        assert!(validator_index(v3_addr) == 0, 0);
+
+        join_validator_set(&validator_4, v4_addr);
+        end_epoch();
+        assert!(validator_index(v3_addr) == 0, 1);
+        assert!(validator_index(v4_addr) == 1, 2);
+
+        join_validator_set(&validator_1, v1_addr);
+        join_validator_set(&validator_2, v2_addr);
+        // pending_inactive is appended in reverse order
+        end_epoch();
+        assert!(validator_index(v3_addr) == 0, 6);
+        assert!(validator_index(v4_addr) == 1, 7);
+        assert!(validator_index(v2_addr) == 2, 8);
+        assert!(validator_index(v1_addr) == 3, 9);
+
+        join_validator_set(&validator_5, v5_addr);
+        end_epoch();
+        assert!(validator_index(v3_addr) == 0, 10);
+        assert!(validator_index(v4_addr) == 1, 11);
+        assert!(validator_index(v2_addr) == 2, 12);
+        assert!(validator_index(v1_addr) == 3, 13);
+        assert!(validator_index(v5_addr) == 4, 14);
+
+        // after swap remove, it's 3,4,2,5
+        leave_validator_set(&validator_1, v1_addr);
+        // after swap remove, it's 5,4,2
+        leave_validator_set(&validator_3, v3_addr);
+        end_epoch();
+
+        assert!(validator_index(v5_addr) == 0, 15);
+        assert!(validator_index(v4_addr) == 1, 16);
+        assert!(validator_index(v2_addr) == 2, 17);
+    }
+
     #[test(aptos_framework = @0x1, core_resources = @core_resources, validator_1 = @0x123, validator_2 = @0x234)]
     public entry fun test_validator_rewards_are_performance_based(
         aptos_framework: signer,

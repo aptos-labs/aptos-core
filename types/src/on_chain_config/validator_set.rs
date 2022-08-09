@@ -17,7 +17,7 @@ use std::{
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 #[repr(u8)]
 pub enum ConsensusScheme {
-    Ed25519 = 0,
+    BLS12381 = 0,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -42,11 +42,8 @@ impl fmt::Display for ValidatorSet {
 impl ValidatorSet {
     /// Constructs a ValidatorSet resource.
     pub fn new(payload: Vec<ValidatorInfo>) -> Self {
-        // This is an invariant that should be maintained by the Aptos Framework
-        debug_assert!(Self::ordered_validators(&payload));
-
         Self {
-            scheme: ConsensusScheme::Ed25519,
+            scheme: ConsensusScheme::BLS12381,
             active_validators: payload,
             pending_inactive: vec![],
             pending_active: vec![],
@@ -61,22 +58,6 @@ impl ValidatorSet {
 
     pub fn empty() -> Self {
         ValidatorSet::new(Vec::new())
-    }
-
-    fn ordered_validators(payload: &[ValidatorInfo]) -> bool {
-        if payload.is_empty() {
-            return true;
-        }
-        let mut left = payload[0].account_address();
-        for current in payload.iter().skip(1) {
-            let right = current.account_address();
-            if right < left {
-                return false;
-            }
-            left = right;
-        }
-
-        true
     }
 }
 

@@ -27,10 +27,7 @@ use consensus_types::common::{Author, Round};
 use itertools::Itertools;
 use move_deps::move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
 use num_traits::Pow;
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 use storage_interface::{DbReader, Order};
 
 struct MockHistory {
@@ -613,8 +610,8 @@ fn test_extract_epoch_to_proposers_impl() {
             verifier: ValidatorVerifier::new(
                 authors
                     .iter()
-                    .map(|author| (*author, ValidatorConsensusInfo::new(public_key.clone(), 1)))
-                    .collect::<BTreeMap<_, _>>(),
+                    .map(|author| ValidatorConsensusInfo::new(*author, public_key.clone(), 1))
+                    .collect::<Vec<_>>(),
             ),
         }
     }

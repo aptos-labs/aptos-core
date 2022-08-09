@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -17,6 +16,7 @@ use crate::{
     },
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
+    monitor,
     network::NetworkSender,
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
