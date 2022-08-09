@@ -50,7 +50,7 @@ use network::{
     },
 };
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
-use storage_interface::{DbReader, ExecutedTrees, Order, StartupInfo};
+use storage_interface::{DbReader, ExecutedTrees, Order};
 use storage_service_types::requests::{
     DataRequest, EpochEndingLedgerInfoRequest, NewTransactionOutputsWithProofRequest,
     NewTransactionsWithProofRequest, StateValuesWithProofRequest, StorageServiceRequest,
@@ -1609,8 +1609,6 @@ mock! {
         fn get_latest_version(&self) -> Result<Version>;
 
         fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
-
-        fn get_startup_info(&self) -> Result<Option<StartupInfo>>;
 
         fn get_account_transaction(
             &self,
