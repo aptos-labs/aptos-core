@@ -389,7 +389,6 @@ impl Transactions {
         let ledger_version = self.ledger_info.version();
         let limit = page.limit()?;
         let start_version = page.compute_start(limit, ledger_version)?;
-
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)?;
