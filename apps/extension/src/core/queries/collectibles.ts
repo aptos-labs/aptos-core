@@ -8,7 +8,7 @@ import {
 import axios from 'axios';
 import { useQuery } from 'react-query';
 import { validStorageUris } from 'core/constants';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { MetadataJson } from 'core/types/tokenMetadata';
 import { NodeUrl } from 'core/utils/network';
 import { useCallback, useMemo } from 'react';

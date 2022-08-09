@@ -37,7 +37,7 @@ import { secondaryDividerColor, secondaryErrorMessageColor, secondaryTextColor }
 import { GraceHopperBoringAvatar } from 'core/components/BoringAvatar';
 import numeral from 'numeral';
 import useDebounce from 'core/hooks/useDebounce';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 
 interface CoinTransferFormData {
   amount?: number;

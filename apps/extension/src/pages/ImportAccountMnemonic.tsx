@@ -6,7 +6,7 @@ import AuthLayout from 'core/layouts/AuthLayout';
 import Routes, { Routes as PageRoutes } from 'core/routes';
 import ImportAccountMnemonicBody from 'core/components/ImportAccountMnemonicBody';
 import { ImportAccountMnemonicLayout, MnemonicFormValues } from 'core/layouts/AddAccountLayout';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { useNavigate } from 'react-router-dom';
 import { generateMnemonicObject } from 'core/utils/account';
 import { AptosAccount } from 'aptos';

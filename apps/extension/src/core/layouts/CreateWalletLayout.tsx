@@ -11,13 +11,11 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { FormProvider, useForm, useFormContext } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import Routes from 'core/routes';
-import * as bip39 from '@scure/bip39';
-import { wordlist } from '@scure/bip39/wordlists/english';
 import { zxcvbn, zxcvbnOptions } from '@zxcvbn-ts/core';
 import { passwordOptions } from 'core/components/CreatePasswordBody';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { AptosAccount } from 'aptos';
-import { generateMnemonicObject } from 'core/utils/account';
+import { generateMnemonic, generateMnemonicObject } from 'core/utils/account';
 
 zxcvbnOptions.setOptions(passwordOptions);
 
@@ -194,7 +192,7 @@ export default function CreateWalletLayout({
   const {
     activeStep,
   } = useOnboardingStateContext();
-  const mnemonic = bip39.generateMnemonic(wordlist);
+  const mnemonic = generateMnemonic();
   const methods = useForm<OnboardFormValues>({
     defaultValues: {
       confirmPassword: '',

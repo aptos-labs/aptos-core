@@ -12,7 +12,7 @@ import TransferDrawer from 'core/components/TransferDrawer';
 import Faucet from 'core/components/Faucet';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 
 function Wallet() {
   const { faucetNetwork } = useWalletState();

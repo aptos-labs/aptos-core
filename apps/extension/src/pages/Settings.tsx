@@ -15,7 +15,7 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import WalletLayout from 'core/layouts/WalletLayout';
 import SettingsPaths from 'core/components/SettingsPaths';
 import SettingsListItem from 'core/components/SettingsListItem';

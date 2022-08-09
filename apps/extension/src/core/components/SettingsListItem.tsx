@@ -5,7 +5,7 @@ import {
   Center,
   Grid, Icon, Text, useColorMode,
 } from '@chakra-ui/react';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { secondaryGridHoverBgColor, secondaryGridBgColor, textColor } from 'core/colors';

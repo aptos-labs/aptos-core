@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Box } from '@chakra-ui/react';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import React, { useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { RoutePaths } from 'core/routes';

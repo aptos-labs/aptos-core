@@ -18,7 +18,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import React from 'react';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { CredentialRow } from 'pages/Settings';
 
 export interface CredentialHeaderAndBodyProps {

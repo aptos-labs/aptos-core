@@ -9,12 +9,12 @@ import ImportAccountPrivateKeyBody from 'core/components/ImportAccountPrivateKey
 import { AptosAccount } from 'aptos';
 import { getAccountResources } from 'core/queries/account';
 import { useNavigate } from 'react-router-dom';
-import { useWalletStateContext } from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { importAccountErrorToast, importAccountNotFoundToast } from 'core/components/Toast';
 
 export default function ImportAccountPrivateKey() {
   const navigate = useNavigate();
-  const { addAccount, nodeUrl } = useWalletStateContext();
+  const { addAccount, nodeUrl } = useWalletState();
 
   const onSubmit = useCallback(async (
     data: PrivateKeyFormValues,

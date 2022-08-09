@@ -46,7 +46,7 @@ export interface RemoveAccountProps {
   accountAddress?: string;
 }
 
-export default function useWalletState() {
+export default function useWalletStateRecorder() {
   const [localStorageState, setLocalStorageState] = useState<LocalStorageState>(
     () => getLocalStorageState() ?? defaultValue,
   );
@@ -75,7 +75,6 @@ export default function useWalletState() {
     account, isImport = false, mnemonic,
   }: AddAccountProps) => {
     const newAccountAddress = account.address().hex();
-    console.log('hi');
 
     // check if account already exists
     if (localStorageState.accounts !== null && newAccountAddress in localStorageState.accounts) {
@@ -196,7 +195,6 @@ export default function useWalletState() {
       newAccountAddress = currAccountAddress || null;
       toastMessage = `Using the same account with address: ${newAccountAddress?.substring(0, 6)}...`;
     }
-    console.log('hi');
     localStorageStateCopy = {
       ...localStorageStateCopy,
       currAccountAddress: newAccountAddress,
@@ -229,4 +227,4 @@ export default function useWalletState() {
   };
 }
 
-export const [WalletStateProvider, useWalletStateContext] = constate(useWalletState);
+export const [WalletStateProvider, useWalletState] = constate(useWalletStateRecorder);

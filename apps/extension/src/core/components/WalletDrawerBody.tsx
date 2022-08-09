@@ -24,7 +24,7 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { secondaryTextColor, secondaryBgColor } from 'core/colors';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import {
   useAccountCoinBalance,
 } from 'core/queries/account';

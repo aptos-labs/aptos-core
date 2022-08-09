@@ -8,7 +8,7 @@ import React from 'react';
 import { secondaryAddressFontColor } from 'core/colors';
 import { useAccountCoinBalance } from 'core/queries/account';
 import numeral from 'numeral';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 
 function WalletAccountBalance() {
   const { colorMode } = useColorMode();

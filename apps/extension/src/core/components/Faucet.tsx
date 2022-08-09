@@ -7,7 +7,7 @@ import {
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFaucet } from '@fortawesome/free-solid-svg-icons/faFaucet';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { fundAccountWithFaucet } from 'core/queries/faucet';
 import { useMutation, useQueryClient } from 'react-query';
 import { aptosCoinStructTag } from 'core/constants';

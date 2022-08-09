@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosClient, TokenClient, RequestError } from 'aptos';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { getIsValidMetadataStructure } from 'core/queries/collectibles';
 import queryKeys from 'core/queries/queryKeys';
 import { AptosAccountState } from 'core/types/stateTypes';

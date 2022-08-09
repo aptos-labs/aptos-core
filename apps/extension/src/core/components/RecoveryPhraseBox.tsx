@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from '@chakra-ui/react';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import React from 'react';
 import Copyable from 'core/components/Copyable';
 import { BiCopy } from '@react-icons/all-files/bi/BiCopy';

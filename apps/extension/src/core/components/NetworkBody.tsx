@@ -10,7 +10,7 @@ import {
 } from '@chakra-ui/react';
 import React, { useEffect, useState } from 'react';
 import { NodeUrl, nodeUrlMap } from 'core/utils/network';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { useTestnetStatus } from 'core/queries/network';
 import useSwitchNetwork from 'core/mutations/network';
 import NetworkListItem from './NetworkListItem';

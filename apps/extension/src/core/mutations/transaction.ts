@@ -7,7 +7,7 @@ import {
   RequestError,
 } from 'aptos';
 import { toast } from 'core/components/Toast';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { useSequenceNumber } from 'core/queries/account';
 import queryKeys from 'core/queries/queryKeys';
 import Analytics from 'core/utils/analytics/analytics';

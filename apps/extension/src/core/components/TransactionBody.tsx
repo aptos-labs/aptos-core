@@ -17,7 +17,7 @@ import { FaRegTimesCircle } from '@react-icons/all-files/fa/FaRegTimesCircle';
 import { ScriptFunctionPayload } from 'aptos/dist/api/data-contracts';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { collapseHexString } from 'core/utils/hex';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { MaybeHexString } from 'aptos';
 import { useParams } from 'react-router-dom';
 import { useUserTransaction } from 'core/queries/transaction';

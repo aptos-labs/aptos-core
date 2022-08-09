@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosClient, MaybeHexString } from 'aptos';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { useCallback } from 'react';
 import { useQuery, UseQueryOptions } from 'react-query';
 import { ScriptFunctionPayload, UserTransaction } from 'aptos/dist/api/data-contracts';

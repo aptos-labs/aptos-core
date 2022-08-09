@@ -22,7 +22,7 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { secondaryTextColor } from 'core/colors';
 import { useCreateTokenAndCollection } from 'core/mutations/collectibles';
 import { useAccountCoinBalance } from 'core/queries/account';

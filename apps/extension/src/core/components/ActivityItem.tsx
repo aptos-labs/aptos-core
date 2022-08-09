@@ -22,7 +22,7 @@ import {
   secondaryGridHoverBgColor,
   timestampColor,
 } from 'core/colors';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 
 /**
  * Convert a timestamp into a relative time short string. If the time difference

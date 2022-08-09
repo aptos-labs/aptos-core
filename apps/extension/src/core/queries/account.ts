@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosClient, MaybeHexString } from 'aptos';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { useQuery, useQueryClient } from 'react-query';
 import { aptosCoinStoreStructTag } from 'core/constants';
 

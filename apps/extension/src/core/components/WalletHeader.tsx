@@ -24,7 +24,7 @@ import {
   useDisclosure,
 } from '@chakra-ui/react';
 import React, { useState } from 'react';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import {
   AddIcon, ChevronLeftIcon, DragHandleIcon,
 } from '@chakra-ui/icons';

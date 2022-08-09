@@ -3,7 +3,7 @@
 
 import axios from 'axios';
 import { useQuery } from 'react-query';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { useCallback } from 'react';
 import { AptosClient } from 'aptos';
 import { faucetUrlMap, nodeUrlMap } from 'core/utils/network';

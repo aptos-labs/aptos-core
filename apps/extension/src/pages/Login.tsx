@@ -22,7 +22,7 @@ import {
 } from '@chakra-ui/react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import ChakraLink from 'core/components/ChakraLink';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import { AptosWhiteLogo, AptosBlackLogo } from 'core/components/AptosLogo';
 import { secondaryBgColor, secondaryErrorMessageColor, secondaryTextColor } from 'core/colors';
 import { getAccountResources } from 'core/queries/account';

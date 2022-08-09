@@ -10,7 +10,7 @@ import WalletLayout from 'core/layouts/WalletLayout';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
 import { useCoinTransferTransactions } from 'core/queries/transaction';
-import useWalletState from 'core/hooks/useWalletState';
+import { useWalletState } from 'core/hooks/useWalletState';
 import TransactionList from 'core/components/TransactionList';
 
 function Activity() {
