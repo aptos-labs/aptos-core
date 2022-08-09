@@ -5,6 +5,7 @@ use crate::{
     common::types::{CliError, CliTypedResult, PromptOptions},
     CliResult,
 };
+use aptos_crypto::HashValue;
 use aptos_logger::{debug, Level};
 use aptos_rest_client::Client;
 use aptos_telemetry::collect_build_information;
@@ -295,7 +296,7 @@ pub async fn fund_account(
     faucet_url: Url,
     num_coins: u64,
     address: AccountAddress,
-) -> CliTypedResult<()> {
+) -> CliTypedResult<Vec<HashValue>> {
     let response = reqwest::Client::new()
         .post(format!(
             "{}mint?amount={}&auth_key={}",
@@ -305,7 +306,11 @@ pub async fn fund_account(
         .await
         .map_err(|err| CliError::ApiError(err.to_string()))?;
     if response.status() == 200 {
-        Ok(())
+        let hashes: Vec<HashValue> = response
+            .json()
+            .await
+            .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
+        Ok(hashes)
     } else {
         Err(CliError::ApiError(format!(
             "Faucet issue: {}",
