@@ -15,7 +15,6 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
-import { useWalletState } from 'core/hooks/useWalletState';
 import WalletLayout from 'core/layouts/WalletLayout';
 import SettingsPaths from 'core/components/SettingsPaths';
 import SettingsListItem from 'core/components/SettingsListItem';
@@ -23,6 +22,7 @@ import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
 import { secondaryTextColor } from 'core/colors';
 import { CredentialHeaderAndBodyProps } from 'core/components/CredentialsBody';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 export function CredentialRow({
   body,
@@ -49,10 +49,9 @@ export function CredentialRow({
 }
 
 function Account() {
-  const { accountMnemonic, aptosAccount } = useWalletState();
+  const { activeAccount } = useGlobalStateContext();
+  const { address, mnemonic } = activeAccount!;
 
-  const privateKeyObject = aptosAccount?.toPrivateKeyObject();
-  const address = privateKeyObject?.address;
   const explorerAddress = `https://explorer.devnet.aptos.dev/account/${address}`;
 
   return (
@@ -77,7 +76,7 @@ function Account() {
             </Flex>
             <VStack spacing={2}>
               {
-              SettingsPaths(accountMnemonic !== undefined).map((value) => (
+              SettingsPaths(mnemonic !== undefined).map((value) => (
                 <SettingsListItem
                   key={value.path}
                   {...value}

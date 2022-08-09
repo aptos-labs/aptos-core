@@ -1,176 +1,117 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient, MaybeHexString } from 'aptos';
-import { useWalletState } from 'core/hooks/useWalletState';
-import { useCallback } from 'react';
+import { AptosClient } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
 import { ScriptFunctionPayload, UserTransaction } from 'aptos/dist/api/data-contracts';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { coinNamespace } from 'core/constants';
 
 export const transactionQueryKeys = Object.freeze({
   getAccountLatestTransactionTimestamp: 'getAccountLatestTransactionTimestamp',
   getCoinTransferSimulation: 'getCoinTransferSimulation',
   getCoinTransferTransactions: 'getCoinTransferTransactions',
-  getUserTransaction: 'getUserTransaction',
+  getTransaction: 'getTransaction',
+  getUserTransactions: 'getUserTransactions',
 } as const);
-
-export interface GetTransactionProps {
-  nodeUrl: string,
-  txnHashOrVersion: string;
-}
-
-export const getTransaction = async ({
-  nodeUrl,
-  txnHashOrVersion,
-}: GetTransactionProps) => {
-  const aptosClient = new AptosClient(nodeUrl);
-  return aptosClient.getTransaction(txnHashOrVersion);
-};
-
-export const getUserTransaction = async ({
-  nodeUrl,
-  txnHashOrVersion,
-}: GetTransactionProps) => {
-  const aptosClient = new AptosClient(nodeUrl);
-  if (txnHashOrVersion) {
-    const txn = await aptosClient.getTransaction(txnHashOrVersion);
-    if ('events' in txn && 'signature' in txn) {
-      return txn;
-    }
-  }
-  return undefined;
-};
-
-export interface GetAccountUserTransactionsProps {
-  address: MaybeHexString;
-  nodeUrl: string,
-}
 
 /**
  * Get successful user transactions for the specified account
  */
-export async function getAccountUserTransactions({
-  address,
-  nodeUrl,
-}: GetAccountUserTransactionsProps) {
-  const aptosClient = new AptosClient(nodeUrl);
-  const transactions = await aptosClient.getAccountTransactions(address, { limit: 200 });
-
+export async function getUserTransactions(aptosClient: AptosClient, address: string) {
+  const transactions = await aptosClient!.getAccountTransactions(address!, { limit: 200 });
   return transactions
-    .filter((txn) => !txn.vm_status.includes('Move abort'))
+    .filter((txn) => txn.success)
     .filter((t) => t.type === 'user_transaction')
     .map((t) => t as UserTransaction);
 }
 
-export interface GetScriptFunctionTransactionsProps {
-  address: MaybeHexString;
+export async function getScriptFunctionTransactions(
+  aptosClient: AptosClient,
+  address: string,
   functionName: string,
-  nodeUrl: string,
-}
-
-/**
- * Get transactions that ran a specific function for the provided account
- */
-export async function getScriptFunctionTransactions({
-  address,
-  functionName,
-  nodeUrl,
-}: GetScriptFunctionTransactionsProps) {
-  const userTransactions = await getAccountUserTransactions({ address, nodeUrl });
-  return userTransactions
+) {
+  const transactions = await getUserTransactions(aptosClient, address);
+  return transactions
     .filter((t) => t.payload.type === 'script_function_payload'
       && (t.payload as ScriptFunctionPayload).function === functionName);
 }
 
-interface UseCoinTransferTransactionParams {
-  address?: string,
-}
+// region Use transactions
 
-export function useCoinTransferTransactions(
-  { address }: UseCoinTransferTransactionParams,
+export function useUserTransactions(
+  address: string | undefined,
   options?: UseQueryOptions<UserTransaction[]>,
 ) {
-  const { nodeUrl } = useWalletState();
+  const { aptosClient } = useGlobalStateContext();
 
   return useQuery<UserTransaction[]>(
-    [transactionQueryKeys.getCoinTransferTransactions, address],
-    () => getScriptFunctionTransactions({
-      address: address!,
-      functionName: '0x1::coin::transfer',
-      nodeUrl,
-    }),
+    [transactionQueryKeys.getUserTransactions, address],
+    async () => getUserTransactions(aptosClient!, address!),
     {
       ...options,
-      enabled: Boolean(address) && options?.enabled,
+      enabled: Boolean(aptosClient && address) && options?.enabled,
     },
   );
 }
 
-type UseUserTransactionProps = Omit<GetTransactionProps, 'nodeUrl'>;
+export function useCoinTransferTransactions(
+  address: string | undefined,
+  options?: UseQueryOptions<UserTransaction[]>,
+) {
+  const { aptosClient } = useGlobalStateContext();
 
-export const useUserTransaction = ({ txnHashOrVersion }: UseUserTransactionProps) => {
-  const { nodeUrl } = useWalletState();
+  return useQuery<UserTransaction[]>(
+    [transactionQueryKeys.getCoinTransferTransactions, address],
+    async () => getScriptFunctionTransactions(
+      aptosClient!,
+      address!,
+      `${coinNamespace}::transfer`,
+    ),
+    {
+      ...options,
+      enabled: Boolean(aptosClient && address) && options?.enabled,
+    },
+  );
+}
 
-  const getTransactionQuery = useCallback(async () => {
-    const transaction = await getTransaction({
-      nodeUrl,
-      txnHashOrVersion,
-    });
+// endregion
 
-    if (transaction.type !== 'user_transaction') {
-      throw new Error('Requested transaction is not an user transaction');
-    }
+export const useTransaction = (
+  txnHashOrVersion: string | undefined,
+  options?: UseQueryOptions<UserTransaction>,
+) => {
+  const { aptosClient } = useGlobalStateContext();
 
-    return transaction as UserTransaction;
-  }, [nodeUrl, txnHashOrVersion]);
-
-  return useQuery([transactionQueryKeys.getUserTransaction, txnHashOrVersion], getTransactionQuery);
+  return useQuery<UserTransaction>(
+    [transactionQueryKeys.getTransaction, txnHashOrVersion],
+    async () => aptosClient!.getTransaction(txnHashOrVersion!) as Promise<UserTransaction>,
+    {
+      ...options,
+      enabled: Boolean(aptosClient && txnHashOrVersion) && options?.enabled,
+    },
+  );
 };
 
-export interface GetAccountLatestTransactionTimestamp {
-  address: string;
-  nodeUrl: string;
-}
+export function useAccountLatestTransactionTimestamp(
+  address?: string,
+  options?: UseQueryOptions<Date | undefined>,
+) {
+  const { aptosClient } = useGlobalStateContext();
 
-export async function getAccountLatestTransactionTimestamp({
-  address,
-  nodeUrl,
-}:GetAccountLatestTransactionTimestamp) {
-  const txns = await getAccountUserTransactions({ address, nodeUrl });
-
-  // milliseconds
-  const latestTxnTimestamp = Number(txns.pop()?.timestamp.substring(0, 13));
-  const date = (latestTxnTimestamp) ? new Date(latestTxnTimestamp) : undefined;
-  return date;
-}
-
-export interface UseAccountLatestTransactionTimestampProps {
-  address: string;
-  refetchInterval?: number | false;
-}
-
-export function useAccountLatestTransactionTimestamp({
-  address,
-  refetchInterval,
-}: UseAccountLatestTransactionTimestampProps) {
-  const { nodeUrl } = useWalletState();
-
-  const getCoinTransferTransactionsQuery = useCallback(
-    async () => getAccountLatestTransactionTimestamp({
-      address,
-      nodeUrl,
-    }),
-    [address, nodeUrl],
-  );
-
-  return useQuery(
+  return useQuery<Date | undefined>(
     [
       transactionQueryKeys.getAccountLatestTransactionTimestamp,
       address,
     ],
-    getCoinTransferTransactionsQuery,
+    async () => {
+      const txns = await aptosClient!.getAccountTransactions(address!, { limit: 1 });
+      const latestTxn = (txns as UserTransaction[]).pop();
+      return latestTxn && new Date(Number(latestTxn?.timestamp) / 1000);
+    },
     {
-      refetchInterval,
+      ...options,
+      enabled: Boolean(address) && options?.enabled,
     },
   );
 }

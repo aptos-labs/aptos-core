@@ -7,14 +7,13 @@ import Routes, { Routes as PageRoutes } from 'core/routes';
 import { ImportAccountPrivateKeyLayout, PrivateKeyFormValues } from 'core/layouts/AddAccountLayout';
 import ImportAccountPrivateKeyBody from 'core/components/ImportAccountPrivateKeyBody';
 import { AptosAccount } from 'aptos';
-import { getAccountResources } from 'core/queries/account';
 import { useNavigate } from 'react-router-dom';
-import { useWalletState } from 'core/hooks/useWalletState';
-import { importAccountErrorToast, importAccountNotFoundToast } from 'core/components/Toast';
+import { importAccountErrorToast, importAccountToast } from 'core/components/Toast';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 export default function ImportAccountPrivateKey() {
   const navigate = useNavigate();
-  const { addAccount, nodeUrl } = useWalletState();
+  const { addAccount } = useGlobalStateContext();
 
   const onSubmit = useCallback(async (
     data: PrivateKeyFormValues,
@@ -25,21 +24,28 @@ export default function ImportAccountPrivateKey() {
     try {
       const nonHexKey = (privateKey.startsWith('0x')) ? privateKey.substring(2) : privateKey;
       const encodedKey = Uint8Array.from(Buffer.from(nonHexKey, 'hex'));
-      const account = new AptosAccount(encodedKey, undefined);
-      const response = await getAccountResources({
-        address: account.address().hex(),
-        nodeUrl,
+      const aptosAccount = new AptosAccount(encodedKey);
+      // TODO: prompt user for confirmation if account is not on chain
+
+      const {
+        address,
+        privateKeyHex,
+        publicKeyHex,
+      } = aptosAccount.toPrivateKeyObject();
+
+      await addAccount({
+        address: address!,
+        name: 'Wallet',
+        privateKey: privateKeyHex,
+        publicKey: publicKeyHex!,
       });
-      if (!response) {
-        importAccountNotFoundToast();
-        return;
-      }
-      await addAccount({ account, isImport: true });
+
+      importAccountToast();
       navigate(Routes.wallet.routePath);
     } catch (err) {
       importAccountErrorToast();
     }
-  }, [addAccount, navigate, nodeUrl]);
+  }, [addAccount, navigate]);
 
   return (
     <AuthLayout routePath={PageRoutes.importWalletPrivateKey.routePath}>

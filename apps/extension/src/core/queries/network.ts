@@ -3,10 +3,8 @@
 
 import axios from 'axios';
 import { useQuery } from 'react-query';
-import { useWalletState } from 'core/hooks/useWalletState';
-import { useCallback } from 'react';
-import { AptosClient } from 'aptos';
 import { faucetUrlMap, nodeUrlMap } from 'core/utils/network';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 export const getLocalhostIsLive = async () => {
   try {
@@ -47,17 +45,16 @@ export const useTestnetStatus = () => useQuery(
  * which is required to BCD-encode a transaction locally
  */
 export function useChainId() {
-  const walletState = useWalletState();
-  const NodeNetworkUrl = walletState.nodeUrl!;
+  const { aptosClient } = useGlobalStateContext();
 
-  const chainIdQuery = useCallback(async () => {
-    const aptosClient = new AptosClient(NodeNetworkUrl);
-    return aptosClient.getChainId();
-  }, [NodeNetworkUrl]);
-
-  return useQuery([networkQueryKeys.getChainId], chainIdQuery, {
-    staleTime: 60000,
-  });
+  return useQuery(
+    [networkQueryKeys.getChainId],
+    () => aptosClient!.getChainId(),
+    {
+      enabled: Boolean(aptosClient),
+      staleTime: 60000,
+    },
+  );
 }
 
 export default getLocalhostIsLive;

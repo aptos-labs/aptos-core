@@ -22,10 +22,10 @@ import {
 } from '@chakra-ui/react';
 import React from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
-import { useWalletState } from 'core/hooks/useWalletState';
 import { secondaryTextColor } from 'core/colors';
 import { useCreateTokenAndCollection } from 'core/mutations/collectibles';
 import { useAccountCoinBalance } from 'core/queries/account';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 // eslint-disable-next-line global-require
 window.Buffer = window.Buffer || require('buffer').Buffer;
@@ -34,11 +34,8 @@ export default function CreateNFTModal() {
   const { colorMode } = useColorMode();
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { handleSubmit, register, watch } = useForm();
-  const { aptosAccount, nodeUrl } = useWalletState();
-
-  const { data: coinBalance } = useAccountCoinBalance({
-    address: aptosAccount?.address().hex(),
-  });
+  const { activeAccountAddress } = useGlobalStateContext();
+  const { data: coinBalance } = useAccountCoinBalance(activeAccountAddress);
 
   const collectionName: string | undefined = watch('collectionName');
   const tokenName: string | undefined = watch('tokenName');
@@ -58,11 +55,9 @@ export default function CreateNFTModal() {
   const onSubmit: SubmitHandler<Record<string, any>> = async (_data, event) => {
     event?.preventDefault();
     await createTokenAndCollectionOnClick({
-      account: aptosAccount,
       collectionName,
       description,
       name: tokenName,
-      nodeUrl,
       supply,
       uri,
     });

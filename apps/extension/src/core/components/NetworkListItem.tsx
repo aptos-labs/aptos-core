@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import React from 'react';
 import {
   Box,
   Center,
@@ -11,34 +12,24 @@ import {
   UseRadioProps,
 } from '@chakra-ui/react';
 import { secondaryHoverBgColor, secondaryButtonColor } from 'core/colors';
-import {
-  NodeUrl,
-  NetworkType,
-  nodeUrlMap,
-  nodeUrlReverseMap,
-} from 'core/utils/network';
-import React from 'react';
+import { Network, NetworkType } from 'core/hooks/useGlobalState';
 
-export interface SettingsListItemProps {
-  title?: NetworkType;
-  value: NodeUrl;
-}
+type NetworkListItemProps = UseRadioProps & {
+  isLoading: boolean,
+  network: Network,
+};
 
-export default function NetworkListItem(
-  props: UseRadioProps & { isLoading: boolean, value: NodeUrl },
-) {
+export default function NetworkListItem(props: NetworkListItemProps) {
   const { getCheckboxProps, getInputProps } = useRadio(props);
   const { colorMode } = useColorMode();
   const {
-    isChecked, isDisabled, isLoading, value,
+    isChecked, isDisabled, isLoading, network, value,
   } = props;
-  const input = getInputProps();
-  const checkbox = getCheckboxProps();
   return (
     <Box as="label">
-      <input disabled={isDisabled && (value === nodeUrlMap.Localhost)} {...input} />
+      <input disabled={isDisabled} {...getInputProps()} />
       <Box
-        {...checkbox}
+        {...getCheckboxProps()}
         cursor="pointer"
         borderRadius="md"
         bgColor={secondaryButtonColor[colorMode]}
@@ -56,16 +47,16 @@ export default function NetworkListItem(
         py={3}
       >
         {
-          isLoading ? (
+          !isLoading ? (
             <>
               <Text fontSize="md" fontWeight={600}>
-                {value ? nodeUrlReverseMap[value] : undefined}
+                { network.name }
               </Text>
               <Text fontSize="md" fontWeight={400}>
-                {value}
+                { network.nodeUrl }
               </Text>
               {
-                (isDisabled && value === nodeUrlMap.Localhost) ? (
+                (isDisabled && value === NetworkType.LocalHost) ? (
                   <Text fontSize="sm">(Please start testnet and testnet faucet on localhost to switch)</Text>
                 ) : undefined
               }

@@ -12,10 +12,10 @@ import TransferDrawer from 'core/components/TransferDrawer';
 import Faucet from 'core/components/Faucet';
 import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
-import { useWalletState } from 'core/hooks/useWalletState';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 function Wallet() {
-  const { faucetNetwork } = useWalletState();
+  const { faucetClient } = useGlobalStateContext();
 
   return (
     <AuthLayout routePath={PageRoutes.wallet.routePath}>
@@ -23,7 +23,7 @@ function Wallet() {
         <VStack width="100%" paddingTop={8}>
           <WalletAccountBalance />
           <HStack spacing={4}>
-            { faucetNetwork && <Faucet /> }
+            { faucetClient && <Faucet /> }
             <TransferDrawer />
           </HStack>
         </VStack>

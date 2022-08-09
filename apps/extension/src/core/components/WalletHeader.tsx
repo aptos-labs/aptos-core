@@ -1,32 +1,23 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+import React from 'react';
 import {
   Box,
-  Button,
   Center,
-  Drawer,
-  DrawerBody,
-  DrawerContent,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerOverlay,
   Grid,
   HStack,
   Input,
   InputGroup,
   InputLeftAddon,
   InputRightAddon,
-  Text,
   Tooltip,
   useClipboard,
   useColorMode,
   useDisclosure,
 } from '@chakra-ui/react';
-import React, { useState } from 'react';
-import { useWalletState } from 'core/hooks/useWalletState';
 import {
-  AddIcon, ChevronLeftIcon, DragHandleIcon,
+  ChevronLeftIcon, DragHandleIcon,
 } from '@chakra-ui/icons';
 import {
   secondaryBorderColor,
@@ -35,9 +26,8 @@ import {
 } from 'core/colors';
 import { IoIosWallet } from '@react-icons/all-files/io/IoIosWallet';
 import { useNavigate } from 'react-router-dom';
-import Routes from 'core/routes';
-import WalletDrawerBody from './WalletDrawerBody';
-import ChakraLink from './ChakraLink';
+import AccountDrawer from 'core/components/AccountDrawer';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 interface WalletHeaderProps {
   showBackButton?: boolean;
@@ -46,14 +36,11 @@ interface WalletHeaderProps {
 export default function WalletHeader({
   showBackButton,
 }: WalletHeaderProps) {
-  const { aptosAccount } = useWalletState();
-  const [isLoading] = useState<boolean>(false);
-  const navigate = useNavigate();
+  const { activeAccountAddress } = useGlobalStateContext();
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { colorMode } = useColorMode();
-  const { hasCopied, onCopy } = useClipboard(
-    aptosAccount?.address().hex() || '',
-  );
+  const { hasCopied, onCopy } = useClipboard(activeAccountAddress || '');
+  const navigate = useNavigate();
 
   return (
     <Grid
@@ -92,7 +79,7 @@ export default function WalletHeader({
               <Input
                 size="sm"
                 readOnly
-                value={aptosAccount?.address().hex()}
+                value={activeAccountAddress}
                 onClick={onCopy}
                 borderColor={secondaryBorderColor[colorMode]}
                 bgColor={secondaryHeaderInputBgColor[colorMode]}
@@ -121,45 +108,7 @@ export default function WalletHeader({
               </InputRightAddon>
             </Tooltip>
           </InputGroup>
-          <Drawer placement="bottom" onClose={onClose} isOpen={isOpen}>
-            <DrawerOverlay />
-            <DrawerContent>
-              <DrawerHeader
-                px={4}
-                borderBottomWidth="1px"
-              >
-                <Grid templateColumns="1fr 136px">
-                  <Text>Accounts</Text>
-                  <ChakraLink
-                    to={Routes.addAccount.routePath}
-                    display="flex"
-                    justifyContent="flex-end"
-                  >
-                    <Button
-                      colorScheme="teal"
-                      size="sm"
-                      leftIcon={<AddIcon />}
-                      isLoading={isLoading}
-                    >
-                      New Account
-                    </Button>
-                  </ChakraLink>
-                </Grid>
-              </DrawerHeader>
-              <DrawerBody px={4} maxH="400px">
-                <WalletDrawerBody />
-              </DrawerBody>
-              <DrawerFooter
-                px={4}
-                borderTopWidth="1px"
-                borderTopColor={secondaryBorderColor[colorMode]}
-              >
-                <Button onClick={onClose}>
-                  Close
-                </Button>
-              </DrawerFooter>
-            </DrawerContent>
-          </Drawer>
+          <AccountDrawer isOpen={isOpen} onClose={onClose} />
         </HStack>
       </Center>
       <Box />

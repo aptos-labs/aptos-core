@@ -8,13 +8,12 @@ import React from 'react';
 import { secondaryAddressFontColor } from 'core/colors';
 import { useAccountCoinBalance } from 'core/queries/account';
 import numeral from 'numeral';
-import { useWalletState } from 'core/hooks/useWalletState';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 function WalletAccountBalance() {
   const { colorMode } = useColorMode();
-  const { aptosAccount } = useWalletState();
-  const { data: coinBalance } = useAccountCoinBalance({
-    address: aptosAccount?.address().hex(),
+  const { activeAccountAddress } = useGlobalStateContext();
+  const { data: coinBalance } = useAccountCoinBalance(activeAccountAddress, {
     refetchInterval: 5000,
   });
   const coinBalanceString = numeral(coinBalance).format('0,0.0000');

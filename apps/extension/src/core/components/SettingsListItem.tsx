@@ -5,10 +5,10 @@ import {
   Center,
   Grid, Icon, Text, useColorMode,
 } from '@chakra-ui/react';
-import { useWalletState } from 'core/hooks/useWalletState';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { secondaryGridHoverBgColor, secondaryGridBgColor, textColor } from 'core/colors';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 interface BgColorDictType {
   dark: string;
@@ -34,12 +34,11 @@ export default function SettingsListItem({
 }: SettingsListItemProps) {
   const navigate = useNavigate();
   const { colorMode } = useColorMode();
-  const { aptosAccount, removeAccount } = useWalletState();
+  const { lockAccounts } = useGlobalStateContext();
 
-  const gridOnClick = () => {
-    if (title === 'Sign out') {
-      // Change to signOut once password is implemented
-      removeAccount({ accountAddress: aptosAccount?.address().hex() });
+  const gridOnClick = async () => {
+    if (title === 'Sign out' && lockAccounts) {
+      await lockAccounts();
     }
     navigate(path);
   };

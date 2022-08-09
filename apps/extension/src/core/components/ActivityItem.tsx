@@ -22,7 +22,7 @@ import {
   secondaryGridHoverBgColor,
   timestampColor,
 } from 'core/colors';
-import { useWalletState } from 'core/hooks/useWalletState';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 /**
  * Convert a timestamp into a relative time short string. If the time difference
@@ -81,7 +81,7 @@ interface ActivityItemProps {
 
 export function ActivityItem({ transaction }: ActivityItemProps) {
   const { colorMode } = useColorMode();
-  const { aptosAccount } = useWalletState();
+  const { aptosAccount } = useGlobalStateContext();
 
   const typedPayload = transaction.payload as ScriptFunctionPayload;
   const [recipient, amount]: string[] = typedPayload.arguments;

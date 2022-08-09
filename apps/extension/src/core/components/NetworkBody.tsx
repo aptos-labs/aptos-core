@@ -8,53 +8,27 @@ import {
   Heading,
   useRadioGroup,
 } from '@chakra-ui/react';
-import React, { useEffect, useState } from 'react';
-import { NodeUrl, nodeUrlMap } from 'core/utils/network';
-import { useWalletState } from 'core/hooks/useWalletState';
-import { useTestnetStatus } from 'core/queries/network';
-import useSwitchNetwork from 'core/mutations/network';
+import React from 'react';
+import useGlobalStateContext, { NetworkType } from 'core/hooks/useGlobalState';
+import { useQueryClient } from 'react-query';
 import NetworkListItem from './NetworkListItem';
-
-interface NetworkPreference {
-  description?: string;
-  title: string;
-  value: NodeUrl;
-}
-
-const networkPreferences: NetworkPreference[] = Object.entries(nodeUrlMap).map(
-  ([key, value]) => ({
-    title: key,
-    value,
-  }),
-);
 
 export default function NetworkBody() {
   const {
-    nodeUrl,
-  } = useWalletState();
-  const { data: localTestnetIsLive } = useTestnetStatus();
-  const { isLoading, mutateAsync } = useSwitchNetwork();
-  const [error, setError] = useState<boolean>(false);
+    activeNetworkType,
+    networks,
+    switchNetwork,
+  } = useGlobalStateContext();
+  const queryClient = useQueryClient();
 
-  const onClick = async (event: NodeUrl) => {
-    try {
-      await mutateAsync({ event, localTestnetIsLive });
-    } catch (err) {
-      setError(!error);
-    }
-  };
-
-  const { getRadioProps, getRootProps, setValue: radioSetValue } = useRadioGroup({
-    defaultValue: nodeUrl,
-    name: 'NodeNetworkUrl',
-    onChange: onClick,
+  const { getRadioProps, getRootProps } = useRadioGroup({
+    defaultValue: activeNetworkType,
+    onChange: async (networkType: NetworkType) => {
+      await switchNetwork(networkType);
+      // Invalidate all queries to clear cached data from previous network
+      await queryClient.invalidateQueries();
+    },
   });
-
-  const group = getRootProps();
-
-  useEffect(() => {
-    radioSetValue(nodeUrl);
-  }, [nodeUrl, error, radioSetValue]);
 
   return (
     <>
@@ -63,19 +37,18 @@ export default function NetworkBody() {
           <Heading fontSize="xl">Network</Heading>
         </Flex>
       </SimpleGrid>
-      <VStack mt={2} spacing={2} alignItems="left" {...group}>
+      <VStack mt={2} spacing={2} alignItems="left" {...getRootProps()}>
         {
-          networkPreferences.map((network) => {
-            const radio = getRadioProps({ value: network.value });
+          Object.keys(networks).map((networkType) => {
+            const network = networks[networkType as NetworkType];
             return (
               <NetworkListItem
-                key={network.value}
-                isDisabled={(
-                  network.value === nodeUrlMap.Localhost && !localTestnetIsLive)
-                  || network.value === nodeUrlMap.Testnet}
-                isLoading={!isLoading}
-                {...radio}
-                value={network.value}
+                key={networkType}
+                network={network}
+                isLoading={false}
+                isDisabled={networkType === NetworkType.LocalHost
+                  || networkType === NetworkType.Testnet}
+                {...getRadioProps({ value: networkType })}
               />
             );
           })

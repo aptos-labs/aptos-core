@@ -109,7 +109,7 @@ function CreatorTag({
 
 function TokenBody() {
   const { id } = useParams();
-  const { data } = useTokenData({ tokenId: id || '' });
+  const { data } = useTokenData(id);
   const { colorMode } = useColorMode();
 
   const metadataStorageProvider = useMemo(

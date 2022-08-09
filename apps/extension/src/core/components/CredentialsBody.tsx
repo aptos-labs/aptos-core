@@ -18,8 +18,8 @@ import {
   Text,
 } from '@chakra-ui/react';
 import React from 'react';
-import { useWalletState } from 'core/hooks/useWalletState';
 import { CredentialRow } from 'pages/Settings';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 export interface CredentialHeaderAndBodyProps {
   body?: string;
@@ -52,11 +52,8 @@ export function CredentialHeaderAndBody({
 
 export default function CredentialsBody() {
   const { isOpen, onClose, onOpen } = useDisclosure();
-  const { aptosAccount } = useWalletState();
-  const privateKeyObject = aptosAccount?.toPrivateKeyObject();
-  const privateKeyHex = privateKeyObject?.privateKeyHex;
-  const publicKeyHex = privateKeyObject?.publicKeyHex;
-  const address = privateKeyObject?.address;
+  const { activeAccount } = useGlobalStateContext();
+  const { address, privateKey, publicKey } = activeAccount!;
 
   return (
     <>
@@ -82,11 +79,11 @@ export default function CredentialsBody() {
                 <VStack mt={2} spacing={4} pb={8} alignItems="flex-start">
                   <CredentialHeaderAndBody
                     header="Private key"
-                    body={privateKeyHex}
+                    body={privateKey}
                   />
                   <CredentialHeaderAndBody
                     header="Public key"
-                    body={publicKeyHex}
+                    body={publicKey}
                   />
                   <CredentialHeaderAndBody
                     header="Address"
@@ -101,11 +98,11 @@ export default function CredentialsBody() {
       <VStack mt={2} spacing={2} alignItems="left">
         <CredentialRow
           header="Private key"
-          body={privateKeyHex}
+          body={privateKey}
         />
         <CredentialRow
           header="Public key"
-          body={publicKeyHex}
+          body={publicKey}
         />
         <CredentialRow
           header="Address"

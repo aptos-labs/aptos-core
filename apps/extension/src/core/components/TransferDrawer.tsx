@@ -37,7 +37,7 @@ import { secondaryDividerColor, secondaryErrorMessageColor, secondaryTextColor }
 import { GraceHopperBoringAvatar } from 'core/components/BoringAvatar';
 import numeral from 'numeral';
 import useDebounce from 'core/hooks/useDebounce';
-import { useWalletState } from 'core/hooks/useWalletState';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 interface CoinTransferFormData {
   amount?: number;
@@ -88,10 +88,8 @@ function TransferDrawer() {
   const debouncedAmount = useDebounce(amount, 500);
   const amountNumeral = numeral(debouncedAmount).format('0,0');
 
-  const { aptosAccount } = useWalletState();
-  const { data: coinBalance } = useAccountCoinBalance({
-    address: aptosAccount?.address().hex(),
-  });
+  const { activeAccountAddress } = useGlobalStateContext();
+  const { data: coinBalance } = useAccountCoinBalance(activeAccountAddress);
   const coinBalanceString = numeral(coinBalance).format('0,0.0000');
 
   const {

@@ -1,27 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient, TokenClient, RequestError } from 'aptos';
-import { useWalletState } from 'core/hooks/useWalletState';
+import {
+  AptosAccount,
+  AptosClient,
+  TokenClient,
+  RequestError,
+} from 'aptos';
 import { getIsValidMetadataStructure } from 'core/queries/collectibles';
 import queryKeys from 'core/queries/queryKeys';
-import { AptosAccountState } from 'core/types/stateTypes';
 import Analytics from 'core/utils/analytics/analytics';
 import { collectiblesEvents, CombinedEventParams } from 'core/utils/analytics/events';
 import { NodeUrl } from 'core/utils/network';
 import { useCallback } from 'react';
 import { useMutation, useQueryClient } from 'react-query';
-
-interface CreateTokenAndCollectionProps {
-  account: AptosAccountState;
-  collectionName?: string;
-  description?: string;
-  name?: string;
-  nodeUrl: NodeUrl;
-  royalty_points_per_million?: number;
-  supply: number;
-  uri?: string;
-}
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 export const defaultRequestErrorAttributes = {
   config: {},
@@ -62,16 +55,27 @@ const raiseForError = ({
   }
 };
 
-export const createTokenAndCollection = async ({
-  account,
-  collectionName,
-  description,
-  name,
-  nodeUrl,
-  royalty_points_per_million = 0,
-  supply,
-  uri,
-}: CreateTokenAndCollectionProps) => {
+interface CreateTokenAndCollectionProps {
+  collectionName?: string;
+  description?: string;
+  name?: string;
+  royalty_points_per_million?: number;
+  supply: number;
+  uri?: string;
+}
+
+export const createTokenAndCollection = async (
+  account: AptosAccount,
+  aptosClient: AptosClient,
+  {
+    collectionName,
+    description,
+    name,
+    royalty_points_per_million = 0,
+    supply,
+    uri,
+  }: CreateTokenAndCollectionProps,
+) => {
   if (!account || !(collectionName && description && uri && name)) {
     return undefined;
   }
@@ -81,7 +85,6 @@ export const createTokenAndCollection = async ({
       ? undefined
       : `${ERROR_CODES.URI_METADATA_FORMAT} or ${ERROR_CODES.URI_GENERAL}`,
   });
-  const aptosClient = new AptosClient(nodeUrl);
   const tokenClient = new TokenClient(aptosClient);
 
   const collectionTxnHash = await tokenClient.createCollection(
@@ -121,7 +124,11 @@ export const createTokenAndCollection = async ({
 
 export const useCreateTokenAndCollection = () => {
   const queryClient = useQueryClient();
-  const { nodeUrl } = useWalletState();
+  const {
+    activeNetwork,
+    aptosAccount,
+    aptosClient,
+  } = useGlobalStateContext();
 
   const createTokenAndCollectionOnSettled = useCallback(async (
     data: CombinedEventParams | undefined,
@@ -131,16 +138,23 @@ export const useCreateTokenAndCollection = () => {
     Analytics.event({
       eventType: collectiblesEvents.CREATE_NFT,
       params: {
-        network: nodeUrl,
+        network: activeNetwork!.nodeUrl as NodeUrl,
         ...data,
       },
     });
-  }, [nodeUrl, queryClient]);
+  }, [activeNetwork, queryClient]);
 
   return useMutation<
   CombinedEventParams | undefined,
   RequestError,
-  CreateTokenAndCollectionProps>(createTokenAndCollection, {
-    onSettled: createTokenAndCollectionOnSettled,
-  });
+  CreateTokenAndCollectionProps>(
+    async (props) => createTokenAndCollection(
+      aptosAccount!,
+      aptosClient!,
+      props,
+    ),
+    {
+      onSettled: createTokenAndCollectionOnSettled,
+    },
+  );
 };

@@ -6,16 +6,15 @@ import AuthLayout from 'core/layouts/AuthLayout';
 import Routes, { Routes as PageRoutes } from 'core/routes';
 import ImportAccountMnemonicBody from 'core/components/ImportAccountMnemonicBody';
 import { ImportAccountMnemonicLayout, MnemonicFormValues } from 'core/layouts/AddAccountLayout';
-import { useWalletState } from 'core/hooks/useWalletState';
 import { useNavigate } from 'react-router-dom';
 import { generateMnemonicObject } from 'core/utils/account';
 import { AptosAccount } from 'aptos';
-import { getAccountResources } from 'core/queries/account';
-import { importAccountErrorToast, importAccountNotFoundToast } from 'core/components/Toast';
+import { importAccountErrorToast, importAccountToast } from 'core/components/Toast';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 export default function ImportWalletMnemonic() {
   const navigate = useNavigate();
-  const { addAccount, nodeUrl } = useWalletState();
+  const { addAccount } = useGlobalStateContext();
 
   const onSubmit = useCallback(async (
     mnemonicAll: MnemonicFormValues,
@@ -28,25 +27,32 @@ export default function ImportWalletMnemonic() {
     });
     mnemonicString = mnemonicString.trim();
     try {
-      const mnemonicObject = await generateMnemonicObject(mnemonicString);
-      const aptosAccount = new AptosAccount(mnemonicObject.seed);
-      const response = await getAccountResources({
-        address: aptosAccount.address().hex(),
-        nodeUrl,
+      const { mnemonic, seed } = await generateMnemonicObject(mnemonicString);
+      const aptosAccount = new AptosAccount(seed);
+      // TODO: prompt user for confirmation if account is not on chain
+
+      const {
+        address,
+        privateKeyHex,
+        publicKeyHex,
+      } = aptosAccount.toPrivateKeyObject();
+
+      await addAccount({
+        address: address!,
+        mnemonic,
+        name: 'Wallet',
+        privateKey: privateKeyHex,
+        publicKey: publicKeyHex!,
       });
-      if (!response) {
-        // invalid mneomic, not found
-        importAccountNotFoundToast();
-        return;
-      }
-      await addAccount({ account: aptosAccount, isImport: true, mnemonic: mnemonicObject });
+
+      importAccountToast();
       navigate(Routes.wallet.routePath);
     } catch (err) {
       importAccountErrorToast();
       // eslint-disable-next-line no-console
       console.error('Invalid mnemonic, account not found');
     }
-  }, [addAccount, navigate, nodeUrl]);
+  }, [addAccount, navigate]);
 
   return (
     <AuthLayout routePath={PageRoutes.importWalletMnemonic.routePath}>

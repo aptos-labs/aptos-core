@@ -8,25 +8,25 @@ import {
   useColorMode,
   VStack,
 } from '@chakra-ui/react';
-import { useWalletState } from 'core/hooks/useWalletState';
 import React from 'react';
 import Copyable from 'core/components/Copyable';
 import { BiCopy } from '@react-icons/all-files/bi/BiCopy';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 import { secondaryBorderColor } from 'core/colors';
 
 export default function RecoveryPhraseBox() {
-  const { accountMnemonic } = useWalletState();
+  const { activeAccount } = useGlobalStateContext();
   const { colorMode } = useColorMode();
   return (
     <VStack align="flex-start">
       <Box width="100%" borderRadius=".5rem" borderWidth="1px" borderColor={secondaryBorderColor[colorMode]} p={4} rounded="md" bg="white">
         <Text>
-          {accountMnemonic?.mnemonic}
+          { activeAccount?.mnemonic }
         </Text>
       </Box>
       <Copyable
         prompt="Copy phrase"
-        value={accountMnemonic?.mnemonic}
+        value={activeAccount?.mnemonic}
       >
         <Button
           justifyContent="flex-start"

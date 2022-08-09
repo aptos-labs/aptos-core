@@ -17,11 +17,11 @@ import { FaRegTimesCircle } from '@react-icons/all-files/fa/FaRegTimesCircle';
 import { ScriptFunctionPayload } from 'aptos/dist/api/data-contracts';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { collapseHexString } from 'core/utils/hex';
-import { useWalletState } from 'core/hooks/useWalletState';
-import { MaybeHexString } from 'aptos';
+import { HexString, MaybeHexString } from 'aptos';
 import { useParams } from 'react-router-dom';
-import { useUserTransaction } from 'core/queries/transaction';
+import { useTransaction } from 'core/queries/transaction';
 import ChakraLink from 'core/components/ChakraLink';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 import Copyable from './Copyable';
 
 interface DetailItemProps {
@@ -39,8 +39,7 @@ function DetailItem({ children, label }: DetailItemProps) {
 }
 
 function useTransactionDetails(version: string) {
-  const { data: txn } = useUserTransaction({ txnHashOrVersion: version });
-
+  const { data: txn } = useTransaction(version);
   if (!txn) {
     return null;
   }
@@ -69,11 +68,12 @@ function useTransactionDetails(version: string) {
 }
 
 function TransactionBody() {
-  const { aptosAccount } = useWalletState();
+  const { activeAccountAddress } = useGlobalStateContext();
   const { version } = useParams();
 
   const txn = useTransactionDetails(version!);
-  const userAddress = aptosAccount!.address().toShortString();
+  const userAddress = activeAccountAddress
+    && HexString.ensure(activeAccountAddress).toShortString();
 
   function clickableAddress(address: MaybeHexString) {
     return address === userAddress

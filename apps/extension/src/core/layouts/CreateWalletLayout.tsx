@@ -13,9 +13,10 @@ import { useNavigate } from 'react-router-dom';
 import Routes from 'core/routes';
 import { zxcvbn, zxcvbnOptions } from '@zxcvbn-ts/core';
 import { passwordOptions } from 'core/components/CreatePasswordBody';
-import { useWalletState } from 'core/hooks/useWalletState';
 import { AptosAccount } from 'aptos';
 import { generateMnemonic, generateMnemonicObject } from 'core/utils/account';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
+import useFundAccount from 'core/mutations/faucet';
 
 zxcvbnOptions.setOptions(passwordOptions);
 
@@ -41,7 +42,9 @@ export interface OnboardFormValues {
 
 const NextButton = () => {
   const { watch } = useFormContext<OnboardFormValues>();
-  const { addAccount } = useWalletState();
+  const { initAccounts } = useGlobalStateContext();
+  const { fundAccount } = useFundAccount();
+
   const {
     activeStep, nextStep,
   } = useOnboardingStateContext();
@@ -62,19 +65,32 @@ const NextButton = () => {
       nextStep();
     } else if (activeStep === 1) {
       setIsLoading(true);
-      const mnemonicObject = await generateMnemonicObject(mnemonicString);
-      const aptosAccount = new AptosAccount(mnemonicObject.seed);
-      await addAccount({
-        account: aptosAccount,
-        mnemonic: mnemonicObject,
-        password: confirmPassword,
+      const { mnemonic, seed } = await generateMnemonicObject(mnemonicString);
+      const aptosAccount = new AptosAccount(seed);
+      const {
+        address,
+        privateKeyHex,
+        publicKeyHex,
+      } = aptosAccount.toPrivateKeyObject();
+
+      await initAccounts(confirmPassword, {
+        address: address!,
+        mnemonic,
+        name: 'Wallet',
+        privateKey: privateKeyHex,
+        publicKey: publicKeyHex!,
       });
+
+      if (fundAccount) {
+        await fundAccount({ address: address!, amount: 0 });
+      }
+
       setIsLoading(false);
       nextStep();
     } else if (activeStep === 2) {
       navigate(Routes.wallet.routePath);
     }
-  }, [activeStep, addAccount, confirmPassword, mnemonicString, navigate, nextStep]);
+  }, [activeStep, initAccounts, confirmPassword, fundAccount, mnemonicString, navigate, nextStep]);
 
   const NextButtonComponent = useMemo(() => {
     const baseNextButton = (

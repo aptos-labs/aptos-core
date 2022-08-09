@@ -7,72 +7,54 @@ import {
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFaucet } from '@fortawesome/free-solid-svg-icons/faFaucet';
-import { useWalletState } from 'core/hooks/useWalletState';
-import { fundAccountWithFaucet } from 'core/queries/faucet';
-import { useMutation, useQueryClient } from 'react-query';
 import { aptosCoinStructTag } from 'core/constants';
 import Analytics from 'core/utils/analytics/analytics';
 import { faucetEvents } from 'core/utils/analytics/events';
-import queryKeys from 'core/queries/queryKeys';
-import { faucetUrlMap } from 'core/utils/network';
+import useGlobalStateContext, { NetworkType } from 'core/hooks/useGlobalState';
+import useFundAccount from 'core/mutations/faucet';
+import { NodeUrl } from 'core/utils/network';
 import { toast } from './Toast';
 
+const defaultFundAmount = 5000;
+
 export default function Faucet() {
-  const { aptosAccount, faucetNetwork, nodeUrl } = useWalletState();
-  const queryClient = useQueryClient();
   const {
-    isLoading: isFaucetLoading,
-    mutateAsync: fundWithFaucet,
-  } = useMutation(fundAccountWithFaucet, {
-    onSettled: (_data, error) => {
-      if (error) {
-        toast({
-          description: `Error accessing faucet at ${faucetNetwork}: ${error}`,
-          status: 'error',
-          title: 'Faucet failure',
-        });
-      }
-      queryClient.invalidateQueries(queryKeys.getAccountCoinBalance);
+    activeAccountAddress,
+    activeNetwork,
+    activeNetworkType,
+  } = useGlobalStateContext();
+  const { fundAccount, isFunding } = useFundAccount();
+
+  const onClick = async () => {
+    try {
+      await fundAccount({ address: activeAccountAddress!, amount: defaultFundAmount });
       Analytics.event({
         eventType: faucetEvents.RECEIVE_FAUCET,
         params: {
-          address: aptosAccount?.address().hex(),
-          amount: 5000,
+          address: activeAccountAddress,
+          amount: defaultFundAmount,
           coinType: aptosCoinStructTag,
-          network: nodeUrl,
+          network: activeNetwork?.nodeUrl as NodeUrl,
         },
       });
-    },
-  });
-
-  const address = aptosAccount?.address().hex();
-
-  const faucetOnClick = async () => {
-    try {
-      if (address && faucetNetwork) {
-        await fundWithFaucet({ address, faucetUrl: faucetNetwork, nodeUrl });
-      }
     } catch (err) {
-      const localhostMessage = (faucetNetwork === faucetUrlMap.Localhost)
+      const localhostMessage = (activeNetworkType === NetworkType.LocalHost)
         ? 'If you are on localhost, please ensure that the faucet is running.'
         : undefined;
       toast({
-        description: `Error accessing faucet at ${faucetNetwork}. ${localhostMessage}`,
-        duration: 5000,
-        isClosable: true,
+        description: `Error accessing faucet at ${activeNetwork?.faucetUrl}. ${localhostMessage}`,
         status: 'error',
         title: 'Error calling faucet',
-        variant: 'solid',
       });
     }
   };
 
   return (
     <Button
-      isLoading={isFaucetLoading}
+      isLoading={isFunding}
       leftIcon={<FontAwesomeIcon icon={faFaucet} />}
-      onClick={faucetOnClick}
-      isDisabled={isFaucetLoading}
+      onClick={onClick}
+      isDisabled={isFunding}
     >
       Faucet
     </Button>

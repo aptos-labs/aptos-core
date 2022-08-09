@@ -2,19 +2,27 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  AptosClient, HexString,
-  MaybeHexString, TokenClient,
+  AptosClient,
+  HexString,
+  TokenClient,
 } from 'aptos';
 import axios from 'axios';
-import { useQuery } from 'react-query';
+import { useQuery, UseQueryOptions } from 'react-query';
 import { validStorageUris } from 'core/constants';
-import { useWalletState } from 'core/hooks/useWalletState';
 import { MetadataJson } from 'core/types/tokenMetadata';
-import { NodeUrl } from 'core/utils/network';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { getTokenIdDictFromString, TokenId } from 'core/utils/token';
 import { ScriptFunctionPayload } from 'aptos/dist/api/data-contracts';
-import { getScriptFunctionTransactions } from 'core/queries/transaction';
+import {
+  getScriptFunctionTransactions,
+} from 'core/queries/transaction';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
+
+export const collectiblesQueryKeys = Object.freeze({
+  getGalleryItems: 'getGalleryItems',
+  getTokenData: 'getTokenData',
+  isValidMetadataStructure: 'isValidMetadataStructure',
+} as const);
 
 interface TokenAttributes {
   description?: string;
@@ -28,94 +36,59 @@ interface TokenAttributes {
 
 type CollectionDict = Record<string, TokenAttributes[]>;
 
-interface GetGalleryItemsProps {
-  address: MaybeHexString;
-  nodeUrl: NodeUrl;
-}
+export function useGalleryItems(
+  options?: UseQueryOptions<TokenAttributes[]>,
+) {
+  const { activeAccountAddress, aptosClient } = useGlobalStateContext();
 
-// this is a temporary workaround until we get the indexer working
-export const getGalleryItems = async ({
-  address,
-  nodeUrl,
-}: GetGalleryItemsProps) => {
-  const createTokenTransactions = await getScriptFunctionTransactions({
-    address,
-    functionName: '0x1::token::create_unlimited_token_script',
-    nodeUrl,
-  });
+  async function getGalleryItems() {
+    const createTokenTxns = await getScriptFunctionTransactions(
+      aptosClient!,
+      activeAccountAddress!,
+      '0x1::token::create_unlimited_token_script',
+    );
 
-  const collectionDict: CollectionDict = {};
+    const collectionDict: CollectionDict = {};
 
-  // Note: next block is currently not needed. Maybe it could be
-  // helpful in the future to support showing empty collections?
+    await Promise.all(createTokenTxns.map(async (txn) => {
+      const payload = txn.payload as ScriptFunctionPayload;
 
-  // Initialize collection dict from `create_unlimited_collection` transactions
-  // const createCollectionTransactions = await getScriptFunctionTransactions({
-  //   address,
-  //   functionName: '0x1::token::create_unlimited_collection_script',
-  //   nodeUrl,
-  // });
-  //
-  // createCollectionTransactions.forEach((txn) => {
-  //   const payload = txn.payload as ScriptFunctionPayload;
-  //   const collectionName = new HexString(payload.arguments[0]).toBuffer().toString();
-  //   collectionDict[collectionName] = [];
-  // });
+      // TODO: do we need to go through HexString to deserialize the parameters?
+      const creator = txn.sender;
+      const collectionName = new HexString(payload.arguments[0]).toBuffer().toString();
+      const name = new HexString(payload.arguments[1]).toBuffer().toString();
+      const uri = new HexString(payload.arguments[5]).toBuffer().toString();
 
-  await Promise.all(createTokenTransactions.map(async (txn) => {
-    const payload = txn.payload as ScriptFunctionPayload;
+      const isSupportedStorage = validStorageUris.some((storageUri) => uri.includes(storageUri));
+      const metadata = isSupportedStorage ? (await axios.get<MetadataJson>(uri)).data : undefined;
 
-    // TODO: do we need to go through HexString to deserialize the parameters?
-    const creator = txn.sender;
-    const collectionName = new HexString(payload.arguments[0]).toBuffer().toString();
-    const name = new HexString(payload.arguments[1]).toBuffer().toString();
-    const uri = new HexString(payload.arguments[5]).toBuffer().toString();
+      if (!(collectionName in collectionDict)) {
+        collectionDict[collectionName] = [];
+      }
 
-    const isSupportedStorage = validStorageUris.some((storageUri) => uri.includes(storageUri));
-    const metadata = isSupportedStorage ? (await axios.get<MetadataJson>(uri)).data : undefined;
-
-    if (!(collectionName in collectionDict)) {
-      collectionDict[collectionName] = [];
-    }
-
-    collectionDict[collectionName].push({
-      id: {
-        collection: collectionName,
-        creator,
+      collectionDict[collectionName].push({
+        id: {
+          collection: collectionName,
+          creator,
+          name,
+        },
+        metadata,
         name,
-      },
-      metadata,
-      name,
-      uri,
-    });
-  }));
+        uri,
+      });
+    }));
 
-  return Array.from(Object.values(collectionDict)).flat(1);
-};
+    return Array.from(Object.values(collectionDict)).flat(1);
+  }
 
-export const collectiblesQueryKeys = Object.freeze({
-  getGalleryItems: 'getGalleryItems',
-  getTokenData: 'getTokenData',
-  isValidMetadataStructure: 'isValidMetadataStructure',
-} as const);
-
-interface GetTokenDataProps {
-  id: TokenId;
-  nodeUrl: string;
-}
-
-export const getTokenData = async ({
-  id,
-  nodeUrl,
-}: GetTokenDataProps) => {
-  const aptosClient = new AptosClient(nodeUrl);
-  const tokenClient = new TokenClient(aptosClient);
-  const data = await tokenClient.getTokenData(id.creator, id.collection, id.name);
-  return data;
-};
-
-interface UseTokenDataProps {
-  tokenId: string;
+  return useQuery<TokenAttributes[]>(
+    [collectiblesQueryKeys.getGalleryItems],
+    getGalleryItems,
+    {
+      ...options,
+      enabled: Boolean(activeAccountAddress && aptosClient) && options?.enabled,
+    },
+  );
 }
 
 export interface TokenDataResponse {
@@ -132,46 +105,30 @@ export interface TokenDataResponse {
   uri: string;
 }
 
-export const useTokenData = ({
-  tokenId,
-}: UseTokenDataProps) => {
-  const { nodeUrl } = useWalletState();
-  const tokenIdDict = useMemo(() => getTokenIdDictFromString({ tokenId }), [tokenId]);
+async function getTokenData(aptosClient: AptosClient, tokenId: string) {
+  const tokenClient = new TokenClient(aptosClient);
+  const { collection, creator, name } = getTokenIdDictFromString({ tokenId });
+  const tokenData = await tokenClient.getTokenData(creator, collection, name);
 
-  const getGalleryItemsQuery = useCallback(async () => {
-    const tokenData = await getTokenData({
-      id: tokenIdDict,
-      nodeUrl,
-    });
-
-    // Cast as AxiosResponse of type TokenDataResponse
-    const reformattedTokenData = (
-      tokenData as unknown as TokenDataResponse
-    );
-
-    // Get Arweave / IPFS link
-    const tokenMetadata = await axios.get<MetadataJson>(reformattedTokenData.uri);
-    reformattedTokenData.metadata = tokenMetadata.data;
-    return reformattedTokenData;
-  }, [nodeUrl, tokenIdDict]);
-
-  return useQuery(collectiblesQueryKeys.getTokenData, getGalleryItemsQuery);
-};
-
-export const useGalleryItems = () => {
-  const {
-    aptosAccount, nodeUrl,
-  } = useWalletState();
-
-  const getGalleryItemsQuery = useCallback(
-    async () => (aptosAccount ? getGalleryItems({
-      address: aptosAccount.address(),
-      nodeUrl,
-    }) : null),
-    [aptosAccount, nodeUrl],
+  // Cast as AxiosResponse of type TokenDataResponse
+  const reformattedTokenData = (
+    tokenData as unknown as TokenDataResponse
   );
 
-  return useQuery(collectiblesQueryKeys.getGalleryItems, getGalleryItemsQuery);
+  // Get Arweave / IPFS link
+  const tokenMetadata = await axios.get<MetadataJson>(reformattedTokenData.uri);
+  reformattedTokenData.metadata = tokenMetadata.data;
+  return reformattedTokenData;
+}
+
+export const useTokenData = (tokenId: string | undefined) => {
+  const { aptosClient } = useGlobalStateContext();
+
+  return useQuery(
+    [collectiblesQueryKeys.getTokenData, tokenId],
+    async () => getTokenData(aptosClient!, tokenId!),
+    { enabled: Boolean(aptosClient && tokenId) },
+  );
 };
 
 interface IsValidMetadataStructureProps {

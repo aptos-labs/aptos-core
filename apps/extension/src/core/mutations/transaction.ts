@@ -7,7 +7,6 @@ import {
   RequestError,
 } from 'aptos';
 import { toast } from 'core/components/Toast';
-import { useWalletState } from 'core/hooks/useWalletState';
 import { useSequenceNumber } from 'core/queries/account';
 import queryKeys from 'core/queries/queryKeys';
 import Analytics from 'core/utils/analytics/analytics';
@@ -21,6 +20,8 @@ import {
   buildAccountTransferPayload,
   createRawTransaction,
 } from 'core/utils/transaction';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { NodeUrl } from 'core/utils/network';
 
 export interface SubmitCoinTransferParams {
   amount: number,
@@ -32,11 +33,11 @@ export interface SubmitCoinTransferParams {
  * Get a raw coin transfer transaction factory for the current account
  */
 function useCreateCoinTransferTransaction() {
-  const { aptosAccount } = useWalletState();
+  const { activeAccountAddress } = useGlobalStateContext();
   const { data: chainId } = useChainId();
   const { get: getSequenceNumber } = useSequenceNumber();
 
-  const sender = aptosAccount?.address();
+  const sender = activeAccountAddress;
   const isReady = sender && chainId !== undefined;
 
   return isReady
@@ -69,11 +70,11 @@ export function useCoinTransferSimulation({
   enabled,
   recipient,
 } : UseCoinTransferParams) {
-  const { aptosAccount, nodeUrl } = useWalletState();
+  const { aptosAccount, aptosClient } = useGlobalStateContext();
   const { refetch: refetchSeqNumber } = useSequenceNumber();
   const createTxn = useCreateCoinTransferTransaction();
 
-  const isReady = Boolean(aptosAccount && createTxn);
+  const isReady = Boolean(aptosAccount && aptosClient && createTxn);
   const isInputValid = Boolean(amount && create !== undefined && recipient);
 
   return useQuery(
@@ -85,9 +86,8 @@ export function useCoinTransferSimulation({
         recipient: recipient!,
       });
 
-      const aptosClient = new AptosClient(nodeUrl);
       const simulatedTxn = AptosClient.generateBCSSimulation(aptosAccount!, rawTxn);
-      const userTxn = (await aptosClient.submitBCSSimulation(simulatedTxn)) as UserTransaction;
+      const userTxn = (await aptosClient!.submitBCSSimulation(simulatedTxn)) as UserTransaction;
       if (!userTxn.success) {
         // Miscellaneous error is probably associated with invalid sequence number
         if (parseMoveVmStatus(userTxn.vm_status) === MoveExecutionStatus.MiscellaneousError) {
@@ -111,7 +111,7 @@ export function useCoinTransferSimulation({
  * Mutation for submitting a coin transfer transaction
  */
 export function useCoinTransferTransaction() {
-  const { aptosAccount, nodeUrl } = useWalletState();
+  const { aptosAccount, aptosClient } = useGlobalStateContext();
   const {
     increment: incrementSeqNumber,
     refetch: refetchSeqNumber,
@@ -127,13 +127,12 @@ export function useCoinTransferTransaction() {
     recipient,
   }: SubmitCoinTransferParams) => {
     const rawTxn = await createTxn!({ amount, create, recipient });
-    const aptosClient = new AptosClient(nodeUrl);
     const signedTxn = AptosClient.generateBCSTransaction(aptosAccount!, rawTxn);
 
     try {
-      const { hash } = await aptosClient.submitSignedBCSTransaction(signedTxn);
-      await aptosClient.waitForTransaction(hash);
-      return (await aptosClient.getTransaction(hash)) as UserTransaction;
+      const { hash } = await aptosClient!.submitSignedBCSTransaction(signedTxn);
+      await aptosClient!.waitForTransaction(hash);
+      return (await aptosClient!.getTransaction(hash)) as UserTransaction;
     } catch (err) {
       if (err instanceof RequestError) {
         const errorMsg = (err.response?.data as AptosError)?.message;
@@ -162,7 +161,7 @@ export function useCoinTransferTransaction() {
         amount,
         coinType,
         fromAddress: txn.sender,
-        network: nodeUrl,
+        network: aptosClient!.nodeUrl as NodeUrl,
         ...txn,
       };
 

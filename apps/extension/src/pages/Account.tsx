@@ -13,13 +13,13 @@ import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
 import { useParams } from 'react-router-dom';
 import { useCoinTransferTransactions } from 'core/queries/transaction';
-import { useWalletState } from 'core/hooks/useWalletState';
 import { ScriptFunctionPayload, UserTransaction } from 'aptos/dist/api/data-contracts';
 import { MaybeHexString } from 'aptos';
 import GraceHopperBoringAvatar from 'core/components/BoringAvatar';
 import Copyable from 'core/components/Copyable';
 import { collapseHexString } from 'core/utils/hex';
 import TransactionList from 'core/components/TransactionList';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 function filterByRecipient(recipient: MaybeHexString) {
   return (txn: UserTransaction) => {
@@ -33,18 +33,18 @@ function sortTxnsByVersionDescending(lhs: UserTransaction, rhs: UserTransaction)
 }
 
 function useOtherAccountTransactions(theirAddress: string) {
-  const { aptosAccount } = useWalletState();
+  const { aptosAccount } = useGlobalStateContext();
   const myAddress = aptosAccount!.address().toShortString();
 
   // TODO: manage paging (waiting for indexer)
   const {
     data: myTxns,
     isFetching: areMyTxnsFetching,
-  } = useCoinTransferTransactions({ address: myAddress });
+  } = useCoinTransferTransactions(myAddress);
   const {
     data: theirTxns,
     isFetching: areTheirTxnsFetching,
-  } = useCoinTransferTransactions({ address: theirAddress });
+  } = useCoinTransferTransactions(theirAddress);
 
   if (!myTxns || !theirTxns || areMyTxnsFetching || areTheirTxnsFetching) {
     return undefined;

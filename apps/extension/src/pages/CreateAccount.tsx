@@ -9,12 +9,15 @@ import { CreateAccountFormValues, CreateAccountLayout } from 'core/layouts/AddAc
 import { useNavigate } from 'react-router-dom';
 import { AptosAccount } from 'aptos';
 import { generateMnemonic, generateMnemonicObject } from 'core/utils/account';
-import { useWalletState } from 'core/hooks/useWalletState';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
+import useFundAccount from 'core/mutations/faucet';
+import { createAccountErrorToast, createAccountToast } from 'core/components/Toast';
 
 function CreateAccount() {
   const navigate = useNavigate();
-  const { addAccount } = useWalletState();
-  const mnemonic = useMemo(() => generateMnemonic(), []);
+  const { addAccount } = useGlobalStateContext();
+  const { fundAccount } = useFundAccount();
+  const newMnemonic = useMemo(() => generateMnemonic(), []);
 
   const onSubmit = async (data: CreateAccountFormValues, event?: React.BaseSyntheticEvent) => {
     const { mnemonicString, secretRecoveryPhrase } = data;
@@ -22,11 +25,30 @@ function CreateAccount() {
 
     if (secretRecoveryPhrase) {
       try {
-        const mnemonicObject = await generateMnemonicObject(mnemonicString);
-        const aptosAccount = new AptosAccount(mnemonicObject.seed);
-        await addAccount({ account: aptosAccount, isImport: false, mnemonic: mnemonicObject });
+        const { mnemonic, seed } = await generateMnemonicObject(mnemonicString);
+        const aptosAccount = new AptosAccount(seed);
+        const {
+          address,
+          privateKeyHex,
+          publicKeyHex,
+        } = aptosAccount.toPrivateKeyObject();
+
+        await addAccount({
+          address: address!,
+          mnemonic,
+          name: 'Wallet',
+          privateKey: privateKeyHex,
+          publicKey: publicKeyHex!,
+        });
+
+        if (fundAccount) {
+          await fundAccount({ address: address!, amount: 0 });
+        }
+
+        createAccountToast();
         navigate(Routes.wallet.routePath);
       } catch (err) {
+        createAccountErrorToast();
         // eslint-disable-next-line no-console
         console.error(err);
       }
@@ -39,8 +61,8 @@ function CreateAccount() {
         headerValue="Create account"
         backPage={Routes.addAccount.routePath}
         defaultValues={{
-          mnemonic: mnemonic.split(' '),
-          mnemonicString: mnemonic,
+          mnemonic: newMnemonic.split(' '),
+          mnemonicString: newMnemonic,
           secretRecoveryPhrase: false,
         }}
         onSubmit={onSubmit}

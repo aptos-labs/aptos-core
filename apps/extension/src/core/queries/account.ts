@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { AptosClient, MaybeHexString } from 'aptos';
-import { useWalletState } from 'core/hooks/useWalletState';
-import { useQuery, useQueryClient } from 'react-query';
+import { useQuery, useQueryClient, UseQueryOptions } from 'react-query';
 import { aptosCoinStoreStructTag } from 'core/constants';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 export interface GetAccountResourcesProps {
   address?: MaybeHexString;
@@ -48,40 +48,40 @@ interface UseAccountExistsProps {
 export const useAccountExists = ({
   address,
 }: UseAccountExistsProps) => {
-  const { nodeUrl } = useWalletState();
+  const { aptosClient } = useGlobalStateContext();
 
   return useQuery(
     [accountQueryKeys.getAccountExists, address],
-    async () => getAccountExists({ address: address!, nodeUrl }),
-    { enabled: Boolean(address) },
+    async () => aptosClient!.getAccount(address!)
+      .then(() => true)
+      .catch(() => false),
+    {
+      enabled: Boolean(aptosClient && address),
+    },
   );
 };
-
-interface UseAccountCoinBalanceParams {
-  address?: string,
-  refetchInterval?: number | false,
-}
 
 /**
  * Query coin balance for the specified account
  * @param address account address of the balance to be queried
- * @param refetchInterval automatic refetch interval in milliseconds
+ * @param options query options
  */
-export function useAccountCoinBalance({
-  address,
-  refetchInterval,
-}: UseAccountCoinBalanceParams = {}) {
-  const { nodeUrl } = useWalletState();
+export function useAccountCoinBalance(
+  address: string | undefined,
+  options?: UseQueryOptions<number>,
+) {
+  const { aptosClient } = useGlobalStateContext();
 
-  return useQuery([accountQueryKeys.getAccountCoinBalance, address], async () => {
-    const client = new AptosClient(nodeUrl);
-    return client.getAccountResource(address!, aptosCoinStoreStructTag)
+  return useQuery<number>(
+    [accountQueryKeys.getAccountCoinBalance, address],
+    async () => aptosClient!.getAccountResource(address!, aptosCoinStoreStructTag)
       .then((res: any) => Number(res.data.coin.value))
-      .catch(() => 0);
-  }, {
-    enabled: Boolean(address),
-    refetchInterval,
-  });
+      .catch(() => 0),
+    {
+      enabled: Boolean(address),
+      ...options,
+    },
+  );
 }
 
 /**
@@ -92,18 +92,17 @@ export function useAccountCoinBalance({
  * manually refetching.
  */
 export function useSequenceNumber() {
-  const { aptosAccount, nodeUrl } = useWalletState();
+  const { aptosAccount, aptosClient } = useGlobalStateContext();
   const accountAddress = aptosAccount?.address()?.hex();
   const queryClient = useQueryClient();
 
-  const queryKey = [accountQueryKeys.getSequenceNumber, nodeUrl, accountAddress];
+  const queryKey = [accountQueryKeys.getSequenceNumber];
 
   const { refetch } = useQuery(queryKey, async () => {
     if (!accountAddress) {
       return undefined;
     }
-    const aptosClient = new AptosClient(nodeUrl);
-    const account = await aptosClient.getAccount(accountAddress!);
+    const account = await aptosClient!.getAccount(accountAddress!);
     return BigInt(account.sequence_number);
   }, { enabled: false });
 
