@@ -1,5 +1,4 @@
 # Aptos Python SDK
-
 [![Discord][discord-image]][discord-url]
 [![PyPI Package Version][pypi-image-version]][pypi-url]
 [![PyPI Package Downloads][pypi-image-downloads]][pypi-url]
@@ -7,41 +6,45 @@
 You need to connect to an [Aptos](https:/github.com/aptos-labs/aptos-core/) node to use this library, or run one
 yourself locally.
 
-## Usage
-
 Currently this is still in development and is unsuitable for directly interfacing with Aptos.
 
-### Requirements
+## Requirements
+We use [Poetry](https://python-poetry.org/docs/#installation) for packaging and dependency management:
 
-- [Black](https://github.com/psf/black)
-- [PyNaCl](https://pypi.org/project/PyNaCl/)
-
-### Testing
-
-To run all unit tests:
-```bash
-python3 -m unittest discover -s aptos_sdk/ -p '*.py' -t ..
+```
+curl -sSL https://install.python-poetry.org | python3
 ```
 
-To run all end-to-end tests:
+## Unit testing
 ```bash
-ln -s `pwd`/aptos_sdk examples/
-python3 -m examples.coin
-python3 -m examples.token
+make test
 ```
 
-Note: end-to-end tests rely on [Aptos Devnet](https://aptos.dev/guides/getting-started#aptos-devnet).
-
-### Autoformatting
-
+## E2E testing
+First, run a local testnet (run this from the root of aptos-core):
 ```bash
-find aptos_sdk -type f -name "*.py" | xargs python3 -m black
-find aptos_sdk -type f -name "*.py" | xargs python3 -m autoflake -i -r --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports
-find aptos_sdk -type f -name "*.py" | xargs python3 -m isort
+cargo run -p aptos -- node run-local-testnet --with-faucet --faucet-port 8081 --force-restart --assume-yes
 ```
 
-### Generating types
+Next, tell the end-to-end tests to talk to this locally running testnet:
+```bash
+export APTOS_NODE_URL="http://127.0.0.1:8080/v1"
+export APTOS_FAUCET_URL="http://127.0.0.1:8081"
+```
 
+Finally run the tests:
+```bash
+make examples
+```
+
+Note: These end-to-end tests are tested against a node built from the same commit as part of CI, not devnet. For examples tested against devnet, see `developer-docs-site/static/examples/python/` from the root of the repo.
+
+## Autoformatting
+```bash
+make fmt
+```
+
+## Generating types
 The Python `openapi-python-client` tool cannot parse references. Therefore there are three options:
 * Use swagger-cli to dereference, gain a type explosion, and still have missing types
 * Live without missing types
@@ -57,7 +60,6 @@ mv aptos-dev-api-specification-client/aptos_dev_api_specification_client/ aptos_
 ```
 
 ## Semantic versioning
-
 This project follows [semver](https://semver.org/) as closely as possible
 
 [repo]: https://github.com/aptos-labs/aptos-core

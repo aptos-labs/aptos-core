@@ -352,7 +352,7 @@ async fn test_block() {
     };
 
     let start = Instant::now();
-    let max_wait = Duration::from_secs(1);
+    let max_wait = Duration::from_secs(5);
     let mut successful = false;
     while start.elapsed() < max_wait {
         if rosetta_client
@@ -361,12 +361,12 @@ async fn test_block() {
             .unwrap()
             .current_block_identifier
             .index
-            == latest_block.block_identifier.index
+            >= latest_block.block_identifier.index
         {
             successful = true;
             break;
         }
-        tokio::time::sleep(Duration::from_micros(10)).await
+        tokio::time::sleep(Duration::from_micros(50)).await
     }
 
     assert!(successful, "Failed to get the next block");
