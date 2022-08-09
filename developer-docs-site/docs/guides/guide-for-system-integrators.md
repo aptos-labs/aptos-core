@@ -150,7 +150,20 @@ BCS encoded transactions can be submitted to the `/transactions` endpoint but 
 
 ### Types of Transactions
 
-Within a given transaction, the target of execution can be one of two types: an entry point (formerly known as script function) and or a script (payload). Currently the SDKs ([Python](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/python/sdk/aptos_sdk/client.py#L248) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98)) only support the generation of transactions that target entry points and the entirety of this guide points out many of those entry points, such as `coin::transfer` and `account::create_account`. All operations on the blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. A script payload transaction can call any entry point or public function defined within any module. Currently there are no tutorials on script payloads, but the [Move book](https://move-language.github.io/move/modules-and-scripts.html?highlight=script#scripts) does go in some depth.
+Within a given transaction, the target of execution can be one of two types: 
+
+- An entry point (formerly known as script function), and/or
+- A script (payload). 
+
+Currently the SDKs: [Python](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/python/sdk/aptos_sdk/client.py#L248) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) only support the generation of transactions that target entry points. This guide points out many of those entry points, such as `coin::transfer` and `account::create_account`. 
+
+All operations on the Aptos blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. 
+
+A script payload transaction can call any entry point or public function defined within any module. 
+
+:::tip Move book
+Currently there are no tutorials in this guide on script payloads, but the [Move book](https://move-language.github.io/move/modules-and-scripts.html?highlight=script#scripts) does go in some depth.
+:::
 
 ### Status of a transaction
 
@@ -182,13 +195,22 @@ Here's an example showing how to use the simulation API in the [Typescript SDK]
 
 ## Viewing current and historical state
 
-Most integrations into Aptos benefit from a holistic and comprehensive overview of the current and historical state of the blockchain. Aptos provides historical transactions, state, and events which are the result of transaction execution.
+Most integrations into the Aptos blockchain benefit from a holistic and comprehensive overview of the current and historical state of the blockchain. Aptos provides historical transactions, state, and events, which are the result of transaction execution.
 
 * Historical transactions specify the execution status, output, and tie to related events. Each transaction has a unique version number associated with it that dictates its global sequential ordering in the history of the blockchain ledger.
 * The state is the representation of all transaction outputs up to a specific version. In otherwords, a state version is the accumulation of all transactions inclusive of that transaction version.
-* As transactions execute, they may emit events. [Events](../concepts/basics-events) are hints about changes in on-chain data.
+* As transactions execute, they may emit events. [Events](/concepts/basics-events) are hints about changes in on-chain data.
 
-The storage service on a node employs two forms of pruning that erase data from nodes: 1) state and 2) events, transactions, and everything else. While either of these may be disabled, storing state versions is not particularly sustainable. Events and transactions pruning can be disabled via setting the [`ledger_prune_window`](https://github.com/aptos-labs/aptos-core/blob/b718154c93b3556658c8c06341be0cf47957188c/config/src/config/storage_config.rs#L106) to `None`. In the near future, Aptos will provide indexers that mitigate the need to directly query from a node. The REST API contains the following useful APIs for querying transactions and events:
+The storage service on a node employs two forms of pruning that erase data from nodes: 
+
+1. state, and 
+2. events, transactions, and everything else. 
+
+While either of these may be disabled, storing the state versions is not particularly sustainable. 
+
+Events and transactions pruning can be disabled via setting the [`ledger_prune_window`](https://github.com/aptos-labs/aptos-core/blob/b718154c93b3556658c8c06341be0cf47957188c/config/src/config/storage_config.rs#L106) to `None`. In the near future, Aptos will provide indexers that mitigate the need to directly query from a node. 
+
+The REST API contains the following useful APIs for querying transactions and events:
 
 * [Transactions for an account](https://aptos.dev/rest-api/#tag/transactions/operation/get_account_transactions)
 * [Transactions by version](https://aptos.dev/rest-api/#tag/transactions/operation/get_transaction)
@@ -196,9 +218,19 @@ The storage service on a node employs two forms of pruning that erase data from 
 
 ## Exchanging and tracking coins
 
-Aptos has a standard [Coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that represent the type parameter or generic for `Coin<T>`. Coins are stored within an account under the resource `CoinStore<T>`. At account creation, each user has the resource `CoinStore<0x1::aptos_coin::AptosCoin>` or `CoinStore<AptosCoin>`, for short. Within this resource is the Aptos coin: `Coin<AptosCoin>`.
+Aptos has a standard [Coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that represent the type parameter or generic for `Coin<T>`. 
 
-Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`account::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/account.move#L398) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist. It is important to note, that if an account has not registered a `CoinStore<T>` for a given `T`, then any transfer of type `T` to that account will fail.
+Coins are stored within an account under the resource `CoinStore<T>`. At account creation, each user has the resource `CoinStore<0x1::aptos_coin::AptosCoin>` or `CoinStore<AptosCoin>`, for short. Within this resource is the Aptos coin: `Coin<AptosCoin>`.
+
+### Transferring coins between users
+
+Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`account::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/account.move#L398) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist. 
+
+:::caution
+It is important to note, that if an account has not registered a `CoinStore<T>` for a given `T`, then any transfer of type `T` to that account will fail.
+:::
+
+### Current balance for a coin
 
 The current balance for a `Coin<T>` where T is the Aptos coin is available at the account resources url: `https://{rest_api_server}/accounts/{address}/resource/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`. The balance is stored within `coin::amount`. The resource also contains the total number of deposit and withdraw events, the `counter` value within `deposit_event` and `withdraw_event`, respectively.
 
@@ -230,6 +262,8 @@ The current balance for a `Coin<T>` where T is the Aptos coin is available at th
   }
 }
 ```
+
+### Querying events
 
 Events can be queried by the events by handle url: `https://{rest_api_server}/accounts/{address}/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`
 
