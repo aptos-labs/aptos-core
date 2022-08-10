@@ -9,6 +9,7 @@ use crate::{
         APTOS_GA_API_SECRET, APTOS_GA_MEASUREMENT_ID, ENV_APTOS_DISABLE_TELEMETRY,
         ENV_GA_API_SECRET, ENV_GA_MEASUREMENT_ID, GA4_URL, HTTPBIN_URL,
         NODE_CORE_METRICS_FREQ_SECS, NODE_NETWORK_METRICS_FREQ_SECS, NODE_SYS_INFO_FREQ_SECS,
+        TELEMETRY_SERVICE_URL,
     },
     core_metrics::create_core_metric_telemetry_event,
     metrics,
@@ -90,7 +91,7 @@ fn fetch_peer_id(node_config: &NodeConfig) -> String {
 
 /// Spawns the dedicated telemetry service that operates periodically
 async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config: NodeConfig) {
-    let telemetry_sender = TelemetrySender::new(chain_id, &node_config);
+    let telemetry_sender = TelemetrySender::new(TELEMETRY_SERVICE_URL, chain_id, &node_config);
 
     // Send build information once (only on startup)
     send_build_information(

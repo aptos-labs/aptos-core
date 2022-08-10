@@ -3,13 +3,13 @@
 
 use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_infallible::RwLock;
-use aptos_logger::error;
+use aptos_logger::{debug, error};
 use aptos_types::chain_id::ChainId;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time;
 use url::Url;
 
-use crate::{rest_client::RestClient, AptosTelemetryServiceConfig};
+use crate::{rest_client::RestClient, TelemetryServiceConfig};
 
 pub type EpochNum = u64;
 pub type ValidatorSetCache = Arc<RwLock<HashMap<ChainId, (EpochNum, PeerSet)>>>;
@@ -23,7 +23,7 @@ pub struct ValidatorSetCacheUpdater {
 }
 
 impl ValidatorSetCacheUpdater {
-    pub fn new(cache: ValidatorSetCache, config: &AptosTelemetryServiceConfig) -> Self {
+    pub fn new(cache: ValidatorSetCache, config: &TelemetryServiceConfig) -> Self {
         Self {
             cache,
             query_addresses: Arc::new(config.trusted_full_node_addresses.clone()),
@@ -65,6 +65,11 @@ impl ValidatorSetCacheUpdater {
                             )
                         })
                         .collect();
+
+                    debug!(
+                        "Validator set for chain id {} at epoch {}: {:?}",
+                        chain_id, state.epoch, peer_set
+                    );
 
                     store.insert(*chain_id, (state.epoch, peer_set));
                 }

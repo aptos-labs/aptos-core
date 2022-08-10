@@ -43,7 +43,7 @@ impl AptosTelemetryServiceArgs {
     pub async fn run(self) {
         // Load the config file
         let config =
-            AptosTelemetryServiceConfig::load(self.config_path.clone()).unwrap_or_else(|error| {
+            TelemetryServiceConfig::load(self.config_path.clone()).unwrap_or_else(|error| {
                 panic!(
                     "Failed to load config file: {:?}. Error: {:?}",
                     self.config_path, error
@@ -61,7 +61,7 @@ impl AptosTelemetryServiceArgs {
         Self::serve(&config, routes(context)).await;
     }
 
-    async fn serve<F>(config: &AptosTelemetryServiceConfig, routes: F)
+    async fn serve<F>(config: &TelemetryServiceConfig, routes: F)
     where
         F: Filter<Error = Infallible> + Clone + Sync + Send + 'static,
         F::Extract: Reply,
@@ -82,7 +82,7 @@ impl AptosTelemetryServiceArgs {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct AptosTelemetryServiceConfig {
+pub struct TelemetryServiceConfig {
     pub address: SocketAddr,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_cert_path: Option<String>,
@@ -96,7 +96,7 @@ pub struct AptosTelemetryServiceConfig {
     pub gcp_bq_config: GCPBigQueryConfig,
 }
 
-impl AptosTelemetryServiceConfig {
+impl TelemetryServiceConfig {
     pub fn load(path: PathBuf) -> Result<Self, anyhow::Error> {
         let mut file = File::open(&path).map_err(|e| {
             anyhow::anyhow!(
