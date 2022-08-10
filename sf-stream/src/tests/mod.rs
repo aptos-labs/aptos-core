@@ -4,7 +4,7 @@
 mod proto_converter_tests;
 mod test_context;
 
-use crate::protos::extractor;
+use aptos_protos::extractor::v1 as extractor;
 pub use test_context::{new_test_context, TestContext};
 
 pub(crate) mod golden_output;
@@ -28,22 +28,6 @@ macro_rules! current_function_name {
 
 // TODO: Remove after we add back golden
 #[allow(dead_code)]
-pub fn convert_protubuf_txn_to_serde_value(txn: &extractor::Transaction) -> serde_json::Value {
-    serde_json::from_str(&protobuf_json_mapping::print_to_string(txn).unwrap()).unwrap()
-}
-
-// TODO: Remove after we add back golden
-#[allow(dead_code)]
-pub fn convert_protubuf_txn_arr_to_serde_value(
-    txns: &[extractor::Transaction],
-) -> serde_json::Value {
-    let txns_value = txns
-        .iter()
-        .map(convert_protubuf_txn_to_serde_value)
-        .collect::<Vec<serde_json::Value>>();
-    serde_json::to_value(txns_value).unwrap()
-}
-
-pub fn pretty(val: &serde_json::Value) -> String {
-    serde_json::to_string_pretty(val).unwrap() + "\n"
+pub fn pretty(txns: &[extractor::Transaction]) -> String {
+    serde_json::to_string_pretty(txns).unwrap()
 }
