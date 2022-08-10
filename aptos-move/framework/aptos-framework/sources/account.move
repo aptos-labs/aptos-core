@@ -50,7 +50,7 @@ module aptos_framework::account {
 
     struct RotationProof has drop {
         originator: address, // originating address
-        destination: vector<u8>, // new auth key
+        current_auth_key: vector<u8>, // current auth key
     }
 
     struct Proof<RotationProof> has drop {
@@ -79,6 +79,7 @@ module aptos_framework::account {
     const ESCRIPT_NOT_ALLOWED: u64 = 11;
     const EMALFORMED_PUBLIC_KEY: u64 = 12;
     const EMALFORMED_PROOF_OF_KNOWLEDGE: u64 = 13;
+    const EINVALID_PROOF_OF_KNOWLEDGE: u64 = 14;
 
     /// Prologue errors. These are separated out from the other errors in this
     /// module since they are mapped separately to major VM statuses, and are
@@ -214,16 +215,12 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    fun verify_hashed<T: drop> (data: RotationProof, public_key: vector<u8>, signature: vector<u8>): bool {
+    fun ed25519_verify_t<T: drop> (signature: vector<u8>, public_key: vector<u8>, data: T): bool {
         let encoded = Proof {
             type_info: type_info::type_of<T>(),
-            inner:data,
+            inner: data,
         };
-        verify(signature, public_key, bcs::to_bytes(&encoded))
-    }
-
-    fun verify(signature: vector<u8>, public_key: vector<u8>, message: vector<u8>): bool {
-            signature::ed25519_verify(signature, public_key, message)
+        signature::ed25519_verify(signature, public_key, bcs::to_bytes(&encoded))
     }
 
     public entry fun rotate_authentication_key_ed25519(account: &signer, new_public_key: vector<u8>, signature: vector<u8>) acquires Account, OriginatingAddress {
@@ -233,33 +230,30 @@ module aptos_framework::account {
             vector::length(&new_public_key) == 32,
             error::invalid_argument(EMALFORMED_PUBLIC_KEY)
         );
+        assert!(
+            vector::length(&signature) == 64,
+            error::invalid_argument(EMALFORMED_PROOF_OF_KNOWLEDGE)
+        );
 
-        let account_resource = borrow_global<Account>(addr);
-        let current_addr = create_address(account_resource.authentication_key);
-        let address_map = &mut borrow_global_mut<OriginatingAddress>(@core_resources).address_map;
-        let originating_address = table::borrow(address_map, current_addr);
-        let new_auth_key = hash::sha3_256(new_public_key);
+        let account_resource = borrow_global_mut<Account>(addr);
+        let current_auth_key = account_resource.authentication_key;
+        let current_addr = create_address(current_auth_key);
 
         let proof= RotationProof {
-            originator: *originating_address,
-            destination: new_auth_key,
+            originator: addr,
+            current_auth_key: copy current_auth_key,
         };
 
-        rotate_authentication_key_ed25519_internal(account, proof, new_public_key, signature);
-    }
-
-    fun rotate_authentication_key_ed25519_internal(account: &signer, proof: RotationProof, new_public_key: vector<u8>, signature: vector<u8>) acquires Account, OriginatingAddress {
+        assert!(ed25519_verify_t(signature, new_public_key, proof), EINVALID_PROOF_OF_KNOWLEDGE);
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@core_resources).address_map;
+        if (table::contains(address_map, current_addr)) {
+            table::remove(address_map, current_addr);
+        };
+
         let new_auth_key = hash::sha3_256(new_public_key);
         let new_address = create_address(new_auth_key);
-
-        if (verify_hashed<RotationProof>(proof, new_public_key, signature)) {
-            let account_resource = borrow_global_mut<Account>(signer::address_of(account));
-            let current_address = create_address(account_resource.authentication_key);
-            let originating_address = table::remove(address_map, current_address);
-            table::add(address_map, new_address, originating_address);
-            account_resource.authentication_key = new_auth_key;
-        };
+        table::add(address_map, new_address, addr);
+        account_resource.authentication_key = new_auth_key;
     }
 
     fun prologue_common(
