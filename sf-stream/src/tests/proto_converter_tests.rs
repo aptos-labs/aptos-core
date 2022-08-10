@@ -6,12 +6,10 @@ use crate::{
     runtime::SfStreamer,
     tests::{new_test_context, TestContext},
 };
-
 use aptos_protos::extractor::v1::{
     transaction::{TransactionType, TxnData},
     transaction_payload::{Payload, Type as PayloadType},
     write_set_change::Change::WriteTableItem,
-    Transaction as TransactionPB,
 };
 use aptos_sdk::types::{account_config::aptos_root_address, LocalAccount};
 use move_deps::{
