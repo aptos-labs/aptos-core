@@ -40,11 +40,14 @@ use warp::{
 pub fn get_json_transaction(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("transactions" / TransactionIdParam)
         .and(warp::get())
-        .and(context.filter())
-        .map(|id, context| (id, context, AcceptType::Json))
-        .untuple_one()
-        .and_then(handle_get_transaction)
-        .with(metrics("get_json_transaction"))
+        .and(
+            context
+                .filter()
+                .map(|id, context| (id, context, AcceptType::Json))
+                .untuple_one()
+                .and_then(handle_get_transaction)
+                .with(metrics("get_json_transaction")),
+        )
         .boxed()
 }
 
@@ -53,11 +56,14 @@ pub fn get_bcs_transaction(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("transactions" / TransactionIdParam)
         .and(warp::get())
         .and(warp::header::exact_ignore_case(ACCEPT.as_str(), BCS))
-        .and(context.filter())
-        .map(|id, context| (id, context, AcceptType::Bcs))
-        .untuple_one()
-        .and_then(handle_get_transaction)
-        .with(metrics("get_bcs_transaction"))
+        .and(
+            context
+                .filter()
+                .map(|id, context| (id, context, AcceptType::Bcs))
+                .untuple_one()
+                .and_then(handle_get_transaction)
+                .with(metrics("get_bcs_transaction")),
+        )
         .boxed()
 }
 
@@ -66,11 +72,14 @@ pub fn get_json_transactions(context: Context) -> BoxedFilter<(impl Reply,)> {
     warp::path!("transactions")
         .and(warp::get())
         .and(warp::query::<Page>())
-        .and(context.filter())
-        .map(|page: Page, context: Context| (page, context, AcceptType::Json))
-        .untuple_one()
-        .and_then(handle_get_transactions)
-        .with(metrics("get_json_transactions"))
+        .and(
+            context
+                .filter()
+                .map(|page: Page, context: Context| (page, context, AcceptType::Json))
+                .untuple_one()
+                .and_then(handle_get_transactions)
+                .with(metrics("get_json_transactions")),
+        )
         .boxed()
 }
 
@@ -80,11 +89,14 @@ pub fn get_bcs_transactions(context: Context) -> BoxedFilter<(impl Reply,)> {
         .and(warp::get())
         .and(warp::header::exact_ignore_case(ACCEPT.as_str(), BCS))
         .and(warp::query::<Page>())
-        .and(context.filter())
-        .map(|page: Page, context: Context| (page, context, AcceptType::Bcs))
-        .untuple_one()
-        .and_then(handle_get_transactions)
-        .with(metrics("get_bcs_transactions"))
+        .and(
+            context
+                .filter()
+                .map(|page: Page, context: Context| (page, context, AcceptType::Bcs))
+                .untuple_one()
+                .and_then(handle_get_transactions)
+                .with(metrics("get_bcs_transactions")),
+        )
         .boxed()
 }
 
@@ -93,9 +105,12 @@ pub fn get_account_transactions(context: Context) -> BoxedFilter<(impl Reply,)> 
     warp::path!("accounts" / AddressParam / "transactions")
         .and(warp::get())
         .and(warp::query::<Page>())
-        .and(context.filter())
-        .and_then(handle_get_account_transactions)
-        .with(metrics("get_account_transactions"))
+        .and(
+            context
+                .filter()
+                .and_then(handle_get_account_transactions)
+                .with(metrics("get_account_transactions")),
+        )
         .boxed()
 }
 
@@ -107,9 +122,12 @@ pub fn simulate_json_transactions(context: Context) -> BoxedFilter<(impl Reply,)
             context.content_length_limit(),
         ))
         .and(warp::body::json::<UserTransactionRequest>())
-        .and(context.filter())
-        .and_then(handle_simulate_json_transactions)
-        .with(metrics("simulate_json_transactions"))
+        .and(
+            context
+                .filter()
+                .and_then(handle_simulate_json_transactions)
+                .with(metrics("simulate_json_transactions")),
+        )
         .boxed()
 }
 
@@ -125,9 +143,12 @@ pub fn simulate_bcs_transactions(context: Context) -> BoxedFilter<(impl Reply,)>
             BCS_SIGNED_TRANSACTION,
         ))
         .and(warp::body::bytes())
-        .and(context.filter())
-        .and_then(handle_simulate_bcs_transactions)
-        .with(metrics("simulate_bcs_transactions"))
+        .and(
+            context
+                .filter()
+                .and_then(handle_simulate_bcs_transactions)
+                .with(metrics("simulate_bcs_transactions")),
+        )
         .boxed()
 }
 
