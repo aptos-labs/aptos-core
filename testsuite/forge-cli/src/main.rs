@@ -423,9 +423,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
         "network_latency" => config.with_network_tests(&[&NetworkLatencyTest]),
         "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
-        "bench_with_fullnode" => config
-            .with_network_tests(&[&PerformanceBenchmarkWithFN])
-            .with_initial_fullnode_count(7),
         "setup_test" => config
             .with_initial_fullnode_count(1)
             .with_network_tests(&[&ForgeSetupTest]),
@@ -436,8 +433,8 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
 
 fn land_blocking_test_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
-        .with_initial_fullnode_count(1)
+        .with_initial_validator_count(NonZeroUsize::new(22).unwrap())
+        .with_initial_fullnode_count(8)
         .with_network_tests(&[&PerformanceBenchmark])
 }
 
