@@ -24,18 +24,16 @@ import { randomBytes, secretbox } from 'tweetnacl';
 import pbkdf2 from 'pbkdf2';
 import Browser from 'core/utils/browser';
 import bs58 from 'bs58';
+import { HDKey } from '@scure/bip32';
 import {
   defaultNetworkType, defaultNetworks, NetworkType, Network,
 } from 'core/hooks/useNetworks';
 
+// https://github.com/satoshilabs/slips/blob/master/slip-0044.md
+const bip44Coin = 637;
 const pbkdf2Iterations = 10000;
 const pbkdf2Digest = 'sha256';
 const pbkdf2SaltSize = 16;
-
-export function generateMnemonic() {
-  const mnemonic = bip39.generateMnemonic(wordlist);
-  return mnemonic;
-}
 
 interface EncryptedAccounts {
   encrypted: string,
@@ -43,17 +41,26 @@ interface EncryptedAccounts {
   salt: string
 }
 
-export async function generateMnemonicObject(mnemonicString: string): Promise<Mnemonic> {
-  const seed = await bip39.mnemonicToSeed(mnemonicString);
-  const bufferSeed = new Uint8Array(seed.buffer);
-  return { mnemonic: mnemonicString, seed: bufferSeed };
+export function generateMnemonic() {
+  const mnemonic = bip39.generateMnemonic(wordlist);
+  return mnemonic;
 }
 
-export async function createNewMnemonic(): Promise<Mnemonic> {
-  const mnemonic = bip39.generateMnemonic(wordlist);
-  const seed = await bip39.mnemonicToSeed(mnemonic);
-  const bufferSeed = new Uint8Array(seed.buffer);
-  return { mnemonic, seed: bufferSeed };
+// We are only looking for the first derivation of the bip44
+// In the future we may support importing multiple keys from other wallets
+function getAptosBip44Path(): string {
+  return `m/44'/${bip44Coin}'/0'/0/0`;
+}
+
+export async function generateMnemonicObject(mnemonicString: string): Promise<Mnemonic> {
+  const seed = await bip39.mnemonicToSeed(mnemonicString);
+  const derivationPath = getAptosBip44Path();
+  const node = HDKey.fromMasterSeed(Buffer.from(seed));
+  const key = node.derive(derivationPath).privateKey;
+  if (key) {
+    return { mnemonic: mnemonicString, seed: key };
+  }
+  throw new Error('Private key can not be derived');
 }
 
 export function createNewAccount(): AptosAccount {
