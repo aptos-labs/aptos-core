@@ -53,6 +53,8 @@ pub struct StatePrunerManager {
     last_version_sent_to_pruner: Arc<Mutex<Version>>,
     /// latest version
     latest_version: Arc<Mutex<Version>>,
+    /// Offset for displaying to users
+    user_pruning_window_offset: u64,
 }
 
 impl PrunerManager for StatePrunerManager {
@@ -69,12 +71,11 @@ impl PrunerManager for StatePrunerManager {
     }
 
     fn get_min_viable_version(&self) -> Version {
-        let pruner_window = self.get_pruner_window();
         let min_version = self.get_min_readable_version();
-        let window_cutoff_with_buffer = self
-            .latest_version
-            .lock()
-            .saturating_sub((9 * pruner_window) / 10);
+        let window_cutoff_with_buffer = self.latest_version.lock().saturating_sub(
+            self.prune_window
+                .saturating_sub(self.user_pruning_window_offset),
+        );
         std::cmp::max(min_version, window_cutoff_with_buffer)
     }
 
@@ -178,6 +179,7 @@ impl StatePrunerManager {
             command_sender,
             last_version_sent_to_pruner: Arc::new(Mutex::new(min_readable_version)),
             latest_version: Arc::new(Mutex::new(min_readable_version)),
+            user_pruning_window_offset: storage_pruner_config.user_pruning_window_offset,
         }
     }
 
