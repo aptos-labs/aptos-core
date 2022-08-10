@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::pb::extractor::Transaction as TransactionPB;
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{hash::HashValue, SigningKey};
 use aptos_mempool::mocks::MockSharedMempool;
@@ -17,7 +18,6 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{Transaction, TransactionStatus},
 };
-use crate::pb::extractor::Transaction as TransactionPB;
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::{block_executor::BlockExecutor, db_bootstrapper};

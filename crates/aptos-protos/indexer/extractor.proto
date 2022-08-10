@@ -7,8 +7,8 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/streamingfast/firehose-aptos/types/pb/sf/aptos/type/v1;pbaptos";
 
-// Transaction is actually right what will be transported inside the Firehose's Block envelope.
-// meaning we get a 1 transaction == 1 block mapping.
+package aptos.extractor.v1;
+
 message Transaction {
   google.protobuf.Timestamp timestamp = 1;
   uint64 version = 2;
