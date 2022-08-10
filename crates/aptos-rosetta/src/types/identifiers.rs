@@ -9,7 +9,7 @@ use crate::{
     common::{to_hex_lower, BLOCKCHAIN},
     error::{ApiError, ApiResult},
 };
-use aptos_rest_client::aptos_api_types::{BlockInfo, TransactionInfo};
+use aptos_rest_client::aptos_api_types::TransactionInfo;
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -71,10 +71,10 @@ pub struct BlockIdentifier {
 }
 
 impl BlockIdentifier {
-    pub fn from_block_info(block_info: BlockInfo) -> BlockIdentifier {
+    pub fn from_block(block: &aptos_rest_client::aptos_api_types::Block) -> BlockIdentifier {
         BlockIdentifier {
-            index: block_info.block_height,
-            hash: to_hex_lower(&block_info.block_hash),
+            index: block.block_height.0,
+            hash: to_hex_lower(&block.block_hash),
         }
     }
 }
