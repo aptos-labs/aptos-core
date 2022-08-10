@@ -13,6 +13,9 @@ variable "TARGET_CACHE_TYPE" {
   default = "normalized_branch_or_pr"
 }
 variable "BUILD_DATE" {}
+
+variable "BUILD_PROFILE" {}
+
 // this is the full GIT_SHA - let's use that as primary identifier going forward
 variable "GIT_SHA" {}
 
@@ -49,6 +52,7 @@ target "builder" {
   cache-to   = generate_cache_to("builder")
   tags       = generate_tags("builder")
   args       = {
+    BUILD_PROFILE   = "${BUILD_PROFILE}"
     GIT_SHA         = "${GIT_SHA}"
     GIT_BRANCH      = "${GIT_BRANCH}"
     GIT_TAG         = "${GIT_TAG}"
