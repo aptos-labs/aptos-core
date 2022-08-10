@@ -4,6 +4,9 @@ All notable changes to the Aptos Node API will be captured in this file. This ch
 
 **Note**: The Aptos Node API does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the API will follow semantic versioning closely.
 
+## 1.0.1 (2022-08-10)
+- Changed snake casing by updating Poem version. For example, `ed_25519_signature` will now be `ed25519_signature`. This behavior matches serde.
+
 ## 1.0.0 (2022-08-04)
 
 This is the first major release of v1 of the Aptos Node API. This first changelog is therefore dedicated to changes between v0 and v1. These changes should only be generally relevant to client / SDK developers, if you are a dapp developer, you likely interact with the API via an SDK, in which case the changelog of that SDK will be more useful to you.

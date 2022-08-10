@@ -3,7 +3,7 @@ info:
   title: Aptos Node API
   description: The Aptos Node API is a RESTful API for client applications to interact
     with the Aptos blockchain.
-  version: 1.0.0
+  version: 1.0.1
   contact:
     name: Aptos Labs
     url: https://github.com/aptos-labs/aptos-core
@@ -1492,8 +1492,8 @@ components:
       discriminator:
         propertyName: type
         mapping:
-          ed_25519_signature: '#/components/schemas/AccountSignature_Ed25519Signature'
-          multi_ed_25519_signature: '#/components/schemas/AccountSignature_MultiEd25519Signature'
+          ed25519_signature: '#/components/schemas/AccountSignature_Ed25519Signature'
+          multi_ed25519_signature: '#/components/schemas/AccountSignature_MultiEd25519Signature'
     AccountSignature_Ed25519Signature:
       allOf:
       - type: object
@@ -1502,7 +1502,7 @@ components:
         properties:
           type:
             type: string
-            example: ed_25519_signature
+            example: ed25519_signature
       - $ref: '#/components/schemas/Ed25519Signature'
     AccountSignature_MultiEd25519Signature:
       allOf:
@@ -1512,7 +1512,7 @@ components:
         properties:
           type:
             type: string
-            example: multi_ed_25519_signature
+            example: multi_ed25519_signature
       - $ref: '#/components/schemas/MultiEd25519Signature'
     Address:
       type: string
@@ -2399,8 +2399,8 @@ components:
       discriminator:
         propertyName: type
         mapping:
-          ed_25519_signature: '#/components/schemas/TransactionSignature_Ed25519Signature'
-          multi_ed_25519_signature: '#/components/schemas/TransactionSignature_MultiEd25519Signature'
+          ed25519_signature: '#/components/schemas/TransactionSignature_Ed25519Signature'
+          multi_ed25519_signature: '#/components/schemas/TransactionSignature_MultiEd25519Signature'
           multi_agent_signature: '#/components/schemas/TransactionSignature_MultiAgentSignature'
     TransactionSignature_Ed25519Signature:
       allOf:
@@ -2410,7 +2410,7 @@ components:
         properties:
           type:
             type: string
-            example: ed_25519_signature
+            example: ed25519_signature
       - $ref: '#/components/schemas/Ed25519Signature'
     TransactionSignature_MultiAgentSignature:
       allOf:
@@ -2430,7 +2430,7 @@ components:
         properties:
           type:
             type: string
-            example: multi_ed_25519_signature
+            example: multi_ed25519_signature
       - $ref: '#/components/schemas/MultiEd25519Signature'
     Transaction_BlockMetadataTransaction:
       allOf:

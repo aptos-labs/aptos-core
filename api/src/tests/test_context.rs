@@ -440,12 +440,8 @@ impl TestContext {
             .private_key()
             .sign_arbitrary_message(signing_msg.inner());
 
-        let typ = match self.api_specific_config {
-            ApiSpecificConfig::V0 => "ed25519_signature",
-            ApiSpecificConfig::V1(_) => "ed_25519_signature",
-        };
         request["signature"] = json!({
-            "type": typ,
+            "type": "ed25519_signature",
             "public_key": HexEncodedBytes::from(account.public_key().to_bytes().to_vec()),
             "signature": HexEncodedBytes::from(sig.to_bytes().to_vec()),
         });
