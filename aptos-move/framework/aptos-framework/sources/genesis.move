@@ -47,6 +47,13 @@ module aptos_framework::genesis {
         rewards_rate_denominator: u64,
         voting_power_increase_limit: u64,
     ) {
+        // This can fail genesis but is necessary so that any misconfigurations can be corrected before genesis succeeds
+        assert!(epoch_interval > 0, error::invalid_argument(EINVALID_EPOCH_DURATION));
+
+        // TODO: Only do create the core resources account in testnets
+        account::create_account_internal(signer::address_of(core_resource_account));
+        account::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
+
         // Initialize the aptos framework account. This is the account where system resources and modules will be
         // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
         // to use this account.
@@ -64,6 +71,7 @@ module aptos_framework::genesis {
             b"epilogue",
             b"writeset_epilogue",
         );
+        account::create_address_map(&aptos_framework_account);
 
         // Give the decentralized on-chain governance control over the core framework account.
         aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, framework_signer_cap);

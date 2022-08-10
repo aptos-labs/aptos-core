@@ -52,6 +52,16 @@ module aptos_framework::account {
         address_map: Table<address, address>,
     }
 
+    struct RotationProof has drop {
+        originator: address, // originating address
+        current_auth_key: address, // current auth key
+    }
+
+    struct Proof<RotationProof> has drop {
+        type_info: TypeInfo,
+        inner: RotationProof,
+    }
+
     const MAX_U64: u128 = 18446744073709551615;
 
     /// Account already existed
@@ -73,6 +83,7 @@ module aptos_framework::account {
     const ESCRIPT_NOT_ALLOWED: u64 = 11;
     const EMALFORMED_PUBLIC_KEY: u64 = 12;
     const EMALFORMED_PROOF_OF_KNOWLEDGE: u64 = 13;
+    const EINVALID_PROOF_OF_KNOWLEDGE: u64 = 14;
 
     /// Prologue errors. These are separated out from the other errors in this
     /// module since they are mapped separately to major VM statuses, and are
@@ -192,7 +203,7 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    public entry fun rotate_authentication_key_proof_of_knowledge(account: &signer,new_public_key: vector<u8>, proof_of_knowledge: vector<u8>) acquires Account, OriginatingAddress {
+    public entry fun rotate_authentication_key_ed25519(account: &signer, new_public_key: vector<u8>, signature: vector<u8>) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT));
         assert!(
@@ -200,28 +211,24 @@ module aptos_framework::account {
             error::invalid_argument(EMALFORMED_PUBLIC_KEY)
         );
         assert!(
-            vector::length(&proof_of_knowledge) == 64,
+            vector::length(&signature) == 64,
             error::invalid_argument(EMALFORMED_PROOF_OF_KNOWLEDGE)
         );
 
-        // TODO assert proof of knowledge here
-        let new_auth_key = hash::sha3_256(new_public_key);
-        let new_address = create_address(new_auth_key);
-        let new_signer = create_signer(new_address);
-
-        if(exists<OriginatingAddress>(addr)) {
-            let address_redirect = borrow_global<OriginatingAddress>(addr);
-            addr = table::remove(&mut address_redirect.address_map, addr);
-            table::destroy_empty(address_redirect.address_map);
+        let proof= RotationProof {
+            originator: addr,
+            current_auth_key: current_auth_key,
         };
 
-        let new_address_map = table::new();
-        table::add(new_address_map, new_address, addr);
-        move_to(&new_signer, OriginatingAddress{
-            address_map: new_address_map
-        });
+        assert!(ed25519_verify_t(signature, new_public_key, proof), EINVALID_PROOF_OF_KNOWLEDGE);
+        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
+        if (table::contains(address_map, current_auth_key)) {
+            table::remove(address_map, current_auth_key);
+        };
 
-        let account_resource = borrow_global_mut<Account>(addr);
+        let new_auth_key = hash::sha3_256(new_public_key);
+        let new_address = create_address(new_auth_key);
+        table::add(address_map, new_address, addr);
         account_resource.authentication_key = new_auth_key;
     }
 
