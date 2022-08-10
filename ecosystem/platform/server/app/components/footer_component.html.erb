@@ -28,12 +28,12 @@
       </div>
 
       <div>
-        <h5 class="text-xl font-mono font-bold block uppercase text-white mb-2">Connect</h5>
+        <h5 class="text-xl font-mono block uppercase text-white mb-2">Connect</h5>
         <%= render DividerComponent.new(class: 'mb-4') %>
         <div class="flex flex-col gap-8">
           <%= form_with url: 'https://aptoslabs.us18.list-manage.com/subscribe/post?u=5456bc936272125ed825d0218&amp;id=a15b523910', method: 'post', html: { target: '_blank' }, data: { turbo: false }, class: 'flex flex-col xl:flex-row gap-2 !text-sm', builder: AptosFormBuilder do |form| %>
             <%= form.email_field :EMAIL, required: true, class: '!text-sm', placeholder: 'Enter Email' %>
-            <%= form.submit 'Subscribe', size: :small, class: 'whitespace-nowrap bg-transparent border border-teal-400 text-teal-300 ring-teal-400 hover:ring-1 hover:bg-neutral-800 hover:text-teal-300 uppercase font-normal uppercase' %>
+            <%= form.submit 'Subscribe', size: :small, scheme: :secondary %>
           <% end %>
           <div class="flex gap-4 items-center">
             <a href="https://github.com/aptos-labs" title="Git">

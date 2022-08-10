@@ -31,7 +31,7 @@
 
   <% if @user %>
     <div class="relative">
-      <button data-action="click->header#toggleUser" class="w-8 h-8 bg-transparent border border-1 border-teal-400 ring-teal-400 hover:ring-1 hover:bg-neutral-800 text-teal-300 font-semibold rounded-lg inline-flex items-center justify-center overflow-hidden">
+      <button data-action="click->header#toggleUser" class="w-8 h-8 bg-transparent ring-1 ring-teal-400 hover:ring-2 hover:bg-teal-400 hover:text-neutral-900 hover:brightness-105 active:brightness-95 text-teal-300 font-semibold rounded-lg inline-flex items-center justify-center overflow-hidden">
         <span>
         <% if @user&.username? %>
         <%= @user.username&.first&.upcase %>
@@ -41,10 +41,10 @@
         </span>
       </button>
       <div data-header-target="user" class="hidden open:flex absolute top-full right-0 mt-4 origin-top-right transition-opacity duration-150 cursor-default">
-        <div class="text-gray-700 p-2 bg-neutral-800 border-neutral-800 rounded-b-lg min-w-fit shadow whitespace-nowrap w-48 flex flex-col gap-2 shadow-2xl">
+        <div class="text-gray-700 p-2 bg-neutral-800 border-neutral-800 rounded-lg min-w-fit shadow whitespace-nowrap w-48 flex flex-col gap-2 shadow-2xl">
         <% if @user&.username? %>
           <div class="text-neutral-50 px-3 py-2 font-mono"><%= @user.username %></div>
-          <div class="block h-px bg-neutral-500"></div>
+          <div class="block h-px bg-neutral-700"></div>
         <% end %>
           <ul>
             <% user_nav_items.each do |item| %>
@@ -55,7 +55,9 @@
       </div>
     </div>
   <% else %>
-    <a title="Sign in" href="<%= new_user_session_path %>" class="h-8 font-mono font-normal text-sm flex items-center justify-center leading-none py-1 px-8 rounded-lg border border-teal-400 text-teal-300 ring-teal-400 hover:ring-1 hover:bg-neutral-800 hover:text-teal-300 uppercase z-20">Sign in</a>
+    <%= render ButtonComponent.new(href: new_user_session_path, title: 'Sign in', size: :small, scheme: :secondary, class: 'z-10') do %>
+      Sign in
+    <% end %>
   <% end %>
 
   <button class="md:hidden flex-nowrap hover:text-neutral-300" aria-label="Toggle navigation" data-header-target="navButton" data-action="click->header#toggleNav">
