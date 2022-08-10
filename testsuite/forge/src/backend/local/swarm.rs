@@ -524,6 +524,14 @@ impl Swarm for LocalSwarm {
         todo!()
     }
 
+    async fn ensure_no_validator_restart(&mut self) -> Result<()> {
+        todo!()
+    }
+
+    async fn ensure_no_fullnode_restart(&mut self) -> Result<()> {
+        todo!()
+    }
+
     async fn query_metrics(
         &self,
         _query: &str,

@@ -77,6 +77,9 @@ pub trait Swarm: Sync {
     fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
     fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
 
+    async fn ensure_no_validator_restart(&mut self) -> Result<()>;
+    async fn ensure_no_fullnode_restart(&mut self) -> Result<()>;
+
     // Get prometheus metrics from the swarm
     async fn query_metrics(
         &self,
