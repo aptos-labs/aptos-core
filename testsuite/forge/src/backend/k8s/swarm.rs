@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    chaos, create_k8s_client, get_free_port,
+    chaos, check_for_container_restart, create_k8s_client, get_free_port,
     node::{K8sNode, REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT},
     prometheus::{self, query_with_metadata},
     query_sequence_numbers, set_validator_image_tag, uninstall_testnet_resources, ChainInfo,
@@ -243,6 +243,36 @@ impl Swarm for K8sSwarm {
             chaos::remove_swarm_chaos(&self.kube_namespace, &chaos)?;
         } else {
             bail!("Chaos {:?} not found", chaos);
+        }
+        Ok(())
+    }
+
+    async fn ensure_no_validator_restart(&mut self) -> Result<()> {
+        for validator in &self.validators {
+            if let Err(e) = check_for_container_restart(
+                &self.kube_client,
+                &self.kube_namespace.clone(),
+                validator.1.stateful_set_name(),
+            )
+            .await
+            {
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
+
+    async fn ensure_no_fullnode_restart(&mut self) -> Result<()> {
+        for fullnode in &self.fullnodes {
+            if let Err(e) = check_for_container_restart(
+                &self.kube_client,
+                &self.kube_namespace.clone(),
+                fullnode.1.stateful_set_name(),
+            )
+            .await
+            {
+                return Err(e);
+            }
         }
         Ok(())
     }
