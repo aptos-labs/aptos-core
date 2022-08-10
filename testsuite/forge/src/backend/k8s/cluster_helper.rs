@@ -9,6 +9,7 @@ use crate::{
 use again::RetryPolicy;
 use anyhow::{bail, format_err};
 use aptos_logger::info;
+use aptos_retrier::ExponentWithLimitDelay;
 use aptos_sdk::types::PeerId;
 use async_trait::async_trait;
 use k8s_openapi::api::{
@@ -158,6 +159,45 @@ async fn wait_node_haproxy(
             Ok(())
         })
     })
+    .await
+}
+
+pub async fn check_for_container_restart(
+    kube_client: &K8sClient,
+    kube_namespace: &str,
+    sts_name: &str,
+) -> Result<()> {
+    aptos_retrier::retry_async(
+        ExponentWithLimitDelay::new(1000, 10 * 1000, 60 * 1000),
+        || {
+            let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), kube_namespace);
+            Box::pin(async move {
+                // Get the StatefulSet's Pod status
+                return if let Some(status) = pod_api
+                    .get_status(format!("{}-0", sts_name).as_str())
+                    .await?
+                    .status
+                {
+                    if let Some(container_statuses) = status.container_statuses {
+                        for container_status in container_statuses {
+                            if container_status.restart_count > 0 {
+                                bail!(
+                                    "Container {} restarted {} times ",
+                                    container_status.name,
+                                    container_status.restart_count
+                                );
+                            }
+                        }
+                        return Ok(());
+                    }
+                    // In case of no restarts, k8 apis returns no container statuses
+                    Ok(())
+                } else {
+                    bail!("Can't query the pod status for {}", sts_name)
+                };
+            })
+        },
+    )
     .await
 }
 

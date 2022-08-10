@@ -43,6 +43,7 @@ use network_builder::builder::NetworkBuilder;
 use rand::{rngs::StdRng, SeedableRng};
 use state_sync_driver::driver_factory::DriverFactory;
 use state_sync_driver::driver_factory::StateSyncRuntimes;
+use state_sync_driver::metadata_storage::PersistentMetadataStorage;
 use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
@@ -353,8 +354,9 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
         aptos_data_client.clone(),
     )?;
 
-    // Create the chunk executor
+    // Create the chunk executor and persistent storage
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
+    let metadata_storage = PersistentMetadataStorage::new(&node_config.storage.dir());
 
     // Create the state sync driver factory
     let state_sync = DriverFactory::create_and_spawn_driver(
@@ -364,6 +366,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
         db_rw,
         chunk_executor,
         mempool_notifier,
+        metadata_storage,
         consensus_listener,
         event_subscription_service,
         aptos_data_client,

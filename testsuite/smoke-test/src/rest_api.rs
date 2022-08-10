@@ -38,9 +38,9 @@ impl AptosTest for BasicClient {
         client.get_ledger_information().await?;
 
         // TODO(Gas): double check if this is correct
-        let mut account1 = ctx.create_and_fund_user_account(4_000_000).await?;
+        let mut account1 = ctx.create_and_fund_user_account(10_000).await?;
         // TODO(Gas): double check if this is correct
-        let account2 = ctx.create_and_fund_user_account(4_000_000).await?;
+        let account2 = ctx.create_and_fund_user_account(10_000).await?;
 
         let tx = account1.sign_with_transaction_builder(
             ctx.transaction_factory()

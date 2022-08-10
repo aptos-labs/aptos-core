@@ -4,6 +4,7 @@
 use crate::{
     error::Error,
     logging::{LogEntry, LogSchema},
+    metadata_storage::MetadataStorageInterface,
     metrics,
     notification_handlers::{
         CommitNotification, CommittedTransactions, ErrorNotification, MempoolNotificationHandler,
@@ -100,7 +101,7 @@ pub trait StorageSynchronizerInterface {
 }
 
 /// The implementation of the `StorageSynchronizerInterface` used by state sync
-pub struct StorageSynchronizer<ChunkExecutor> {
+pub struct StorageSynchronizer<ChunkExecutor, MetadataStorage> {
     // The executor for transaction and transaction output chunks
     chunk_executor: Arc<ChunkExecutor>,
 
@@ -115,6 +116,9 @@ pub struct StorageSynchronizer<ChunkExecutor> {
 
     // A channel through which to notify the executor of new data chunks
     executor_notifier: mpsc::Sender<StorageDataChunk>,
+
+    // The storage to write metadata about the syncing progress
+    metadata_storage: MetadataStorage,
 
     // The number of storage data chunks pending execute/apply, or commit
     pending_data_chunks: Arc<AtomicU64>,
@@ -131,7 +135,11 @@ pub struct StorageSynchronizer<ChunkExecutor> {
 
 // TODO(joshlind): this cannot currently be derived because of limitations around
 // how deriving `Clone` works. See: https://github.com/rust-lang/rust/issues/26925.
-impl<ChunkExecutor: ChunkExecutorTrait + 'static> Clone for StorageSynchronizer<ChunkExecutor> {
+impl<
+        ChunkExecutor: ChunkExecutorTrait + 'static,
+        MetadataStorage: MetadataStorageInterface + Clone,
+    > Clone for StorageSynchronizer<ChunkExecutor, MetadataStorage>
+{
     fn clone(&self) -> Self {
         Self {
             chunk_executor: self.chunk_executor.clone(),
@@ -140,6 +148,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> Clone for StorageSynchronizer<
             error_notification_sender: self.error_notification_sender.clone(),
             executor_notifier: self.executor_notifier.clone(),
             pending_data_chunks: self.pending_data_chunks.clone(),
+            metadata_storage: self.metadata_storage.clone(),
             runtime: self.runtime.clone(),
             state_snapshot_notifier: self.state_snapshot_notifier.clone(),
             storage: self.storage.clone(),
@@ -147,7 +156,11 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> Clone for StorageSynchronizer<
     }
 }
 
-impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecutor> {
+impl<
+        ChunkExecutor: ChunkExecutorTrait + 'static,
+        MetadataStorage: MetadataStorageInterface + Clone,
+    > StorageSynchronizer<ChunkExecutor, MetadataStorage>
+{
     /// Returns a new storage synchronizer alongside the executor and committer handles
     pub fn new<MempoolNotifier: MempoolNotificationSender>(
         driver_config: StateSyncDriverConfig,
@@ -156,6 +169,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
         error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
         event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
         mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
+        metadata_storage: MetadataStorage,
         storage: DbReaderWriter,
         runtime: Option<&Runtime>,
     ) -> (Self, JoinHandle<()>, JoinHandle<()>) {
@@ -203,6 +217,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
             error_notification_sender,
             executor_notifier,
             pending_data_chunks: pending_transaction_chunks,
+            metadata_storage,
             runtime,
             state_snapshot_notifier: None,
             storage,
@@ -225,8 +240,10 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizer<ChunkExecu
     }
 }
 
-impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
-    for StorageSynchronizer<ChunkExecutor>
+impl<
+        ChunkExecutor: ChunkExecutorTrait + 'static,
+        MetadataStorage: MetadataStorageInterface + Clone + Send + Sync + 'static,
+    > StorageSynchronizerInterface for StorageSynchronizer<ChunkExecutor, MetadataStorage>
 {
     fn apply_transaction_outputs(
         &mut self,
@@ -278,6 +295,7 @@ impl<ChunkExecutor: ChunkExecutorTrait + 'static> StorageSynchronizerInterface
             self.commit_notification_sender.clone(),
             self.error_notification_sender.clone(),
             self.pending_data_chunks.clone(),
+            self.metadata_storage.clone(),
             self.storage.clone(),
             epoch_change_proofs,
             target_ledger_info,
@@ -376,6 +394,12 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         end_of_epoch_ledger_info.as_ref(),
                     );
                     if result.is_ok() {
+                        info!(
+                            LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                                "Executed a new transaction chunk! Transaction total: {:?}.",
+                                num_transactions
+                            ))
+                        );
                         metrics::increment_gauge(
                             &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
                             metrics::StorageSynchronizerOperations::ExecutedTransactions
@@ -398,6 +422,12 @@ fn spawn_executor<ChunkExecutor: ChunkExecutorTrait + 'static>(
                         end_of_epoch_ledger_info.as_ref(),
                     );
                     if result.is_ok() {
+                        info!(
+                            LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                                "Applied a new transaction output chunk! Transaction total: {:?}.",
+                                num_outputs
+                            ))
+                        );
                         metrics::increment_gauge(
                             &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
                             metrics::StorageSynchronizerOperations::AppliedTransactionOutputs
@@ -471,7 +501,7 @@ fn spawn_committer<
             match chunk_executor.commit_chunk() {
                 Ok(notification) => {
                     // Log the event and update the metrics
-                    debug!(
+                    info!(
                         LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
                             "Committed a new transaction chunk! \
                                     Transaction total: {:?}, event total: {:?}",
@@ -522,12 +552,16 @@ fn spawn_committer<
 }
 
 /// Spawns a dedicated receiver that commits state values from a state snapshot
-fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
+fn spawn_state_snapshot_receiver<
+    ChunkExecutor: ChunkExecutorTrait + 'static,
+    MetadataStorage: MetadataStorageInterface + Clone + Send + Sync + 'static,
+>(
     chunk_executor: Arc<ChunkExecutor>,
     mut state_snapshot_listener: mpsc::Receiver<StorageDataChunk>,
     mut commit_notification_sender: mpsc::UnboundedSender<CommitNotification>,
     error_notification_sender: mpsc::UnboundedSender<ErrorNotification>,
     pending_transaction_chunks: Arc<AtomicU64>,
+    metadata_storage: MetadataStorage,
     storage: DbReaderWriter,
     epoch_change_proofs: Vec<LedgerInfoWithSignatures>,
     target_ledger_info: LedgerInfoWithSignatures,
@@ -553,6 +587,7 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
             .expect("Failed to initialize the state snapshot receiver!");
 
         // Handle state value chunks
+        let target_ledger_info = &target_ledger_info;
         while let Some(storage_data_chunk) = state_snapshot_listener.next().await {
             // Process the chunk
             match storage_data_chunk {
@@ -561,13 +596,21 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                     let last_committed_state_index = states_with_proof.last_index;
 
                     // Attempt to commit the chunk
+                    let num_state_values = states_with_proof.raw_values.len();
                     let commit_result = state_snapshot_receiver.add_chunk(
                         states_with_proof.raw_values,
                         states_with_proof.proof.clone(),
                     );
                     match commit_result {
                         Ok(()) => {
-                            // Update the metrics
+                            // Update the logs and metrics
+                            info!(
+                                LogSchema::new(LogEntry::StorageSynchronizer).message(&format!(
+                                    "Committed a new state value chunk! Chunk size: {:?}, last persisted index: {:?}",
+                                    num_state_values,
+                                    last_committed_state_index
+                                ))
+                            );
                             metrics::set_gauge(
                                 &metrics::STORAGE_SYNCHRONIZER_OPERATIONS,
                                 metrics::StorageSynchronizerOperations::SyncedStates.get_label(),
@@ -575,19 +618,16 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                             );
 
                             if !all_states_synced {
-                                // Send a commit notification to the listener
-                                let commit_notification = CommitNotification::new_committed_states(
-                                    all_states_synced,
-                                    last_committed_state_index,
-                                    None,
-                                );
-                                if let Err(error) =
-                                    commit_notification_sender.send(commit_notification).await
+                                // Update the metadata storage with the last committed state index
+                                if let Err(error) = metadata_storage
+                                    .clone()
+                                    .update_last_persisted_state_value_index(
+                                        target_ledger_info,
+                                        last_committed_state_index,
+                                        all_states_synced,
+                                    )
                                 {
-                                    let error = format!(
-                                        "Failed to send state commit notification! Error: {:?}",
-                                        error
-                                    );
+                                    let error = format!("Failed to update the last persisted state index at version: {:?}! Error: {:?}", version, error);
                                     send_storage_synchronizer_error(
                                         error_notification_sender.clone(),
                                         notification_id,
@@ -595,15 +635,15 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                     )
                                     .await;
                                 }
-
                                 decrement_pending_data_chunks(pending_transaction_chunks.clone());
                                 continue; // Wait for the next chunk
                             }
 
                             // All states have been synced! Create a new commit notification
-                            let commit_notification = create_final_commit_notification(
+                            let commit_notification = create_commit_notification(
                                 &target_output_with_proof,
                                 last_committed_state_index,
+                                version,
                             );
 
                             // Finalize storage, reset the executor and send a commit
@@ -635,8 +675,17 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
                                     "Failed to delete the genesis transaction! Error: {:?}",
                                     error
                                 ))
+                            } else if let Err(error) = metadata_storage
+                                .clone()
+                                .update_last_persisted_state_value_index(
+                                    target_ledger_info,
+                                    last_committed_state_index,
+                                    all_states_synced,
+                                )
+                            {
+                                Err(format!("All states have synced, but failed to update the metadata storage at version {:?}! Error: {:?}", version, error))
                             } else if let Err(error) = chunk_executor.reset() {
-                                Err(format!("Failed to reset the chunk executor after states synchronization! Error: {:?}", error))
+                                Err(format!("Failed to reset the chunk executor after state snapshot synchronization! Error: {:?}", error))
                             } else if let Err(error) =
                                 commit_notification_sender.send(commit_notification).await
                             {
@@ -687,10 +736,11 @@ fn spawn_state_snapshot_receiver<ChunkExecutor: ChunkExecutorTrait + 'static>(
     spawn(runtime, receiver)
 }
 
-/// Creates a final commit notification for the last states chunk
-fn create_final_commit_notification(
+/// Creates a commit notification for the new committed state snapshot
+fn create_commit_notification(
     target_output_with_proof: &TransactionOutputListWithProof,
     last_committed_state_index: u64,
+    version: u64,
 ) -> CommitNotification {
     let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
         target_output_with_proof
@@ -702,14 +752,11 @@ fn create_final_commit_notification(
         .into_iter()
         .flat_map(|output| output.events().to_vec())
         .collect::<Vec<_>>();
-    let committed_transaction = CommittedTransactions {
+    CommitNotification::new_committed_state_snapshot(
         events,
         transactions,
-    };
-    CommitNotification::new_committed_states(
-        true,
         last_committed_state_index,
-        Some(committed_transaction),
+        version,
     )
 }
 

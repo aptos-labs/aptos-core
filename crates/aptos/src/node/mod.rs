@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::PromptOptions;
+use crate::common::types::{ConfigSearchMode, PromptOptions};
 use crate::common::utils::prompt_yes_with_override;
 use crate::config::GlobalConfig;
 use crate::{
@@ -542,7 +542,9 @@ impl CliCommand<()> for RunLocalTestnet {
             .unwrap_or_else(StdRng::from_entropy);
 
         let global_config = GlobalConfig::load()?;
-        let test_dir = global_config.get_config_location()?.join(TESTNET_FOLDER);
+        let test_dir = global_config
+            .get_config_location(ConfigSearchMode::CurrentDirAndParents)?
+            .join(TESTNET_FOLDER);
 
         // Remove the current test directory and start with a new node
         if self.force_restart && test_dir.exists() {

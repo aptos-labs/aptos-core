@@ -4,6 +4,7 @@
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{hash::HashValue, SigningKey};
 use aptos_mempool::mocks::MockSharedMempool;
+use aptos_protos::extractor::v1::Transaction as TransactionPB;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{account_config::aptos_root_address, transaction::SignedTransaction, LocalAccount},
@@ -356,7 +357,7 @@ impl TestContext {
         body
     }
 
-    pub fn check_golden_output(&mut self, msg: Value) {
+    pub fn check_golden_output(&mut self, txns: &[TransactionPB]) {
         if self.golden_output.is_none() {
             self.golden_output = Some(GoldenOutputs::new(
                 self.test_name.replace(':', "_"),
@@ -364,7 +365,7 @@ impl TestContext {
             ));
         }
 
-        let msg = pretty(&msg);
+        let msg = pretty(txns);
         let re = regex::Regex::new("hash\": \".*\"").unwrap();
         let msg = re.replace_all(&msg, "hash\": \"\"");
 

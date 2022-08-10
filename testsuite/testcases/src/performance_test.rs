@@ -3,6 +3,7 @@
 
 use crate::generate_traffic;
 use forge::{NetworkContext, NetworkTest, Result, Test};
+use tokio::runtime::Runtime;
 
 pub struct PerformanceBenchmark;
 
@@ -36,6 +37,11 @@ impl NetworkTest for PerformanceBenchmark {
         // ensure we meet the success criteria
         ctx.success_criteria()
             .check_for_success(&txn_stat, &duration)?;
+
+        let runtime = Runtime::new().unwrap();
+
+        runtime.block_on(ctx.swarm().ensure_no_fullnode_restart())?;
+        runtime.block_on(ctx.swarm().ensure_no_fullnode_restart())?;
 
         Ok(())
     }

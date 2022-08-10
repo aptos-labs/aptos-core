@@ -192,7 +192,7 @@
           }
         },
         "signature": {
-          "ed255198": {
+          "ed25519": {
             "publicKey": "FEGPhnoL1tQquy2qUM1opahpziCCgkgfV1BPYwUQ0NM=",
             "signature": "BPHZ/DDkp2fqrjdDD4O/mZmfV8WJZ35LrM5vHLo7LUvknlNL1asMUHZqU8UpqO2YYEWu6IS9N2fWHu7eu3noAw=="
           }

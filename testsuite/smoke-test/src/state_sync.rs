@@ -12,6 +12,7 @@ use aptos_sdk::types::LocalAccount;
 use aptos_types::{account_address::AccountAddress, PeerId};
 use aptosdb::{LEDGER_DB_NAME, STATE_MERKLE_DB_NAME};
 use forge::{LocalSwarm, NodeExt, Swarm, SwarmExt};
+use state_sync_driver::metadata_storage::STATE_SYNC_DB_NAME;
 use std::{
     fs,
     sync::Arc,
@@ -21,11 +22,11 @@ use std::{
 const MAX_CATCH_UP_SECS: u64 = 120; // The max time we'll wait for nodes to catch up
 
 #[tokio::test]
-async fn test_full_node_bootstrap_accounts() {
+async fn test_full_node_bootstrap_state_snapshot() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
-    // Create a fullnode config that uses account state syncing
+    // Create a fullnode config that uses snapshot syncing
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
     vfn_config.state_sync.state_sync_driver.bootstrapping_mode =
         BootstrappingMode::DownloadLatestStates;
@@ -34,7 +35,7 @@ async fn test_full_node_bootstrap_accounts() {
     let vfn_peer_id = create_full_node(vfn_config, &mut swarm).await;
     swarm.fullnode_mut(vfn_peer_id).unwrap().stop();
 
-    // Set at most 2 accounts per storage request for the validator
+    // Set at most 2 values per storage request for the validator
     let validator = swarm.validators_mut().next().unwrap();
     let mut config = validator.config().clone();
     config.state_sync.storage_service.max_state_chunk_size = 2;
@@ -316,7 +317,7 @@ async fn test_validator_sync(mut swarm: LocalSwarm) {
 
 #[tokio::test]
 async fn test_validator_failure_bootstrap_outputs() {
-    // Create a swarm of 4 validators with state sync v2 enabled (account
+    // Create a swarm of 4 validators with state sync v2 enabled (snapshot
     // bootstrapping and transaction output application).
     let swarm = SwarmBuilder::new_local(4)
         .with_aptos()
@@ -335,7 +336,7 @@ async fn test_validator_failure_bootstrap_outputs() {
 
 #[tokio::test]
 async fn test_validator_failure_bootstrap_execution() {
-    // Create a swarm of 4 validators with state sync v2 enabled (account
+    // Create a swarm of 4 validators with state sync v2 enabled (snapshot
     // bootstrapping and transaction execution).
     let swarm = SwarmBuilder::new_local(4)
         .with_aptos()
@@ -512,13 +513,20 @@ fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountA
     let node_config = swarm.validator_mut(validator).unwrap().config().clone();
     let ledger_db_path = node_config.storage.dir().join(LEDGER_DB_NAME);
     let state_db_path = node_config.storage.dir().join(STATE_MERKLE_DB_NAME);
+    let state_sync_db_path = node_config.storage.dir().join(STATE_SYNC_DB_NAME);
     info!(
-        "Deleting ledger and state db paths ({:?}, {:?}) for validator {:?}",
+        "Deleting ledger, state and state sync db paths ({:?}, {:?}, {:?}) for validator {:?}",
         ledger_db_path.as_path(),
         state_db_path.as_path(),
+        state_sync_db_path.as_path(),
         validator
     );
-    assert!(ledger_db_path.as_path().exists() && state_db_path.as_path().exists());
+    assert!(
+        ledger_db_path.as_path().exists()
+            && state_db_path.as_path().exists()
+            && state_sync_db_path.as_path().exists()
+    );
     fs::remove_dir_all(ledger_db_path).unwrap();
     fs::remove_dir_all(state_db_path).unwrap();
+    fs::remove_dir_all(state_sync_db_path).unwrap();
 }
