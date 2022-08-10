@@ -84,10 +84,6 @@ test = false
     );
 }
 
-fn test_go(){
-
-}
-
 #[test]
 // Ignored because transactions require minting/transfering Coin<AptosCoin>, which the
 // transaction builder does not support (it doesn't supported typed functions yet).

@@ -20,8 +20,6 @@ use move_deps::move_core_types::{
     language_storage::{ModuleId, TypeTag},
 };
 
-type Bytes = Vec<u8>;
-
 /// Structured representation of a call into a known Move script function.
 /// ```ignore
 /// impl ScriptFunctionCall {

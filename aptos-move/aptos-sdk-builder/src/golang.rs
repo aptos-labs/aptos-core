@@ -16,13 +16,14 @@ use serde_generate::{
 };
 
 use heck::CamelCase;
+use move_deps::move_core_types::language_storage::StructTag;
+use once_cell::sync::Lazy;
+use std::str::FromStr;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
     path::PathBuf,
 };
-use std::str::FromStr;
-use move_deps::move_core_types::language_storage::StructTag;
 
 /// Output transaction builders and decoders in Go for the given ABIs.
 pub fn output(
@@ -715,7 +716,8 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
 
     fn quote_type(type_tag: &TypeTag) -> String {
         use TypeTag::*;
-        let str_tag: StructTag = StructTag::from_str("0x1::string::String").unwrap();
+        let str_tag: Lazy<StructTag> =
+            Lazy::new(|| StructTag::from_str("0x1::string::String").unwrap());
         match type_tag {
             Bool => "bool".into(),
             U8 => "uint8".into(),
@@ -724,9 +726,9 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
             Address => "aptostypes.AccountAddress".into(),
             Vector(type_tag) => {
                 format!("[]{}", Self::quote_type(type_tag))
-            },
-            Struct(struct_tag) => match struct_tag.clone() {
-                tag if tag == str_tag => "[]uint8".into(),
+            }
+            Struct(struct_tag) => match struct_tag {
+                tag if tag == Lazy::force(&str_tag) => "[]byte".into(),
                 _ => common::type_not_allowed(type_tag),
             },
             Signer => common::type_not_allowed(type_tag),
@@ -763,6 +765,8 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
     // - otherwise, we can use `<arg>.BcsSerialize()`, `<arg>.BcsDeserialize()` to do the work.
     fn bcs_primitive_type_name(type_tag: &TypeTag) -> Option<&'static str> {
         use TypeTag::*;
+        let str_tag: Lazy<StructTag> =
+            Lazy::new(|| StructTag::from_str("0x1::string::String").unwrap());
         match type_tag {
             Bool => Some("Bool"),
             U8 => Some("U8"),
@@ -770,11 +774,15 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
             U128 => Some("U128"),
             Address => None,
             Vector(type_tag) => match type_tag.as_ref() {
-                U8 => Some("Bytes"),
+                U8 => Some("[]byte"),
                 type_tag => Self::bcs_primitive_type_name(type_tag).and(None),
                 // _ => common::type_not_allowed(type_tag),
             },
-            Struct(_) | Signer => common::type_not_allowed(type_tag),
+            Struct(struct_tag) => match struct_tag {
+                tag if tag == Lazy::force(&str_tag) => Some("[]byte"),
+                _ => common::type_not_allowed(type_tag),
+            },
+            Signer => common::type_not_allowed(type_tag),
         }
     }
 }

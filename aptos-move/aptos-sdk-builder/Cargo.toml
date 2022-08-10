@@ -13,6 +13,7 @@ edition = "2018"
 anyhow = "1.0.57"
 bcs = "0.1.3"
 heck = "0.3.2"
+once_cell = "1.10.0"
 regex = "1.5.5"
 serde-generate = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
