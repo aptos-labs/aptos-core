@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+//! This module contains the official gas meter implementation, along with some top-level gas
+//! parameters and traits to help manipulate them.
+
 use crate::{instr::InstructionGasParameters, transaction::TransactionGasParameters};
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
@@ -13,18 +16,29 @@ use move_core_types::{
 use move_vm_types::gas::GasMeter;
 use std::collections::BTreeMap;
 
+/// A trait for converting from a map representation of the on-chain gas schedule.
 pub trait FromOnChainGasSchedule: Sized {
+    /// Constructs a value of this type from a map representation of the on-chain gas schedule.
+    /// `None` should be returned when the gas schedule is missing some required entries.
+    /// Unused entries should be safely ignored.
     fn from_on_chain_gas_schedule(gas_schedule: &BTreeMap<String, u64>) -> Option<Self>;
 }
 
+/// A trait for converting to a list of entries of the on-chain gas schedule.
 pub trait ToOnChainGasSchedule {
+    /// Converts `self` into a list of entries of the on-chain gas schedule.
+    /// Each entry is a key-value pair where the key is a string representing the name of the
+    /// parameter, where the value is the gas parameter itself.
     fn to_on_chain_gas_schedule(&self) -> Vec<(String, u64)>;
 }
 
+/// A trait for defining an initial value to be used in the genesis.
 pub trait InitialGasSchedule: Sized {
+    /// Returns the initial value of this type, which is used in the genesis.
     fn initial() -> Self;
 }
 
+/// Gas parameters for all native functions.
 #[derive(Debug, Clone)]
 pub struct NativeGasParameters {
     pub move_stdlib: move_stdlib::natives::GasParameters,
@@ -66,6 +80,8 @@ impl InitialGasSchedule for NativeGasParameters {
     }
 }
 
+/// Gas parameters for everything that is needed to run the Aptos blockchain, including
+/// instructions, transactions and native functions from various packages.
 #[derive(Debug, Clone)]
 pub struct AptosGasParameters {
     pub instr: InstructionGasParameters,
@@ -112,6 +128,9 @@ impl InitialGasSchedule for AptosGasParameters {
     }
 }
 
+/// The official gas meter used inside the Aptos VM.
+/// It maintains an internal gas counter, measured in internal gas units, and carries an environment
+/// consisting all the gas parameters, which it can lookup when performing gas calcuations.
 pub struct AptosGasMeter {
     gas_params: AptosGasParameters,
     balance: u64,

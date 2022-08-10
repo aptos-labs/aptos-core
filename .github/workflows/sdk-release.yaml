@@ -53,16 +53,15 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       # Build the API specs.
-      - run: mkdir -p /tmp/api_specs
-      - run: docker run --name=yaml-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml > /tmp/api_specs/spec.yaml
-      - run: docker run --name=json-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json > /tmp/api_specs/spec.json
+      - run: docker run --mount=type=bind,source=/tmp,target=/specs --name=yaml-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
+      - run: docker run --mount=type=bind,source=/tmp,target=/specs --name=json-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json -o /specs/spec.json
 
       # Confirm that the specs we built here are the same as those checked in.
       - run: echo "If this lint fails, run the following commands locally to fix it:"
       - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/v1/spec.yaml"
       - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/v1/spec.json"
-      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/api_specs/spec.yaml api/doc/v1/spec.yaml
-      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/api_specs/spec.json api/doc/v1/spec.json
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/spec.yaml api/doc/v1/spec.yaml
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/spec.json api/doc/v1/spec.json
 
       # Set up dotenv file for tests (jest doesn't read env vars properly).
       - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
@@ -96,17 +95,18 @@ jobs:
       - run: cd ./ecosystem/typescript/sdk/examples/javascript && yarn install && yarn test
 
       # Ensure the version, changelog, etc. are valid.
-      # TODO: Reenable once we figure out SDK release strategy.
-      # - run: cd ./ecosystem/typescript/sdk && ./check.sh
+      - run: cd ./ecosystem/typescript/sdk && ./check.sh
+        if: github.event_name == 'push' && github.ref_name == 'devnet'
 
       # Finally, if this is a push and the version in package.json is different,
       # publish a new version of the package to npm.js. For more details on how
-      # this works, see ecosystem/typescript/sdk/checked_publish.sh.
-      # TODO: Reenable once we figure out SDK release strategy.
-      # - run: cd ./ecosystem/typescript/sdk && yarn checked-publish
-      #   if: github.event_name == 'push'
-      #   env:
-      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}
+      # this works, see ecosystem/typescript/sdk/checked_publish.sh. The package
+      # we publish to npmjs is meant to work with devnet, so we only release
+      # from that branch. See ecosystem/typescript/sdk/README.md for more.
+      - run: cd ./ecosystem/typescript/sdk && yarn checked-publish
+        if: github.event_name == 'push' && github.ref_name == 'devnet'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}
 
       - name: Print spec generation logs on failure (YAML)
         if: ${{ failure() }}

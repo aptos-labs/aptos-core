@@ -146,7 +146,7 @@ fn test_reconfiguration() {
         vm_output.has_reconfiguration(),
         "StateComputeResult does not see a reconfiguration"
     );
-    let ledger_info_with_sigs = gen_ledger_info_with_sigs(1, &vm_output, block_id, vec![&signer]);
+    let ledger_info_with_sigs = gen_ledger_info_with_sigs(1, &vm_output, block_id, &[signer]);
     executor
         .commit_blocks(vec![block_id], ledger_info_with_sigs)
         .unwrap();

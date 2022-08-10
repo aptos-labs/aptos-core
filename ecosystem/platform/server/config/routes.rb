@@ -32,6 +32,7 @@ Rails.application.routes.draw do
 
   # CMS
   resources :articles, param: :slug, only: %i[index show]
+  resources :network_operations, only: %i[index show]
 
   # Settings
   get 'settings', to: redirect('/settings/profile')

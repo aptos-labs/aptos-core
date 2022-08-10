@@ -2151,7 +2151,7 @@
         "type": "string",
         "format": "hex",
         "description": "Hex encoded 32 byte Aptos account address",
-        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 "
       },
       "AptosError": {
         "type": "object",
@@ -2460,7 +2460,7 @@
         "type": "string",
         "format": "hex",
         "description": "Event key is a global index for an event stream.\n\nIt is hex-encoded BCS bytes of `EventHandle` `guid` field value, which is\na combination of a `uint64` creation number and account address (without\ntrimming leading zeros).\n\nFor example, event key `0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1` is combined by the following 2 parts:\n  1. `0000000000000000`: `uint64` representation of `0`.\n  2. `88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1`: 32 bytes of account address.\n",
-        "example": "0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+        "example": "0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 "
       },
       "GenesisPayload": {
         "type": "object",
@@ -2559,7 +2559,7 @@
         "type": "string",
         "format": "hex",
         "description": "All bytes (Vec<u8>) data is represented as hex-encoded string prefixed with `0x` and fulfilled with\ntwo hex digits per byte.\n\nUnlike the `Address` type, HexEncodedBytes will not trim any zeros.\n",
-        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 "
       },
       "IdentifierWrapper": {
         "type": "string"

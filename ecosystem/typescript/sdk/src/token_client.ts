@@ -3,8 +3,9 @@ import { AptosClient } from "./aptos_client";
 import * as TokenTypes from "./token_types";
 import * as Gen from "./generated/index";
 import { HexString, MaybeHexString } from "./hex_string";
-import { BCS, TxnBuilderTypes } from "./transaction_builder";
+import { BCS, TxnBuilderTypes, TransactionBuilderABI } from "./transaction_builder";
 import { MAX_U64_BIG_INT } from "./transaction_builder/bcs/consts";
+import { TOKEN_ABIS } from "./token_client_abis";
 
 /**
  * Class for creating, minting and managing minting NFT collections and tokens
@@ -12,12 +13,15 @@ import { MAX_U64_BIG_INT } from "./transaction_builder/bcs/consts";
 export class TokenClient {
   aptosClient: AptosClient;
 
+  transactionBuilder: TransactionBuilderABI;
+
   /**
    * Creates new TokenClient instance
    * @param aptosClient AptosClient instance
    */
   constructor(aptosClient: AptosClient) {
     this.aptosClient = aptosClient;
+    this.transactionBuilder = new TransactionBuilderABI(TOKEN_ABIS.map((abi) => new HexString(abi).toUint8Array()));
   }
 
   /**
@@ -64,19 +68,10 @@ export class TokenClient {
     uri: string,
     maxAmount: BCS.AnyNumber = MAX_U64_BIG_INT,
   ): Promise<string> {
-    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
-        "0x3::token",
-        "create_collection_script",
-        [],
-        [
-          BCS.bcsSerializeStr(name),
-          BCS.bcsSerializeStr(description),
-          BCS.bcsSerializeStr(uri),
-          BCS.bcsSerializeUint64(maxAmount),
-          BCS.serializeVectorWithFunc([false, false, false], "serializeBool"),
-        ],
-      ),
+    const payload = this.transactionBuilder.buildTransactionPayload(
+      "0x3::token::create_collection_script",
+      [],
+      [name, description, uri, maxAmount, [false, false, false]],
     );
 
     return this.submitTransactionHelper(account, payload);
@@ -114,27 +109,24 @@ export class TokenClient {
     property_values: Array<string> = [],
     property_types: Array<string> = [],
   ): Promise<Gen.HexEncodedBytes> {
-    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
-        "0x3::token",
-        "create_token_script",
-        [],
-        [
-          BCS.bcsSerializeStr(collectionName),
-          BCS.bcsSerializeStr(name),
-          BCS.bcsSerializeStr(description),
-          BCS.bcsSerializeUint64(supply),
-          BCS.bcsSerializeUint64(max),
-          BCS.bcsSerializeStr(uri),
-          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(royalty_payee_address)),
-          BCS.bcsSerializeUint64(royalty_points_denominator),
-          BCS.bcsSerializeUint64(royalty_points_numerator),
-          BCS.serializeVectorWithFunc([false, false, false, false, false], "serializeBool"),
-          BCS.serializeVectorWithFunc(property_keys, "serializeStr"),
-          BCS.serializeVectorWithFunc(property_values, "serializeStr"),
-          BCS.serializeVectorWithFunc(property_types, "serializeStr"),
-        ],
-      ),
+    const payload = this.transactionBuilder.buildTransactionPayload(
+      "0x3::token::create_token_script",
+      [],
+      [
+        collectionName,
+        name,
+        description,
+        supply,
+        max,
+        uri,
+        royalty_payee_address,
+        royalty_points_denominator,
+        royalty_points_numerator,
+        [false, false, false, false, false],
+        property_keys,
+        property_values,
+        property_types,
+      ],
     );
 
     return this.submitTransactionHelper(account, payload);
@@ -160,20 +152,10 @@ export class TokenClient {
     amount: number,
     property_version: number = 0,
   ): Promise<string> {
-    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
-        "0x3::token_transfers",
-        "offer_script",
-        [],
-        [
-          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver)),
-          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(creator)),
-          BCS.bcsSerializeStr(collectionName),
-          BCS.bcsSerializeStr(name),
-          BCS.bcsSerializeUint64(property_version),
-          BCS.bcsSerializeUint64(amount),
-        ],
-      ),
+    const payload = this.transactionBuilder.buildTransactionPayload(
+      "0x3::token_transfers::offer_script",
+      [],
+      [receiver, creator, collectionName, name, property_version, amount],
     );
 
     return this.submitTransactionHelper(account, payload);
@@ -197,19 +179,10 @@ export class TokenClient {
     name: string,
     property_version: number = 0,
   ): Promise<string> {
-    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
-        "0x3::token_transfers",
-        "claim_script",
-        [],
-        [
-          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(sender)),
-          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(creator)),
-          BCS.bcsSerializeStr(collectionName),
-          BCS.bcsSerializeStr(name),
-          BCS.bcsSerializeUint64(property_version),
-        ],
-      ),
+    const payload = this.transactionBuilder.buildTransactionPayload(
+      "0x3::token_transfers::claim_script",
+      [],
+      [sender, creator, collectionName, name, property_version],
     );
 
     return this.submitTransactionHelper(account, payload);
@@ -233,19 +206,10 @@ export class TokenClient {
     name: string,
     property_version: number = 0,
   ): Promise<string> {
-    const payload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
-        "0x3::token_transfers",
-        "cancel_offer_script",
-        [],
-        [
-          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(receiver)),
-          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(creator)),
-          BCS.bcsSerializeStr(collectionName),
-          BCS.bcsSerializeStr(name),
-          BCS.bcsSerializeUint64(property_version),
-        ],
-      ),
+    const payload = this.transactionBuilder.buildTransactionPayload(
+      "0x3::token_transfers::cancel_offer_script",
+      [],
+      [receiver, creator, collectionName, name, property_version],
     );
 
     return this.submitTransactionHelper(account, payload);

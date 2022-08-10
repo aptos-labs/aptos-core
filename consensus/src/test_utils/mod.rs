@@ -148,7 +148,7 @@ impl TreeInserter {
         committed_block: Option<BlockInfo>,
     ) -> QuorumCert {
         gen_test_certificate(
-            vec![&self.signer],
+            &[self.signer.clone()],
             block.block_info(),
             block.quorum_cert().certified_block().clone(),
             committed_block,

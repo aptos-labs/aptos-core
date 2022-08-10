@@ -306,6 +306,9 @@ GEM
       racc (~> 1.4)
     nokogiri (1.13.8-x86_64-linux)
       racc (~> 1.4)
+    noticed (1.5.9)
+      http (>= 4.0.0)
+      rails (>= 5.2.0)
     oauth2 (1.4.10)
       faraday (>= 0.17.3, < 3.0)
       jwt (>= 1.0, < 3.0)
@@ -522,6 +525,7 @@ DEPENDENCIES
   maxmind-geoip2
   memery
   mocha
+  noticed (~> 1.5)
   omniauth
   omniauth-discord
   omniauth-github

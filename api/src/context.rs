@@ -337,17 +337,32 @@ impl Context {
     pub fn get_events(
         &self,
         event_key: &EventKey,
-        start: u64,
+        start: Option<u64>,
         limit: u16,
         ledger_version: u64,
     ) -> Result<Vec<EventWithVersion>> {
-        self.db.get_events(
-            event_key,
-            start,
-            Order::Ascending,
-            limit as u64,
-            ledger_version,
-        )
+        if let Some(start) = start {
+            self.db.get_events(
+                event_key,
+                start,
+                Order::Ascending,
+                limit as u64,
+                ledger_version,
+            )
+        } else {
+            self.db
+                .get_events(
+                    event_key,
+                    u64::MAX,
+                    Order::Descending,
+                    limit as u64,
+                    ledger_version,
+                )
+                .map(|mut result| {
+                    result.reverse();
+                    result
+                })
+        }
     }
 
     pub fn health_check_route(&self) -> BoxedFilter<(impl Reply,)> {

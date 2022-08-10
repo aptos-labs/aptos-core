@@ -48,6 +48,7 @@ impl CliCommand<String> for CreateAccount {
                 self.account,
             )
             .await
+            .map(|_| ())
         } else {
             self.create_account_with_key(address).await
         }
