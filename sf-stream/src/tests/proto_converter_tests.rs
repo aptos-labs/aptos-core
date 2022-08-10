@@ -88,7 +88,6 @@ async fn test_block_transactions_work() {
             .unwrap()
             .payload
             .as_ref()
-            .clone()
             .unwrap()
             .payload
             .as_ref()
