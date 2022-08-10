@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics;
-use crate::pb::extractor;
+use aptos_protos::extractor::v1 as extractor;
 
 use crate::convert::convert_transaction;
 use aptos_api::context::Context;
