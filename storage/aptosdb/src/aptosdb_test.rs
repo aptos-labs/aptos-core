@@ -94,6 +94,7 @@ fn test_error_if_version_is_pruned() {
             ledger_prune_window: 0,
             ledger_pruning_batch_size: 1,
             state_store_pruning_batch_size: 1,
+            user_pruning_window_offset: 0,
         },
     );
 
@@ -106,6 +107,7 @@ fn test_error_if_version_is_pruned() {
             ledger_prune_window: 0,
             ledger_pruning_batch_size: 1,
             state_store_pruning_batch_size: 1,
+            user_pruning_window_offset: 0,
         },
     );
     state_pruner.testonly_update_min_version(5);

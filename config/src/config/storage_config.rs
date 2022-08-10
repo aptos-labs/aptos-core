@@ -94,6 +94,7 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig
     ledger_prune_window: 0,
     ledger_pruning_batch_size: 10_000,
     state_store_pruning_batch_size: 10_000,
+    user_pruning_window_offset: 2000,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -118,6 +119,8 @@ pub struct StoragePrunerConfig {
     /// Similar to the variable above but for state store pruner. It means the number of stale
     /// nodes to prune a time.
     pub state_store_pruning_batch_size: usize,
+    /// The offset for user pruning window to adjust
+    pub user_pruning_window_offset: u64,
 }
 
 impl StoragePrunerConfig {
@@ -136,6 +139,7 @@ impl StoragePrunerConfig {
             ledger_prune_window: ledger_store_prune_window,
             ledger_pruning_batch_size,
             state_store_pruning_batch_size,
+            user_pruning_window_offset: ledger_store_prune_window / 5,
         }
     }
 }
@@ -162,6 +166,7 @@ impl Default for StorageConfig {
                 // A 10k transaction block (touching 60k state values, in the case of the account
                 // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
                 state_store_pruning_batch_size: 1_000,
+                user_pruning_window_offset: 2_000_000,
             },
             data_dir: PathBuf::from("/opt/aptos/data"),
             // Default read/write/connection timeout, in milliseconds
