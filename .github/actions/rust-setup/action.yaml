@@ -12,7 +12,7 @@ runs:
         path: ~/.cargo/registry/src/**/librocksdb-sys-*
     - name: install Prover dependencies
       shell: bash
-      run: scripts/dev_setup.sh -b -p -y
+      run: scripts/dev_setup.sh -b -p -r -y
     - name: prepare move lang prover tooling.
       shell: bash
       run: |
