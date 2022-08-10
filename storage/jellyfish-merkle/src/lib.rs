@@ -79,6 +79,7 @@ pub mod restore;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helper;
 
+use crate::metrics::APTOS_JELLYFISH_LEAF_COUNT;
 use anyhow::{bail, ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
@@ -408,6 +409,8 @@ where
                 &mut batch,
             )?
         };
+
+        APTOS_JELLYFISH_LEAF_COUNT.set(root_node.leaf_count() as i64);
 
         Ok((root_node.hash(), batch))
     }
