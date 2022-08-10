@@ -15,9 +15,9 @@ use std::{
     ops::{BitAnd, BitOr},
 };
 
-// Every u8 is used as a bucket of 8 bits. Total max buckets = 256 / 8 = 32.
+// Every u8 is used as a bucket of 8 bits. Total max buckets = 65536 / 8 = 8196.
 const BUCKET_SIZE: usize = 8;
-const MAX_BUCKETS: usize = 32;
+const MAX_BUCKETS: usize = 8192;
 
 /// BitVec represents a bit vector that supports 4 operations:
 ///
@@ -77,7 +77,7 @@ impl BitVec {
     }
 
     /// Sets the bit at position @pos.
-    pub fn set(&mut self, pos: u8) {
+    pub fn set(&mut self, pos: u16) {
         // This is optimised to: let bucket = pos >> 3;
         let bucket: usize = pos as usize / BUCKET_SIZE;
         if self.inner.len() <= bucket {
@@ -90,7 +90,7 @@ impl BitVec {
 
     /// Checks if the bit at position @pos is set.
     #[inline]
-    pub fn is_set(&self, pos: u8) -> bool {
+    pub fn is_set(&self, pos: u16) -> bool {
         // This is optimised to: let bucket = pos >> 3;
         let bucket: usize = pos as usize / BUCKET_SIZE;
         if self.inner.len() <= bucket {
@@ -124,8 +124,8 @@ impl BitVec {
     }
 
     /// Return an `Iterator` over all '1' bit indexes.
-    pub fn iter_ones(&self) -> impl Iterator<Item = u8> + '_ {
-        (0..=u8::MAX).filter(move |idx| self.is_set(*idx))
+    pub fn iter_ones(&self) -> impl Iterator<Item = usize> + '_ {
+        (0..self.inner.len() * BUCKET_SIZE).filter(move |idx| self.is_set(*idx as u16))
     }
 }
 
@@ -163,7 +163,7 @@ impl FromIterator<u8> for BitVec {
     fn from_iter<T: IntoIterator<Item = u8>>(iter: T) -> Self {
         let mut bitvec = Self::default();
         for bit in iter {
-            bitvec.set(bit);
+            bitvec.set(bit as u16);
         }
         bitvec
     }
@@ -278,7 +278,7 @@ mod test {
     #[test]
     fn test_empty() {
         let p = BitVec::default();
-        for i in 0..=std::u8::MAX {
+        for i in 0..=u16::MAX {
             assert!(!p.is_set(i));
         }
     }
@@ -286,22 +286,25 @@ mod test {
     #[test]
     fn test_extremes() {
         let mut p = BitVec::default();
-        p.set(std::u8::MAX);
+        p.set(u16::MAX);
         p.set(0);
-        assert!(p.is_set(std::u8::MAX));
+        assert!(p.is_set(u16::MAX));
         assert!(p.is_set(0));
-        for i in 1..std::u8::MAX {
+        for i in 1..u16::MAX {
             assert!(!p.is_set(i));
         }
-        assert_eq!(vec![0, u8::MAX], p.iter_ones().collect::<Vec<_>>());
+        assert_eq!(
+            vec![0, u16::MAX as usize],
+            p.iter_ones().collect::<Vec<_>>()
+        );
     }
 
     #[test]
     fn test_deserialization() {
         // When the length is smaller than 128, it is encoded in the first byte.
         // (see comments in BCS crate)
-        let mut bytes = [0u8; 47];
-        bytes[0] = 46;
+        let inner = vec![0u8; 9000];
+        let bytes = bcs::to_bytes(&inner).unwrap();
         assert!(bcs::from_bytes::<Vec<u8>>(&bytes).is_ok());
         // However, 46 > MAX_BUCKET:
         assert!(bcs::from_bytes::<BitVec>(&bytes).is_err());
@@ -322,7 +325,7 @@ mod test {
             assert!(intersection.count_ones() <= bv1.count_ones());
             assert!(intersection.count_ones() <= bv2.count_ones());
 
-            for i in 0..=std::u8::MAX {
+            for i in 0..=u16::MAX {
                 if bv1.is_set(i) && bv2.is_set(i) {
                     assert!(intersection.is_set(i));
                 } else {
@@ -338,7 +341,7 @@ mod test {
             assert!(union.count_ones() >= bv1.count_ones());
             assert!(union.count_ones() >= bv2.count_ones());
 
-            for i in 0..=std::u8::MAX {
+            for i in 0..=u16::MAX {
                 if bv1.is_set(i) || bv2.is_set(i) {
                     assert!(union.is_set(i));
                 } else {
