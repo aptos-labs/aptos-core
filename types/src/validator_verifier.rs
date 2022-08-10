@@ -557,6 +557,22 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_multi_signatures() {
+        let validator_signer = ValidatorSigner::random(TEST_SEED);
+        let dummy_struct = TestAptosCrypto("Hello, World".to_string());
+        let validator =
+            ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key());
+
+        assert_eq!(
+            validator.verify_multi_signatures(&dummy_struct, &MultiSignature::empty()),
+            Err(VerifyError::TooLittleVotingPower {
+                voting_power: 0,
+                expected_voting_power: 1
+            })
+        );
+    }
+
+    #[test]
     fn test_equal_vote_quorum_validators() {
         const NUM_SIGNERS: u8 = 7;
         // Generate NUM_SIGNERS random signers.
