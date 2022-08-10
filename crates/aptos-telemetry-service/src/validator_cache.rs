@@ -9,7 +9,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time;
 use url::Url;
 
-use crate::{rest_client::RestClient, AptosTelemetryServiceConfig};
+use crate::{rest_client::RestClient, TelemetryServiceConfig};
 
 pub type EpochNum = u64;
 pub type ValidatorSetCache = Arc<RwLock<HashMap<ChainId, (EpochNum, PeerSet)>>>;
@@ -23,7 +23,7 @@ pub struct ValidatorSetCacheUpdater {
 }
 
 impl ValidatorSetCacheUpdater {
-    pub fn new(cache: ValidatorSetCache, config: &AptosTelemetryServiceConfig) -> Self {
+    pub fn new(cache: ValidatorSetCache, config: &TelemetryServiceConfig) -> Self {
         Self {
             cache,
             query_addresses: Arc::new(config.trusted_full_node_addresses.clone()),
