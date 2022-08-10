@@ -5,9 +5,10 @@ use aptos_types::transaction::{
     ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI,
 };
 use heck::CamelCase;
-use move_deps::move_core_types::language_storage::TypeTag;
+use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
 use serde_reflection::{ContainerFormat, Format, Named, VariantFormat};
 use std::collections::{BTreeMap, BTreeSet};
+use std::str::FromStr;
 
 /// Useful error message.
 pub(crate) fn type_not_allowed(type_tag: &TypeTag) -> ! {
@@ -24,28 +25,19 @@ pub(crate) fn prepare_doc_string(doc: &str) -> String {
 
 fn quote_type_as_format(type_tag: &TypeTag) -> Format {
     use TypeTag::*;
+    let str_tag: StructTag = StructTag::from_str("0x1::string::String").unwrap();
     match type_tag {
         Bool => Format::Bool,
         U8 => Format::U8,
         U64 => Format::U64,
         U128 => Format::U128,
         Address => Format::TypeName("AccountAddress".into()),
-        Vector(type_tag) => match type_tag.as_ref() {
-            U8 => Format::Bytes,
-            Vector(type_tag) => {
-                if type_tag.as_ref() == &U8 {
-                    Format::Seq(Box::new(Format::Bytes))
-                } else {
-                    type_not_allowed(type_tag)
-                }
-            }
-            Bool => Format::Seq(Box::new(Format::Bool)),
-            U64 => Format::Seq(Box::new(Format::U64)),
-            U128 => Format::Seq(Box::new(Format::U128)),
-            Address => Format::Seq(Box::new(Format::TypeName("AccountAddress".into()))),
+        Vector(type_tag) => Format::Seq(Box::new(quote_type_as_format(type_tag))),
+        Struct(tag) => match tag.clone() {
+            tag if tag == str_tag => Format::Seq(Box::new(Format::U8)),
             _ => type_not_allowed(type_tag),
         },
-        Struct(_) | Signer => type_not_allowed(type_tag),
+        Signer => type_not_allowed(type_tag),
     }
 }
 
@@ -98,6 +90,8 @@ pub(crate) fn make_abi_enum_container(abis: &[ScriptABI]) -> ContainerFormat {
 
 pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
     use TypeTag::*;
+    let str_tag: StructTag = StructTag::from_str("0x1::string::String").unwrap();
+
     match type_tag {
         Bool => "bool".into(),
         U8 => "u8".into(),
@@ -115,7 +109,11 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
             }
             _ => format!("vec{}", mangle_type(type_tag)),
         },
-        Struct(_) | Signer => type_not_allowed(type_tag),
+        Struct(tag) => match tag.clone() {
+            tag if tag == str_tag => "u8vector".into(),
+            _ => type_not_allowed(type_tag),
+        },
+        Signer => type_not_allowed(type_tag),
     }
 }
 
