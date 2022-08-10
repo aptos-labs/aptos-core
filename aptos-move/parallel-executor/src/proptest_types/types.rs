@@ -4,8 +4,12 @@
 use crate::{
     errors::{Error, Result},
     executor::MVHashMapView,
-    task::{ExecutionStatus, ExecutorTask, Transaction as TransactionType, TransactionOutput},
+    task::{
+        ExecutionStatus, ExecutorTask, ModulePath, Transaction as TransactionType,
+        TransactionOutput,
+    },
 };
+use aptos_types::{access_path::AccessPath, account_address::AccountAddress};
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::{
@@ -22,6 +26,30 @@ use std::{
 ///////////////////////////////////////////////////////////////////////////
 // Generation of transactions
 ///////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Copy, Hash, Debug, PartialEq, PartialOrd, Eq)]
+pub struct KeyType<K: Hash + Clone + Debug + PartialOrd + Eq>(
+    /// Wrapping the types used for testing to add ModulePath trait implementation (below).
+    pub K,
+    /// The bool field determines for testing purposes, whether the key will be interpreted
+    /// as a module access path. In this case, if a module path is both read and written
+    /// during parallel execution, Error::ModulePathReadWrite must be returned and the
+    /// block execution must fall back to the sequential execution.
+    pub bool,
+);
+
+impl<K: Hash + Clone + Debug + Eq + PartialOrd> ModulePath for KeyType<K> {
+    fn module_path(&self) -> Option<AccessPath> {
+        if self.1 {
+            Some(AccessPath {
+                address: AccountAddress::new([1u8; AccountAddress::LENGTH]),
+                path: b"/foo/b".to_vec(),
+            })
+        } else {
+            None
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub struct TransactionGenParams {
@@ -96,17 +124,22 @@ impl Default for TransactionGenParams {
 }
 
 impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
-    pub fn materialize<K: Clone + Eq + Ord>(self, universe: &[K]) -> Transaction<K, V> {
+    pub fn materialize<K: Clone + Hash + Debug + Eq + Ord>(
+        self,
+        universe: &[K],
+        // Are writes and reads module access (same access path).
+        module_access: (bool, bool),
+    ) -> Transaction<KeyType<K>, V> {
         let mut keys_modified = BTreeSet::new();
         let mut writes = vec![];
 
         for modified in self.keys_modified.into_iter() {
-            let mut incarnation_writes: Vec<(K, V)> = vec![];
+            let mut incarnation_writes: Vec<(KeyType<K>, V)> = vec![];
             for (idx, value) in modified.into_iter() {
                 let key = universe[idx.index(universe.len())].clone();
                 if !keys_modified.contains(&key) {
                     keys_modified.insert(key.clone());
-                    incarnation_writes.push((key, value.clone()));
+                    incarnation_writes.push((KeyType(key, module_access.0), value.clone()));
                 }
             }
             writes.push(incarnation_writes);
@@ -121,7 +154,9 @@ impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
                 .map(|keys_read| {
                     keys_read
                         .into_iter()
-                        .map(|k| universe[k.index(universe.len())].clone())
+                        .map(|k| {
+                            KeyType(universe[k.index(universe.len())].clone(), module_access.1)
+                        })
                         .collect()
                 })
                 .collect(),
@@ -131,7 +166,7 @@ impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
 
 impl<K, V> TransactionType for Transaction<K, V>
 where
-    K: PartialOrd + Send + Sync + Clone + Hash + Eq + 'static,
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + 'static,
 {
     type Key = K;
@@ -152,7 +187,7 @@ impl<K, V> Task<K, V> {
 
 impl<K, V> ExecutorTask for Task<K, V>
 where
-    K: PartialOrd + Send + Sync + Clone + Hash + Eq + 'static,
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + 'static,
 {
     type T = Transaction<K, V>;
@@ -196,11 +231,12 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct Output<K, V>(Vec<(K, V)>, Vec<Option<V>>);
 
 impl<K, V> TransactionOutput for Output<K, V>
 where
-    K: PartialOrd + Send + Sync + Clone + Hash + Eq + 'static,
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + 'static,
 {
     type T = Transaction<K, V>;
