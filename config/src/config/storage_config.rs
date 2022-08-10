@@ -71,12 +71,9 @@ pub struct StorageConfig {
     pub address: SocketAddr,
     pub backup_service_address: SocketAddr,
     pub dir: PathBuf,
-    pub grpc_max_receive_len: Option<i32>,
     pub storage_pruner_config: StoragePrunerConfig,
     #[serde(skip)]
     data_dir: PathBuf,
-    /// Read, Write, Connect timeout for network operations in milliseconds
-    pub timeout_ms: u64,
     /// The threshold that determine whether a snapshot should be committed to state merkle db.
     pub target_snapshot_size: usize,
     /// Rocksdb-specific configurations
@@ -145,7 +142,6 @@ impl Default for StorageConfig {
             address: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6666),
             backup_service_address: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6186),
             dir: PathBuf::from("db"),
-            grpc_max_receive_len: Some(100_000_000),
             // The prune window must at least out live a RPC request because its sub requests are
             // to return a consistent view of the DB at exactly same version. Considering a few
             // thousand TPS we are potentially going to achieve, and a few minutes a consistent view
@@ -154,8 +150,6 @@ impl Default for StorageConfig {
             // depending on the size of an average account blob.
             storage_pruner_config: StoragePrunerConfig::default(),
             data_dir: PathBuf::from("/opt/aptos/data"),
-            // Default read/write/connection timeout, in milliseconds
-            timeout_ms: 30_000,
             rocksdb_configs: RocksdbConfigs::default(),
             enable_indexer: false,
             target_snapshot_size: TARGET_SNAPSHOT_SIZE,
