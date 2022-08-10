@@ -9,7 +9,7 @@ use proptest::{
     collection::{vec, VecStrategy},
     strategy::{Map, Strategy},
 };
-use serde::{de::Error, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{
     iter::FromIterator,
     ops::{BitAnd, BitOr},
@@ -33,8 +33,8 @@ const MAX_BUCKETS: usize = 8192;
 /// * Bits are read from left to right. For instance, in the following bitvec
 ///   [0b0001_0000, 0b0000_0000, 0b0000_0000, 0b0000_0001], the 3rd and 31st positions are set.
 /// * Each bit of a u8 is set to 1 if the position is set and to 0 if it's not.
-/// * We only allow setting positions upto u8::MAX. As a result, the size of the inner vector is
-///   limited to 32 (= 256 / 8).
+/// * We only allow setting positions upto u16::MAX. As a result, the size of the inner vector is
+///   limited to 8192 (= 65536 / 8).
 /// * Once a bit has been set, it cannot be unset. As a result, the inner vector cannot shrink.
 /// * The positions can be set in any order.
 /// * A position can set more than once -- it remains set after the first time.
@@ -63,7 +63,7 @@ const MAX_BUCKETS: usize = 8192;
 /// assert!(intersection.is_set(2));
 /// assert_eq!(false, intersection.is_set(3));
 /// ```
-#[derive(Clone, Default, Debug, Eq, PartialEq, Serialize)]
+#[derive(Clone, Default, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct BitVec {
     #[serde(with = "serde_bytes")]
     inner: Vec<u8>,
@@ -73,6 +73,13 @@ impl BitVec {
     fn with_capacity(num_buckets: usize) -> Self {
         Self {
             inner: Vec::with_capacity(num_buckets),
+        }
+    }
+
+    /// Initialize with buckets that can fit in num_bits.
+    pub fn with_num_bits(num_bits: u16) -> Self {
+        Self {
+            inner: vec![0; Self::required_buckets(num_bits)],
         }
     }
 
@@ -127,6 +134,18 @@ impl BitVec {
     pub fn iter_ones(&self) -> impl Iterator<Item = usize> + '_ {
         (0..self.inner.len() * BUCKET_SIZE).filter(move |idx| self.is_set(*idx as u16))
     }
+
+    /// Return the number of buckets.
+    pub fn num_buckets(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Number of buckets require for num_bits.
+    pub fn required_buckets(num_bits: u16) -> usize {
+        num_bits
+            .checked_sub(1)
+            .map_or(0, |pos| pos as usize / BUCKET_SIZE + 1)
+    }
 }
 
 impl BitAnd for &BitVec {
@@ -169,18 +188,29 @@ impl FromIterator<u8> for BitVec {
     }
 }
 
-// We impl custom deserialization to ensure that the length of inner vector does not exceed
-// 32 (= 256 / 8).
-impl<'de> Deserialize<'de> for BitVec {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let v = serde_bytes::ByteBuf::deserialize(deserializer)?.into_vec();
-        if v.len() > MAX_BUCKETS {
-            return Err(D::Error::custom(format!("BitVec too long: {}", v.len())));
+impl From<Vec<u8>> for BitVec {
+    fn from(raw_bytes: Vec<u8>) -> Self {
+        assert!(raw_bytes.len() <= MAX_BUCKETS);
+        Self { inner: raw_bytes }
+    }
+}
+
+impl From<BitVec> for Vec<u8> {
+    fn from(bitvec: BitVec) -> Self {
+        bitvec.inner
+    }
+}
+
+impl From<Vec<bool>> for BitVec {
+    fn from(bits: Vec<bool>) -> Self {
+        assert!(bits.len() <= MAX_BUCKETS * BUCKET_SIZE);
+        let mut bitvec = Self::with_num_bits(bits.len() as u16);
+        for (index, b) in bits.iter().enumerate() {
+            if *b {
+                bitvec.set(index as u16);
+            }
         }
-        Ok(BitVec { inner: v })
+        bitvec
     }
 }
 
@@ -300,20 +330,14 @@ mod test {
     }
 
     #[test]
-    fn test_deserialization() {
-        // When the length is smaller than 128, it is encoded in the first byte.
-        // (see comments in BCS crate)
-        let inner = vec![0u8; 9000];
-        let bytes = bcs::to_bytes(&inner).unwrap();
-        assert!(bcs::from_bytes::<Vec<u8>>(&bytes).is_ok());
-        // However, 46 > MAX_BUCKET:
-        assert!(bcs::from_bytes::<BitVec>(&bytes).is_err());
-        let mut bytes = [0u8; 33];
-        bytes[0] = 32;
-        let bv = BitVec {
-            inner: Vec::from([0u8; 32].as_ref()),
-        };
-        assert_eq!(Ok(bv), bcs::from_bytes::<BitVec>(&bytes));
+    fn test_conversion() {
+        let bitmaps = vec![
+            false, true, true, false, false, true, true, false, true, true, true,
+        ];
+        let bitvec = BitVec::from(bitmaps.clone());
+        for (index, is_set) in bitmaps.into_iter().enumerate() {
+            assert_eq!(bitvec.is_set(index as u16), is_set);
+        }
     }
 
     // Test for bitwise AND operation on 2 bitvecs.

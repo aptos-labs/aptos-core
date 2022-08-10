@@ -595,12 +595,7 @@ mod test {
               "previous_block_votes": [],
               "failed_proposer_indices": [],
               "epoch": "1",
-              "previous_block_votes_bitmap": [
-                true,
-                true,
-                false,
-                true
-              ],
+              "previous_block_votes_bitmap": "0xf1",
               "proposer": "0x68f04222bd9f8846cda028ea5ba3846a806b04a47e1f1a4f0939f350d713b2eb",
               "timestamp": "1649395495746947",
               "events": [
@@ -611,7 +606,7 @@ mod test {
                     "data": {
                       "epoch": "1",
                       "failed_proposer_indices": [],
-                      "previous_block_votes": [false],
+                      "previous_block_votes_bitvec": "0x0",
                       "proposer": "0xf7c109be515785bba951fc8c51063515d474f78cad150457d6ebd08c4faf2f3b",
                       "round": "1",
                       "time_microseconds": "1656565270489235"

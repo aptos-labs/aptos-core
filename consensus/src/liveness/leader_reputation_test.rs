@@ -10,6 +10,7 @@ use crate::liveness::{
     },
     proposer_election::{choose_index, ProposerElection},
 };
+use aptos_bitvec::BitVec;
 use aptos_crypto::bls12381;
 use aptos_infallible::Mutex;
 use aptos_keygen::KeyGen;
@@ -79,7 +80,7 @@ impl TestBlockBuilder {
             self.epoch,
             self.round,
             self.round,
-            voters,
+            BitVec::from(voters).into(),
             proposer,
             failed_proposers,
             self.round * 3600,
@@ -94,7 +95,7 @@ fn test_aggregation_bitmap_to_voters() {
     let validators: Vec<_> = (0..4).into_iter().map(|_| Author::random()).collect();
     let bitmap = vec![true, true, false, true];
 
-    if let Ok(voters) = NewBlockEventAggregation::bitmap_to_voters(&validators, &bitmap) {
+    if let Ok(voters) = NewBlockEventAggregation::bitvec_to_voters(&validators, &bitmap.into()) {
         assert_eq!(&validators[0], voters[0]);
         assert_eq!(&validators[1], voters[1]);
         assert_eq!(&validators[3], voters[2]);
@@ -105,14 +106,18 @@ fn test_aggregation_bitmap_to_voters() {
 
 #[test]
 fn test_aggregation_bitmap_to_voters_mismatched_lengths() {
-    let validators: Vec<_> = (0..4) // size of 4
+    let validators: Vec<_> = (0..8) // size of 8 with one u8 in bitvec
         .into_iter()
         .map(|_| Author::random())
         .collect();
-    let bitmap_too_long = vec![true, true, false, true, true]; // size of 5
-    assert!(NewBlockEventAggregation::bitmap_to_voters(&validators, &bitmap_too_long).is_err());
-    let bitmap_too_short = vec![true, true, false];
-    assert!(NewBlockEventAggregation::bitmap_to_voters(&validators, &bitmap_too_short).is_err());
+    let bitmap_too_long = vec![true; 9]; // 2 bytes in bitvec
+    assert!(
+        NewBlockEventAggregation::bitvec_to_voters(&validators, &bitmap_too_long.into()).is_err()
+    );
+    let bitmap_too_short: Vec<bool> = vec![]; // 0 bytes in bitvec
+    assert!(
+        NewBlockEventAggregation::bitvec_to_voters(&validators, &bitmap_too_short.into()).is_err()
+    );
 }
 
 #[test]

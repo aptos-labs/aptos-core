@@ -624,7 +624,7 @@ pub fn convert_transaction(
             extractor::transaction::TxnData::BlockMetadata(extractor::BlockMetadataTransaction {
                 id: bm.id.to_string(),
                 events: convert_events(&bm.events),
-                previous_block_votes: bm.previous_block_votes.clone(),
+                previous_block_votes_bitvec: bm.previous_block_votes_bitvec.clone(),
                 proposer: bm.proposer.to_string(),
                 failed_proposer_indices: bm.failed_proposer_indices.clone(),
                 round: bm.round.0,

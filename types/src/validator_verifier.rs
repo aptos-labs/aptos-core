@@ -14,6 +14,7 @@ use crate::multi_signature::{MultiSignature, PartialSignatures};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_signer::ValidatorSigner;
 use anyhow::{ensure, Result};
+use aptos_bitvec::BitVec;
 use aptos_crypto::bls12381::PublicKey;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -198,13 +199,13 @@ impl ValidatorVerifier {
     ) -> Result<(MultiSignature, PublicKey), VerifyError> {
         let mut pub_keys = vec![];
         let mut sigs = vec![];
-        let mut masks = vec![false; self.validator_infos.len()];
+        let mut masks = BitVec::default();
         for (addr, sig) in partial_signatures.signatures() {
             let index = *self
                 .address_to_validator_index
                 .get(addr)
                 .ok_or(VerifyError::UnknownAuthor)?;
-            masks[index] = true;
+            masks.set(index as u16);
             pub_keys.push(self.validator_infos[index].public_key());
             sigs.push(sig.clone());
         }
@@ -251,11 +252,9 @@ impl ValidatorVerifier {
         self.check_num_of_voters(multi_signature)?;
         let mut pub_keys = vec![];
         let mut authors = vec![];
-        for (index, exist) in multi_signature.get_voters_bitmap().iter().enumerate() {
-            if *exist {
-                authors.push(self.validator_infos[index].address);
-                pub_keys.push(self.validator_infos[index].public_key());
-            }
+        for index in multi_signature.get_voters_bitvec().iter_ones() {
+            authors.push(self.validator_infos[index].address);
+            pub_keys.push(self.validator_infos[index].public_key());
         }
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter())?;
