@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::pb::extractor;
 use aptos_api_types::{
     AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, Event, GenesisPayload,
     MoveAbility, MoveFunction, MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule,
@@ -11,6 +10,8 @@ use aptos_api_types::{
     WriteSet, WriteSetChange,
 };
 use aptos_logger::warn;
+use aptos_protos::extractor::v1 as extractor;
+use aptos_protos::util::timestamp;
 use hex;
 use move_deps::move_binary_format::file_format::Ability;
 use std::time::Duration;
@@ -273,7 +274,7 @@ pub fn convert_move_type(move_type: &MoveType) -> extractor::MoveType {
         MoveType::Reference { mutable, to } => Some(extractor::move_type::Content::Reference(
             Box::new(extractor::move_type::ReferenceType {
                 mutable: *mutable,
-                to: Some(convert_move_type(to)),
+                to: Some(Box::new(convert_move_type(to))),
             }),
         )),
         MoveType::Unparsable(string) => {
@@ -458,16 +459,16 @@ pub fn convert_event(event: &Event) -> extractor::Event {
     }
 }
 
-pub fn convert_timestamp_secs(timestamp: u64) -> prost_wkt_types::Timestamp {
-    prost_wkt_types::Timestamp {
+pub fn convert_timestamp_secs(timestamp: u64) -> timestamp::Timestamp {
+    timestamp::Timestamp {
         seconds: timestamp as i64,
         nanos: 0,
     }
 }
 
-pub fn convert_timestamp_usecs(timestamp: u64) -> prost_wkt_types::Timestamp {
+pub fn convert_timestamp_usecs(timestamp: u64) -> timestamp::Timestamp {
     let ts = Duration::from_nanos(timestamp * 1000);
-    prost_wkt_types::Timestamp {
+    timestamp::Timestamp {
         seconds: ts.as_secs() as i64,
         nanos: ts.subsec_nanos() as i32,
     }
@@ -577,7 +578,7 @@ pub fn convert_transaction(
     block_height: u64,
     current_epoch: u64,
 ) -> extractor::Transaction {
-    let mut timestamp: Option<prost_wkt_types::Timestamp> = None;
+    let mut timestamp: Option<timestamp::Timestamp> = None;
 
     let txn_type = match transaction {
         Transaction::UserTransaction(_) => extractor::transaction::TransactionType::User,
