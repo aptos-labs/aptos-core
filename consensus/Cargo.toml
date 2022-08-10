@@ -29,6 +29,7 @@ termion = { version = "1.5.6", default-features = false }
 thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["full"] }
 
+aptos-bitvec = { path = "../crates/aptos-bitvec" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-infallible = { path = "../crates/aptos-infallible" }

@@ -25,7 +25,7 @@ module aptos_framework::block {
         epoch: u64,
         round: u64,
         height: u64,
-        previous_block_votes: vector<bool>,
+        previous_block_votes_bitvec: vector<u8>,
         proposer: address,
         failed_proposer_indices: vector<u64>,
         /// On-chain time during the block at the given height
@@ -78,7 +78,7 @@ module aptos_framework::block {
         proposer: address,
         proposer_index_optional: vector<u64>,
         failed_proposer_indices: vector<u64>,
-        previous_block_votes: vector<bool>,
+        previous_block_votes_bitvec: vector<u8>,
         timestamp: u64
     ) acquires BlockResource {
         timestamp::assert_operating();
@@ -98,7 +98,7 @@ module aptos_framework::block {
             epoch,
             round,
             height: block_metadata_ref.height,
-            previous_block_votes,
+            previous_block_votes_bitvec,
             proposer,
             failed_proposer_indices,
             time_microseconds: timestamp,
@@ -138,7 +138,7 @@ module aptos_framework::block {
                 epoch: 0,
                 round: 0,
                 height: 0,
-                previous_block_votes: vector::empty(),
+                previous_block_votes_bitvec: vector::empty(),
                 proposer: @vm_reserved,
                 failed_proposer_indices: vector::empty(),
                 time_microseconds: 0,

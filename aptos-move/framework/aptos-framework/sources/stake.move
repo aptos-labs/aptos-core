@@ -68,12 +68,18 @@ module aptos_framework::stake {
     const EINVALID_PUBLIC_KEY: u64 = 16;
     /// Invalid stake amount (usuaully 0).
     const EINVALID_STAKE_AMOUNT: u64 = 17;
+    /// Validator set exceeds the limit
+    const EVALIDATOR_SET_TOO_LARGE: u64 = 18;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
     const VALIDATOR_STATUS_ACTIVE: u64 = 2;
     const VALIDATOR_STATUS_PENDING_INACTIVE: u64 = 3;
     const VALIDATOR_STATUS_INACTIVE: u64 = 4;
+
+    /// Limit the maximum size to u16::max, it's the current limit of the bitvec
+    /// https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-bitvec/src/lib.rs#L20
+    const MAX_VALIDATOR_SET_SIZE: u64 = 65536;
 
     /// Capability that represents ownership and can be used to control the validator and the associated stake pool.
     /// Having this be separate from the signer for the account that the validator resources are hosted at allows
@@ -667,6 +673,8 @@ module aptos_framework::stake {
         assert!(!vector::is_empty(&validator_config.consensus_pubkey), error::invalid_argument(EINVALID_PUBLIC_KEY));
 
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
+        let validator_set_size = vector::length(&validator_set.active_validators) + vector::length(&validator_set.pending_active);
+        assert!( validator_set_size <= MAX_VALIDATOR_SET_SIZE, error::invalid_argument(EVALIDATOR_SET_TOO_LARGE));
         vector::push_back(&mut validator_set.pending_active, generate_validator_info(pool_address, stake_pool, *validator_config));
 
         event::emit_event<JoinValidatorSetEvent>(
