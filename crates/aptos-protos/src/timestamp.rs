@@ -45,8 +45,8 @@ mod tests {
         assert_eq!(a.seconds, utc.timestamp());
         assert_eq!(a.nanos, utc.timestamp_subsec_nanos() as i32);
 
-        let t = Timestamp::try_from(a).unwrap();
-        assert_eq!(t.seconds, utc.timestamp());
-        assert_eq!(t.nanos, utc.timestamp_subsec_nanos() as i32);
+        let t: DateTime<Utc> = DateTime::<Utc>::try_from(a).unwrap();
+        assert_eq!(t.timestamp(), utc.timestamp());
+        assert_eq!(t.timestamp_subsec_nanos(), utc.timestamp_subsec_nanos());
     }
 }

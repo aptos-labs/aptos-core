@@ -12,8 +12,8 @@ edition = "2018"
 [dependencies]
 bytes = "1.1.0"
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
-prost = "0.10.4"
 pbjson = "0.4.0"
 pbjson-types = "0.4.0"
+prost = "0.10.4"
 serde = { version = "1.0.137", features = ["derive"], default-features = false }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
