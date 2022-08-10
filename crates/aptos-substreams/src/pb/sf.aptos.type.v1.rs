@@ -1,5 +1,4 @@
-// @generated
-/// Transaction is acutally right what will be transported inside the Firehose's Block envloppe.
+/// Transaction is actually right what will be transported inside the Firehose's Block envelope.
 /// meaning we get a 1 transaction == 1 block mapping.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Transaction {
@@ -144,13 +143,13 @@ pub struct WriteSet {
 }
 /// Nested message and enum types in `WriteSet`.
 pub mod write_set {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum WriteSetType {
         ScriptWriteSet = 0,
         DirectWriteSet = 1,
     }
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum WriteSet {
         #[prost(message, tag="2")]
         ScriptWriteSet(super::ScriptWriteSet),
@@ -181,7 +180,7 @@ pub struct WriteSetChange {
 }
 /// Nested message and enum types in `WriteSetChange`.
 pub mod write_set_change {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Type {
         DeleteModule = 0,
@@ -191,7 +190,7 @@ pub mod write_set_change {
         WriteResource = 4,
         WriteTableItem = 5,
     }
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Change {
         #[prost(message, tag="2")]
         DeleteModule(super::DeleteModule),
@@ -292,7 +291,7 @@ pub struct TransactionPayload {
 }
 /// Nested message and enum types in `TransactionPayload`.
 pub mod transaction_payload {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Type {
         ScriptFunctionPayload = 0,
@@ -300,7 +299,7 @@ pub mod transaction_payload {
         ModuleBundlePayload = 2,
         WriteSetPayload = 3,
     }
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Payload {
         #[prost(message, tag="2")]
         ScriptFunctionPayload(super::ScriptFunctionPayload),
@@ -379,7 +378,7 @@ pub struct MoveFunction {
 }
 /// Nested message and enum types in `MoveFunction`.
 pub mod move_function {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Visibility {
         Private = 0,
@@ -421,52 +420,32 @@ pub struct MoveFunctionGenericTypeParam {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MoveType {
-    #[prost(enumeration="move_type::Type", tag="1")]
+    #[prost(enumeration="MoveTypes", tag="1")]
     pub r#type: i32,
     #[prost(oneof="move_type::Content", tags="3, 4, 5, 6, 7")]
     pub content: ::core::option::Option<move_type::Content>,
 }
 /// Nested message and enum types in `MoveType`.
 pub mod move_type {
-    #[derive(Clone, PartialEq, ::prost::Message)]
+        #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct ReferenceType {
         #[prost(bool, tag="1")]
         pub mutable: bool,
         #[prost(message, optional, tag="2")]
         pub to: ::core::option::Option<super::MoveType>,
     }
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
-    #[repr(i32)]
-    pub enum Type {
-        Bool = 0,
-        U8 = 1,
-        U64 = 2,
-        U128 = 3,
-        Address = 4,
-        Signer = 5,
-        /// { items: Box<MoveType> },
-        Vector = 6,
-        ///(MoveStructTag),
-        Struct = 7,
-        /// { index: u16 },
-        GenericTypeParam = 8,
-        /// { mutable: bool, to: Box<MoveType> },
-        Reference = 9,
-        ///(String),
-        Unparsable = 10,
-    }
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Content {
         #[prost(message, tag="3")]
-        VectorContent(::prost::alloc::boxed::Box<super::MoveType>),
+        Vector(::prost::alloc::boxed::Box<super::MoveType>),
         #[prost(message, tag="4")]
-        StructContent(super::MoveStructTag),
+        Struct(super::MoveStructTag),
         #[prost(uint32, tag="5")]
-        GenericTypeParamIndexContent(u32),
+        GenericTypeParamIndex(u32),
         #[prost(message, tag="6")]
-        ReferenceContent(::prost::alloc::boxed::Box<ReferenceType>),
+        Reference(::prost::alloc::boxed::Box<ReferenceType>),
         #[prost(string, tag="7")]
-        UnparsableContent(::prost::alloc::string::String),
+        Unparsable(::prost::alloc::string::String),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -515,19 +494,19 @@ pub struct Signature {
 }
 /// Nested message and enum types in `Signature`.
 pub mod signature {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Type {
-        Ed255198 = 0,
-        MultiEd255198 = 1,
+        Ed25519 = 0,
+        MultiEd25519 = 1,
         MultiAgent = 2,
     }
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Signature {
         #[prost(message, tag="2")]
-        Ed255198(super::Ed25519Signature),
+        Ed25519(super::Ed25519Signature),
         #[prost(message, tag="3")]
-        MultiEd255198(super::MultiEd25519Signature),
+        MultiEd25519(super::MultiEd25519Signature),
         #[prost(message, tag="4")]
         MultiAgent(super::MultiAgentSignature),
     }
@@ -568,19 +547,39 @@ pub struct AccountSignature {
 }
 /// Nested message and enum types in `AccountSignature`.
 pub mod account_signature {
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Type {
-        Ed255198 = 0,
-        MultiEd255198 = 1,
+        Ed25519 = 0,
+        MultiEd25519 = 1,
     }
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
+        #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Signature {
         #[prost(message, tag="2")]
-        Ed255198(super::Ed25519Signature),
+        Ed25519(super::Ed25519Signature),
         #[prost(message, tag="3")]
-        MultiEd255198(super::MultiEd25519Signature),
+        MultiEd25519(super::MultiEd25519Signature),
     }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum MoveTypes {
+    Bool = 0,
+    U8 = 1,
+    U64 = 2,
+    U128 = 3,
+    Address = 4,
+    Signer = 5,
+    /// { items: Box<MoveType> },
+    Vector = 6,
+    ///(MoveStructTag),
+    Struct = 7,
+    /// { index: u16 },
+    GenericTypeParam = 8,
+    /// { mutable: bool, to: Box<MoveType> },
+    Reference = 9,
+    ///(String),
+    Unparsable = 10,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
@@ -590,4 +589,3 @@ pub enum MoveAbility {
     Store = 2,
     Key = 3,
 }
-// @@protoc_insertion_point(module)

@@ -4,7 +4,7 @@ package:
   version: v0.0.1
 
 imports:
-  aptos: ./aptos-firehose-v0.0.1.spkg
+  # aptos: ./aptos-firehose-v0.0.1.spkg
 
 protobuf:
   files:

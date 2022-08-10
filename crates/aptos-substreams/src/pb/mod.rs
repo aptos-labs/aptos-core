@@ -1,3 +1,4 @@
+// #[path = "../../../../sf-stream/src/pb/extractor.rs"]
 #[path = "sf.aptos.type.v1.rs"]
 #[allow(dead_code)]
 pub mod aptos;
