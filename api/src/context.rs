@@ -107,8 +107,8 @@ impl Context {
 
     pub fn get_latest_ledger_info(&self) -> Result<LedgerInfo, Error> {
         let oldest_version = self.db.get_first_viable_txn_version()?;
-        let ledger_info = self.get_latest_ledger_info_with_signatures()?;
         let (_, _, oldest_block_event) = self.db.get_block_info(oldest_version)?;
+        let ledger_info = self.get_latest_ledger_info_with_signatures()?;
         let (_, _, newest_block_event) = self
             .db
             .get_block_info(ledger_info.ledger_info().version())?;
