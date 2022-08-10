@@ -15,14 +15,15 @@ use serde_generate::{
 };
 
 use heck::{CamelCase, ShoutySnakeCase, SnakeCase};
+use move_deps::move_core_types::language_storage::StructTag;
+use once_cell::sync::Lazy;
 use serde_reflection::ContainerFormat;
+use std::str::FromStr;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
     path::PathBuf,
 };
-use std::str::FromStr;
-use move_deps::move_core_types::language_storage::StructTag;
 
 /// Output transaction builders in Rust for the given ABIs.
 /// If `local_types` is true, we generate a file suitable for the Aptos codebase itself
@@ -37,6 +38,7 @@ pub fn output(out: &mut dyn Write, abis: &[ScriptABI], local_types: bool) -> Res
     };
 
     emitter.output_preamble()?;
+    writeln!(emitter.out, "#![allow(dead_code)]")?;
     writeln!(emitter.out, "#![allow(unused_imports)]")?;
 
     emitter.output_script_call_enum_with_imports(abis)?;
@@ -230,7 +232,6 @@ impl ScriptFunctionCall {
         } else {
             None
         };
-
         // Deactivate serialization for local types to force `Bytes = Vec<u8>`.
         let config = CodeGeneratorConfig::new("crate".to_string())
             .with_comments(comments)
@@ -857,7 +858,8 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
 
     fn quote_type(type_tag: &TypeTag, local_types: bool) -> String {
         use TypeTag::*;
-        let str_tag: StructTag = StructTag::from_str("0x1::string::String").unwrap();
+        let str_tag: Lazy<StructTag> =
+            Lazy::new(|| StructTag::from_str("0x1::string::String").unwrap());
         match type_tag {
             Bool => "bool".into(),
             U8 => "u8".into(),
@@ -867,8 +869,8 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
             Vector(type_tag) => {
                 format!("Vec<{}>", Self::quote_type(type_tag.as_ref(), local_types))
             }
-            Struct(struct_tag) => match struct_tag.clone() {
-                tag if tag == str_tag => "Vec<u8>".into(),
+            Struct(struct_tag) => match struct_tag {
+                tag if tag == Lazy::force(&str_tag) => "Vec<u8>".into(),
                 _ => common::type_not_allowed(type_tag),
             },
             Signer => common::type_not_allowed(type_tag),
