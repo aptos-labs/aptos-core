@@ -5,6 +5,7 @@ use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use std::collections::HashMap;
 
+use aptos_bitvec::BitVec;
 use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
@@ -13,13 +14,13 @@ use serde::{Deserialize, Serialize};
 /// aggregated from these validators' partial BLS signatures.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct MultiSignature {
-    validator_bitmask: Vec<bool>,
+    validator_bitmask: BitVec,
     multi_sig: Option<bls12381::Signature>,
 }
 
 impl MultiSignature {
     pub fn new(
-        validator_bitmask: Vec<bool>,
+        validator_bitmask: BitVec,
         aggregated_signature: Option<bls12381::Signature>,
     ) -> Self {
         Self {
@@ -30,29 +31,36 @@ impl MultiSignature {
 
     pub fn empty() -> Self {
         Self {
-            validator_bitmask: vec![],
+            validator_bitmask: BitVec::default(),
             multi_sig: None,
         }
     }
 
-    pub fn get_voters_bitmap(&self) -> &Vec<bool> {
+    pub fn get_voters_bitvec(&self) -> &BitVec {
         &self.validator_bitmask
     }
 
     pub fn get_voter_addresses(
         &self,
-        validator_addresses: &Vec<AccountAddress>,
+        validator_addresses: &[AccountAddress],
     ) -> Vec<AccountAddress> {
-        self.validator_bitmask
+        validator_addresses
             .iter()
-            .zip(validator_addresses)
-            .filter_map(|(voted, address)| if *voted { Some(*address) } else { None })
+            .enumerate()
+            .filter_map(|(index, addr)| {
+                if self.validator_bitmask.is_set(index as u16) {
+                    Some(*addr)
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
     pub fn get_num_voters(&self) -> usize {
-        self.validator_bitmask.iter().filter(|x| **x).count()
+        self.validator_bitmask.count_ones() as usize
     }
+
     pub fn multi_sig(&self) -> &Option<bls12381::Signature> {
         &self.multi_sig
     }

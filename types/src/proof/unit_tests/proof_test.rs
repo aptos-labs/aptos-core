@@ -401,7 +401,7 @@ fn test_transaction_list_with_proof() {
         0,
         AccountAddress::random(),
         Some(0),
-        vec![false],
+        vec![0],
         vec![],
         0,
     ))];
@@ -477,7 +477,7 @@ fn test_transaction_and_output_list_with_proof() {
         0,
         AccountAddress::random(),
         Some(0),
-        vec![false],
+        vec![0],
         vec![],
         0,
     ));

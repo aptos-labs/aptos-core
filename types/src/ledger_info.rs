@@ -257,7 +257,7 @@ impl LedgerInfoWithV0 {
         self.ledger_info.commit_info()
     }
 
-    pub fn get_voters(&self, validator_addresses: &Vec<AccountAddress>) -> Vec<AccountAddress> {
+    pub fn get_voters(&self, validator_addresses: &[AccountAddress]) -> Vec<AccountAddress> {
         self.signatures.get_voter_addresses(validator_addresses)
     }
 
@@ -265,8 +265,8 @@ impl LedgerInfoWithV0 {
         self.signatures.get_num_voters()
     }
 
-    pub fn get_voters_bitmap(&self) -> &Vec<bool> {
-        self.signatures.get_voters_bitmap()
+    pub fn get_voters_bitvec(&self) -> &BitVec {
+        self.signatures.get_voters_bitvec()
     }
 
     pub fn verify_signatures(
@@ -360,6 +360,7 @@ use crate::validator_verifier::generate_validator_verifier;
 use crate::validator_verifier::random_validator_verifier;
 #[cfg(any(test, feature = "fuzzing"))]
 use ::proptest::prelude::*;
+use aptos_bitvec::BitVec;
 use itertools::Itertools;
 
 #[cfg(any(test, feature = "fuzzing"))]
