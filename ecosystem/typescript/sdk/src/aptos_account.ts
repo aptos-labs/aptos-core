@@ -35,6 +35,9 @@ export class AptosAccount {
     return new AptosAccount(HexString.ensure(obj.privateKeyHex).toUint8Array(), obj.address);
   }
 
+  /**
+   * Test derive path
+   */
   static isValidPath = (path: string): boolean => {
     if (!/^m\/44'\/637'\/[0-9]+'\/[0-9]+'\/[0-9]+'+$/.test(path)) {
       return false;
@@ -42,6 +45,13 @@ export class AptosAccount {
     return true;
   };
 
+  /**
+   * Creates new account with bip44 path and mnemonics,
+   * @param path. (e.g. m/44'/637'/0'/0'/0')
+   * Detailed description: {@link https://github.com/bitcoin/bips/blob/master/bip-0044.mediawiki}
+   * @param mnemonics.
+   * @returns AptosAccount
+   */
   static fromDerivePath(path: string, mnemonics: string): AptosAccount {
     if (!AptosAccount.isValidPath(path)) {
       throw new Error("Invalid derivation path");
