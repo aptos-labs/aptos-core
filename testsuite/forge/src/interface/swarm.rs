@@ -4,6 +4,7 @@
 use crate::{ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version};
 use anyhow::{anyhow, bail};
 use aptos_config::config::NodeConfig;
+use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
 use futures::future::try_join_all;
@@ -113,7 +114,7 @@ pub trait SwarmExt: Swarm {
 
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
-
+        info!("Swarm liveness check passed");
         Ok(())
     }
 
@@ -138,7 +139,7 @@ pub trait SwarmExt: Swarm {
 
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
-
+        info!("Swarm connectivity check passed");
         Ok(())
     }
 
