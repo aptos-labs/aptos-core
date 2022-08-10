@@ -3,14 +3,16 @@
 
 use crate::{
     current_function_name,
-    pb::extractor::{
-        transaction::{TransactionType, TxnData},
-        transaction_payload::{Payload, Type as PayloadType},
-        write_set_change::Change::WriteTableItem,
-    },
     runtime::SfStreamer,
     tests::{new_test_context, TestContext},
 };
+
+use aptos_protos::extractor::v1::{
+    transaction::{TransactionType, TxnData},
+    transaction_payload::{Payload, Type as PayloadType},
+    write_set_change::Change::WriteTableItem,
+};
+
 use aptos_sdk::types::{account_config::aptos_root_address, LocalAccount};
 use move_deps::{
     move_core_types::{account_address::AccountAddress, value::MoveValue},

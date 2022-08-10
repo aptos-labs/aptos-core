@@ -4,7 +4,7 @@
 mod proto_converter_tests;
 mod test_context;
 
-use crate::pb::extractor;
+use aptos_protos::extractor::v1 as extractor;
 pub use test_context::{new_test_context, TestContext};
 
 pub(crate) mod golden_output;
