@@ -11,7 +11,7 @@ This document describes how to install the `aptos` CLI tool. See [Use Aptos CLI]
 ## Install precompiled binary (easy mode)
 
 1. Navigate to the [release page](https://github.com/aptos-labs/aptos-core/releases?q=cli&expanded=true) for Aptos CLI.
-2. From the latest release section, download the binary zip file for your platform. The binary zip files contain the platform name in the filename, i.e., `aptos-cli-0.2.3-MacOSX-x86_64.zip` for the MacOS binary and `aptos-cli-0.2.3-Ubuntu-x86_64.zip` for the Linux binary.
+2. From the latest release section, download the binary zip file for your platform. The binary zip files contain the platform name in the filename.
 3. Unzip the downloaded file. This will extract the `aptos` CLI tool.
 4. Place this extracted `aptos` file at a location for you to run it. For example, place it in `~/bin/aptos` in Linux.
 5. On Linux and Mac, make this `~/bin/aptos` as an executable by running this command: `chmod +x ~/bin/aptos`.

@@ -29,13 +29,18 @@ To get started, you will need:
 
 1. The Aptos CLI tool.
 2. A local testnet with a validator node that has the faucet service turned on, and
-3. The correct version of the Aptos SDK. The version is important to ensure that the SDK code builds the clients that talk to the local tesnet. 
+3. The Aptos SDK. You can use either the Typescript SDK or the Python SDK. For Typescript SDK, the version of the SDK is important to ensure that the TS SDK code builds the clients that talk to the local testnet, and not to the Aptos devnet. 
 
 Follow the below steps to set up the above three:
 
-1. Follow the instructions for Aptos CLI in [Install with cargo](/cli-tools/aptos-cli-tool/install-aptos-cli#install-with-cargo) and install the CLI tool. Make sure you that when you execute Step 2, you use `--branch main` to target the `main` branch, and not the `--branch devnet` as the codebase is undergoing many changes during the next 2-3 weeks.
-2. Start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet): `aptos node run-local-testnet --with-faucet`. This will See the [Starting a local testnet with a faucet, using CLI](https://aptos.dev/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet) for more.
-3. Install the SDK from the `aptos-core`. Follow the steps described in [Use the SDK from aptos-core](/guides/local-testnet-dev-flow#typescript-use-the-sdk-from-aptos-core). 
+1. Follow the instructions for Aptos CLI in [Install with cargo](/cli-tools/aptos-cli-tool/install-aptos-cli#install-with-cargo) and install the CLI tool. 
+
+   :::caution
+   Make sure that when you execute Step 2, you use `--branch main` to target the `main` branch, and not the `--branch devnet`. The `main` branch should be used for your local development, i.e., on the local node with the faucet, and the `devnet` branch is for development on the Aptos devnet.
+2. Start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet): `aptos node run-local-testnet --with-faucet`. See the [Starting a local testnet with a faucet, using CLI](https://aptos.dev/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet) for more.
+3. Install the SDK. 
+   - **Typescript SDK**: Install the Typescript SDK from the `aptos-core`. Follow the steps described in [Use the SDK from aptos-core](/guides/local-testnet-dev-flow#typescript-use-the-sdk-from-aptos-core).
+   - **Python SDK**: Install the Python SDK as described in this [Python SDK](/sdks/python-sdk).
 
 This will start a local testnet with a faucet and cause SDKs to automatically point toward this node as the default endpoint, if one is not specified.
 
@@ -157,9 +162,7 @@ Within a given transaction, the target of execution can be one of two types:
 
 Currently the SDKs: [Python](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/python/sdk/aptos_sdk/client.py#L248) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) only support the generation of transactions that target entry points. This guide points out many of those entry points, such as `coin::transfer` and `account::create_account`. 
 
-All operations on the Aptos blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. 
-
-A script payload transaction can call any entry point or public function defined within any module. 
+All operations on the Aptos blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. A script payload transaction can call any entry point or public function defined within any module. 
 
 :::tip Move book
 Currently there are no tutorials in this guide on script payloads, but the [Move book](https://move-language.github.io/move/modules-and-scripts.html?highlight=script#scripts) does go in some depth.
