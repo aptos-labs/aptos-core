@@ -19,6 +19,7 @@ use move_deps::{
 use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
 use std::collections::{BTreeSet, VecDeque};
+use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -36,10 +37,15 @@ pub struct PackageMetadata {
     pub name: String,
     /// The upgrade policy of this package.
     pub upgrade_policy: UpgradePolicy,
+    /// Build info, in BuildInfo.yaml format
+    pub build_info: String,
     /// The package manifest, in the Move.toml format.
     pub manifest: String,
     /// The list of modules installed by this package.
     pub modules: Vec<ModuleMetadata>,
+    /// Error map, in internal encoding
+    #[serde(with = "serde_bytes")]
+    pub error_map: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -49,8 +55,10 @@ pub struct ModuleMetadata {
     /// Source text if available.
     pub source: String,
     /// Source map, in internal encoding.
+    #[serde(with = "serde_bytes")]
     pub source_map: Vec<u8>,
     /// ABI, in JSON byte encoding.
+    #[serde(with = "serde_bytes")]
     pub abi: Vec<u8>,
 }
 
@@ -83,13 +91,21 @@ impl FromStr for UpgradePolicy {
     }
 }
 
+impl fmt::Display for UpgradePolicy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self.policy {
+            0 => "arbitrary",
+            1 => "compatible",
+            _ => "immutable",
+        })
+    }
+}
+
 // ========================================================================================
 // Code Publishing Logic
 
 /// Abort code when code publishing is requested twice (0x03 == INVALID_STATE)
 const EALREADY_REQUESTED: u64 = 0x03_0000;
-
-const ENOT_SUPPORTED: u64 = 0x03_0002;
 
 const CHECK_COMPAT_POLICY: u8 = 1;
 
@@ -145,11 +161,6 @@ fn native_request_publish(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert_eq!(args.len(), 4);
-
-    if !cfg!(any(test, feature = "fuzzing")) {
-        // This feature is currently disabled outside of test builds
-        return Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(ENOT_SUPPORTED));
-    }
 
     let policy = pop_arg!(args, u8);
     let mut code = vec![];

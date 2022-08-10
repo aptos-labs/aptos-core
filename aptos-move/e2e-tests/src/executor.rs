@@ -77,6 +77,7 @@ pub struct FakeExecutor {
     executed_output: Option<GoldenOutputs>,
     trace_dir: Option<PathBuf>,
     rng: KeyGen,
+    no_parallel_exec: bool,
 }
 
 impl FakeExecutor {
@@ -88,9 +89,16 @@ impl FakeExecutor {
             executed_output: None,
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
+            no_parallel_exec: false,
         };
         executor.apply_write_set(write_set);
         executor
+    }
+
+    /// Configure this executor to not use parallel execution.
+    pub fn set_not_parallel(mut self) -> Self {
+        self.no_parallel_exec = true;
+        self
     }
 
     /// Create an executor from a saved genesis blob
@@ -117,6 +125,7 @@ impl FakeExecutor {
             executed_output: None,
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
+            no_parallel_exec: false,
         }
     }
 
@@ -345,8 +354,10 @@ impl FakeExecutor {
         }
 
         let output = AptosVM::execute_block(txn_block.clone(), &self.data_store);
-        let parallel_output = self.execute_transaction_block_parallel(txn_block);
-        assert_eq!(output, parallel_output);
+        if !self.no_parallel_exec {
+            let parallel_output = self.execute_transaction_block_parallel(txn_block);
+            assert_eq!(output, parallel_output);
+        }
 
         if let Some(logger) = &self.executed_output {
             logger.log(format!("{:#?}\n", output).as_str());
@@ -403,8 +414,8 @@ impl FakeExecutor {
     }
 
     /// Get the blob for the associated AccessPath
-    pub fn read_from_access_path(&self, path: &AccessPath) -> Option<Vec<u8>> {
-        StateView::get_state_value(&self.data_store, &StateKey::AccessPath(path.clone())).unwrap()
+    pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
+        StateView::get_state_value(&self.data_store, state_key).unwrap()
     }
 
     /// Verifies the given transaction by running it through the VM verifier.
@@ -421,18 +432,26 @@ impl FakeExecutor {
         self.new_block_with_timestamp(self.block_time + 1);
     }
 
-    pub fn new_block_with_timestamp(&mut self, time_stamp: u64) {
+    pub fn new_block_with_timestamp(&mut self, time_microseconds: u64) {
+        self.block_time = time_microseconds;
+        self.new_block_with_metadata(None, vec![])
+    }
+
+    pub fn new_block_with_metadata(
+        &mut self,
+        proposer_index: Option<u32>,
+        failed_proposer_indices: Vec<u32>,
+    ) {
         let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
             .expect("Unable to retrieve the validator set from storage");
-        self.block_time = time_stamp;
         let new_block = BlockMetadata::new(
             HashValue::zero(),
             0,
             0,
             *validator_set.payload().next().unwrap().account_address(),
-            Some(0),
+            proposer_index,
             vec![false; validator_set.payload().count()],
-            vec![],
+            failed_proposer_indices,
             self.block_time,
         );
         let output = self
@@ -461,6 +480,10 @@ impl FakeExecutor {
 
     pub fn get_block_time(&mut self) -> u64 {
         self.block_time
+    }
+
+    pub fn get_block_time_seconds(&mut self) -> u64 {
+        self.block_time / 1_000_000
     }
 
     pub fn exec(

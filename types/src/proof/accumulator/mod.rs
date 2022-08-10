@@ -44,13 +44,13 @@ pub struct InMemoryAccumulator<H> {
     ///      / \     / \     / \
     ///     a   b   c   d   e   placeholder
     /// ```
-    frozen_subtree_roots: Vec<HashValue>,
+    pub frozen_subtree_roots: Vec<HashValue>,
 
     /// The total number of leaves in this accumulator.
-    num_leaves: LeafCount,
+    pub num_leaves: LeafCount,
 
     /// The root hash of this accumulator.
-    root_hash: HashValue,
+    pub root_hash: HashValue,
 
     phantom: PhantomData<H>,
 }

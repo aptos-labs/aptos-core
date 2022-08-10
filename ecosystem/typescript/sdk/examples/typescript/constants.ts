@@ -1,6 +1,1 @@
-export const aptosCoin = {
-  address: "0x1",
-  module: "coin",
-  name: "CoinStore",
-  generic_type_params: ["0x1::aptos_coin::AptosCoin"],
-};
+export const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";

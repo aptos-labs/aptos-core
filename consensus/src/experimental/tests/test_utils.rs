@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::MockStorage};
-use aptos_crypto::{bls12381, hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
+use aptos_crypto::{hash::ACCUMULATOR_PLACEHOLDER_HASH, HashValue};
 use aptos_infallible::Mutex;
 use aptos_secure_storage::Storage;
+use aptos_types::ledger_info::generate_ledger_info_with_sig;
 use aptos_types::{
-    account_address::AccountAddress,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
     validator_verifier::random_validator_verifier,
@@ -24,7 +24,7 @@ use safety_rules::{
     test_utils::{make_proposal_with_parent, make_proposal_with_qc},
     PersistentSafetyStorage, SafetyRulesManager,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 pub fn prepare_safety_rules() -> (Arc<Mutex<MetricsSafetyRules>>, Vec<ValidatorSigner>) {
     let num_nodes = 1;
@@ -53,7 +53,7 @@ pub fn prepare_safety_rules() -> (Arc<Mutex<MetricsSafetyRules>>, Vec<ValidatorS
     (Arc::new(Mutex::new(safety_rules)), signers)
 }
 
-// This function priorizes using parent over init_qc
+// This function prioritizes using parent over init_qc
 pub fn prepare_executed_blocks_with_ledger_info(
     signer: &ValidatorSigner,
     num_blocks: Round,
@@ -106,12 +106,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
         consensus_hash,
     );
 
-    let mut li_sig = LedgerInfoWithSignatures::new(
-        li.clone(),
-        BTreeMap::<AccountAddress, bls12381::Signature>::new(),
-    );
-
-    li_sig.add_signature(signer.author(), signer.sign(&li));
+    let li_sig = generate_ledger_info_with_sig(&[signer.clone()], li);
 
     let executed_blocks: Vec<ExecutedBlock> = proposals
         .iter()

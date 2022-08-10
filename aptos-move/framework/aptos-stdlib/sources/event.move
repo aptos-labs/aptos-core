@@ -41,10 +41,16 @@ module aptos_std::event {
     public fun guid<T: drop + store>(handle_ref: &EventHandle<T>): &GUID {
         &handle_ref.guid
     }
+    spec guid {
+        pragma intrinsic = false;
+    }
 
     /// Return the current counter associated with this EventHandle
     public fun counter<T: drop + store>(handle_ref: &EventHandle<T>): u64 {
         handle_ref.counter
+    }
+    spec counter {
+        pragma intrinsic = false;
     }
 
     /// Log `msg` as the `count`th event associated with the event stream identified by `guid`

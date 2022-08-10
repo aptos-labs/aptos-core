@@ -10,9 +10,5 @@ export const $MoveStructGenericTypeParam = {
             },
             isRequired: true,
         },
-        is_phantom: {
-            type: 'boolean',
-            isRequired: true,
-        },
     },
 } as const;

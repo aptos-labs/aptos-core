@@ -1,12 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::{collections::BTreeMap, iter::once, sync::Arc};
+use std::{iter::once, sync::Arc};
 
 use proptest::prelude::*;
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_state_view::StateViewId;
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -128,7 +129,7 @@ fn gen_ledger_info(
         ),
         HashValue::zero(),
     );
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
 }
 
 #[test]
@@ -715,6 +716,7 @@ proptest! {
         prop_assert_eq!(root_hash, expected_root_hash);
     }
 
+    #[ignore]
     #[test]
     fn test_idempotent_commits(chunk_size in 1..30u64, overlap_size in 1..30u64, num_new_txns in 1..30u64) {
         let (chunk_start, chunk_end) = (1, chunk_size + 1);
@@ -738,7 +740,7 @@ proptest! {
         let second_block_txns = ((chunk_size + overlap_size + 1..=chunk_size + overlap_size + num_new_txns)
                              .map(|i| encode_mint_transaction(gen_address(i), 100))).collect::<Vec<_>>();
 
-        executor.reset();
+        executor.reset().unwrap();
         let parent_block_id = executor.committed_block_id();
         let first_block_id = gen_block_id(1);
         let _output1 = executor.execute_block(

@@ -5,16 +5,26 @@
 //! traits with Poem. For more information on how these macros work, see the
 //! documentation within `crates/aptos-openapi`.
 //!
+//! In some cases we use these derives because the underlying types are not
+//! expressible via OpenAPI, e.g. Address. In other cases, we use them because
+//! we do not want to use the default serialization of the types, but instead
+//! serialize them as strings, e.g. ScriptFunctionId.
+//!
 //! For potential future improvements here, see:
 //! https://github.com/aptos-labs/aptos-core/issues/2319.
+
+// READ ME: You'll see that some of the examples (specifically those for hex
+// strings) have a space at the end. This is necessary to make sure the UI
+// displays the example value correctly. See more here:
+// https://github.com/aptos-labs/aptos-core/pull/2703
 
 use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use serde_json::json;
 
 use crate::{
     move_types::{MoveAbility, MoveStructValue},
-    Address, EventKey, HashValue, HexEncodedBytes, IdentifierWrapper, MoveStructTagParam, MoveType,
-    U128, U64,
+    Address, EventKey, HashValue, HexEncodedBytes, IdentifierWrapper, MoveModuleId, MoveStructTag,
+    MoveType, ScriptFunctionId, U128, U64,
 };
 use indoc::indoc;
 
@@ -23,7 +33,7 @@ impl_poem_type!(
     "string",
     (
         example = Some(serde_json::Value::String(
-            "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1".to_string()
+            "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 ".to_string()
         )),
         format = Some("hex"),
         description = Some("Hex encoded 32 byte Aptos account address")
@@ -35,7 +45,7 @@ impl_poem_type!(
     "string",
     (
         example = Some(serde_json::Value::String(
-            "0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+            "0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 "
                 .to_string()
         )),
         format = Some("hex"),
@@ -60,7 +70,7 @@ impl_poem_type!(
     "string",
     (
         example = Some(serde_json::Value::String(
-            "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1".to_string()
+            "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 ".to_string()
         )),
         format = Some("hex"),
         description = Some(indoc! {"
@@ -77,7 +87,24 @@ impl_poem_type!(IdentifierWrapper, "string", ());
 impl_poem_type!(MoveAbility, "string", ());
 
 impl_poem_type!(
-    MoveStructTagParam,
+    MoveModuleId,
+    "string",
+    (
+        example = Some(serde_json::Value::String("0x1::aptos_coin".to_string())),
+        description = Some(indoc! {"
+          Move module id is a string representation of Move module.
+
+          Format: `{address}::{module name}`
+
+          `address` should be hex-encoded 32 byte account address that is prefixed with `0x`.
+
+          Module name is case-sensitive.
+    "})
+    )
+);
+
+impl_poem_type!(
+    MoveStructTag,
     "string",
     (
         example = Some(serde_json::Value::String(
@@ -202,6 +229,23 @@ impl_poem_type!(
 );
 
 impl_poem_type!(
+    ScriptFunctionId,
+    "string",
+    (
+        example = Some(serde_json::Value::String(
+            "0x1::aptos_coin::transfer".to_string()
+        )),
+        description = Some(indoc! {"
+            Script function id is string representation of a script function defined on-chain.
+
+            Format: `{address}::{module name}::{function name}`
+
+            Both `module name` and `function name` are case-sensitive.
+    "})
+    )
+);
+
+impl_poem_type!(
     U64,
     "string",
     (
@@ -239,7 +283,7 @@ impl_poem_parameter!(
     HashValue,
     IdentifierWrapper,
     HexEncodedBytes,
-    MoveStructTagParam,
+    MoveStructTag,
     U64,
     U128
 );

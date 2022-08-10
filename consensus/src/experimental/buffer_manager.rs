@@ -221,7 +221,7 @@ impl BufferManager {
             let executed_item = item.unwrap_executed_ref();
             let request = self.create_new_request(SigningRequest {
                 ordered_ledger_info: executed_item.ordered_proof.clone(),
-                commit_ledger_info: executed_item.commit_proof.ledger_info().clone(),
+                commit_ledger_info: executed_item.partial_commit_proof.ledger_info().clone(),
             });
             if cursor == self.signing_root {
                 let sender = self.signing_phase_tx.clone();

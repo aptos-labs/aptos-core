@@ -11,8 +11,7 @@ module aptos_framework::block {
     use aptos_framework::stake;
 
     /// Should be in-sync with BlockResource rust struct in new_block.rs
-    /// TODO rename to BlockResource for consistency.
-    struct BlockMetadata has key {
+    struct BlockResource has key {
         /// Height of the current block
         height: u64,
         /// Time period between epochs.
@@ -33,7 +32,7 @@ module aptos_framework::block {
         time_microseconds: u64,
     }
 
-    /// The `BlockMetadata` resource is in an invalid state
+    /// The `BlockResource` resource is in an invalid state
     const EBLOCK_METADATA: u64 = 0;
     /// An invalid signer was provided. Expected the signer to be the VM or a Validator.
     const EVM_OR_VALIDATOR: u64 = 1;
@@ -44,9 +43,9 @@ module aptos_framework::block {
         system_addresses::assert_aptos_framework(account);
 
         assert!(!is_initialized(), error::already_exists(EBLOCK_METADATA));
-        move_to<BlockMetadata>(
+        move_to<BlockResource>(
             account,
-            BlockMetadata {
+            BlockResource {
                 height: 0,
                 epoch_interval,
                 new_block_events: event::new_event_handle<Self::NewBlockEvent>(account),
@@ -59,15 +58,15 @@ module aptos_framework::block {
     public fun update_epoch_interval(
         aptos_framework: &signer,
         new_epoch_interval: u64,
-    ) acquires BlockMetadata {
+    ) acquires BlockResource {
         system_addresses::assert_aptos_framework(aptos_framework);
-        let block_metadata = borrow_global_mut<BlockMetadata>(@aptos_framework);
+        let block_metadata = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata.epoch_interval = new_epoch_interval;
     }
 
     /// Helper function to determine whether this module has been initialized.
     fun is_initialized(): bool {
-        exists<BlockMetadata>(@aptos_framework)
+        exists<BlockResource>(@aptos_framework)
     }
 
     /// Set the metadata for the current block.
@@ -81,7 +80,7 @@ module aptos_framework::block {
         failed_proposer_indices: vector<u64>,
         previous_block_votes: vector<bool>,
         timestamp: u64
-    ) acquires BlockMetadata {
+    ) acquires BlockResource {
         timestamp::assert_operating();
         // Operational constraint: can only be invoked by the VM.
         system_addresses::assert_vm(&vm);
@@ -92,7 +91,7 @@ module aptos_framework::block {
         error::permission_denied(EVM_OR_VALIDATOR)
         );
 
-        let block_metadata_ref = borrow_global_mut<BlockMetadata>(@aptos_framework);
+        let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
 
         let new_block_event = NewBlockEvent {
@@ -116,9 +115,9 @@ module aptos_framework::block {
     }
 
     /// Get the current block height
-    public fun get_current_block_height(): u64 acquires BlockMetadata {
+    public fun get_current_block_height(): u64 acquires BlockResource {
         assert!(is_initialized(), error::not_found(EBLOCK_METADATA));
-        borrow_global<BlockMetadata>(@aptos_framework).height
+        borrow_global<BlockResource>(@aptos_framework).height
     }
 
     /// Emit the event and update height and global timestamp
@@ -130,8 +129,8 @@ module aptos_framework::block {
 
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
-    fun emit_genesis_block_event(vm: signer) acquires BlockMetadata {
-        let block_metadata_ref = borrow_global_mut<BlockMetadata>(@aptos_framework);
+    fun emit_genesis_block_event(vm: signer) acquires BlockResource {
+        let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
         emit_new_block_event(
             &vm,
             &mut block_metadata_ref.new_block_events,
@@ -149,11 +148,11 @@ module aptos_framework::block {
 
 
     #[test(aptos_framework = @aptos_framework)]
-    public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockMetadata {
+    public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockResource {
         initialize_block_metadata(&aptos_framework, 1);
-        assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_interval == 1, 0);
+        assert!(borrow_global<BlockResource>(@aptos_framework).epoch_interval == 1, 0);
         update_epoch_interval(&aptos_framework, 2);
-        assert!(borrow_global<BlockMetadata>(@aptos_framework).epoch_interval == 2, 1);
+        assert!(borrow_global<BlockResource>(@aptos_framework).epoch_interval == 2, 1);
     }
 
     #[test(aptos_framework = @aptos_framework, account = @0x123)]
@@ -161,7 +160,7 @@ module aptos_framework::block {
     public entry fun test_update_epoch_interval_unauthorized_should_fail(
         aptos_framework: signer,
         account: signer,
-    ) acquires BlockMetadata {
+    ) acquires BlockResource {
         initialize_block_metadata(&aptos_framework, 1);
         update_epoch_interval(&account, 2);
     }

@@ -8,6 +8,7 @@ use aptos_crypto::{PrivateKey, SigningKey, Uniform};
 use aptos_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::transaction::{
     ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
     TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
@@ -17,7 +18,6 @@ use aptos_types::write_set::WriteSet;
 use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::collections::BTreeMap;
 use std::fmt::Debug;
 
 #[test]
@@ -96,7 +96,7 @@ fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWith
         ),
         HashValue::zero(),
     );
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
 }
 
 /// Creates a test transaction output

@@ -1,6 +1,8 @@
 import { HexString } from "../hex_string";
 import {
   AccountAddress,
+  Identifier,
+  StructTag,
   TransactionArgumentAddress,
   TransactionArgumentBool,
   TransactionArgumentU128,
@@ -212,6 +214,29 @@ describe("BuilderUtils", () => {
     expect(() => {
       serializeArg(123456, new TypeTagVector(new TypeTagU8()), serializer);
     }).toThrow("Invalid vector args.");
+  });
+
+  it("serializes a struct arg", async () => {
+    let serializer = new Serializer();
+    serializeArg(
+      "abc",
+      new TypeTagStruct(
+        new StructTag(AccountAddress.fromHex("0x1"), new Identifier("string"), new Identifier("String"), []),
+      ),
+      serializer,
+    );
+    expect(serializer.getBytes()).toEqual(new Uint8Array([0x3, 0x61, 0x62, 0x63]));
+
+    serializer = new Serializer();
+    expect(() => {
+      serializeArg(
+        "abc",
+        new TypeTagStruct(
+          new StructTag(AccountAddress.fromHex("0x3"), new Identifier("token"), new Identifier("Token"), []),
+        ),
+        serializer,
+      );
+    }).toThrow("The only supported struct arg is of type 0x1::string::String");
   });
 
   it("throws at unrecognized arg types", async () => {

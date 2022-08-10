@@ -16,47 +16,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[tokio::test]
-async fn test_account_flow() {
-    let (_swarm, cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
-        .build_with_cli(2)
-        .await;
-
-    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(0).await.unwrap());
-    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(1).await.unwrap());
-
-    // Transfer an amount between the accounts
-    let transfer_amount = 100;
-    let response = cli.transfer_coins(0, 1, transfer_amount).await.unwrap();
-    let expected_sender_amount =
-        DEFAULT_FUNDED_COINS - response.gas_used.unwrap() - transfer_amount;
-    let expected_receiver_amount = DEFAULT_FUNDED_COINS + transfer_amount;
-
-    assert_eq!(
-        expected_sender_amount,
-        cli.wait_for_balance(0, expected_sender_amount)
-            .await
-            .unwrap()
-    );
-    assert_eq!(
-        expected_receiver_amount,
-        cli.wait_for_balance(1, expected_receiver_amount)
-            .await
-            .unwrap()
-    );
-
-    // Wait for faucet amount to be updated
-    let expected_sender_amount = expected_sender_amount + DEFAULT_FUNDED_COINS;
-    let _ = cli.fund_account(0).await.unwrap();
-    assert_eq!(
-        expected_sender_amount,
-        cli.wait_for_balance(0, expected_sender_amount)
-            .await
-            .unwrap()
-    );
-}
-
-#[tokio::test]
 async fn test_show_validator_set() {
     let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
@@ -180,8 +139,9 @@ async fn test_join_and_leave_validator() {
         }))
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.allow_new_validators = true;
-            genesis_config.epoch_duration_secs = 3600;
-            genesis_config.recurring_lockup_duration_secs = 2;
+            genesis_config.epoch_duration_secs = 5;
+            genesis_config.recurring_lockup_duration_secs = 10;
+            genesis_config.voting_duration_secs = 5;
         }))
         .build_with_cli(0)
         .await;
@@ -218,10 +178,8 @@ async fn test_join_and_leave_validator() {
 
     assert_validator_set_sizes(&cli, 1, 0, 0).await;
 
-    assert_eq!(
-        DEFAULT_FUNDED_COINS - gas_used,
-        cli.account_balance(validator_cli_index).await.unwrap()
-    );
+    cli.assert_account_balance_now(validator_cli_index, DEFAULT_FUNDED_COINS - gas_used)
+        .await;
 
     let stake_coins = 7;
     gas_used += get_gas(
@@ -230,10 +188,11 @@ async fn test_join_and_leave_validator() {
             .unwrap(),
     );
 
-    assert_eq!(
+    cli.assert_account_balance_now(
+        validator_cli_index,
         DEFAULT_FUNDED_COINS - stake_coins - gas_used,
-        cli.account_balance(validator_cli_index).await.unwrap()
-    );
+    )
+    .await;
 
     reconfig(
         &rest_client,
@@ -286,10 +245,12 @@ async fn test_join_and_leave_validator() {
 
     assert_validator_set_sizes(&cli, 1, 0, 0).await;
 
-    assert_eq!(
+    cli.assert_account_balance_now(
+        validator_cli_index,
         DEFAULT_FUNDED_COINS - stake_coins - gas_used,
-        cli.account_balance(validator_cli_index).await.unwrap()
-    );
+    )
+    .await;
+
     let unlock_stake = 3;
 
     // Unlock stake.
@@ -300,7 +261,7 @@ async fn test_join_and_leave_validator() {
     );
 
     // Conservatively wait until the recurring lockup is over.
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    tokio::time::sleep(Duration::from_secs(10)).await;
 
     let withdraw_stake = 2;
     gas_used += get_gas(
@@ -309,10 +270,11 @@ async fn test_join_and_leave_validator() {
             .unwrap(),
     );
 
-    assert_eq!(
+    cli.assert_account_balance_now(
+        validator_cli_index,
         DEFAULT_FUNDED_COINS - stake_coins + withdraw_stake - gas_used,
-        cli.account_balance(validator_cli_index).await.unwrap()
-    );
+    )
+    .await;
 }
 
 fn dns_name(addr: &str) -> DnsName {
@@ -352,10 +314,9 @@ async fn init_validator_account(
         .add_cli_account(validator_node_keys.account_private_key.clone())
         .await
         .unwrap();
-    assert_eq!(
-        DEFAULT_FUNDED_COINS,
-        cli.account_balance(validator_cli_index).await.unwrap()
-    );
+
+    cli.assert_account_balance_now(validator_cli_index, DEFAULT_FUNDED_COINS)
+        .await;
     (validator_cli_index, validator_node_keys)
 }
 

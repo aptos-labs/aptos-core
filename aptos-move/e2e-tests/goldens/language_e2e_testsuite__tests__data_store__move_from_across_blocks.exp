@@ -20,7 +20,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 600,
+            gas_used: 1,
             status: Keep(
                 Success,
             ),
@@ -43,7 +43,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 666,
+            gas_used: 1,
             status: Keep(
                 ExecutionFailure {
                     location: F5B9D6F01A99E74C790E2F330C092FA05455A8193F1DFC1B113ECC54D067AFE1::M,
@@ -76,7 +76,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 2535,
+            gas_used: 3,
             status: Keep(
                 Success,
             ),
@@ -99,7 +99,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 1577,
+            gas_used: 2,
             status: Keep(
                 Success,
             ),
@@ -128,7 +128,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 2604,
+            gas_used: 3,
             status: Keep(
                 Success,
             ),
@@ -151,7 +151,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 666,
+            gas_used: 1,
             status: Keep(
                 ExecutionFailure {
                     location: F5B9D6F01A99E74C790E2F330C092FA05455A8193F1DFC1B113ECC54D067AFE1::M,
@@ -178,7 +178,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 666,
+            gas_used: 1,
             status: Keep(
                 ExecutionFailure {
                     location: F5B9D6F01A99E74C790E2F330C092FA05455A8193F1DFC1B113ECC54D067AFE1::M,
@@ -211,7 +211,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 2535,
+            gas_used: 3,
             status: Keep(
                 Success,
             ),
@@ -240,7 +240,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 2604,
+            gas_used: 3,
             status: Keep(
                 Success,
             ),
@@ -259,7 +259,7 @@ Ok(
                 },
             ),
             events: [],
-            gas_used: 666,
+            gas_used: 1,
             status: Keep(
                 ExecutionFailure {
                     location: F5B9D6F01A99E74C790E2F330C092FA05455A8193F1DFC1B113ECC54D067AFE1::M,

@@ -566,6 +566,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-rest-client",
  "async-trait",
+ "bigdecimal",
  "chrono",
  "clap 3.2.16",
  "diesel",
@@ -1031,7 +1032,7 @@ dependencies = [
  "move-deps",
  "regex",
  "serde-generate",
- "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection?rev=839aed62a20ddccf043c08961cfe74875741ccb)",
+ "serde-reflection",
  "serde_yaml 0.8.26",
  "structopt 0.3.26",
  "tempfile",
@@ -1168,6 +1169,37 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "uuid",
+]
+
+[[package]]
+name = "aptos-telemetry-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-rest-client",
+ "aptos-types",
+ "bcs",
+ "chrono",
+ "clap 3.2.16",
+ "hex",
+ "jsonwebtoken",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "reqwest",
+ "serde 1.0.141",
+ "serde_json",
+ "serde_repr",
+ "serde_yaml 0.8.26",
+ "thiserror",
+ "tokio",
+ "tokio_schedule",
+ "url",
+ "warp",
 ]
 
 [[package]]
@@ -1717,6 +1749,7 @@ dependencies = [
  "num-bigint 0.2.6",
  "num-integer",
  "num-traits 0.2.15",
+ "serde 1.0.141",
 ]
 
 [[package]]
@@ -1877,7 +1910,7 @@ checksum = "37ccbd214614c6783386c1af30caf03192f17891059cecc394b4fb119e363de3"
 [[package]]
 name = "bytecode-interpreter-crypto"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "curve25519-dalek-fiat",
@@ -2166,6 +2199,16 @@ dependencies = [
  "atty",
  "lazy_static 1.4.0",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "combine"
+version = "4.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a604e93b79d1808327a6fca85a6f2d69de66461e7620f5a4cbf5fb4d1d7c948"
+dependencies = [
+ "bytes 1.2.1",
+ "memchr",
 ]
 
 [[package]]
@@ -2824,8 +2867,7 @@ checksum = "850878694b7933ca4c9569d30a34b55031b9b139ee1fc7b94a527c4ef960d690"
 [[package]]
 name = "diesel"
 version = "1.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b28135ecf6b7d446b43e27e225622a038cc4e2930a1022f51cdb97ada19b8e4d"
+source = "git+https://github.com/aptos-labs/diesel?branch=1.4.x#1346b2087fb11ba2feca1153a88a598a17da0d38"
 dependencies = [
  "bigdecimal",
  "bitflags",
@@ -2834,7 +2876,7 @@ dependencies = [
  "diesel_derives",
  "num-bigint 0.2.6",
  "num-integer",
- "num-traits 0.2.15",
+ "num-traits 0.1.43",
  "pq-sys",
  "r2d2",
  "serde_json",
@@ -3216,6 +3258,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptosdb",
+ "consensus-types",
  "executor",
  "executor-types",
  "move-deps",
@@ -3432,6 +3475,8 @@ dependencies = [
  "once_cell",
  "rayon",
  "serde 1.0.141",
+ "serde_bytes",
+ "serde_json",
  "sha2 0.9.9",
  "siphasher",
  "smallvec",
@@ -3561,7 +3606,7 @@ dependencies = [
  "network",
  "rand 0.7.3",
  "serde 1.0.141",
- "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection?rev=839aed62a20ddccf043c08961cfe74875741ccb)",
+ "serde-reflection",
  "serde_yaml 0.8.26",
  "structopt 0.3.26",
 ]
@@ -4236,6 +4281,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonwebtoken"
+version = "8.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aa4b4af834c6cfd35d8763d359661b90f2e45d8f750a0849156c7f4671af09c"
+dependencies = [
+ "base64 0.13.0",
+ "pem 1.1.0",
+ "ring",
+ "serde 1.0.141",
+ "serde_json",
+ "simple_asn1",
+]
+
+[[package]]
 name = "k8s-openapi"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4276,7 +4335,7 @@ dependencies = [
  "k8s-openapi",
  "log",
  "openssl",
- "pem",
+ "pem 0.8.3",
  "pin-project",
  "serde 1.0.141",
  "serde_json",
@@ -4741,12 +4800,13 @@ dependencies = [
 [[package]]
 name = "move-abigen"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "bcs",
  "heck 0.3.3",
  "log",
+ "move-binary-format",
  "move-bytecode-verifier",
  "move-command-line-common",
  "move-core-types",
@@ -4757,7 +4817,7 @@ dependencies = [
 [[package]]
 name = "move-binary-format"
 version = "0.0.3"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "move-core-types",
@@ -4772,12 +4832,12 @@ dependencies = [
 [[package]]
 name = "move-borrow-graph"
 version = "0.0.1"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 
 [[package]]
 name = "move-bytecode-source-map"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "bcs",
@@ -4792,19 +4852,19 @@ dependencies = [
 [[package]]
 name = "move-bytecode-utils"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "move-binary-format",
  "move-core-types",
  "petgraph 0.5.1",
- "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection?rev=839aed62a20ddccf043c08961cfe74875741ccba)",
+ "serde-reflection",
 ]
 
 [[package]]
 name = "move-bytecode-verifier"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "move-binary-format",
@@ -4816,7 +4876,7 @@ dependencies = [
 [[package]]
 name = "move-bytecode-viewer"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "clap 3.2.16",
@@ -4833,7 +4893,7 @@ dependencies = [
 [[package]]
 name = "move-cli"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "bcs",
@@ -4869,19 +4929,22 @@ dependencies = [
  "serde 1.0.141",
  "serde_yaml 0.8.26",
  "tempfile",
+ "toml_edit",
  "walkdir",
 ]
 
 [[package]]
 name = "move-command-line-common"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "difference",
+ "dirs-next",
  "hex",
  "move-core-types",
  "num-bigint 0.4.3",
+ "once_cell",
  "serde 1.0.141",
  "sha2 0.9.9",
  "walkdir",
@@ -4890,7 +4953,7 @@ dependencies = [
 [[package]]
 name = "move-compiler"
 version = "0.0.1"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "bcs",
@@ -4919,7 +4982,7 @@ dependencies = [
 [[package]]
 name = "move-core-types"
 version = "0.0.4"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "bcs",
@@ -4936,7 +4999,7 @@ dependencies = [
 [[package]]
 name = "move-coverage"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "bcs",
@@ -4989,7 +5052,7 @@ dependencies = [
 [[package]]
 name = "move-disassembler"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "clap 3.2.16",
@@ -5007,7 +5070,7 @@ dependencies = [
 [[package]]
 name = "move-docgen"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "codespan",
@@ -5025,7 +5088,7 @@ dependencies = [
 [[package]]
 name = "move-errmapgen"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "bcs",
@@ -5051,7 +5114,7 @@ dependencies = [
 [[package]]
 name = "move-ir-compiler"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "bcs",
@@ -5070,7 +5133,7 @@ dependencies = [
 [[package]]
 name = "move-ir-to-bytecode"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "codespan-reporting",
@@ -5089,7 +5152,7 @@ dependencies = [
 [[package]]
 name = "move-ir-to-bytecode-syntax"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "hex",
@@ -5102,7 +5165,7 @@ dependencies = [
 [[package]]
 name = "move-ir-types"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "hex",
@@ -5116,7 +5179,7 @@ dependencies = [
 [[package]]
 name = "move-model"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "codespan",
@@ -5142,13 +5205,14 @@ dependencies = [
 [[package]]
 name = "move-package"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "bcs",
  "clap 3.2.16",
  "colored",
  "dirs-next",
+ "itertools",
  "move-abigen",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -5175,7 +5239,7 @@ dependencies = [
 [[package]]
 name = "move-prover"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5212,7 +5276,7 @@ dependencies = [
 [[package]]
 name = "move-prover-boogie-backend"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -5240,7 +5304,7 @@ dependencies = [
 [[package]]
 name = "move-prover-test-utils"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "move-command-line-common",
@@ -5251,7 +5315,7 @@ dependencies = [
 [[package]]
 name = "move-read-write-set-types"
 version = "0.0.3"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "move-binary-format",
@@ -5262,7 +5326,7 @@ dependencies = [
 [[package]]
 name = "move-resource-viewer"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "bcs",
@@ -5277,7 +5341,7 @@ dependencies = [
 [[package]]
 name = "move-stackless-bytecode"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "codespan",
  "codespan-reporting",
@@ -5304,7 +5368,7 @@ dependencies = [
 [[package]]
 name = "move-stackless-bytecode-interpreter"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "bytecode-interpreter-crypto",
@@ -5322,7 +5386,7 @@ dependencies = [
 [[package]]
 name = "move-stdlib"
 version = "0.1.1"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "log",
@@ -5344,7 +5408,7 @@ dependencies = [
 [[package]]
 name = "move-symbol-pool"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "once_cell",
  "serde 1.0.141",
@@ -5353,7 +5417,7 @@ dependencies = [
 [[package]]
 name = "move-table-extension"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "bcs",
@@ -5370,7 +5434,7 @@ dependencies = [
 [[package]]
 name = "move-transactional-test-runner"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "clap 3.2.16",
@@ -5401,7 +5465,7 @@ dependencies = [
 [[package]]
 name = "move-unit-test"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "better_any",
@@ -5432,7 +5496,7 @@ dependencies = [
 [[package]]
 name = "move-vm-runtime"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "better_any",
  "fail 0.4.0",
@@ -5449,7 +5513,7 @@ dependencies = [
 [[package]]
 name = "move-vm-test-utils"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "move-binary-format",
@@ -5463,7 +5527,7 @@ dependencies = [
 [[package]]
 name = "move-vm-types"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "bcs",
  "move-binary-format",
@@ -6163,6 +6227,15 @@ dependencies = [
  "base64 0.13.0",
  "once_cell",
  "regex",
+]
+
+[[package]]
+name = "pem"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03c64931a1a212348ec4f3b4362585eca7159d0d09cbdf4a7f74f02173596fd4"
+dependencies = [
+ "base64 0.13.0",
 ]
 
 [[package]]
@@ -6960,7 +7033,7 @@ dependencies = [
 [[package]]
 name = "read-write-set"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "move-binary-format",
@@ -6975,7 +7048,7 @@ dependencies = [
 [[package]]
 name = "read-write-set-dynamic"
 version = "0.1.0"
-source = "git+https://github.com/move-language/move?rev=7d28bfa484ef7d9ff225a748832de1cf1b67d77b#7d28bfa484ef7d9ff225a748832de1cf1b67d77b"
+source = "git+https://github.com/move-language/move?rev=76c11e3845bc3a8930ea0d860a62d986eec25ba2#76c11e3845bc3a8930ea0d860a62d986eec25ba2"
 dependencies = [
  "anyhow",
  "move-binary-format",
@@ -7500,7 +7573,7 @@ dependencies = [
 [[package]]
 name = "serde-generate"
 version = "0.20.6"
-source = "git+https://github.com/aptos-labs/serde-reflection?rev=839aed62a20ddccf043c08961cfe74875741ccb#839aed62a20ddccf043c08961cfe74875741ccba"
+source = "git+https://github.com/aptos-labs/serde-reflection?rev=839aed62a20ddccf043c08961cfe74875741ccba#839aed62a20ddccf043c08961cfe74875741ccba"
 dependencies = [
  "bcs",
  "bincode",
@@ -7508,7 +7581,7 @@ dependencies = [
  "include_dir 0.6.2",
  "maplit",
  "serde 1.0.141",
- "serde-reflection 0.3.5 (git+https://github.com/aptos-labs/serde-reflection?rev=839aed62a20ddccf043c08961cfe74875741ccb)",
+ "serde-reflection",
  "serde_bytes",
  "serde_yaml 0.8.26",
  "structopt 0.3.26",
@@ -7533,16 +7606,6 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12c47087018ec281d1cdab673d36aea22d816b54d498264029c05d5fa1910da6"
 dependencies = [
- "serde 1.0.141",
- "thiserror",
-]
-
-[[package]]
-name = "serde-reflection"
-version = "0.3.5"
-source = "git+https://github.com/aptos-labs/serde-reflection?rev=839aed62a20ddccf043c08961cfe74875741ccb#839aed62a20ddccf043c08961cfe74875741ccba"
-dependencies = [
- "once_cell",
  "serde 1.0.141",
  "thiserror",
 ]
@@ -7616,6 +7679,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7868ad3b8196a8a0aea99a8220b124278ee5320a55e4fde97794b6f85b1a377"
 dependencies = [
  "serde 1.0.141",
+]
+
+[[package]]
+name = "serde_repr"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2ad84e47328a31223de7fed7a4f5087f2d6ddfe586cf3ca25b7a165bc0a5aed"
+dependencies = [
+ "proc-macro2 1.0.42",
+ "quote 1.0.20",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -7796,6 +7870,18 @@ checksum = "16ff59182528fddecac72799b8348f6b6768e10989e33b24483ed361809bfd7b"
 dependencies = [
  "console",
  "similar",
+]
+
+[[package]]
+name = "simple_asn1"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adc4e5204eb1910f40f9cfa375f6f05b68c3abac4b6fd879c8ff5e7ae8a0a085"
+dependencies = [
+ "num-bigint 0.4.3",
+ "num-traits 0.2.15",
+ "thiserror",
+ "time 0.3.12",
 ]
 
 [[package]]
@@ -8617,11 +8703,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio_schedule"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b91f371e5032da918342685fde2ca040710d38aaec985378e121055fbf031e9"
+dependencies = [
+ "chrono",
+ "tokio",
+]
+
+[[package]]
 name = "toml"
 version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d82e1a7758622a465f8cee077614c73484dac5b836c02ff6a40d5d1010324d7"
 dependencies = [
+ "serde 1.0.141",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5376256e44f2443f8896ac012507c19a012df0fe8758b55246ae51a2279db51f"
+dependencies = [
+ "combine",
+ "indexmap",
+ "itertools",
  "serde 1.0.141",
 ]
 

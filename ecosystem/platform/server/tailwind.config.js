@@ -37,7 +37,7 @@ module.exports = {
         display: ["apparat-semicond", ...defaultTheme.fontFamily.sans],
       },
       screens: {
-        'max-sm': {'max': '639px'},
+        'max-sm': {'max': '767px'},
       }
     },
     container: {

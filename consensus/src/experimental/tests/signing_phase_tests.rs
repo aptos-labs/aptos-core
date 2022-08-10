@@ -17,13 +17,13 @@ use crate::{
     test_utils::consensus_runtime,
 };
 use aptos_crypto::HashValue;
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     validator_signer::ValidatorSigner,
 };
 use safety_rules::Error;
-use std::collections::BTreeMap;
 
 pub fn prepare_signing_pipeline(
     signing_phase: SigningPhase,
@@ -102,7 +102,7 @@ fn add_signing_phase_test_cases(
         SigningRequest {
             ordered_ledger_info: LedgerInfoWithSignatures::new(
                 ordered_ledger_info.ledger_info().clone(),
-                BTreeMap::new(),
+                MultiSignature::empty(),
             ),
             commit_ledger_info: executed_ledger_info.ledger_info().clone(),
         },

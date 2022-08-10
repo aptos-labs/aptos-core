@@ -133,11 +133,12 @@ impl Events {
     }
 
     pub fn list(self, page: Page, accept_type: AcceptType) -> Result<impl Reply, Error> {
-        let contract_events = self.context.get_events(
+        let ledger_version = self.ledger_info.version();
+        let events = self.context.get_events(
             &self.key,
-            page.start(0, u64::MAX)?,
+            page.start_option()?,
             page.limit()?,
-            self.ledger_info.version(),
+            ledger_version,
         )?;
 
         match accept_type {
@@ -145,10 +146,10 @@ impl Events {
                 let resolver = self.context.move_resolver()?;
                 let events = resolver
                     .as_converter(self.context.db.clone())
-                    .try_into_events(&contract_events)?;
+                    .try_into_versioned_events(&events)?;
                 Response::new(self.ledger_info, &events)
             }
-            AcceptType::Bcs => Response::new_bcs(self.ledger_info, &contract_events),
+            AcceptType::Bcs => Response::new_bcs(self.ledger_info, &events),
         }
     }
 }

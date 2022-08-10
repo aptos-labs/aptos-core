@@ -5,6 +5,7 @@
 module aptos_token::token_coin_swap {
     use aptos_std::event::{Self, EventHandle};
     use std::signer;
+    use std::string::String;
     use aptos_std::table::{Self, Table};
     use aptos_framework::coin;
     use aptos_framework::timestamp;
@@ -63,13 +64,17 @@ module aptos_token::token_coin_swap {
     }
 
     /// Coin owner withdraw coin to swap with tokens listed for swapping at the token owner's address.
-    public entry fun exchange_coin_for_token<CoinType>(
+    public fun exchange_coin_for_token<CoinType>(
         coin_owner: &signer,
         coin_amount: u64,
         token_owner: address,
-        token_id: TokenId,
+        creators_address: address,
+        collection: String,
+        name: String,
+        property_version: u64,
         token_amount: u64,
     ) acquires TokenListings, TokenStoreEscrow {
+        let token_id = token::create_token_id_raw(creators_address, collection, name, property_version);
         // valide listing existing and coin owner has sufficient balance
         let coin_address = signer::address_of(coin_owner);
         let token_listing = borrow_global_mut<TokenListings<CoinType>>(token_owner);
@@ -125,11 +130,15 @@ module aptos_token::token_coin_swap {
     /// Token owner lists their token for swapping
     public entry fun list_token_for_swap<CoinType>(
         token_owner: &signer,
-        token_id: TokenId,
+        creators_address: address,
+        collection: String,
+        name: String,
+        property_version: u64,
         token_amount: u64,
         min_coin_per_token: u64,
         locked_until_secs: u64
     ) acquires TokenStoreEscrow, TokenListings {
+        let token_id = token::create_token_id_raw(creators_address, collection, name, property_version);
         initialize_token_store_escrow(token_owner);
         // withdraw the token and store them to the token_owner's TokenEscrow
         let token = withdraw_token(token_owner, token_id, token_amount);
@@ -248,8 +257,25 @@ module aptos_token::token_coin_swap {
         token::initialize_token_store(&coin_owner);
         coin::create_fake_money(&coin_owner, &token_owner, 100);
 
-        list_token_for_swap<coin::FakeMoney>(&token_owner, token_id, 100, 1, 0);
-        exchange_coin_for_token<coin::FakeMoney>(&coin_owner, 51, signer::address_of(&token_owner), token_id, 50);
+        list_token_for_swap<coin::FakeMoney>(
+            &token_owner,
+            signer::address_of(&token_owner),
+            token::get_collection_name(),
+            token::get_token_name(),
+            0,
+            100,
+            1,
+            0
+        );
+        exchange_coin_for_token<coin::FakeMoney>(
+            &coin_owner,
+            51,
+            signer::address_of(&token_owner),
+            signer::address_of(&token_owner),
+            token::get_collection_name(),
+            token::get_token_name(),
+            0,
+            50);
         // coin owner only has 50 coins left
         assert!(coin::balance<coin::FakeMoney>(signer::address_of(&coin_owner)) == 50, 1);
         // all tokens in token escrow or transferred. Token owner has 0 token in token_store

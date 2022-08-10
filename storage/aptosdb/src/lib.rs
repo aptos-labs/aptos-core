@@ -47,11 +47,9 @@ use crate::{
     ledger_store::LedgerStore,
     metrics::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
-        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, STATE_ITEM_COUNT,
+        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
-    pruner::db_pruner::DBPruner,
-    pruner::pruner_manager::PrunerManager,
-    pruner::utils,
+    pruner::{db_pruner::DBPruner, pruner_manager::PrunerManager, utils},
     schema::*,
     state_store::StateStore,
     system_store::SystemStore,
@@ -65,9 +63,9 @@ use aptos_config::config::{
 use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     account_address::AccountAddress,
+    account_config::{new_block_event_key, NewBlockEvent},
     contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -82,6 +80,7 @@ use aptos_types::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
         state_value::{StateValue, StateValueChunkWithProof},
+        table::{TableHandle, TableInfo},
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
@@ -95,8 +94,7 @@ use aptosdb_indexer::Indexer;
 use itertools::zip_eq;
 use move_deps::move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
-use schemadb::db_options::gen_rocksdb_options;
-use schemadb::DB;
+use schemadb::{db_options::gen_rocksdb_options, DB};
 use std::{
     collections::HashMap,
     iter::Iterator,
@@ -107,13 +105,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::pruner::ledger_pruner_manager::LedgerPrunerManager;
-use crate::pruner::ledger_store::ledger_store_pruner::LedgerPruner;
-use crate::pruner::state_pruner_manager::StatePrunerManager;
-use crate::pruner::state_store::StateStorePruner;
-use storage_interface::state_view::DbStateView;
+use crate::pruner::{
+    ledger_pruner_manager::LedgerPrunerManager, ledger_store::ledger_store_pruner::LedgerPruner,
+    state_pruner_manager::StatePrunerManager, state_store::StateStorePruner,
+};
 use storage_interface::{
-    state_delta::StateDelta, DbReader, DbWriter, ExecutedTrees, Order, StartupInfo,
+    state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
     StateSnapshotReceiver,
 };
 
@@ -570,7 +567,7 @@ impl AptosDB {
             lis.len() == (paging_epoch - start_epoch) as usize,
             "DB corruption: missing epoch ending ledger info for epoch {}",
             lis.last()
-                .map(|li| li.ledger_info().next_block_epoch())
+                .map(|li| li.ledger_info().next_block_epoch() - 1)
                 .unwrap_or(start_epoch),
         );
         Ok((lis, more))
@@ -982,14 +979,14 @@ impl DbReader for AptosDB {
     /// Get the first version that txn starts existent.
     fn get_first_txn_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_txn_version", || {
-            self.transaction_store.get_first_txn_version()
+            Ok(Some(self.ledger_pruner.get_min_readable_version()))
         })
     }
 
     /// Get the first version that write set starts existent.
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_write_set_version", || {
-            self.transaction_store.get_first_write_set_version()
+            Ok(Some(self.ledger_pruner.get_min_readable_version()))
         })
     }
 
@@ -1073,9 +1070,10 @@ impl DbReader for AptosDB {
         start: u64,
         order: Order,
         limit: u64,
+        ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
         gauged_api("get_events", || {
-            self.get_events_by_event_key(event_key, start, order, limit, self.get_latest_version()?)
+            self.get_events_by_event_key(event_key, start, order, limit, ledger_version)
         })
     }
 
@@ -1147,56 +1145,6 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
-        gauged_api("get_startup_info", || {
-            let _lock = self.ledger_commit_lock.lock();
-            self.ledger_store
-                .get_startup_info()?
-                .map(
-                    |(latest_ledger_info, latest_epoch_state_if_not_in_li, synced_version_opt)| {
-                        let executed_trees = self.get_latest_executed_trees()?;
-                        let committed_version = latest_ledger_info.ledger_info().version();
-                        Ok(if synced_version_opt.is_none() {
-                            assert_eq!(
-                                Some(committed_version), executed_trees.version(),
-                                "ledger_info_version {:?} doesn't match with committed_executed_trees version {:?}",
-                                Some(committed_version),
-                                executed_trees.version()
-                            );
-                            StartupInfo::new(
-                                latest_ledger_info,
-                                latest_epoch_state_if_not_in_li,
-                                executed_trees,
-                                None
-                            )
-                        } else {
-                            let num_txns = committed_version + 1;
-                            let frozen_subtrees = self
-                                .ledger_store
-                                .get_frozen_subtree_hashes(num_txns)?;
-                            let transaction_accumulator = Arc::new(InMemoryAccumulator::new(
-                                frozen_subtrees,
-                                num_txns,
-                            )?);
-                            let committed_trees = ExecutedTrees::new(StateDelta::new(executed_trees.state().base.clone(),
-                                                                                     executed_trees.state().base_version,
-                                                                                     executed_trees.state().base.clone(),
-                                                                                     executed_trees.state().base_version,
-                                HashMap::new()
-                            ), transaction_accumulator);
-                            StartupInfo::new(
-                                latest_ledger_info,
-                                latest_epoch_state_if_not_in_li,
-                                committed_trees,
-                                Some(executed_trees)
-                            )
-                        })
-                    },
-                )
-                .transpose()
-        })
-    }
-
     fn get_state_value_with_proof_by_version(
         &self,
         state_store_key: &StateKey,
@@ -1243,19 +1191,55 @@ impl DbReader for AptosDB {
 
     fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
-            let ts = match self.transaction_store.get_block_metadata(version)? {
-                Some((_v, block_meta)) => block_meta.timestamp_usecs(),
-                // genesis timestamp is 0
-                None => 0,
-            };
-            Ok(ts)
+            error_if_version_is_pruned(&self.ledger_pruner, "NewBlockEvent", version)?;
+            ensure!(version <= self.get_latest_version()?);
+
+            let (_first_version, new_block_event) = self.event_store.get_block_metadata(version)?;
+            Ok(new_block_event.proposed_time())
         })
     }
 
-    fn get_block_boundaries(&self, version: u64, latest_ledger_version: u64) -> Result<(u64, u64)> {
-        gauged_api("get_block_boundaries", || {
-            self.transaction_store
-                .get_block_boundaries(version, latest_ledger_version)
+    fn get_block_info(&self, version: Version) -> Result<(Version, Version, NewBlockEvent)> {
+        gauged_api("get_block_info", || {
+            let latest_li = self.get_latest_ledger_info()?;
+            let committed_version = latest_li.ledger_info().version();
+            ensure!(
+                version <= committed_version,
+                "Requested version {} > committed version {}",
+                version,
+                committed_version
+            );
+
+            let (first_version, new_block_event) = self.event_store.get_block_metadata(version)?;
+
+            let last_version = self
+                .event_store
+                .lookup_event_after_version(&new_block_event_key(), version)?
+                .map_or(committed_version, |(v, _, _)| v - 1);
+
+            Ok((first_version, last_version, new_block_event))
+        })
+    }
+
+    fn get_block_info_by_height(&self, height: u64) -> Result<(Version, Version, NewBlockEvent)> {
+        gauged_api("get_block_info_by_height", || {
+            let latest_li = self.get_latest_ledger_info()?;
+            let committed_version = latest_li.ledger_info().version();
+
+            let event_key = new_block_event_key();
+            let (first_version, new_block_event) =
+                self.event_store
+                    .get_event_by_key(&event_key, height, committed_version)?;
+            let last_version = self
+                .event_store
+                .lookup_event_after_version(&event_key, first_version)?
+                .map_or(committed_version, |(v, _, _)| v - 1);
+
+            Ok((
+                first_version,
+                last_version,
+                bcs::from_bytes(new_block_event.event_data())?,
+            ))
         })
     }
 
@@ -1330,15 +1314,27 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_state_prune_window(&self) -> Result<Option<usize>> {
-        gauged_api("get_state_prune_window", || {
-            Ok(self.state_pruner.get_pruner_window().map(|x| x as usize))
+    fn is_state_pruner_enabled(&self) -> Result<bool> {
+        gauged_api("is_state_pruner_enabled", || {
+            Ok(self.state_pruner.is_pruner_enabled())
         })
     }
 
-    fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
+    fn get_state_prune_window(&self) -> Result<usize> {
+        gauged_api("get_state_prune_window", || {
+            Ok(self.state_pruner.get_pruner_window() as usize)
+        })
+    }
+
+    fn is_ledger_pruner_enabled(&self) -> Result<bool> {
+        gauged_api("is_ledger_pruner_enabled", || {
+            Ok(self.ledger_pruner.is_pruner_enabled())
+        })
+    }
+
+    fn get_ledger_prune_window(&self) -> Result<usize> {
         gauged_api("get_ledger_prune_window", || {
-            Ok(self.ledger_pruner.get_pruner_window().map(|x| x as usize))
+            Ok(self.ledger_pruner.get_pruner_window() as usize)
         })
     }
 
@@ -1493,12 +1489,6 @@ impl DbWriter for AptosDB {
                 counters
                     .expect("Counters should be bumped with transactions being saved.")
                     .bump_op_counters();
-                // -1 for "not fully migrated", -2 for "error on get_account_count()"
-                STATE_ITEM_COUNT.set(
-                    self.state_store
-                        .get_value_count(last_version)
-                        .map_or(-1, |c| c as i64),
-                );
 
                 self.wake_pruner(last_version);
             }

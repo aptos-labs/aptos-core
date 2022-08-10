@@ -56,6 +56,7 @@ members = [
     "crates/aptos-rosetta",
     "crates/aptos-rosetta-cli",
     "crates/aptos-telemetry",
+    "crates/aptos-telemetry-service",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
     "crates/bounded-executor",
@@ -151,6 +152,14 @@ default-members = [
 debug = true
 overflow-checks = true
 
+[profile.performance]
+inherits = "release"
+opt-level = 3
+debug = true
+overflow-checks = false
+lto = true
+codegen-units = 1
+
 [profile.cli]
 inherits = "release"
 debug = false
@@ -170,3 +179,4 @@ debug = true
 lz4 = { git = 'https://github.com/aptos-labs/lz4-rs' }
 rocksdb = { git = 'https://github.com/aptos-labs/rust-rocksdb' }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
+diesel = { git = "https://github.com/aptos-labs/diesel", branch = "1.4.x", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }

@@ -160,44 +160,6 @@ impl LedgerStore {
         Accumulator::get_frozen_subtree_hashes(self, num_transactions)
     }
 
-    pub fn get_startup_info(
-        &self,
-    ) -> Result<
-        Option<(
-            LedgerInfoWithSignatures, // latest ledger info
-            Option<EpochState>,       // latest epoch state if not in the above ledger info
-            Option<Version>,          // synced version if newer than the ledger info
-        )>,
-    > {
-        // Get the latest ledger info. Return None if not bootstrapped.
-        let latest_ledger_info = match self.get_latest_ledger_info_option() {
-            Some(x) => x,
-            None => return Ok(None),
-        };
-        let latest_epoch_state_if_not_in_li =
-            match latest_ledger_info.ledger_info().next_epoch_state() {
-                Some(_) => None,
-                // If the latest LedgerInfo doesn't carry a validator set, we look for the previous
-                // LedgerInfo which should always carry a validator set.
-                None => Some(self.get_epoch_state(latest_ledger_info.ledger_info().epoch())?),
-            };
-
-        let li_version = latest_ledger_info.ledger_info().version();
-        let (latest_version, _) = self.get_latest_transaction_info()?;
-        assert!(latest_version >= li_version);
-        let synced_version_opt = if latest_version == li_version {
-            None
-        } else {
-            Some(latest_version)
-        };
-
-        Ok(Some((
-            latest_ledger_info,
-            latest_epoch_state_if_not_in_li,
-            synced_version_opt,
-        )))
-    }
-
     /// Get transaction info given `version`
     pub fn get_transaction_info(&self, version: Version) -> Result<TransactionInfo> {
         self.db

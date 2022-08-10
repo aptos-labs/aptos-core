@@ -59,6 +59,8 @@ ENV RUST_BACKTRACE 1
 ENV RUST_LOG_FORMAT=json
 
 # add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
@@ -79,6 +81,8 @@ COPY --link --from=builder /aptos/dist/aptos-indexer /usr/local/bin/aptos-indexe
 ENV RUST_LOG_FORMAT=json
 
 # add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
@@ -99,6 +103,8 @@ COPY --link --from=builder /aptos/dist/aptos-node-checker /usr/local/bin/aptos-n
 ENV RUST_LOG_FORMAT=json
 
 # add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
@@ -143,6 +149,8 @@ RUN mv /aptos-framework/move/build/AptosFramework/bytecode_modules/dependencies/
 RUN rm -rf /aptos-framework/move/build
 
 # add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
@@ -169,6 +177,8 @@ EXPOSE 8000
 ENV RUST_LOG_FORMAT=json
 
 # add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
@@ -197,6 +207,8 @@ COPY --link --from=builder /aptos/dist/forge /usr/local/bin/forge
 ENV RUST_LOG_FORMAT=json
 
 # add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
