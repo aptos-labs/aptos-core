@@ -1043,6 +1043,7 @@ dependencies = [
  "cached-framework-packages",
  "heck 0.3.3",
  "move-deps",
+ "once_cell",
  "regex",
  "serde-generate",
  "serde-reflection",
