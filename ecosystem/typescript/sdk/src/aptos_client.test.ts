@@ -15,6 +15,13 @@ const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
 const coinTransferFunction = "0x1::coin::transfer";
 
+test("node url empty", () => {
+  expect(() => {
+    const client = new AptosClient("");
+    client.getAccount("0x1");
+  }).toThrow("Node URL cannot be empty.");
+});
+
 test("gets genesis account", async () => {
   const client = new AptosClient(NODE_URL);
   const genesisAccount = await client.getAccount("0x1");

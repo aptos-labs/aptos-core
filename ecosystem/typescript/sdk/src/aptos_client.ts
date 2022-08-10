@@ -26,6 +26,9 @@ export class AptosClient {
    * @param config Additional configuration options for the generated Axios client.
    */
   constructor(nodeUrl: string, config?: Partial<Gen.OpenAPIConfig>, doNotFixNodeUrl: boolean = false) {
+    if (!nodeUrl) {
+      throw new Error("Node URL cannot be empty.");
+    }
     const conf = config === undefined || config === null ? {} : { ...config };
     if (doNotFixNodeUrl) {
       conf.BASE = nodeUrl;

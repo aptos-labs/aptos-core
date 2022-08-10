@@ -3,8 +3,8 @@
 
 import { AptosClient } from "./aptos_client";
 
-export const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com/v1";
-export const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
+export const NODE_URL = process.env.APTOS_NODE_URL;
+export const FAUCET_URL = process.env.APTOS_FAUCET_URL;
 
 test("noop", () => {
   // All TS files are compiled by default into the npm package
