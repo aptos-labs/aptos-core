@@ -28,7 +28,7 @@ test("gets transactions", async () => {
 test("gets genesis resources", async () => {
   const client = new AptosClient(NODE_URL);
   const resources = await client.getAccountResources("0x1");
-  const accountResource = resources.find((r) => r.type == account);
+  const accountResource = resources.find((r) => r.type === account);
   expect(accountResource).toBeDefined();
 });
 
@@ -324,8 +324,7 @@ test(
   30 * 1000,
 );
 
-// TODO: Delete this or fix it pending response in https://github.com/aptos-labs/aptos-core/pull/2164/.
-test.skip(
+test(
   "submits multiagent transaction",
   async () => {
     const client = new AptosClient(NODE_URL);
@@ -337,38 +336,48 @@ test.skip(
     const aliceAccountAddress = TxnBuilderTypes.AccountAddress.fromHex(alice.address());
     const bobAccountAddress = TxnBuilderTypes.AccountAddress.fromHex(bob.address());
 
-    await faucetClient.fundAccount(alice.address(), 50000);
+    await faucetClient.fundAccount(alice.address(), 1000000);
 
     let resources = await client.getAccountResources(alice.address());
     let accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("50000");
+    expect((accountResource!.data as any).coin.value).toBe("1000000");
 
-    await faucetClient.fundAccount(bob.address(), 60000);
+    await faucetClient.fundAccount(bob.address(), 1500000);
     resources = await client.getAccountResources(bob.address());
     accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("60000");
+    expect((accountResource!.data as any).coin.value).toBe("1500000");
 
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";
 
-    // Create collection and token on Alice's account
-    // eslint-disable-next-line quotes
-    await tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev");
+    // eslint-disable-next-line no-inner-declarations
+    async function ensureTxnSuccess(txnHashPromise: Promise<string>) {
+      const txnHash = await txnHashPromise;
+      const txn = await client.waitForTransactionWithResult(txnHash);
+      expect((txn as any)?.success).toBe(true);
+    }
 
-    await tokenClient.createToken(
-      alice,
-      collectionName,
-      tokenName,
-      "Alice's simple token",
-      1,
-      "https://aptos.dev/img/nyan.jpeg",
-      1000,
-      alice.address(),
-      0,
-      0,
-      ["key"],
-      ["2"],
-      ["int"],
+    // Create collection and token on Alice's account
+    await ensureTxnSuccess(
+      tokenClient.createCollection(alice, collectionName, "Alice's simple collection", "https://aptos.dev"),
+    );
+
+    await ensureTxnSuccess(
+      tokenClient.createToken(
+        alice,
+        collectionName,
+        tokenName,
+        "Alice's simple token",
+        1,
+        "https://aptos.dev/img/nyan.jpeg",
+        1000,
+        alice.address(),
+        0,
+        0,
+        ["key"],
+        ["2"],
+        ["int"],
+      ),
     );
 
     let aliceBalance = await tokenClient.getTokenBalance(alice.address().hex(), collectionName, tokenName, "0");
@@ -376,7 +385,7 @@ test.skip(
 
     const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
       TxnBuilderTypes.ScriptFunction.natural(
-        "0x1::token",
+        "0x3::token",
         "direct_transfer_script",
         [],
         [
@@ -384,6 +393,7 @@ test.skip(
           BCS.bcsSerializeStr(collectionName),
           BCS.bcsSerializeStr(tokenName),
           BCS.bcsSerializeUint64(1),
+          BCS.bcsSerializeUint64(0),
         ],
       ),
     );
@@ -397,7 +407,7 @@ test.skip(
       aliceAccountAddress,
       BigInt(sequnceNumber),
       scriptFunctionPayload,
-      1000n,
+      10000n,
       1n,
       BigInt(Math.floor(Date.now() / 1000) + 10),
       new TxnBuilderTypes.ChainId(chainId),
@@ -442,22 +452,25 @@ test.skip(
 
     expect(aliceBalance.amount).toBe("0");
 
-    const bobTokenStore = await client.getAccountResource(bob.address(), "0x1::token::TokenStore");
+    const bobTokenStore = await client.getAccountResource(bob.address(), "0x3::token::TokenStore");
 
     const handle = (bobTokenStore.data as any).tokens?.handle;
 
     const getTokenTableItemRequest = {
-      key_type: "0x1::token::TokenId",
-      value_type: "0x1::token::Token",
+      key_type: "0x3::token::TokenId",
+      value_type: "0x3::token::Token",
       key: {
-        creator: alice.address().hex(),
-        collection: collectionName,
-        name: tokenName,
+        token_data_id: {
+          creator: alice.address().hex(),
+          collection: collectionName,
+          name: tokenName,
+        },
+        property_version: "0",
       },
     };
 
     const bobTokenTableItem = await client.getTableItem(handle, getTokenTableItemRequest);
-    expect(bobTokenTableItem?.value).toBe("1");
+    expect(bobTokenTableItem?.amount).toBe("1");
   },
   30 * 1000,
 );
