@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_sdk::move_types::gas_schedule::{GasAlgebra, GasConstants};
+use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
 use aptos_transaction_builder::aptos_stdlib;
 use forge::{AptosContext, AptosTest, Result, Test};
 use std::time::Duration;
@@ -34,12 +34,17 @@ impl AptosTest for GasCheck {
             .unwrap_err();
         assert!(format!("{:?}", err).contains("INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE"));
 
-        ctx.mint(account1.address(), 1000).await?;
-        ctx.mint(account2.address(), 1000).await?;
+        // TODO(Gas): double check this
+        ctx.mint(account1.address(), 4_000_000).await?;
+        ctx.mint(account2.address(), 4_000_000).await?;
 
         let transfer_too_much = account2.sign_with_transaction_builder(
+            // TODO(Gas): double check this
             ctx.aptos_transaction_factory()
-                .payload(aptos_stdlib::aptos_coin_transfer(account1.address(), 1000)),
+                .payload(aptos_stdlib::aptos_coin_transfer(
+                    account1.address(),
+                    4_000_000,
+                )),
         );
 
         let err = ctx
@@ -53,25 +58,17 @@ impl AptosTest for GasCheck {
         ctx.client().submit_and_wait(&transfer_txn).await?;
 
         // update to allow 0 gas unit price
-        let gas_constant = GasConstants::default();
+        let mut gas_params = AptosGasParameters::initial();
+        gas_params.txn.min_price_per_gas_unit = 0;
+        let gas_schedule_blob = bcs::to_bytes(&gas_params.to_on_chain_gas_schedule())
+            .expect("failed to serialize gas parameters");
+
         let txn_factory = ctx.aptos_transaction_factory();
 
         let update_txn = ctx
             .root_account()
             .sign_with_transaction_builder(txn_factory.payload(
-                aptos_stdlib::vm_config_set_gas_constants(
-                    gas_constant.global_memory_per_byte_cost.get(),
-                    gas_constant.global_memory_per_byte_write_cost.get(),
-                    gas_constant.min_transaction_gas_units.get(),
-                    gas_constant.large_transaction_cutoff.get(),
-                    gas_constant.intrinsic_gas_per_byte.get(),
-                    gas_constant.maximum_number_of_gas_units.get(),
-                    0, // updated value
-                    gas_constant.max_price_per_gas_unit.get(),
-                    gas_constant.max_transaction_size_in_bytes,
-                    gas_constant.gas_unit_scaling_factor,
-                    gas_constant.default_account_size.get(),
-                ),
+                aptos_stdlib::gas_schedule_set_gas_schedule(gas_schedule_blob),
             ));
         ctx.client().submit_and_wait(&update_txn).await?;
 

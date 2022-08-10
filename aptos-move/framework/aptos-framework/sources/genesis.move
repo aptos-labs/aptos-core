@@ -4,18 +4,19 @@ module aptos_framework::genesis {
     use std::vector;
 
     use aptos_framework::account;
+    use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::aptos_governance;
-    use aptos_framework::coins;
-    use aptos_framework::consensus_config;
-    use aptos_framework::version;
     use aptos_framework::block;
     use aptos_framework::chain_id;
+    use aptos_framework::coins;
+    use aptos_framework::consensus_config;
+    use aptos_framework::gas_schedule;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
-    use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
-    use aptos_framework::vm_config;
+    use aptos_framework::staking_config;
+    use aptos_framework::version;
 
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;
@@ -23,12 +24,10 @@ module aptos_framework::genesis {
     fun initialize(
         core_resource_account: &signer,
         core_resource_account_auth_key: vector<u8>,
-        instruction_schedule: vector<u8>,
-        native_schedule: vector<u8>,
+        gas_schedule: vector<u8>,
         chain_id: u8,
         initial_version: u64,
         consensus_config: vector<u8>,
-        min_price_per_gas_unit: u64,
         epoch_interval: u64,
         minimum_stake: u64,
         maximum_stake: u64,
@@ -63,12 +62,13 @@ module aptos_framework::genesis {
         );
 
         // Give the decentralized on-chain governance control over the core framework account.
-        aptos_governance::store_signer_cap(&aptos_framework_account, framework_signer_cap);
+        aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, framework_signer_cap);
 
         // Consensus config setup
         consensus_config::initialize(&aptos_framework_account);
         version::initialize(&aptos_framework_account, initial_version);
-        stake::initialize_validator_set(
+        stake::initialize(&aptos_framework_account);
+        staking_config::initialize(
             &aptos_framework_account,
             minimum_stake,
             maximum_stake,
@@ -78,11 +78,9 @@ module aptos_framework::genesis {
             rewards_rate_denominator,
         );
 
-        vm_config::initialize(
+        gas_schedule::initialize(
             &aptos_framework_account,
-            instruction_schedule,
-            native_schedule,
-            min_price_per_gas_unit,
+            gas_schedule
         );
 
         consensus_config::set(&aptos_framework_account, consensus_config);
@@ -141,7 +139,7 @@ module aptos_framework::genesis {
             let cur_full_node_network_addresses = *vector::borrow(&full_node_network_addresses, i);
             let consensus_pubkey = *vector::borrow(&consensus_pubkeys, i);
             let pop = *vector::borrow(&proof_of_possession, i);
-            stake::register_validator_candidate(
+            stake::initialize_validator(
                 &owner_account,
                 consensus_pubkey,
                 pop,
@@ -167,12 +165,10 @@ module aptos_framework::genesis {
         initialize(
             core_resource_account,
             x"0000000000000000000000000000000000000000000000000000000000000000",
-            x"", // instruction_schedule not needed for unit tests
-            x"", // native schedule not needed for unit tests
+            x"00", // empty gas schedule
             4u8, // TESTING chain ID
             0,
             x"",
-            1,
             1,
             0,
             1,

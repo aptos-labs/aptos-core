@@ -201,9 +201,10 @@ mod tests {
         let checkpoint_dir = TempPath::new();
 
         crate::db_generator::run(
-            25,    /* num_accounts */
-            10000, /* init_account_balance */
-            5,     /* block_size */
+            25, /* num_accounts */
+            // TODO(Gas): double check if this is correct
+            1_000_000_000, /* init_account_balance */
+            5,             /* block_size */
             storage_dir.as_ref(),
             NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
             true,

@@ -13,8 +13,8 @@ use super::{
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{Address, EventKey, IdentifierWrapper, MoveStructTagParam, U64};
-use aptos_api_types::{AsConverter, Event};
+use aptos_api_types::{Address, EventKey, IdentifierWrapper, MoveStructTag, U64};
+use aptos_api_types::{AsConverter, VersionedEvent};
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
 
@@ -42,7 +42,7 @@ impl EventsApi {
         event_key: Path<EventKey>,
         start: Query<Option<U64>>,
         limit: Query<Option<u16>>,
-    ) -> BasicResultWith404<Vec<Event>> {
+    ) -> BasicResultWith404<Vec<VersionedEvent>> {
         fail_point_poem("endpoint_get_events_by_event_key")?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
         self.list(accept_type, page, event_key.0)
@@ -63,17 +63,17 @@ impl EventsApi {
         &self,
         accept_type: AcceptType,
         address: Path<Address>,
-        event_handle: Path<MoveStructTagParam>,
+        event_handle: Path<MoveStructTag>,
         field_name: Path<IdentifierWrapper>,
         start: Query<Option<U64>>,
         limit: Query<Option<u16>>,
-    ) -> BasicResultWith404<Vec<Event>> {
+    ) -> BasicResultWith404<Vec<VersionedEvent>> {
         // TODO: Assert that Event represents u64s as strings.
         fail_point_poem("endpoint_get_events_by_event_handle")?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
         let account = Account::new(self.context.clone(), address.0, None)?;
         let key = account
-            .find_event_key(event_handle.0.into(), field_name.0.into())?
+            .find_event_key(event_handle.0, field_name.0.into())?
             .into();
         self.list(accept_type, page, key)
     }
@@ -85,15 +85,16 @@ impl EventsApi {
         accept_type: AcceptType,
         page: Page,
         event_key: EventKey,
-    ) -> BasicResultWith404<Vec<Event>> {
+    ) -> BasicResultWith404<Vec<VersionedEvent>> {
         let latest_ledger_info = self.context.get_latest_ledger_info_poem()?;
-        let contract_events = self
+        let ledger_version = latest_ledger_info.version();
+        let events = self
             .context
             .get_events(
                 &event_key.into(),
-                page.start(0, u64::MAX)?,
+                page.start_option(),
                 page.limit()?,
-                latest_ledger_info.version(),
+                ledger_version,
             )
             // TODO: Previously this was a 500, but I'm making this a 400. I suspect
             // both could be true depending on the error. Make this more specific.
@@ -103,7 +104,7 @@ impl EventsApi {
         let resolver = self.context.move_resolver_poem()?;
         let events = resolver
             .as_converter(self.context.db.clone())
-            .try_into_events(&contract_events)
+            .try_into_versioned_events(&events)
             .context("Failed to convert events from storage into response {}")
             .map_err(BasicErrorWith404::internal)?;
 

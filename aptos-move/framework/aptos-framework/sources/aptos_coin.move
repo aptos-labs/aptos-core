@@ -39,7 +39,7 @@ module aptos_framework::aptos_coin {
         let (mint_cap, burn_cap) = coin::initialize<AptosCoin>(
             aptos_framework,
             string::utf8(b"Aptos Coin"),
-            string::utf8(b"APTOS"),
+            string::utf8(b"APT"),
             8, /* decimals */
             false, /* monitor_supply */
         );

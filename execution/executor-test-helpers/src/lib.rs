@@ -8,6 +8,7 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue,
 };
+use aptos_types::ledger_info::generate_ledger_info_with_sig;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -40,7 +41,7 @@ pub fn gen_ledger_info_with_sigs(
     epoch: u64,
     output: &StateComputeResult,
     commit_block_id: HashValue,
-    signer: Vec<&ValidatorSigner>,
+    signer: &[ValidatorSigner],
 ) -> LedgerInfoWithSignatures {
     let ledger_info = LedgerInfo::new(
         BlockInfo::new(
@@ -54,11 +55,7 @@ pub fn gen_ledger_info_with_sigs(
         ),
         HashValue::zero(),
     );
-    let signatures = signer
-        .iter()
-        .map(|s| (s.author(), s.sign(&ledger_info)))
-        .collect();
-    LedgerInfoWithSignatures::new(ledger_info, signatures)
+    generate_ledger_info_with_sig(signer, ledger_info)
 }
 
 pub fn extract_signer(config: &mut NodeConfig) -> ValidatorSigner {

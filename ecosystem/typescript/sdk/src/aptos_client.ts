@@ -1,6 +1,6 @@
 import { MemoizeExpiring } from "typescript-memoize";
 import { HexString, MaybeHexString } from "./hex_string";
-import { moveStructTagToParam, sleep } from "./util";
+import { sleep } from "./util";
 import { AptosAccount } from "./aptos_account";
 import * as Gen from "./generated/index";
 import { TxnBuilderTypes, TransactionBuilderEd25519 } from "./transaction_builder";
@@ -141,7 +141,7 @@ export class AptosClient {
   ): Promise<Gen.MoveResource> {
     return this.client.accounts.getAccountResource(
       HexString.ensure(accountAddress).hex(),
-      moveStructTagToParam(resourceType),
+      resourceType,
       query?.ledgerVersion?.toString(),
     );
   }
@@ -205,7 +205,7 @@ export class AptosClient {
       signature: fakeSignature,
       sender: senderAddress.hex(),
       sequence_number: account.sequence_number,
-      max_gas_amount: "1000",
+      max_gas_amount: "2000",
       gas_unit_price: "1",
       // Unix timestamp, in seconds + 10 seconds
       expiration_timestamp_secs: (Math.floor(Date.now() / 1000) + 10).toString(),
@@ -278,7 +278,7 @@ export class AptosClient {
   ): Promise<Gen.Event[]> {
     return this.client.events.getEventsByEventHandle(
       HexString.ensure(address).hex(),
-      moveStructTagToParam(eventHandleStruct),
+      eventHandleStruct,
       fieldName,
       query?.start?.toString(),
       query?.limit,
@@ -394,10 +394,10 @@ export class AptosClient {
   }
 
   /**
-   * Waits up to 10 seconds for a transaction to move past pending state
+   * Waits up to 10 seconds for a transaction to move past pending state.
    * @param txnHash A hash of transaction
-   * @returns A Promise, that will resolve if transaction is accepted to the blockchain,
-   * and reject if more then 10 seconds passed
+   * @returns A Promise, that will resolve if transaction is accepted to the
+   * blockchain and reject if more then 10 seconds passed
    * @example
    * ```
    * const signedTxn = await this.aptosClient.signTransaction(account, txnRequest);
@@ -417,6 +417,47 @@ export class AptosClient {
         throw new Error(`Waiting for transaction ${txnHash} timed out!`);
       }
     }
+  }
+
+  /**
+   * Waits up to 10 seconds for a transaction to move past pending state.
+   * @param txnHash A hash of transaction
+   * @returns A Promise, that will resolve if transaction is accepted to the
+   * blockchain, and reject if more then 10 seconds passed. The return value
+   * contains the last transaction returned by the blockchain.
+   * @example
+   * ```
+   * const signedTxn = await this.aptosClient.signTransaction(account, txnRequest);
+   * const res = await this.aptosClient.submitTransaction(signedTxn);
+   * const waitResult = await this.aptosClient.waitForTransaction(res.hash);
+   * ```
+   */
+  async waitForTransactionWithResult(txnHash: string): Promise<Gen.Transaction> {
+    let isPending = true;
+    let count = 0;
+    while (isPending) {
+      if (count >= 10) {
+        break;
+      }
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const txn = await this.client.transactions.getTransactionByHash(txnHash);
+        isPending = txn.type === "pending_transaction";
+        if (!isPending) {
+          return txn;
+        }
+      } catch (e) {
+        if (e instanceof Gen.ApiError) {
+          isPending = e.status === 404;
+        } else {
+          throw e;
+        }
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(1000);
+      count += 1;
+    }
+    throw new Error(`Waiting for transaction ${txnHash} timed out!`);
   }
 
   // TODO: For some reason this endpoint doesn't appear in the generated client

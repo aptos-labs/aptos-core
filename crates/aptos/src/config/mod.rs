@@ -33,7 +33,7 @@ impl ConfigTool {
         match self {
             ConfigTool::Init(tool) => tool.execute_serialized_success().await,
             ConfigTool::GenerateShellCompletions(tool) => tool.execute_serialized_success().await,
-            ConfigTool::SetGlobalConfig(tool) => tool.execute_serialized_success().await,
+            ConfigTool::SetGlobalConfig(tool) => tool.execute_serialized().await,
             ConfigTool::ShowGlobalConfig(tool) => tool.execute_serialized().await,
         }
     }
@@ -82,21 +82,22 @@ pub struct SetGlobalConfig {
 }
 
 #[async_trait]
-impl CliCommand<()> for SetGlobalConfig {
+impl CliCommand<GlobalConfig> for SetGlobalConfig {
     fn command_name(&self) -> &'static str {
         "SetGlobalConfig"
     }
 
-    async fn execute(self) -> CliTypedResult<()> {
+    async fn execute(self) -> CliTypedResult<GlobalConfig> {
         // Load the global config
         let mut config = GlobalConfig::load()?;
 
         // Enable all features that are actually listed
         if let Some(config_type) = self.config_type {
-            config.config_type = config_type;
+            config.config_type = Some(config_type);
         }
 
-        config.save()
+        config.save()?;
+        config.display()
     }
 }
 
@@ -112,7 +113,9 @@ impl CliCommand<GlobalConfig> for ShowGlobalConfig {
 
     async fn execute(self) -> CliTypedResult<GlobalConfig> {
         // Load the global config
-        GlobalConfig::load()
+        let config = GlobalConfig::load()?;
+
+        config.display()
     }
 }
 
@@ -122,10 +125,20 @@ const GLOBAL_CONFIG_FILE: &str = "global_config.yaml";
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct GlobalConfig {
     /// Whether to be using Global or Workspace mode
-    pub config_type: ConfigType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config_type: Option<ConfigType>,
 }
 
 impl GlobalConfig {
+    /// Fill in defaults for display via the CLI
+    pub fn display(mut self) -> CliTypedResult<Self> {
+        if self.config_type.is_none() {
+            self.config_type = Some(ConfigType::default());
+        }
+
+        Ok(self)
+    }
+
     pub fn load() -> CliTypedResult<Self> {
         let path = global_folder()?.join(GLOBAL_CONFIG_FILE);
         if path.exists() {
@@ -138,7 +151,7 @@ impl GlobalConfig {
 
     /// Get the config location based on the type
     pub fn get_config_location(&self) -> CliTypedResult<PathBuf> {
-        match self.config_type {
+        match self.config_type.unwrap_or_default() {
             ConfigType::Global => global_folder(),
             ConfigType::Workspace => Ok(current_dir()?.join(CONFIG_FOLDER)),
         }

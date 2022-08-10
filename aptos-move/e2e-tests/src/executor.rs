@@ -17,12 +17,15 @@ use crate::{
     golden_outputs::GoldenOutputs,
 };
 use aptos_crypto::HashValue;
+use aptos_gas::NativeGasParameters;
 use aptos_keygen::KeyGen;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
-    block_metadata::{new_block_event_key, BlockMetadata},
+    account_config::{
+        new_block_event_key, AccountResource, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS,
+    },
+    block_metadata::BlockMetadata,
     on_chain_config::{OnChainConfig, ValidatorSet, Version},
     state_store::state_key::StateKey,
     transaction::{
@@ -45,7 +48,7 @@ use move_deps::{
         language_storage::{ModuleId, ResourceKey, TypeTag},
         move_resource::MoveResource,
     },
-    move_vm_types::gas_schedule::GasStatus,
+    move_vm_types::gas::UnmeteredGasMeter,
 };
 use num_cpus;
 
@@ -74,6 +77,7 @@ pub struct FakeExecutor {
     executed_output: Option<GoldenOutputs>,
     trace_dir: Option<PathBuf>,
     rng: KeyGen,
+    no_parallel_exec: bool,
 }
 
 impl FakeExecutor {
@@ -85,9 +89,16 @@ impl FakeExecutor {
             executed_output: None,
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
+            no_parallel_exec: false,
         };
         executor.apply_write_set(write_set);
         executor
+    }
+
+    /// Configure this executor to not use parallel execution.
+    pub fn set_not_parallel(mut self) -> Self {
+        self.no_parallel_exec = true;
+        self
     }
 
     /// Create an executor from a saved genesis blob
@@ -114,6 +125,7 @@ impl FakeExecutor {
             executed_output: None,
             trace_dir: None,
             rng: KeyGen::from_seed(RNG_SEED),
+            no_parallel_exec: false,
         }
     }
 
@@ -342,11 +354,13 @@ impl FakeExecutor {
         }
 
         let output = AptosVM::execute_block(txn_block.clone(), &self.data_store);
-        let parallel_output = self.execute_transaction_block_parallel(txn_block);
-        assert_eq!(output, parallel_output);
+        if !self.no_parallel_exec {
+            let parallel_output = self.execute_transaction_block_parallel(txn_block);
+            assert_eq!(output, parallel_output);
+        }
 
         if let Some(logger) = &self.executed_output {
-            logger.log(format!("{:?}\n", output).as_str());
+            logger.log(format!("{:#?}\n", output).as_str());
         }
 
         // dump serialized transaction output after execution, if tracing
@@ -400,8 +414,8 @@ impl FakeExecutor {
     }
 
     /// Get the blob for the associated AccessPath
-    pub fn read_from_access_path(&self, path: &AccessPath) -> Option<Vec<u8>> {
-        StateView::get_state_value(&self.data_store, &StateKey::AccessPath(path.clone())).unwrap()
+    pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {
+        StateView::get_state_value(&self.data_store, state_key).unwrap()
     }
 
     /// Verifies the given transaction by running it through the VM verifier.
@@ -418,17 +432,26 @@ impl FakeExecutor {
         self.new_block_with_timestamp(self.block_time + 1);
     }
 
-    pub fn new_block_with_timestamp(&mut self, time_stamp: u64) {
+    pub fn new_block_with_timestamp(&mut self, time_microseconds: u64) {
+        self.block_time = time_microseconds;
+        self.new_block_with_metadata(None, vec![])
+    }
+
+    pub fn new_block_with_metadata(
+        &mut self,
+        proposer_index: Option<u32>,
+        failed_proposer_indices: Vec<u32>,
+    ) {
         let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
             .expect("Unable to retrieve the validator set from storage");
-        self.block_time = time_stamp;
         let new_block = BlockMetadata::new(
             HashValue::zero(),
             0,
             0,
-            vec![false; validator_set.payload().count()],
             *validator_set.payload().next().unwrap().account_address(),
-            vec![],
+            proposer_index,
+            vec![false; validator_set.payload().count()],
+            failed_proposer_indices,
             self.block_time,
         );
         let output = self
@@ -459,6 +482,10 @@ impl FakeExecutor {
         self.block_time
     }
 
+    pub fn get_block_time_seconds(&mut self) -> u64 {
+        self.block_time / 1_000_000
+    }
+
     pub fn exec(
         &mut self,
         module_name: &str,
@@ -467,8 +494,8 @@ impl FakeExecutor {
         args: Vec<Vec<u8>>,
     ) {
         let write_set = {
-            let mut gas_status = GasStatus::new_unmetered();
-            let vm = MoveVmExt::new().unwrap();
+            // TODO(Gas): we probably want to switch to non-zero costs in the future
+            let vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
             let remote_view = RemoteStorage::new(&self.data_store);
             let mut session = vm.new_session(&remote_view, SessionId::void());
             session
@@ -477,7 +504,7 @@ impl FakeExecutor {
                     &Self::name(function_name),
                     type_params,
                     args,
-                    &mut gas_status,
+                    &mut UnmeteredGasMeter,
                 )
                 .unwrap_or_else(|e| {
                     panic!(
@@ -504,8 +531,8 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> Result<WriteSet, VMStatus> {
-        let mut gas_status = GasStatus::new_unmetered();
-        let vm = MoveVmExt::new().unwrap();
+        // TODO(Gas): we probably want to switch to non-zero costs in the future
+        let vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
         let remote_view = RemoteStorage::new(&self.data_store);
         let mut session = vm.new_session(&remote_view, SessionId::void());
         session
@@ -514,7 +541,7 @@ impl FakeExecutor {
                 &Self::name(function_name),
                 type_params,
                 args,
-                &mut gas_status,
+                &mut UnmeteredGasMeter,
             )
             .map_err(|e| e.into_vm_status())?;
         let session_out = session.finish().expect("Failed to generate txn effects");

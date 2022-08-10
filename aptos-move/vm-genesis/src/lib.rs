@@ -11,6 +11,9 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     HashValue, PrivateKey, Uniform,
 };
+use aptos_gas::{
+    AptosGasParameters, InitialGasSchedule, NativeGasParameters, ToOnChainGasSchedule,
+};
 use aptos_types::{
     account_config::{self, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
@@ -33,7 +36,7 @@ use move_deps::{
         resolver::MoveResolver,
         value::{serialize_values, MoveValue},
     },
-    move_vm_types::gas_schedule::{GasStatus, INITIAL_COST_SCHEDULE},
+    move_vm_types::gas::UnmeteredGasMeter,
 };
 use once_cell::sync::Lazy;
 use rand::prelude::*;
@@ -47,15 +50,17 @@ const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
-const FIXED_REWARDS_APY: u64 = 10;
 
-pub struct GenesisConfigurations {
-    pub min_price_per_gas_unit: u64,
-    pub epoch_duration_secs: u64,
-    pub min_stake: u64,
-    pub max_stake: u64,
-    pub recurring_lockup_duration_secs: u64,
+pub struct GenesisConfiguration {
     pub allow_new_validators: bool,
+    pub epoch_duration_secs: u64,
+    pub max_stake: u64,
+    pub min_stake: u64,
+    pub min_voting_threshold: u128,
+    pub recurring_lockup_duration_secs: u64,
+    pub required_proposer_stake: u64,
+    pub rewards_apy_percentage: u64,
+    pub voting_duration_secs: u64,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -70,7 +75,7 @@ pub fn encode_genesis_transaction(
     validators: &[Validator],
     stdlib_module_bytes: &[Vec<u8>],
     chain_id: ChainId,
-    genesis_configs: GenesisConfigurations,
+    genesis_config: GenesisConfiguration,
 ) -> Transaction {
     let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1::default());
 
@@ -80,7 +85,7 @@ pub fn encode_genesis_transaction(
         stdlib_module_bytes,
         consensus_config,
         chain_id,
-        &genesis_configs,
+        &genesis_config,
     )))
 }
 
@@ -90,8 +95,10 @@ pub fn encode_genesis_change_set(
     stdlib_module_bytes: &[Vec<u8>],
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
-    genesis_configs: &GenesisConfigurations,
+    genesis_config: &GenesisConfiguration,
 ) -> ChangeSet {
+    validate_genesis_config(genesis_config);
+
     let mut stdlib_modules = Vec::new();
     // create a data view for move_vm
     let mut state_view = GenesisStateView::new();
@@ -102,7 +109,7 @@ pub fn encode_genesis_change_set(
     }
     let data_cache = StateViewCache::new(&state_view).into_move_resolver();
 
-    let move_vm = MoveVmExt::new().unwrap();
+    let move_vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
@@ -111,13 +118,13 @@ pub fn encode_genesis_change_set(
         aptos_root_key,
         consensus_config,
         chain_id,
-        genesis_configs,
+        genesis_config,
     );
     // generate the genesis WriteSet
     create_and_initialize_validators(&mut session, validators);
 
     // Initialize on-chain governance.
-    initialize_on_chain_governance(&mut session);
+    initialize_on_chain_governance(&mut session, genesis_config);
 
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
@@ -146,6 +153,37 @@ pub fn encode_genesis_change_set(
     change_set
 }
 
+fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
+    assert!(
+        genesis_config.min_stake <= genesis_config.max_stake,
+        "Min stake must be smaller than or equal to max stake"
+    );
+    assert!(
+        genesis_config.epoch_duration_secs > 0,
+        "Epoch duration must be > 0"
+    );
+    assert!(
+        genesis_config.recurring_lockup_duration_secs > 0,
+        "Recurring lockup duration must be > 0"
+    );
+    assert!(
+        genesis_config.recurring_lockup_duration_secs >= genesis_config.epoch_duration_secs,
+        "Recurring lockup duration must be at least as long as epoch duration"
+    );
+    assert!(
+        genesis_config.rewards_apy_percentage > 0 && genesis_config.rewards_apy_percentage < 100,
+        "Rewards APY must be > 0% and < 100%"
+    );
+    assert!(
+        genesis_config.voting_duration_secs > 0,
+        "On-chain voting duration must be > 0"
+    );
+    assert!(
+        genesis_config.voting_duration_secs < genesis_config.recurring_lockup_duration_secs,
+        "Voting duration must be strictly smaller than recurring lockup"
+    );
+}
+
 fn exec_function(
     session: &mut SessionExt<impl MoveResolver>,
     module_name: &str,
@@ -162,7 +200,7 @@ fn exec_function(
             &Identifier::new(function_name).unwrap(),
             ty_args,
             args,
-            &mut GasStatus::new_unmetered(),
+            &mut UnmeteredGasMeter,
         )
         .unwrap_or_else(|e| {
             panic!(
@@ -180,33 +218,29 @@ fn create_and_initialize_main_accounts(
     aptos_root_key: &Ed25519PublicKey,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
-    genesis_configs: &GenesisConfigurations,
+    genesis_config: &GenesisConfiguration,
 ) {
     let aptos_root_auth_key = AuthenticationKey::ed25519(aptos_root_key);
 
-    let genesis_gas_schedule = &INITIAL_COST_SCHEDULE;
-    let instr_gas_costs = bcs::to_bytes(&genesis_gas_schedule.instruction_table)
-        .expect("Failure serializing genesis instr gas costs");
-    let native_gas_costs = bcs::to_bytes(&genesis_gas_schedule.native_table)
-        .expect("Failure serializing genesis native gas costs");
+    let genesis_gas_params = AptosGasParameters::initial();
+    let gas_schedule_blob = bcs::to_bytes(&genesis_gas_params.to_on_chain_gas_schedule())
+        .expect("Failure serializing genesis gas schedule");
 
     let consensus_config_bytes =
         bcs::to_bytes(&consensus_config).expect("Failure serializing genesis consensus config");
 
-    // TODO: Make reward rate numerator/denominator configurable in the genesis blob.
-    // We're aiming for roughly 10% APY.
-    // This represents the rewards rate fraction (numerator / denominator).
-    // For an APY=0.1 (10%) and epoch interval = 1 hour, the numerator = 1B * 10 / 100 / (365 * 24) ~ 1141.
-    // Rewards rate = 1141 / 1B ~ 0.0011% per 1 hour. This compounds to ~10.12% per year.
+    // Calculate the per-epoch rewards rate, represented as 2 separate ints (numerator and
+    // denominator).
     let rewards_rate_denominator = 1_000_000_000;
-    let num_epochs_in_a_year = NUM_SECONDS_PER_YEAR / genesis_configs.epoch_duration_secs;
+    let num_epochs_in_a_year = NUM_SECONDS_PER_YEAR / genesis_config.epoch_duration_secs;
     // Multiplication before division to minimize rounding errors due to integer division.
-    let rewards_rate_numerator =
-        (FIXED_REWARDS_APY * rewards_rate_denominator / 100) / num_epochs_in_a_year;
+    let rewards_rate_numerator = (genesis_config.rewards_apy_percentage * rewards_rate_denominator
+        / 100)
+        / num_epochs_in_a_year;
 
     // Block timestamps are in microseconds and epoch_interval is used to check if a block timestamp
     // has crossed into a new epoch. So epoch_interval also needs to be in micro seconds.
-    let epoch_interval_usecs = genesis_configs.epoch_duration_secs * MICRO_SECONDS_PER_SECOND;
+    let epoch_interval_usecs = genesis_config.epoch_duration_secs * MICRO_SECONDS_PER_SECOND;
     exec_function(
         session,
         GENESIS_MODULE_NAME,
@@ -215,17 +249,15 @@ fn create_and_initialize_main_accounts(
         serialize_values(&vec![
             MoveValue::Signer(account_config::aptos_root_address()),
             MoveValue::vector_u8(aptos_root_auth_key.to_vec()),
-            MoveValue::vector_u8(instr_gas_costs),
-            MoveValue::vector_u8(native_gas_costs),
+            MoveValue::vector_u8(gas_schedule_blob),
             MoveValue::U8(chain_id.id()),
             MoveValue::U64(APTOS_MAX_KNOWN_VERSION.major),
             MoveValue::vector_u8(consensus_config_bytes),
-            MoveValue::U64(genesis_configs.min_price_per_gas_unit),
             MoveValue::U64(epoch_interval_usecs),
-            MoveValue::U64(genesis_configs.min_stake),
-            MoveValue::U64(genesis_configs.max_stake),
-            MoveValue::U64(genesis_configs.recurring_lockup_duration_secs),
-            MoveValue::Bool(genesis_configs.allow_new_validators),
+            MoveValue::U64(genesis_config.min_stake),
+            MoveValue::U64(genesis_config.max_stake),
+            MoveValue::U64(genesis_config.recurring_lockup_duration_secs),
+            MoveValue::Bool(genesis_config.allow_new_validators),
             MoveValue::U64(rewards_rate_numerator),
             MoveValue::U64(rewards_rate_denominator),
         ]),
@@ -233,12 +265,10 @@ fn create_and_initialize_main_accounts(
 }
 
 /// Create and initialize Association and Core Code accounts.
-fn initialize_on_chain_governance(session: &mut SessionExt<impl MoveResolver>) {
-    // TODO: Make on chain governance parameters configurable in the genesis blob.
-    let min_voting_threshold = 0;
-    let required_proposer_stake = 0;
-    let voting_period_secs = 7 * 24 * 60 * 60; // 1 week.
-
+fn initialize_on_chain_governance(
+    session: &mut SessionExt<impl MoveResolver>,
+    genesis_config: &GenesisConfiguration,
+) {
     exec_function(
         session,
         GOVERNANCE_MODULE_NAME,
@@ -246,9 +276,9 @@ fn initialize_on_chain_governance(session: &mut SessionExt<impl MoveResolver>) {
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
-            MoveValue::U128(min_voting_threshold),
-            MoveValue::U64(required_proposer_stake),
-            MoveValue::U64(voting_period_secs),
+            MoveValue::U128(genesis_config.min_voting_threshold),
+            MoveValue::U64(genesis_config.required_proposer_stake),
+            MoveValue::U64(genesis_config.voting_duration_secs),
         ]),
     );
 }
@@ -351,7 +381,7 @@ fn publish_token_modules(
         let mut bytes = vec![];
         m.serialize(&mut bytes).unwrap();
         session
-            .publish_module(bytes, *module_id.address(), &mut GasStatus::new_unmetered())
+            .publish_module(bytes, *module_id.address(), &mut UnmeteredGasMeter)
             .unwrap_or_else(|e| panic!("Failure publishing module {:?}, {:?}", module_id, e));
     }
 }
@@ -384,7 +414,7 @@ fn publish_module_bundle(session: &mut SessionExt<impl MoveResolver>, lib: Modul
     // TODO: allow genesis modules published under different addresses. supporting this while
     // maintaining the topological order is challenging.
     session
-        .publish_module_bundle(modules, addr_opt.unwrap(), &mut GasStatus::new_unmetered())
+        .publish_module_bundle(modules, addr_opt.unwrap(), &mut UnmeteredGasMeter)
         .unwrap_or_else(|e| panic!("Failure publishing modules {:?}", e));
 }
 
@@ -527,13 +557,17 @@ pub fn generate_test_genesis(
         stdlib_modules,
         OnChainConsensusConfig::default(),
         ChainId::test(),
-        &GenesisConfigurations {
-            min_price_per_gas_unit: 0,
-            epoch_duration_secs: 86400,
+        &GenesisConfiguration {
+            allow_new_validators: true,
+            epoch_duration_secs: 3600,
             min_stake: 0,
-            max_stake: 1000000,
-            recurring_lockup_duration_secs: 1,
-            allow_new_validators: false,
+            min_voting_threshold: 0,
+            // 1M APTOS coins (with 8 decimals).
+            max_stake: 100_000_000_000_000,
+            recurring_lockup_duration_secs: 7200,
+            required_proposer_stake: 0,
+            rewards_apy_percentage: 10,
+            voting_duration_secs: 3600,
         },
     );
     (genesis, test_validators)
@@ -551,7 +585,7 @@ pub fn test_genesis_module_publishing() {
     }
     let data_cache = StateViewCache::new(&state_view).into_move_resolver();
 
-    let move_vm = MoveVmExt::new().unwrap();
+    let move_vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
     publish_stdlib(&mut session, stdlib_modules);

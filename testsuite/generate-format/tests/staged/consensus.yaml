@@ -60,10 +60,12 @@ BlockMetadata:
         TYPENAME: HashValue
     - epoch: U64
     - round: U64
-    - previous_block_votes:
-        SEQ: BOOL
     - proposer:
         TYPENAME: AccountAddress
+    - proposer_index:
+        OPTION: U32
+    - previous_block_votes:
+        SEQ: BOOL
     - failed_proposer_indices:
         SEQ: U32
     - timestamp_usecs: U64
@@ -234,11 +236,7 @@ LedgerInfoWithV0:
     - ledger_info:
         TYPENAME: LedgerInfo
     - signatures:
-        MAP:
-          KEY:
-            TYPENAME: AccountAddress
-          VALUE:
-            TYPENAME: Signature
+        TYPENAME: MultiSignature
 Module:
   STRUCT:
     - code: BYTES
@@ -257,6 +255,13 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+MultiSignature:
+  STRUCT:
+    - validator_bitmask:
+        SEQ: BOOL
+    - multi_sig:
+        OPTION:
+          TYPENAME: Signature
 Payload:
   ENUM:
     0:

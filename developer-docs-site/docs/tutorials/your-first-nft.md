@@ -1,15 +1,20 @@
 ---
 title: "Your First NFT"
 slug: "your-first-nft"
-sidebar_position: 3
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import ThemedImage from '@theme/ThemedImage';
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
-Note: The following tutorial is a work in progress. Furthermore, the Aptos' (Non-Fungible) Token specification has not been formalized.
+:::caution
 
-# Tokens and NFTs in Aptos
+The following tutorial is a work in progress. The Aptos (Non-Fungible) Token specification has not been formalized.
+
+:::
+
+# Your First NFT
 
 An [NFT](https://en.wikipedia.org/wiki/Non-fungible_token) is a non-fungible token or data stored on a blockchain that uniquely defines ownership of an asset. NFTs were first defined in [EIP-721](https://eips.ethereum.org/EIPS/eip-721) and later expanded upon in [EIP-1155](https://eips.ethereum.org/EIPS/eip-1155). NFTs typically comprise of the following aspects:
 
@@ -24,98 +29,67 @@ Additionally, most NFTs are part of a collection or a set of NFTs with a common 
 - A description, the description of the asset
 - A URL, a non-descript pointer off-chain to more information about the asset could be media such as an image or video or more metadata
 
-The Aptos implementation for core NFTs or Tokens can be found in [Token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/Token.move).
+## Aptos digital asset token standard
 
-## Aptos Token Definitions
+The Aptos token standard is developed following the below principles:
 
-### The Token
+- Provide a standard implementation to improve interoperability across ecosystem projects.
 
-The Aptos Token is defined as:
+- Achieve maximal liquidity through defining NFT, Fungible (non-decimal) and Semi-Fungible tokens in one contract. These different types of tokens can be easily stored, transferred and transacted in the same way
 
-| Field        | Type             | Description                                                                                 |
-| ------------ | ---------------- | ------------------------------------------------------------------------------------------- |
-| `id`         | `GUID:ID`        | A globally unique identifier for this token also useful for identifying the creator         |
-| `name`       | `string::String` | The name of this token, must be unique within the collection                                |
-| `collection` | `GUID:ID`        | A globally unique identifier for the collection that contains this token                    |
-| `balance`    | `u64`            | The current stored amount of this token in relation to the supply, `1 <= balance <= supply` |
+- Enable the customization of token properties, users can define their own properties and store them on-chain.
 
-The Aptos TokenData is defined as:
+- Reduce the cost of minting large amounts of NFT tokens. We support `lazy` on-chain mint through semi-fungible token
 
-| Field         | Type             | Description                                                                                           |
-| ------------- | ---------------- | ----------------------------------------------------------------------------------------------------- |
-| `id`          | `GUID:ID`        | A globally unique identifier for this token also useful for identifying the creator                   |
-| `description` | `string::String` | Describes this token                                                                                  |
-| `name`        | `string::String` | The name of this token, must be unique within the collection                                          |
-| `supply`      | `u64`            | Total number of editions of this Token                                                                |
-| `uri`         | `string::String` | URL for additional information / media                                                                |
-| `metadata`    | `TokenType`      | A generic, a optional user defined struct to contain additional information about this token on-chain |
+:::tip Aptos implementation for core NFT
 
-Tokens are defined with the move attributes `store`, which means that they can be saved to global storage. Tokens cannot be implicitly dropped and must be burned to ensure that the total balance is equal to supply. Tokens cannot be copied. That is the total balance or supply cannot be changed by anyone but the creator due to the lack of a copy operator. Note, the current APIs do not expose the ability for post creation mints. A token can be uniquely identified by either its `id` or by the tuple of `TokenType, collection name, and token name`.
+The Aptos implementation for core NFTs or Tokens can be found in [Token.move](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-token/sources/token.move).
 
-TokenData has the `copy` attribute to support simplicity of token balance splitting. A token split can happen whenever an individual with balance greater than `1` offers another individual a portion of their balance less than their total balance. Users trading Tokens are advised that two Tokens can share the same TokenData as the Aptos standard does not attempt to identify if a token copies attributes from another. Repeating what was said earlier, the token can be uniquely identified by either its `id` or `TokenType`, collection name, and token name. A creator could change any of the values in the set of `TokenType`, collection name, or token name to create similar but not identtcal tokens.
+:::
 
-### The Token Collection
+## Aptos token definitions
 
-Aptos defines a set of collections grouped together by their unique `id`:
+### The Token Data model
 
-```rust
-struct Collections<TokenType: copy + drop + store> has key {
-    collections: Table<string::String, Collection>,
-}
+<ThemedImage
+  alt="Signed Transaction Flow"
+  sources={{
+    light: useBaseUrl('/img/docs/token-standard-light-mode.svg'),
+    dark: useBaseUrl('/img/docs/token-standard-dark-mode.svg'),
+  }}
+/>
 
-struct TokenMetadata<TokenType: store> has key {
-    metadata: Table<ID, TokenType>,
-}
-```
+The token related data are stored at both creator’s account and owner’s account.
 
-As the `Collections` has the attribute `key`, it is stored directly to the creators account. It is important to note, that if there were no notion of `Collections` and instead `Collection` had the `key` attribute, an Aptos account could only have a single collection, which often is not the case. A collection can be looked up in the set of Collections by name, hence enforcing a unique collection name.
+**Resource stored at creator’s address:**
 
-The Token and TokenData structs are fixed in their content. The resource `TokenMetadata` enables creators to store additional token data. The Data in the table is stored as the `Token`'s unique `ID`. The use of this is optional and requires API specialization due to the limitation that script functions cannot support structs or generics.
+| Field                      | Description                                                                                                                                                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Collections                | Maintains a table called `collection_data`, which maps the collection name to the `CollectionData`. It also stores all the TokenData that this creator creates.                                                                 |
+| CollectionData             | Store the collection metadata. The `supply` is the number of tokens created for the current collection. `maxium` is the upper bound of tokens in this collection.                                                                |
+| CollectionMutabilityConfig | Specify which field is mutable.                                                                                                                                                                                                 |
+| TokenData                  | The main struct for holding the token metadata. Properties is a where user can add their own properties that are not defined in the token data. User can mint more tokens based on the TokenData and they share the same TokenData. |
+| TokenMutabilityConfig      | Control which fields are mutable.                                                                                                                                                                                                |
+| TokenDataId                | An id used for representing and querying TokenData on-chain. This id mainly contains 3 fields including creator address, collection name and token name.                                                                        |
+| Royalty                    | Specify the denominator and numerator for calculating the royalty fee. It also has payee account address for depositing the Royalty.                                                                                            |
+| PropertyValue              | Contains both value of a property and type of property.                                                                                                                                                                          |
 
-Each collection has the following fields:
+**Resource stored at owner’s address:**
 
-| Field            | Type                                              | Description                                                                                            |
-| ---------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `tokens`         | `Table<string::String, TokenMetadata<TokenType>>` | Keeps track of all Tokens associated with this collection                                              |
-| `claimed_tokens` | `Table<string::String, address>`                  | Keeps track of where tokens wth `supply == 1` are stored                                               |
-| `description`    | `string::String`                                  | Describes this collection                                                                              |
-| `name`           | `string::String`                                  | The name of this collection, must be unique within the creators account for the specified `TokenType`. |
-| `uri`            | `string::String`                                  | URL for additional information / media                                                                 |
-| `count`          | `u64`                                             | Total number of distinct Tokens tracked by this collection                                             |
-| `maximum`        | `Option<u64>`                                     | Optional, maximum amount of tokens that can be minted within this collection                           |
+| Field      | Description                                                                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| TokenStore | The main struct for storing the token owned by this address. It maps TokenId to the actual token.                                                                      |
+| Token      | `amount` is the number of tokens.                                                                                                                                  |
+| TokenId    | `TokenDataId` points to the metadata of this token. The `property_version` represents a token with mutated PropertyMap from `default_properties` in the TokenData. |
 
-A collection is not a store for accumulating Tokens, so instead of containing a `Token`, it contains a `TokenData`:
+## Tokens tutorial
 
-| Field  | Type        | Description                                                                         |
-| ------ | ----------- | ----------------------------------------------------------------------------------- |
-| `id`   | `GUID:ID`   | A globally unique identifier for this token also useful for identifying the creator |
-| `data` | `TokenData` | Additional data about this token, this is set of supply of the token `> 1`          |
+This tutorial will walk you through the process of:
 
-### Storing Tokens
-
-In order to acquire and store tokens, a user must have a `Gallery` of `TokenType`:
-
-```rust
-struct Gallery has key {
-    gallery: Table<ID, Token>,
-}
-```
-
-Like the `Collections`, this is stored as a resource on an Aptos account.
-
-## Introducing Tokens
-
-As part of our core framework, Aptos provides a basic [Token](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/Token.move) interface with no additional data, or explicitly one in which the `TokenMetadata` resource has no entry for that token. The motivations for doing so include:
-
-- Creating a new token requires writing Move code
-- The Script function for creating a new token must be specialized as Move does not support template types or structs as input arguments
-- Template types on script functions add extra friction to writing script functions
-
-This tutorial will walk you through the process of
-
-- creating your own Token collection,
-- a Token of our favorite cat,
-- and giving that token to someone else.
+- Creating your own token collection.
+- Creating a token of our favorite cat.
+- Giving that token to someone else.
+- The on-chain lazy mint token through mutation.
 
 This tutorial builds on [Your first transaction](/tutorials/your-first-transaction) as a library for this example. The following tutorial contains example code that can be downloaded in its entirety below:
 
@@ -124,51 +98,36 @@ This tutorial builds on [Your first transaction](/tutorials/your-first-transacti
 
 For this tutorial, will be focusing on `first_nft.ts` and re-using the `first_transaction.ts` library from the previous tutorial.
 
-You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript)
+You can find the typescript project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/typescript).
 
   </TabItem>
   <TabItem value="python" label="Python">
 
 For this tutorial, will be focusing on `first_nft.py` and re-using the `first_transaction.py` library from the previous tutorial.
 
-You can find the python project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/python)
-
   </TabItem>
   <TabItem value="rust" label="Rust">
-
-TODO
-
+  Under construction.
   </TabItem>
+
 </Tabs>
 
 ### Creating a Collection
 
-The Aptos Token enables creators to create finite or unlimited collections. Many NFTs are of a limited nature, where the creator only intends on creating a certain amount forever, this enforces scarcity. Whereas other tokens may have an unlimited nature, for example, a collection used for utility may see new tokens appear over time. SimpleToken collections can be instantiated with either behavior by using the appropriate script function:
-
-Finite, that is no more than a `maximum` number of tokens can ever be minted:
+The Aptos token enables creators to create collections. The `maximum` is the total number of tokens that can be created for this collection.
 
 ```rust
-public(script) fun create_limited_collection_script (
-    account: signer,
-    description: vector<u8>,
-    name: vector<u8>,
-    uri: vector<u8>,
-    maximum: u64,
+public(script) fun create_collection_script (
+	creator: &signer,
+	name: String,
+	description: String,
+	uri: String,
+	maximum: u64,
+	mutate_setting: vector<bool>,
 )
 ```
 
-Unlimited, that is there is no limit to the number of tokens that can be added to the collection:
-
-```rust
-public(script) fun create_unlimited_collection_script(
-    account: signer,
-    description: vector<u8>,
-    name: vector<u8>,
-    uri: vector<u8>,
-)
-```
-
-These script functions can be called via the REST API. The following demonstrates how to call the as demonstrated in the following:
+These script functions can be called via the REST API. See below: 
 
 <Tabs>
 <TabItem value="typescript" label="Typescript" default>
@@ -177,7 +136,7 @@ These script functions can be called via the REST API. The following demonstrate
 :!: static/examples/typescript/first_nft.ts section_1
 ```
 
-  </TabItem>
+</TabItem>
   <TabItem value="python" label="Python">
 
 ```python
@@ -187,26 +146,41 @@ These script functions can be called via the REST API. The following demonstrate
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-TODO
+Under construction.
 </TabItem>
 </Tabs>
 
-### Creating a Token
+### Creating a token
 
-Tokens can be created after collection creation. To do so, the token must specify the same `collection_name` as specified as the name of a previously created collection `name`. The Move script function to create a `SimpleToken` is:
+Tokens can be created after collection creation. To do so, the token must specify the same `collection` as specified as the name of a previously created collection `name`. The Move script function is:
 
 ```rust
-public(script) fun create_token_script(
-    account: signer,
-    collection_name: vector<u8>,
-    description: vector<u8>,
-    name: vector<u8>,
-    supply: u64,
-    uri: vector<u8>,
+public entry fun create_token_script(
+	creator: &signer,
+	collection: String,
+	name: String,
+	description: String,
+	balance: u64,
+	maximum: u64,
+	uri: String,
+	royalty_payee_address: address,
+	royalty_points_denominator: u64,
+	royalty_points_numerator: u64,
+	token_mutate_setting: vector<bool>,
+	property_keys: vector<String>,
+	property_values: vector<vector<u8>>,
+	property_types: vector<String>,
 )
 ```
 
-These script functions can be called via the REST API. The following demonstrates how to call the as demonstrated in the following:
+- The `balance` field is the initial amount to be created for this token.
+- The `maximum` dictates the maximal number of tokens to be minted for this created `TokenData`.
+- The `royalty_payee_address` is address that royalty is paid to.
+- The quantity `royalty_points_numerator` / `royalty_points_denominator` is the percentage of sale price (`Royalty`) should be paid to the payee address. It can be a single owner's account address or an address of a shared account owned by a group of creators.
+- The `token_mutate_setting` describes whether a field is `TokenData` is mutable.
+- The `property_keys`, `property_values` and `property_types` are the property key value pairs that can be stored, read and write on-chain.
+
+These script functions can be called via the REST API. See below:
 
 <Tabs>
 <TabItem value="typescript" label="Typescript" default>
@@ -216,24 +190,26 @@ These script functions can be called via the REST API. The following demonstrate
 ```
 
   </TabItem>
-  <TabItem value="python" label="Python">
+  <TabItem value="python" label="Python" >
 
 ```python
 :!: static/examples/python/first_nft.py section_2
 ```
 
   </TabItem>
-  <TabItem value="rust" label="Rust">
+  <TabItem value="rust" label="Rust" >
 
-TODO
+Under construction.
 </TabItem>
 </Tabs>
 
-### Giving Away a Token
+### Giving away a token
 
-In Aptos and Move, each token occupies space and has ownership. Because of this, token transfers are not unilateral and require two phase process similar to a bulletin board. The sender must first register that a token is available for the recipient to claim, the recipient must then claim this token. This has been implemented in a proof of concept move module called [`TokenTransfer`](https://github.com/aptos-labs/aptos-core/blob/nft/aptos-move/framework/aptos-framework/sources/TokenTransfers.move). `SimpleToken` provides a few wrapper functions to support transferring to another account, claiming that transfer, or stopping that transfer.
+In Aptos and Move, each token occupies space and has ownership. Because of this, token transfers are not unilateral and require two phase process similar to a bulletin board. The sender must first register that a token is available for the recipient to claim, the recipient must then claim this token. This is implemented in a proof of concept Move module called [`TokenTransfer`](https://github.com/aptos-labs/aptos-core/blob/nft/aptos-move/framework/aptos-framework/sources/TokenTransfers.move). 
 
-#### Obtaining the Token ID
+The `SimpleToken` provides a few wrapper functions to support transferring to another account, claiming that transfer, or stopping that transfer.
+
+#### Obtaining the token ID
 
 In order to transfer the token, the sender must first identify the token id based upon knowing the creator's account, the collection name, and the token name. This can be obtained by querying REST:
 
@@ -245,29 +221,31 @@ In order to transfer the token, the sender must first identify the token id base
 ```
 
   </TabItem>
-  <TabItem value="python" label="Python">
+  <TabItem value="python" label="Python" >
 
 ```python
 :!: static/examples/python/first_nft.py section_3
 ```
 
   </TabItem>
-  <TabItem value="rust" label="Rust">
+  <TabItem value="rust" label="Rust" >
 
-TODO
+Under construction.
 </TabItem>
 </Tabs>
 
-#### Offering the Token
+#### Offering the token
 
 The following Move script function in `Token` supports transferring a token to another account, effectively registering that the other account can claim the token:
 
 ```rust
-public(script) fun offer_script(
+public entry fun offer_script(
     sender: signer,
     receiver: address,
     creator: address,
-    token_creation_num: u64,
+    collection: String,
+    name: String,
+    property_version: u64,
     amount: u64,
 )
 ```
@@ -289,21 +267,22 @@ public(script) fun offer_script(
   </TabItem>
   <TabItem value="rust" label="Rust">
 
-TODO
+Under construction.
 </TabItem>
 </Tabs>
 
-#### Claiming the Token
+#### Claiming the token
 
 The following Move script function in `SimpleToken` supports receiving a token provided by the previous function, effectively claiming a token:
 
 ```rust
-public(script) fun claim_script(
-    sender: signer,
-    receiver: address,
+public entry fun claim_script(
+    receiver: signer,
+    sender: address,
     creator: address,
-    token_creation_num: u64,
-    amount: u64,
+    collection: String,
+    name: String,
+    property_version: u64,
 )
 ```
 
@@ -323,15 +302,57 @@ public(script) fun claim_script(
 
   </TabItem>
   <TabItem value="rust" label="Rust">
-TODO
+Under construction.
   </TabItem>
 </Tabs>
 
+#### On-chain Lazy Mint
+
+When Alice becomes a celebrity in her community, her cat NFTs are in high demand. However, Alice doesn't want to pay the cost of minting 10 million NFTs initially. She wants to only pay the cost when someone wants the NFT. She can mint 10 million uninitialized fungible cat token in one transaction.
+
+When Jack wants to buy an NFT from Alice, she can mutate one fungible token.
+
+```rust
+    public entry fun mutate_token_properties(
+        account: &signer,
+        token_owner: address,
+        creator: address,
+        collection_name: String,
+        token_name: String,
+        token_property_version: u64,
+        amount: u64,
+        keys: vector<String>,
+        values: vector<vector<u8>>,
+        types: vector<String>,
+    )
+```
+
+This will create a new `property_version` and create a new `TokenId` for the previous uninitialized fungible token (`property_version` = 0) to become an NFT. Alice can then transfer the NFT to Jack. Alice only need to pay the cost for creating NFT from the fungbile token when someone wants to buy.
+
+<Tabs>
+  <TabItem value="typescript" label="Typescript" default>
+Under construction.
+  </TabItem>
+  <TabItem value="python" label="Python">
+
+```python
+:!: static/examples/python/first_nft.py section_6
+```
+
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+Under construction.
+  </TabItem>
+</Tabs>
+
+<!--- 
 ## Todos for Tokens
 
 - Add ability for additional mints
-- Ensure that at least a single token is produced at time of mint
 - Add events -- needs feedback on what events
 - Provide mutable APIs for tokens
-- Write a smoketest for generics and simple token directly
+- Provide testing tools for testing token related contracts
 - Enable burning in a safe way
+- Provide SDK, APIs and Indexing for tokens with better UX
+- Add marketplace and auction contracts to our token standard
+--->

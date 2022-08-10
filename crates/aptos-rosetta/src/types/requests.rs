@@ -35,8 +35,15 @@ pub struct AccountBalanceResponse {
     pub block_identifier: BlockIdentifier,
     /// Balances of all known currencies
     pub balances: Vec<Amount>,
+    /// Metadata of account, must have sequence number
+    pub metadata: AccountBalanceMetadata,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AccountBalanceMetadata {
+    /// Sequence number of the account
+    pub sequence_number: u64,
+}
 /// Reqyest a block (version) on the account
 ///
 /// With neither value for PartialBlockIdentifier, get the latest version

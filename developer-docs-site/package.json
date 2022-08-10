@@ -17,9 +17,9 @@
     "lint": "yarn install --frozen-lockfile --silent && prettier --ignore-path .gitignore --check '**/*.(ts|js)'"
   },
   "dependencies": {
-    "@docusaurus/core": "^2.0.0-beta.20",
-    "@docusaurus/plugin-client-redirects": "^2.0.0-beta.20",
-    "@docusaurus/plugin-google-analytics": "^2.0.0-beta.20",
+    "@docusaurus/core": "^2.0.1",
+    "@docusaurus/plugin-client-redirects": "^2.0.1",
+    "@docusaurus/plugin-google-analytics": "^2.0.1",
     "@docusaurus/plugin-google-gtag": "^2.0.0-beta.20",
     "@docusaurus/preset-classic": "^2.0.0-beta.20",
     "@mdx-js/react": "^1.6.21",
@@ -27,7 +27,6 @@
     "prism-react-renderer": "^1.2.1",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
-    "redocusaurus": "^1.2.1",
     "unist-util-visit": "^4.1.0",
     "unist-util-visit-children": "^2.0.0"
   },

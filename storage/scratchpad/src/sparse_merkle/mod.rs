@@ -90,6 +90,7 @@ use aptos_crypto::{
 };
 use aptos_infallible::Mutex;
 use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProof};
+use std::sync::MutexGuard;
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, HashMap},
@@ -114,7 +115,10 @@ struct BranchTracker<V> {
 }
 
 impl<V> BranchTracker<V> {
-    fn new_head_unknown(parent: Option<Arc<Mutex<Self>>>) -> Arc<Mutex<Self>> {
+    fn new_head_unknown(
+        parent: Option<Arc<Mutex<Self>>>,
+        _locked_family: &MutexGuard<()>,
+    ) -> Arc<Mutex<Self>> {
         Arc::new(Mutex::new(Self {
             head: Weak::new(),
             next: Weak::new(),
@@ -122,7 +126,12 @@ impl<V> BranchTracker<V> {
         }))
     }
 
-    fn become_oldest(&mut self, head: &Arc<Inner<V>>, next: Option<&Arc<Inner<V>>>) {
+    fn become_oldest(
+        &mut self,
+        head: &Arc<Inner<V>>,
+        next: Option<&Arc<Inner<V>>>,
+        _locked_family: &MutexGuard<()>,
+    ) {
         // Detach from parent
         // n.b. the parent branch might not be dropped after this, because whenever a fork
         //      happens, the first branch shares the parent branch tracker.
@@ -132,11 +141,11 @@ impl<V> BranchTracker<V> {
         self.next = next.map_or_else(Weak::new, Arc::downgrade)
     }
 
-    fn parent(&self) -> Option<Arc<Mutex<Self>>> {
+    fn parent(&self, _locked_family: &MutexGuard<()>) -> Option<Arc<Mutex<Self>>> {
         self.parent.clone()
     }
 
-    fn head(&self) -> Option<Arc<Inner<V>>> {
+    fn head(&self, _locked_family: &MutexGuard<()>) -> Option<Arc<Inner<V>>> {
         // if `head.upgrade()` failed, it's that the head is being dropped.
         self.head.upgrade().or_else(|| self.next.upgrade())
     }
@@ -165,42 +174,57 @@ struct Inner<V> {
     root: SubTree<V>,
     links: Mutex<InnerLinks<V>>,
     generation: u64,
+    family_lock: Arc<Mutex<()>>,
 }
 
 impl<V> Drop for Inner<V> {
     fn drop(&mut self) {
-        let mut stack = self.drain_children_for_drop();
+        // to prevent recursively locking the family, buffer all processed descendants outside.
+        let mut processed_decendents = Vec::new();
 
-        while let Some(descendant) = stack.pop() {
-            if Arc::strong_count(&descendant) == 1 {
-                // The only ref is the one we are now holding, so the structure will be dropped
-                // after we free the `Arc`, which results in a chain of such structures being
-                // dropped recursively and that might trigger a stack overflow. To prevent that we
-                // follow the chain further to disconnect things beforehand.
-                stack.extend(descendant.drain_children_for_drop());
+        {
+            let locked_family = self.family_lock.lock();
+
+            let mut stack = self.drain_children_for_drop(&locked_family);
+
+            while let Some(descendant) = stack.pop() {
+                if Arc::strong_count(&descendant) == 1 {
+                    // The only ref is the one we are now holding, so the structure will be dropped
+                    // after we free the `Arc`, which results in a chain of such structures being
+                    // dropped recursively and that might trigger a stack overflow. To prevent that we
+                    // follow the chain further to disconnect things beforehand.
+                    stack.extend(descendant.drain_children_for_drop(&locked_family));
+                }
+                processed_decendents.push(descendant);
             }
-        }
+        };
     }
 }
 
 impl<V> Inner<V> {
     fn new(root: SubTree<V>) -> Arc<Self> {
-        let branch_tracker = BranchTracker::new_head_unknown(None);
+        let family_lock = Arc::new(Mutex::new(()));
+        let branch_tracker = BranchTracker::new_head_unknown(None, &family_lock.lock());
         let me = Arc::new(Self {
             root,
             links: InnerLinks::new(branch_tracker.clone()),
             generation: 0,
+            family_lock,
         });
         branch_tracker.lock().head = Arc::downgrade(&me);
 
         me
     }
 
-    fn become_oldest(self: Arc<Self>) -> Arc<Self> {
+    fn become_oldest(self: Arc<Self>, locked_family: &MutexGuard<()>) -> Arc<Self> {
         {
             let links_locked = self.links.lock();
             let mut branch_tracker_locked = links_locked.branch_tracker.lock();
-            branch_tracker_locked.become_oldest(&self, links_locked.children.first());
+            branch_tracker_locked.become_oldest(
+                &self,
+                links_locked.children.first(),
+                locked_family,
+            );
         }
         self
     }
@@ -209,20 +233,27 @@ impl<V> Inner<V> {
         &self,
         child_root: SubTree<V>,
         branch_tracker: Arc<Mutex<BranchTracker<V>>>,
+        family_lock: Arc<Mutex<()>>,
     ) -> Arc<Self> {
         LATEST_GENERATION.set(self.generation as i64 + 1);
         Arc::new(Self {
             root: child_root,
             links: InnerLinks::new(branch_tracker),
             generation: self.generation + 1,
+            family_lock,
         })
     }
 
     fn spawn(self: &Arc<Self>, child_root: SubTree<V>) -> Arc<Self> {
+        let locked_family = self.family_lock.lock();
         let mut links_locked = self.links.lock();
 
         let child = if links_locked.children.is_empty() {
-            let child = self.spawn_impl(child_root, links_locked.branch_tracker.clone());
+            let child = self.spawn_impl(
+                child_root,
+                links_locked.branch_tracker.clone(),
+                self.family_lock.clone(),
+            );
             let mut branch_tracker_locked = links_locked.branch_tracker.lock();
             if branch_tracker_locked.next.upgrade().is_none() {
                 branch_tracker_locked.next = Arc::downgrade(&child);
@@ -230,9 +261,12 @@ impl<V> Inner<V> {
             child
         } else {
             // forking a new branch
-            let branch_tracker =
-                BranchTracker::new_head_unknown(Some(links_locked.branch_tracker.clone()));
-            let child = self.spawn_impl(child_root, branch_tracker.clone());
+            let branch_tracker = BranchTracker::new_head_unknown(
+                Some(links_locked.branch_tracker.clone()),
+                &locked_family,
+            );
+            let child =
+                self.spawn_impl(child_root, branch_tracker.clone(), self.family_lock.clone());
             branch_tracker.lock().head = Arc::downgrade(&child);
             child
         };
@@ -242,25 +276,26 @@ impl<V> Inner<V> {
     }
 
     fn get_oldest_ancestor(self: &Arc<Self>) -> Arc<Self> {
+        let locked_family = self.family_lock.lock();
         let (mut ret, mut parent) = {
             let branch_tracker = self.links.lock().branch_tracker.clone();
             let branch_tracker_locked = branch_tracker.lock();
             (
                 branch_tracker_locked
-                    .head()
+                    .head(&locked_family)
                     .expect("Leaf must have a head."),
-                branch_tracker_locked.parent(),
+                branch_tracker_locked.parent(&locked_family),
             )
         };
 
         while let Some(branch_tracker) = parent {
             let branch_tracker_locked = branch_tracker.lock();
-            if let Some(head) = branch_tracker_locked.head() {
+            if let Some(head) = branch_tracker_locked.head(&locked_family) {
                 // Whenever it forks, the first branch shares the BranchTracker with the parent,
                 // hence this
                 if head.generation < self.generation {
                     ret = head;
-                    parent = branch_tracker_locked.parent();
+                    parent = branch_tracker_locked.parent(&locked_family);
                     continue;
                 }
             }
@@ -271,12 +306,12 @@ impl<V> Inner<V> {
         ret
     }
 
-    fn drain_children_for_drop(&self) -> Vec<Arc<Self>> {
+    fn drain_children_for_drop(&self, locked_family: &MutexGuard<()>) -> Vec<Arc<Self>> {
         self.links
             .lock()
             .children
             .drain(..)
-            .map(Self::become_oldest)
+            .map(|child| child.become_oldest(locked_family))
             .collect()
     }
 }

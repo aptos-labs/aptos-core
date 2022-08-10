@@ -22,15 +22,6 @@ ENV BUILT_VIA_BUILDKIT $BUILT_VIA_BUILDKIT
 
 RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nFor more information, see https://github.com/aptos-labs/aptos-core/pull/2472\n\nThanks!" && false)
 
-ARG GIT_SHA
-ENV GIT_SHA ${GIT_SHA}
-
-ARG GIT_BRANCH
-ENV GIT_BRANCH ${GIT_BRANCH}
-
-ARG GIT_TAG
-ENV GIT_TAG ${GIT_TAG}
-
 COPY --link . /aptos/
 
 RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOME/registry docker/build-rust-all.sh && rm -rf $CARGO_HOME/registry/index
@@ -48,11 +39,11 @@ RUN ln -sf /usr/bin/perf_* /usr/bin/perf
 
 RUN addgroup --system --gid 6180 aptos && adduser --system --ingroup aptos --no-create-home --uid 6180 aptos
 
-RUN mkdir -p /opt/aptos/bin /opt/aptos/etc
-COPY --link --from=builder /aptos/dist/aptos-node /opt/aptos/bin/
-COPY --link --from=builder /aptos/dist/db-backup /opt/aptos/bin/
-COPY --link --from=builder /aptos/dist/db-bootstrapper /opt/aptos/bin/
-COPY --link --from=builder /aptos/dist/db-restore /opt/aptos/bin/
+RUN mkdir -p /opt/aptos/etc
+COPY --link --from=builder /aptos/dist/aptos-node /usr/local/bin/
+COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/
+COPY --link --from=builder /aptos/dist/db-bootstrapper /usr/local/bin/
+COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/
 
 # Admission control
 EXPOSE 8000
@@ -67,6 +58,14 @@ EXPOSE 6186
 ENV RUST_BACKTRACE 1
 ENV RUST_LOG_FORMAT=json
 
+# add build info
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
+
 
 ### Indexer Image ###
 
@@ -75,10 +74,18 @@ FROM debian-base AS indexer
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
-RUN mkdir -p /opt/aptos/bin
 COPY --link --from=builder /aptos/dist/aptos-indexer /usr/local/bin/aptos-indexer
 
 ENV RUST_LOG_FORMAT=json
+
+# add build info
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
+
 
 ### Node Checker Image ###
 
@@ -87,10 +94,18 @@ FROM debian-base AS node-checker
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
-RUN mkdir -p /opt/aptos/bin
 COPY --link --from=builder /aptos/dist/aptos-node-checker /usr/local/bin/aptos-node-checker
 
 ENV RUST_LOG_FORMAT=json
+
+# add build info
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
+
 
 ### Tools Image ###
 FROM debian-base AS tools
@@ -114,6 +129,7 @@ COPY --link --from=builder /aptos/dist/db-backup /usr/local/bin/db-backup
 COPY --link --from=builder /aptos/dist/db-backup-verify /usr/local/bin/db-backup-verify
 COPY --link --from=builder /aptos/dist/db-restore /usr/local/bin/db-restore
 COPY --link --from=builder /aptos/dist/aptos /usr/local/bin/aptos
+COPY --link --from=builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
 COPY --link --from=builder /aptos/dist/transaction-emitter /usr/local/bin/transaction-emitter
 
 ### Get Aptos Move modules bytecodes for genesis ceremony
@@ -126,6 +142,14 @@ RUN mv /aptos-framework/move/build/**/bytecode_modules/*.mv /aptos-framework/mov
 RUN mv /aptos-framework/move/build/AptosFramework/bytecode_modules/dependencies/**/*.mv /aptos-framework/move/modules
 RUN rm -rf /aptos-framework/move/build
 
+# add build info
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
+
 
 ### Faucet Image ###
 FROM debian-base AS faucet
@@ -133,9 +157,9 @@ FROM debian-base AS faucet
 RUN apt-get update && apt-get install -y libssl1.1 ca-certificates nano net-tools tcpdump iproute2 netcat \
     && apt-get clean && rm -r /var/lib/apt/lists/*
 
-RUN mkdir -p /opt/aptos/bin  /aptos/client/data/wallet/
+RUN mkdir -p /aptos/client/data/wallet/
 
-COPY --link --from=builder /aptos/dist/aptos-faucet /opt/aptos/bin/aptos-faucet
+COPY --link --from=builder /aptos/dist/aptos-faucet /usr/local/bin/aptos-faucet
 
 #install needed tools
 RUN apt-get update && apt-get install -y procps
@@ -144,6 +168,13 @@ RUN apt-get update && apt-get install -y procps
 EXPOSE 8000
 ENV RUST_LOG_FORMAT=json
 
+# add build info
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
 
 
 ### Forge Image ###
@@ -164,5 +195,13 @@ ENV PATH "$PATH:/root/bin"
 WORKDIR /aptos
 COPY --link --from=builder /aptos/dist/forge /usr/local/bin/forge
 ENV RUST_LOG_FORMAT=json
+
+# add build info
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
 
 ENTRYPOINT ["/tini", "--", "forge"]

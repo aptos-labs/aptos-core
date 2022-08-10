@@ -24,9 +24,9 @@ pub enum ConsensusScheme {
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub struct ValidatorSet {
     scheme: ConsensusScheme,
-    active_validators: Vec<ValidatorInfo>,
-    pending_inactive: Vec<ValidatorInfo>,
-    pending_active: Vec<ValidatorInfo>,
+    pub active_validators: Vec<ValidatorInfo>,
+    pub pending_inactive: Vec<ValidatorInfo>,
+    pub pending_active: Vec<ValidatorInfo>,
 }
 
 impl fmt::Display for ValidatorSet {

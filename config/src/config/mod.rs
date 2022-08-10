@@ -34,6 +34,8 @@ mod secure_backend_config;
 pub use secure_backend_config::*;
 mod state_sync_config;
 pub use state_sync_config::*;
+mod sf_streamer_config;
+pub use sf_streamer_config::*;
 mod storage_config;
 pub use storage_config::*;
 mod safety_rules_config;
@@ -79,6 +81,8 @@ pub struct NodeConfig {
     pub api: ApiConfig,
     #[serde(default)]
     pub state_sync: StateSyncConfig,
+    #[serde(default)]
+    pub sf_stream: SfStreamerConfig,
     #[serde(default)]
     pub storage: StorageConfig,
     #[serde(default)]
@@ -489,11 +493,6 @@ mod test {
         NodeConfig::default_for_public_full_node();
         NodeConfig::default_for_validator();
         NodeConfig::default_for_validator_full_node();
-
-        let docker_public_full_node =
-            std::include_str!("../../../docker/compose/public_full_node/public_full_node.yaml");
-        // Only verify it is in the correct format as the values cannot be loaded for this config
-        NodeConfig::parse(docker_public_full_node).unwrap();
 
         let contents = std::include_str!("test_data/safety_rules.yaml");
         SafetyRulesConfig::parse(contents)

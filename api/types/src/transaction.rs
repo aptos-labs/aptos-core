@@ -14,7 +14,7 @@ use aptos_crypto::{
 use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, EventWithVersion},
     transaction::{
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
@@ -436,6 +436,32 @@ impl From<(&ContractEvent, serde_json::Value)> for Event {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct VersionedEvent {
+    pub version: U64,
+    pub key: EventKey,
+    pub sequence_number: U64,
+    #[serde(rename = "type")]
+    #[oai(rename = "type")]
+    pub typ: MoveType,
+    // TODO: Use the real data here, not a JSON representation.
+    pub data: serde_json::Value,
+}
+
+impl From<(&EventWithVersion, serde_json::Value)> for VersionedEvent {
+    fn from((event, data): (&EventWithVersion, serde_json::Value)) -> Self {
+        match &event.event {
+            ContractEvent::V0(v0) => Self {
+                version: event.transaction_version.into(),
+                key: (*v0.key()).into(),
+                sequence_number: v0.sequence_number().into(),
+                typ: v0.type_tag().clone().into(),
+                data,
+            },
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Union)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
@@ -627,8 +653,8 @@ impl TryFrom<TransactionSignature> for TransactionAuthenticator {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct Ed25519Signature {
-    public_key: HexEncodedBytes,
-    signature: HexEncodedBytes,
+    pub public_key: HexEncodedBytes,
+    pub signature: HexEncodedBytes,
 }
 
 impl TryFrom<Ed25519Signature> for TransactionAuthenticator {
@@ -675,10 +701,10 @@ impl TryFrom<Ed25519Signature> for AccountAuthenticator {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MultiEd25519Signature {
-    public_keys: Vec<HexEncodedBytes>,
-    signatures: Vec<HexEncodedBytes>,
-    threshold: u8,
-    bitmap: HexEncodedBytes,
+    pub public_keys: Vec<HexEncodedBytes>,
+    pub signatures: Vec<HexEncodedBytes>,
+    pub threshold: u8,
+    pub bitmap: HexEncodedBytes,
 }
 
 impl TryFrom<MultiEd25519Signature> for TransactionAuthenticator {
@@ -762,9 +788,9 @@ impl TryFrom<AccountSignature> for AccountAuthenticator {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MultiAgentSignature {
-    sender: AccountSignature,
-    secondary_signer_addresses: Vec<Address>,
-    secondary_signers: Vec<AccountSignature>,
+    pub sender: AccountSignature,
+    pub secondary_signer_addresses: Vec<Address>,
+    pub secondary_signers: Vec<AccountSignature>,
 }
 
 impl TryFrom<MultiAgentSignature> for TransactionAuthenticator {

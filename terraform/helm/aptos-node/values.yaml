@@ -35,9 +35,10 @@ validator:
     provide_genesis: true
     sync_only: false
     concurrency_level: 8
-    enable_state_sync_v2: true
     round_initial_timeout_ms:
     quorum_store_poll_count: 1
+    enable_state_store_pruner: true
+    enable_ledger_pruner: true
     ledger_prune_window: 10000000
     state_store_prune_window: 1000000
     ledger_pruning_batch_size: 10000

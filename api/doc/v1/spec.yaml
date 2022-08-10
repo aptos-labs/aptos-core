@@ -3,7 +3,7 @@ info:
   title: Aptos Node API
   description: The Aptos Node API is a RESTful API for client applications to interact
     with the Aptos blockchain.
-  version: 0.1.0
+  version: 1.0.0
   contact:
     name: Aptos Labs
     url: https://github.com/aptos-labs/aptos-core
@@ -337,7 +337,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Event'
+                  $ref: '#/components/schemas/VersionedEvent'
             application/x-bcs:
               schema:
                 type: array
@@ -412,7 +412,7 @@ paths:
         deprecated: false
       - name: event_handle
         schema:
-          $ref: '#/components/schemas/MoveStructTagParam'
+          $ref: '#/components/schemas/MoveStructTag'
         in: path
         required: true
         deprecated: false
@@ -443,7 +443,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Event'
+                  $ref: '#/components/schemas/VersionedEvent'
             application/x-bcs:
               schema:
                 type: array
@@ -587,7 +587,7 @@ paths:
         deprecated: false
       - name: resource_type
         schema:
-          $ref: '#/components/schemas/MoveStructTagParam'
+          $ref: '#/components/schemas/MoveStructTag'
         in: path
         required: true
         deprecated: false
@@ -1518,7 +1518,7 @@ components:
       type: string
       format: hex
       description: Hex encoded 32 byte Aptos account address
-      example: 0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1
+      example: '0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 '
     AptosError:
       type: object
       description: |-
@@ -1750,7 +1750,7 @@ components:
         For example, event key `0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1` is combined by the following 2 parts:
           1. `0000000000000000`: `uint64` representation of `0`.
           2. `88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1`: 32 bytes of account address.
-      example: 0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1
+      example: '0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 '
     GenesisPayload:
       type: object
       oneOf:
@@ -1820,7 +1820,7 @@ components:
         two hex digits per byte.
 
         Unlike the `Address` type, HexEncodedBytes will not trim any zeros.
-      example: 0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1
+      example: '0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 '
     IdentifierWrapper:
       type: string
     IndexResponse:
@@ -1938,15 +1938,16 @@ components:
         abi:
           $ref: '#/components/schemas/MoveModule'
     MoveModuleId:
-      type: object
-      required:
-      - address
-      - name
-      properties:
-        address:
-          $ref: '#/components/schemas/Address'
-        name:
-          $ref: '#/components/schemas/IdentifierWrapper'
+      type: string
+      description: |
+        Move module id is a string representation of Move module.
+
+        Format: `{address}::{module name}`
+
+        `address` should be hex-encoded 32 byte account address that is prefixed with `0x`.
+
+        Module name is case-sensitive.
+      example: 0x1::aptos_coin
     MoveResource:
       type: object
       required:
@@ -2005,33 +2006,12 @@ components:
       type: object
       required:
       - constraints
-      - is_phantom
       properties:
         constraints:
           type: array
           items:
             $ref: '#/components/schemas/MoveAbility'
-        is_phantom:
-          type: boolean
     MoveStructTag:
-      type: object
-      required:
-      - address
-      - module
-      - name
-      - generic_type_params
-      properties:
-        address:
-          $ref: '#/components/schemas/Address'
-        module:
-          $ref: '#/components/schemas/IdentifierWrapper'
-        name:
-          $ref: '#/components/schemas/IdentifierWrapper'
-        generic_type_params:
-          type: array
-          items:
-            $ref: '#/components/schemas/MoveType'
-    MoveStructTagParam:
       type: string
       description: |
         String representation of a MoveStructTag (on-chain Move struct type). This exists so you
@@ -2217,15 +2197,14 @@ components:
       - validator
       - full_node
     ScriptFunctionId:
-      type: object
-      required:
-      - module
-      - name
-      properties:
-        module:
-          $ref: '#/components/schemas/MoveModuleId'
-        name:
-          $ref: '#/components/schemas/IdentifierWrapper'
+      type: string
+      description: |
+        Script function id is string representation of a script function defined on-chain.
+
+        Format: `{address}::{module name}::{function name}`
+
+        Both `module name` and `function name` are case-sensitive.
+      example: 0x1::aptos_coin::transfer
     ScriptFunctionPayload:
       type: object
       required:
@@ -2582,6 +2561,24 @@ components:
             $ref: '#/components/schemas/Event'
         timestamp:
           $ref: '#/components/schemas/U64'
+    VersionedEvent:
+      type: object
+      required:
+      - version
+      - key
+      - sequence_number
+      - type
+      - data
+      properties:
+        version:
+          $ref: '#/components/schemas/U64'
+        key:
+          $ref: '#/components/schemas/EventKey'
+        sequence_number:
+          $ref: '#/components/schemas/U64'
+        type:
+          $ref: '#/components/schemas/MoveType'
+        data: {}
     WriteModule:
       type: object
       required:

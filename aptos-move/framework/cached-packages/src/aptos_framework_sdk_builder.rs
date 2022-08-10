@@ -99,6 +99,10 @@ pub enum ScriptFunctionCall {
         coin_type: TypeTag,
     },
 
+    GasScheduleSetGasSchedule {
+        gas_schedule_blob: Bytes,
+    },
+
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     ManagedCoinBurn {
         coin_type: TypeTag,
@@ -147,6 +151,24 @@ pub enum ScriptFunctionCall {
     /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
     StakeIncreaseLockup {},
 
+    /// Initialize the validator account and give ownership to the signing account
+    /// except it leaves the ValidatorConfig to be set by another entity.
+    /// Note: this triggers setting the operator and owner, set it to the account's address
+    /// to set later.
+    StakeInitializeOwnerOnly {
+        initial_stake_amount: u64,
+        operator: AccountAddress,
+        voter: AccountAddress,
+    },
+
+    /// Initialize the validator account and give ownership to the signing account.
+    StakeInitializeValidator {
+        consensus_pubkey: Bytes,
+        proof_of_possession: Bytes,
+        network_addresses: Bytes,
+        fullnode_addresses: Bytes,
+    },
+
     /// This can only called by the operator of the validator/staking pool.
     StakeJoinValidatorSet {
         pool_address: AccountAddress,
@@ -160,14 +182,6 @@ pub enum ScriptFunctionCall {
     /// Can only be called by the operator of the validator/staking pool.
     StakeLeaveValidatorSet {
         pool_address: AccountAddress,
-    },
-
-    /// Initialize the validator account and give ownership to the signing account.
-    StakeRegisterValidatorCandidate {
-        consensus_pubkey: Bytes,
-        proof_of_possession: Bytes,
-        network_addresses: Bytes,
-        fullnode_addresses: Bytes,
     },
 
     /// Rotate the consensus key of the validator, it'll take effect in next epoch.
@@ -208,20 +222,6 @@ pub enum ScriptFunctionCall {
     /// This is only used in test environments and outside of them, the core resources account shouldn't exist.
     VersionSetVersion {
         major: u64,
-    },
-
-    VmConfigSetGasConstants {
-        global_memory_per_byte_cost: u64,
-        global_memory_per_byte_write_cost: u64,
-        min_transaction_gas_units: u64,
-        large_transaction_cutoff: u64,
-        intrinsic_gas_per_byte: u64,
-        maximum_number_of_gas_units: u64,
-        min_price_per_gas_unit: u64,
-        max_price_per_gas_unit: u64,
-        max_transaction_size_in_bytes: u64,
-        gas_unit_scaling_factor: u64,
-        default_account_size: u64,
     },
 }
 
@@ -264,6 +264,9 @@ impl ScriptFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinsRegister { coin_type } => coins_register(coin_type),
+            GasScheduleSetGasSchedule { gas_schedule_blob } => {
+                gas_schedule_set_gas_schedule(gas_schedule_blob)
+            }
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -285,19 +288,24 @@ impl ScriptFunctionCall {
             } => resource_account_create_resource_account(seed, optional_auth_key),
             StakeAddStake { amount } => stake_add_stake(amount),
             StakeIncreaseLockup {} => stake_increase_lockup(),
-            StakeJoinValidatorSet { pool_address } => stake_join_validator_set(pool_address),
-            StakeLeaveValidatorSet { pool_address } => stake_leave_validator_set(pool_address),
-            StakeRegisterValidatorCandidate {
+            StakeInitializeOwnerOnly {
+                initial_stake_amount,
+                operator,
+                voter,
+            } => stake_initialize_owner_only(initial_stake_amount, operator, voter),
+            StakeInitializeValidator {
                 consensus_pubkey,
                 proof_of_possession,
                 network_addresses,
                 fullnode_addresses,
-            } => stake_register_validator_candidate(
+            } => stake_initialize_validator(
                 consensus_pubkey,
                 proof_of_possession,
                 network_addresses,
                 fullnode_addresses,
             ),
+            StakeJoinValidatorSet { pool_address } => stake_join_validator_set(pool_address),
+            StakeLeaveValidatorSet { pool_address } => stake_leave_validator_set(pool_address),
             StakeRotateConsensusKey {
                 pool_address,
                 new_consensus_pubkey,
@@ -321,31 +329,6 @@ impl ScriptFunctionCall {
             ),
             StakeWithdraw { withdraw_amount } => stake_withdraw(withdraw_amount),
             VersionSetVersion { major } => version_set_version(major),
-            VmConfigSetGasConstants {
-                global_memory_per_byte_cost,
-                global_memory_per_byte_write_cost,
-                min_transaction_gas_units,
-                large_transaction_cutoff,
-                intrinsic_gas_per_byte,
-                maximum_number_of_gas_units,
-                min_price_per_gas_unit,
-                max_price_per_gas_unit,
-                max_transaction_size_in_bytes,
-                gas_unit_scaling_factor,
-                default_account_size,
-            } => vm_config_set_gas_constants(
-                global_memory_per_byte_cost,
-                global_memory_per_byte_write_cost,
-                min_transaction_gas_units,
-                large_transaction_cutoff,
-                intrinsic_gas_per_byte,
-                maximum_number_of_gas_units,
-                min_price_per_gas_unit,
-                max_price_per_gas_unit,
-                max_transaction_size_in_bytes,
-                gas_unit_scaling_factor,
-                default_account_size,
-            ),
         }
     }
 
@@ -572,6 +555,21 @@ pub fn coins_register(coin_type: TypeTag) -> TransactionPayload {
     ))
 }
 
+pub fn gas_schedule_set_gas_schedule(gas_schedule_blob: Vec<u8>) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("gas_schedule").to_owned(),
+        ),
+        ident_str!("set_gas_schedule").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&gas_schedule_blob).unwrap()],
+    ))
+}
+
 /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
 pub fn managed_coin_burn(coin_type: TypeTag, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -728,6 +726,59 @@ pub fn stake_increase_lockup() -> TransactionPayload {
     ))
 }
 
+/// Initialize the validator account and give ownership to the signing account
+/// except it leaves the ValidatorConfig to be set by another entity.
+/// Note: this triggers setting the operator and owner, set it to the account's address
+/// to set later.
+pub fn stake_initialize_owner_only(
+    initial_stake_amount: u64,
+    operator: AccountAddress,
+    voter: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("stake").to_owned(),
+        ),
+        ident_str!("initialize_owner_only").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&initial_stake_amount).unwrap(),
+            bcs::to_bytes(&operator).unwrap(),
+            bcs::to_bytes(&voter).unwrap(),
+        ],
+    ))
+}
+
+/// Initialize the validator account and give ownership to the signing account.
+pub fn stake_initialize_validator(
+    consensus_pubkey: Vec<u8>,
+    proof_of_possession: Vec<u8>,
+    network_addresses: Vec<u8>,
+    fullnode_addresses: Vec<u8>,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("stake").to_owned(),
+        ),
+        ident_str!("initialize_validator").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&consensus_pubkey).unwrap(),
+            bcs::to_bytes(&proof_of_possession).unwrap(),
+            bcs::to_bytes(&network_addresses).unwrap(),
+            bcs::to_bytes(&fullnode_addresses).unwrap(),
+        ],
+    ))
+}
+
 /// This can only called by the operator of the validator/staking pool.
 pub fn stake_join_validator_set(pool_address: AccountAddress) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -762,32 +813,6 @@ pub fn stake_leave_validator_set(pool_address: AccountAddress) -> TransactionPay
         ident_str!("leave_validator_set").to_owned(),
         vec![],
         vec![bcs::to_bytes(&pool_address).unwrap()],
-    ))
-}
-
-/// Initialize the validator account and give ownership to the signing account.
-pub fn stake_register_validator_candidate(
-    consensus_pubkey: Vec<u8>,
-    proof_of_possession: Vec<u8>,
-    network_addresses: Vec<u8>,
-    fullnode_addresses: Vec<u8>,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("stake").to_owned(),
-        ),
-        ident_str!("register_validator_candidate").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&consensus_pubkey).unwrap(),
-            bcs::to_bytes(&proof_of_possession).unwrap(),
-            bcs::to_bytes(&network_addresses).unwrap(),
-            bcs::to_bytes(&fullnode_addresses).unwrap(),
-        ],
     ))
 }
 
@@ -919,45 +944,6 @@ pub fn version_set_version(major: u64) -> TransactionPayload {
         vec![bcs::to_bytes(&major).unwrap()],
     ))
 }
-
-pub fn vm_config_set_gas_constants(
-    global_memory_per_byte_cost: u64,
-    global_memory_per_byte_write_cost: u64,
-    min_transaction_gas_units: u64,
-    large_transaction_cutoff: u64,
-    intrinsic_gas_per_byte: u64,
-    maximum_number_of_gas_units: u64,
-    min_price_per_gas_unit: u64,
-    max_price_per_gas_unit: u64,
-    max_transaction_size_in_bytes: u64,
-    gas_unit_scaling_factor: u64,
-    default_account_size: u64,
-) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("vm_config").to_owned(),
-        ),
-        ident_str!("set_gas_constants").to_owned(),
-        vec![],
-        vec![
-            bcs::to_bytes(&global_memory_per_byte_cost).unwrap(),
-            bcs::to_bytes(&global_memory_per_byte_write_cost).unwrap(),
-            bcs::to_bytes(&min_transaction_gas_units).unwrap(),
-            bcs::to_bytes(&large_transaction_cutoff).unwrap(),
-            bcs::to_bytes(&intrinsic_gas_per_byte).unwrap(),
-            bcs::to_bytes(&maximum_number_of_gas_units).unwrap(),
-            bcs::to_bytes(&min_price_per_gas_unit).unwrap(),
-            bcs::to_bytes(&max_price_per_gas_unit).unwrap(),
-            bcs::to_bytes(&max_transaction_size_in_bytes).unwrap(),
-            bcs::to_bytes(&gas_unit_scaling_factor).unwrap(),
-            bcs::to_bytes(&default_account_size).unwrap(),
-        ],
-    ))
-}
 mod decoder {
     use super::*;
     pub fn account_create_account(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
@@ -1086,6 +1072,18 @@ mod decoder {
         }
     }
 
+    pub fn gas_schedule_set_gas_schedule(
+        payload: &TransactionPayload,
+    ) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::GasScheduleSetGasSchedule {
+                gas_schedule_blob: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::ManagedCoinBurn {
@@ -1174,6 +1172,31 @@ mod decoder {
         }
     }
 
+    pub fn stake_initialize_owner_only(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::StakeInitializeOwnerOnly {
+                initial_stake_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
+                operator: bcs::from_bytes(script.args().get(1)?).ok()?,
+                voter: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn stake_initialize_validator(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::StakeInitializeValidator {
+                consensus_pubkey: bcs::from_bytes(script.args().get(0)?).ok()?,
+                proof_of_possession: bcs::from_bytes(script.args().get(1)?).ok()?,
+                network_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
+                fullnode_addresses: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn stake_join_validator_set(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::StakeJoinValidatorSet {
@@ -1188,21 +1211,6 @@ mod decoder {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::StakeLeaveValidatorSet {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
-
-    pub fn stake_register_validator_candidate(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeRegisterValidatorCandidate {
-                consensus_pubkey: bcs::from_bytes(script.args().get(0)?).ok()?,
-                proof_of_possession: bcs::from_bytes(script.args().get(1)?).ok()?,
-                network_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
-                fullnode_addresses: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
             None
@@ -1284,26 +1292,6 @@ mod decoder {
             None
         }
     }
-
-    pub fn vm_config_set_gas_constants(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::VmConfigSetGasConstants {
-                global_memory_per_byte_cost: bcs::from_bytes(script.args().get(0)?).ok()?,
-                global_memory_per_byte_write_cost: bcs::from_bytes(script.args().get(1)?).ok()?,
-                min_transaction_gas_units: bcs::from_bytes(script.args().get(2)?).ok()?,
-                large_transaction_cutoff: bcs::from_bytes(script.args().get(3)?).ok()?,
-                intrinsic_gas_per_byte: bcs::from_bytes(script.args().get(4)?).ok()?,
-                maximum_number_of_gas_units: bcs::from_bytes(script.args().get(5)?).ok()?,
-                min_price_per_gas_unit: bcs::from_bytes(script.args().get(6)?).ok()?,
-                max_price_per_gas_unit: bcs::from_bytes(script.args().get(7)?).ok()?,
-                max_transaction_size_in_bytes: bcs::from_bytes(script.args().get(8)?).ok()?,
-                gas_unit_scaling_factor: bcs::from_bytes(script.args().get(9)?).ok()?,
-                default_account_size: bcs::from_bytes(script.args().get(10)?).ok()?,
-            })
-        } else {
-            None
-        }
-    }
 }
 
 type ScriptFunctionDecoderMap = std::collections::HashMap<
@@ -1363,6 +1351,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
             Box::new(decoder::coins_register),
         );
         map.insert(
+            "gas_schedule_set_gas_schedule".to_string(),
+            Box::new(decoder::gas_schedule_set_gas_schedule),
+        );
+        map.insert(
             "managed_coin_burn".to_string(),
             Box::new(decoder::managed_coin_burn),
         );
@@ -1395,16 +1387,20 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
             Box::new(decoder::stake_increase_lockup),
         );
         map.insert(
+            "stake_initialize_owner_only".to_string(),
+            Box::new(decoder::stake_initialize_owner_only),
+        );
+        map.insert(
+            "stake_initialize_validator".to_string(),
+            Box::new(decoder::stake_initialize_validator),
+        );
+        map.insert(
             "stake_join_validator_set".to_string(),
             Box::new(decoder::stake_join_validator_set),
         );
         map.insert(
             "stake_leave_validator_set".to_string(),
             Box::new(decoder::stake_leave_validator_set),
-        );
-        map.insert(
-            "stake_register_validator_candidate".to_string(),
-            Box::new(decoder::stake_register_validator_candidate),
         );
         map.insert(
             "stake_rotate_consensus_key".to_string(),
@@ -1430,10 +1426,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "version_set_version".to_string(),
             Box::new(decoder::version_set_version),
-        );
-        map.insert(
-            "vm_config_set_gas_constants".to_string(),
-            Box::new(decoder::vm_config_set_gas_constants),
         );
         map
     });

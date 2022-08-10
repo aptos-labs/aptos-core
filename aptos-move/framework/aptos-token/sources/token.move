@@ -295,18 +295,23 @@ module aptos_token::token {
     public entry fun mutate_token_properties(
         account: &signer,
         token_owner: address,
-        token_id: TokenId,
+        creator: address,
+        collection_name: String,
+        token_name: String,
+        token_property_version: u64,
         amount: u64,
         keys: vector<String>,
         values: vector<vector<u8>>,
         types: vector<String>,
     ) acquires Collections, TokenStore {
-        assert!(signer::address_of(account) == token_id.token_data_id.creator, ENO_MUTATE_CAPABILITY);
+        assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
         // validate if the properties is mutable
-        assert!(exists<Collections>(token_id.token_data_id.creator), ECOLLECTIONS_NOT_PUBLISHED);
+        assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
         let all_token_data = &mut borrow_global_mut<Collections>(
-            token_id.token_data_id.creator
+            creator
         ).token_data;
+
+        let token_id: TokenId = create_token_id_raw(creator, collection_name, token_name, token_property_version);
         assert!(table::contains(all_token_data, token_id.token_data_id), ETOKEN_NOT_PUBLISHED);
         let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
 
@@ -324,7 +329,7 @@ module aptos_token::token {
                 let new_token = Token {
                     id: new_token_id,
                     amount: 1,
-                    token_properties:property_map::empty(),
+                    token_properties: *&token_data.default_properties,
                 };
                 // update the token largest property_version
                 direct_deposit(token_owner, new_token);
@@ -349,8 +354,8 @@ module aptos_token::token {
         let tokens = &mut borrow_global_mut<TokenStore>(token_owner).tokens;
         assert!(table::contains(tokens, token_id), ENO_TOKEN_IN_TOKEN_STORE);
         let value = &mut table::borrow_mut(tokens, token_id).token_properties;
-        *value = property_map::new(keys, values, types);
 
+        property_map::update_property_map(value, keys, values, types);
         event::emit_event<MutateTokenPropertyMapEvent>(
             &mut borrow_global_mut<TokenStore>(token_owner).mutate_token_property_events,
             MutateTokenPropertyMapEvent {
@@ -466,7 +471,7 @@ module aptos_token::token {
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
-    public fun transfer(
+    fun transfer(
         from: &signer,
         id: TokenId,
         to: address,
@@ -1004,12 +1009,15 @@ module aptos_token::token {
 
         mutate_token_properties(
             creator,
-            signer::address_of(creator),
-            token_id,
+            token_id.token_data_id.creator,
+            token_id.token_data_id.creator,
+            token_id.token_data_id.collection,
+            token_id.token_data_id.name,
+            token_id.property_version,
             2,
             new_keys,
             new_vals,
-            new_types
+            new_types,
         );
         // should have two new property_version from the orignal two tokens
         let new_id_1 = create_token_id(token_id.token_data_id, 1);
@@ -1028,7 +1036,10 @@ module aptos_token::token {
         mutate_token_properties(
             creator,
             signer::address_of(creator),
-            new_id_1,
+            new_id_1.token_data_id.creator,
+            new_id_1.token_data_id.collection,
+            new_id_1.token_data_id.name,
+            new_id_1.property_version,
             1,
             new_keys,
             new_vals,
@@ -1043,5 +1054,37 @@ module aptos_token::token {
         assert!(table::contains(props, new_id_1), 1);
         let token = table::borrow(props, new_id_1);
         assert!(property_map::length(&token.token_properties) == 2, property_map::length(&token.token_properties));
+    }
+
+    #[test(creator = @0xAF, owner = @0xBB)]
+    #[expected_failure(abort_code = 3)]
+    fun test_mutate_token_property_fail(creator: &signer) acquires Collections, TokenStore {
+        use std::string;
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(creator, 2, 4, 4);
+        assert!(token_id.property_version == 0, 1);
+        // only be able to mutate the attributed defined when creating the token
+        let new_keys = vector<String>[
+            string::utf8(b"attack"), string::utf8(b"num_of_use"), string::utf8(b"wrong_attribute")
+        ];
+        let new_vals = vector<vector<u8>>[
+            b"1", b"1", b"1"
+        ];
+        let new_types = vector<String>[
+            string::utf8(b"integer"), string::utf8(b"integer"), string::utf8(b"integer")
+        ];
+
+        mutate_token_properties(
+            creator,
+            token_id.token_data_id.creator,
+            token_id.token_data_id.creator,
+            token_id.token_data_id.collection,
+            token_id.token_data_id.name,
+            token_id.property_version,
+            2,
+            new_keys,
+            new_vals,
+            new_types,
+        );
     }
 }

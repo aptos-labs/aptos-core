@@ -42,9 +42,10 @@ use storage_interface::DbReaderWriter;
 
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_types::multi_signature::MultiSignature;
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, collections::BTreeMap, iter::once, net::SocketAddr, sync::Arc};
+use std::{boxed::Box, iter::once, net::SocketAddr, sync::Arc};
 use storage_interface::state_view::DbStateView;
 use vm_validator::vm_validator::VMValidator;
 use warp::http::header::CONTENT_TYPE;
@@ -108,7 +109,6 @@ pub fn new_test_context(test_name: String, api_version: &str) -> TestContext {
     )
     .unwrap()
     .with_init_genesis_config(Some(Arc::new(|genesis_config| {
-        genesis_config.min_price_per_gas_unit = 0;
         genesis_config.recurring_lockup_duration_secs = 86400;
     })))
     .with_randomize_first_validator_ports(false);
@@ -371,26 +371,9 @@ impl TestContext {
             ))
             .await;
         let vals: Vec<serde_json::Value> = serde_json::from_value(resources).unwrap();
-        match self.api_specific_config {
-            ApiSpecificConfig::V0 => vals
-                .into_iter()
-                .find(|v| {
-                    v["type"] == format!("{}::{}::{}", resource_account_address, module, name,)
-                })
-                .unwrap(),
-            ApiSpecificConfig::V1(_) => vals
-                .into_iter()
-                .find(|v| {
-                    v["type"]
-                        == json!({
-                            "address": resource_account_address,
-                            "module": module,
-                            "name": name,
-                            "generic_type_params": []
-                        })
-                })
-                .unwrap(),
-        }
+        vals.into_iter()
+            .find(|v| v["type"] == format!("{}::{}::{}", resource_account_address, module, name,))
+            .unwrap()
     }
 
     pub async fn api_execute_script_function(
@@ -401,32 +384,16 @@ impl TestContext {
         type_args: serde_json::Value,
         args: serde_json::Value,
     ) {
-        let (typ, function) = match self.api_specific_config {
-            ApiSpecificConfig::V0 => (
-                "script_function_payload",
-                json!(format!(
+        self.api_execute_txn(
+            account,
+            json!({
+                "type": "script_function_payload",
+                "function": format!(
                     "{}::{}::{}",
                     account.address().to_hex_literal(),
                     module,
                     func
-                )),
-            ),
-            ApiSpecificConfig::V1(_) => (
-                "script_function_payload",
-                json!({
-                    "module": json!({
-                        "address": account.address().to_hex_literal(),
-                        "name": module,
-                    }),
-                    "name": func,
-                }),
-            ),
-        };
-        self.api_execute_txn(
-            account,
-            json!({
-                "type": typ,
-                "function": function,
+                ),
                 "type_arguments": type_args,
                 "arguments": args
             }),
@@ -574,8 +541,9 @@ impl TestContext {
             id,
             0,
             round,
-            vec![false],
             self.validator_owner,
+            Some(0),
+            vec![false],
             vec![],
             timestamp,
         )
@@ -605,6 +573,6 @@ impl TestContext {
             ),
             HashValue::zero(),
         );
-        LedgerInfoWithSignatures::new(info, BTreeMap::new())
+        LedgerInfoWithSignatures::new(info, MultiSignature::empty())
     }
 }

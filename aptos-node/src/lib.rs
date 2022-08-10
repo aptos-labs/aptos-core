@@ -16,6 +16,7 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Level};
+use aptos_sf_stream::runtime::bootstrap as bootstrap_sf_stream;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -40,10 +41,8 @@ use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
 use network_builder::builder::NetworkBuilder;
 use rand::{rngs::StdRng, SeedableRng};
-use state_sync_multiplexer::{
-    state_sync_v1_network_config, StateSyncMultiplexer, StateSyncRuntimes,
-};
-use state_sync_v1::network::{StateSyncEvents, StateSyncSender};
+use state_sync_driver::driver_factory::DriverFactory;
+use state_sync_driver::driver_factory::StateSyncRuntimes;
 use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
@@ -153,6 +152,7 @@ pub struct AptosHandle {
     _consensus_runtime: Option<Runtime>,
     _mempool: Runtime,
     _network_runtimes: Vec<Runtime>,
+    _sf_stream: Option<Runtime>,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
 }
@@ -259,7 +259,7 @@ where
             .with_init_genesis_config(Some(Arc::new(|genesis_config| {
                 genesis_config.allow_new_validators = true;
                 genesis_config.epoch_duration_secs = EPOCH_LENGTH_SECS;
-                genesis_config.recurring_lockup_duration_secs = 86400;
+                genesis_config.recurring_lockup_duration_secs = 7200;
             })))
             .with_randomize_first_validator_ports(random_ports);
 
@@ -324,7 +324,6 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
         NetworkId,
         storage_service_client::StorageServiceNetworkSender,
     >,
-    state_sync_network_handles: Vec<(NetworkId, StateSyncSender, StateSyncEvents)>,
     peer_metadata_storage: Arc<PeerMetadataStorage>,
     mempool_notifier: M,
     consensus_listener: ConsensusNotificationListener,
@@ -357,15 +356,15 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     // Create the chunk executor
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
 
-    // Create the state sync multiplexer
-    let state_sync_multiplexer = StateSyncMultiplexer::new(
-        state_sync_network_handles,
-        mempool_notifier,
-        consensus_listener,
-        db_rw,
-        chunk_executor,
+    // Create the state sync driver factory
+    let state_sync = DriverFactory::create_and_spawn_driver(
+        true,
         node_config,
         waypoint,
+        db_rw,
+        chunk_executor,
+        mempool_notifier,
+        consensus_listener,
         event_subscription_service,
         aptos_data_client,
         streaming_service_client,
@@ -374,7 +373,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
     // Create and return the new state sync handle
     Ok(StateSyncRuntimes::new(
         aptos_data_client_runtime,
-        state_sync_multiplexer,
+        state_sync,
         storage_service_runtime,
         streaming_service_runtime,
     ))
@@ -508,7 +507,6 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
 
     let chain_id = fetch_chain_id(&db_rw)?;
     let mut network_runtimes = vec![];
-    let mut state_sync_network_handles = vec![];
     let mut mempool_network_handles = vec![];
     let mut consensus_network_handles = None;
     let mut storage_service_server_network_handles = vec![];
@@ -581,11 +579,6 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         );
         let network_id = network_config.network_id;
 
-        // Create the endpoints to connect the Network to State Sync.
-        let (state_sync_sender, state_sync_events) =
-            network_builder.add_p2p_service(&state_sync_v1_network_config());
-        state_sync_network_handles.push((network_id, state_sync_sender, state_sync_events));
-
         // TODO(philiphayes): configure which networks we serve the storage service
         // on? for example, if we're a light node we wouldn't want to provide the
         // storage service at all.
@@ -637,7 +630,10 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         mempool_notifications::new_mempool_notifier_listener_pair();
     let (consensus_notifier, consensus_listener) =
         consensus_notifications::new_consensus_notifier_listener_pair(
-            node_config.state_sync.client_commit_timeout_ms,
+            node_config
+                .state_sync
+                .state_sync_driver
+                .commit_notification_timeout_ms,
         );
 
     // Create the state sync runtimes
@@ -645,7 +641,6 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         &node_config,
         storage_service_server_network_handles,
         storage_service_client_network_handles,
-        state_sync_network_handles,
         peer_metadata_storage.clone(),
         mempool_notifier,
         consensus_listener,
@@ -656,7 +651,16 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
 
     let (mp_client_sender, mp_client_events) = channel(AC_SMP_CHANNEL_BUFFER_SIZE);
 
-    let api_runtime = bootstrap_api(&node_config, chain_id, aptos_db, mp_client_sender)?;
+    let api_runtime = bootstrap_api(
+        &node_config,
+        chain_id,
+        aptos_db.clone(),
+        mp_client_sender.clone(),
+    )?;
+    let sf_runtime = match bootstrap_sf_stream(&node_config, chain_id, aptos_db, mp_client_sender) {
+        None => None,
+        Some(res) => Some(res?),
+    };
 
     let mut consensus_runtime = None;
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
@@ -725,6 +729,7 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
         _consensus_runtime: consensus_runtime,
         _mempool: mempool,
         _network_runtimes: network_runtimes,
+        _sf_stream: sf_runtime,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
     })

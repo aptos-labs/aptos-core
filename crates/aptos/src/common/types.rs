@@ -166,6 +166,7 @@ impl From<bcs::Error> for CliError {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
     /// Map of profile configs
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub profiles: Option<HashMap<String, ProfileConfig>>,
 }
 
@@ -177,14 +178,19 @@ pub const CONFIG_FOLDER: &str = ".aptos";
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
     /// Private key for commands.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub private_key: Option<Ed25519PrivateKey>,
     /// Public key for commands
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key: Option<Ed25519PublicKey>,
     /// Account for commands
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub account: Option<AccountAddress>,
     /// URL for the Aptos rest endpoint
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rest_url: Option<String>,
     /// URL for the Faucet endpoint (if applicable)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub faucet_url: Option<String>,
 }
 
@@ -685,7 +691,7 @@ pub struct MovePackageDir {
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
-    named_addresses: BTreeMap<String, AccountAddressWrapper>,
+    pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
 }
 
 impl MovePackageDir {
@@ -742,6 +748,44 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
         Err(CliError::CommandArgumentError(
             "'--account-address' or '--profile' after using aptos init must be provided"
                 .to_string(),
+        ))
+    }
+}
+
+/// A wrapper around `AccountAddress` to allow for "_"
+#[derive(Clone, Copy, Debug)]
+pub struct MoveManifestAccountWrapper {
+    pub account_address: Option<AccountAddress>,
+}
+
+impl FromStr for MoveManifestAccountWrapper {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(MoveManifestAccountWrapper {
+            account_address: load_manifest_account_arg(s)?,
+        })
+    }
+}
+
+/// Loads an account arg and allows for naming based on profiles and "_"
+pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, CliError> {
+    if str == "_" {
+        Ok(None)
+    } else if str.starts_with("0x") {
+        AccountAddress::from_hex_literal(str)
+            .map(Some)
+            .map_err(|err| {
+                CliError::CommandArgumentError(format!("Failed to parse AccountAddress {}", err))
+            })
+    } else if let Ok(account_address) = AccountAddress::from_str(str) {
+        Ok(Some(account_address))
+    } else if let Some(Some(private_key)) = CliConfig::load_profile(str)?.map(|p| p.private_key) {
+        let public_key = private_key.public_key();
+        Ok(Some(account_address_from_public_key(&public_key)))
+    } else {
+        Err(CliError::CommandArgumentError(
+            "Invalid manifest account address".to_string(),
         ))
     }
 }
@@ -904,7 +948,8 @@ impl FaucetOptions {
     }
 }
 
-pub const DEFAULT_MAX_GAS: u64 = 1000;
+// TODO(Gas): double check if this is correct
+pub const DEFAULT_MAX_GAS: u64 = 4_000_000;
 pub const DEFAULT_GAS_UNIT_PRICE: u64 = 1;
 
 /// Gas price options for manipulating how to prioritize transactions

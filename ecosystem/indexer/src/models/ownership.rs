@@ -11,7 +11,7 @@ pub struct Ownership {
     pub ownership_id: String,
     pub token_id: String,
     pub owner: String,
-    pub amount: i64,
+    pub amount: bigdecimal::BigDecimal,
     pub updated_at: chrono::NaiveDateTime,
     pub inserted_at: chrono::NaiveDateTime,
 }
@@ -20,7 +20,7 @@ impl Ownership {
     pub fn new(
         token_id: String,
         owner: String,
-        amount: i64,
+        amount: bigdecimal::BigDecimal,
         updated_at: chrono::NaiveDateTime,
         inserted_at: chrono::NaiveDateTime,
     ) -> Self {

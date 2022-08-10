@@ -5,16 +5,19 @@
 
 class ButtonComponent < ViewComponent::Base
   SCHEME_CLASSES = {
-    primary: 'bg-teal-400 hover:brightness-105 text-neutral-800 font-mono uppercase font-bold flex ' \
-             'items-center justify-center disabled:opacity-50',
-    secondary: 'border border-teal-400 hover:border-teal-300 text-white font-mono uppercase flex ' \
-               'items-center justify-center'
+    primary: 'bg-teal-400 hover:brightness-105 text-neutral-800 font-mono uppercase flex ' \
+             'items-center justify-center disabled:opacity-50 subpixel-antialiased font-normal ' \
+             'active:brightness-95',
+    secondary: 'whitespace-nowrap bg-transparent ring-1 text-teal-300 ring-teal-400 hover:ring-2 ' \
+               'hover:bg-teal-400 hover:brightness-105 hover:ring-teal-400 hover:text-neutral-900 ' \
+               'uppercase font-normal uppercase font-mono active:brightness-95 font-normal ' \
+               'hover:subpixel-antialiased'
   }.freeze
 
   SIZE_CLASSES = {
     large: 'px-8 py-4 text-lg rounded-lg gap-4',
     medium: 'px-8 py-2 text-lg rounded-lg gap-2',
-    small: 'px-4 py-1 text-sm rounded-lg gap-1'
+    small: 'px-4 py-1.5 text-sm rounded-lg gap-1'
   }.freeze
 
   def initialize(scheme: :primary,

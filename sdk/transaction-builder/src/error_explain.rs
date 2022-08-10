@@ -25,6 +25,11 @@ pub fn get_explanation(module_id: &ModuleId, abort_code: u64) -> Option<ErrorDes
     errmap
         .iter()
         .find_map(|e| e.get_explanation(module_id, abort_code))
+        .or_else(|| {
+            errmap
+                .iter()
+                .find_map(|e| e.get_explanation(module_id, abort_code & 0xffff))
+        })
 }
 
 #[cfg(test)]
@@ -34,8 +39,14 @@ mod tests {
 
     #[test]
     fn test_get_explanation() {
-        let module_id = ModuleId::new(AccountAddress::ZERO, ident_str!("TESTTEST").to_owned());
-        // We don't care about the result, just that the errmap deserializes without panicking.
-        let _ = get_explanation(&module_id, 1234);
+        let module_id = ModuleId::new(AccountAddress::ONE, ident_str!("coin").to_owned());
+        // If this breaks, well then someone adjusted the error codes...
+        let no_category = get_explanation(&module_id, 4).unwrap();
+        let category = get_explanation(&module_id, 65540).unwrap();
+        // bcs because ErrorDescription doesn't support `==`
+        assert_eq!(
+            bcs::to_bytes(&no_category).unwrap(),
+            bcs::to_bytes(&category).unwrap()
+        );
     }
 }

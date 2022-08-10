@@ -20,7 +20,6 @@ module aptos_framework::account {
     struct Account has key, store {
         authentication_key: vector<u8>,
         sequence_number: u64,
-        self_address: address,
         coin_register_events: EventHandle<CoinRegisterEvent>,
     }
 
@@ -86,14 +85,6 @@ module aptos_framework::account {
 
     native fun create_address(bytes: vector<u8>): address;
     native fun create_signer(addr: address): signer;
-
-    spec create_address { // TODO: temporary mockup.
-        pragma opaque;
-    }
-
-    spec create_signer { // TODO: temporary mockup.
-        pragma opaque;
-    }
 
     public fun initialize(account: &signer,
         module_addr: address,
@@ -162,7 +153,6 @@ module aptos_framework::account {
             Account {
                 authentication_key,
                 sequence_number: 0,
-                self_address: new_address,
                 coin_register_events: event::new_event_handle<CoinRegisterEvent>(&new_account),
             }
         );

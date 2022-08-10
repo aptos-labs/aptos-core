@@ -4,25 +4,35 @@
 mod aptos_debug_natives;
 mod built_package;
 pub use built_package::*;
+mod manifest;
+pub mod stored_package;
+mod transactional_tests_runner;
+pub use stored_package::*;
 
-use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
+use crate::common::types::MoveManifestAccountWrapper;
+use crate::common::types::{ProfileOptions, RestOptions};
+use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current, write_to_file};
+use crate::move_tool::manifest::{Dependency, MovePackageManifest, PackageInfo};
 use crate::{
     common::{
         types::{
-            load_account_arg, AccountAddressWrapper, CliError, CliTypedResult, MovePackageDir,
-            PromptOptions, TransactionOptions, TransactionSummary,
+            load_account_arg, CliError, CliTypedResult, MovePackageDir, PromptOptions,
+            TransactionOptions, TransactionSummary,
         },
         utils::check_if_file_exists,
     },
     CliCommand, CliResult,
 };
+use aptos_gas::NativeGasParameters;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
+use aptos_transactional_test_harness::run_aptos_test;
+use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
-use aptos_vm;
-use aptos_vm::move_vm_ext::UpgradePolicy;
 use async_trait::async_trait;
-use clap::{Parser, Subcommand};
+use clap::{ArgEnum, Parser, Subcommand};
+use framework::natives::code::UpgradePolicy;
+use itertools::Itertools;
 use move_deps::move_cli::base::test::UnitTestResult;
 use move_deps::{
     move_cli,
@@ -37,14 +47,15 @@ use move_deps::{
     move_prover,
     move_unit_test::UnitTestingConfig,
 };
+use std::fmt::{Display, Formatter};
 use std::{
     collections::BTreeMap,
     convert::TryFrom,
-    io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
 use tokio::task;
+use transactional_tests_runner::TransactionalTestOpts;
 
 /// CLI tool for performing Move tasks
 ///
@@ -53,9 +64,12 @@ pub enum MoveTool {
     Compile(CompilePackage),
     Init(InitPackage),
     Publish(PublishPackage),
+    Download(DownloadPackage),
+    List(ListPackage),
     Run(RunFunction),
     Test(TestPackage),
     Prove(ProvePackage),
+    TransactionalTest(TransactionalTestOpts),
 }
 
 impl MoveTool {
@@ -64,9 +78,12 @@ impl MoveTool {
             MoveTool::Compile(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
             MoveTool::Publish(tool) => tool.execute_serialized().await,
+            MoveTool::Download(tool) => tool.execute_serialized().await,
+            MoveTool::List(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
+            MoveTool::TransactionalTest(tool) => tool.execute_serialized_success().await,
         }
     }
 }
@@ -76,19 +93,19 @@ impl MoveTool {
 pub struct InitPackage {
     /// Name of the new move package
     #[clap(long)]
-    name: String,
+    pub(crate) name: String,
     /// Path to create the new move package
     #[clap(long, parse(from_os_str))]
-    package_dir: Option<PathBuf>,
+    pub(crate) package_dir: Option<PathBuf>,
     /// Named addresses for the move binary
     ///
     /// Example: alice=0x1234, bob=0x5678
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
-    named_addresses: BTreeMap<String, AccountAddressWrapper>,
+    pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
     #[clap(flatten)]
-    prompt_options: PromptOptions,
+    pub(crate) prompt_options: PromptOptions,
 }
 
 #[async_trait]
@@ -106,44 +123,40 @@ impl CliCommand<()> for InitPackage {
                 .join(SourcePackageLayout::Sources.path())
                 .as_path(),
         )?;
-        let mut w = std::fs::File::create(move_toml.as_path()).map_err(|err| {
-            CliError::UnexpectedError(format!(
-                "Failed to create {}: {}",
-                package_dir.join(Path::new("Move.toml")).display(),
-                err
-            ))
-        })?;
 
-        let addresses: BTreeMap<String, String> = self
+        let addresses = self
             .named_addresses
             .clone()
             .into_iter()
-            .map(|(key, value)| (key, value.account_address.to_hex_literal()))
+            .map(|(key, value)| (key, value.account_address.into()))
             .collect();
+        let mut dependencies = BTreeMap::new();
+        dependencies.insert(
+            "AptosFramework".to_string(),
+            Dependency {
+                local: None,
+                git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
+                rev: Some("devnet".to_string()),
+                subdir: Some("aptos-move/framework/aptos-framework".to_string()),
+            },
+        );
+        let manifest = MovePackageManifest {
+            package: PackageInfo {
+                name: self.name,
+                version: "0.0.0".to_string(),
+                author: None,
+            },
+            addresses,
+            dependencies,
+        };
 
-        // TODO: Support Git as default when Github credentials are properly handled from GH CLI
-        writeln!(
-            &mut w,
-            "[package]
-name = \"{}\"
-version = \"0.0.0\"
-
-[dependencies]
-AptosFramework = {{ git = \"https://github.com/aptos-labs/aptos-core.git\", subdir = \"aptos-move/framework/aptos-framework/\", rev = \"devnet\" }}
-
-[addresses]
-{}
-",
-            self.name,
-            toml::to_string(&addresses).map_err(|err| CliError::UnexpectedError(err.to_string()))?
+        write_to_file(
+            move_toml.as_path(),
+            SourcePackageLayout::Manifest.location_str(),
+            toml::to_string_pretty(&manifest)
+                .map_err(|err| CliError::UnexpectedError(err.to_string()))?
+                .as_bytes(),
         )
-        .map_err(|err| {
-            CliError::UnexpectedError(format!(
-                "Failed to write {:?}: {}",
-                package_dir.join(Path::new("Move.toml")),
-                err
-            ))
-        })
     }
 }
 
@@ -151,7 +164,7 @@ AptosFramework = {{ git = \"https://github.com/aptos-labs/aptos-core.git\", subd
 #[derive(Parser)]
 pub struct CompilePackage {
     #[clap(flatten)]
-    move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageDir,
 }
 
 #[async_trait]
@@ -186,7 +199,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
 #[derive(Parser)]
 pub struct TestPackage {
     #[clap(flatten)]
-    move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageDir,
 
     /// A filter string to determine which unit tests to run
     #[clap(long)]
@@ -213,7 +226,8 @@ impl CliCommand<&'static str> for TestPackage {
                 filter: self.filter,
                 ..UnitTestingConfig::default_with_bound(Some(100_000))
             },
-            aptos_debug_natives::aptos_debug_natives(),
+            // TODO(Gas): we may want to switch to non-zero costs in the future
+            aptos_debug_natives::aptos_debug_natives(NativeGasParameters::zeros()),
             false,
             &mut std::io::stdout(),
         )
@@ -224,6 +238,26 @@ impl CliCommand<&'static str> for TestPackage {
             UnitTestResult::Success => Ok("Success"),
             UnitTestResult::Failure => Err(CliError::MoveTestError),
         }
+    }
+}
+
+#[async_trait]
+impl CliCommand<()> for TransactionalTestOpts {
+    fn command_name(&self) -> &'static str {
+        "TransactionalTest"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        let root_path = self.root_path.display().to_string();
+
+        let requirements = vec![transactional_tests_runner::Requirements::new(
+            run_aptos_test,
+            "tests".to_string(),
+            root_path,
+            self.pattern.clone(),
+        )];
+
+        transactional_tests_runner::runner(&self, &requirements)
     }
 }
 
@@ -282,16 +316,16 @@ fn compile_move(build_config: BuildConfig, package_dir: &Path) -> CliTypedResult
 #[derive(Parser)]
 pub struct PublishPackage {
     #[clap(flatten)]
-    move_options: MovePackageDir,
+    pub(crate) move_options: MovePackageDir,
     #[clap(flatten)]
-    txn_options: TransactionOptions,
-    /// Whether to use the new publishing flow.
+    pub(crate) txn_options: TransactionOptions,
+    /// Whether to use the legacy publishing flow. This will be soon removed.
     #[clap(long)]
-    new_flow: bool,
-    /// The upgrade policy used for the published package (new flow only). One of
+    pub(crate) legacy_flow: bool,
+    /// The upgrade policy used for the published package. One of
     /// `arbitrary`, `compatible`, or `immutable`. Defaults to `compatible`.
     #[clap(long)]
-    upgrade_policy: Option<UpgradePolicy>,
+    pub(crate) upgrade_policy: Option<UpgradePolicy>,
 }
 
 #[async_trait]
@@ -304,15 +338,16 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         let PublishPackage {
             move_options,
             txn_options,
-            new_flow,
+            legacy_flow,
             upgrade_policy,
         } = self;
         let package = BuiltPackage::build(move_options, true, true)?;
         let compiled_units = package.extract_code();
-        if !new_flow {
+        if legacy_flow {
             if upgrade_policy.is_some() {
                 return Err(CliError::CommandArgumentError(
-                    "`--upgrade-policy` can only be used with the `--new-flow` option".to_owned(),
+                    "`--upgrade-policy` can only be used without the `--legacy-flow` option"
+                        .to_owned(),
                 ));
             }
             // Send the compiled module using a module bundle
@@ -338,26 +373,141 @@ impl CliCommand<TransactionSummary> for PublishPackage {
     }
 }
 
+/// Downloads a package and stores it in a directory named after the package.
+#[derive(Parser)]
+pub struct DownloadPackage {
+    #[clap(flatten)]
+    rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+    /// Address of the account.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) account: AccountAddress,
+    /// Name of the package.
+    #[clap(long)]
+    package: String,
+    /// Where to store the downloaded packages. Defaults to the current directory.
+    #[clap(long)]
+    target: Option<String>,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for DownloadPackage {
+    fn command_name(&self) -> &'static str {
+        "DownloadPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let url = self.rest_options.url(&self.profile_options.profile)?;
+        let registry = CachedPackageRegistry::create(url, self.account).await?;
+        let path = if let Some(p) = self.target {
+            PathBuf::from(p)
+        } else {
+            PathBuf::from(".")
+        };
+        let package = registry
+            .get_package(self.package)
+            .await
+            .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+        let package_path = path.join(package.name());
+        package
+            .save_package_to_disk(package_path.clone(), true)
+            .map_err(|e| CliError::UnexpectedError(format!("cannot save package: {}", e)))?;
+        println!(
+            "saved package with {} module(s) to `{}`",
+            package.module_names().len(),
+            package_path.display()
+        );
+        Ok("download succeeded")
+    }
+}
+
+/// Lists information about packages and modules.
+#[derive(Parser)]
+pub struct ListPackage {
+    #[clap(flatten)]
+    rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+    /// Address of the account.
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) account: AccountAddress,
+    #[clap(long, default_value_t = ListQuery::Packages)]
+    query: ListQuery,
+}
+
+#[derive(ArgEnum, Clone, Copy, Debug)]
+pub enum ListQuery {
+    Packages,
+}
+
+impl Display for ListQuery {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            ListQuery::Packages => "packages",
+        };
+        write!(f, "{}", str)
+    }
+}
+
+impl FromStr for ListQuery {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "packages" => Ok(ListQuery::Packages),
+            _ => Err("Invalid query. Valid values are modules, packages"),
+        }
+    }
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for ListPackage {
+    fn command_name(&self) -> &'static str {
+        "ListPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let url = self.rest_options.url(&self.profile_options.profile)?;
+        let registry = CachedPackageRegistry::create(url, self.account).await?;
+        match self.query {
+            ListQuery::Packages => {
+                for name in registry.package_names() {
+                    let data = registry.get_package(name).await?;
+                    println!("package {}", data.name());
+                    println!("  upgrade_policy: {}", data.upgrade_policy());
+                    println!("  modules: {}", data.module_names().into_iter().join(", "));
+                    println!(
+                        "  build_info:\n    {}",
+                        data.build_info().replace('\n', "\n    ")
+                    );
+                }
+            }
+        }
+        Ok("list succeeded")
+    }
+}
+
 /// Run a Move function
 #[derive(Parser)]
 pub struct RunFunction {
     #[clap(flatten)]
-    txn_options: TransactionOptions,
+    pub(crate) txn_options: TransactionOptions,
     /// Function name as `<ADDRESS>::<MODULE_ID>::<FUNCTION_NAME>`
     ///
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
     #[clap(long)]
-    function_id: MemberId,
+    pub(crate) function_id: MemberId,
     /// Hex encoded arguments separated by spaces.
     ///
     /// Example: `0x01 0x02 0x03`
     #[clap(long, multiple_values = true)]
-    args: Vec<ArgWithType>,
+    pub(crate) args: Vec<ArgWithType>,
     /// TypeTag arguments separated by spaces.
     ///
     /// Example: `u8 u64 u128 bool address vector true false signer`
     #[clap(long, multiple_values = true)]
-    type_args: Vec<MoveType>,
+    pub(crate) type_args: Vec<MoveType>,
 }
 
 #[async_trait]

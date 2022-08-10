@@ -4,10 +4,10 @@
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
     move_core_types::{
-        gas_schedule::GasCost,
+        gas_schedule::GasAlgebra,
         language_storage::{StructTag, TypeTag},
     },
-    move_vm_runtime::native_functions::NativeContext,
+    move_vm_runtime::native_functions::{NativeContext, NativeFunction},
     move_vm_types::{
         loaded_data::runtime_types::Type,
         natives::function::NativeResult,
@@ -15,54 +15,7 @@ use move_deps::{
     },
 };
 use smallvec::{smallvec, SmallVec};
-use std::{collections::VecDeque, fmt::Write};
-
-/// Returns the structs Module Address, Module Name and the Structs Name
-pub fn type_of(
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    debug_assert!(ty_args.len() == 1);
-    debug_assert!(arguments.is_empty());
-
-    let cost = GasCost::new(super::cost::APTOS_LIB_TYPE_OF, 1).total();
-
-    let type_tag = context.type_to_type_tag(&ty_args[0])?;
-
-    if let TypeTag::Struct(struct_tag) = type_tag {
-        Ok(NativeResult::ok(
-            cost,
-            type_of_internal(&struct_tag).expect("type_of should never fail."),
-        ))
-    } else {
-        Ok(NativeResult::err(
-            cost,
-            super::status::NFE_EXPECTED_STRUCT_TYPE_TAG,
-        ))
-    }
-}
-
-/// Returns a string representing the TypeTag of the parameter.
-pub fn type_name(
-    context: &mut NativeContext,
-    ty_args: Vec<Type>,
-    arguments: VecDeque<Value>,
-) -> PartialVMResult<NativeResult> {
-    debug_assert!(ty_args.len() == 1);
-    debug_assert!(arguments.is_empty());
-
-    let cost = GasCost::new(super::cost::APTOS_LIB_TYPE_NAME, 1).total();
-    let type_tag = context.type_to_type_tag(&ty_args[0])?;
-    let type_name = type_tag.to_string();
-
-    Ok(NativeResult::ok(
-        cost,
-        smallvec![Value::struct_(Struct::pack(vec![Value::vector_u8(
-            type_name.as_bytes().to_vec()
-        )]))],
-    ))
-}
+use std::{collections::VecDeque, fmt::Write, sync::Arc};
 
 fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std::fmt::Error> {
     let mut name = struct_tag.name.to_string();
@@ -81,6 +34,115 @@ fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std:
         Value::vector_u8(name.as_bytes().to_vec()),
     ]);
     Ok(smallvec![Value::struct_(struct_value)])
+}
+
+/***************************************************************************************************
+ * native fun type_of
+ *
+ *   Returns the structs Module Address, Module Name and the Structs Name.
+ *
+ *   gas cost: base_cost + unit_cost * type_size
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct TypeOfGasParameters {
+    pub base_cost: u64,
+    pub unit_cost: u64,
+}
+
+fn native_type_of(
+    gas_params: &TypeOfGasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(ty_args.len() == 1);
+    debug_assert!(arguments.is_empty());
+
+    let mut cost = gas_params.base_cost;
+    if gas_params.unit_cost > 0 {
+        cost += gas_params.unit_cost * ty_args[0].size().get()
+    }
+
+    let type_tag = context.type_to_type_tag(&ty_args[0])?;
+
+    if let TypeTag::Struct(struct_tag) = type_tag {
+        Ok(NativeResult::ok(
+            cost,
+            type_of_internal(&struct_tag).expect("type_of should never fail."),
+        ))
+    } else {
+        Ok(NativeResult::err(
+            cost,
+            super::status::NFE_EXPECTED_STRUCT_TYPE_TAG,
+        ))
+    }
+}
+
+pub fn make_native_type_of(gas_params: TypeOfGasParameters) -> NativeFunction {
+    Arc::new(move |context, ty_args, args| native_type_of(&gas_params, context, ty_args, args))
+}
+
+/***************************************************************************************************
+ * native fun type_name
+ *
+ *   Returns a string representing the TypeTag of the parameter.
+ *
+ *   gas cost: base_cost + unit_cost * type_size
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct TypeNameGasParameters {
+    pub base_cost: u64,
+    pub unit_cost: u64,
+}
+
+fn native_type_name(
+    gas_params: &TypeNameGasParameters,
+    context: &mut NativeContext,
+    ty_args: Vec<Type>,
+    arguments: VecDeque<Value>,
+) -> PartialVMResult<NativeResult> {
+    debug_assert!(ty_args.len() == 1);
+    debug_assert!(arguments.is_empty());
+
+    let mut cost = gas_params.base_cost;
+    if gas_params.unit_cost > 0 {
+        cost += gas_params.unit_cost * ty_args[0].size().get()
+    }
+
+    let type_tag = context.type_to_type_tag(&ty_args[0])?;
+    let type_name = type_tag.to_string();
+
+    Ok(NativeResult::ok(
+        cost,
+        smallvec![Value::struct_(Struct::pack(vec![Value::vector_u8(
+            type_name.as_bytes().to_vec()
+        )]))],
+    ))
+}
+
+pub fn make_native_type_name(gas_params: TypeNameGasParameters) -> NativeFunction {
+    Arc::new(move |context, ty_args, args| native_type_name(&gas_params, context, ty_args, args))
+}
+
+/***************************************************************************************************
+ * module
+ *
+ **************************************************************************************************/
+#[derive(Debug, Clone)]
+pub struct GasParameters {
+    pub type_of: TypeOfGasParameters,
+    pub type_name: TypeNameGasParameters,
+}
+
+pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
+    let natives = [
+        ("type_of", make_native_type_of(gas_params.type_of)),
+        ("type_name", make_native_type_name(gas_params.type_name)),
+    ];
+
+    crate::natives::helpers::make_module_natives(natives)
 }
 
 #[cfg(test)]

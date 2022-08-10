@@ -506,11 +506,13 @@ pub enum Transaction {
 
 pub struct BlockMetadata {
     id: HashValue,
+    epoch: u64,
     round: u64,
-    timestamp_usecs: u64,
-    // The vector has to be sorted to ensure consistent result among all nodes
-    previous_block_votes: Vec<AccountAddress>,
     proposer: AccountAddress,
+    proposer_index: Option<u32>,
+    previous_block_votes: Vec<bool>,
+    failed_proposer_indices: Vec<u32>,
+    timestamp_usecs: u64,
 }
 
 /// The output of executing a transaction.

@@ -5,6 +5,7 @@
 #![allow(clippy::extra_unused_lifetimes)]
 #![allow(clippy::unused_unit)]
 
+use crate::util::u64_to_bigdecimal;
 use crate::{
     database::PgPoolConnection,
     models::{events::EventModel, write_set_changes::WriteSetChangeModel},
@@ -29,11 +30,11 @@ pub struct Transaction {
     #[diesel(column_name = type)]
     pub type_: String,
     pub payload: serde_json::Value,
-    pub version: i64,
+    pub version: bigdecimal::BigDecimal,
     pub hash: String,
     pub state_root_hash: String,
     pub event_root_hash: String,
-    pub gas_used: i64,
+    pub gas_used: bigdecimal::BigDecimal,
     pub success: bool,
     pub vm_status: String,
     pub accumulator_root_hash: String,
@@ -43,7 +44,7 @@ pub struct Transaction {
 
 impl Transaction {
     pub fn get_many_by_version(
-        start_version: i64,
+        start_version: u64,
         number_to_get: i64,
         connection: &PgPoolConnection,
     ) -> diesel::QueryResult<
@@ -56,9 +57,9 @@ impl Transaction {
         )>,
     > {
         let mut txs = transactions::table
-            .filter(transactions::version.ge(start_version))
+            .filter(transactions::version.ge(u64_to_bigdecimal(start_version)))
             .order(transactions::version.asc())
-            .limit(number_to_get)
+            .limit(number_to_get as i64)
             .load::<Transaction>(connection)?;
 
         let mut user_transactions: Vec<Vec<UserTransaction>> = UserTransaction::belonging_to(&txs)
@@ -105,7 +106,7 @@ impl Transaction {
         Vec<WriteSetChangeModel>,
     )> {
         let transaction = transactions::table
-            .filter(transactions::version.eq(version as i64))
+            .filter(transactions::version.eq(u64_to_bigdecimal(version)))
             .first::<Transaction>(connection)?;
 
         let (user_transaction, block_metadata_transaction, events, write_set_changes) =
@@ -265,11 +266,11 @@ impl Transaction {
         Self {
             type_,
             payload,
-            version: *info.version.inner() as i64,
+            version: u64_to_bigdecimal(*info.version.inner()),
             hash: info.hash.to_string(),
             state_root_hash: info.state_root_hash.to_string(),
             event_root_hash: info.event_root_hash.to_string(),
-            gas_used: *info.gas_used.inner() as i64,
+            gas_used: u64_to_bigdecimal(*info.gas_used.inner()),
             success: info.success,
             vm_status: info.vm_status.clone(),
             accumulator_root_hash: info.accumulator_root_hash.to_string(),
@@ -286,12 +287,12 @@ pub struct UserTransaction {
     pub hash: String,
     pub signature: serde_json::Value,
     pub sender: String,
-    pub sequence_number: i64,
-    pub max_gas_amount: i64,
+    pub sequence_number: bigdecimal::BigDecimal,
+    pub max_gas_amount: bigdecimal::BigDecimal,
 
     // from UserTransactionRequest
     pub expiration_timestamp_secs: chrono::NaiveDateTime,
-    pub gas_unit_price: i64,
+    pub gas_unit_price: bigdecimal::BigDecimal,
 
     // from UserTransaction
     pub timestamp: chrono::NaiveDateTime,
@@ -306,13 +307,13 @@ impl UserTransaction {
             hash: tx.info.hash.to_string(),
             signature: serde_json::to_value(&tx.request.signature).unwrap(),
             sender: tx.request.sender.inner().to_hex_literal(),
-            sequence_number: *tx.request.sequence_number.inner() as i64,
-            max_gas_amount: *tx.request.max_gas_amount.inner() as i64,
+            sequence_number: u64_to_bigdecimal(tx.request.sequence_number.0),
+            max_gas_amount: u64_to_bigdecimal(tx.request.max_gas_amount.0),
             expiration_timestamp_secs: parse_timestamp_secs(
                 tx.request.expiration_timestamp_secs,
                 tx.info.version,
             ),
-            gas_unit_price: *tx.request.gas_unit_price.inner() as i64,
+            gas_unit_price: u64_to_bigdecimal(tx.request.gas_unit_price.0),
             timestamp: parse_timestamp(tx.timestamp, tx.info.version),
             inserted_at: chrono::Utc::now().naive_utc(),
         }
@@ -326,14 +327,14 @@ impl UserTransaction {
 pub struct BlockMetadataTransaction {
     pub hash: String,
     pub id: String,
-    pub round: i64,
+    pub round: bigdecimal::BigDecimal,
     pub previous_block_votes: serde_json::Value,
     pub proposer: String,
     pub timestamp: chrono::NaiveDateTime,
 
     // Default time columns
     pub inserted_at: chrono::NaiveDateTime,
-    pub epoch: i64,
+    pub epoch: bigdecimal::BigDecimal,
     pub previous_block_votes_bitmap: serde_json::Value,
     pub failed_proposer_indices: serde_json::Value,
 }
@@ -343,14 +344,14 @@ impl BlockMetadataTransaction {
         Self {
             hash: tx.info.hash.to_string(),
             id: tx.id.to_string(),
-            round: *tx.round.inner() as i64,
+            round: u64_to_bigdecimal(tx.round.0),
             // TODO: Deprecated, use previous_block_votes_bitmap instead. Column kept to not break indexer users (e.g., explorer), writing an empty vector.
             previous_block_votes: serde_json::to_value(vec![] as Vec<Address>).unwrap(),
             proposer: tx.proposer.inner().to_hex_literal(),
             // time is in milliseconds, but chronos wants seconds
             timestamp: parse_timestamp(tx.timestamp, tx.info.version),
             inserted_at: chrono::Utc::now().naive_utc(),
-            epoch: *tx.epoch.inner() as i64,
+            epoch: u64_to_bigdecimal(tx.epoch.0),
             previous_block_votes_bitmap: serde_json::to_value(&tx.previous_block_votes).unwrap(),
             failed_proposer_indices: serde_json::to_value(&tx.failed_proposer_indices).unwrap(),
         }
