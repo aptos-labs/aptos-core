@@ -152,9 +152,9 @@ async fn network_status(
         .block_id;
 
     // Get the latest block
-    let latest_version = state.version;
-    // Get the latest block
-    let current_block = block_cache.get_block_info_by_height(latest_version).await?;
+    let current_block = block_cache
+        .get_block_info_by_height(state.block_height)
+        .await?;
     let current_block_identifier = current_block.block_id;
 
     let response = NetworkStatusResponse {
