@@ -10,6 +10,7 @@ use aptos_config::config::NetworkConfig;
 use aptos_config::network_id::NetworkId;
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
 use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
+use aptos_logger::{info, warn};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{
@@ -106,7 +107,7 @@ impl LocalSwarm {
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        println!("Building a new swarm");
+        info!("Building a new swarm");
         let dir_actual = if let Some(dir_) = dir {
             if dir_.exists() {
                 fs::remove_dir_all(&dir_)?;
@@ -131,6 +132,10 @@ impl LocalSwarm {
                     if number_of_validators.get() == 1 {
                         // this delays empty block by (30-1) * 30ms
                         config.consensus.quorum_store_poll_count = 30;
+                        config
+                            .state_sync
+                            .state_sync_driver
+                            .max_connection_deadline_secs = 1;
                     }
 
                     if let Some(init_config) = &init_config {
@@ -222,7 +227,7 @@ impl LocalSwarm {
         }
 
         self.wait_all_alive(Duration::from_secs(60)).await?;
-        println!("Swarm launched successfully.");
+        info!("Swarm launched successfully.");
         Ok(())
     }
 
@@ -232,7 +237,7 @@ impl LocalSwarm {
         self.wait_for_startup().await?;
         self.wait_for_connectivity(deadline).await?;
         self.liveness_check(deadline).await?;
-        println!("Swarm alive.");
+        info!("Swarm alive.");
         Ok(())
     }
 
@@ -240,7 +245,7 @@ impl LocalSwarm {
         let num_attempts = 10;
         let mut done = vec![false; self.validators.len()];
         for i in 0..num_attempts {
-            println!("Wait for startup attempt: {} of {}", i, num_attempts);
+            info!("Wait for startup attempt: {} of {}", i, num_attempts);
             for (node, done) in self.validators.values_mut().zip(done.iter_mut()) {
                 if *done {
                     continue;
@@ -263,7 +268,7 @@ impl LocalSwarm {
                         ));
                     }
                     Err(HealthCheckError::Failure(e)) => {
-                        println!("health check failure: {}", e);
+                        warn!("health check failure: {}", e);
                         break;
                     }
                 }
