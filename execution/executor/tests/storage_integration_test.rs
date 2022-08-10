@@ -121,7 +121,7 @@ fn test_reconfiguration() {
         1,
         validator_account,
         Some(0),
-        vec![false],
+        vec![0],
         vec![],
         300000001,
     ));

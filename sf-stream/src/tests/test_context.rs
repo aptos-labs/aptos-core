@@ -25,8 +25,7 @@ use executor_types::BlockExecutorTrait;
 use mempool_notifications::MempoolNotificationSender;
 use storage_interface::DbReaderWriter;
 
-use crate::tests::golden_output::GoldenOutputs;
-use crate::tests::pretty;
+use crate::tests::{golden_output::GoldenOutputs, pretty};
 use aptos_api::{context::Context, index};
 use aptos_api_types::HexEncodedBytes;
 use aptos_config::keys::ConfigKey;
@@ -234,7 +233,7 @@ impl TestContext {
             round,
             self.validator_owner,
             Some(0),
-            vec![false],
+            vec![0],
             vec![],
             self.fake_time_usecs,
         )

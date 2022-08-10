@@ -29,6 +29,7 @@ serde_yaml = "0.8.24"
 thiserror = "1.0.31"
 tiny-keccak = { version = "2.0.2", default-features = false, features = ["sha3"] }
 
+aptos-bitvec = { path = "../crates/aptos-bitvec" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-crypto-derive = { path = "../crates/aptos-crypto-derive" }
 
