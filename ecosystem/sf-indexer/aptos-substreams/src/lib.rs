@@ -6,17 +6,11 @@ mod transaction_converter;
 
 use pb::aptos::{
     block_output::v1::{
-        self, transaction_output::TxnData as TxnDataOutput, BlockOutput, EventKeyOutput,
-        SignatureOutput, TransactionOutput,
+        transaction_output::TxnData as TxnDataOutput, BlockOutput, TransactionOutput,
     },
     extractor::v1::{
-        account_signature::Signature as AccountSignature,
-        signature::{Signature, Type as SignatureType},
         transaction::TransactionType,
-        transaction::TxnData as TxnDataInput,
-        BlockMetadataTransaction, Ed25519Signature, Event, MultiAgentSignature,
-        MultiEd25519Signature, Transaction, TransactionInfo, UserTransaction,
-        UserTransactionRequest,
+        transaction::TxnData as TxnDataInput, Event, Transaction,
     },
 };
 
