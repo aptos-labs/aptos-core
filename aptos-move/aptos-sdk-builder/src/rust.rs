@@ -21,6 +21,8 @@ use std::{
     io::{Result, Write},
     path::PathBuf,
 };
+use std::str::FromStr;
+use move_deps::move_core_types::language_storage::StructTag;
 
 /// Output transaction builders in Rust for the given ABIs.
 /// If `local_types` is true, we generate a file suitable for the Aptos codebase itself
@@ -36,19 +38,6 @@ pub fn output(out: &mut dyn Write, abis: &[ScriptABI], local_types: bool) -> Res
 
     emitter.output_preamble()?;
     writeln!(emitter.out, "#![allow(unused_imports)]")?;
-
-    // Filter out all ABIs which have struct parameters, as those aren't yet supported
-    // TODO: teach the builder to support structs
-    let filtered_abis = abis
-        .iter()
-        .filter(|s| {
-            s.args()
-                .iter()
-                .all(|a| !matches!(a.type_tag(), TypeTag::Struct(_)))
-        })
-        .cloned()
-        .collect::<Vec<_>>();
-    let abis = filtered_abis.as_slice();
 
     emitter.output_script_call_enum_with_imports(abis)?;
 
@@ -868,52 +857,25 @@ fn decode_{}_argument(arg: TransactionArgument) -> Option<{}> {{
 
     fn quote_type(type_tag: &TypeTag, local_types: bool) -> String {
         use TypeTag::*;
+        let str_tag: StructTag = StructTag::from_str("0x1::string::String").unwrap();
         match type_tag {
             Bool => "bool".into(),
             U8 => "u8".into(),
             U64 => "u64".into(),
             U128 => "u128".into(),
             Address => "AccountAddress".into(),
-            Vector(type_tag) => match type_tag.as_ref() {
-                U8 => {
-                    if local_types {
-                        "Vec<u8>".into()
-                    } else {
-                        "Bytes".into()
-                    }
-                }
-                Bool => "Vec<bool>".into(),
-                U64 => "Vec<u64>".into(),
-                U128 => "Vec<u128>".into(),
-                Address => "Vec<AccountAddress>".into(),
-                Vector(type_tag) if type_tag.as_ref() == &U8 => "Vec<Vec<u8>>".into(),
+            Vector(type_tag) => {
+                format!("Vec<{}>", Self::quote_type(type_tag.as_ref(), local_types))
+            }
+            Struct(struct_tag) => match struct_tag.clone() {
+                tag if tag == str_tag => "Vec<u8>".into(),
                 _ => common::type_not_allowed(type_tag),
             },
-
-            Struct(_) | Signer => common::type_not_allowed(type_tag),
+            Signer => common::type_not_allowed(type_tag),
         }
     }
 
-    fn quote_transaction_argument(type_tag: &TypeTag, name: &str, local_types: bool) -> String {
-        // NOTE: this check is not necessary as with BCS-encoding, argument of
-        // any valid Move type is possible, including Struct and Vector of types
-        // other than U8. However, to be consistent with the restrictions on
-        // transaction script arguments, we still check the TypeTag here.
-        use TypeTag::*;
-        match type_tag {
-            Bool | U8 | U64 | U128 | Address => {}
-            Vector(type_tag) => match type_tag.as_ref() {
-                U8 => {}
-                Bool | U64 | U128 | Address => {}
-                Vector(type_tag) => {
-                    if type_tag.as_ref() != &U8 {
-                        common::type_not_allowed(type_tag)
-                    }
-                }
-                _ => common::type_not_allowed(type_tag),
-            },
-            Struct(_) | Signer => common::type_not_allowed(type_tag),
-        }
+    fn quote_transaction_argument(_type_tag: &TypeTag, name: &str, local_types: bool) -> String {
         let conversion = format!("bcs::to_bytes(&{}).unwrap()", name);
         if local_types {
             conversion

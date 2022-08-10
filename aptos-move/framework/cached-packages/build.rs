@@ -54,8 +54,7 @@ fn main() {
         )),
     };
     token_release.create_release();
-    // TODO: re-enable file copy after abigen works for string type
-    /* std::fs::copy(
+    std::fs::copy(
         PathBuf::from(std::env::var("OUT_DIR").unwrap())
             .join("token")
             .join("aptos_sdk_builder.rs"),
@@ -64,5 +63,5 @@ fn main() {
             .join("src")
             .join("aptos_token_sdk_builder.rs"),
     )
-    .unwrap();*/
+    .unwrap();
 }

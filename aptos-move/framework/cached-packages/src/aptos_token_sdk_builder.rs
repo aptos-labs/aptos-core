@@ -33,83 +33,106 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum ScriptFunctionCall {
+    TokenBurn {
+        creators_address: AccountAddress,
+        collection: Vec<u8>,
+        name: Vec<u8>,
+        property_version: u64,
+        amount: u64,
+    },
+
     /// create a empty token collection with parameters
     TokenCreateCollectionScript {
-        name: Bytes,
-        description: Bytes,
-        uri: Bytes,
+        name: Vec<u8>,
+        description: Vec<u8>,
+        uri: Vec<u8>,
         maximum: u64,
         mutate_setting: Vec<bool>,
     },
 
     /// create token with raw inputs
     TokenCreateTokenScript {
-        collection: Bytes,
-        name: Bytes,
-        description: Bytes,
+        collection: Vec<u8>,
+        name: Vec<u8>,
+        description: Vec<u8>,
         balance: u64,
         maximum: u64,
-        uri: Bytes,
+        uri: Vec<u8>,
         royalty_payee_address: AccountAddress,
         royalty_points_denominator: u64,
-        royalty_points_nominator: u64,
-        token_mutate_setting: Vec<bool>,
-        property_keys: Vec<Bytes>,
-        property_values: Vec<Bytes>,
-        property_types: Vec<Bytes>,
+        royalty_points_numerator: u64,
+        mutate_setting: Vec<bool>,
+        property_keys: Vec<Vec<u8>>,
+        property_values: Vec<Vec<u8>>,
+        property_types: Vec<Vec<u8>>,
     },
 
     TokenDirectTransferScript {
         creators_address: AccountAddress,
-        collection: Bytes,
-        name: Bytes,
-        amount: u64,
+        collection: Vec<u8>,
+        name: Vec<u8>,
         property_version: u64,
+        amount: u64,
     },
 
     TokenInitializeTokenScript {},
 
+    /// Mint more token from an existing token_data. Mint only adds more token to property_version 0
+    TokenMintScript {
+        token_data_address: AccountAddress,
+        collection: Vec<u8>,
+        name: Vec<u8>,
+        amount: u64,
+    },
+
+    /// mutate the token property and save the new property in TokenStore
+    /// if the token property_version is 0, we will create a new property_version per token and store the properties
+    /// if the token property_version is not 0, we will just update the propertyMap
     TokenMutateTokenProperties {
         token_owner: AccountAddress,
         creator: AccountAddress,
-        collection_name: Bytes,
-        token_name: Bytes,
+        collection_name: Vec<u8>,
+        token_name: Vec<u8>,
         token_property_version: u64,
         amount: u64,
-        keys: Vec<Bytes>,
-        values: Vec<Bytes>,
-        types: Vec<Bytes>,
+        keys: Vec<Vec<u8>>,
+        values: Vec<Vec<u8>>,
+        types: Vec<Vec<u8>>,
     },
 
-    /// Mint more token from an existing token_data. Mint only adds more token to property_version 0
-    TokenMint {
-        token_data_address: AccountAddress,
-        collection: Bytes,
-        name: Bytes,
-        amount: u64,
+    /// Token owner lists their token for swapping
+    TokenCoinSwapListTokenForSwap {
+        coin_type: TypeTag,
+        creators_address: AccountAddress,
+        collection: Vec<u8>,
+        name: Vec<u8>,
+        property_version: u64,
+        token_amount: u64,
+        min_coin_per_token: u64,
+        locked_until_secs: u64,
     },
 
     TokenTransfersCancelOfferScript {
         receiver: AccountAddress,
         creator: AccountAddress,
-        collection: Bytes,
-        name: Bytes,
+        collection: Vec<u8>,
+        name: Vec<u8>,
         property_version: u64,
     },
 
     TokenTransfersClaimScript {
         sender: AccountAddress,
         creator: AccountAddress,
-        collection: Bytes,
-        name: Bytes,
+        collection: Vec<u8>,
+        name: Vec<u8>,
         property_version: u64,
     },
 
     TokenTransfersOfferScript {
         receiver: AccountAddress,
         creator: AccountAddress,
-        collection: Bytes,
-        name: Bytes,
+        collection: Vec<u8>,
+        name: Vec<u8>,
         property_version: u64,
         amount: u64,
     },
@@ -120,6 +143,13 @@ impl ScriptFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use ScriptFunctionCall::*;
         match self {
+            TokenBurn {
+                creators_address,
+                collection,
+                name,
+                property_version,
+                amount,
+            } => token_burn(creators_address, collection, name, property_version, amount),
             TokenCreateCollectionScript {
                 name,
                 description,
@@ -136,8 +166,8 @@ impl ScriptFunctionCall {
                 uri,
                 royalty_payee_address,
                 royalty_points_denominator,
-                royalty_points_nominator,
-                token_mutate_setting,
+                royalty_points_numerator,
+                mutate_setting,
                 property_keys,
                 property_values,
                 property_types,
@@ -150,8 +180,8 @@ impl ScriptFunctionCall {
                 uri,
                 royalty_payee_address,
                 royalty_points_denominator,
-                royalty_points_nominator,
-                token_mutate_setting,
+                royalty_points_numerator,
+                mutate_setting,
                 property_keys,
                 property_values,
                 property_types,
@@ -160,22 +190,62 @@ impl ScriptFunctionCall {
                 creators_address,
                 collection,
                 name,
-                amount,
                 property_version,
+                amount,
             } => token_direct_transfer_script(
                 creators_address,
                 collection,
                 name,
-                amount,
                 property_version,
+                amount,
             ),
             TokenInitializeTokenScript {} => token_initialize_token_script(),
-            TokenMint {
+            TokenMintScript {
                 token_data_address,
                 collection,
                 name,
                 amount,
-            } => token_mint(token_data_address, collection, name, amount),
+            } => token_mint_script(token_data_address, collection, name, amount),
+            TokenMutateTokenProperties {
+                token_owner,
+                creator,
+                collection_name,
+                token_name,
+                token_property_version,
+                amount,
+                keys,
+                values,
+                types,
+            } => token_mutate_token_properties(
+                token_owner,
+                creator,
+                collection_name,
+                token_name,
+                token_property_version,
+                amount,
+                keys,
+                values,
+                types,
+            ),
+            TokenCoinSwapListTokenForSwap {
+                coin_type,
+                creators_address,
+                collection,
+                name,
+                property_version,
+                token_amount,
+                min_coin_per_token,
+                locked_until_secs,
+            } => token_coin_swap_list_token_for_swap(
+                coin_type,
+                creators_address,
+                collection,
+                name,
+                property_version,
+                token_amount,
+                min_coin_per_token,
+                locked_until_secs,
+            ),
             TokenTransfersCancelOfferScript {
                 receiver,
                 creator,
@@ -201,36 +271,15 @@ impl ScriptFunctionCall {
                 creator,
                 collection,
                 name,
-                amount,
                 property_version,
+                amount,
             } => token_transfers_offer_script(
                 receiver,
                 creator,
                 collection,
                 name,
-                amount,
                 property_version,
-            ),
-            TokenMutateTokenProperties {
-                token_owner,
-                creator,
-                collection_name,
-                token_name,
-                token_property_version,
                 amount,
-                keys,
-                values,
-                types,
-            } => token_mutate_token_properties(
-                token_owner,
-                creator,
-                collection_name,
-                token_name,
-                token_property_version,
-                amount,
-                keys,
-                values,
-                types,
             ),
         }
     }
@@ -250,6 +299,33 @@ impl ScriptFunctionCall {
             None
         }
     }
+}
+
+pub fn token_burn(
+    creators_address: AccountAddress,
+    collection: Vec<u8>,
+    name: Vec<u8>,
+    property_version: u64,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("token").to_owned(),
+        ),
+        ident_str!("burn").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&creators_address).unwrap(),
+            bcs::to_bytes(&collection).unwrap(),
+            bcs::to_bytes(&name).unwrap(),
+            bcs::to_bytes(&property_version).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
 }
 
 /// create a empty token collection with parameters
@@ -290,8 +366,8 @@ pub fn token_create_token_script(
     uri: Vec<u8>,
     royalty_payee_address: AccountAddress,
     royalty_points_denominator: u64,
-    royalty_points_nominator: u64,
-    token_mutate_setting: Vec<bool>,
+    royalty_points_numerator: u64,
+    mutate_setting: Vec<bool>,
     property_keys: Vec<Vec<u8>>,
     property_values: Vec<Vec<u8>>,
     property_types: Vec<Vec<u8>>,
@@ -315,8 +391,8 @@ pub fn token_create_token_script(
             bcs::to_bytes(&uri).unwrap(),
             bcs::to_bytes(&royalty_payee_address).unwrap(),
             bcs::to_bytes(&royalty_points_denominator).unwrap(),
-            bcs::to_bytes(&royalty_points_nominator).unwrap(),
-            bcs::to_bytes(&token_mutate_setting).unwrap(),
+            bcs::to_bytes(&royalty_points_numerator).unwrap(),
+            bcs::to_bytes(&mutate_setting).unwrap(),
             bcs::to_bytes(&property_keys).unwrap(),
             bcs::to_bytes(&property_values).unwrap(),
             bcs::to_bytes(&property_types).unwrap(),
@@ -328,8 +404,8 @@ pub fn token_direct_transfer_script(
     creators_address: AccountAddress,
     collection: Vec<u8>,
     name: Vec<u8>,
-    amount: u64,
     property_version: u64,
+    amount: u64,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
@@ -345,8 +421,8 @@ pub fn token_direct_transfer_script(
             bcs::to_bytes(&creators_address).unwrap(),
             bcs::to_bytes(&collection).unwrap(),
             bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&amount).unwrap(),
             bcs::to_bytes(&property_version).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
         ],
     ))
 }
@@ -366,16 +442,45 @@ pub fn token_initialize_token_script() -> TransactionPayload {
     ))
 }
 
+/// Mint more token from an existing token_data. Mint only adds more token to property_version 0
+pub fn token_mint_script(
+    token_data_address: AccountAddress,
+    collection: Vec<u8>,
+    name: Vec<u8>,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("token").to_owned(),
+        ),
+        ident_str!("mint_script").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&token_data_address).unwrap(),
+            bcs::to_bytes(&collection).unwrap(),
+            bcs::to_bytes(&name).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+        ],
+    ))
+}
+
+/// mutate the token property and save the new property in TokenStore
+/// if the token property_version is 0, we will create a new property_version per token and store the properties
+/// if the token property_version is not 0, we will just update the propertyMap
 pub fn token_mutate_token_properties(
     token_owner: AccountAddress,
     creator: AccountAddress,
-    collection_name: Bytes,
-    token_name: Bytes,
+    collection_name: Vec<u8>,
+    token_name: Vec<u8>,
     token_property_version: u64,
     amount: u64,
-    property_keys: Vec<Vec<u8>>,
-    property_values: Vec<Vec<u8>>,
-    property_types: Vec<Vec<u8>>,
+    keys: Vec<Vec<u8>>,
+    values: Vec<Vec<u8>>,
+    types: Vec<Vec<u8>>,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
@@ -394,19 +499,23 @@ pub fn token_mutate_token_properties(
             bcs::to_bytes(&token_name).unwrap(),
             bcs::to_bytes(&token_property_version).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
-            bcs::to_bytes(&property_keys).unwrap(),
-            bcs::to_bytes(&property_values).unwrap(),
-            bcs::to_bytes(&property_types).unwrap(),
+            bcs::to_bytes(&keys).unwrap(),
+            bcs::to_bytes(&values).unwrap(),
+            bcs::to_bytes(&types).unwrap(),
         ],
     ))
 }
 
-/// Mint more token from an existing token_data. Mint only adds more token to property_version 0
-pub fn token_mint(
-    token_data_address: AccountAddress,
+/// Token owner lists their token for swapping
+pub fn token_coin_swap_list_token_for_swap(
+    coin_type: TypeTag,
+    creators_address: AccountAddress,
     collection: Vec<u8>,
     name: Vec<u8>,
-    amount: u64,
+    property_version: u64,
+    token_amount: u64,
+    min_coin_per_token: u64,
+    locked_until_secs: u64,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
@@ -414,15 +523,18 @@ pub fn token_mint(
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 3,
             ]),
-            ident_str!("token").to_owned(),
+            ident_str!("token_coin_swap").to_owned(),
         ),
-        ident_str!("mint").to_owned(),
-        vec![],
+        ident_str!("list_token_for_swap").to_owned(),
+        vec![coin_type],
         vec![
-            bcs::to_bytes(&token_data_address).unwrap(),
+            bcs::to_bytes(&creators_address).unwrap(),
             bcs::to_bytes(&collection).unwrap(),
             bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&amount).unwrap(),
+            bcs::to_bytes(&property_version).unwrap(),
+            bcs::to_bytes(&token_amount).unwrap(),
+            bcs::to_bytes(&min_coin_per_token).unwrap(),
+            bcs::to_bytes(&locked_until_secs).unwrap(),
         ],
     ))
 }
@@ -486,8 +598,8 @@ pub fn token_transfers_offer_script(
     creator: AccountAddress,
     collection: Vec<u8>,
     name: Vec<u8>,
-    amount: u64,
     property_version: u64,
+    amount: u64,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
@@ -504,13 +616,27 @@ pub fn token_transfers_offer_script(
             bcs::to_bytes(&creator).unwrap(),
             bcs::to_bytes(&collection).unwrap(),
             bcs::to_bytes(&name).unwrap(),
-            bcs::to_bytes(&amount).unwrap(),
             bcs::to_bytes(&property_version).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
         ],
     ))
 }
 mod decoder {
     use super::*;
+    pub fn token_burn(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::TokenBurn {
+                creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                collection: bcs::from_bytes(script.args().get(1)?).ok()?,
+                name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(4)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn token_create_collection_script(
         payload: &TransactionPayload,
     ) -> Option<ScriptFunctionCall> {
@@ -538,8 +664,8 @@ mod decoder {
                 uri: bcs::from_bytes(script.args().get(5)?).ok()?,
                 royalty_payee_address: bcs::from_bytes(script.args().get(6)?).ok()?,
                 royalty_points_denominator: bcs::from_bytes(script.args().get(7)?).ok()?,
-                royalty_points_nominator: bcs::from_bytes(script.args().get(8)?).ok()?,
-                token_mutate_setting: bcs::from_bytes(script.args().get(9)?).ok()?,
+                royalty_points_numerator: bcs::from_bytes(script.args().get(8)?).ok()?,
+                mutate_setting: bcs::from_bytes(script.args().get(9)?).ok()?,
                 property_keys: bcs::from_bytes(script.args().get(10)?).ok()?,
                 property_values: bcs::from_bytes(script.args().get(11)?).ok()?,
                 property_types: bcs::from_bytes(script.args().get(12)?).ok()?,
@@ -557,8 +683,8 @@ mod decoder {
                 creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
-                amount: bcs::from_bytes(script.args().get(3)?).ok()?,
-                property_version: bcs::from_bytes(script.args().get(4)?).ok()?,
+                property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(4)?).ok()?,
             })
         } else {
             None
@@ -575,13 +701,52 @@ mod decoder {
         }
     }
 
-    pub fn token_mint(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+    pub fn token_mint_script(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::TokenMint {
+            Some(ScriptFunctionCall::TokenMintScript {
                 token_data_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 collection: bcs::from_bytes(script.args().get(1)?).ok()?,
                 name: bcs::from_bytes(script.args().get(2)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn token_mutate_token_properties(
+        payload: &TransactionPayload,
+    ) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::TokenMutateTokenProperties {
+                token_owner: bcs::from_bytes(script.args().get(0)?).ok()?,
+                creator: bcs::from_bytes(script.args().get(1)?).ok()?,
+                collection_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                token_name: bcs::from_bytes(script.args().get(3)?).ok()?,
+                token_property_version: bcs::from_bytes(script.args().get(4)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(5)?).ok()?,
+                keys: bcs::from_bytes(script.args().get(6)?).ok()?,
+                values: bcs::from_bytes(script.args().get(7)?).ok()?,
+                types: bcs::from_bytes(script.args().get(8)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn token_coin_swap_list_token_for_swap(
+        payload: &TransactionPayload,
+    ) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::TokenCoinSwapListTokenForSwap {
+                coin_type: script.ty_args().get(0)?.clone(),
+                creators_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                collection: bcs::from_bytes(script.args().get(1)?).ok()?,
+                name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
+                token_amount: bcs::from_bytes(script.args().get(4)?).ok()?,
+                min_coin_per_token: bcs::from_bytes(script.args().get(5)?).ok()?,
+                locked_until_secs: bcs::from_bytes(script.args().get(6)?).ok()?,
             })
         } else {
             None
@@ -650,6 +815,7 @@ type ScriptFunctionDecoderMap = std::collections::HashMap<
 static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderMap> =
     once_cell::sync::Lazy::new(|| {
         let mut map: ScriptFunctionDecoderMap = std::collections::HashMap::new();
+        map.insert("token_burn".to_string(), Box::new(decoder::token_burn));
         map.insert(
             "token_create_collection_script".to_string(),
             Box::new(decoder::token_create_collection_script),
@@ -666,7 +832,18 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
             "token_initialize_token_script".to_string(),
             Box::new(decoder::token_initialize_token_script),
         );
-        map.insert("token_mint".to_string(), Box::new(decoder::token_mint));
+        map.insert(
+            "token_mint_script".to_string(),
+            Box::new(decoder::token_mint_script),
+        );
+        map.insert(
+            "token_mutate_token_properties".to_string(),
+            Box::new(decoder::token_mutate_token_properties),
+        );
+        map.insert(
+            "token_coin_swap_list_token_for_swap".to_string(),
+            Box::new(decoder::token_coin_swap_list_token_for_swap),
+        );
         map.insert(
             "token_transfers_cancel_offer_script".to_string(),
             Box::new(decoder::token_transfers_cancel_offer_script),

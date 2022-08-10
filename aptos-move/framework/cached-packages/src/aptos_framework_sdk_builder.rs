@@ -39,7 +39,7 @@ pub enum ScriptFunctionCall {
     },
 
     AccountRotateAuthenticationKey {
-        new_auth_key: Bytes,
+        new_auth_key: Vec<u8>,
     },
 
     AccountTransfer {
@@ -66,9 +66,9 @@ pub enum ScriptFunctionCall {
     /// only the exact script with matching hash can be successfully executed.
     AptosGovernanceCreateProposal {
         stake_pool: AccountAddress,
-        execution_hash: Bytes,
-        metadata_location: Bytes,
-        metadata_hash: Bytes,
+        execution_hash: Vec<u8>,
+        metadata_location: Vec<u8>,
+        metadata_hash: Vec<u8>,
     },
 
     /// Vote on proposal with `proposal_id` and voting power from `stake_pool`.
@@ -81,8 +81,8 @@ pub enum ScriptFunctionCall {
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     CodePublishPackageTxn {
-        pack_serialized: Bytes,
-        code: Vec<Bytes>,
+        pack_serialized: Vec<u8>,
+        code: Vec<Vec<u8>>,
     },
 
     /// Transfers `amount` of coins `CoinType` from `from` to `to`.
@@ -100,7 +100,7 @@ pub enum ScriptFunctionCall {
     },
 
     GasScheduleSetGasSchedule {
-        gas_schedule_blob: Bytes,
+        gas_schedule_blob: Vec<u8>,
     },
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
@@ -113,8 +113,8 @@ pub enum ScriptFunctionCall {
     /// Mint and Burn Capabilities will be stored under `account` in `Capabilities` resource.
     ManagedCoinInitialize {
         coin_type: TypeTag,
-        name: Bytes,
-        symbol: Bytes,
+        name: Vec<u8>,
+        symbol: Vec<u8>,
         decimals: u64,
         monitor_supply: bool,
     },
@@ -139,8 +139,8 @@ pub enum ScriptFunctionCall {
     /// the optional auth key if it is non-empty (though auth keys are 32-bytes)
     /// or the source accounts current auth key.
     ResourceAccountCreateResourceAccount {
-        seed: Bytes,
-        optional_auth_key: Bytes,
+        seed: Vec<u8>,
+        optional_auth_key: Vec<u8>,
     },
 
     /// Add `amount` of coins from the `account` owning the StakePool.
@@ -163,10 +163,10 @@ pub enum ScriptFunctionCall {
 
     /// Initialize the validator account and give ownership to the signing account.
     StakeInitializeValidator {
-        consensus_pubkey: Bytes,
-        proof_of_possession: Bytes,
-        network_addresses: Bytes,
-        fullnode_addresses: Bytes,
+        consensus_pubkey: Vec<u8>,
+        proof_of_possession: Vec<u8>,
+        network_addresses: Vec<u8>,
+        fullnode_addresses: Vec<u8>,
     },
 
     /// This can only called by the operator of the validator/staking pool.
@@ -187,8 +187,8 @@ pub enum ScriptFunctionCall {
     /// Rotate the consensus key of the validator, it'll take effect in next epoch.
     StakeRotateConsensusKey {
         pool_address: AccountAddress,
-        new_consensus_pubkey: Bytes,
-        proof_of_possession: Bytes,
+        new_consensus_pubkey: Vec<u8>,
+        proof_of_possession: Vec<u8>,
     },
 
     /// Allows an owner to change the delegated voter of the stake pool.
@@ -209,8 +209,8 @@ pub enum ScriptFunctionCall {
     /// Update the network and full node addresses of the validator. This only takes effect in the next epoch.
     StakeUpdateNetworkAndFullnodeAddresses {
         pool_address: AccountAddress,
-        new_network_addresses: Bytes,
-        new_fullnode_addresses: Bytes,
+        new_network_addresses: Vec<u8>,
+        new_fullnode_addresses: Vec<u8>,
     },
 
     /// Withdraw from `account`'s inactive stake.
