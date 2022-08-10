@@ -107,20 +107,23 @@ impl Context {
 
     pub fn get_latest_ledger_info(&self) -> Result<LedgerInfo, Error> {
         if let Some(oldest_version) = self.db.get_first_txn_version()? {
-            let ledger_info = self.get_latest_ledger_info_with_signatures()?;
-            let (_, _, oldest_block_event) = self.db.get_block_info(oldest_version)?;
-            let (_, _, newest_block_event) = self
-                .db
-                .get_block_info(ledger_info.ledger_info().version())?;
-            Ok(LedgerInfo::new(
-                &self.chain_id(),
-                &ledger_info,
-                oldest_version,
-                oldest_block_event.height(),
-                newest_block_event.height(),
-            ))
+            if let Some(oldest_block_height) = self.db.get_first_block_height()? {
+                let ledger_info = self.get_latest_ledger_info_with_signatures()?;
+                let (_, _, newest_block_event) = self
+                    .db
+                    .get_block_info(ledger_info.ledger_info().version())?;
+                Ok(LedgerInfo::new(
+                    &self.chain_id(),
+                    &ledger_info,
+                    oldest_version,
+                    oldest_block_height,
+                    newest_block_event.height(),
+                ))
+            } else {
+                Err(anyhow!("Failed to retrieve oldest block height").into())
+            }
         } else {
-            return Err(anyhow! {"Failed to retrieve oldest version"}.into());
+            Err(anyhow! {"Failed to retrieve oldest version"}.into())
         }
     }
 

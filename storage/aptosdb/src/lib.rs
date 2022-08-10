@@ -986,6 +986,17 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_first_block_height(&self) -> Result<Option<u64>> {
+        gauged_api("get_first_block_height", || {
+            if let Some(version) = self.get_first_txn_version()? {
+                let (_, _, event) = self.get_block_info(version)?;
+                Ok(Some(event.height()))
+            } else {
+                Ok(None)
+            }
+        })
+    }
+
     /// Get the first version that write set starts existent.
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_write_set_version", || {
