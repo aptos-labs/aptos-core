@@ -19,7 +19,6 @@ storage:
 mempool:
   shared_mempool_max_concurrent_inbound_syncs: {{ .Values.fullnode.config.shared_mempool_max_concurrent_inbound_syncs }}
   max_broadcasts_per_peer: {{ .Values.fullnode.config.max_broadcasts_per_peer }}
-  default_failovers: {{ .Values.fullnode.config.default_failovers }}
 
 full_node_networks:
 - network_id:
