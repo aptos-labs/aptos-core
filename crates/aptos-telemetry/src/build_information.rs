@@ -29,32 +29,37 @@ pub const BUILD_VERSION: &str = "build_version";
 #[macro_export]
 macro_rules! collect_build_information {
     () => {{
-        // Get Git metadata from environment variables set during build-time.
-        // This is applicable for docker based builds.
-        const GIT_SHA: Option<&str> = option_env!("GIT_SHA");
-        const GIT_BRANCH: Option<&str> = option_env!("GIT_BRANCH");
-        const GIT_TAG: Option<&str> = option_env!("GIT_TAG");
-
+        println!("calling collect {:?}", std::env::var("GIT_SHA"));
         // Collect and return the build information
         let mut build_information: std::collections::BTreeMap<String, String> = BTreeMap::new();
-        if let Some(git_branch) = GIT_BRANCH {
-            build_information.insert(
-                aptos_telemetry::build_information::BUILD_BRANCH.into(),
-                git_branch.into(),
-            );
-        }
 
-        if let Some(git_hash) = GIT_SHA {
+        // Get Git metadata from environment variables set during build-time.
+        // This is applicable for docker based builds.
+        if let Ok(git_branch) = std::env::var("GIT_SHA") {
             build_information.insert(
                 aptos_telemetry::build_information::BUILD_COMMIT_HASH.into(),
-                git_hash.into(),
+                git_branch,
             );
         }
 
-        if let Some(git_tag) = GIT_TAG {
+        if let Ok(git_hash) = std::env::var("GIT_BRANCH") {
+            build_information.insert(
+                aptos_telemetry::build_information::BUILD_BRANCH.into(),
+                git_hash,
+            );
+        }
+
+        if let Ok(git_tag) = std::env::var("GIT_TAG") {
             build_information.insert(
                 aptos_telemetry::build_information::BUILD_TAG.into(),
-                git_tag.into(),
+                git_tag,
+            );
+        }
+
+        if let Ok(build_date) = std::env::var("BUILD_DATE") {
+            build_information.insert(
+                aptos_telemetry::build_information::BUILD_TIME.into(),
+                build_date,
             );
         }
 
@@ -79,4 +84,26 @@ pub(crate) fn get_build_information(chain_id: Option<String>) -> BTreeMap<String
     let mut build_information = collect_build_information!();
     utils::insert_optional_value(&mut build_information, BUILD_CHAIN_ID, chain_id);
     build_information
+}
+
+#[test]
+fn test_get_build_information() {
+    let commit_hash = String::from("COMMIT-HASH-1");
+    let build_branch = String::from("branch-1");
+    let build_tag = String::from("release-1");
+
+    std::env::set_var("GIT_SHA", commit_hash.clone());
+    std::env::set_var("GIT_BRANCH", build_branch.clone());
+    std::env::set_var("GIT_TAG", build_tag.clone());
+
+    let info = get_build_information(None);
+
+    assert!(info.contains_key(BUILD_COMMIT_HASH));
+    assert_eq!(info.get(BUILD_COMMIT_HASH), Some(&commit_hash));
+
+    assert!(info.contains_key(BUILD_BRANCH));
+    assert_eq!(info.get(BUILD_BRANCH), Some(&build_branch));
+
+    assert!(info.contains_key(BUILD_TAG));
+    assert_eq!(info.get(BUILD_TAG), Some(&build_tag));
 }
