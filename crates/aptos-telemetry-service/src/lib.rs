@@ -21,7 +21,7 @@ use crate::{
 
 mod auth;
 mod context;
-mod custom_telemetry;
+mod custom_event;
 mod error;
 mod index;
 mod jwt_auth;
