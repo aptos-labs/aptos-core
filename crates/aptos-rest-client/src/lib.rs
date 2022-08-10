@@ -58,11 +58,11 @@ impl Client {
             .await
     }
 
-    pub async fn get_block(&self, height: u64) -> Result<Response<Block>> {
-        self.get(
-            self.base_url
-                .join(&format!("v1/blocks/by_height/{}", height))?,
-        )
+    pub async fn get_block(&self, height: u64, with_transactions: bool) -> Result<Response<Block>> {
+        self.get(self.base_url.join(&format!(
+            "v1/blocks/by_height/{}?with_transactions={}",
+            height, with_transactions
+        ))?)
         .await
     }
 
@@ -97,13 +97,13 @@ impl Client {
             #[serde(deserialize_with = "types::deserialize_from_string")]
             ledger_version: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
-            ledger_timestamp: u64,
-            #[serde(deserialize_with = "types::deserialize_from_string")]
             oldest_ledger_version: u64,
+            #[serde(deserialize_with = "types::deserialize_from_string")]
+            block_height: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
             oldest_block_height: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
-            block_height: u64,
+            ledger_timestamp: u64,
         }
 
         let response = self

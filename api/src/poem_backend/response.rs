@@ -247,6 +247,8 @@ macro_rules! generate_success_response {
                 #[oai(header = "X-Aptos-Ledger-Oldest-Version")] u64,
                 #[oai(header = "X-Aptos-Ledger-TimestampUsec")] u64,
                 #[oai(header = "X-Aptos-Epoch")] u64,
+                #[oai(header = "X-Aptos-Block-Height")] u64,
+                #[oai(header = "X-Aptos-Oldest-Block-Height")] u64,
             ),
             )*
         }
@@ -284,6 +286,8 @@ macro_rules! generate_success_response {
                             ledger_info.oldest_ledger_version.into(),
                             ledger_info.ledger_timestamp.into(),
                             ledger_info.epoch.into(),
+                            ledger_info.block_height.into(),
+                            ledger_info.oldest_block_height.into(),
                         )
                     },
                     )*

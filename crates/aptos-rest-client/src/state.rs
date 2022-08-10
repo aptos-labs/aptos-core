@@ -71,8 +71,8 @@ impl State {
                 version,
                 timestamp_usecs,
                 oldest_ledger_version,
-                oldest_block_height,
                 block_height,
+                oldest_block_height,
             }
         } else {
             anyhow::bail!(

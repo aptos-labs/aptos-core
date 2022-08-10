@@ -12,7 +12,6 @@ use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::StateView;
-use aptos_types::account_config::NewBlockEvent;
 use aptos_types::transaction::Transaction;
 use aptos_types::{
     account_address::AccountAddress,
@@ -236,30 +235,58 @@ impl Context {
         })
     }
 
-    fn get_block(
+    pub fn get_block_by_height(
         &self,
-        first_version: u64,
-        last_version: u64,
-        new_block_event: NewBlockEvent,
+        height: u64,
         ledger_version: u64,
+        with_transactions: bool,
     ) -> Result<Block, BasicErrorWith404> {
+        let (first_version, last_version, new_block_event) = self
+            .db
+            .get_block_info_by_height(height)
+            .context("Failed to find block")
+            .map_err(BasicErrorWith404::not_found)?;
+
         if last_version > ledger_version {
             return Err(BasicErrorWith404::not_found(anyhow!("Block not found")));
         }
 
-        let txns = self
-            .get_transactions(
-                first_version,
-                (last_version - first_version + 1) as u16,
-                ledger_version,
-            )
-            .context("Failed to read raw transactions from storage")
-            .map_err(BasicErrorWith404::internal)
-            .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
+        let (block_hash, txns) = if with_transactions {
+            let txns = self
+                .get_transactions(
+                    first_version,
+                    (last_version - first_version + 1) as u16,
+                    ledger_version,
+                )
+                .context("Failed to read raw transactions from storage")
+                .map_err(BasicErrorWith404::internal)
+                .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
 
-        // TODO: embed block hash into the NewBlockEvent
-        let block_hash = if let Some(txn) = txns.first() {
-            match txn.transaction {
+            // TODO: embed block hash into the NewBlockEvent
+            let block_hash = if let Some(txn) = txns.first() {
+                match txn.transaction {
+                    Transaction::GenesisTransaction(_) => HashValue::zero(),
+                    Transaction::BlockMetadata(ref inner) => inner.id(),
+                    _ => {
+                        return Err(BasicErrorWith404::internal(anyhow!(
+                        "Genesis or BlockMetadata transaction expected at block first version {}",
+                        first_version,
+                    )))
+                    }
+                }
+            } else {
+                return Err(BasicErrorWith404::internal(anyhow!(
+                    "No transactions found for block"
+                )));
+            };
+            (block_hash, Some(txns))
+        } else {
+            let txn = self
+                .get_transaction_by_version(first_version, ledger_version)
+                .context("Failed to read raw transactions from storage")
+                .map_err(BasicErrorWith404::internal)
+                .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
+            let block_hash = match txn.transaction {
                 Transaction::GenesisTransaction(_) => HashValue::zero(),
                 Transaction::BlockMetadata(ref inner) => inner.id(),
                 _ => {
@@ -268,45 +295,24 @@ impl Context {
                         first_version,
                     )))
                 }
-            }
+            };
+            (block_hash, None)
+        };
+
+        let transactions = if let Some(inner) = txns {
+            Some(self.render_transactions(inner)?)
         } else {
-            return Err(BasicErrorWith404::internal(anyhow!(
-                "No transactions found for block"
-            )));
+            None
         };
 
         Ok(Block {
-            block_height: new_block_event.height(),
+            block_height: new_block_event.height().into(),
             block_hash: block_hash.into(),
-            block_timestamp: new_block_event.proposed_time(),
-            transactions: self.render_transactions(txns)?,
+            block_timestamp: new_block_event.proposed_time().into(),
+            first_version: first_version.into(),
+            last_version: last_version.into(),
+            transactions,
         })
-    }
-
-    pub fn get_block_by_version(
-        &self,
-        version: u64,
-        ledger_version: u64,
-    ) -> Result<Block, BasicErrorWith404> {
-        let (first_version, last_version, new_block_event) = self
-            .db
-            .get_block_info(version)
-            .context("Failed to find block")
-            .map_err(BasicErrorWith404::not_found)?;
-        self.get_block(first_version, last_version, new_block_event, ledger_version)
-    }
-
-    pub fn get_block_by_height(
-        &self,
-        height: u64,
-        ledger_version: u64,
-    ) -> Result<Block, BasicErrorWith404> {
-        let (first_version, last_version, new_block_event) = self
-            .db
-            .get_block_info_by_height(height)
-            .context("Failed to find block")
-            .map_err(BasicErrorWith404::not_found)?;
-        self.get_block(first_version, last_version, new_block_event, ledger_version)
     }
 
     pub fn render_transactions<E: InternalError>(
