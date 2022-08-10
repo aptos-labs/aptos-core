@@ -1,6 +1,3 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
 // @generated
 impl serde::Serialize for Timestamp {
     #[allow(deprecated)]
@@ -32,7 +29,10 @@ impl<'de> serde::Deserialize<'de> for Timestamp {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["seconds", "nanos"];
+        const FIELDS: &[&str] = &[
+            "seconds",
+            "nanos",
+        ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -49,10 +49,7 @@ impl<'de> serde::Deserialize<'de> for Timestamp {
                 impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
                     type Value = GeneratedField;
 
-                    fn expecting(
-                        &self,
-                        formatter: &mut std::fmt::Formatter<'_>,
-                    ) -> std::fmt::Result {
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                         write!(formatter, "expected one of: {:?}", &FIELDS)
                     }
 
@@ -80,8 +77,8 @@ impl<'de> serde::Deserialize<'de> for Timestamp {
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<Timestamp, V::Error>
-            where
-                V: serde::de::MapAccess<'de>,
+                where
+                    V: serde::de::MapAccess<'de>,
             {
                 let mut seconds__ = None;
                 let mut nanos__ = None;
@@ -92,8 +89,7 @@ impl<'de> serde::Deserialize<'de> for Timestamp {
                                 return Err(serde::de::Error::duplicate_field("seconds"));
                             }
                             seconds__ = Some(
-                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?
-                                    .0,
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
                             );
                         }
                         GeneratedField::Nanos => {
@@ -101,8 +97,7 @@ impl<'de> serde::Deserialize<'de> for Timestamp {
                                 return Err(serde::de::Error::duplicate_field("nanos"));
                             }
                             nanos__ = Some(
-                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?
-                                    .0,
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0
                             );
                         }
                     }

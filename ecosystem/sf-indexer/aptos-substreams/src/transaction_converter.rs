@@ -1,9 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::pb::aptos::{
-    block_output::{self, EventKeyOutput, SignatureOutput},
-    extractor::{
+use anyhow::{bail, Context, Result};
+use aptos_protos::{
+    block_output::v1::{
+        BlockMetadataTransactionOutput, EventKeyOutput, EventOutput, SignatureOutput,
+        TransactionInfoOutput, UserTransactionOutput, WriteSetChangeOutput,
+    },
+    extractor::v1::{
         account_signature::Signature as AccountSignature,
         signature::{Signature, Type as SignatureType},
         transaction::TransactionType,
@@ -11,11 +15,6 @@ use crate::pb::aptos::{
         MultiEd25519Signature, Transaction, TransactionInfo, UserTransaction,
         UserTransactionRequest,
     },
-};
-use anyhow::{bail, Context, Result};
-use block_output::{
-    BlockMetadataTransactionOutput, EventOutput, TransactionInfoOutput, UserTransactionOutput,
-    WriteSetChangeOutput,
 };
 
 pub fn get_transaction_info_output(

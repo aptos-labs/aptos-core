@@ -1,18 +1,21 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod pb;
 mod transaction_converter;
 
-use pb::aptos::block_output::{
-    transaction_output::TxnData as TxnDataOutput, BlockOutput, TransactionOutput,
+use aptos_protos::{
+    block_output::v1::{
+        transaction_output::TxnData as TxnDataOutput, BlockOutput, TransactionOutput,
+    },
+    extractor::v1::{
+        transaction::TransactionType, transaction::TxnData as TxnDataInput, Event, Transaction,
+    },
 };
-use pb::aptos::extractor::{self, transaction::TxnData as TxnDataInput, Event};
 use substreams::{errors::Error, store};
 
 #[substreams::handlers::map]
 /// Input will be block soon but for now we're using transaction as block
-fn block_to_block_output(input_txn: extractor::Transaction) -> Result<BlockOutput, Error> {
+fn block_to_block_output(input_txn: Transaction) -> Result<BlockOutput, Error> {
     let mut transactions: Vec<TransactionOutput> = vec![];
 
     // TODO: Add a for loop here for block
@@ -74,7 +77,7 @@ fn block_to_block_output(input_txn: extractor::Transaction) -> Result<BlockOutpu
 }
 
 #[substreams::handlers::store]
-fn store_count(transaction: extractor::Transaction, store: store::StoreAddInt64) {
+fn store_count(transaction: Transaction, store: store::StoreAddInt64) {
     store.add(transaction.version, generate_trx_key(), 1);
     store.add(
         transaction.version,
@@ -87,9 +90,7 @@ fn generate_trx_key() -> String {
     String::from("total")
 }
 
-fn generate_trx_type_key(trx_type: extractor::transaction::TransactionType) -> String {
-    use extractor::transaction::TransactionType;
-
+fn generate_trx_type_key(trx_type: TransactionType) -> String {
     match trx_type {
         TransactionType::Genesis => "genesis",
         TransactionType::BlockMetadata => "block_metadata",

@@ -2,4 +2,3 @@
 .idea
 .DS_Store
 /target
-*.spkg

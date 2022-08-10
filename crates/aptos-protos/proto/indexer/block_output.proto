@@ -3,9 +3,9 @@
 
 syntax = "proto3";
 
-import "google/protobuf/timestamp.proto";
+import "timestamp.proto";
 
-package aptos.block_output;
+package aptos.block_output.v1;
 
 message BlockOutput {
   repeated TransactionOutput transactions = 1;
@@ -34,7 +34,7 @@ message TransactionInfoOutput {
   uint64 block_height = 9;
   string vm_status = 10;
   bytes accumulator_root_hash = 11;
-  google.protobuf.Timestamp timestamp = 12;
+  aptos.util.timestamp.Timestamp timestamp = 12;
 }
 
 message BlockMetadataTransactionOutput {
@@ -44,7 +44,7 @@ message BlockMetadataTransactionOutput {
   repeated bool previous_block_votes_bitmap = 4;
   string proposer = 5;
   repeated uint32 failed_proposer_indices = 6;
-  google.protobuf.Timestamp timestamp = 7;
+  aptos.util.timestamp.Timestamp timestamp = 7;
   uint64 epoch = 8;
 }
 
@@ -54,9 +54,9 @@ message UserTransactionOutput {
   string sender = 3;
   uint64 sequence_number = 4;
   uint64 max_gas_amount = 5;
-  google.protobuf.Timestamp expiration_timestamp_secs = 6;
+  aptos.util.timestamp.Timestamp expiration_timestamp_secs = 6;
   uint64 gas_unit_price = 7;
-  google.protobuf.Timestamp timestamp = 8;
+  aptos.util.timestamp.Timestamp timestamp = 8;
   repeated SignatureOutput signatures = 9;
 }
 

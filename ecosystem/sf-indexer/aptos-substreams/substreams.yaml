@@ -4,13 +4,15 @@ package:
   version: v0.0.1
 
 imports:
-  # aptos: ./aptos-firehose-v0.0.1.spkg
+  aptos: ./aptos-firehose-v0.0.1.spkg
 
 protobuf:
   files:
     - block_output.proto
+    - timestamp.proto
   importPaths:
-    - ./proto
+    - ../../../crates/aptos-protos/proto/indexer
+    - ../../../crates/aptos-protos/proto
 
 binaries:
   default:

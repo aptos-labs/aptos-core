@@ -20,5 +20,4 @@ serde = { version = "1.0.137", features = ["derive"], default-features = false }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 substreams = "0.0.12"
 
-[build-dependencies]
-prost-build = "0.10.1"
+aptos-protos = { path = "../../../crates/aptos-protos" }
