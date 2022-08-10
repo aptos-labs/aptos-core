@@ -18,6 +18,7 @@ mirai-annotations = { version = "1.12.0", default-features = false }
 proptest = { version = "1.0.0", optional = true }
 serde = { version = "1.0.137", default-features = false }
 
+aptos-bitvec = { path = "../../crates/aptos-bitvec" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }

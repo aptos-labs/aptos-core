@@ -9,10 +9,10 @@ use aptos_sdk::{
 };
 use aptos_state_view::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
 use aptos_transaction_builder::aptos_stdlib;
-use aptos_types::block_metadata::BlockMetadata;
 use aptos_types::{
     account_config::aptos_root_address,
     account_view::AccountView,
+    block_metadata::BlockMetadata,
     chain_id::ChainId,
     event::EventKey,
     test_helpers::transaction_test_helpers::block,
@@ -75,7 +75,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         0,
         signer.author(),
         Some(0),
-        vec![false],
+        vec![0],
         vec![],
         1,
     ));
@@ -135,7 +135,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         0,
         signer.author(),
         Some(0),
-        vec![false],
+        vec![0],
         vec![],
         2,
     ));
@@ -150,7 +150,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         1,
         signer.author(),
         Some(0),
-        vec![false],
+        vec![0],
         vec![],
         3,
     ));
