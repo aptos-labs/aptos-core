@@ -224,6 +224,20 @@ module aptos_framework::account {
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
         if (table::contains(address_map, current_auth_key)) {
             table::remove(address_map, current_auth_key);
+
+        let account_resource = borrow_global_mut<Account>(addr);
+        let current_auth_key = account_resource.authentication_key;
+        let current_addr = create_address(current_auth_key);
+
+        let proof= RotationProof {
+            originator: addr,
+            current_auth_key: copy current_auth_key,
+        };
+
+        assert!(ed25519_verify_t(signature, new_public_key, proof), EINVALID_PROOF_OF_KNOWLEDGE);
+        let address_map = &mut borrow_global_mut<OriginatingAddress>(@core_resources).address_map;
+        if (table::contains(address_map, current_addr)) {
+            table::remove(address_map, current_addr);
         };
 
         let new_auth_key = hash::sha3_256(new_public_key);
