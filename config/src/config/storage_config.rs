@@ -94,7 +94,7 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig
     ledger_prune_window: 0,
     ledger_pruning_batch_size: 10_000,
     state_store_pruning_batch_size: 10_000,
-    user_pruning_window_offset: 2000,
+    user_pruning_window_offset: 0,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
