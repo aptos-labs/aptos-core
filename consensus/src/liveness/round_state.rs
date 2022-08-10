@@ -89,11 +89,11 @@ impl ExponentialTimeInterval {
     }
 
     pub fn new(base: Duration, exponent_base: f64, max_exponent: usize) -> Self {
-        assert!(
+        debug_assert!(
             max_exponent < 32,
             "max_exponent for RoundStateTimeInterval should be <32"
         );
-        assert!(
+        debug_assert!(
             exponent_base.powf(max_exponent as f64).ceil() < f64::from(std::u32::MAX),
             "Maximum interval multiplier should be less then u32::Max"
         );

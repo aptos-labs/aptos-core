@@ -84,7 +84,7 @@ fn test_get_public_key_previous_version(storage: &mut Storage) {
     let mut private_key = storage.export_private_key(CRYPTO_NAME).unwrap();
 
     // Verify no previous version exists
-    assert!(storage
+    debug_assert!(storage
         .get_public_key_previous_version(CRYPTO_NAME)
         .is_err());
 
@@ -214,7 +214,7 @@ fn test_create_get_key_pair(storage: &mut Storage) {
 /// such, it asserts that this attempt fails.
 fn test_get_uncreated_key_pair(storage: &mut Storage) {
     let key_pair_name = "Non-existent Key";
-    assert!(
+    debug_assert!(
         storage.get_public_key(key_pair_name).is_err(),
         "Accessing a key that has not yet been created should have failed!"
     );
@@ -243,7 +243,7 @@ fn test_create_and_get_non_existent_version(storage: &mut Storage) {
 
     // Get a non-existent version of the new key pair and verify failure
     let non_existent_public_key = Ed25519PrivateKey::generate_for_testing().public_key();
-    assert!(
+    debug_assert!(
         storage.export_private_key_for_version(CRYPTO_NAME, non_existent_public_key).is_err(),
         "We have tried to retrieve a non-existent private key version -- the call should have failed!",
     );
@@ -282,7 +282,7 @@ fn test_create_sign_rotate_sign(storage: &mut Storage) {
     // Create then sign message and verify correct signature
     let message = TestAptosCrypto("Hello, World".to_string());
     let message_signature = storage.sign(CRYPTO_NAME, &message).unwrap();
-    assert!(message_signature.verify(&message, &public_key).is_ok());
+    debug_assert!(message_signature.verify(&message, &public_key).is_ok());
 
     // Rotate the key pair and sign the message again using the previous key pair version
     let _ = storage.rotate_key(CRYPTO_NAME).unwrap();
@@ -307,5 +307,5 @@ fn test_incremental_timestamp(storage: &mut Storage) {
     let second = storage.get::<u64>(key).unwrap();
 
     assert_ne!(first.value, second.value);
-    assert!(first.last_update < second.last_update);
+    debug_assert!(first.last_update < second.last_update);
 }

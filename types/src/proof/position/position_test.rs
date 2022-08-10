@@ -80,23 +80,23 @@ fn test_position_level() {
 
 #[test]
 fn test_position_is_left_child() {
-    assert!(Position::from_inorder_index(1).is_left_child());
-    assert!(Position::from_inorder_index(0).is_left_child());
-    assert!(Position::from_inorder_index(3).is_left_child());
-    assert!(Position::from_inorder_index(7).is_left_child());
-    assert!(Position::from_inorder_index(8).is_left_child());
-    assert!(Position::from_inorder_index(12).is_left_child());
+    debug_assert!(Position::from_inorder_index(1).is_left_child());
+    debug_assert!(Position::from_inorder_index(0).is_left_child());
+    debug_assert!(Position::from_inorder_index(3).is_left_child());
+    debug_assert!(Position::from_inorder_index(7).is_left_child());
+    debug_assert!(Position::from_inorder_index(8).is_left_child());
+    debug_assert!(Position::from_inorder_index(12).is_left_child());
 }
 
 #[test]
 fn test_position_is_right_child() {
-    assert!(Position::from_inorder_index(5).is_right_child());
-    assert!(Position::from_inorder_index(6).is_right_child());
-    assert!(Position::from_inorder_index(2).is_right_child());
-    assert!(Position::from_inorder_index(11).is_right_child());
-    assert!(Position::from_inorder_index(13).is_right_child());
-    assert!(Position::from_inorder_index(14).is_right_child());
-    assert!(Position::from_inorder_index(10).is_right_child());
+    debug_assert!(Position::from_inorder_index(5).is_right_child());
+    debug_assert!(Position::from_inorder_index(6).is_right_child());
+    debug_assert!(Position::from_inorder_index(2).is_right_child());
+    debug_assert!(Position::from_inorder_index(11).is_right_child());
+    debug_assert!(Position::from_inorder_index(13).is_right_child());
+    debug_assert!(Position::from_inorder_index(14).is_right_child());
+    debug_assert!(Position::from_inorder_index(10).is_right_child());
 }
 
 #[test]
@@ -287,20 +287,20 @@ fn collect_all_positions(num_leaves: LeafCount, num_new_leaves: LeafCount) -> Ve
 
 #[test]
 fn test_frozen_subtree_sibling_iterator() {
-    assert!(collect_all_positions(0, 0).is_empty());
+    debug_assert!(collect_all_positions(0, 0).is_empty());
     assert_eq!(collect_all_positions(0, 1), vec![0]);
     assert_eq!(collect_all_positions(0, 2), vec![1]);
     assert_eq!(collect_all_positions(0, 7), vec![3, 9, 12]);
     assert_eq!(collect_all_positions(0, 1 << 63), vec![(1 << 63) - 1]);
 
-    assert!(collect_all_positions(1, 1).is_empty());
+    debug_assert!(collect_all_positions(1, 1).is_empty());
     assert_eq!(collect_all_positions(1, 2), vec![2]);
     assert_eq!(collect_all_positions(1, 3), vec![2, 4]);
     assert_eq!(collect_all_positions(1, 4), vec![2, 5]);
     assert_eq!(collect_all_positions(1, 5), vec![2, 5, 8]);
     assert_eq!(collect_all_positions(1, 1 << 63).len(), 63);
 
-    assert!(collect_all_positions(2, 2).is_empty());
+    debug_assert!(collect_all_positions(2, 2).is_empty());
     assert_eq!(collect_all_positions(2, 3), vec![4]);
     assert_eq!(collect_all_positions(2, 4), vec![5]);
     assert_eq!(collect_all_positions(2, 5), vec![5, 8]);
@@ -308,13 +308,13 @@ fn test_frozen_subtree_sibling_iterator() {
     assert_eq!(collect_all_positions(2, 7), vec![5, 9, 12]);
     assert_eq!(collect_all_positions(2, 1 << 63).len(), 62);
 
-    assert!(collect_all_positions(3, 3).is_empty());
+    debug_assert!(collect_all_positions(3, 3).is_empty());
     assert_eq!(collect_all_positions(3, 4), vec![6]);
     assert_eq!(collect_all_positions(3, 5), vec![6, 8]);
     assert_eq!(collect_all_positions(3, 8), vec![6, 11]);
     assert_eq!(collect_all_positions(3, 1 << 63).len(), 62);
 
-    assert!(collect_all_positions(6, 6).is_empty());
+    debug_assert!(collect_all_positions(6, 6).is_empty());
     assert_eq!(collect_all_positions(6, 7), vec![12]);
     assert_eq!(collect_all_positions(6, 8), vec![13]);
     assert_eq!(collect_all_positions(6, 16), vec![13, 23]);
@@ -352,7 +352,7 @@ fn slow_nodes_to_left_of(pos: Position) -> u64 {
 fn test_invariant(invariant_fn: fn(Position) -> bool) {
     for x in 0..300 {
         let position = Position::from_inorder_index(x);
-        assert!(
+        debug_assert!(
             invariant_fn(position),
             "position = {}",
             position.to_inorder_index()
@@ -363,7 +363,7 @@ fn test_invariant(invariant_fn: fn(Position) -> bool) {
 fn test_invariant_non_leaf(invariant_fn: fn(Position) -> bool) {
     for x in 0..300 {
         let position = Position::from_inorder_index(x);
-        assert!(
+        debug_assert!(
             position.level() == 0 || invariant_fn(position),
             "position = {}",
             position.to_inorder_index()

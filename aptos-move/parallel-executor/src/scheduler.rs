@@ -32,7 +32,7 @@ impl<'a> TaskGuard<'a> {
 
 impl Drop for TaskGuard<'_> {
     fn drop(&mut self) {
-        assert!(self.counter.fetch_sub(1, Ordering::SeqCst) > 0);
+        debug_assert!(self.counter.fetch_sub(1, Ordering::SeqCst) > 0);
     }
 }
 

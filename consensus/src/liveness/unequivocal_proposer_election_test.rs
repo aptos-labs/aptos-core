@@ -86,19 +86,19 @@ fn test_is_valid_proposal() {
             (2, chosen_author),
         ]))));
 
-    assert!(pe.is_valid_proposer(chosen_author, 1));
-    assert!(pe.is_valid_proposal(&good_proposal));
-    assert!(!pe.is_valid_proposal(&bad_author_proposal));
+    debug_assert!(pe.is_valid_proposer(chosen_author, 1));
+    debug_assert!(pe.is_valid_proposal(&good_proposal));
+    debug_assert!(!pe.is_valid_proposal(&bad_author_proposal));
 
     // another proposal from the valid proposer should fail
-    assert!(!pe.is_valid_proposal(&bad_duplicate_proposal));
+    debug_assert!(!pe.is_valid_proposal(&bad_duplicate_proposal));
     // good proposal still passes
-    assert!(pe.is_valid_proposal(&good_proposal));
+    debug_assert!(pe.is_valid_proposal(&good_proposal));
 
     // going to the next round:
-    assert!(pe.is_valid_proposal(&next_good_proposal));
-    assert!(!pe.is_valid_proposal(&next_bad_duplicate_proposal));
+    debug_assert!(pe.is_valid_proposal(&next_good_proposal));
+    debug_assert!(!pe.is_valid_proposal(&next_bad_duplicate_proposal));
 
     // Proposal from previous round is not valid any more:
-    assert!(!pe.is_valid_proposal(&good_proposal));
+    debug_assert!(!pe.is_valid_proposal(&good_proposal));
 }

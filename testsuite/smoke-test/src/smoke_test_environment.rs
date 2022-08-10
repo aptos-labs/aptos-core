@@ -56,7 +56,7 @@ impl SwarmBuilder {
     pub async fn build(self) -> LocalSwarm {
         // TODO change to return Swarm trait
         // Add support for forge
-        assert!(self.local);
+        debug_assert!(self.local);
         static FACTORY: Lazy<LocalFactory> = Lazy::new(|| LocalFactory::from_workspace().unwrap());
 
         ::aptos_logger::Logger::new().init();
@@ -126,12 +126,12 @@ async fn test_prevent_starting_nodes_twice() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
-    assert!(swarm.launch().await.is_err());
+    debug_assert!(swarm.launch().await.is_err());
     let validator = swarm.validators_mut().next().unwrap();
-    assert!(validator.start().is_err());
+    debug_assert!(validator.start().is_err());
     validator.stop();
-    assert!(validator.start().is_ok());
-    assert!(validator.start().is_err());
+    debug_assert!(validator.start().is_ok());
+    debug_assert!(validator.start().is_err());
 }
 
 pub fn launch_faucet(

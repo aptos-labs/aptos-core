@@ -365,7 +365,7 @@ impl NetworkAddress {
     ///
     /// let addr_str = "/ip4/1.2.3.4/tcp/6180/noise-ik/080e287879c918794170e258bfaddd75acac5b3e350419044655e4983a487120/handshake/0";
     /// let addr = NetworkAddress::from_str(addr_str).unwrap();
-    /// assert!(addr.is_aptosnet_addr());
+    /// debug_assert!(addr.is_aptosnet_addr());
     /// ```
     pub fn is_aptosnet_addr(&self) -> bool {
         parse_aptosnet_protos(self.as_slice()).is_some()
@@ -1108,7 +1108,7 @@ mod test {
 
         #[test]
         fn test_is_aptosnet_addr(addr in arb_aptosnet_addr()) {
-            assert!(addr.is_aptosnet_addr(), "addr.is_aptosnet_addr() = false; addr: '{}'", addr);
+            debug_assert!(addr.is_aptosnet_addr(), "addr.is_aptosnet_addr() = false; addr: '{}'", addr);
         }
     }
 }

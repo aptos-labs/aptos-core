@@ -265,7 +265,7 @@ fn test_event_notification_queuing() {
     // Verify that less than 1000 notifications were received by listener_1
     // (i.e., messages were dropped).
     let notification_count = count_event_notifications_and_ensure_ordering(&mut listener_1);
-    assert!(notification_count < num_events);
+    debug_assert!(notification_count < num_events);
 
     // Notify the subscription service of 50 new events (with event_key_1 and event_key_2)
     let num_events = 50;
@@ -405,9 +405,9 @@ fn test_missing_configs() {
             ON_CHAIN_CONFIG_REGISTRY.len()
         );
         for config in ON_CHAIN_CONFIG_REGISTRY {
-            assert!(returned_configs.contains_key(config));
+            debug_assert!(returned_configs.contains_key(config));
         }
-        assert!(!returned_configs.contains_key(&TestOnChainConfig::CONFIG_ID));
+        debug_assert!(!returned_configs.contains_key(&TestOnChainConfig::CONFIG_ID));
     } else {
         panic!("Expected a reconfiguration notification but got None!");
     }
@@ -466,14 +466,14 @@ fn count_reconfig_notifications(listener: &mut ReconfigNotificationListener) -> 
 // Ensures that no event notifications have been received by the listeners
 fn verify_no_event_notifications(listeners: Vec<&mut EventNotificationListener>) {
     for listener in listeners {
-        assert!(listener.select_next_some().now_or_never().is_none());
+        debug_assert!(listener.select_next_some().now_or_never().is_none());
     }
 }
 
 // Ensures that no reconfig notifications have been received by the listeners
 fn verify_no_reconfig_notifications(listeners: Vec<&mut ReconfigNotificationListener>) {
     for listener in listeners {
-        assert!(listener.select_next_some().now_or_never().is_none());
+        debug_assert!(listener.select_next_some().now_or_never().is_none());
     }
 }
 
@@ -510,7 +510,7 @@ fn verify_reconfig_notifications_received(
 
             let returned_configs = reconfig_notification.on_chain_configs.configs();
             for config in ON_CHAIN_CONFIG_REGISTRY {
-                assert!(returned_configs.contains_key(config));
+                debug_assert!(returned_configs.contains_key(config));
             }
         } else {
             panic!("Expected a reconfiguration notification but got None!");

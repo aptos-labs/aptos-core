@@ -31,7 +31,7 @@ fn string_args() {
     let module_data = parse_struct_tag("0xCAFE::test::ModuleData").unwrap();
 
     // Check in initial state, resource does not exist.
-    assert!(!h.exists_resource(acc.address(), module_data.clone()));
+    debug_assert!(!h.exists_resource(acc.address(), module_data.clone()));
 
     // Now send hi transaction, after that resource should exist and carry value
     assert_success!(h.run_entry_function(

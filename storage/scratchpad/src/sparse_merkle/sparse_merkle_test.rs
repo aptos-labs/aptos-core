@@ -194,7 +194,7 @@ fn test_update_256_siblings_in_proof() {
     let old_root_hash = siblings.iter().fold(leaf1_hash, |previous_hash, hash| {
         hash_internal(previous_hash, *hash)
     });
-    assert!(proof_of_key1
+    debug_assert!(proof_of_key1
         .verify(old_root_hash, key1, Some(&value1))
         .is_ok());
 
@@ -223,7 +223,7 @@ fn test_update_256_siblings_in_proof() {
 fn test_new_unknown() {
     let root_hash = HashValue::new([1; HashValue::LENGTH]);
     let smt = SparseMerkleTree::new(root_hash);
-    assert!(smt.root_weak().is_unknown());
+    debug_assert!(smt.root_weak().is_unknown());
     assert_eq!(smt.root_hash(), root_hash);
 }
 
@@ -231,7 +231,7 @@ fn test_new_unknown() {
 fn test_new_empty() {
     let root_hash = *SPARSE_MERKLE_PLACEHOLDER_HASH;
     let smt = SparseMerkleTree::new(root_hash);
-    assert!(smt.root_weak().is_empty());
+    debug_assert!(smt.root_weak().is_empty());
     assert_eq!(smt.root_hash(), root_hash);
 }
 
@@ -271,7 +271,7 @@ fn test_update() {
     let y_hash = hash_internal(x_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH);
     let old_root_hash = hash_internal(y_hash, leaf3_hash);
     let proof = SparseMerkleProof::new(None, vec![x_hash, leaf3_hash]);
-    assert!(proof
+    debug_assert!(proof
         .verify::<StateValue>(old_root_hash, key4, None)
         .is_ok());
 
@@ -307,14 +307,14 @@ fn test_update() {
     assert_eq!(smt1.root_hash(), root_hash);
 
     // Verify oldest ancestor
-    assert!(Arc::ptr_eq(&smt1.get_oldest_ancestor().inner, &smt1.inner));
+    debug_assert!(Arc::ptr_eq(&smt1.get_oldest_ancestor().inner, &smt1.inner));
 
     // Next, we are going to modify key1. Create a proof for key1.
     let proof = SparseMerkleProof::new(
         Some(leaf1),
         vec![leaf2_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH, leaf3_hash],
     );
-    assert!(proof.verify(old_root_hash, key1, Some(&value1)).is_ok());
+    debug_assert!(proof.verify(old_root_hash, key1, Some(&value1)).is_ok());
 
     let value1 = StateValue::from(String::from("test_val1111").into_bytes());
     let proof_reader = ProofReader::new(vec![(key1, proof)]);
@@ -502,7 +502,7 @@ fn test_get_oldest_ancestor() {
 }
 
 fn assert_eq_pointee(left: &SparseMerkleTree, right: &SparseMerkleTree) {
-    assert!(Arc::ptr_eq(&left.inner, &right.inner,))
+    debug_assert!(Arc::ptr_eq(&left.inner, &right.inner,))
 }
 
 /// update smt from multiple threads, creating branches, trying to explore edge cases around
@@ -558,7 +558,7 @@ fn test_multithread_get_oldest_ancestor() {
             let t = current_tree.lock().clone();
             let mut tree_pair = VecDeque::from(vec![t.clone(), t]);
             for _ in 0..100000 {
-                assert!(tree_pair[0]
+                debug_assert!(tree_pair[0]
                     .get_oldest_ancestor()
                     .is_the_same(&tree_pair[1].get_oldest_ancestor()));
                 tree_pair.pop_front();

@@ -16,10 +16,10 @@ fn test_rotating_proposer() {
     // Send a proposal from both chosen author and another author, the only winning proposals
     // follow the round-robin rotation.
 
-    assert!(!pe.is_valid_proposer(chosen_author, 1));
-    assert!(pe.is_valid_proposer(another_author, 1),);
-    assert!(pe.is_valid_proposer(chosen_author, 2));
-    assert!(!pe.is_valid_proposer(another_author, 2));
+    debug_assert!(!pe.is_valid_proposer(chosen_author, 1));
+    debug_assert!(pe.is_valid_proposer(another_author, 1),);
+    debug_assert!(pe.is_valid_proposer(chosen_author, 2));
+    debug_assert!(!pe.is_valid_proposer(another_author, 2));
     assert_eq!(pe.get_valid_proposer(1), another_author);
     assert_eq!(pe.get_valid_proposer(2), chosen_author);
 }
@@ -34,10 +34,10 @@ fn test_rotating_proposer_with_three_contiguous_rounds() {
     // Send a proposal from both chosen author and another author, the only winning proposals
     // follow the round-robin rotation with 3 contiguous rounds.
 
-    assert!(!pe.is_valid_proposer(another_author, 1));
-    assert!(pe.is_valid_proposer(chosen_author, 1));
-    assert!(pe.is_valid_proposer(chosen_author, 2));
-    assert!(!pe.is_valid_proposer(another_author, 2));
+    debug_assert!(!pe.is_valid_proposer(another_author, 1));
+    debug_assert!(pe.is_valid_proposer(chosen_author, 1));
+    debug_assert!(pe.is_valid_proposer(chosen_author, 2));
+    debug_assert!(!pe.is_valid_proposer(another_author, 2));
     assert_eq!(pe.get_valid_proposer(1), chosen_author);
     assert_eq!(pe.get_valid_proposer(2), chosen_author);
 }
@@ -51,8 +51,8 @@ fn test_fixed_proposer() {
     // Send a proposal from both chosen author and another author, the only winning proposal is
     // from the chosen author.
 
-    assert!(pe.is_valid_proposer(chosen_author, 1));
-    assert!(!pe.is_valid_proposer(another_author, 1));
+    debug_assert!(pe.is_valid_proposer(chosen_author, 1));
+    debug_assert!(!pe.is_valid_proposer(another_author, 1));
     assert_eq!(pe.get_valid_proposer(1), chosen_author);
-    assert!(pe.is_valid_proposer(chosen_author, 2));
+    debug_assert!(pe.is_valid_proposer(chosen_author, 2));
 }

@@ -46,7 +46,7 @@ impl NodeVisitInfo {
     /// be set to the leftmost child.
     fn new(node_key: NodeKey, node: InternalNode) -> Self {
         let (children_bitmap, _) = node.generate_bitmaps();
-        assert!(children_bitmap != 0);
+        debug_assert!(children_bitmap != 0);
         Self {
             node_key,
             node,
@@ -65,7 +65,7 @@ impl NodeVisitInfo {
     ) -> Self {
         let (children_bitmap, _) = node.generate_bitmaps();
         let mut next_child_to_visit = 1 << u8::from(next_child_to_visit);
-        assert!(children_bitmap >= next_child_to_visit);
+        debug_assert!(children_bitmap >= next_child_to_visit);
         while next_child_to_visit & children_bitmap == 0 {
             next_child_to_visit <<= 1;
         }
@@ -79,13 +79,15 @@ impl NodeVisitInfo {
 
     /// Whether the next child to visit is the rightmost one.
     fn is_rightmost(&self) -> bool {
-        assert!(self.next_child_to_visit.leading_zeros() >= self.children_bitmap.leading_zeros());
+        debug_assert!(
+            self.next_child_to_visit.leading_zeros() >= self.children_bitmap.leading_zeros()
+        );
         self.next_child_to_visit.leading_zeros() == self.children_bitmap.leading_zeros()
     }
 
     /// Advances `next_child_to_visit` to the next child on the right.
     fn advance(&mut self) {
-        assert!(!self.is_rightmost(), "Advancing past rightmost child.");
+        debug_assert!(!self.is_rightmost(), "Advancing past rightmost child.");
         self.next_child_to_visit <<= 1;
         while self.next_child_to_visit & self.children_bitmap == 0 {
             self.next_child_to_visit <<= 1;

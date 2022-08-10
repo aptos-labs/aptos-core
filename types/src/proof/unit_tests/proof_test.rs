@@ -37,7 +37,7 @@ fn test_verify_empty_accumulator() {
     let element_hash = b"hello".test_only_hash();
     let root_hash = *ACCUMULATOR_PLACEHOLDER_HASH;
     let proof = TestAccumulatorProof::new(vec![]);
-    assert!(proof.verify(root_hash, element_hash, 0).is_err());
+    debug_assert!(proof.verify(root_hash, element_hash, 0).is_err());
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn test_verify_single_element_accumulator() {
     let element_hash = b"hello".test_only_hash();
     let root_hash = element_hash;
     let proof = TestAccumulatorProof::new(vec![]);
-    assert!(proof.verify(root_hash, element_hash, 0).is_ok());
+    debug_assert!(proof.verify(root_hash, element_hash, 0).is_ok());
 }
 
 #[test]
@@ -54,10 +54,10 @@ fn test_verify_two_element_accumulator() {
     let element1_hash = b"world".test_only_hash();
     let root_hash = TestAccumulatorInternalNode::new(element0_hash, element1_hash).hash();
 
-    assert!(TestAccumulatorProof::new(vec![element1_hash])
+    debug_assert!(TestAccumulatorProof::new(vec![element1_hash])
         .verify(root_hash, element0_hash, 0)
         .is_ok());
-    assert!(TestAccumulatorProof::new(vec![element0_hash])
+    debug_assert!(TestAccumulatorProof::new(vec![element0_hash])
         .verify(root_hash, element1_hash, 1)
         .is_ok());
 }
@@ -72,17 +72,17 @@ fn test_verify_three_element_accumulator() {
         TestAccumulatorInternalNode::new(element2_hash, *ACCUMULATOR_PLACEHOLDER_HASH).hash();
     let root_hash = TestAccumulatorInternalNode::new(internal0_hash, internal1_hash).hash();
 
-    assert!(
+    debug_assert!(
         TestAccumulatorProof::new(vec![element1_hash, internal1_hash])
             .verify(root_hash, element0_hash, 0)
             .is_ok()
     );
-    assert!(
+    debug_assert!(
         TestAccumulatorProof::new(vec![element0_hash, internal1_hash])
             .verify(root_hash, element1_hash, 1)
             .is_ok()
     );
-    assert!(
+    debug_assert!(
         TestAccumulatorProof::new(vec![*ACCUMULATOR_PLACEHOLDER_HASH, internal0_hash])
             .verify(root_hash, element2_hash, 2)
             .is_ok()
@@ -101,7 +101,7 @@ fn test_accumulator_proof_max_siblings_leftmost() {
     });
     let proof = TestAccumulatorProof::new(siblings);
 
-    assert!(proof.verify(root_hash, element_hash, 0).is_ok());
+    debug_assert!(proof.verify(root_hash, element_hash, 0).is_ok());
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn test_accumulator_proof_max_siblings_rightmost() {
     let leaf_index = (std::u64::MAX - 1) / 2;
     let proof = TestAccumulatorProof::new(siblings);
 
-    assert!(proof.verify(root_hash, element_hash, leaf_index).is_ok());
+    debug_assert!(proof.verify(root_hash, element_hash, leaf_index).is_ok());
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn test_accumulator_proof_sibling_overflow() {
         });
     let proof = TestAccumulatorProof::new(siblings);
 
-    assert!(proof.verify(root_hash, element_hash, 0).is_err());
+    debug_assert!(proof.verify(root_hash, element_hash, 0).is_err());
 }
 
 #[test]
@@ -147,9 +147,9 @@ fn test_verify_empty_sparse_merkle() {
     let proof = SparseMerkleProof::new(None, vec![]);
 
     // Trying to show that this key doesn't exist.
-    assert!(proof.verify::<StateValue>(root_hash, key, None).is_ok());
+    debug_assert!(proof.verify::<StateValue>(root_hash, key, None).is_ok());
     // Trying to show that this key exists.
-    assert!(proof
+    debug_assert!(proof
         .verify::<StateValue>(root_hash, key, Some(&blob))
         .is_err());
 }
@@ -165,24 +165,24 @@ fn test_verify_single_element_sparse_merkle() {
     let proof = SparseMerkleProof::new(Some(root_node), vec![]);
 
     // Trying to show this exact key exists with its value.
-    assert!(proof
+    debug_assert!(proof
         .verify::<StateValue>(root_hash, key, Some(&blob))
         .is_ok());
     // Trying to show this exact key exists with another value.
-    assert!(proof
+    debug_assert!(proof
         .verify::<StateValue>(root_hash, key, Some(&non_existing_blob))
         .is_err());
     // Trying to show this key doesn't exist.
-    assert!(proof.verify::<StateValue>(root_hash, key, None).is_err());
+    debug_assert!(proof.verify::<StateValue>(root_hash, key, None).is_err());
 
     let non_existing_key = b"HELLO".test_only_hash();
 
     // The proof can be used to show non_existing_key doesn't exist.
-    assert!(proof
+    debug_assert!(proof
         .verify::<StateValue>(root_hash, non_existing_key, None)
         .is_ok());
     // The proof can't be used to non_existing_key exists.
-    assert!(proof
+    debug_assert!(proof
         .verify::<StateValue>(root_hash, non_existing_key, Some(&blob))
         .is_err());
 }
@@ -229,23 +229,23 @@ fn test_verify_three_element_sparse_merkle() {
         );
 
         // The exact key value exists.
-        assert!(proof.verify(root_hash, key1, Some(&blob1)).is_ok());
+        debug_assert!(proof.verify(root_hash, key1, Some(&blob1)).is_ok());
         // Trying to show that this key has another value.
-        assert!(proof.verify(root_hash, key1, Some(&blob2)).is_err());
+        debug_assert!(proof.verify(root_hash, key1, Some(&blob2)).is_err());
         // Trying to show that this key doesn't exist.
-        assert!(proof.verify::<StateValue>(root_hash, key1, None).is_err());
+        debug_assert!(proof.verify::<StateValue>(root_hash, key1, None).is_err());
         // This proof can't be used to show anything about key2.
-        assert!(proof.verify::<StateValue>(root_hash, key2, None).is_err());
-        assert!(proof.verify(root_hash, key2, Some(&blob1)).is_err());
-        assert!(proof.verify(root_hash, key2, Some(&blob2)).is_err());
+        debug_assert!(proof.verify::<StateValue>(root_hash, key2, None).is_err());
+        debug_assert!(proof.verify(root_hash, key2, Some(&blob1)).is_err());
+        debug_assert!(proof.verify(root_hash, key2, Some(&blob2)).is_err());
 
         // This proof can be used to show that non_existing_key1 indeed doesn't exist.
-        assert!(proof
+        debug_assert!(proof
             .verify::<StateValue>(root_hash, non_existing_key1, None)
             .is_ok());
         // This proof can't be used to show that non_existing_key2 doesn't exist because it lives
         // in a different subtree.
-        assert!(proof
+        debug_assert!(proof
             .verify::<StateValue>(root_hash, non_existing_key2, None)
             .is_err());
     }
@@ -255,11 +255,11 @@ fn test_verify_three_element_sparse_merkle() {
         let proof = SparseMerkleProof::new(None, vec![internal_a_hash]);
 
         // This proof can't be used to show that a key starting with 0 doesn't exist.
-        assert!(proof
+        debug_assert!(proof
             .verify::<StateValue>(root_hash, non_existing_key1, None)
             .is_err());
         // This proof can be used to show that a key starting with 1 doesn't exist.
-        assert!(proof
+        debug_assert!(proof
             .verify::<StateValue>(root_hash, non_existing_key2, None)
             .is_ok());
     }
@@ -308,9 +308,9 @@ fn test_verify_transaction() {
         TransactionInfoWithProof::new(ledger_info_to_transaction_info_proof.clone(), txn_info1);
 
     // The proof can be used to verify txn1.
-    assert!(proof.verify(&ledger_info, 1).is_ok());
+    debug_assert!(proof.verify(&ledger_info, 1).is_ok());
     // Trying to show that txn1 is at version 2.
-    assert!(proof.verify(&ledger_info, 2).is_err());
+    debug_assert!(proof.verify(&ledger_info, 2).is_err());
     // Replacing txn1 with some other txn should cause the verification to fail.
     let fake_txn_info = TransactionInfo::new(
         HashValue::random(),
@@ -321,7 +321,7 @@ fn test_verify_transaction() {
         /* major_status = */ ExecutionStatus::Success,
     );
     let proof = TransactionInfoWithProof::new(ledger_info_to_transaction_info_proof, fake_txn_info);
-    assert!(proof.verify(&ledger_info, 1).is_err());
+    debug_assert!(proof.verify(&ledger_info, 1).is_err());
 }
 
 // This test does the following:
@@ -361,7 +361,7 @@ fn test_accumulator_extension_proof() {
 
     // Test nonsense breaks
     let derived_tree_err = two_tree.verify(*ACCUMULATOR_PLACEHOLDER_HASH);
-    assert!(derived_tree_err.is_err());
+    debug_assert!(derived_tree_err.is_err());
 }
 
 #[test]

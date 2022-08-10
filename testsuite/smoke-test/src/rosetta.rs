@@ -104,8 +104,8 @@ async fn test_network() {
         network_identifier: NetworkIdentifier::from(chain_id),
     };
     let status = rosetta_client.network_status(&request).await.unwrap();
-    assert!(status.current_block_identifier.index > 0);
-    assert!(status.current_block_timestamp > Y2K_MS);
+    debug_assert!(status.current_block_identifier.index > 0);
+    debug_assert!(status.current_block_timestamp > Y2K_MS);
     assert_eq!(
         BlockIdentifier {
             index: 0,
@@ -295,17 +295,17 @@ async fn test_block() {
     let block_1 = get_block(&rosetta_client, chain_id, 1).await;
     assert_eq!(1, block_1.transactions.len());
     // Block metadata won't have operations
-    assert!(block_1.transactions.first().unwrap().operations.is_empty());
-    assert!(block_1.timestamp > genesis_block.timestamp);
+    debug_assert!(block_1.transactions.first().unwrap().operations.is_empty());
+    debug_assert!(block_1.timestamp > genesis_block.timestamp);
 
     // Block 2 is always a standard block with 2 or more txns
     let block_2 = get_block(&rosetta_client, chain_id, 2).await;
-    assert!(block_2.transactions.len() >= 2);
+    debug_assert!(block_2.transactions.len() >= 2);
     // Block metadata won't have operations
-    assert!(block_2.transactions.first().unwrap().operations.is_empty());
+    debug_assert!(block_2.transactions.first().unwrap().operations.is_empty());
     // StateCheckpoint won't have operations
-    assert!(block_2.transactions.last().unwrap().operations.is_empty());
-    assert!(block_2.timestamp >= block_1.timestamp);
+    debug_assert!(block_2.transactions.last().unwrap().operations.is_empty());
+    debug_assert!(block_2.timestamp >= block_1.timestamp);
 
     // No input should give the latest version, not the genesis txn
     let request_latest = BlockRequest::latest(chain_id);
@@ -317,8 +317,8 @@ async fn test_block() {
         .unwrap();
 
     // The latest block should always come after genesis
-    assert!(latest_block.block_identifier.index >= block_2.block_identifier.index);
-    assert!(latest_block.timestamp >= block_2.timestamp);
+    debug_assert!(latest_block.block_identifier.index >= block_2.block_identifier.index);
+    debug_assert!(latest_block.timestamp >= block_2.timestamp);
 
     // The parent should always be exactly one version before
     assert_eq!(
@@ -327,7 +327,7 @@ async fn test_block() {
     );
 
     // There should be at least 1 txn
-    assert!(!latest_block.transactions.is_empty());
+    debug_assert!(!latest_block.transactions.is_empty());
 
     // We should be able to query it again by hash or by version and it is the same
     let latest_block_by_version = get_block(
@@ -369,7 +369,7 @@ async fn test_block() {
         tokio::time::sleep(Duration::from_micros(50)).await
     }
 
-    assert!(successful, "Failed to get the next block");
+    debug_assert!(successful, "Failed to get the next block");
 
     // And querying latest again should get yet another transaction in the future
     let newer_block = rosetta_client
@@ -378,8 +378,8 @@ async fn test_block() {
         .unwrap()
         .block
         .unwrap();
-    assert!(newer_block.block_identifier.index >= latest_block.block_identifier.index);
-    assert!(newer_block.timestamp >= latest_block.timestamp);
+    debug_assert!(newer_block.block_identifier.index >= latest_block.block_identifier.index);
+    debug_assert!(newer_block.timestamp >= latest_block.timestamp);
 }
 
 #[tokio::test]
@@ -474,7 +474,7 @@ async fn test_block_transactions() {
             );
 
             // No operations occur in block metadata txn
-            assert!(block_txn.operations.is_empty());
+            debug_assert!(block_txn.operations.is_empty());
         } else if expected_version == transfer_version {
             if let Transaction::UserTransaction(actual_txn) = actual_txn {
                 assert_transfer_transaction(
@@ -494,7 +494,7 @@ async fn test_block_transactions() {
                 block_txn_metadata.transaction_type
             );
             assert_eq!(block_txn_metadata.version.0, block_info.end_version);
-            assert!(block_txn.operations.is_empty());
+            debug_assert!(block_txn.operations.is_empty());
             assert_eq!(
                 actual_txn.info.hash.to_string(),
                 block_txn.transaction_identifier.hash
@@ -724,7 +724,7 @@ fn assert_genesis_block(block: &Block) {
         "Genesis should have a txn hash"
     );
 
-    assert!(
+    debug_assert!(
         !genesis_txn.operations.is_empty(),
         "There should be at least one operation in genesis"
     );

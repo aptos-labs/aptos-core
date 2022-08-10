@@ -78,7 +78,7 @@ impl<'a> AsyncRead for ReadOnlyTestSocket<'a> {
         mut buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
         // read/recv on an empty buffer is underspecified
-        assert!(!buf.is_empty());
+        debug_assert!(!buf.is_empty());
 
         if self.fragmented_read {
             buf = &mut buf[..1];
@@ -172,7 +172,7 @@ impl AsyncRead for ReadOnlyTestSocketVec {
         mut buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
         // read/recv on an empty buffer is underspecified
-        assert!(!buf.is_empty());
+        debug_assert!(!buf.is_empty());
 
         if self.fragmented_read {
             buf = &mut buf[..1];
@@ -293,7 +293,7 @@ impl<'a> AsyncRead for ReadWriteTestSocket<'a> {
         mut buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
         // read/recv on an empty buffer is underspecified
-        assert!(!buf.is_empty());
+        debug_assert!(!buf.is_empty());
 
         if self.fragmented_read {
             buf = &mut buf[..1];
@@ -325,7 +325,7 @@ mod tests {
         block_on(async {
             let mut buf = [0u8; 10];
             socket.read_exact(&mut buf).await.unwrap();
-            assert!(buf == a);
+            debug_assert!(buf == a);
         });
     }
 
@@ -339,8 +339,8 @@ mod tests {
             let mut buf = [9u8; 10];
             for i in 1..=5 {
                 let read = socket.read(&mut buf).await.unwrap();
-                assert!(read == 1);
-                assert!(buf[0] == i);
+                debug_assert!(read == 1);
+                debug_assert!(buf[0] == i);
             }
         });
     }
@@ -383,8 +383,8 @@ mod tests {
         block_on(async {
             let mut buf = [0u8; 10];
             socket.read_exact(&mut buf).await.unwrap();
-            assert!(buf[..5] == a);
-            assert!(buf[5..] == [0u8, 0, 0, 0, 0]);
+            debug_assert!(buf[..5] == a);
+            debug_assert!(buf[5..] == [0u8, 0, 0, 0, 0]);
         });
     }
 
@@ -414,8 +414,8 @@ mod tests {
             let mut buf = [0u8; 5];
             for i in 1..=5 {
                 let read = listener.read(&mut buf).await.unwrap();
-                assert!(read == 1);
-                assert!(buf[0] == i);
+                debug_assert!(read == 1);
+                debug_assert!(buf[0] == i);
             }
 
             // listener responds with second message
@@ -425,13 +425,13 @@ mod tests {
             // dialer reads byte-by-byte
             for i in 6..=10 {
                 let read = dialer.read(&mut buf).await.unwrap();
-                assert!(read == 1);
-                assert!(buf[0] == i);
+                debug_assert!(read == 1);
+                debug_assert!(buf[0] == i);
             }
 
             // did we record the writes correctly?
-            assert!(init_msg.as_slice() == first_message);
-            assert!(resp_msg.as_slice() == second_message);
+            debug_assert!(init_msg.as_slice() == first_message);
+            debug_assert!(resp_msg.as_slice() == second_message);
         });
     }
 }

@@ -263,7 +263,7 @@ struct NibbleRangeIterator<'a, K> {
 
 impl<'a, K> NibbleRangeIterator<'a, K> {
     fn new(sorted_kvs: &'a [(HashValue, K)], nibble_idx: usize) -> Self {
-        assert!(nibble_idx < ROOT_NIBBLE_HEIGHT);
+        debug_assert!(nibble_idx < ROOT_NIBBLE_HEIGHT);
         NibbleRangeIterator {
             sorted_kvs,
             nibble_idx,

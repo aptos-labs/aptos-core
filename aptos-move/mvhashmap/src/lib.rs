@@ -83,7 +83,7 @@ impl<K: Hash + Clone + Eq, V> MVHashMap<K, V> {
         );
 
         // Assert that the previous entry for txn_idx, if present, had lower incarnation.
-        assert!(prev_cell
+        debug_assert!(prev_cell
             .map(|cell| cell.incarnation < incarnation)
             .unwrap_or(true));
     }

@@ -10,7 +10,7 @@ use std::{
 
 static APTOS_VAULT: Lazy<Option<VaultRunner>> = Lazy::new(|| match VaultRunner::run() {
     Err(err) => {
-        assert!(
+        debug_assert!(
             std::env::var("APTOS_REQUIRE_VAULT_TESTS").is_err(),
             "Vault is not running: {}",
             err
@@ -133,7 +133,7 @@ impl VaultRunner {
 fn run_vault() {
     let vr = VaultRunner::run();
     if let Err(err) = vr {
-        assert!(
+        debug_assert!(
             std::env::var("APTOS_REQUIRE_VAULT_TESTS").is_err(),
             "Vault is not running: {}",
             err

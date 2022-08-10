@@ -43,14 +43,14 @@ fn test_get_valid_proposer_caching() {
 
     assert_eq!(cpe.get_valid_proposer(0), authors[0]);
     assert_eq!(asked.lock().get(), 1);
-    assert!(cpe.is_valid_proposer(authors[0], 0));
-    assert!(!cpe.is_valid_proposer(authors[1], 0));
+    debug_assert!(cpe.is_valid_proposer(authors[0], 0));
+    debug_assert!(!cpe.is_valid_proposer(authors[1], 0));
     assert_eq!(asked.lock().get(), 1);
 
     assert_eq!(cpe.get_valid_proposer(1), authors[1]);
     assert_eq!(asked.lock().get(), 2);
-    assert!(cpe.is_valid_proposer(authors[1], 1));
-    assert!(!cpe.is_valid_proposer(authors[0], 1));
+    debug_assert!(cpe.is_valid_proposer(authors[1], 1));
+    debug_assert!(!cpe.is_valid_proposer(authors[0], 1));
     assert_eq!(asked.lock().get(), 2);
 
     assert_eq!(cpe.get_valid_proposer(0), authors[0]);
@@ -58,8 +58,8 @@ fn test_get_valid_proposer_caching() {
 
     assert_eq!(cpe.get_valid_proposer(11), authors[3]);
     assert_eq!(asked.lock().get(), 3);
-    assert!(cpe.is_valid_proposer(authors[3], 11));
-    assert!(!cpe.is_valid_proposer(authors[0], 11));
+    debug_assert!(cpe.is_valid_proposer(authors[3], 11));
+    debug_assert!(!cpe.is_valid_proposer(authors[0], 11));
     assert_eq!(asked.lock().get(), 3);
 
     // round=0 is outside the caching window, and round=1 is still inside

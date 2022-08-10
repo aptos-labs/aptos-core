@@ -1024,7 +1024,7 @@ mod tests {
         data.insert("keep".to_string(), "false".to_string());
         data.insert("start".to_string(), "0".to_string());
 
-        assert!(check_namespace_for_cleanup(
+        debug_assert!(check_namespace_for_cleanup(
             &data,
             "foo".to_string(),
             time_since_the_epoch
@@ -1034,7 +1034,7 @@ mod tests {
         data.insert("keep".to_string(), "true".to_string());
         data.insert("start".to_string(), "0".to_string());
 
-        assert!(!check_namespace_for_cleanup(
+        debug_assert!(!check_namespace_for_cleanup(
             &data,
             "foo".to_string(),
             time_since_the_epoch
@@ -1044,7 +1044,7 @@ mod tests {
         data.insert("keep".to_string(), "false".to_string());
         data.insert("cleanup".to_string(), "20".to_string());
 
-        assert!(check_namespace_for_cleanup(
+        debug_assert!(check_namespace_for_cleanup(
             &data,
             "foo".to_string(),
             time_since_the_epoch
@@ -1054,7 +1054,7 @@ mod tests {
         data.insert("keep".to_string(), "true".to_string());
         data.insert("cleanup".to_string(), "20".to_string());
 
-        assert!(!check_namespace_for_cleanup(
+        debug_assert!(!check_namespace_for_cleanup(
             &data,
             "foo".to_string(),
             time_since_the_epoch
@@ -1069,7 +1069,7 @@ mod tests {
         .as_secs();
         data.insert("cleanup".to_string(), cleanup_time.to_string());
 
-        assert!(!check_namespace_for_cleanup(
+        debug_assert!(!check_namespace_for_cleanup(
             &data,
             "foo".to_string(),
             time_since_the_epoch

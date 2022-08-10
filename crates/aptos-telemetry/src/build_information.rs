@@ -98,12 +98,12 @@ fn test_get_build_information() {
 
     let info = get_build_information(None);
 
-    assert!(info.contains_key(BUILD_COMMIT_HASH));
+    debug_assert!(info.contains_key(BUILD_COMMIT_HASH));
     assert_eq!(info.get(BUILD_COMMIT_HASH), Some(&commit_hash));
 
-    assert!(info.contains_key(BUILD_BRANCH));
+    debug_assert!(info.contains_key(BUILD_BRANCH));
     assert_eq!(info.get(BUILD_BRANCH), Some(&build_branch));
 
-    assert!(info.contains_key(BUILD_TAG));
+    debug_assert!(info.contains_key(BUILD_TAG));
     assert_eq!(info.get(BUILD_TAG), Some(&build_tag));
 }

@@ -32,27 +32,27 @@ fn bls12381_sigshare_verify() {
     let signature_wrong = key_pair_wrong.private_key.sign_arbitrary_message(message);
 
     // sig on message under key_pair should verify
-    assert!(signature
+    debug_assert!(signature
         .verify_arbitrary_msg(message, &key_pair.public_key)
         .is_ok());
 
     // sig_wrong on message under key_pair_wrong should verify
-    assert!(signature_wrong
+    debug_assert!(signature_wrong
         .verify_arbitrary_msg(message, &key_pair_wrong.public_key)
         .is_ok());
 
     // sig on message under keypair should NOT verify under keypair_wrong
-    assert!(signature
+    debug_assert!(signature
         .verify_arbitrary_msg(message, &key_pair_wrong.public_key)
         .is_err());
 
     // sig on message under keypair should NOT verify on message_wrong under key_pair
-    assert!(signature
+    debug_assert!(signature
         .verify_arbitrary_msg(message_wrong, &key_pair.public_key)
         .is_err());
 
     // sig on message under keypair_wrong should NOT verify under key_pair
-    assert!(signature_wrong
+    debug_assert!(signature_wrong
         .verify_arbitrary_msg(message, &key_pair.public_key)
         .is_err());
 }
@@ -76,15 +76,15 @@ fn bls12381_pop_verify() {
         ProofOfPossession::create_with_pubkey(&keypair1.private_key, &keypair2.public_key);
 
     // PoP for SK i should verify for PK i
-    assert!(pop1.verify(&keypair1.public_key).is_ok());
-    assert!(pop2.verify(&keypair2.public_key).is_ok());
+    debug_assert!(pop1.verify(&keypair1.public_key).is_ok());
+    debug_assert!(pop2.verify(&keypair2.public_key).is_ok());
 
     // PoP for SK 1 should not verify for PK 2
-    assert!(pop1.verify(&keypair2.public_key).is_err());
+    debug_assert!(pop1.verify(&keypair2.public_key).is_err());
     // Pop for SK 2 should not verify for PK 1
-    assert!(pop2.verify(&keypair1.public_key).is_err());
+    debug_assert!(pop2.verify(&keypair1.public_key).is_err());
     // Invalid PoP for SK 2 should not verify
-    assert!(pop_bad.verify(&keypair2.public_key).is_err());
+    debug_assert!(pop_bad.verify(&keypair2.public_key).is_err());
 }
 
 /// Generates `num_signers` BLS key-pairs.
@@ -139,10 +139,10 @@ fn bls12381_multisig_should_verify() {
     let aggpk = PublicKey::aggregate(pubkeys).unwrap();
 
     // multisig should verify on the correct message under the correct aggregate PK
-    assert!(multisig.verify(&message, &aggpk).is_ok());
+    debug_assert!(multisig.verify(&message, &aggpk).is_ok());
 
     // multisig should not verify on an incorrect message under the correct aggregate PK
-    assert!(multisig.verify(&message_wrong, &aggpk).is_err());
+    debug_assert!(multisig.verify(&message_wrong, &aggpk).is_err());
 }
 
 /// Tests signature (de)serialization
@@ -186,11 +186,11 @@ fn bls12381_aggsig_should_verify() {
 
     // aggsig should verify on the correct messages under the correct PKs
     let msgs_refs = messages.iter().collect::<Vec<&TestAptosCrypto>>();
-    assert!(aggsig.verify_aggregate(&msgs_refs, &pubkeys).is_ok());
+    debug_assert!(aggsig.verify_aggregate(&msgs_refs, &pubkeys).is_ok());
 
     // aggsig should NOT verify on incorrect messages under the correct PKs
     let msgs_wrong_refs = messages_wrong.iter().collect::<Vec<&TestAptosCrypto>>();
-    assert!(aggsig.verify_aggregate(&msgs_wrong_refs, &pubkeys).is_err());
+    debug_assert!(aggsig.verify_aggregate(&msgs_wrong_refs, &pubkeys).is_err());
 }
 
 /// Tests that a multisignature incorrectly aggregated from signature shares on different messages does
@@ -224,8 +224,8 @@ fn bls12381_multisig_wrong_messages_aggregated() {
 
     // multisig should NOT verify on any of the messages, because it is actually not a multisig:
     // i.e., it is not an aggregate signature on a single message
-    assert!(multisig.verify(&message, &aggpk).is_err());
-    assert!(multisig.verify(&message_wrong, &aggpk).is_err());
+    debug_assert!(multisig.verify(&message, &aggpk).is_err());
+    debug_assert!(multisig.verify(&message_wrong, &aggpk).is_err());
 }
 
 /// Returns two different sets of signer IDs (i.e., numbers in 0..num_signers)
@@ -280,16 +280,16 @@ fn bls12381_multisig_wrong_pks_aggregated() {
     let aggpk2 = PublicKey::aggregate(pubkeys2).unwrap();
 
     // first, make sure multisig1 (and multisig2) verify on message1 (and on message2) under aggpk1 (and aggpk2, respectively)
-    assert!(multisig1.verify(&message1, &aggpk1).is_ok());
-    assert!(multisig2.verify(&message2, &aggpk2).is_ok());
+    debug_assert!(multisig1.verify(&message1, &aggpk1).is_ok());
+    debug_assert!(multisig2.verify(&message2, &aggpk2).is_ok());
 
     // second, make sure multisig1 doesn't verify against multisig2's signer set (and viceversa)
-    assert!(multisig1.verify(&message1, &aggpk2).is_err());
-    assert!(multisig2.verify(&message2, &aggpk1).is_err());
+    debug_assert!(multisig1.verify(&message1, &aggpk2).is_err());
+    debug_assert!(multisig2.verify(&message2, &aggpk1).is_err());
 
     // ...and try swapping the messages too
-    assert!(multisig1.verify(&message2, &aggpk2).is_err());
-    assert!(multisig2.verify(&message1, &aggpk1).is_err());
+    debug_assert!(multisig1.verify(&message2, &aggpk2).is_err());
+    debug_assert!(multisig2.verify(&message1, &aggpk1).is_err());
 }
 
 /// Tests that a randomly generated multisig does not verify under a randomly generated PK.
@@ -303,9 +303,9 @@ fn bls12381_random_multisig_dont_verify_with_random_pk() {
 
     let signature = keypair.private_key.sign(&message);
 
-    assert!(signature.verify(&message, &keypair.public_key).is_ok());
+    debug_assert!(signature.verify(&message, &keypair.public_key).is_ok());
 
-    assert!(signature
+    debug_assert!(signature
         .verify(&message, &keypair_junk.public_key)
         .is_err());
 }
@@ -349,7 +349,7 @@ fn bls12381_sample_signature_verifies() {
         ).unwrap().as_slice()
     ).unwrap();
 
-    assert!(sig.verify_arbitrary_msg(b"Hello Aptos!", &pk).is_ok());
+    debug_assert!(sig.verify_arbitrary_msg(b"Hello Aptos!", &pk).is_ok());
 }
 
 #[test]

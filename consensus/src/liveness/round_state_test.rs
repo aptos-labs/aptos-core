@@ -62,7 +62,7 @@ fn test_round_event_generation() {
         pm.process_certificates(generate_sync_info(Some(1), None, None)),
     );
     // Old QC does not generate anything
-    assert!(pm
+    debug_assert!(pm
         .process_certificates(generate_sync_info(Some(1), None, None))
         .is_none());
     // A TC for a higher round

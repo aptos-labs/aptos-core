@@ -214,7 +214,7 @@ impl AccountPicker {
         let idxs = pick_slice_idxs(max, indexes);
         assert_eq!(idxs.len(), 2);
         let idxs = [idxs[0], idxs[1]];
-        assert!(
+        debug_assert!(
             idxs[0] < idxs[1],
             "pick_slice_idxs should return sorted order"
         );

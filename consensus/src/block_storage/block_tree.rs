@@ -47,7 +47,7 @@ impl LinkableBlock {
     }
 
     pub fn add_child(&mut self, child_id: HashValue) {
-        assert!(
+        debug_assert!(
             self.children.insert(child_id),
             "Block {:x} already existed.",
             child_id,
@@ -239,7 +239,7 @@ impl BlockTree {
             };
             let linkable_block = LinkableBlock::new(block);
             let arc_block = Arc::clone(linkable_block.executed_block());
-            assert!(self.id_to_block.insert(block_id, linkable_block).is_none());
+            debug_assert!(self.id_to_block.insert(block_id, linkable_block).is_none());
             counters::NUM_BLOCKS_IN_TREE.inc();
             Ok(arc_block)
         }
@@ -328,12 +328,12 @@ impl BlockTree {
     }
 
     pub(super) fn update_ordered_root(&mut self, root_id: HashValue) {
-        assert!(self.block_exists(&root_id));
+        debug_assert!(self.block_exists(&root_id));
         self.ordered_root_id = root_id;
     }
 
     pub(super) fn update_commit_root(&mut self, root_id: HashValue) {
-        assert!(self.block_exists(&root_id));
+        debug_assert!(self.block_exists(&root_id));
         self.commit_root_id = root_id;
     }
 

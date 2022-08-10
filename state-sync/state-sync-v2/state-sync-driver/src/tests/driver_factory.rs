@@ -92,7 +92,7 @@ fn test_new_initialized_configs() {
     );
 
     // Verify the initial configs were notified
-    assert!(reconfiguration_subscriber
+    debug_assert!(reconfiguration_subscriber
         .select_next_some()
         .now_or_never()
         .is_some());

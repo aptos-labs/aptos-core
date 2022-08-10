@@ -72,12 +72,12 @@ test = false
         .arg(target_dir.clone())
         .status()
         .unwrap();
-    assert!(status.success());
+    debug_assert!(status.success());
 
     let output = Command::new(target_dir.join("debug/stdlib_demo"))
         .output()
         .unwrap();
-    assert!(output.status.success());
+    debug_assert!(output.status.success());
     assert_eq!(
         std::str::from_utf8(&output.stdout).unwrap(),
         expected_output

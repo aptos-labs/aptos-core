@@ -387,7 +387,7 @@ fn test_open_read_only() {
             db.get::<TestSchema1>(&TestField(0)).unwrap(),
             Some(TestField(0)),
         );
-        assert!(db.put::<TestSchema1>(&TestField(1), &TestField(1)).is_err());
+        debug_assert!(db.put::<TestSchema1>(&TestField(1), &TestField(1)).is_err());
     }
 }
 
@@ -424,12 +424,12 @@ fn test_report_size() {
     db.flush_cf("TestCF1").unwrap();
     db.flush_cf("TestCF2").unwrap();
 
-    assert!(
+    debug_assert!(
         db.get_property("TestCF1", "rocksdb.estimate-live-data-size")
             .unwrap()
             > 0
     );
-    assert!(
+    debug_assert!(
         db.get_property("TestCF2", "rocksdb.estimate-live-data-size")
             .unwrap()
             > 0

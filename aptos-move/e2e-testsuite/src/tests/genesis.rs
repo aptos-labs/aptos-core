@@ -9,7 +9,7 @@ use language_e2e_tests::{
 #[test]
 fn no_deletion_in_genesis() {
     let genesis = GENESIS_CHANGE_SET.clone();
-    assert!(!genesis.write_set().iter().any(|(_, op)| op.is_deletion()))
+    debug_assert!(!genesis.write_set().iter().any(|(_, op)| op.is_deletion()))
 }
 
 #[test]
@@ -21,7 +21,7 @@ fn execute_genesis_write_set() {
 
     // Executing the genesis transaction should succeed
     assert_eq!(output.len(), 1);
-    assert!(!output.pop().unwrap().status().is_discarded())
+    debug_assert!(!output.pop().unwrap().status().is_discarded())
 }
 
 #[test]

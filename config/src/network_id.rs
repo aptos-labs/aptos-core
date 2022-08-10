@@ -277,9 +277,9 @@ mod test {
 
     #[test]
     fn test_ensure_network_id_order() {
-        assert!(NetworkId::Validator < NetworkId::Vfn);
-        assert!(NetworkId::Vfn < NetworkId::Public);
-        assert!(NetworkId::Validator < NetworkId::Public);
+        debug_assert!(NetworkId::Validator < NetworkId::Vfn);
+        debug_assert!(NetworkId::Vfn < NetworkId::Public);
+        debug_assert!(NetworkId::Validator < NetworkId::Public);
     }
 
     #[test]

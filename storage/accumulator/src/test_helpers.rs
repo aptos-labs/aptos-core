@@ -77,7 +77,7 @@ impl MockHashStore {
     }
 
     fn verify_subtree(&self, leaves: &[HashValue], min_position: u64) -> Result<Subtree> {
-        assert!(leaves.len().is_power_of_two());
+        debug_assert!(leaves.len().is_power_of_two());
 
         let me = if leaves.len() == 1 {
             // leaf
@@ -333,5 +333,5 @@ pub fn test_append_empty_impl(leaves: Vec<HashValue>) {
         TestAccumulator::append(&store, leaves.len() as LeafCount, &[]).unwrap();
 
     assert_eq!(root_hash, root_hash2);
-    assert!(writes2.is_empty());
+    debug_assert!(writes2.is_empty());
 }

@@ -38,7 +38,7 @@ fn compute_hashes_for_all_positions(leaves: &[HashValue]) -> HashMap<Position, H
     let mut current_level = 0;
 
     while current_leaves.len() > 1 {
-        assert!(current_leaves.len().is_power_of_two());
+        debug_assert!(current_leaves.len().is_power_of_two());
 
         let mut parent_leaves = vec![];
         for (index, _hash) in current_leaves.iter().enumerate().step_by(2) {

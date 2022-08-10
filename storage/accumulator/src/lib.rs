@@ -307,7 +307,7 @@ where
             };
             pos = pos.parent();
         }
-        assert!(left_siblings.is_empty());
+        debug_assert!(left_siblings.is_empty());
 
         Ok((hash, to_freeze))
     }

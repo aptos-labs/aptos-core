@@ -57,9 +57,9 @@ async fn test_block_request_no_txns() {
         .unwrap()
     {
         ConsensusResponse::GetBlockResponse(payload) => {
-            assert!(payload.is_empty());
+            debug_assert!(payload.is_empty());
             match payload {
-                Payload::DirectMempool(txns) => assert!(txns.is_empty()),
+                Payload::DirectMempool(txns) => debug_assert!(txns.is_empty()),
                 _ => panic!("Unexpected payload {:?}", payload),
             }
         }

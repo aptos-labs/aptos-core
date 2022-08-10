@@ -141,8 +141,8 @@ fn test_skip_common_prefix() {
         let mut iter1 = nibble_path1.nibbles();
         let mut iter2 = nibble_path2.nibbles();
         assert_eq!(skip_common_prefix(&mut iter1, &mut iter2), 6);
-        assert!(iter1.is_finished());
-        assert!(iter2.is_finished());
+        debug_assert!(iter1.is_finished());
+        debug_assert!(iter2.is_finished());
     }
     {
         let nibble_path1 = NibblePath::new_even(vec![0x12, 0x35]);
@@ -177,7 +177,7 @@ fn test_skip_common_prefix() {
             iter1.remaining_nibbles().get_nibble_path(),
             NibblePath::new_odd(vec![0x45, 0x60])
         );
-        assert!(iter2.is_finished());
+        debug_assert!(iter2.is_finished());
     }
 }
 

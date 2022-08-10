@@ -74,7 +74,7 @@ The recorded format for type `{}` was removed or does not match the recorded val
     }
 
     for key in registry.keys() {
-        assert!(
+        debug_assert!(
             expected.contains_key(key),
             r#"
 ----

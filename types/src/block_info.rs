@@ -125,7 +125,7 @@ impl BlockInfo {
     }
 
     pub fn change_timestamp(&mut self, timestamp: u64) {
-        assert!(self.allow_timestamp_change(timestamp));
+        debug_assert!(self.allow_timestamp_change(timestamp));
         self.timestamp_usecs = timestamp;
     }
 

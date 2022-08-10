@@ -31,7 +31,7 @@ fn test_consensus_events_rejected_txns() {
     // Add txns to mempool
     {
         let mut pool = smp.mempool.lock();
-        assert!(batch_add_signed_txn(&mut pool, txns).is_ok());
+        debug_assert!(batch_add_signed_txn(&mut pool, txns).is_ok());
     }
 
     let transactions = vec![TransactionSummary {
@@ -42,8 +42,8 @@ fn test_consensus_events_rejected_txns() {
     let req = QuorumStoreRequest::RejectNotification(transactions, callback);
     let mut consensus_sender = smp.consensus_to_mempool_sender.clone();
     block_on(async {
-        assert!(consensus_sender.send(req).await.is_ok());
-        assert!(callback_rcv.await.is_ok());
+        debug_assert!(consensus_sender.send(req).await.is_ok());
+        debug_assert!(callback_rcv.await.is_ok());
     });
 
     let pool = smp.mempool.lock();
@@ -76,12 +76,12 @@ fn test_mempool_notify_committed_txns() {
     // Add txns to mempool
     {
         let mut pool = smp.mempool.lock();
-        assert!(batch_add_signed_txn(&mut pool, txns).is_ok());
+        debug_assert!(batch_add_signed_txn(&mut pool, txns).is_ok());
     }
 
     let committed_txns = vec![Transaction::UserTransaction(committed_txn)];
     block_on(async {
-        assert!(smp
+        debug_assert!(smp
             .mempool_notifier
             .notify_new_commit(committed_txns, 1, 1000)
             .await

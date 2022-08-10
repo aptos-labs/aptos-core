@@ -15,7 +15,7 @@ use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::collections::HashMap;
 
 fn update_nibble(original_key: &HashValue, n: usize, nibble: u8) -> HashValue {
-    assert!(nibble < 16);
+    debug_assert!(nibble < 16);
     let mut key = original_key.to_vec();
     key[n / 2] = if n % 2 == 0 {
         key[n / 2] & 0x0f | nibble << 4
@@ -44,7 +44,7 @@ fn test_insert_to_empty_tree() {
     let (_new_root_hash, batch) = tree
         .put_value_set_test(vec![(key, &(value_hash, state_key))], 0 /* version */)
         .unwrap();
-    assert!(batch
+    debug_assert!(batch
         .stale_node_index_batch
         .iter()
         .flatten()
@@ -68,7 +68,7 @@ fn test_insert_at_leaf_with_internal_created() {
         .put_value_set_test(vec![(key1, &value1)], 0 /* version */)
         .unwrap();
 
-    assert!(batch
+    debug_assert!(batch
         .stale_node_index_batch
         .iter()
         .flatten()
@@ -89,7 +89,7 @@ fn test_insert_at_leaf_with_internal_created() {
     db.write_tree_update_batch(batch).unwrap();
 
     assert_eq!(tree.get(key1, 0).unwrap().unwrap(), value1.0);
-    assert!(tree.get(key2, 0).unwrap().is_none());
+    debug_assert!(tree.get(key2, 0).unwrap().is_none());
     assert_eq!(tree.get(key2, 1).unwrap().unwrap(), value2.0);
 
     // get # of nodes
@@ -148,7 +148,7 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
         .unwrap();
     db.write_tree_update_batch(batch).unwrap();
     assert_eq!(tree.get(key1, 0).unwrap().unwrap(), value1.0);
-    assert!(tree.get(key2, 0).unwrap().is_none());
+    debug_assert!(tree.get(key2, 0).unwrap().is_none());
     assert_eq!(tree.get(key2, 1).unwrap().unwrap(), value2.0);
 
     assert_eq!(db.num_nodes(), 5);
@@ -206,7 +206,7 @@ fn test_insert_at_leaf_with_multiple_internals_created() {
         .put_value_set_test(vec![(key2, &value2_update)], 2 /* version */)
         .unwrap();
     db.write_tree_update_batch(batch).unwrap();
-    assert!(tree.get(key2, 0).unwrap().is_none());
+    debug_assert!(tree.get(key2, 0).unwrap().is_none());
     assert_eq!(tree.get(key2, 1).unwrap().unwrap(), value2.0);
     assert_eq!(tree.get(key2, 2).unwrap().unwrap(), value2_update.0);
 
@@ -441,21 +441,21 @@ fn test_non_existence() {
         let non_existing_key = update_nibble(&key1, 0, 1);
         let (value, proof) = tree.get_with_proof(non_existing_key, 0).unwrap();
         assert_eq!(value, None);
-        assert!(proof.verify_by_hash(root, non_existing_key, None).is_ok());
+        debug_assert!(proof.verify_by_hash(root, non_existing_key, None).is_ok());
     }
     // 2. Non-existing node at non-root internal node
     {
         let non_existing_key = update_nibble(&key1, 1, 15);
         let (value, proof) = tree.get_with_proof(non_existing_key, 0).unwrap();
         assert_eq!(value, None);
-        assert!(proof.verify_by_hash(root, non_existing_key, None).is_ok());
+        debug_assert!(proof.verify_by_hash(root, non_existing_key, None).is_ok());
     }
     // 3. Non-existing node at leaf node
     {
         let non_existing_key = update_nibble(&key1, 2, 4);
         let (value, proof) = tree.get_with_proof(non_existing_key, 0).unwrap();
         assert_eq!(value, None);
-        assert!(proof.verify_by_hash(root, non_existing_key, None).is_ok());
+        debug_assert!(proof.verify_by_hash(root, non_existing_key, None).is_ok());
     }
 }
 
@@ -473,7 +473,7 @@ fn test_missing_root() {
 }
 
 fn many_keys_get_proof_and_verify_tree_root(seed: &[u8], num_keys: usize) {
-    assert!(seed.len() < 32);
+    debug_assert!(seed.len() < 32);
     let mut actual_seed = [0u8; 32];
     actual_seed[..seed.len()].copy_from_slice(seed);
     let mut rng: StdRng = StdRng::from_seed(actual_seed);
@@ -499,7 +499,7 @@ fn many_keys_get_proof_and_verify_tree_root(seed: &[u8], num_keys: usize) {
         let (value, proof) = tree.get_with_proof(*k, 0).unwrap();
         assert_eq!(value.as_ref().unwrap().0, v.0);
         assert_eq!(value.as_ref().unwrap().1 .0, v.1);
-        assert!(proof.verify_by_hash(root, *k, Some(v.0)).is_ok());
+        debug_assert!(proof.verify_by_hash(root, *k, Some(v.0)).is_ok());
     }
 }
 
@@ -510,7 +510,7 @@ fn test_1000_keys() {
 }
 
 fn many_versions_get_proof_and_verify_tree_root(seed: &[u8], num_versions: usize) {
-    assert!(seed.len() < 32);
+    debug_assert!(seed.len() < 32);
     let mut actual_seed = [0u8; 32];
     actual_seed[..seed.len()].copy_from_slice(seed);
     let mut rng: StdRng = StdRng::from_seed(actual_seed);
@@ -553,7 +553,7 @@ fn many_versions_get_proof_and_verify_tree_root(seed: &[u8], num_versions: usize
         let (value, proof) = tree.get_with_proof(*k, random_version as Version).unwrap();
         assert_eq!(value.as_ref().unwrap().0, v.0);
         assert_eq!(value.as_ref().unwrap().1 .0, v.1);
-        assert!(proof
+        debug_assert!(proof
             .verify_by_hash(roots[random_version], *k, Some(v.0))
             .is_ok());
     }
@@ -563,7 +563,7 @@ fn many_versions_get_proof_and_verify_tree_root(seed: &[u8], num_versions: usize
         let (value, proof) = tree.get_with_proof(*k, random_version as Version).unwrap();
         assert_eq!(value.as_ref().unwrap().0, v.0);
         assert_eq!(value.as_ref().unwrap().1 .0, v.1);
-        assert!(proof
+        debug_assert!(proof
             .verify_by_hash(roots[random_version], *k, Some(v.0))
             .is_ok());
     }

@@ -61,7 +61,7 @@ fn add_execution_phase_test_cases(
         ExecutionRequest {
             ordered_blocks: vec![],
         },
-        Box::new(move |resp| assert!(matches!(resp.inner, Err(Error::EmptyBlocks)))),
+        Box::new(move |resp| debug_assert!(matches!(resp.inner, Err(Error::EmptyBlocks)))),
     );
 
     // bad parent id
@@ -78,7 +78,7 @@ fn add_execution_phase_test_cases(
                 StateComputeResult::new_dummy(),
             )],
         },
-        Box::new(move |resp| assert!(matches!(resp.inner, Err(Error::BlockNotFound(_))))),
+        Box::new(move |resp| debug_assert!(matches!(resp.inner, Err(Error::BlockNotFound(_))))),
     );
 }
 

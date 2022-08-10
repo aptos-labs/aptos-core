@@ -72,7 +72,7 @@ impl<'a> NaiveSubTree<'a> {
     }
 
     fn get_hash_uncached(&self, cache: &mut Cache) -> HashValue {
-        assert!(!self.leaves.is_empty());
+        debug_assert!(!self.leaves.is_empty());
         if self.leaves.len() == 1 {
             let only_leaf = self.leaves[0];
             SparseMerkleLeafNode::new(only_leaf.0, only_leaf.1).hash()

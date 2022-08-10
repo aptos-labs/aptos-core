@@ -101,7 +101,7 @@ fn test_bad_execution_output(safety_rules: &Callback) {
 
     let evil_a3_block = safety_rules.construct_and_sign_vote_two_chain(&evil_a3, None);
 
-    assert!(matches!(
+    debug_assert!(matches!(
         evil_a3_block.unwrap_err(),
         Error::InvalidAccumulatorExtension(_)
     ));
@@ -216,7 +216,7 @@ fn test_sign_old_proposal(safety_rules: &Callback) {
     let err = safety_rules
         .sign_proposal(a1.block().block_data())
         .unwrap_err();
-    assert!(matches!(err, Error::InvalidProposal(_)));
+    debug_assert!(matches!(err, Error::InvalidProposal(_)));
 }
 
 fn test_sign_proposal_with_bad_signer(safety_rules: &Callback) {
@@ -363,7 +363,7 @@ fn test_validator_not_in_set(safety_rules: &Callback) {
     proof
         .ledger_info_with_sigs
         .push(a2.block().quorum_cert().ledger_info().clone());
-    assert!(matches!(
+    debug_assert!(matches!(
         safety_rules.initialize(&proof),
         Err(Error::ValidatorNotInSet(_))
     ));
@@ -447,7 +447,7 @@ fn test_2chain_rules(constructor: &Callback) {
                 HashValue::zero()
             };
             assert_eq!(vote.ledger_info().consensus_block_id(), id);
-            assert!(
+            debug_assert!(
                 safety_rules.consensus_state().unwrap().one_chain_round()
                     >= qc.certified_block().round()
             );
@@ -565,7 +565,7 @@ fn test_2chain_timeout(constructor: &Callback) {
             .unwrap_err(),
         Error::NotSafeToTimeout(4, 1, 3, 2)
     );
-    assert!(matches!(
+    debug_assert!(matches!(
         safety_rules
             .sign_timeout_with_qc(
                 &TwoChainTimeout::new(1, 1, a3.block().quorum_cert().clone(),),
@@ -594,7 +594,7 @@ fn test_sign_commit_vote(constructor: &Callback) {
     // now we try to agree on a1's execution result
     let ledger_info_with_sigs = a3.block().quorum_cert().ledger_info();
     // make sure this is for a1
-    assert!(ledger_info_with_sigs
+    debug_assert!(ledger_info_with_sigs
         .ledger_info()
         .commit_info()
         .match_ordered_only(
@@ -602,7 +602,7 @@ fn test_sign_commit_vote(constructor: &Callback) {
                 .gen_block_info(*ACCUMULATOR_PLACEHOLDER_HASH, 0, None,)
         ));
 
-    assert!(safety_rules
+    debug_assert!(safety_rules
         .sign_commit_vote(
             ledger_info_with_sigs.clone(),
             ledger_info_with_sigs.ledger_info().clone()
@@ -610,7 +610,7 @@ fn test_sign_commit_vote(constructor: &Callback) {
         .is_ok());
 
     // check empty ledger info
-    assert!(matches!(
+    debug_assert!(matches!(
         safety_rules
             .sign_commit_vote(
                 a2.block().quorum_cert().ledger_info().clone(),
@@ -621,7 +621,7 @@ fn test_sign_commit_vote(constructor: &Callback) {
     ));
 
     // non-dummy blockinfo test
-    assert!(matches!(
+    debug_assert!(matches!(
         safety_rules
             .sign_commit_vote(
                 LedgerInfoWithSignatures::new(
@@ -642,7 +642,7 @@ fn test_sign_commit_vote(constructor: &Callback) {
     ));
 
     // empty signature test
-    assert!(matches!(
+    debug_assert!(matches!(
         safety_rules
             .sign_commit_vote(
                 LedgerInfoWithSignatures::new(
@@ -661,7 +661,7 @@ fn test_sign_commit_vote(constructor: &Callback) {
         ledger_info_with_sigs.ledger_info().consensus_data_hash(),
     );
 
-    assert!(matches!(
+    debug_assert!(matches!(
         safety_rules
             .sign_commit_vote(ledger_info_with_sigs.clone(), bad_ledger_info,)
             .unwrap_err(),

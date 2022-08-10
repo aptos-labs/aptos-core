@@ -664,8 +664,8 @@ mod test {
         let (tx1, ut1, bmt1, events1, wsc1) =
             TransactionModel::get_by_version(69158, &conn_pool.get().unwrap()).unwrap();
         assert_eq!(tx1.type_, "block_metadata_transaction");
-        assert!(ut1.is_none());
-        assert!(bmt1.is_some());
+        debug_assert!(ut1.is_none());
+        debug_assert!(bmt1.is_some());
         assert_eq!(events1.len(), 1);
         assert_eq!(wsc1.len(), 2);
 
@@ -673,8 +673,8 @@ mod test {
         let (tx0, ut0, bmt0, events0, wsc0) =
             TransactionModel::get_by_version(0, &conn_pool.get().unwrap()).unwrap();
         assert_eq!(tx0.type_, "genesis_transaction");
-        assert!(ut0.is_none());
-        assert!(bmt0.is_none());
+        debug_assert!(ut0.is_none());
+        debug_assert!(bmt0.is_none());
         assert_eq!(events0.len(), 1);
         assert_eq!(wsc0.len(), 2);
 
@@ -784,8 +784,8 @@ mod test {
             tx2.hash,
             "0xefd4c865e00c240da0c426a37ceeda10d9b030d0e8a4fb4fb7ff452ad63401fb"
         );
-        assert!(ut2.is_some());
-        assert!(bmt2.is_none());
+        debug_assert!(ut2.is_some());
+        debug_assert!(bmt2.is_none());
 
         assert_eq!(events2.len(), 2);
         assert_eq!(events2.get(0).unwrap().type_, "0x1::Whatever::FakeEvent1");
@@ -863,13 +863,13 @@ mod test {
 
         let (_conn_pool, tailer) = setup_indexer().unwrap();
         tailer.set_fetcher_version(4).await;
-        assert!(tailer.check_or_update_chain_id().await.is_ok());
-        assert!(tailer.check_or_update_chain_id().await.is_ok());
+        debug_assert!(tailer.check_or_update_chain_id().await.is_ok());
+        debug_assert!(tailer.check_or_update_chain_id().await.is_ok());
 
         tailer.set_fetcher_version(10).await;
-        assert!(tailer.check_or_update_chain_id().await.is_err());
+        debug_assert!(tailer.check_or_update_chain_id().await.is_err());
 
         tailer.set_fetcher_version(4).await;
-        assert!(tailer.check_or_update_chain_id().await.is_ok());
+        debug_assert!(tailer.check_or_update_chain_id().await.is_ok());
     }
 }

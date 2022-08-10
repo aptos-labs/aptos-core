@@ -32,7 +32,7 @@ pub fn find_value(val: &Value, filter: for<'r> fn(&'r &Value) -> bool) -> Value 
 }
 
 pub fn assert_json(ret: Value, expected: Value) {
-    assert!(
+    debug_assert!(
         ret == expected,
         "\nexpected: {}, \nbut got: {}",
         pretty(&expected),

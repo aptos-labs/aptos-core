@@ -192,7 +192,7 @@ async fn write_read_msg(socket: &mut impl TSocket, msg: &[u8]) -> Bytes {
 /// Check that the network address matches the format
 /// `"/memory/<port>/noise-ik/<pubkey>/handshake/<version>"`
 fn expect_memory_noise_addr(addr: &NetworkAddress) {
-    assert!(
+    debug_assert!(
         matches!(addr.as_slice(), [Memory(_), NoiseIK(_), Handshake(_)]),
         "addr: '{}'",
         addr
@@ -202,7 +202,7 @@ fn expect_memory_noise_addr(addr: &NetworkAddress) {
 /// Check that the network address matches the format
 /// `"/ip4/<ipaddr>/tcp/<port>/noise-ik/<pubkey>/handshake/<version>"`
 fn expect_ip4_tcp_noise_addr(addr: &NetworkAddress) {
-    assert!(
+    debug_assert!(
         matches!(addr.as_slice(), [Ip4(_), Tcp(_), NoiseIK(_), Handshake(_)]),
         "addr: '{}'",
         addr

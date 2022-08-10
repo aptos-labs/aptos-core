@@ -98,7 +98,7 @@ mod test {
         assert_eq!(config.genesis, None);
         let root_dir = RootPath::new_path(path.path());
         let result = config.load(&root_dir);
-        assert!(result.is_ok());
+        debug_assert!(result.is_ok());
         assert_eq!(config.genesis_file_location, PathBuf::new());
     }
 
@@ -116,7 +116,7 @@ mod test {
 
         config.genesis = None;
         let result = config.load(&root_dir);
-        assert!(result.is_ok());
+        debug_assert!(result.is_ok());
         assert_eq!(config.genesis, Some(fake_genesis));
     }
 

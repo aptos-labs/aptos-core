@@ -515,7 +515,7 @@ where
             .with_label_values(&["new_node_hashes_since"])
             .start_timer();
 
-        assert!(self.base_smt.is_the_same(&since_smt.base_smt));
+        debug_assert!(self.base_smt.is_the_same(&since_smt.base_smt));
         let mut node_hashes = HashMap::new();
         Self::new_node_hashes_since_impl(
             self.smt.root_weak(),
@@ -571,7 +571,7 @@ where
     }
 
     fn maybe_to_nibble_path(pos: &NodePosition) -> Option<NibblePath> {
-        assert!(pos.len() <= HashValue::LENGTH_IN_BITS);
+        debug_assert!(pos.len() <= HashValue::LENGTH_IN_BITS);
 
         const BITS_IN_NIBBLE: usize = 4;
         const BITS_IN_BYTE: usize = 8;

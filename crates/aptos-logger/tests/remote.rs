@@ -41,7 +41,7 @@ fn remote_end_to_end() {
     stream.read_until(b'\n', &mut buf).unwrap();
 
     let log: Log = serde_json::from_slice(&buf).unwrap();
-    assert!(log.backtrace.is_some());
+    debug_assert!(log.backtrace.is_some());
     assert_eq!(log.level, Level::Error);
 
     let mut buf = Vec::new();

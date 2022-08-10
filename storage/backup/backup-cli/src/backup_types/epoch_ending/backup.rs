@@ -108,7 +108,7 @@ impl EpochEndingBackupController {
             current_epoch += 1;
         }
 
-        assert!(!chunk_bytes.is_empty());
+        debug_assert!(!chunk_bytes.is_empty());
         assert_eq!(current_epoch, self.end_epoch);
         let chunk = self
             .write_chunk(

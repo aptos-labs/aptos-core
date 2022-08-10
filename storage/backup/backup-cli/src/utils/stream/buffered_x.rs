@@ -47,7 +47,7 @@ where
     St::Item: Future,
 {
     pub(super) fn new(stream: St, n: usize, max_in_progress: usize) -> BufferedX<St> {
-        assert!(n > 0);
+        debug_assert!(n > 0);
 
         BufferedX {
             stream: stream.fuse(),

@@ -356,7 +356,7 @@ where
         for i in 0..ROOT_NIBBLE_HEIGHT {
             let child_index = u8::from(nibbles.next().expect("This nibble must exist.")) as usize;
 
-            assert!(i < self.partial_nodes.len());
+            debug_assert!(i < self.partial_nodes.len());
             match self.partial_nodes[i].children[child_index] {
                 Some(ref child_info) => {
                     // If there exists an internal node at this position, we just continue the loop
@@ -468,7 +468,7 @@ where
 
         // Now we set the new child.
         let new_child_index = new_hashed_key.get_nibble(common_prefix_len);
-        assert!(
+        debug_assert!(
             new_child_index > existing_child_index,
             "New leaf must be on the right.",
         );
@@ -634,7 +634,7 @@ where
 
     /// Computes the sibling on the left for the `n`-th child.
     fn compute_left_sibling(partial_node: &InternalInfo<K>, n: Nibble, height: u8) -> HashValue {
-        assert!(height < 4);
+        debug_assert!(height < 4);
         let width = 1usize << height;
         let start = get_child_and_sibling_half_start(n, height).1 as usize;
         Self::compute_left_sibling_impl(&partial_node.children[start..start + width]).0
@@ -642,10 +642,10 @@ where
 
     /// Returns the hash for given portion of the subtree and whether this part is a leaf node.
     fn compute_left_sibling_impl(children: &[Option<ChildInfo<K>>]) -> (HashValue, bool) {
-        assert!(!children.is_empty());
+        debug_assert!(!children.is_empty());
 
         let num_children = children.len();
-        assert!(num_children.is_power_of_two());
+        debug_assert!(num_children.is_power_of_two());
 
         if num_children == 1 {
             match &children[0] {
@@ -693,7 +693,7 @@ where
             if num_children == 1 {
                 if let Some(node) = leaf {
                     let node_key = NodeKey::new_empty_path(self.version);
-                    assert!(self.frozen_nodes.is_empty());
+                    debug_assert!(self.frozen_nodes.is_empty());
                     self.frozen_nodes.insert(node_key, node.into());
                     self.store.write_node_batch(&self.frozen_nodes)?;
                     return Ok(());

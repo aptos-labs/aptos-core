@@ -286,8 +286,8 @@ impl MempoolNode {
         } = response
         {
             assert_eq!(response_request_id, request_id);
-            assert!(!retry);
-            assert!(!backoff);
+            debug_assert!(!retry);
+            debug_assert!(!backoff);
         } else {
             panic!("Expected a response!");
         }
@@ -424,7 +424,7 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
         let mut network_id_mapping = HashMap::new();
         for peer_network_id in peer_network_ids {
             let network_id = peer_network_id.network_id();
-            assert!(
+            debug_assert!(
                 !network_id_mapping.contains_key(&network_id),
                 "Duplicate network id for node"
             );

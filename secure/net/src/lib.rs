@@ -555,7 +555,7 @@ mod test {
 
         client.shutdown().unwrap();
         let mut client = NetworkClient::new("test", server_addr, TIMEOUT);
-        assert!(server.read().is_err());
+        debug_assert!(server.read().is_err());
 
         let data = vec![4, 5, 6, 7];
         client.write(&data).unwrap();

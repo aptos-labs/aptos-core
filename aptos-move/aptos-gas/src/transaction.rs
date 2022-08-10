@@ -51,7 +51,7 @@ macro_rules! define_gas_parameters_for_transaction {
             let mut map: BTreeMap<&str, ()> = BTreeMap::new();
 
             for key in [$($key),*] {
-                assert!(map.insert(key, ()).is_none());
+                debug_assert!(map.insert(key, ()).is_none());
             }
         }
     }

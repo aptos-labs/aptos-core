@@ -166,7 +166,7 @@ impl SMRNode {
         proposer_type: ProposerElectionType,
         round_proposers_idx: Option<HashMap<Round, usize>>,
     ) -> Vec<Self> {
-        assert!(num_nodes >= num_twins);
+        debug_assert!(num_nodes >= num_twins);
         let ValidatorSwarm {
             nodes: mut node_configs,
         } = generator::validator_swarm_for_testing(num_nodes);

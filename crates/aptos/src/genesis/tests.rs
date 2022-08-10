@@ -65,9 +65,9 @@ async fn test_genesis_e2e_flow() {
 
     // TODO: Verify that these are good
     let waypoint_file = output_dir.join("waypoint.txt");
-    assert!(waypoint_file.exists());
+    debug_assert!(waypoint_file.exists());
     let genesis_file = output_dir.join("genesis.blob");
-    assert!(genesis_file.exists());
+    debug_assert!(genesis_file.exists());
 }
 
 /// Generate genesis and waypoint

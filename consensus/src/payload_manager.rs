@@ -34,7 +34,7 @@ impl QuorumStoreClient {
         poll_count: u64,
         pull_timeout_ms: u64,
     ) -> Self {
-        assert!(
+        debug_assert!(
             poll_count > 0,
             "poll_count = 0 won't pull any txns from quorum store"
         );

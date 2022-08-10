@@ -131,7 +131,7 @@ impl NibblePath {
 
     /// Adds a nibble to the end of the nibble path.
     pub fn push(&mut self, nibble: Nibble) {
-        assert!(ROOT_NIBBLE_HEIGHT > self.num_nibbles);
+        debug_assert!(ROOT_NIBBLE_HEIGHT > self.num_nibbles);
         if self.num_nibbles % 2 == 0 {
             self.bytes.push(u8::from(nibble) << 4);
         } else {
@@ -170,7 +170,7 @@ impl NibblePath {
 
     /// Get the i-th bit.
     fn get_bit(&self, i: usize) -> bool {
-        assert!(i < self.num_nibbles * 4);
+        debug_assert!(i < self.num_nibbles * 4);
         let pos = i / 8;
         let bit = 7 - i % 8;
         ((self.bytes[pos] >> bit) & 1) != 0
@@ -178,7 +178,7 @@ impl NibblePath {
 
     /// Get the i-th nibble.
     pub fn get_nibble(&self, i: usize) -> Nibble {
-        assert!(i < self.num_nibbles);
+        debug_assert!(i < self.num_nibbles);
         Nibble::from((self.bytes[i / 2] >> (if i % 2 == 1 { 0 } else { 4 })) & 0xf)
     }
 
@@ -213,7 +213,7 @@ impl NibblePath {
     }
 
     pub fn truncate(&mut self, len: usize) {
-        assert!(len <= self.num_nibbles);
+        debug_assert!(len <= self.num_nibbles);
         self.num_nibbles = len;
         self.bytes.truncate((len + 1) / 2);
         if len % 2 != 0 {

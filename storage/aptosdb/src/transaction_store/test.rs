@@ -210,7 +210,7 @@ fn init_store(
         })
         .collect::<Vec<_>>();
 
-    assert!(store.get_transaction(0).is_err());
+    debug_assert!(store.get_transaction(0).is_err());
 
     let mut cs = ChangeSet::new();
     for (ver, txn) in txns.iter().enumerate() {

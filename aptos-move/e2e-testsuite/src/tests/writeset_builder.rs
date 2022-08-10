@@ -61,7 +61,7 @@ fn build_upgrade_writeset() {
         output.status(),
         &TransactionStatus::Keep(ExecutionStatus::Success)
     );
-    assert!(executor.verify_transaction(writeset_txn).status().is_none());
+    debug_assert!(executor.verify_transaction(writeset_txn).status().is_none());
 
     executor.apply_write_set(output.write_set());
 

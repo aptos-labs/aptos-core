@@ -289,10 +289,10 @@ mod test {
     #[test]
     fn peek() {
         let mut list = List::new();
-        assert!(list.peek_front().is_none());
-        assert!(list.peek_back().is_none());
-        assert!(list.peek_front_mut().is_none());
-        assert!(list.peek_back_mut().is_none());
+        debug_assert!(list.peek_front().is_none());
+        debug_assert!(list.peek_back().is_none());
+        debug_assert!(list.peek_front_mut().is_none());
+        debug_assert!(list.peek_back_mut().is_none());
 
         list.push_front(1);
         list.push_front(2);

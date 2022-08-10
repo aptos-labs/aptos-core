@@ -195,7 +195,7 @@ impl Node for K8sNode {
             .args(&delete_pvc_args)
             .output()
             .expect("failed to clear node storage");
-        assert!(
+        debug_assert!(
             cleanup_output.status.success(),
             "{}",
             String::from_utf8(cleanup_output.stderr).unwrap()

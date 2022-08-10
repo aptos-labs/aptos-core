@@ -26,7 +26,7 @@ fn coverage() {
     };
 
     // check if it exists
-    assert!(
+    debug_assert!(
         corpus_path.exists(),
         "path to fuzzing corpus must exists or be provided"
     );

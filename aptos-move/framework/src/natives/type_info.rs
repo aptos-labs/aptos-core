@@ -170,15 +170,15 @@ mod tests {
 
         let account_addr =
             AccountAddress::from_hex_literal(dummy_as_strings.next().unwrap()).unwrap();
-        assert!(Value::address(account_addr)
+        debug_assert!(Value::address(account_addr)
             .equals(&dummy_as_type_of.next().unwrap())
             .unwrap());
         let module = dummy_as_strings.next().unwrap().as_bytes().to_owned();
-        assert!(Value::vector_u8(module)
+        debug_assert!(Value::vector_u8(module)
             .equals(&dummy_as_type_of.next().unwrap())
             .unwrap());
         let name = dummy_as_strings.next().unwrap().as_bytes().to_owned();
-        assert!(Value::vector_u8(name)
+        debug_assert!(Value::vector_u8(name)
             .equals(&dummy_as_type_of.next().unwrap())
             .unwrap());
     }

@@ -55,7 +55,7 @@ fn single_peer_to_peer_with_event() {
         let rec_ev_path = receiver.received_events_key();
         let sent_ev_path = sender.sent_events_key();
         for event in output.events() {
-            assert!(rec_ev_path == event.key() || sent_ev_path == event.key());
+            debug_assert!(rec_ev_path == event.key() || sent_ev_path == event.key());
         }
     }
     }
@@ -116,7 +116,7 @@ fn single_peer_to_peer_with_event() {
 //         .sequence_number(10)
 //         .sign();
 //     let unpadded_txn = peer_to_peer_txn(sender.account(), receiver.account(), 10, transfer_amount);
-//     assert!(txn.raw_txn_bytes_len() > unpadded_txn.raw_txn_bytes_len());
+//     debug_assert!(txn.raw_txn_bytes_len() > unpadded_txn.raw_txn_bytes_len());
 //     // execute transaction
 //     let output = executor.execute_transaction(txn);
 //     assert_eq!(

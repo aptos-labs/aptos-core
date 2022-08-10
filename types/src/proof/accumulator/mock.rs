@@ -35,7 +35,7 @@ pub struct MockTransactionAccumulator {
 impl MockTransactionAccumulator {
     /// Create a full transaction accumulator from a list of leaf node hashes.
     pub fn from_leaves(leaves: Vec<HashValue>) -> Self {
-        assert!(!leaves.is_empty());
+        debug_assert!(!leaves.is_empty());
         Self {
             leaves,
             c2p: RefCell::new(HashMap::new()),
@@ -73,7 +73,7 @@ impl MockTransactionAccumulator {
     /// Get the accumulator root hash at a specific version. Note that this method
     /// has the side effect of seeding the parent<->child caches.
     pub fn get_root_hash(&self, version: Version) -> HashValue {
-        assert!(version <= self.version());
+        debug_assert!(version <= self.version());
         let leaves_view = &self.leaves[0..=version as usize];
 
         let mut level = leaves_view.to_vec();
@@ -134,7 +134,7 @@ impl MockTransactionAccumulator {
     }
 
     pub fn get_accumulator_summary(&self, version: Version) -> TransactionAccumulatorSummary {
-        assert!(version <= self.version());
+        debug_assert!(version <= self.version());
 
         let genesis_consistency_proof = self.get_consistency_proof(None, version);
         TransactionAccumulatorSummary::try_from_genesis_proof(genesis_consistency_proof, version)
@@ -146,8 +146,8 @@ impl MockTransactionAccumulator {
         start_version: Option<Version>,
         end_version: Version,
     ) -> AccumulatorConsistencyProof {
-        assert!(start_version <= Some(end_version));
-        assert!(end_version <= self.version());
+        debug_assert!(start_version <= Some(end_version));
+        debug_assert!(end_version <= self.version());
 
         let maybe_old_root = start_version.map(|v| self.get_root_hash(v));
         let new_root = self.get_root_hash(end_version);

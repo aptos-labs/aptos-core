@@ -256,7 +256,7 @@ impl RestClient {
     pub fn wait_for_transaction(&self, txn_hash: &str) {
         let mut count = 0;
         while self.transaction_pending(txn_hash) {
-            assert!(count < 10, "transaction {} timed out", txn_hash);
+            debug_assert!(count < 10, "transaction {} timed out", txn_hash);
             thread::sleep(Duration::from_secs(1));
             count += 1;
         }

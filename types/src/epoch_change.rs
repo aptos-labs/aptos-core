@@ -191,7 +191,7 @@ mod tests {
 
         // Test well-formed proof will succeed
         let proof_1 = EpochChangeProof::new(valid_ledger_info.clone(), /* more = */ false);
-        assert!(proof_1
+        debug_assert!(proof_1
             .verify(&EpochState {
                 epoch: all_epoch[0],
                 verifier: validator_verifier[0].clone(),
@@ -200,7 +200,7 @@ mod tests {
 
         let proof_2 =
             EpochChangeProof::new(valid_ledger_info[2..5].to_vec(), /* more = */ false);
-        assert!(proof_2
+        debug_assert!(proof_2
             .verify(&EpochState {
                 epoch: all_epoch[2],
                 verifier: validator_verifier[2].clone()
@@ -208,7 +208,7 @@ mod tests {
             .is_ok());
 
         // Test proof with stale prefix will verify
-        assert!(proof_1
+        debug_assert!(proof_1
             .verify(&EpochState {
                 epoch: all_epoch[4],
                 verifier: validator_verifier[4].clone()
@@ -217,7 +217,7 @@ mod tests {
 
         // Test empty proof will fail verification
         let proof_3 = EpochChangeProof::new(vec![], /* more = */ false);
-        assert!(proof_3
+        debug_assert!(proof_3
             .verify(&EpochState {
                 epoch: all_epoch[0],
                 verifier: validator_verifier[0].clone()
@@ -228,7 +228,7 @@ mod tests {
         let mut list = valid_ledger_info[3..5].to_vec();
         list.extend_from_slice(&valid_ledger_info[8..9]);
         let proof_4 = EpochChangeProof::new(list, /* more = */ false);
-        assert!(proof_4
+        debug_assert!(proof_4
             .verify(&EpochState {
                 epoch: all_epoch[3],
                 verifier: validator_verifier[3].clone()
@@ -239,7 +239,7 @@ mod tests {
         let mut list = valid_ledger_info.clone();
         list.reverse();
         let proof_5 = EpochChangeProof::new(list, /* more = */ false);
-        assert!(proof_5
+        debug_assert!(proof_5
             .verify(&EpochState {
                 epoch: all_epoch[9],
                 verifier: validator_verifier[9].clone()
@@ -254,7 +254,7 @@ mod tests {
             )],
             /* more = */ false,
         );
-        assert!(proof_6
+        debug_assert!(proof_6
             .verify(&EpochState {
                 epoch: all_epoch[0],
                 verifier: validator_verifier[0].clone()
@@ -264,22 +264,22 @@ mod tests {
         // Test proof with waypoint corresponding to the first epoch change succeeds.
         let waypoint_for_1_to_2 =
             Waypoint::new_epoch_boundary(valid_ledger_info[0].ledger_info()).unwrap();
-        assert!(proof_1.verify(&waypoint_for_1_to_2).is_ok());
+        debug_assert!(proof_1.verify(&waypoint_for_1_to_2).is_ok());
 
         // Test proof with stale prefix will verify with a Waypoint
         let waypoint_for_5_to_6 =
             Waypoint::new_epoch_boundary(valid_ledger_info[4].ledger_info()).unwrap();
-        assert!(proof_1.verify(&waypoint_for_5_to_6).is_ok());
+        debug_assert!(proof_1.verify(&waypoint_for_5_to_6).is_ok());
 
         // Waypoint before proof range will fail to verify
         let waypoint_for_3_to_4 =
             Waypoint::new_epoch_boundary(valid_ledger_info[2].ledger_info()).unwrap();
         let proof_7 =
             EpochChangeProof::new(valid_ledger_info[4..8].to_vec(), /* more */ false);
-        assert!(proof_7.verify(&waypoint_for_3_to_4).is_err());
+        debug_assert!(proof_7.verify(&waypoint_for_3_to_4).is_err());
 
         // Waypoint after proof range will fail to verify
         let proof_8 = EpochChangeProof::new(valid_ledger_info[..1].to_vec(), /* more */ false);
-        assert!(proof_8.verify(&waypoint_for_3_to_4).is_err());
+        debug_assert!(proof_8.verify(&waypoint_for_3_to_4).is_err());
     }
 }

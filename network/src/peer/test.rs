@@ -501,13 +501,13 @@ fn peer_recv_rpc_timeout() {
         };
 
         // The rpc response channel should still be open since we haven't timed out yet.
-        assert!(!res_tx.is_canceled());
+        debug_assert!(!res_tx.is_canceled());
 
         // Advancing time should trigger the timeout.
         mock_time.advance_ms_async(INBOUND_RPC_TIMEOUT_MS).await;
 
         // The rpc response channel should be canceled from the timeout.
-        assert!(res_tx.is_canceled());
+        debug_assert!(res_tx.is_canceled());
         res_tx.cancellation().await;
 
         // Client then half-closes write side.
@@ -559,7 +559,7 @@ fn peer_recv_rpc_cancel() {
         };
 
         // The rpc response channel should still be open since we haven't timed out yet.
-        assert!(!res_tx.is_canceled());
+        debug_assert!(!res_tx.is_canceled());
 
         // Server drops the response completion handle to cancel the request.
         drop(res_tx);
@@ -613,7 +613,7 @@ fn peer_send_rpc() {
             assert_eq!(received.priority, 0);
             assert_eq!(received.raw_request, b"hello world");
 
-            assert!(
+            debug_assert!(
                 request_ids.insert(received.request_id),
                 "should not receive requests with duplicate request ids: {}",
                 received.request_id,
@@ -628,7 +628,7 @@ fn peer_send_rpc() {
             // Server should send the rpc request.
             server_sink.send(&response).await.unwrap();
         }
-        assert!(matches!(server_stream.next().await, None));
+        debug_assert!(matches!(server_stream.next().await, None));
     };
     rt.block_on(future::join3(peer.start(), server, client));
 }
@@ -682,7 +682,7 @@ fn peer_send_rpc_concurrent() {
             assert_eq!(received.priority, 0);
             assert_eq!(received.raw_request, b"hello world");
 
-            assert!(
+            debug_assert!(
                 request_ids.insert(received.request_id),
                 "should not receive requests with duplicate request ids: {}",
                 received.request_id,
@@ -697,7 +697,7 @@ fn peer_send_rpc_concurrent() {
             // Server should send the rpc request.
             server_sink.send(&response).await.unwrap();
         }
-        assert!(matches!(server_stream.next().await, None));
+        debug_assert!(matches!(server_stream.next().await, None));
     };
     rt.block_on(future::join3(peer.start(), server, client));
 }
@@ -739,7 +739,7 @@ fn peer_send_rpc_cancel() {
 
         // Request should still be live. Ok(_) means the sender is not dropped.
         // Ok(None) means there is no response yet.
-        assert!(matches!(response_rx.try_recv(), Ok(None)));
+        debug_assert!(matches!(response_rx.try_recv(), Ok(None)));
 
         // Client cancels the request.
         drop(response_rx);
@@ -800,13 +800,13 @@ fn peer_send_rpc_timeout() {
 
         // Request should still be live. Ok(_) means the sender is not dropped.
         // Ok(None) means there is no response yet.
-        assert!(matches!(response_rx.try_recv(), Ok(None)));
+        debug_assert!(matches!(response_rx.try_recv(), Ok(None)));
 
         // Advancing time should cause the client request timeout to elapse.
         mock_time.advance_async(timeout).await;
 
         // Client cancels the request.
-        assert!(matches!(response_rx.await, Ok(Err(RpcError::TimedOut))));
+        debug_assert!(matches!(response_rx.await, Ok(Err(RpcError::TimedOut))));
 
         // Server sending an expired response is fine.
         let response = NetworkMessage::RpcResponse(RpcResponse {

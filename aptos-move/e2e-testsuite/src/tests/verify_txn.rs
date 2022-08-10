@@ -454,7 +454,7 @@ pub fn test_arbitrary_script_execution() {
         .sign();
     assert_eq!(executor.verify_transaction(txn.clone()).status(), None);
     let status = executor.execute_transaction(txn).status().clone();
-    assert!(!status.is_discarded());
+    debug_assert!(!status.is_discarded());
     assert_eq!(
         status.status(),
         // StatusCode::CODE_DESERIALIZATION_ERROR
@@ -607,14 +607,14 @@ pub fn test_open_publishing_invalid_address() {
     // verify and fail because the addresses don't match
     // let vm_status = executor.verify_transaction(txn.clone()).status().unwrap();
 
-    // assert!(vm_status.is(StatusType::Verification));
-    // assert!(vm_status.major_status == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER);
+    // debug_assert!(vm_status.is(StatusType::Verification));
+    // debug_assert!(vm_status.major_status == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER);
 
     // execute and fail for the same reason
     let output = executor.execute_transaction(txn);
     if let TransactionStatus::Keep(status) = output.status() {
-        // assert!(status.status_code() == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER)
-        assert!(
+        // debug_assert!(status.status_code() == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER)
+        debug_assert!(
             status
                 == &ExecutionStatus::MiscellaneousError(Some(MODULE_ADDRESS_DOES_NOT_MATCH_SENDER))
         );

@@ -31,7 +31,7 @@ async fn test_move_compile_flow() {
     let mut named_addresses = BTreeMap::new();
     named_addresses.insert(HELLO_BLOCKCHAIN, account.as_str());
     match cli.compile_package(named_addresses.clone()).await {
-        Ok(modules) => assert!(modules.is_empty()),
+        Ok(modules) => debug_assert!(modules.is_empty()),
         Err(err) => panic!("Error compiling: {:?}", err),
     }
 
@@ -48,7 +48,7 @@ async fn test_move_compile_flow() {
     assert_eq!(addresses.len(), 1);
     let (key, value) = addresses.iter().next().expect("Expect an address");
     assert_eq!(key.as_str(), HELLO_BLOCKCHAIN);
-    assert!(value.is_none());
+    debug_assert!(value.is_none());
 
     assert_eq!(manifest.dependencies.len(), 1);
 
@@ -64,7 +64,7 @@ async fn test_move_compile_flow() {
     cli.add_move_files();
 
     match cli.compile_package(named_addresses.clone()).await {
-        Ok(modules) => assert!(!modules.is_empty()),
+        Ok(modules) => debug_assert!(!modules.is_empty()),
         Err(err) => panic!("Error compiling: {:?}", err),
     }
 
@@ -113,12 +113,12 @@ async fn test_move_publish_flow() {
     // Wrong number of args will definitely fail
     let function_id = MemberId::from_str(&format!("{}::message::set_message", account)).unwrap();
 
-    assert!(cli
+    debug_assert!(cli
         .run_function(0, None, function_id.clone(), vec![], vec![])
         .await
         .is_err());
 
-    assert!(cli
+    debug_assert!(cli
         .run_function(0, None, function_id, vec!["string:hello_world"], vec![])
         .await
         .is_ok());

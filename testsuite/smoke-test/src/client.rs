@@ -27,7 +27,7 @@ async fn test_create_mint_transfer_block_metadata() {
         .unwrap()
         .into_inner()
         .version;
-    assert!(
+    debug_assert!(
         version > 4,
         "BlockMetadata txn not produced, current version: {}",
         version
@@ -134,12 +134,12 @@ async fn test_latest_events_and_transactions() {
         .unwrap()
         .into_parts();
 
-    assert!(start_events[0].round() < cur_events[0].round());
-    assert!(cur_events[0].round() < cur_events[1].round());
+    debug_assert!(start_events[0].round() < cur_events[0].round());
+    debug_assert!(cur_events[0].round() < cur_events[1].round());
     assert_eq!(cur_events.len(), 2);
 
-    assert!(start_transations[0].version() < cur_transations[0].version());
-    assert!(cur_transations[0].version() < cur_transations[1].version());
+    debug_assert!(start_transations[0].version() < cur_transations[0].version());
+    debug_assert!(cur_transations[0].version() < cur_transations[1].version());
     assert_eq!(cur_transations.len(), 2);
     assert_eq!(cur_transations[1].version().unwrap(), cur_ledger.version);
 }

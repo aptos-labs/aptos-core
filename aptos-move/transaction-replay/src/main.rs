@@ -105,7 +105,7 @@ fn main() -> Result<()> {
             let latest_version = debugger
                 .get_latest_version()
                 .expect("Failed to get latest version");
-            assert!(latest_version >= txns);
+            debug_assert!(latest_version >= txns);
             println!(
                 "{:#?}",
                 debugger.execute_past_transactions(

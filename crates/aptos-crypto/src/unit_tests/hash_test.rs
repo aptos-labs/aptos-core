@@ -57,11 +57,11 @@ fn test_from_slice() {
     {
         // The length is mismatched.
         let zero_byte_vec = vec![0; 31];
-        assert!(HashValue::from_slice(&zero_byte_vec).is_err());
+        debug_assert!(HashValue::from_slice(&zero_byte_vec).is_err());
     }
     {
         let bytes = vec![1; 123];
-        assert!(HashValue::from_slice(&bytes[..]).is_err());
+        debug_assert!(HashValue::from_slice(&bytes[..]).is_err());
     }
 }
 

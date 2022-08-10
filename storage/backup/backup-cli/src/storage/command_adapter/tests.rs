@@ -78,7 +78,7 @@ async fn assert_commands_error(cmd: &str) {
     let store = dummy_store(cmd);
 
     // create_backup
-    assert!(store
+    debug_assert!(store
         .create_backup(&ShellSafeName::from_str("backup_name").unwrap())
         .await
         .is_err());
@@ -87,7 +87,7 @@ async fn assert_commands_error(cmd: &str) {
 
     // open_for_read
     let mut buf = String::new();
-    assert!(store
+    debug_assert!(store
         .open_for_read(handle)
         .await
         .unwrap()
@@ -96,7 +96,7 @@ async fn assert_commands_error(cmd: &str) {
         .is_err());
 
     // create_for_write
-    assert!(async {
+    debug_assert!(async {
         let (_, mut file) = store.create_for_write(handle, &name).await?;
         file.write_all(&[0; 1024]).await?;
         file.shutdown().await?;
@@ -106,13 +106,13 @@ async fn assert_commands_error(cmd: &str) {
     .is_err());
 
     // save_metadata_line
-    assert!(store
+    debug_assert!(store
         .save_metadata_line(&name, &TextLine::new("1234").unwrap())
         .await
         .is_err());
 
     // list_metadata_files
-    assert!(store.list_metadata_files().await.is_err());
+    debug_assert!(store.list_metadata_files().await.is_err());
 }
 
 async fn assert_commands_okay(cmd: &str) {

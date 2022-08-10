@@ -142,10 +142,10 @@ mod test {
         let t = MemoryTransport::default();
 
         let result = t.listen_on("/ip4/127.0.0.1/tcp/0".parse().unwrap());
-        assert!(result.is_err());
+        debug_assert!(result.is_err());
 
         let peer_id = PeerId::random();
         let result = t.dial(peer_id, "/ip4/127.0.0.1/tcp/22".parse().unwrap());
-        assert!(result.is_err());
+        debug_assert!(result.is_err());
     }
 }

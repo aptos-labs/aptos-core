@@ -34,7 +34,7 @@ impl SystemStore {
         last_version: Version,
         cs: &mut ChangeSet,
     ) -> Result<LedgerCounters> {
-        assert!(first_version <= last_version);
+        debug_assert!(first_version <= last_version);
 
         let mut counters = if first_version > 0 {
             let base_version = first_version - 1;

@@ -203,7 +203,7 @@ async fn check_correct_connection_is_live(
         Ok(())
     }
     .await;
-    assert!(f_open_stream_on_dropped_conn.is_err());
+    debug_assert!(f_open_stream_on_dropped_conn.is_err());
 
     let f_open_stream_on_live_conn: Result<(), PeerManagerError> = async move {
         // Send ping and wait for pong.
@@ -213,7 +213,7 @@ async fn check_correct_connection_is_live(
         Ok(())
     }
     .await;
-    assert!(f_open_stream_on_live_conn.is_ok());
+    debug_assert!(f_open_stream_on_live_conn.is_ok());
     assert_peer_disconnected_event(
         expected_peer_id,
         live_connection_origin,
@@ -570,7 +570,7 @@ fn peer_manager_simultaneous_dial_disconnect_event() {
         );
         peer_manager.handle_connection_event(event);
         // The active connection should still remain.
-        assert!(peer_manager.active_peers.contains_key(&ids[0]));
+        debug_assert!(peer_manager.active_peers.contains_key(&ids[0]));
     };
 
     runtime.block_on(test);
@@ -599,7 +599,7 @@ fn test_dial_disconnect() {
 
         // Expect NewPeer notification from PeerManager.
         let conn_notif = conn_status_rx.next().await.unwrap();
-        assert!(matches!(conn_notif, ConnectionNotification::NewPeer(_, _)));
+        debug_assert!(matches!(conn_notif, ConnectionNotification::NewPeer(_, _)));
 
         // Send DisconnectPeer request to PeerManager.
         let (disconnect_resp_tx, disconnect_resp_rx) = oneshot::channel();
@@ -627,7 +627,7 @@ fn test_dial_disconnect() {
 
         // Expect LostPeer notification from PeerManager.
         let conn_notif = conn_status_rx.next().await.unwrap();
-        assert!(matches!(
+        debug_assert!(matches!(
             conn_notif,
             ConnectionNotification::LostPeer(_, _, _)
         ));

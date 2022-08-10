@@ -21,7 +21,7 @@ fn access_path_ord() {
         address: AccountAddress::new([2u8; AccountAddress::LENGTH]),
         path: b"/foo/a".to_vec(),
     };
-    assert!(ap1 < ap2);
+    debug_assert!(ap1 < ap2);
     assert_eq!(ap2, ap3);
-    assert!(ap3 < ap4);
+    debug_assert!(ap3 < ap4);
 }

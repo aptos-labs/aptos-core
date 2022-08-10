@@ -23,7 +23,7 @@ where
 
     let baseline = ExpectedOutput::generate_baseline(&transactions);
 
-    assert!(baseline.check_output(&output))
+    debug_assert!(baseline.check_output(&output))
 }
 
 const TOTAL_KEY_NUM: u64 = 50;
@@ -142,7 +142,7 @@ fn scheduler_tasks() {
 
     for i in 0..5 {
         // not calling finish execution, so validation tasks not dispatched.
-        assert!(matches!(
+        debug_assert!(matches!(
             s.next_task(),
             SchedulerTask::ExecutionTask((j, 0), None, _) if i == j
         ));
@@ -150,97 +150,97 @@ fn scheduler_tasks() {
 
     // Finish execution for txns 0, 2, 4. txn 0 without validate_suffix and because
     // validation index is higher will return validation task to the caller.
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(0, 0, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::ValidationTask((0, 0), _)
     ));
     // Requires revalidation suffix, so validation index will be decreased to 2,
     // and txn 4 will not need to return a validation task.
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(2, 0, true, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
     // txn 2's finish validation pulled back validation index, so 4 will get validated
     // and no need to return a validation task.
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(4, 0, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((2, 0), _)
     ));
     // txn 3 hasn't finished execution, so no validation task for it.
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((4, 0), _)
     ));
 
     // Validation index is decreased and no task returned to caller.
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(3, 0, true, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((3, 0), _)
     ));
     // txn 4 dispatched for validation again because it the previous validation
     // hasn't finished.
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((4, 0), _)
     ));
 
     // successful abort.
-    assert!(s.try_abort(3, 0));
-    assert!(matches!(
+    debug_assert!(s.try_abort(3, 0));
+    debug_assert!(matches!(
         s.finish_execution(1, 0, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::ValidationTask((1, 0), _)
     ));
 
     // unsuccessful abort.
-    assert!(!s.try_abort(3, 0));
-    assert!(matches!(
+    debug_assert!(!s.try_abort(3, 0));
+    debug_assert!(matches!(
         s.finish_abort(3, 0, TaskGuard::new(&fake_counter)),
         SchedulerTask::ExecutionTask((3, 1), None, _)
     ));
 
     // can abort even after succesful validation
-    assert!(s.try_abort(4, 0));
-    assert!(matches!(
+    debug_assert!(s.try_abort(4, 0));
+    debug_assert!(matches!(
         s.finish_abort(4, 0, TaskGuard::new(&fake_counter)),
         SchedulerTask::ExecutionTask((4, 1), None, _)
     ));
 
     // txn 4 is aborted, so there won't be a validation task.
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ExecutionTask((5, 0), None, _)
     ));
     // Wrap up all outstanding tasks.
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(4, 1, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::ValidationTask((4, 1), _)
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(3, 1, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::ValidationTask((3, 1), _)
     ));
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(5, 0, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((5, 0), _)
     ));
 
-    assert!(matches!(s.next_task(), SchedulerTask::Done));
+    debug_assert!(matches!(s.next_task(), SchedulerTask::Done));
 }
 
 #[test]
@@ -250,30 +250,30 @@ fn scheduler_dependency() {
 
     for i in 0..5 {
         // not calling finish execution, so validation tasks not dispatched.
-        assert!(matches!(
+        debug_assert!(matches!(
             s.next_task(),
             SchedulerTask::ExecutionTask((j, 0), None, _) if j == i
         ));
     }
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(0, 0, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::ValidationTask((0, 0), _)
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ExecutionTask((5, 0), None, _)
     ));
 
-    assert!(s.wait_for_dependency(3, 0).is_none());
-    assert!(s.wait_for_dependency(4, 2).is_some());
+    debug_assert!(s.wait_for_dependency(3, 0).is_none());
+    debug_assert!(s.wait_for_dependency(4, 2).is_some());
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(2, 0, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::ValidationTask((2, 0), _)
     ));
     // resumed task doesn't bump incarnation
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ExecutionTask((4, 0), Some(_), _)
     ));
@@ -286,92 +286,92 @@ fn scheduler_incarnation() {
 
     for i in 0..5 {
         // not calling finish execution, so validation tasks not dispatched.
-        assert!(matches!(
+        debug_assert!(matches!(
             s.next_task(),
             SchedulerTask::ExecutionTask((j, 0), None, _) if j == i
         ));
     }
 
     // execution index = 5
-    assert!(s.wait_for_dependency(1, 0).is_some());
-    assert!(s.wait_for_dependency(3, 0).is_some());
+    debug_assert!(s.wait_for_dependency(1, 0).is_some());
+    debug_assert!(s.wait_for_dependency(3, 0).is_some());
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(2, 0, true, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(4, 0, true, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((2, 0), _)
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((4, 0), _)
     ));
 
-    assert!(s.try_abort(2, 0));
-    assert!(s.try_abort(4, 0));
-    assert!(!s.try_abort(2, 0));
+    debug_assert!(s.try_abort(2, 0));
+    debug_assert!(s.try_abort(4, 0));
+    debug_assert!(!s.try_abort(2, 0));
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_abort(2, 0, TaskGuard::new(&fake_counter)),
         SchedulerTask::ExecutionTask((2, 1), None, _)
     ));
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(0, 0, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::ValidationTask((0, 0), _)
     ));
     // execution index =  1
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_abort(4, 0, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ExecutionTask((1, 0), Some(_), _)
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ExecutionTask((3, 0), Some(_), _)
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ExecutionTask((4, 1), None, _)
     ));
     // execution index = 5
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(1, 0, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::ValidationTask((1, 0), _)
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(2, 1, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::ValidationTask((2, 1), _)
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(3, 0, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::ValidationTask((3, 0), _)
     ));
 
     // validation index is 4, so finish execution doesn't return validation task, next task does.
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(4, 1, false, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((4, 1), _)
     ));
 
-    assert!(matches!(s.next_task(), SchedulerTask::Done));
+    debug_assert!(matches!(s.next_task(), SchedulerTask::Done));
 }
 
 #[test]
@@ -381,44 +381,44 @@ fn scheduler_stop_idx() {
 
     for i in 0..2 {
         // not calling finish execution, so validation tasks not dispatched.
-        assert!(matches!(
+        debug_assert!(matches!(
             s.next_task(),
             SchedulerTask::ExecutionTask((j, 0), None, _) if j == i
         ));
     }
 
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ExecutionTask((2, 0), None, _)
     ));
 
     // Finish executions & dispatch validation tasks.
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(0, 0, true, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(1, 0, true, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((0, 0), _)
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((1, 0), _)
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(2, 0, true, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((2, 0), _)
     ));
 
-    assert!(matches!(s.next_task(), SchedulerTask::Done));
+    debug_assert!(matches!(s.next_task(), SchedulerTask::Done));
 }
 
 #[test]
@@ -428,37 +428,37 @@ fn scheduler_drain_idx() {
 
     for i in 0..3 {
         // not calling finish execution, so validation tasks not dispatched.
-        assert!(matches!(
+        debug_assert!(matches!(
             s.next_task(),
             SchedulerTask::ExecutionTask((j, 0), None, _) if j == i
         ));
     }
 
     // Finish executions & dispatch validation tasks.
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(0, 0, true, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(1, 0, true, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((0, 0), _)
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((1, 0), _)
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.finish_execution(2, 0, true, TaskGuard::new(&fake_counter)),
         SchedulerTask::NoTask
     ));
-    assert!(matches!(
+    debug_assert!(matches!(
         s.next_task(),
         SchedulerTask::ValidationTask((2, 0), _)
     ));
 
-    assert!(matches!(s.next_task(), SchedulerTask::Done));
+    debug_assert!(matches!(s.next_task(), SchedulerTask::Done));
 }

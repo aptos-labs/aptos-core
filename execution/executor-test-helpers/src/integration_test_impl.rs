@@ -207,7 +207,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .reader
         .get_account_transaction(genesis_account.address(), 7, false, current_version)
         .unwrap();
-    assert!(tn.is_none());
+    debug_assert!(tn.is_none());
 
     let t4 = db
         .reader
@@ -341,13 +341,13 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         .as_account_with_state_view(&account4.address())
         .get_account_resource()
         .unwrap();
-    assert!(account4_resource.is_none());
+    debug_assert!(account4_resource.is_none());
 
     let account4_transaction = db
         .reader
         .get_account_transaction(account4.address(), 0, true, current_version)
         .unwrap();
-    assert!(account4_transaction.is_none());
+    debug_assert!(account4_transaction.is_none());
 
     let account4_sent_events = db
         .reader
@@ -359,7 +359,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
             current_version,
         )
         .unwrap();
-    assert!(account4_sent_events.is_empty());
+    debug_assert!(account4_sent_events.is_empty());
 
     // Execute block 2, 3, 4
     let output2 = executor

@@ -43,20 +43,20 @@ fn bad_module_address() {
     // TODO: This is not verified for now.
     // verify and fail because the addresses don't match
     // let vm_status = executor.verify_transaction(txn.clone()).status().unwrap();
-    // assert!(vm_status.is(StatusType::Verification));
-    // assert!(vm_status.major_status == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER);
+    // debug_assert!(vm_status.is(StatusType::Verification));
+    // debug_assert!(vm_status.major_status == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER);
 
     // execute and fail for the same reason
     let output = executor.execute_transaction(txn);
     match output.status() {
         TransactionStatus::Keep(status) => {
-            assert!(
+            debug_assert!(
                 status
                     == &ExecutionStatus::MiscellaneousError(Some(
                         StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER
                     ))
             );
-            // assert!(status.status_code() == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER);
+            // debug_assert!(status.status_code() == StatusCode::MODULE_ADDRESS_DOES_NOT_MATCH_SENDER);
         }
         vm_status => panic!("Unexpected verification status: {:?}", vm_status),
     };
@@ -96,7 +96,7 @@ macro_rules! module_republish_test {
             let output1 = executor.execute_transaction(txn1);
             executor.apply_write_set(output1.write_set());
             // first tx should allways succeed
-            assert!(transaction_status_eq(
+            debug_assert!(transaction_status_eq(
                 &output1.status(),
                 &TransactionStatus::Keep(ExecutionStatus::Success),
             ));
@@ -104,7 +104,7 @@ macro_rules! module_republish_test {
             let output2 = executor.execute_transaction(txn2);
             println!("{:?}", output2.status());
             // second tx should always fail, module republish is not allowed
-            assert!(transaction_status_eq(
+            debug_assert!(transaction_status_eq(
                 &output2.status(),
                 &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
                     StatusCode::DUPLICATE_MODULE_NAME

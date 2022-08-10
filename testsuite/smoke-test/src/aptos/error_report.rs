@@ -31,7 +31,7 @@ async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
         "{:?}",
         ctx.client().submit_and_wait(&txn).await.unwrap_err()
     );
-    assert!(
+    debug_assert!(
         err.contains(expected),
         "expected = {}, err = {}",
         expected,

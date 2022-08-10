@@ -193,13 +193,13 @@ mod tests {
             rt.block_on(async {
                 let num_sleeps = sleeps_ms.len();
                 let mut futures = FuturesOrderedX::new(max_in_progress);
-                assert!(futures.is_empty());
+                debug_assert!(futures.is_empty());
 
                 futures.extend(sleeps_ms.into_iter().enumerate().map(|(n, sleep_ms)| async move {
                         tokio::time::sleep(Duration::from_millis(sleep_ms)).await;
                         n
                 }));
-                assert!(num_sleeps > 0 || futures.is_empty());
+                debug_assert!(num_sleeps > 0 || futures.is_empty());
                 assert_eq!(
                     futures.collect::<Vec<_>>().await,
                     (0..num_sleeps).collect::<Vec<_>>()

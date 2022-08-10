@@ -212,10 +212,10 @@ mod test {
         assert_eq!(buffer.get(&res_1), &HashWrapper::from(1));
         // look for 4 (fail)
         let res_no_4 = buffer.find_elem_by_key(*buffer.head_cursor(), HashValue::from_u64(4));
-        assert!(res_no_4.is_none());
+        debug_assert!(res_no_4.is_none());
         // look for 1 after (or on) the tail (fail)
         let res_no_1 = buffer.find_elem_by_key(*buffer.tail_cursor(), HashValue::from_u64(1));
-        assert!(res_no_1.is_none());
+        debug_assert!(res_no_1.is_none());
 
         // look for 2 (succeed)
         let res_2 =
@@ -224,11 +224,11 @@ mod test {
         // look for 5 (fail)
         let res_no_5 =
             buffer.find_elem_from(*buffer.head_cursor(), |item| item == &HashWrapper::from(5));
-        assert!(res_no_5.is_none());
+        debug_assert!(res_no_5.is_none());
         // look for 2 after (or on) the tail (fail)
         let res_no_2 =
             buffer.find_elem_from(*buffer.tail_cursor(), |item| item == &HashWrapper::from(2));
-        assert!(res_no_2.is_none());
+        debug_assert!(res_no_2.is_none());
     }
 
     #[test]

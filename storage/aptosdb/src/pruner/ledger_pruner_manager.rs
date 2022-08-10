@@ -77,8 +77,8 @@ impl PrunerManager for LedgerPrunerManager {
         }
     }
     fn wake_pruner(&self, latest_version: Version) {
-        assert!(self.pruner_enabled);
-        assert!(self.command_sender.is_some());
+        debug_assert!(self.pruner_enabled);
+        debug_assert!(self.command_sender.is_some());
         self.command_sender
             .as_ref()
             .unwrap()

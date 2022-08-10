@@ -69,14 +69,14 @@ mod tests {
     #[test]
     fn test_parse_percent_encoded_path_parameter() {
         let param = MoveIdentifierParam::from_str("abcd%5F").unwrap();
-        assert!(param.parse("param_name").is_ok())
+        debug_assert!(param.parse("param_name").is_ok())
     }
 
     #[test]
     fn test_parse_percent_encoded_path_parameter_failed() {
         let param = MoveIdentifierParam::from_str("%3Aabcd").unwrap();
         let ret = param.parse("param_name");
-        assert!(ret.is_err());
+        debug_assert!(ret.is_err());
         assert_eq!(
             "400 Bad Request: invalid parameter param_name: :abcd",
             ret.err().unwrap().to_string()

@@ -395,7 +395,7 @@ mod tests {
     fn test_branches() {
         let github = Client::new(OWNER.into(), REPOSITORY.into(), BRANCH.into(), TOKEN.into());
         let branches = github.get_branches().unwrap();
-        assert!(!branches.is_empty());
-        assert!(branches.iter().any(|b| b == BRANCH));
+        debug_assert!(!branches.is_empty());
+        debug_assert!(branches.iter().any(|b| b == BRANCH));
     }
 }

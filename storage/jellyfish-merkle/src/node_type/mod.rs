@@ -84,7 +84,7 @@ impl NodeKey {
     /// Generates parent node key at the same version based on this node key.
     pub fn gen_parent_node_key(&self) -> Self {
         let mut node_nibble_path = self.nibble_path().clone();
-        assert!(
+        debug_assert!(
             node_nibble_path.pop().is_some(),
             "Current node key is root.",
         );
@@ -430,8 +430,8 @@ impl InternalNode {
 
     /// Given a range [start, start + width), returns the sub-bitmap of that range.
     fn range_bitmaps(start: u8, width: u8, bitmaps: (u16, u16)) -> (u16, u16) {
-        assert!(start < 16 && width.count_ones() == 1 && start % width == 0);
-        assert!(width <= 16 && (start + width) <= 16);
+        debug_assert!(start < 16 && width.count_ones() == 1 && start % width == 0);
+        debug_assert!(width <= 16 && (start + width) <= 16);
         // A range with `start == 8` and `width == 4` will generate a mask 0b0000111100000000.
         // use as converting to smaller integer types when 'width == 16'
         let mask = (((1u32 << width) - 1) << start) as u16;
@@ -783,7 +783,7 @@ fn serialize_u64_varint(mut num: u64, binary: &mut Vec<u8>) {
     }
     // Last byte is encoded raw; this means there are no bad encodings.
     assert_ne!(num, 0);
-    assert!(num <= 0xff);
+    debug_assert!(num <= 0xff);
     binary.push(num as u8);
 }
 

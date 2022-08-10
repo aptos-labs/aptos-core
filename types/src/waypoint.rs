@@ -206,7 +206,7 @@ mod test {
     #[test]
     fn test_waypoint_li_verification() {
         let empty_li = LedgerInfo::new(BlockInfo::empty(), HashValue::zero());
-        assert!(Waypoint::new_epoch_boundary(&empty_li).is_err()); // no validator set in empty LI
+        debug_assert!(Waypoint::new_epoch_boundary(&empty_li).is_err()); // no validator set in empty LI
         let li = LedgerInfo::new(
             BlockInfo::new(
                 1,
@@ -220,6 +220,6 @@ mod test {
             HashValue::zero(),
         );
         let waypoint = Waypoint::new_epoch_boundary(&li).unwrap();
-        assert!(waypoint.verify(&li).is_ok());
+        debug_assert!(waypoint.verify(&li).is_ok());
     }
 }
