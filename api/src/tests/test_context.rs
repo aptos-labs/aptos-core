@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::golden_output::GoldenOutputs;
-use super::pretty;
+use super::{golden_output::GoldenOutputs, pretty};
 use crate::{
     context::Context, index, poem_backend::attach_poem_to_runtime, runtime::get_routes_with_poem,
 };
@@ -539,7 +538,7 @@ impl TestContext {
             round,
             self.validator_owner,
             Some(0),
-            vec![false],
+            vec![0],
             vec![],
             timestamp,
         )
