@@ -15,17 +15,10 @@ use aptos_telemetry_service::types::{
     telemetry::TelemetryDump,
 };
 use aptos_types::{chain_id::ChainId, PeerId};
-use reqwest::{StatusCode, Url};
+use reqwest::StatusCode;
 use std::sync::Arc;
-
-// const METRICS_ENDPOINT: &str = "https://aptos.dev/telemetry/";
-// const AUTH_URL: &str = "https://aptos.dev/telemetry/auth";
-// const METRICS_URL: &str = "https://aptos.dev/telemetry/telemetry";
-
-const METRICS_ENDPOINT: &str = "http://localhost:8081/";
-const AUTH_URL: &str = "http://localhost:8081/auth";
-const METRICS_URL: &str = "http://localhost:8081/telemetry";
-const MAX_RETRIES: i32 = 5;
+use tokio_retry::strategy::{jitter, ExponentialBackoff};
+use tokio_retry::RetryIf;
 
 struct AuthContext {
     noise_config: Option<NoiseConfig>,
@@ -45,6 +38,7 @@ impl AuthContext {
 
 #[derive(Clone)]
 pub(crate) struct TelemetrySender {
+    base_url: String,
     chain_id: ChainId,
     peer_id: PeerId,
     client: reqwest::Client,
@@ -52,8 +46,9 @@ pub(crate) struct TelemetrySender {
 }
 
 impl TelemetrySender {
-    pub fn new(chain_id: ChainId, node_config: &NodeConfig) -> Self {
+    pub fn new(base_url: &str, chain_id: ChainId, node_config: &NodeConfig) -> Self {
         Self {
+            base_url: base_url.into(),
             chain_id,
             peer_id: node_config.peer_id().unwrap_or(PeerId::ZERO),
             client: reqwest::Client::new(),
@@ -62,25 +57,37 @@ impl TelemetrySender {
     }
 
     pub async fn send_metrics(&self, event_name: String, telemetry_dump: TelemetryDump) {
-        for i in 1..MAX_RETRIES {
-            match self.post_metrics(&telemetry_dump).await {
-                Ok(_) => {
+        let retry_strategy = ExponentialBackoff::from_millis(100)
+            .map(jitter) // add jitter to delays
+            .take(5); // limit to 5 retries
+
+        let result = RetryIf::spawn(
+            retry_strategy,
+            || async { self.post_metrics(&telemetry_dump.clone()).await },
+            |err: &Error| {
+                if err.to_string().contains("Unauthorized") {
                     debug!(
-                        "Sent telemetry event {}, data: {:?}",
-                        &event_name, &telemetry_dump
+                        "Failed to send telemetry due to authorization failure: Error: {}.",
+                        err
                     );
-                    metrics::increment_telemetry_service_successes(&event_name);
-                    return;
+                    return true;
                 }
-                Err(error) => {
-                    if error.to_string().contains("Unauthorized") && i < MAX_RETRIES {
-                        debug!("Retrying failed send telemetry event: Error: {}.", error);
-                        continue;
-                    }
-                    error!("Failed to send telemetry event: Error: {}", error);
-                    metrics::increment_telemetry_service_failures(&event_name);
-                    return;
-                }
+                false
+            },
+        )
+        .await;
+
+        match result {
+            Ok(_) => {
+                debug!(
+                    "Sent telemetry event {}, data: {:?}",
+                    &event_name, &telemetry_dump
+                );
+                metrics::increment_telemetry_service_successes(&event_name);
+            }
+            Err(error) => {
+                error!("Failed to send telemetry event: Error: {}", error);
+                metrics::increment_telemetry_service_failures(&event_name);
             }
         }
     }
@@ -91,7 +98,7 @@ impl TelemetrySender {
         // Send the request and wait for a response
         let send_result = self
             .client
-            .post(METRICS_URL)
+            .post(format!("{}/telemetry", self.base_url))
             .json::<TelemetryDump>(telemetry_dump)
             .bearer_auth(token)
             .send()
@@ -128,8 +135,7 @@ impl TelemetrySender {
     }
 
     async fn get_public_key_from_server(&self) -> Result<x25519::PublicKey, anyhow::Error> {
-        let url = Url::parse(METRICS_ENDPOINT)?;
-        let response = self.client.get(url).send().await?;
+        let response = self.client.get(self.base_url.to_string()).send().await?;
 
         match response.error_for_status() {
             Ok(response) => {
@@ -153,7 +159,8 @@ impl TelemetrySender {
     }
 
     fn reset_token(&self) {
-        *self.auth_context.token.write() = None
+        *self.auth_context.token.write() = None;
+        *self.auth_context.server_public_key.lock() = None;
     }
 
     pub async fn authenticate(&self) -> Result<String, anyhow::Error> {
@@ -197,7 +204,7 @@ impl TelemetrySender {
 
         let response = self
             .client
-            .post(AUTH_URL)
+            .post(format!("{}/auth", self.base_url))
             .json::<AuthRequest>(&auth_request)
             .send()
             .await?;
@@ -220,5 +227,132 @@ impl TelemetrySender {
         let jwt = String::from_utf8(response_payload)?;
 
         Ok(jwt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::{
+        collections::BTreeMap,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use super::*;
+    use aptos_crypto::Uniform;
+    use aptos_telemetry_service::types::telemetry::TelemetryEvent;
+    use httpmock::MockServer;
+
+    #[tokio::test]
+    async fn test_server_public_key() {
+        let mut rng = rand::thread_rng();
+        let private_key = x25519::PrivateKey::generate(&mut rng);
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("GET").path("/");
+            then.status(200).json_body_obj(&private_key.public_key());
+        });
+
+        let node_config = NodeConfig::default();
+        let client = TelemetrySender::new(&server.base_url(), ChainId::default(), &node_config);
+
+        let result1 = client.server_public_key().await;
+        let result2 = client.server_public_key().await;
+
+        println!("{:?}", result1);
+
+        // Should call the server once and cache the key
+        assert_eq!(mock.hits(), 1);
+        assert_eq!(result1.is_ok(), true);
+        assert_eq!(result1.unwrap(), private_key.public_key());
+        assert_eq!(result2.is_ok(), true);
+        assert_eq!(result2.unwrap(), private_key.public_key());
+
+        client.reset_token();
+
+        let result3 = client.server_public_key().await;
+        assert_eq!(mock.hits(), 2);
+        assert_eq!(result3.is_ok(), true);
+        assert_eq!(result3.unwrap(), private_key.public_key());
+    }
+
+    #[tokio::test]
+    async fn test_post_metrics() {
+        let mut telemetry_event = TelemetryEvent {
+            name: "sample-event".into(),
+            params: BTreeMap::new(),
+        };
+        telemetry_event
+            .params
+            .insert("key-1".into(), "value-1".into());
+        let telemetry_dump = TelemetryDump {
+            client_id: "client-1".into(),
+            user_id: "user-1".into(),
+            timestamp_micros: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_micros()
+                .to_string(),
+            events: vec![],
+        };
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("POST")
+                .header("Authorization", "Bearer SECRET_JWT_TOKEN")
+                .path("/telemetry")
+                .json_body_obj(&telemetry_dump);
+            then.status(200);
+        });
+
+        let node_config = NodeConfig::default();
+        let client = TelemetrySender::new(&server.base_url(), ChainId::default(), &node_config);
+        {
+            *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
+        }
+
+        let result = client.post_metrics(&telemetry_dump).await;
+
+        mock.assert();
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_post_metrics_retry() {
+        let mut telemetry_event = TelemetryEvent {
+            name: "sample-event".into(),
+            params: BTreeMap::new(),
+        };
+        telemetry_event
+            .params
+            .insert("key-1".into(), "value-1".into());
+        let telemetry_dump = TelemetryDump {
+            client_id: "client-1".into(),
+            user_id: "user-1".into(),
+            timestamp_micros: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_micros()
+                .to_string(),
+            events: vec![],
+        };
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("POST").path("/telemetry");
+            then.status(400);
+        });
+
+        let node_config = NodeConfig::default();
+        let client = TelemetrySender::new(&server.base_url(), ChainId::default(), &node_config);
+        {
+            *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
+        }
+
+        let result = client.post_metrics(&telemetry_dump).await;
+
+        mock.assert_hits(5);
+        assert!(result.is_err());
     }
 }
