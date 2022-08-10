@@ -198,7 +198,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0x04f1d9fc30e4a767eaae37430f83bf99999f57c589677e4bacce6f1cba3b2d4be49e534bd5ab0c50766a53c529a8ed986045aee884bd3767d61eeedebb79e803",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {

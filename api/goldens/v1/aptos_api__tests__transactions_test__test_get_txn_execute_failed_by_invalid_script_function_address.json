@@ -49,7 +49,7 @@
   "signature": {
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
     "signature": "0x4e4f7c65c9fe8419d5a3f0572b1fd8b7e046ff41f1b612447fcd935683bc0205399fb546fa59bfc4db133a9011e316d742f3dc984aff69c5994306e4350cbf03",
-    "type": "ed_25519_signature"
+    "type": "ed25519_signature"
   },
   "events": [],
   "timestamp": "1",

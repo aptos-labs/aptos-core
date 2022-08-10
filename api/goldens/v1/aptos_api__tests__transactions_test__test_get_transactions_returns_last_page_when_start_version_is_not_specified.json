@@ -211,7 +211,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0xe4000f3c0c11738bf87c6a7552eb8e9c5131e57720955a4b693c0937b476c1c062040d714f12121bb61e243fe0edcb7d9f510f30b8c3a8d056f470574d1cfe0b",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -442,7 +442,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0x13cbcc64c0c7b8657f69d47d78093e3d940f178e147045af824e61673b95eeb1efdc51d9c49cc1a50de59a03ce24db3c37a282538f4c237db7a21ce77b6d0c0f",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -673,7 +673,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0x6305cc65b00eaffb966de878934eeb4c38ba3760d306a31adeffca755fb35a1ea5ae016c2351375290ced893870559727709144e5d14c89192a4b76eabcbea0e",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -904,7 +904,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0x1f14da222683ddd48d6c8d6278a9d85d94c5ecdb531fade78a8be2342ca602d6b95e9febf315395875e8fde99a841a9037729fc41714a10f02bc4e651c6f1100",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -1135,7 +1135,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0x42bc578d010b1c42a87303294f5588f3f189020c7f9cec45c1114abbbabd36bb918ade84ad967ac20a8a0a8b6b7acbc04f7467c088b2e570cbde5f94b5c2f70f",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -1366,7 +1366,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0x9e0c805b066eba7fab96418da864885519f46f21e5a2c6e6a89d1364f72bdd20fd785243699913d5795afc218e7539641bfd6026f6b0748944689ac16b9aa201",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -1597,7 +1597,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0x3fc43f8560e94e8761c69e659155facf4aba431f44cd0b4ad192ea391a3881be1a93740905446d39f24376b440a02e8a63d290c924eb84ec6c564df5f370690a",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -1828,7 +1828,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0xa313c4f766ec0e41a769c21fd7d059929510199e8ac8a7e61252dd4fa2c45390e1cd0a9efcb48065e00dc6a6998b618d7056f03ba6d09097304befa29b4bb805",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
