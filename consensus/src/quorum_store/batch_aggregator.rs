@@ -6,6 +6,7 @@ use aptos_crypto::{hash::DefaultHasher, HashValue};
 use aptos_types::transaction::SignedTransaction;
 use bcs::from_bytes;
 use std::result::Result;
+use aptos_logger::debug;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum BatchAggregatorError {
@@ -160,6 +161,7 @@ impl BatchAggregator {
 
         let missed_fragment = self.missed_fragment(batch_id, fragment_id);
         if missed_fragment {
+            debug!("QS: missed_fragment batch_id: {:?} fragment_id {:?}", batch_id, fragment_id);
             // If we started receiving a new batch, allow aggregating it by
             // clearing the state. Otherwise, when some fragment is skipped
             // within a batch, this just stops aggregating it.

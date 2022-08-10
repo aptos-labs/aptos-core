@@ -57,7 +57,7 @@ impl NetworkListener {
             .or_insert(BatchAggregator::new(self.max_batch_size));
         if let Some(expiration) = fragment.fragment_info.maybe_expiration() {
             // end batch message
-            debug!("QS: got end batch message from {:?}", source);
+            debug!("QS: got end batch message from {:?} batch_id {:?}, fragment_id {:?}", source, fragment.fragment_info.batch_id(), fragment.fragment_info.fragment_id());
             if expiration.epoch() == self.epoch {
                 match entry.end_batch(
                     fragment.batch_id(),
@@ -79,7 +79,7 @@ impl NetworkListener {
                 }
             } // Malformed request with an inconsistent expiry epoch.
         } else {
-            debug!("QS: got append_batch message from {:?}", source);
+            debug!("QS: got append_batch message from {:?} batch_id {:?}, fragment_id {:?}", source, fragment.fragment_info.batch_id(), fragment.fragment_info.fragment_id());
             if let Err(e) = entry.append_transactions(
                 fragment.batch_id(),
                 fragment.fragment_id(),
