@@ -53,6 +53,8 @@ pub struct GenesisInfo {
     pub rewards_apy_percentage: u64,
     /// Voting duration for a proposal in seconds.
     pub voting_duration_secs: u64,
+    /// Initial addresses and how much they should be minted.
+    pub initial_accounts: Vec<(Ed25519PublicKey, u64)>,
 }
 
 impl GenesisInfo {
@@ -70,8 +72,10 @@ impl GenesisInfo {
         required_proposer_stake: u64,
         rewards_apy_percentage: u64,
         voting_duration_secs: u64,
+        initial_accounts: Vec<(Ed25519PublicKey, u64)>,
     ) -> anyhow::Result<GenesisInfo> {
         let mut validators = Vec::new();
+        let mut initial_accounts = Vec::new();
 
         for config in configs {
             validators.push(config.try_into()?)
@@ -92,6 +96,7 @@ impl GenesisInfo {
             required_proposer_stake,
             rewards_apy_percentage,
             voting_duration_secs,
+            initial_accounts,
         })
     }
 
@@ -121,6 +126,8 @@ impl GenesisInfo {
                 rewards_apy_percentage: self.rewards_apy_percentage,
                 voting_duration_secs: self.voting_duration_secs,
             },
+            // This code fails expected slice found struct Vec
+            &self.initial_accounts,
         )
     }
 

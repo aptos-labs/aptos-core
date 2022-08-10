@@ -75,6 +75,7 @@ pub fn encode_genesis_transaction(
     stdlib_module_bytes: &[Vec<u8>],
     chain_id: ChainId,
     genesis_config: GenesisConfiguration,
+    initial_accounts: &[(AccountAddress, u64)],
 ) -> Transaction {
     let consensus_config = OnChainConsensusConfig::V1(ConsensusConfigV1::default());
 
@@ -85,6 +86,7 @@ pub fn encode_genesis_transaction(
         consensus_config,
         chain_id,
         &genesis_config,
+        initial_accounts,
     )))
 }
 
@@ -95,6 +97,7 @@ pub fn encode_genesis_change_set(
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
+    initial_accounts: &[(AccountAddress, u64)],
 ) -> ChangeSet {
     validate_genesis_config(genesis_config);
 
@@ -121,6 +124,9 @@ pub fn encode_genesis_change_set(
     );
     // generate the genesis WriteSet
     create_and_initialize_validators(&mut session, validators);
+
+    // generate and fund the initial list of accounts
+    create_and_initialize_initial_accounts(&mut session, initial_accounts);
 
     // Initialize on-chain governance.
     initialize_on_chain_governance(&mut session, genesis_config);
@@ -240,6 +246,7 @@ fn create_and_initialize_main_accounts(
     // Block timestamps are in microseconds and epoch_interval is used to check if a block timestamp
     // has crossed into a new epoch. So epoch_interval also needs to be in micro seconds.
     let epoch_interval_usecs = genesis_config.epoch_duration_secs * MICRO_SECONDS_PER_SECOND;
+
     exec_function(
         session,
         GENESIS_MODULE_NAME,
@@ -318,6 +325,23 @@ fn create_and_initialize_validators(
             MoveValue::Vector(validator_network_addresses),
             MoveValue::Vector(full_node_network_addresses),
             MoveValue::Vector(staking_distribution),
+        ]),
+    );
+}
+
+fn create_and_initialize_initial_accounts(
+    session: &mut SessionExt<impl MoveResolver>,
+    initial_accounts: &[(AccountAddress, u64)],
+) {
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "create_initialize_validators",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::Vector(vec![]),
+            MoveValue::Vector(vec![]),
         ]),
     );
 }
@@ -549,6 +573,7 @@ pub fn generate_test_genesis(
     let test_validators = TestValidator::new_test_set(count);
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
     let validators = &validators_;
+    let initial_accounts = vec![];
 
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
@@ -568,6 +593,7 @@ pub fn generate_test_genesis(
             rewards_apy_percentage: 10,
             voting_duration_secs: 3600,
         },
+        &initial_accounts,
     );
     (genesis, test_validators)
 }

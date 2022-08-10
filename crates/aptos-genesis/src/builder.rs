@@ -23,6 +23,8 @@ use aptos_crypto::{
 };
 use aptos_keygen::KeyGen;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
+// I try and include move_deps but it fails because undeclared crate or module
+// use move_deps::move_core_types::account_address::AccountAddress;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -451,8 +453,11 @@ impl Builder {
             .map(|i| self.generate_validator_config(i, &mut rng, &template))
             .collect::<anyhow::Result<Vec<ValidatorNodeConfig>>>()?;
 
+        // TODO get list of initial accounts?
+        let initial_accounts = vec![];
+
         // Build genesis
-        let (genesis, waypoint) = self.genesis_ceremony(&mut validators, root_key.public_key())?;
+        let (genesis, waypoint) = self.genesis_ceremony(&mut validators, root_key.public_key(), initial_accounts)?;
 
         // Save configs for validators so they can run
         for validator in validators.iter_mut() {
@@ -539,6 +544,9 @@ impl Builder {
         &mut self,
         validators: &mut Vec<ValidatorNodeConfig>,
         root_key: Ed25519PublicKey,
+        // I think this needs to be Ed25519PublicKey, but I'm not sure
+        // Either way I couldnt import account address
+        initial_accounts: Vec<(Ed25519PublicKey, u64)>,
     ) -> anyhow::Result<(Transaction, Waypoint)> {
         let mut configs: Vec<ValidatorConfiguration> = Vec::new();
 
@@ -576,6 +584,7 @@ impl Builder {
             genesis_config.required_proposer_stake,
             genesis_config.rewards_apy_percentage,
             genesis_config.voting_duration_secs,
+            initial_accounts,
         )?;
         let waypoint = genesis_info.generate_waypoint()?;
         let genesis = genesis_info.get_genesis();

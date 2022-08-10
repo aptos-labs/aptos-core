@@ -20,6 +20,7 @@ module aptos_framework::genesis {
 
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;
+    const EMISMATCHED_INITIAL_ACCOUNT_BALANCES: u64 = 2;
 
     fun initialize(
         core_resource_account: &signer,
@@ -158,6 +159,27 @@ module aptos_framework::genesis {
             i = i + 1;
         };
         stake::on_new_epoch();
+    }
+
+    // Creates the initial list of accounts and funds them with their initial balances.
+    public fun create_initial_accounts(
+        aptos_framework_account: signer,
+        initial_accounts: vector<address>,
+        initial_balances: vector<u64>,
+    ) {
+        // The number of accounts and balances must be equal
+        let num_initial_accounts = vector::length(&initial_accounts);
+        assert!(num_initial_accounts == vector::length(&initial_balances), error::invalid_argument(EMISMATCHED_INITIAL_ACCOUNT_BALANCES));
+        let i = 0;
+        while (i < num_initial_accounts) {
+            let initial_address = vector::borrow(&initial_accounts, i);
+            let amount = *vector::borrow(&initial_balances, i);
+            let initial_account = account::create_account_internal(*initial_address);
+            coins::register<AptosCoin>(&initial_account);
+            aptos_coin::mint(&aptos_framework_account, *initial_address, amount);
+
+            i = i + 1;
+        }
     }
 
     #[test_only]
