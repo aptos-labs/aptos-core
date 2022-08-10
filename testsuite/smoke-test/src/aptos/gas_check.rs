@@ -35,16 +35,13 @@ impl AptosTest for GasCheck {
         assert!(format!("{:?}", err).contains("INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE"));
 
         // TODO(Gas): double check this
-        ctx.mint(account1.address(), 4_000_000).await?;
-        ctx.mint(account2.address(), 4_000_000).await?;
+        ctx.mint(account1.address(), 1_000).await?;
+        ctx.mint(account2.address(), 1_000).await?;
 
         let transfer_too_much = account2.sign_with_transaction_builder(
             // TODO(Gas): double check this
             ctx.aptos_transaction_factory()
-                .payload(aptos_stdlib::aptos_coin_transfer(
-                    account1.address(),
-                    4_000_000,
-                )),
+                .payload(aptos_stdlib::aptos_coin_transfer(account1.address(), 1_000)),
         );
 
         let err = ctx
