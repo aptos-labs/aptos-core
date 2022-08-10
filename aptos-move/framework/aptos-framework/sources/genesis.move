@@ -42,7 +42,6 @@ module aptos_framework::genesis {
         // TODO: Only do create the core resources account in testnets
         account::create_account_internal(signer::address_of(core_resource_account));
         account::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
-        account::create_address_map(core_resource_account);
 
         // Initialize the aptos framework account. This is the account where system resources and modules will be
         // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
@@ -61,6 +60,7 @@ module aptos_framework::genesis {
             b"epilogue",
             b"writeset_epilogue",
         );
+        account::create_address_map(&aptos_framework_account);
 
         // Give the decentralized on-chain governance control over the core framework account.
         aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, framework_signer_cap);
