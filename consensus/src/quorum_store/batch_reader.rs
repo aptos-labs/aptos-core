@@ -10,6 +10,7 @@ use crate::quorum_store::{
 use anyhow::bail;
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
+use aptos_types::validator_verifier::ValidatorVerifier;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use consensus_types::{
     common::Round,
@@ -33,7 +34,6 @@ use tokio::{
     },
     time,
 };
-use aptos_types::validator_verifier::ValidatorVerifier;
 
 #[derive(Debug)]
 pub(crate) enum BatchReaderCommand {

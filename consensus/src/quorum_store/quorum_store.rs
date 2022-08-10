@@ -18,16 +18,13 @@ use aptos_types::{
     validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier, PeerId,
 };
 use channel::aptos_channel;
-use consensus_types::{
-    common::Round,
-    proof_of_store::LogicalTime,
-};
+use consensus_types::proof_of_store::SignedDigestInfo;
+use consensus_types::{common::Round, proof_of_store::LogicalTime};
 use std::sync::Arc;
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
     oneshot,
 };
-use consensus_types::proof_of_store::SignedDigestInfo;
 
 #[derive(Debug)]
 pub enum QuorumStoreCommand {
@@ -205,7 +202,11 @@ impl QuorumStore {
                 );
 
                 self.proof_builder_tx
-                    .send(ProofBuilderCommand::InitProof(SignedDigestInfo::new(digest, expiration), fragment.batch_id(), proof_tx))
+                    .send(ProofBuilderCommand::InitProof(
+                        SignedDigestInfo::new(digest, expiration),
+                        fragment.batch_id(),
+                        proof_tx,
+                    ))
                     .await
                     .expect("Failed to send to ProofBuilder");
 
@@ -242,12 +243,17 @@ impl QuorumStore {
                         .await
                         .expect("Failed to send to BatchStore");
                     let (proof_builder_shutdown_tx, proof_builder_shutdown_rx) = oneshot::channel();
-                    self.proof_builder_tx.send(ProofBuilderCommand::Shutdown(proof_builder_shutdown_tx))
+                    self.proof_builder_tx
+                        .send(ProofBuilderCommand::Shutdown(proof_builder_shutdown_tx))
                         .await
                         .expect("Failed to send to ProofBuilder");
 
-                    batch_store_shutdown_rx.await.expect("Failed to stop BatchStore");
-                    proof_builder_shutdown_rx.await.expect("Failed to stop ProofBuilder");
+                    batch_store_shutdown_rx
+                        .await
+                        .expect("Failed to stop BatchStore");
+                    proof_builder_shutdown_rx
+                        .await
+                        .expect("Failed to stop ProofBuilder");
 
                     ack_tx
                         .send(())
@@ -262,10 +268,16 @@ impl QuorumStore {
                     self.fragment_id = self.fragment_id + 1;
                 }
 
-                QuorumStoreCommand::EndBatch(fragment_payload, batch_id, logical_time, proof_tx) => {
+                QuorumStoreCommand::EndBatch(
+                    fragment_payload,
+                    batch_id,
+                    logical_time,
+                    proof_tx,
+                ) => {
                     debug!("QS: end batch cmd received, batch id = {}", batch_id);
-                    let (batch_store_command, fragment) =
-                        self.handle_end_batch(fragment_payload, batch_id, logical_time, proof_tx).await;
+                    let (batch_store_command, fragment) = self
+                        .handle_end_batch(fragment_payload, batch_id, logical_time, proof_tx)
+                        .await;
 
                     self.network_sender
                         .broadcast_without_self(ConsensusMsg::FragmentMsg(Box::new(fragment)))
@@ -280,7 +292,6 @@ impl QuorumStore {
                 }
             }
         }
-
 
         debug!(
             "[QS worker] QuorumStore worker for epoch {} stopping",

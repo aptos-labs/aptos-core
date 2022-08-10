@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network::QuorumStoreSender;
+use crate::quorum_store::proof_builder::ProofBuilderCommand;
 use crate::quorum_store::types::{Batch, PersistedValue};
 use crate::quorum_store::{
     batch_reader::{BatchReader, BatchReaderCommand},
@@ -9,6 +10,7 @@ use crate::quorum_store::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::debug;
+use aptos_types::validator_verifier::ValidatorVerifier;
 use aptos_types::{transaction::SignedTransaction, validator_signer::ValidatorSigner, PeerId};
 use consensus_types::{
     common::Round,
@@ -20,8 +22,6 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
     oneshot,
 };
-use aptos_types::validator_verifier::ValidatorVerifier;
-use crate::quorum_store::proof_builder::ProofBuilderCommand;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PersistRequest {
@@ -165,7 +165,11 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
         }
     }
 
-    pub async fn start(self, mut batch_store_rx: Receiver<BatchStoreCommand>, proof_builder_tx: Sender<ProofBuilderCommand>) {
+    pub async fn start(
+        self,
+        mut batch_store_rx: Receiver<BatchStoreCommand>,
+        proof_builder_tx: Sender<ProofBuilderCommand>,
+    ) {
         debug!(
             "[QS worker] BatchStore worker for epoch {} starting",
             self.epoch
@@ -186,7 +190,8 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchStore<T> {
                         if self.my_peer_id == author {
                             proof_builder_tx
                                 .send(ProofBuilderCommand::AppendSignature(signed_digest))
-                                .await.expect("Failed to send to ProofBuilder");
+                                .await
+                                .expect("Failed to send to ProofBuilder");
                             debug!("QS: sent signed digest to ProofBuilder");
                         } else {
                             self.network_sender

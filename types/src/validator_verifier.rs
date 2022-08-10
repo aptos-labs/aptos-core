@@ -242,8 +242,7 @@ impl ValidatorVerifier {
     ) -> std::result::Result<(), VerifyError> {
         // Verify the number of signature is not greater than expected.
         self.check_num_of_signatures(multi_signature)?;
-        let authors = multi_signature
-            .get_voter_addresses(&self.validator_addresses());
+        let authors = multi_signature.get_voter_addresses(&self.validator_addresses());
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter())?;
         #[cfg(any(test, feature = "fuzzing"))]

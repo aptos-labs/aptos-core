@@ -57,7 +57,12 @@ impl NetworkListener {
             .or_insert(BatchAggregator::new(self.max_batch_size));
         if let Some(expiration) = fragment.fragment_info.maybe_expiration() {
             // end batch message
-            debug!("QS: got end batch message from {:?} batch_id {:?}, fragment_id {:?}", source, fragment.fragment_info.batch_id(), fragment.fragment_info.fragment_id());
+            debug!(
+                "QS: got end batch message from {:?} batch_id {:?}, fragment_id {:?}",
+                source,
+                fragment.fragment_info.batch_id(),
+                fragment.fragment_info.fragment_id()
+            );
             if expiration.epoch() == self.epoch {
                 match entry.end_batch(
                     fragment.batch_id(),
@@ -65,9 +70,9 @@ impl NetworkListener {
                     fragment.take_transactions(),
                 ) {
                     Ok((num_bytes, payload, digest)) => {
-                        let persist_cmd = BatchStoreCommand::Persist(
-                            PersistRequest::new(source, payload, digest, num_bytes, expiration)
-                        );
+                        let persist_cmd = BatchStoreCommand::Persist(PersistRequest::new(
+                            source, payload, digest, num_bytes, expiration,
+                        ));
                         self.batch_store_tx
                             .send(persist_cmd)
                             .await
@@ -79,7 +84,12 @@ impl NetworkListener {
                 }
             } // Malformed request with an inconsistent expiry epoch.
         } else {
-            debug!("QS: got append_batch message from {:?} batch_id {:?}, fragment_id {:?}", source, fragment.fragment_info.batch_id(), fragment.fragment_info.fragment_id());
+            debug!(
+                "QS: got append_batch message from {:?} batch_id {:?}, fragment_id {:?}",
+                source,
+                fragment.fragment_info.batch_id(),
+                fragment.fragment_info.fragment_id()
+            );
             if let Err(e) = entry.append_transactions(
                 fragment.batch_id(),
                 fragment.fragment_id(),

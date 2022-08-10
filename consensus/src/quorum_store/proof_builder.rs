@@ -4,15 +4,17 @@
 use crate::quorum_store::{quorum_store::QuorumStoreError, types::BatchId, utils::DigestTimeouts};
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::{debug, info};
+use aptos_types::multi_signature::PartialSignatures;
 use aptos_types::validator_verifier::ValidatorVerifier;
-use consensus_types::proof_of_store::{ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo};
+use aptos_types::PeerId;
+use consensus_types::proof_of_store::{
+    ProofOfStore, SignedDigest, SignedDigestError, SignedDigestInfo,
+};
 use futures::channel::oneshot;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
-use tokio::{time, sync::oneshot as TokioOneshot};
-use aptos_types::multi_signature::PartialSignatures;
-use aptos_types::PeerId;
+use tokio::{sync::oneshot as TokioOneshot, time};
 
 #[derive(Debug)]
 pub(crate) enum ProofBuilderCommand {
@@ -22,7 +24,7 @@ pub(crate) enum ProofBuilderCommand {
 }
 
 pub(crate) type ProofReturnChannel =
-oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
+    oneshot::Sender<Result<(ProofOfStore, BatchId), QuorumStoreError>>;
 
 struct IncrementalProofState {
     info: SignedDigestInfo,
@@ -55,14 +57,19 @@ impl IncrementalProofState {
     }
 
     fn ready(&self, validator_verifier: &ValidatorVerifier, my_peer_id: PeerId) -> bool {
-        self.aggregated_signature.contains_key(&my_peer_id) &&
-            validator_verifier
+        self.aggregated_signature.contains_key(&my_peer_id)
+            && validator_verifier
                 .check_voting_power(self.aggregated_signature.keys())
                 .is_ok()
     }
 
-    fn take(self, validator_verifier: &ValidatorVerifier) -> (ProofOfStore, BatchId, ProofReturnChannel) {
-        let proof = match validator_verifier.aggregate_multi_signature(&PartialSignatures::new(self.aggregated_signature)) {
+    fn take(
+        self,
+        validator_verifier: &ValidatorVerifier,
+    ) -> (ProofOfStore, BatchId, ProofReturnChannel) {
+        let proof = match validator_verifier
+            .aggregate_multi_signature(&PartialSignatures::new(self.aggregated_signature))
+        {
             Ok((sig, _)) => ProofOfStore::new(self.info, sig),
             Err(e) => unreachable!("Cannot aggregate signatures on digest err = {:?}", e),
         };
@@ -70,7 +77,9 @@ impl IncrementalProofState {
     }
 
     fn send_timeout(self) {
-        self.ret_tx.send(Err(QuorumStoreError::Timeout(self.batch_id))).expect("Unable to send the timeout a proof of store");
+        self.ret_tx
+            .send(Err(QuorumStoreError::Timeout(self.batch_id)))
+            .expect("Unable to send the timeout a proof of store");
     }
 }
 
@@ -128,8 +137,11 @@ impl ProofBuilder {
                 }
             });
         if ready {
-            let (proof, batch_id, tx) =
-                self.digest_to_proof.remove(&digest).unwrap().take(validator_verifier);
+            let (proof, batch_id, tx) = self
+                .digest_to_proof
+                .remove(&digest)
+                .unwrap()
+                .take(validator_verifier);
             tx.send(Ok((proof, batch_id)))
                 .expect("Unable to send the proof of store");
         }

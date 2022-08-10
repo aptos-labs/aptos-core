@@ -6,12 +6,12 @@ use anyhow::Context;
 use aptos_crypto::{bls12381, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::account_address::AccountAddress as PeerId;
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::validator_signer::ValidatorSigner;
 use aptos_types::validator_verifier::ValidatorVerifier;
 use rand::{seq::SliceRandom, thread_rng};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use aptos_types::multi_signature::MultiSignature;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize, Hash)]
 pub struct LogicalTime {
@@ -120,7 +120,9 @@ impl ProofOfStore {
     }
 
     pub fn shuffled_signers(&self, validator: &ValidatorVerifier) -> Vec<PeerId> {
-        let mut ret: Vec<PeerId> = self.multi_signature.get_voter_addresses(&validator.validator_addresses());
+        let mut ret: Vec<PeerId> = self
+            .multi_signature
+            .get_voter_addresses(&validator.validator_addresses());
         ret.shuffle(&mut thread_rng());
         ret
     }
