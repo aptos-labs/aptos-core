@@ -566,7 +566,6 @@ mod tests {
             ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key());
 
         assert_eq!(
-            // This should fail with insufficient quorum voting power.
             validator
                 .verify_multi_signatures(&dummy_struct, &MultiSignature::new(vec![true], None)),
             Err(VerifyError::EmptySignature)
