@@ -18,9 +18,8 @@ export default function AuthLayout({
   children,
   routePath,
 }: AuthLayoutProps) {
-  const { accounts, aptosAccount } = useWalletState();
+  const { aptosAccount } = useWalletState();
   const page = <Box width="100%" height="100%">{children}</Box>;
-  console.log(accounts);
 
   const redirectPath = useMemo(() => {
     switch (routePath) {
