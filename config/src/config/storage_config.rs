@@ -123,27 +123,6 @@ pub struct StoragePrunerConfig {
     pub user_pruning_window_offset: u64,
 }
 
-impl StoragePrunerConfig {
-    pub fn new(
-        enable_state_store_pruner: bool,
-        enable_ledger_pruner: bool,
-        state_store_prune_window: u64,
-        ledger_store_prune_window: u64,
-        ledger_pruning_batch_size: usize,
-        state_store_pruning_batch_size: usize,
-    ) -> Self {
-        StoragePrunerConfig {
-            enable_state_store_pruner,
-            enable_ledger_pruner,
-            state_store_prune_window,
-            ledger_prune_window: ledger_store_prune_window,
-            ledger_pruning_batch_size,
-            state_store_pruning_batch_size,
-            user_pruning_window_offset: ledger_store_prune_window / 5,
-        }
-    }
-}
-
 impl Default for StorageConfig {
     fn default() -> StorageConfig {
         StorageConfig {
@@ -166,7 +145,7 @@ impl Default for StorageConfig {
                 // A 10k transaction block (touching 60k state values, in the case of the account
                 // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
                 state_store_pruning_batch_size: 1_000,
-                user_pruning_window_offset: 2_000_000,
+                user_pruning_window_offset: 200_000,
             },
             data_dir: PathBuf::from("/opt/aptos/data"),
             // Default read/write/connection timeout, in milliseconds

@@ -70,7 +70,7 @@ impl PrunerManager for LedgerPrunerManager {
                 .prune_window
                 .saturating_sub(self.user_pruning_window_offset);
             let adjusted_cutoff = self.latest_version.lock().saturating_sub(adjusted_window);
-            std::cmp::min(min_version, adjusted_cutoff)
+            std::cmp::max(min_version, adjusted_cutoff)
         } else {
             min_version
         }
