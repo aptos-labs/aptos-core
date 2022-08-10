@@ -72,11 +72,15 @@ impl PrunerManager for StatePrunerManager {
 
     fn get_min_viable_version(&self) -> Version {
         let min_version = self.get_min_readable_version();
-        let window_cutoff_with_buffer = self.latest_version.lock().saturating_sub(
-            self.prune_window
-                .saturating_sub(self.user_pruning_window_offset),
-        );
-        std::cmp::max(min_version, window_cutoff_with_buffer)
+        if self.is_pruner_enabled() {
+            let window_cutoff_with_buffer = self.latest_version.lock().saturating_sub(
+                self.prune_window
+                    .saturating_sub(self.user_pruning_window_offset),
+            );
+            std::cmp::max(min_version, window_cutoff_with_buffer)
+        } else {
+            min_version
+        }
     }
 
     /// Sends pruning command to the worker thread when necessary.
