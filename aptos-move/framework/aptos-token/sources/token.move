@@ -316,10 +316,9 @@ module aptos_token::token {
         let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
 
         assert!(token_data.mutability_config.properties, EFIELD_NOT_MUTABLE);
-        let addr = signer::address_of(account);
         // check if the property_version is 0 to determine if we need to update the property_version
         if (token_id.property_version == 0) {
-            let token = withdraw_with_event_internal(addr, token_id, amount);
+            let token = withdraw_with_event_internal(token_owner, token_id, amount);
             let i = 0;
             let largest_property_version = token_data.largest_property_version;
             // give a new property_version for each token
@@ -381,7 +380,7 @@ module aptos_token::token {
     }
 
     /// Deposit the token balance into the recipients account and emit an event.
-    public fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
+    fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
         let token_store = borrow_global_mut<TokenStore>(account_addr);
 
         event::emit_event<DepositEvent>(
@@ -389,11 +388,6 @@ module aptos_token::token {
             DepositEvent { id: token.id, amount: token.amount },
         );
 
-        direct_deposit_without_event_internal(account_addr, token);
-    }
-
-    /// Deposit the token balance into the recipients account without emitting an event.
-    fun direct_deposit_without_event_internal(account_addr: address, token: Token) acquires TokenStore {
         assert!(
             exists<TokenStore>(account_addr),
             error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
