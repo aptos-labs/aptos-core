@@ -20,8 +20,6 @@ use testcases::{
     network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
     reconfiguration_test::ReconfigurationTest, state_sync_performance::StateSyncPerformance,
 };
-
-use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use tokio::runtime::Runtime;
 use url::Url;
 
