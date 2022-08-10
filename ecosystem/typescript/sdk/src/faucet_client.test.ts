@@ -8,6 +8,12 @@ import { NODE_URL, FAUCET_URL } from "./util.test";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
+test("faucet url emtpy", () => {
+  expect(() => {
+    const client = new AptosClient("");
+    client.getAccount("0x1");
+  }).toThrow("Faucet URL cannot be empty.");
+});
 test(
   "full tutorial faucet flow",
   async () => {
