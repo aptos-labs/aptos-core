@@ -187,13 +187,12 @@ impl SfStreamer {
                 return vec![];
             }
         }
-        match self.get_encoded_transactions_with_validation(
+        match self.print_block_with_validation(
             &result,
             block_start_version,
             block_last_version,
         ) {
-            Ok(encoded_txns) => {
-                self.print_block(&encoded_txns, block_start_version).await;
+            Ok(_) => {
                 self.current_block_height += 1;
                 result
             }
@@ -211,16 +210,20 @@ impl SfStreamer {
 
     /// We can consider a block height as valid if these conditions are met:
     /// 1. first transaction is a block metadata or genesis 2. versions are monotonically increasing 3. start and end versions match block boundaries
-    fn get_encoded_transactions_with_validation(
+    /// Return error if the block is not valid. Panic if there's anything wrong with encoding a transaction. 
+    fn print_block_with_validation(
         &self,
         converted_txns: &Vec<TransactionPB>,
         block_start_version: u64,
         block_last_version: u64,
-    ) -> anyhow::Result<Vec<String>> {
-        let mut encoded_txns = vec![];
+    ) -> anyhow::Result<()> {
         if converted_txns.is_empty() {
             bail!("No transactions")
         }
+        println!(
+            "DMLOG BLOCK_START {} {}",
+            self.current_block_height, block_start_version
+        );
         let mut curr_version = block_start_version;
         for (index, txn) in converted_txns.iter().enumerate() {
             // First transaction has to be bmt or genesis
@@ -246,7 +249,7 @@ impl SfStreamer {
                 block_start_version,
                 self.current_block_height
             );
-            encoded_txns.push(self.get_encoded_txn(txn));
+            self.print_transaction(txn);
             curr_version += 1
         }
         // Last version has to match last version of transaction
@@ -257,10 +260,12 @@ impl SfStreamer {
             curr_version - 1,
             self.current_block_height
         );
-        Ok(encoded_txns)
+        println!("DMLOG BLOCK_END {}", self.current_block_height);
+        metrics::BLOCKS_SENT.inc();
+        Ok(())
     }
 
-    fn get_encoded_txn(&self, transaction: &TransactionPB) -> String {
+    fn print_transaction (&self, transaction: &TransactionPB) {
         let mut buf = vec![];
         transaction.encode(&mut buf).unwrap_or_else(|_| {
             panic!(
@@ -268,18 +273,7 @@ impl SfStreamer {
                 transaction
             )
         });
-        base64::encode(buf)
-    }
-
-    pub async fn print_block(&self, encoded_txns: &Vec<String>, block_start_version: u64) {
-        println!(
-            "DMLOG BLOCK_START {} {}",
-            self.current_block_height, block_start_version
-        );
-        for encoded_txn in encoded_txns {
-            println!("DMLOG TRX {}", encoded_txn);
-        }
-        println!("DMLOG BLOCK_END");
-        metrics::BLOCKS_SENT.inc();
+        println!("DMLOG TRX {}", base64::encode(buf));
+        metrics::TRANSACTIONS_SENT.inc();
     }
 }
