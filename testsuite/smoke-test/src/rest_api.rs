@@ -3,65 +3,51 @@
 
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
-use forge::{AptosContext, AptosTest, Result, Test};
+use forge::Swarm;
 
-pub struct GetIndex;
+use crate::smoke_test_environment::new_local_swarm_with_aptos;
 
-impl Test for GetIndex {
-    fn name(&self) -> &'static str {
-        "api::get-index"
-    }
+#[tokio::test]
+async fn test_get_index() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let info = swarm.aptos_public_info();
+
+    let resp = reqwest::get(info.url().to_owned()).await.unwrap();
+    assert_eq!(reqwest::StatusCode::OK, resp.status());
 }
 
-#[async_trait::async_trait]
-impl AptosTest for GetIndex {
-    async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
-        let resp = reqwest::get(ctx.url().to_owned()).await?;
-        assert_eq!(reqwest::StatusCode::OK, resp.status());
+#[tokio::test]
+async fn test_basic_client() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut info = swarm.aptos_public_info();
 
-        Ok(())
-    }
-}
+    info.client().get_ledger_information().await.unwrap();
 
-pub struct BasicClient;
+    // TODO(Gas): double check if this is correct
+    let mut account1 = info.create_and_fund_user_account(10_000).await.unwrap();
+    // TODO(Gas): double check if this is correct
+    let account2 = info.create_and_fund_user_account(10_000).await.unwrap();
 
-impl Test for BasicClient {
-    fn name(&self) -> &'static str {
-        "api::basic-client"
-    }
-}
+    let tx = account1.sign_with_transaction_builder(
+        info.transaction_factory()
+            .payload(aptos_stdlib::aptos_coin_transfer(account2.address(), 1)),
+    );
+    let pending_txn = info.client().submit(&tx).await.unwrap().into_inner();
 
-#[async_trait::async_trait]
-impl AptosTest for BasicClient {
-    async fn run<'t>(&self, ctx: &mut AptosContext<'t>) -> Result<()> {
-        let client = ctx.client();
-        client.get_ledger_information().await?;
+    info.client()
+        .wait_for_transaction(&pending_txn)
+        .await
+        .unwrap();
 
-        // TODO(Gas): double check if this is correct
-        let mut account1 = ctx.create_and_fund_user_account(10_000).await?;
-        // TODO(Gas): double check if this is correct
-        let account2 = ctx.create_and_fund_user_account(10_000).await?;
+    info.client()
+        .get_transaction(pending_txn.hash.into())
+        .await
+        .unwrap();
 
-        let tx = account1.sign_with_transaction_builder(
-            ctx.transaction_factory()
-                .payload(aptos_stdlib::aptos_coin_transfer(account2.address(), 1)),
-        );
-        let pending_txn = client.submit(&tx).await.unwrap().into_inner();
+    info.client()
+        .get_account_resources(CORE_CODE_ADDRESS)
+        .await
+        .unwrap();
 
-        client.wait_for_transaction(&pending_txn).await.unwrap();
-
-        client
-            .get_transaction(pending_txn.hash.into())
-            .await
-            .unwrap();
-
-        client
-            .get_account_resources(CORE_CODE_ADDRESS)
-            .await
-            .unwrap();
-
-        client.get_transactions(None, None).await.unwrap();
-
-        Ok(())
-    }
+    info.client().get_transactions(None, None).await.unwrap();
 }
