@@ -29,7 +29,6 @@ pub const BUILD_VERSION: &str = "build_version";
 #[macro_export]
 macro_rules! collect_build_information {
     () => {{
-        println!("calling collect {:?}", std::env::var("GIT_SHA"));
         // Collect and return the build information
         let mut build_information: std::collections::BTreeMap<String, String> = BTreeMap::new();
 
