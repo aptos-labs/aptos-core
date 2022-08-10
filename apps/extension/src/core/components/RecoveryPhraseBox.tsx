@@ -5,18 +5,21 @@ import {
   Box,
   Button,
   Text,
+  useColorMode,
   VStack,
 } from '@chakra-ui/react';
 import { useWalletState } from 'core/hooks/useWalletState';
 import React from 'react';
 import Copyable from 'core/components/Copyable';
 import { BiCopy } from '@react-icons/all-files/bi/BiCopy';
+import { secondaryBorderColor } from 'core/colors';
 
 export default function RecoveryPhraseBox() {
   const { accountMnemonic } = useWalletState();
+  const { colorMode } = useColorMode();
   return (
     <VStack align="flex-start">
-      <Box width="100%" boxShadow="2xl" p="4" rounded="md" bg="white">
+      <Box width="100%" borderRadius=".5rem" borderWidth="1px" borderColor={secondaryBorderColor[colorMode]} p={4} rounded="md" bg="white">
         <Text>
           {accountMnemonic?.mnemonic}
         </Text>
