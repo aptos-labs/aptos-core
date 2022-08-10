@@ -4,7 +4,7 @@
 set -e
 
 # Build all the rust release binaries
-RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
+RUSTFLAGS="--cfg tokio_unstable" cargo build --performance \
         -p aptos \
         -p aptos-faucet \
         -p aptos-indexer \

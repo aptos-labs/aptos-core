@@ -159,6 +159,7 @@ debug = true
 overflow-checks = false
 lto = true
 codegen-units = 1
+panic = "abort"
 
 [profile.cli]
 inherits = "release"
