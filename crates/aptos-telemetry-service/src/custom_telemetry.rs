@@ -9,7 +9,7 @@ use crate::{
     types::{auth::Claims, telemetry::TelemetryDump},
 };
 use aptos_config::config::PeerRole;
-use aptos_logger::{error, info};
+use aptos_logger::{debug, error};
 use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAllRequest;
 use serde_json::json;
 use warp::{filters::BoxedFilter, reject, reply, Filter, Rejection, Reply};
@@ -38,7 +38,7 @@ pub async fn handle_custom_telemetry(
 
     let mut insert_request = TableDataInsertAllRequest::new();
 
-    let telemetry_event = body.events[0].clone();
+    let telemetry_event = &body.events[0];
     let event_params: Vec<serde_json::Value> = telemetry_event
         .params
         .iter()
@@ -64,7 +64,7 @@ pub async fn handle_custom_telemetry(
     });
 
     insert_request
-        .add_row(None, row.clone())
+        .add_row(None, &row)
         .map_err(|_| reject::reject())?;
 
     context
@@ -83,7 +83,6 @@ pub async fn handle_custom_telemetry(
             reject::reject()
         })?;
 
-    info!("inject succeeded {:?}", row.to_string());
-
+    debug!("inject succeeded {:?}", &row);
     Ok(reply::reply())
 }
