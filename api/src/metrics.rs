@@ -29,6 +29,14 @@ pub static RESPONSE_STATUS: Lazy<HistogramVec> = Lazy::new(|| {
 // Should use same `operationId` defined in `openapi.yaml` whenever possible.
 pub fn metrics(operation_id: &'static str) -> Log<impl Fn(Info) + Copy> {
     let func = move |info: Info| {
+        if operation_id == "simulate_bcs_transactions" {
+            panic!(
+                "BCHO: {}, {}, {}",
+                info.method(),
+                info.status(),
+                info.path()
+            );
+        }
         HISTOGRAM
             .with_label_values(&[
                 info.method().to_string().as_str(),
