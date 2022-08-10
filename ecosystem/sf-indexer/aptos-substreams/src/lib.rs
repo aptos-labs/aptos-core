@@ -1,16 +1,33 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+mod pb;
 mod transaction_converter;
 
-use aptos_protos::{
+use pb::aptos::{
     block_output::v1::{
-        transaction_output::TxnData as TxnDataOutput, BlockOutput, TransactionOutput,
+        self, transaction_output::TxnData as TxnDataOutput, BlockOutput, EventKeyOutput,
+        SignatureOutput, TransactionOutput,
     },
     extractor::v1::{
-        transaction::TransactionType, transaction::TxnData as TxnDataInput, Event, Transaction,
+        account_signature::Signature as AccountSignature,
+        signature::{Signature, Type as SignatureType},
+        transaction::TransactionType,
+        transaction::TxnData as TxnDataInput,
+        BlockMetadataTransaction, Ed25519Signature, Event, MultiAgentSignature,
+        MultiEd25519Signature, Transaction, TransactionInfo, UserTransaction,
+        UserTransactionRequest,
     },
 };
+
+// use aptos_protos::{
+//     block_output::v1::{
+//         transaction_output::TxnData as TxnDataOutput, BlockOutput, TransactionOutput,
+//     },
+//     extractor::v1::{
+//         transaction::TransactionType, transaction::TxnData as TxnDataInput, Event, Transaction,
+//     },
+// };
 use substreams::{errors::Error, store};
 
 #[substreams::handlers::map]

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, Context, Result};
-use aptos_protos::{
+use crate::pb::aptos::{
     block_output::v1::{
         BlockMetadataTransactionOutput, EventKeyOutput, EventOutput, SignatureOutput,
         TransactionInfoOutput, UserTransactionOutput, WriteSetChangeOutput,
@@ -16,6 +16,20 @@ use aptos_protos::{
         UserTransactionRequest,
     },
 };
+// use aptos_protos::{
+//     block_output::v1::{
+//         BlockMetadataTransactionOutput, EventKeyOutput, EventOutput, SignatureOutput,
+//         TransactionInfoOutput, UserTransactionOutput, WriteSetChangeOutput,
+//     },
+//     extractor::v1::{
+//         account_signature::Signature as AccountSignature,
+//         signature::{Signature, Type as SignatureType},
+//         transaction::TransactionType,
+//         BlockMetadataTransaction, Ed25519Signature, Event, MultiAgentSignature,
+//         MultiEd25519Signature, Transaction, TransactionInfo, UserTransaction,
+//         UserTransactionRequest,
+//     },
+// };
 
 pub fn get_transaction_info_output(
     txn: &Transaction,
