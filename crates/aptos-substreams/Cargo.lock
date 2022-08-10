@@ -13,8 +13,9 @@ name = "aptos-substreams"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "bytes",
  "prost",
- "prost-types",
+ "prost-build",
  "serde",
  "serde_json",
  "substreams",

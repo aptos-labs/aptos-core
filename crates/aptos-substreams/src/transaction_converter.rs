@@ -1,16 +1,15 @@
-use crate::{
-    aptos::{
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::pb::aptos::{
+    block_output::{self, EventKeyOutput, SignatureOutput},
+    extractor::{
         account_signature::Signature as AccountSignature,
         signature::{Signature, Type as SignatureType},
         transaction::TransactionType,
-        BlockMetadataTransaction, Transaction,
-    },
-    pb::{
-        aptos::{
-            Ed25519Signature, Event, MultiAgentSignature, MultiEd25519Signature, TransactionInfo,
-            UserTransaction, UserTransactionRequest,
-        },
-        block_output::{self, EventKeyOutput, SignatureOutput},
+        BlockMetadataTransaction, Ed25519Signature, Event, MultiAgentSignature,
+        MultiEd25519Signature, Transaction, TransactionInfo, UserTransaction,
+        UserTransactionRequest,
     },
 };
 use anyhow::{bail, Context, Result};

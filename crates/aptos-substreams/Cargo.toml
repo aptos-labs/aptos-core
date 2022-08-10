@@ -9,17 +9,16 @@ license = "Apache-2.0"
 publish = false
 edition = "2018"
 
+[lib]
+crate-type = ["cdylib"]
+
 [dependencies]
 anyhow = "1.0.57"
+bytes = "1.1.0"
 prost = "0.10.1"
-prost-types = "0.10.1"
-prost-wkt = "0.3.1"
-prost-wkt-types = "0.3.1"
 serde = { version = "1.0.137", features = ["derive"], default-features = false }
 serde_json = { version = "1.0.81", features = ["preserve_order"] }
 substreams = "0.0.12"
 
-[profile.release]
-lto = true
-opt-level = 's'
-strip = "debuginfo"
+[build-dependencies]
+prost-build = "0.10.1"

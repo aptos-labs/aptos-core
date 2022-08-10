@@ -1,15 +1,18 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 pub mod pb;
 mod transaction_converter;
 
-use pb::aptos::{self, transaction::TxnData as TxnDataInput, Event};
-use pb::block_output::{
+use pb::aptos::block_output::{
     transaction_output::TxnData as TxnDataOutput, BlockOutput, TransactionOutput,
 };
+use pb::aptos::extractor::{self, transaction::TxnData as TxnDataInput, Event};
 use substreams::{errors::Error, store};
 
 #[substreams::handlers::map]
 /// Input will be block soon but for now we're using transaction as block
-fn block_to_block_output(input_txn: aptos::Transaction) -> Result<BlockOutput, Error> {
+fn block_to_block_output(input_txn: extractor::Transaction) -> Result<BlockOutput, Error> {
     let mut transactions: Vec<TransactionOutput> = vec![];
 
     // TODO: Add a for loop here for block
@@ -22,11 +25,10 @@ fn block_to_block_output(input_txn: aptos::Transaction) -> Result<BlockOutput, E
             )));
         }
         Some(info) => {
-            transaction_info =
-                transaction_converter::get_transaction_info_output(&input_txn, info)
-                    .map_err(|e| Error::Unexpected(e.to_string()))?;
+            transaction_info = transaction_converter::get_transaction_info_output(&input_txn, info)
+                .map_err(|e| Error::Unexpected(e.to_string()))?;
             write_set_changes = transaction_converter::get_write_set_changes_output(&input_txn)
-            .map_err(|e| Error::Unexpected(e.to_string()))?;
+                .map_err(|e| Error::Unexpected(e.to_string()))?;
         }
     }
     let mut txn_data: Option<TxnDataOutput> = None;
@@ -72,7 +74,7 @@ fn block_to_block_output(input_txn: aptos::Transaction) -> Result<BlockOutput, E
 }
 
 #[substreams::handlers::store]
-fn store_count(transaction: aptos::Transaction, store: store::StoreAddInt64) {
+fn store_count(transaction: extractor::Transaction, store: store::StoreAddInt64) {
     store.add(transaction.version, generate_trx_key(), 1);
     store.add(
         transaction.version,
@@ -85,8 +87,8 @@ fn generate_trx_key() -> String {
     String::from("total")
 }
 
-fn generate_trx_type_key(trx_type: aptos::transaction::TransactionType) -> String {
-    use aptos::transaction::TransactionType;
+fn generate_trx_type_key(trx_type: extractor::transaction::TransactionType) -> String {
+    use extractor::transaction::TransactionType;
 
     match trx_type {
         TransactionType::Genesis => "genesis",
