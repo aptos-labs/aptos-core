@@ -278,6 +278,7 @@ dependencies = [
  "proptest-derive",
  "serde 1.0.141",
  "serde_bytes",
+ "serde_json",
 ]
 
 [[package]]
@@ -1250,6 +1251,7 @@ dependencies = [
 name = "aptos-transaction-benchmarks"
 version = "0.1.0"
 dependencies = [
+ "aptos-bitvec",
  "aptos-crypto",
  "aptos-types",
  "aptos-vm",
@@ -1327,6 +1329,7 @@ name = "aptos-types"
 version = "0.0.3"
 dependencies = [
  "anyhow",
+ "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
  "bcs",
@@ -2454,6 +2457,7 @@ name = "consensus"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-bitvec",
  "aptos-config",
  "aptos-crypto",
  "aptos-infallible",
@@ -2522,6 +2526,7 @@ name = "consensus-types"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-infallible",
@@ -4783,6 +4788,7 @@ name = "language-e2e-tests"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-bitvec",
  "aptos-config",
  "aptos-crypto",
  "aptos-gas",
@@ -8161,9 +8167,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.82"
+version = "1.0.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82c2c1fdcd807d1098552c5b9a36e425e42e9fbd7c6a37a8425f390f781f7fa7"
+checksum = "38dd04e3c8279e75b31ef29dbdceebfe5ad89f4d0937213c53f7d49d01b3d5a7"
 dependencies = [
  "indexmap",
  "itoa 1.0.2",

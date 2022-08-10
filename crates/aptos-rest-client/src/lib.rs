@@ -7,6 +7,7 @@ pub use aptos_api_types::{
 };
 use aptos_api_types::{
     mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, BlockInfo, Event,
+    HexEncodedBytes,
 };
 use aptos_crypto::HashValue;
 use aptos_types::{
@@ -31,7 +32,7 @@ pub mod types;
 use crate::aptos::{AptosVersion, Balance};
 pub use types::{Account, Resource};
 pub mod aptos;
-use types::deserialize_from_string;
+use types::{deserialize_from_prefixed_hex_string, deserialize_from_string};
 
 pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 pub const DEFAULT_VERSION_PATH_BASE: &str = "v1/";
@@ -402,7 +403,8 @@ impl Client {
             round: u64,
             #[serde(deserialize_with = "deserialize_from_string")]
             height: u64,
-            previous_block_votes: Vec<bool>,
+            #[serde(deserialize_with = "deserialize_from_prefixed_hex_string")]
+            previous_block_votes_bitvec: HexEncodedBytes,
             proposer: String,
             failed_proposer_indices: Vec<String>,
             #[serde(deserialize_with = "deserialize_from_string")]
@@ -430,7 +432,7 @@ impl Client {
                                 e.epoch,
                                 e.round,
                                 e.height,
-                                e.previous_block_votes,
+                                e.previous_block_votes_bitvec.0,
                                 AccountAddress::from_hex_literal(&e.proposer)
                                     .map_err(|e| anyhow!(e))?,
                                 e.failed_proposer_indices

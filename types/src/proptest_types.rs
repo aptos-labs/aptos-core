@@ -971,7 +971,7 @@ impl Arbitrary for BlockMetadata {
             any::<u64>(),
             any::<AccountAddress>(),
             any::<u32>(),
-            prop::collection::vec(any::<bool>(), num_validators_range.clone()),
+            prop::collection::vec(any::<u8>(), num_validators_range.clone()),
             prop::collection::vec(any::<u32>(), num_validators_range),
             any::<u64>(),
         )

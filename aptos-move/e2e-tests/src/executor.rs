@@ -16,6 +16,7 @@ use crate::{
     data_store::{FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_FRESH},
     golden_outputs::GoldenOutputs,
 };
+use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_gas::NativeGasParameters;
 use aptos_keygen::KeyGen;
@@ -450,7 +451,7 @@ impl FakeExecutor {
             0,
             *validator_set.payload().next().unwrap().account_address(),
             proposer_index,
-            vec![false; validator_set.payload().count()],
+            BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             failed_proposer_indices,
             self.block_time,
         );
