@@ -36,11 +36,12 @@ impl Default for ConsensusConfig {
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
-            round_initial_timeout_ms: 1000,
+            round_initial_timeout_ms: 1500,
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
             channel_size: 30, // hard-coded
             use_quorum_store: false,
+
             quorum_store_pull_timeout_ms: 1000,
             quorum_store_poll_count: 20,
             intra_consensus_channel_buffer_size: 10,

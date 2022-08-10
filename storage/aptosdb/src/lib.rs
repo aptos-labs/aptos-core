@@ -47,11 +47,9 @@ use crate::{
     ledger_store::LedgerStore,
     metrics::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
-        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, STATE_ITEM_COUNT,
+        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
-    pruner::db_pruner::DBPruner,
-    pruner::pruner_manager::PrunerManager,
-    pruner::utils,
+    pruner::{db_pruner::DBPruner, pruner_manager::PrunerManager, utils},
     schema::*,
     state_store::StateStore,
     system_store::SystemStore,
@@ -65,10 +63,9 @@ use aptos_config::config::{
 use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_types::account_config::{new_block_event_key, NewBlockEvent};
-use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     account_address::AccountAddress,
+    account_config::{new_block_event_key, NewBlockEvent},
     contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -83,6 +80,7 @@ use aptos_types::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
         state_value::{StateValue, StateValueChunkWithProof},
+        table::{TableHandle, TableInfo},
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
@@ -96,8 +94,7 @@ use aptosdb_indexer::Indexer;
 use itertools::zip_eq;
 use move_deps::move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
-use schemadb::db_options::gen_rocksdb_options;
-use schemadb::DB;
+use schemadb::{db_options::gen_rocksdb_options, DB};
 use std::{
     collections::HashMap,
     iter::Iterator,
@@ -108,13 +105,13 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::pruner::ledger_pruner_manager::LedgerPrunerManager;
-use crate::pruner::ledger_store::ledger_store_pruner::LedgerPruner;
-use crate::pruner::state_pruner_manager::StatePrunerManager;
-use crate::pruner::state_store::StateStorePruner;
-use storage_interface::state_view::DbStateView;
+use crate::pruner::{
+    ledger_pruner_manager::LedgerPrunerManager, ledger_store::ledger_store_pruner::LedgerPruner,
+    state_pruner_manager::StatePrunerManager, state_store::StateStorePruner,
+};
 use storage_interface::{
-    state_delta::StateDelta, DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver,
+    state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
+    StateSnapshotReceiver,
 };
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";
@@ -1492,12 +1489,6 @@ impl DbWriter for AptosDB {
                 counters
                     .expect("Counters should be bumped with transactions being saved.")
                     .bump_op_counters();
-                // -1 for "not fully migrated", -2 for "error on get_account_count()"
-                STATE_ITEM_COUNT.set(
-                    self.state_store
-                        .get_value_count(last_version)
-                        .map_or(-1, |c| c as i64),
-                );
 
                 self.wake_pruner(last_version);
             }
