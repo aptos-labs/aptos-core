@@ -18,10 +18,10 @@ struct PrunerOpt {
     #[structopt(long)]
     enable_ledger_pruner: bool,
 
-    #[structopt(long, default_value = "100000", requires = "enable_state_store_pruner")]
+    #[structopt(long, default_value = "100000")]
     state_prune_window: u64,
 
-    #[structopt(long, default_value = "100000", requires = "enable_ledger_pruner")]
+    #[structopt(long, default_value = "100000")]
     ledger_prune_window: u64,
 
     #[structopt(long, default_value = "500")]

@@ -89,6 +89,7 @@ target "_common" {
     GIT_SHA         = "${GIT_SHA}"
     GIT_BRANCH      = "${GIT_BRANCH}"
     GIT_TAG         = "${GIT_TAG}"
+    BUILD_DATE      = "${BUILD_DATE}"
     BUILT_VIA_BUILDKIT = "true"
   }
 }

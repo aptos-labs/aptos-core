@@ -13,8 +13,7 @@ import unittest
 
 from . import ed25519
 from .account_address import AccountAddress
-from .authenticator import (Authenticator, Ed25519Authenticator,
-                            MultiAgentAuthenticator)
+from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
 from .bcs import Deserializer, Serializer
 from .type_tag import StructTag, TypeTag
 

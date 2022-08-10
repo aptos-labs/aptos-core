@@ -316,10 +316,9 @@ module aptos_token::token {
         let token_data = table::borrow_mut(all_token_data, token_id.token_data_id);
 
         assert!(token_data.mutability_config.properties, EFIELD_NOT_MUTABLE);
-        let addr = signer::address_of(account);
         // check if the property_version is 0 to determine if we need to update the property_version
         if (token_id.property_version == 0) {
-            let token = withdraw_with_event_internal(addr, token_id, amount);
+            let token = withdraw_with_event_internal(token_owner, token_id, amount);
             let i = 0;
             let largest_property_version = token_data.largest_property_version;
             // give a new property_version for each token
@@ -329,7 +328,7 @@ module aptos_token::token {
                 let new_token = Token {
                     id: new_token_id,
                     amount: 1,
-                    token_properties:property_map::empty(),
+                    token_properties: *&token_data.default_properties,
                 };
                 // update the token largest property_version
                 direct_deposit(token_owner, new_token);
@@ -354,8 +353,8 @@ module aptos_token::token {
         let tokens = &mut borrow_global_mut<TokenStore>(token_owner).tokens;
         assert!(table::contains(tokens, token_id), ENO_TOKEN_IN_TOKEN_STORE);
         let value = &mut table::borrow_mut(tokens, token_id).token_properties;
-        *value = property_map::new(keys, values, types);
 
+        property_map::update_property_map(value, keys, values, types);
         event::emit_event<MutateTokenPropertyMapEvent>(
             &mut borrow_global_mut<TokenStore>(token_owner).mutate_token_property_events,
             MutateTokenPropertyMapEvent {
@@ -381,7 +380,7 @@ module aptos_token::token {
     }
 
     /// Deposit the token balance into the recipients account and emit an event.
-    public fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
+    fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
         let token_store = borrow_global_mut<TokenStore>(account_addr);
 
         event::emit_event<DepositEvent>(
@@ -389,11 +388,6 @@ module aptos_token::token {
             DepositEvent { id: token.id, amount: token.amount },
         );
 
-        direct_deposit_without_event_internal(account_addr, token);
-    }
-
-    /// Deposit the token balance into the recipients account without emitting an event.
-    fun direct_deposit_without_event_internal(account_addr: address, token: Token) acquires TokenStore {
         assert!(
             exists<TokenStore>(account_addr),
             error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
@@ -1054,5 +1048,37 @@ module aptos_token::token {
         assert!(table::contains(props, new_id_1), 1);
         let token = table::borrow(props, new_id_1);
         assert!(property_map::length(&token.token_properties) == 2, property_map::length(&token.token_properties));
+    }
+
+    #[test(creator = @0xAF, owner = @0xBB)]
+    #[expected_failure(abort_code = 3)]
+    fun test_mutate_token_property_fail(creator: &signer) acquires Collections, TokenStore {
+        use std::string;
+        // token owner mutate the token property
+        let token_id = create_collection_and_token(creator, 2, 4, 4);
+        assert!(token_id.property_version == 0, 1);
+        // only be able to mutate the attributed defined when creating the token
+        let new_keys = vector<String>[
+            string::utf8(b"attack"), string::utf8(b"num_of_use"), string::utf8(b"wrong_attribute")
+        ];
+        let new_vals = vector<vector<u8>>[
+            b"1", b"1", b"1"
+        ];
+        let new_types = vector<String>[
+            string::utf8(b"integer"), string::utf8(b"integer"), string::utf8(b"integer")
+        ];
+
+        mutate_token_properties(
+            creator,
+            token_id.token_data_id.creator,
+            token_id.token_data_id.creator,
+            token_id.token_data_id.collection,
+            token_id.token_data_id.name,
+            token_id.property_version,
+            2,
+            new_keys,
+            new_vals,
+            new_types,
+        );
     }
 }
