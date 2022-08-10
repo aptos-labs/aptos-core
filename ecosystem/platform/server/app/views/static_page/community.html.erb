@@ -4,20 +4,17 @@
       <%= render 'layouts/flash' %>
       <%= render 'shared/it3_intro' %>
     </div>
-    <%= render ButtonComponent.new(size: :large, class: 'w-full mb-6', dialog: @login_dialog) do %>
-      Sign up
-    <% end %>
-    <%= render ButtonComponent.new(href: new_user_session_path, size: :large, scheme: :secondary, class: 'w-full') do %>
-      Log in
+    <%= render ButtonComponent.new(size: :large, class: 'w-full mb-6 max-w-xl', dialog: @login_dialog) do %>
+      Sign in
     <% end %>
     <%= render @login_dialog do |dialog| %>
       <%= dialog.with_title do %>
-        Sign up
+        Sign in with
       <% end %>
       <%= dialog.with_body do %>
         <div class="flex flex-col gap-3 outline-none" autofocus tabindex="-1">
-          <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'mb-4 w-full') %>
-          <%= render LoginButtonComponent.new(provider: :google, size: :large, class: 'mb-4 w-full') %>
+          <%= render LoginButtonComponent.new(provider: :discord, size: :large, class: 'w-full') %>
+          <%= render LoginButtonComponent.new(provider: :google, size: :large, class: 'w-full') %>
           <%= render LoginButtonComponent.new(provider: :github, size: :large, class: 'w-full') %>
         </div>
       <% end %>
