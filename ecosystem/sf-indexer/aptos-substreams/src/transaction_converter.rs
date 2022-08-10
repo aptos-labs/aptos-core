@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Context, Result};
 use crate::pb::aptos::{
     block_output::v1::{
         BlockMetadataTransactionOutput, EventKeyOutput, EventOutput, SignatureOutput,
@@ -16,6 +15,7 @@ use crate::pb::aptos::{
         UserTransactionRequest,
     },
 };
+use anyhow::{bail, Context, Result};
 // use aptos_protos::{
 //     block_output::v1::{
 //         BlockMetadataTransactionOutput, EventKeyOutput, EventOutput, SignatureOutput,
@@ -150,11 +150,9 @@ pub fn get_signature_outputs(
     match s {
         Signature::Ed25519(sig) => Ok(vec![parse_single_signature(
             sig, request, info, true, 0, None,
-        )?]),
-        Signature::MultiEd25519(sig) => {
-            Ok(parse_multi_signature(sig, request, info, true, 0, None)?)
-        }
-        Signature::MultiAgent(sig) => Ok(parse_multi_agent_signature(sig, request, info)?),
+        )]),
+        Signature::MultiEd25519(sig) => Ok(parse_multi_signature(sig, request, info, true, 0, None)),
+        Signature::MultiAgent(sig) => parse_multi_agent_signature(sig, request, info),
     }
 }
 
@@ -165,14 +163,11 @@ fn parse_single_signature(
     is_sender_primary: bool,
     multi_agent_index: u32,
     override_address: Option<&String>,
-) -> Result<SignatureOutput> {
-    let mut signer = request.sender.clone();
-    if let Some(addr) = override_address {
-        signer = addr.clone();
-    }
-    Ok(SignatureOutput {
+) -> SignatureOutput {
+    let signer = override_address.unwrap_or_else(|| &request.sender);
+    SignatureOutput {
         transaction_hash: info.hash.clone(),
-        signer,
+        signer: signer.clone(),
         is_sender_primary,
         signature_type: get_signature_type(SignatureType::Ed25519),
         public_key: s.public_key.clone(),
@@ -181,7 +176,7 @@ fn parse_single_signature(
         bitmap: vec![],
         multi_agent_index,
         multi_sig_index: 0,
-    })
+    }
 }
 
 fn parse_multi_signature(
@@ -191,17 +186,14 @@ fn parse_multi_signature(
     is_sender_primary: bool,
     multi_agent_index: u32,
     override_address: Option<&String>,
-) -> Result<Vec<SignatureOutput>> {
+) -> Vec<SignatureOutput> {
     let mut signatures = vec![];
     let mut signer = &request.sender;
     if let Some(addr) = override_address {
         signer = addr;
     }
     for (index, key) in s.public_keys.iter().enumerate() {
-        let signature = s.signatures.get(index).context(format!(
-            "Failed to get index {} for multi sig signature",
-            index
-        ))?;
+        let signature = s.signatures.get(index).unwrap();
         signatures.push(SignatureOutput {
             transaction_hash: info.hash.clone(),
             signer: signer.clone(),
@@ -215,7 +207,7 @@ fn parse_multi_signature(
             multi_sig_index: index as u32,
         });
     }
-    Ok(signatures)
+    signatures
 }
 
 fn parse_multi_agent_signature(
@@ -231,7 +223,7 @@ fn parse_multi_agent_signature(
             Some(sender_sig) => {
                 signatures.append(&mut parse_multi_agent_signature_helper(
                     sender_sig, request, info, true, 0, None,
-                )?);
+                ));
             }
         }
     }
@@ -239,10 +231,7 @@ fn parse_multi_agent_signature(
         let secondary_sig = s
             .secondary_signers
             .get(index)
-            .context(format!(
-                "Failed to get index {} for multi agent secondary signers",
-                index
-            ))?
+            .unwrap()
             .signature
             .as_ref()
             .context("Failed to parse index {} for multi agent secondary signers")?;
@@ -253,7 +242,7 @@ fn parse_multi_agent_signature(
             false,
             index as u32,
             Some(address),
-        )?);
+        ));
     }
     Ok(signatures)
 }
@@ -265,23 +254,23 @@ fn parse_multi_agent_signature_helper(
     is_sender_primary: bool,
     multi_agent_index: u32,
     override_address: Option<&String>,
-) -> Result<Vec<SignatureOutput>> {
+) -> Vec<SignatureOutput> {
     match s {
-        AccountSignature::Ed25519(sig) => Ok(vec![parse_single_signature(
+        AccountSignature::Ed25519(sig) => vec![parse_single_signature(
             sig,
             request,
             info,
             is_sender_primary,
             multi_agent_index,
             override_address,
-        )?]),
-        AccountSignature::MultiEd25519(sig) => Ok(parse_multi_signature(
+        )],
+        AccountSignature::MultiEd25519(sig) => parse_multi_signature(
             sig,
             request,
             info,
             is_sender_primary,
             multi_agent_index,
             override_address,
-        )?),
+        ),
     }
 }
