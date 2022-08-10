@@ -153,7 +153,7 @@ impl GlobalConfig {
     pub fn get_config_location(&self) -> CliTypedResult<PathBuf> {
         match self.config_type.unwrap_or_default() {
             ConfigType::Global => global_folder(),
-            ConfigType::Workspace => Ok(current_dir()?.join(CONFIG_FOLDER)),
+            ConfigType::Workspace => find_workspace_config(current_dir()?),
         }
     }
 
@@ -176,6 +176,23 @@ fn global_folder() -> CliTypedResult<PathBuf> {
         Err(CliError::UnexpectedError(
             "Unable to retrieve home directory".to_string(),
         ))
+    }
+}
+
+fn find_workspace_config(starting_path: PathBuf) -> CliTypedResult<PathBuf> {
+    let mut current_path = starting_path.clone();
+    loop {
+        let cand = current_path.join(CONFIG_FOLDER);
+        if cand.is_dir() {
+            break Ok(cand);
+        }
+        if !current_path.pop() {
+            return Err(CliError::ConfigNotFoundError(format!(
+                "Unable to find {} in {} or any parent directory",
+                CONFIG_FOLDER,
+                starting_path.display()
+            )));
+        }
     }
 }
 
