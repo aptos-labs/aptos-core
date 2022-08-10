@@ -40,6 +40,7 @@ module aptos_token::token {
     const ENO_MUTATE_CAPABILITY: u64 = 17;
     const ETOEKN_PROPERTY_EXISTED: u64 = 18;
     const ENO_TOKEN_IN_TOKEN_STORE: u64 = 19;
+    const ENON_ZERO_PROPERTY_VERSION_ONLY_ONE_INSTANCE: u64 = 20;
 
 
     //
@@ -278,8 +279,8 @@ module aptos_token::token {
         creators_address: address,
         collection: String,
         name: String,
+        property_version: u64,
         amount: u64,
-        property_version: u64
     ) acquires TokenStore {
         let token_id = create_token_id_raw(creators_address, collection, name, property_version);
         direct_transfer(sender, receiver, token_id, amount);
@@ -339,6 +340,7 @@ module aptos_token::token {
             // burn the orignial property_version 0 token after mutation
             let Token {id: _, amount: _, token_properties: _} = token;
         } else {
+            assert!(amount == 1, ENON_ZERO_PROPERTY_VERSION_ONLY_ONE_INSTANCE);
             update_token_property_internal(token_owner, token_id, keys, values, types);
         };
     }
@@ -748,9 +750,13 @@ module aptos_token::token {
 
     public entry fun burn(
         owner: &signer,
-        token_id: TokenId,
+        creators_address: address,
+        collection: String,
+        name: String,
+        property_version: u64,
         amount: u64
     ) acquires Collections, TokenStore {
+        let token_id = create_token_id_raw(creators_address, collection, name, property_version);
         let owner_addr = signer::address_of(owner);
         assert!(balance_of(owner_addr, token_id) >= amount, EINSUFFICIENT_BALANCE);
         let creator_addr = token_id.token_data_id.creator;

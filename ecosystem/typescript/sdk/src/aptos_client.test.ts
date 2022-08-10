@@ -294,24 +294,14 @@ test(
 
     const alice = new AptosAccount();
     const bob = new AptosAccount();
-    const aliceAccountAddress = TxnBuilderTypes.AccountAddress.fromHex(alice.address());
-    const bobAccountAddress = TxnBuilderTypes.AccountAddress.fromHex(bob.address());
 
-    await faucetClient.fundAccount(alice.address(), 1000000);
-
-    let resources = await client.getAccountResources(alice.address());
-    let accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("1000000");
-
-    await faucetClient.fundAccount(bob.address(), 1500000);
-    resources = await client.getAccountResources(bob.address());
-    accountResource = resources.find((r) => r.type === aptosCoin);
-    expect((accountResource!.data as any).coin.value).toBe("1500000");
+    // Fund both Alice's and Bob's Account
+    await faucetClient.fundAccount(alice.address(), 10000000);
+    await faucetClient.fundAccount(bob.address(), 10000000);
 
     const collectionName = "AliceCollection";
     const tokenName = "Alice Token";
 
-    // eslint-disable-next-line no-inner-declarations
     async function ensureTxnSuccess(txnHashPromise: Promise<string>) {
       const txnHash = await txnHashPromise;
       const txn = await client.waitForTransactionWithResult(txnHash);
@@ -341,7 +331,18 @@ test(
       ),
     );
 
-    let aliceBalance = await tokenClient.getTokenBalance(alice.address().hex(), collectionName, tokenName, "0");
+    const tokenId = {
+      token_data_id: {
+        creator: alice.address().hex(),
+        collection: collectionName,
+        name: tokenName,
+      },
+      property_version: "0",
+    };
+
+    // Transfer Token from Alice's Account to Bob's Account
+    await tokenClient.getCollectionData(alice.address().hex(), collectionName);
+    let aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
 
     const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
@@ -350,7 +351,7 @@ test(
         "direct_transfer_script",
         [],
         [
-          BCS.bcsToBytes(aliceAccountAddress),
+          BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(alice.address())),
           BCS.bcsSerializeStr(collectionName),
           BCS.bcsSerializeStr(tokenName),
           BCS.bcsSerializeUint64(1),
@@ -360,8 +361,9 @@ test(
     );
 
     const rawTxn = await client.generateRawTransaction(alice.address(), scriptFunctionPayload);
-
-    const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [bobAccountAddress]);
+    const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [
+      TxnBuilderTypes.AccountAddress.fromHex(bob.address()),
+    ]);
 
     const aliceSignature = new TxnBuilderTypes.Ed25519Signature(
       alice.signBuffer(TransactionBuilder.getSigningMessage(multiAgentTxn)).toUint8Array(),
@@ -383,7 +385,7 @@ test(
 
     const multiAgentAuthenticator = new TxnBuilderTypes.TransactionAuthenticatorMultiAgent(
       aliceAuthenticator, // sender authenticator
-      [bobAccountAddress], // secondary signer addresses
+      [TxnBuilderTypes.AccountAddress.fromHex(bob.address())], // secondary signer addresses
       [bobAuthenticator], // secondary signer authenticators
     );
 
@@ -396,29 +398,11 @@ test(
     const transaction = await client.getTransactionByHash(transactionRes.hash);
     expect((transaction as any)?.success).toBe(true);
 
-    aliceBalance = await tokenClient.getTokenBalance(alice.address().hex(), collectionName, tokenName, "0");
-
+    aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("0");
 
-    const bobTokenStore = await client.getAccountResource(bob.address(), "0x3::token::TokenStore");
-
-    const handle = (bobTokenStore.data as any).tokens?.handle;
-
-    const getTokenTableItemRequest = {
-      key_type: "0x3::token::TokenId",
-      value_type: "0x3::token::Token",
-      key: {
-        token_data_id: {
-          creator: alice.address().hex(),
-          collection: collectionName,
-          name: tokenName,
-        },
-        property_version: "0",
-      },
-    };
-
-    const bobTokenTableItem = await client.getTableItem(handle, getTokenTableItemRequest);
-    expect(bobTokenTableItem?.amount).toBe("1");
+    let bobBalance = await tokenClient.getTokenBalanceForAccount(bob.address().hex(), tokenId);
+    expect(bobBalance.amount).toBe("1");
   },
   30 * 1000,
 );
