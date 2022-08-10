@@ -983,6 +983,13 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// Get the first version that will likely not be pruned soon
+    fn get_first_viable_txn_version(&self) -> Result<Version> {
+        gauged_api("get_first_viable_txn_version", || {
+            Ok(self.ledger_pruner.get_min_viable_version())
+        })
+    }
+
     /// Get the first version that write set starts existent.
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_write_set_version", || {
