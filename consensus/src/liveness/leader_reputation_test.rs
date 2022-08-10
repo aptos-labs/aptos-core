@@ -108,9 +108,13 @@ fn test_aggregation_bitmap_to_voters_mismatched_lengths() {
         .map(|_| Author::random())
         .collect();
     let bitmap_too_long = vec![true, true, false, true, true]; // size of 5
-    assert!(NewBlockEventAggregation::bitmap_to_voters(&validators, &bitmap_too_long).is_err());
+    debug_assert!(
+        NewBlockEventAggregation::bitmap_to_voters(&validators, &bitmap_too_long).is_err()
+    );
     let bitmap_too_short = vec![true, true, false];
-    assert!(NewBlockEventAggregation::bitmap_to_voters(&validators, &bitmap_too_short).is_err());
+    debug_assert!(
+        NewBlockEventAggregation::bitmap_to_voters(&validators, &bitmap_too_short).is_err()
+    );
 }
 
 #[test]
@@ -132,7 +136,7 @@ fn test_aggregation_indices_to_authors() {
 fn test_aggregation_indices_to_authors_out_of_index() {
     let validators: Vec<_> = (0..4).into_iter().map(|_| Author::random()).collect();
     let indices = vec![0, 0, 4, 0];
-    assert!(NewBlockEventAggregation::indices_to_validators(&validators, &indices).is_err());
+    debug_assert!(NewBlockEventAggregation::indices_to_validators(&validators, &indices).is_err());
 }
 
 struct Example1 {
@@ -498,8 +502,8 @@ fn test_api() {
         let unexpected_index = (expected_index + 1) % proposers.len();
         let output = leader_reputation.get_valid_proposer(round);
         assert_eq!(output, proposers[expected_index]);
-        assert!(leader_reputation.is_valid_proposer(proposers[expected_index], round));
-        assert!(!leader_reputation.is_valid_proposer(proposers[unexpected_index], round));
+        debug_assert!(leader_reputation.is_valid_proposer(proposers[expected_index], round));
+        debug_assert!(!leader_reputation.is_valid_proposer(proposers[unexpected_index], round));
     }
 
     for i in 0..5 {
@@ -515,7 +519,7 @@ fn test_api() {
         // Test is deterministic, as all seeds are, so if it passes once, shouldn't ever fail.
         // Meaning, wheen we change the selection formula, there is 0.3% chance this test will fail
         // unnecessarily.
-        assert!(
+        debug_assert!(
             expected.abs_diff(selected[i]) as f32 <= 3.0 * std_dev,
             "{}: expected={} selected={}, std_dev: {}",
             i,
@@ -596,7 +600,7 @@ impl DbReader for MockDbReader {
     ) -> anyhow::Result<Vec<EventWithVersion>> {
         *self.fetched.lock() += 1;
         assert_eq!(start, u64::max_value());
-        assert!(order == Order::Descending);
+        debug_assert!(order == Order::Descending);
         let events = self.events.lock();
         // println!("Events {:?}", *events);
         Ok(events

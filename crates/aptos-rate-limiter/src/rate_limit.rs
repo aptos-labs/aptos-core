@@ -72,9 +72,9 @@ impl<Key: Eq + Hash + Clone + Debug> TokenBucketRateLimiter<Key> {
         metrics: Option<HistogramVec>,
     ) -> Self {
         // Ensure that we can actually use the rate limiter
-        assert!(new_bucket_start_percentage <= 100);
-        assert!(default_bucket_size > 0);
-        assert!(default_fill_rate > 0);
+        debug_assert!(new_bucket_start_percentage <= 100);
+        debug_assert!(default_bucket_size > 0);
+        debug_assert!(default_fill_rate > 0);
 
         Self {
             label,
@@ -211,7 +211,7 @@ impl Bucket {
         rate: usize,
         metrics: Option<HistogramVec>,
     ) -> Self {
-        assert!(
+        debug_assert!(
             size >= rate,
             "Bucket size must be greater than or equal to fill rate"
         );
@@ -433,7 +433,7 @@ mod tests {
 
         // Larger than bucket, should never succeed
         let result = bucket.acquire_all_tokens(bucket_size + 1);
-        assert!(result.expect_err("Should not give tokens").is_none());
+        debug_assert!(result.expect_err("Should not give tokens").is_none());
 
         // Normal case
         let result = bucket.acquire_all_tokens(bucket_size);
@@ -466,7 +466,7 @@ mod tests {
         sleep(bucket.time_of_next_refill().duration_since(Instant::now()));
         bucket.refill();
         let num_tokens = bucket.tokens;
-        assert!(num_tokens >= bucket_rate);
+        debug_assert!(num_tokens >= bucket_rate);
 
         // Test the autorefill
         assert_acquire(&mut bucket, num_tokens);
@@ -484,10 +484,10 @@ mod tests {
         let mut bucket = bucket_arc.lock();
 
         // Should always be less than 1 second
-        assert!(bucket.time_of_next_refill() < Instant::now() + Duration::from_secs(1));
+        debug_assert!(bucket.time_of_next_refill() < Instant::now() + Duration::from_secs(1));
 
         // If we have all the tokens, it should take 0 time
-        assert!(
+        debug_assert!(
             bucket
                 .time_of_tokens_needed(bucket_size)
                 .expect("Should have a duration")
@@ -496,7 +496,7 @@ mod tests {
         assert_acquire(&mut bucket, bucket_size);
 
         // Should have all the tokens after 5 periods
-        assert!(
+        debug_assert!(
             bucket
                 .time_of_tokens_needed(bucket_size)
                 .expect("Should have a duration")
@@ -504,7 +504,7 @@ mod tests {
         );
 
         // Greater than bucket size will never succeed
-        assert!(bucket.time_of_tokens_needed(bucket_size + 1).is_none());
+        debug_assert!(bucket.time_of_tokens_needed(bucket_size + 1).is_none());
     }
 
     #[test]
@@ -539,11 +539,11 @@ mod tests {
         assert_num_keys(&rate_limiter, 2);
 
         // After garbage collect, the reference should disappear only to the second one
-        assert!(rate_limiter.try_garbage_collect_key(&key_to_gc));
+        debug_assert!(rate_limiter.try_garbage_collect_key(&key_to_gc));
         assert_num_keys(&rate_limiter, 1);
 
         // Can't GC something that's in use
-        assert!(!rate_limiter.try_garbage_collect_key(&key_to_keep));
+        debug_assert!(!rate_limiter.try_garbage_collect_key(&key_to_keep));
         assert_num_keys(&rate_limiter, 1);
     }
 }

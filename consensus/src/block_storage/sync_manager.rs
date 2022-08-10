@@ -217,7 +217,7 @@ impl BlockStore {
             + 1;
 
         // although unlikely, we might wrap num_blocks around on a 32-bit machine
-        assert!(num_blocks < std::usize::MAX as u64);
+        debug_assert!(num_blocks < std::usize::MAX as u64);
 
         let mut blocks = retriever
             .retrieve_block_for_qc(
@@ -518,7 +518,7 @@ impl BlockRetriever {
     }
 
     fn pick_peer(&self, attempt: u32, peers: &mut Vec<AccountAddress>) -> AccountAddress {
-        assert!(!peers.is_empty(), "pick_peer on empty peer list");
+        debug_assert!(!peers.is_empty(), "pick_peer on empty peer list");
 
         if attempt == 0 {
             // remove preferred_peer if its in list of peers
@@ -545,7 +545,7 @@ const RETRIEVAL_MAX_EXP: u32 = 2;
 /// limit of RETRIEVAL_INITIAL_TIMEOUT*(2^RETRIEVAL_MAX_EXP)
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn retrieval_timeout(attempt: u32) -> Duration {
-    assert!(attempt > 0, "retrieval_timeout attempt can't be 0");
+    debug_assert!(attempt > 0, "retrieval_timeout attempt can't be 0");
     let exp = RETRIEVAL_MAX_EXP.min(attempt - 1); // [0..RETRIEVAL_MAX_EXP]
     RETRIEVAL_INITIAL_TIMEOUT * 2_u32.pow(exp)
 }

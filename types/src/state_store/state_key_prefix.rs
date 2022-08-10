@@ -63,10 +63,10 @@ mod tests {
         let account1_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address1.to_vec());
         let account2_key_prefx = StateKeyPrefix::new(StateKeyTag::AccessPath, address2.to_vec());
 
-        assert!(account1_key_prefx.is_prefix(&key1).unwrap());
-        assert!(account2_key_prefx.is_prefix(&key2).unwrap());
+        debug_assert!(account1_key_prefx.is_prefix(&key1).unwrap());
+        debug_assert!(account2_key_prefx.is_prefix(&key2).unwrap());
 
-        assert!(!account1_key_prefx.is_prefix(&key2).unwrap());
-        assert!(!account2_key_prefx.is_prefix(&key1).unwrap());
+        debug_assert!(!account1_key_prefx.is_prefix(&key2).unwrap());
+        debug_assert!(!account2_key_prefx.is_prefix(&key1).unwrap());
     }
 }

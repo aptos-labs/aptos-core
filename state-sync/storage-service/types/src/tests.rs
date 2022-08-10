@@ -45,21 +45,21 @@ fn test_data_summary_can_service_epochs_request() {
 
     for compression in [true, false] {
         // in range, can service
-        assert!(summary.can_service(&epochs_request(100, 200, compression)));
-        assert!(summary.can_service(&epochs_request(125, 175, compression)));
-        assert!(summary.can_service(&epochs_request(100, 100, compression)));
-        assert!(summary.can_service(&epochs_request(150, 150, compression)));
-        assert!(summary.can_service(&epochs_request(200, 200, compression)));
+        debug_assert!(summary.can_service(&epochs_request(100, 200, compression)));
+        debug_assert!(summary.can_service(&epochs_request(125, 175, compression)));
+        debug_assert!(summary.can_service(&epochs_request(100, 100, compression)));
+        debug_assert!(summary.can_service(&epochs_request(150, 150, compression)));
+        debug_assert!(summary.can_service(&epochs_request(200, 200, compression)));
 
         // out of range, can't service
-        assert!(!summary.can_service(&epochs_request(99, 200, compression)));
-        assert!(!summary.can_service(&epochs_request(100, 201, compression)));
-        assert!(!summary.can_service(&epochs_request(50, 250, compression)));
-        assert!(!summary.can_service(&epochs_request(50, 150, compression)));
-        assert!(!summary.can_service(&epochs_request(150, 250, compression)));
+        debug_assert!(!summary.can_service(&epochs_request(99, 200, compression)));
+        debug_assert!(!summary.can_service(&epochs_request(100, 201, compression)));
+        debug_assert!(!summary.can_service(&epochs_request(50, 250, compression)));
+        debug_assert!(!summary.can_service(&epochs_request(50, 150, compression)));
+        debug_assert!(!summary.can_service(&epochs_request(150, 250, compression)));
 
         // degenerate range, can't service
-        assert!(!summary.can_service(&epochs_request(150, 149, compression)));
+        debug_assert!(!summary.can_service(&epochs_request(150, 149, compression)));
     }
 }
 
@@ -73,26 +73,26 @@ fn test_data_summary_can_service_txns_request() {
 
     for compression in [true, false] {
         // in range, can service
-        assert!(summary.can_service(&txns_request(225, 100, 200, compression)));
-        assert!(summary.can_service(&txns_request(225, 125, 175, compression)));
-        assert!(summary.can_service(&txns_request(225, 100, 100, compression)));
-        assert!(summary.can_service(&txns_request(225, 150, 150, compression)));
-        assert!(summary.can_service(&txns_request(225, 200, 200, compression)));
-        assert!(summary.can_service(&txns_request(250, 200, 200, compression)));
+        debug_assert!(summary.can_service(&txns_request(225, 100, 200, compression)));
+        debug_assert!(summary.can_service(&txns_request(225, 125, 175, compression)));
+        debug_assert!(summary.can_service(&txns_request(225, 100, 100, compression)));
+        debug_assert!(summary.can_service(&txns_request(225, 150, 150, compression)));
+        debug_assert!(summary.can_service(&txns_request(225, 200, 200, compression)));
+        debug_assert!(summary.can_service(&txns_request(250, 200, 200, compression)));
 
         // out of range, can't service
-        assert!(!summary.can_service(&txns_request(225, 99, 200, compression)));
-        assert!(!summary.can_service(&txns_request(225, 100, 201, compression)));
-        assert!(!summary.can_service(&txns_request(225, 50, 250, compression)));
-        assert!(!summary.can_service(&txns_request(225, 50, 150, compression)));
-        assert!(!summary.can_service(&txns_request(225, 150, 250, compression)));
+        debug_assert!(!summary.can_service(&txns_request(225, 99, 200, compression)));
+        debug_assert!(!summary.can_service(&txns_request(225, 100, 201, compression)));
+        debug_assert!(!summary.can_service(&txns_request(225, 50, 250, compression)));
+        debug_assert!(!summary.can_service(&txns_request(225, 50, 150, compression)));
+        debug_assert!(!summary.can_service(&txns_request(225, 150, 250, compression)));
 
-        assert!(!summary.can_service(&txns_request(300, 100, 200, compression)));
-        assert!(!summary.can_service(&txns_request(300, 125, 175, compression)));
-        assert!(!summary.can_service(&txns_request(300, 100, 100, compression)));
-        assert!(!summary.can_service(&txns_request(300, 150, 150, compression)));
-        assert!(!summary.can_service(&txns_request(300, 200, 200, compression)));
-        assert!(!summary.can_service(&txns_request(251, 200, 200, compression)));
+        debug_assert!(!summary.can_service(&txns_request(300, 100, 200, compression)));
+        debug_assert!(!summary.can_service(&txns_request(300, 125, 175, compression)));
+        debug_assert!(!summary.can_service(&txns_request(300, 100, 100, compression)));
+        debug_assert!(!summary.can_service(&txns_request(300, 150, 150, compression)));
+        debug_assert!(!summary.can_service(&txns_request(300, 200, 200, compression)));
+        debug_assert!(!summary.can_service(&txns_request(251, 200, 200, compression)));
     }
 }
 
@@ -106,30 +106,30 @@ fn test_data_summary_can_service_txn_outputs_request() {
 
     for compression in [true, false] {
         // in range and can provide proof => can service
-        assert!(summary.can_service(&outputs_request(225, 100, 200, compression)));
-        assert!(summary.can_service(&outputs_request(225, 125, 175, compression)));
-        assert!(summary.can_service(&outputs_request(225, 100, 100, compression)));
-        assert!(summary.can_service(&outputs_request(225, 150, 150, compression)));
-        assert!(summary.can_service(&outputs_request(225, 200, 200, compression)));
-        assert!(summary.can_service(&outputs_request(250, 200, 200, compression)));
+        debug_assert!(summary.can_service(&outputs_request(225, 100, 200, compression)));
+        debug_assert!(summary.can_service(&outputs_request(225, 125, 175, compression)));
+        debug_assert!(summary.can_service(&outputs_request(225, 100, 100, compression)));
+        debug_assert!(summary.can_service(&outputs_request(225, 150, 150, compression)));
+        debug_assert!(summary.can_service(&outputs_request(225, 200, 200, compression)));
+        debug_assert!(summary.can_service(&outputs_request(250, 200, 200, compression)));
 
         // can provide proof, but out of range => cannot service
-        assert!(!summary.can_service(&outputs_request(225, 99, 200, compression)));
-        assert!(!summary.can_service(&outputs_request(225, 100, 201, compression)));
-        assert!(!summary.can_service(&outputs_request(225, 50, 250, compression)));
-        assert!(!summary.can_service(&outputs_request(225, 50, 150, compression)));
-        assert!(!summary.can_service(&outputs_request(225, 150, 250, compression)));
+        debug_assert!(!summary.can_service(&outputs_request(225, 99, 200, compression)));
+        debug_assert!(!summary.can_service(&outputs_request(225, 100, 201, compression)));
+        debug_assert!(!summary.can_service(&outputs_request(225, 50, 250, compression)));
+        debug_assert!(!summary.can_service(&outputs_request(225, 50, 150, compression)));
+        debug_assert!(!summary.can_service(&outputs_request(225, 150, 250, compression)));
 
         // in range, but cannot provide proof => cannot service
-        assert!(!summary.can_service(&outputs_request(300, 100, 200, compression)));
-        assert!(!summary.can_service(&outputs_request(300, 125, 175, compression)));
-        assert!(!summary.can_service(&outputs_request(300, 100, 100, compression)));
-        assert!(!summary.can_service(&outputs_request(300, 150, 150, compression)));
-        assert!(!summary.can_service(&outputs_request(300, 200, 200, compression)));
-        assert!(!summary.can_service(&outputs_request(251, 200, 200, compression)));
+        debug_assert!(!summary.can_service(&outputs_request(300, 100, 200, compression)));
+        debug_assert!(!summary.can_service(&outputs_request(300, 125, 175, compression)));
+        debug_assert!(!summary.can_service(&outputs_request(300, 100, 100, compression)));
+        debug_assert!(!summary.can_service(&outputs_request(300, 150, 150, compression)));
+        debug_assert!(!summary.can_service(&outputs_request(300, 200, 200, compression)));
+        debug_assert!(!summary.can_service(&outputs_request(251, 200, 200, compression)));
 
         // invalid range
-        assert!(!summary.can_service(&outputs_request(225, 175, 125, compression)));
+        debug_assert!(!summary.can_service(&outputs_request(225, 175, 125, compression)));
     }
 }
 
@@ -143,17 +143,17 @@ fn test_data_summary_can_service_state_chunk_request() {
 
     for compression in [true, false] {
         // in range and can provide proof => can service
-        assert!(summary.can_service(&states_request(100, compression)));
-        assert!(summary.can_service(&states_request(200, compression)));
-        assert!(summary.can_service(&states_request(250, compression)));
+        debug_assert!(summary.can_service(&states_request(100, compression)));
+        debug_assert!(summary.can_service(&states_request(200, compression)));
+        debug_assert!(summary.can_service(&states_request(250, compression)));
 
         // in range, but cannot provide proof => cannot service
-        assert!(!summary.can_service(&states_request(251, compression)));
-        assert!(!summary.can_service(&states_request(300, compression)));
+        debug_assert!(!summary.can_service(&states_request(251, compression)));
+        debug_assert!(!summary.can_service(&states_request(300, compression)));
 
         // can provide proof, but out of range ==> cannot service
-        assert!(!summary.can_service(&states_request(50, compression)));
-        assert!(!summary.can_service(&states_request(99, compression)));
+        debug_assert!(!summary.can_service(&states_request(50, compression)));
+        debug_assert!(!summary.can_service(&states_request(99, compression)));
     }
 }
 
@@ -167,17 +167,17 @@ fn test_protocol_metadata_can_service() {
     };
 
     for compression in [true, false] {
-        assert!(metadata.can_service(&txns_request(200, 100, 199, compression)));
-        assert!(!metadata.can_service(&txns_request(200, 100, 200, compression)));
+        debug_assert!(metadata.can_service(&txns_request(200, 100, 199, compression)));
+        debug_assert!(!metadata.can_service(&txns_request(200, 100, 200, compression)));
 
-        assert!(metadata.can_service(&epochs_request(100, 199, compression)));
-        assert!(!metadata.can_service(&epochs_request(100, 200, compression)));
+        debug_assert!(metadata.can_service(&epochs_request(100, 199, compression)));
+        debug_assert!(!metadata.can_service(&epochs_request(100, 200, compression)));
 
-        assert!(metadata.can_service(&outputs_request(200, 100, 199, compression)));
-        assert!(!metadata.can_service(&outputs_request(200, 100, 200, compression)));
+        debug_assert!(metadata.can_service(&outputs_request(200, 100, 199, compression)));
+        debug_assert!(!metadata.can_service(&outputs_request(200, 100, 200, compression)));
 
-        assert!(metadata.can_service(&state_values_request(200, 100, 199, compression)));
-        assert!(!metadata.can_service(&state_values_request(200, 100, 200, compression)));
+        debug_assert!(metadata.can_service(&state_values_request(200, 100, 199, compression)));
+        debug_assert!(!metadata.can_service(&state_values_request(200, 100, 200, compression)));
     }
 }
 

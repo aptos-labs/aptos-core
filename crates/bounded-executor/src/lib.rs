@@ -191,13 +191,13 @@ mod test {
                 // critical section
 
                 let prev_workers = WORKERS.fetch_add(1, Ordering::SeqCst);
-                assert!(prev_workers < MAX_WORKERS);
+                debug_assert!(prev_workers < MAX_WORKERS);
 
                 // yield back to the tokio scheduler
                 yield_task().await;
 
                 let prev_workers = WORKERS.fetch_sub(1, Ordering::SeqCst);
-                assert!(prev_workers > 0 && prev_workers <= MAX_WORKERS);
+                debug_assert!(prev_workers > 0 && prev_workers <= MAX_WORKERS);
 
                 COMPLETED_TASKS.fetch_add(1, Ordering::Relaxed);
             }));

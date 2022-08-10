@@ -138,7 +138,7 @@ async fn test_stream_garbage_collection() {
 
         // Verify the notification to response map is garbage collected
         let (_, sent_notifications) = data_stream.get_sent_requests_and_notifications();
-        assert!(
+        debug_assert!(
             (sent_notifications.len() as u64)
                 <= streaming_service_config.max_notification_id_mappings
         );
@@ -153,7 +153,7 @@ async fn test_stream_initialization() {
         create_epoch_ending_stream(streaming_service_config, MIN_ADVERTISED_EPOCH_END);
 
     // Verify the data stream is not initialized
-    assert!(!data_stream.data_requests_initialized());
+    debug_assert!(!data_stream.data_requests_initialized());
 
     // Initialize the data stream
     data_stream
@@ -161,7 +161,7 @@ async fn test_stream_initialization() {
         .unwrap();
 
     // Verify the data stream is now initialized
-    assert!(data_stream.data_requests_initialized());
+    debug_assert!(data_stream.data_requests_initialized());
 
     // Verify that client requests have been made
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();

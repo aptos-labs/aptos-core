@@ -113,7 +113,7 @@ where
     /// The caller needs to ensure that concurrency_level > 1 (0 is illegal and 1 should
     /// be handled by sequential execution) and that concurrency_level <= num_cpus.
     pub fn new(concurrency_level: usize) -> Self {
-        assert!(
+        debug_assert!(
             concurrency_level > 1 && concurrency_level <= num_cpus::get(),
             "Parallel execution concurrency level {} should be between 2 and number of CPUs",
             concurrency_level

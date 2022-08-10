@@ -210,7 +210,7 @@ mod test {
 
         let s = serde_yaml::to_string(&config).unwrap();
         let result = serde_yaml::from_str::<OnChainConsensusConfig>(&s).unwrap();
-        assert!(matches!(
+        debug_assert!(matches!(
             result.proposer_election_type(),
             ProposerElectionType::RoundProposer(_value)
         ));
@@ -236,7 +236,7 @@ mod test {
         let payload = OnChainConfigPayload::new(1, Arc::new(configs));
 
         let result: OnChainConsensusConfig = payload.get().unwrap();
-        assert!(matches!(
+        debug_assert!(matches!(
             result.proposer_election_type(),
             ProposerElectionType::RoundProposer(_value)
         ));

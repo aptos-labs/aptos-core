@@ -43,7 +43,7 @@ async fn test_bootstrap_genesis_waypoint() {
 
     // Create the bootstrapper and verify it's not yet bootstrapped
     let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
-    assert!(!bootstrapper.is_bootstrapped());
+    debug_assert!(!bootstrapper.is_bootstrapped());
 
     // Subscribe to a bootstrapped notification
     let (bootstrap_notification_sender, bootstrap_notification_receiver) = oneshot::channel();
@@ -58,7 +58,7 @@ async fn test_bootstrap_genesis_waypoint() {
     drive_progress(&mut bootstrapper, &global_data_summary, true)
         .await
         .unwrap();
-    assert!(bootstrapper.is_bootstrapped());
+    debug_assert!(bootstrapper.is_bootstrapped());
     verify_bootstrap_notification(bootstrap_notification_receiver);
 
     // Drive progress again and verify we get an error (we're already bootstrapped!)
@@ -86,7 +86,7 @@ async fn test_bootstrap_immediate_notification() {
     drive_progress(&mut bootstrapper, &global_data_summary, true)
         .await
         .unwrap();
-    assert!(bootstrapper.is_bootstrapped());
+    debug_assert!(bootstrapper.is_bootstrapped());
 
     // Subscribe to a bootstrapped notification and verify immediate notification
     let (bootstrap_notification_sender, bootstrap_notification_receiver) = oneshot::channel();

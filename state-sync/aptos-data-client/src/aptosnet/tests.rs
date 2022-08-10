@@ -231,7 +231,7 @@ async fn request_works_only_when_data_available() {
     let (peer, protocol, request, response_sender) = mock_network.next_request().await.unwrap();
     assert_eq!(peer, expected_peer.peer_id());
     assert_eq!(protocol, ProtocolId::StorageServiceRpc);
-    assert!(request.use_compression);
+    debug_assert!(request.use_compression);
     assert_matches!(request.data_request, DataRequest::GetStorageServerSummary);
 
     let summary = mock_storage_summary(200);
@@ -247,7 +247,7 @@ async fn request_works_only_when_data_available() {
 
         assert_eq!(peer, expected_peer.peer_id());
         assert_eq!(protocol, ProtocolId::StorageServiceRpc);
-        assert!(request.use_compression);
+        debug_assert!(request.use_compression);
         assert_matches!(
             request.data_request,
             DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
@@ -299,7 +299,7 @@ async fn fetch_peers_frequency() {
     }
 
     // Verify we received regular peers at a reduced frequency
-    assert!(regular_peer_count < num_fetches);
+    debug_assert!(regular_peer_count < num_fetches);
 
     // Add priority peer 1 and 2
     let _priority_peer_1 = mock_network.add_peer(true);
@@ -339,7 +339,7 @@ async fn fetch_peers_ordering() {
         let peer_to_poll = fetch_peer_to_poll(client.clone(), is_priority_peer)
             .unwrap()
             .unwrap();
-        assert!(peer_to_poll == peer_1 || peer_to_poll == peer_2);
+        debug_assert!(peer_to_poll == peer_1 || peer_to_poll == peer_2);
         client.in_flight_request_complete(&peer_to_poll);
 
         // Request the next peer again, but don't mark the poll as complete
@@ -591,7 +591,7 @@ async fn fetch_peers_max_in_flight() {
         let peer_to_poll_1 = fetch_peer_to_poll(client.clone(), is_priority_peer)
             .unwrap()
             .unwrap();
-        assert!(peer_to_poll_1 == peer_2 || peer_to_poll_1 == peer_3);
+        debug_assert!(peer_to_poll_1 == peer_2 || peer_to_poll_1 == peer_3);
 
         // Request the next peer to poll and verify it's empty (we already have
         // the maximum number of in-flight requests).
@@ -785,7 +785,7 @@ async fn all_peer_request_selection() {
     // Advertise the data for priority peer 2 and verify either priority peer is selected
     client.update_summary(priority_peer_2, mock_storage_summary(100));
     let peer_for_request = client.choose_peer_for_request(&storage_request).unwrap();
-    assert!(peer_for_request == priority_peer_1 || peer_for_request == priority_peer_2);
+    debug_assert!(peer_for_request == priority_peer_1 || peer_for_request == priority_peer_2);
 }
 
 #[tokio::test]
@@ -884,7 +884,7 @@ async fn bad_peer_is_eventually_banned_internal() {
 
     // The global summary should contain the bad peer's advertisement.
     let global_summary = client.get_global_data_summary();
-    assert!(global_summary
+    debug_assert!(global_summary
         .advertised_data
         .transactions
         .contains(&CompleteDataRange::new(0, 200).unwrap()));
@@ -927,12 +927,12 @@ async fn bad_peer_is_eventually_banned_internal() {
 
     // Peer should eventually get ignored and we should consider this request
     // range unserviceable.
-    assert!(seen_data_unavailable_err);
+    debug_assert!(seen_data_unavailable_err);
 
     // The global summary should no longer contain the bad peer's advertisement.
     client.update_global_summary_cache();
     let global_summary = client.get_global_data_summary();
-    assert!(!global_summary
+    debug_assert!(!global_summary
         .advertised_data
         .transactions
         .contains(&CompleteDataRange::new(0, 200).unwrap()));
@@ -997,12 +997,12 @@ async fn bad_peer_is_eventually_banned_callback() {
 
     // Peer should eventually get ignored and we should consider this request
     // range unserviceable.
-    assert!(seen_data_unavailable_err);
+    debug_assert!(seen_data_unavailable_err);
 
     // The global summary should no longer contain the bad peer's advertisement.
     client.update_global_summary_cache();
     let global_summary = client.get_global_data_summary();
-    assert!(!global_summary
+    debug_assert!(!global_summary
         .advertised_data
         .transactions
         .contains(&CompleteDataRange::new(0, 200).unwrap()));
@@ -1042,7 +1042,7 @@ async fn compression_mismatch_disabled() {
     // Handle the client's transactions request using compression
     tokio::spawn(async move {
         let (_, _, request, response_sender) = mock_network.next_request().await.unwrap();
-        assert!(!request.use_compression);
+        debug_assert!(!request.use_compression);
 
         // Compress the response
         let data_response =
@@ -1091,7 +1091,7 @@ async fn compression_mismatch_enabled() {
     // Handle the client's transactions request without compression
     tokio::spawn(async move {
         let (_, _, request, response_sender) = mock_network.next_request().await.unwrap();
-        assert!(request.use_compression);
+        debug_assert!(request.use_compression);
 
         // Compress the response
         let data_response =
@@ -1133,7 +1133,7 @@ async fn disable_compression() {
     let (peer, protocol, request, response_sender) = mock_network.next_request().await.unwrap();
     assert_eq!(peer, expected_peer.peer_id());
     assert_eq!(protocol, ProtocolId::StorageServiceRpc);
-    assert!(!request.use_compression);
+    debug_assert!(!request.use_compression);
     assert_matches!(request.data_request, DataRequest::GetStorageServerSummary);
 
     // Fulfill their request
@@ -1151,7 +1151,7 @@ async fn disable_compression() {
 
         assert_eq!(peer, expected_peer.peer_id());
         assert_eq!(protocol, ProtocolId::StorageServiceRpc);
-        assert!(!request.use_compression);
+        debug_assert!(!request.use_compression);
         assert_matches!(
             request.data_request,
             DataRequest::GetTransactionsWithProof(TransactionsWithProofRequest {
@@ -1221,7 +1221,7 @@ async fn bad_peer_is_eventually_added_back() {
 
     // Initially this request range is serviceable by this peer.
     let global_summary = client.get_global_data_summary();
-    assert!(global_summary
+    debug_assert!(global_summary
         .advertised_data
         .transactions
         .contains(&CompleteDataRange::new(0, 200).unwrap()));
@@ -1242,7 +1242,7 @@ async fn bad_peer_is_eventually_added_back() {
     // Peer is eventually ignored and this request range unserviceable.
     client.update_global_summary_cache();
     let global_summary = client.get_global_data_summary();
-    assert!(!global_summary
+    debug_assert!(!global_summary
         .advertised_data
         .transactions
         .contains(&CompleteDataRange::new(0, 200).unwrap()));
@@ -1254,7 +1254,7 @@ async fn bad_peer_is_eventually_added_back() {
     }
 
     let global_summary = client.get_global_data_summary();
-    assert!(global_summary
+    debug_assert!(global_summary
         .advertised_data
         .transactions
         .contains(&CompleteDataRange::new(0, 200).unwrap()));

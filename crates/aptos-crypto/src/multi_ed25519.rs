@@ -624,19 +624,19 @@ fn bitmap_last_set_bit(input: [u8; BITMAP_NUM_OF_BYTES]) -> Option<u8> {
 #[test]
 fn bitmap_tests() {
     let mut bitmap = [0b0100_0000u8, 0b1111_1111u8, 0u8, 0b1000_0000u8];
-    assert!(!bitmap_get_bit(bitmap, 0));
-    assert!(bitmap_get_bit(bitmap, 1));
+    debug_assert!(!bitmap_get_bit(bitmap, 0));
+    debug_assert!(bitmap_get_bit(bitmap, 1));
     for i in 8..16 {
-        assert!(bitmap_get_bit(bitmap, i));
+        debug_assert!(bitmap_get_bit(bitmap, i));
     }
     for i in 16..24 {
-        assert!(!bitmap_get_bit(bitmap, i));
+        debug_assert!(!bitmap_get_bit(bitmap, i));
     }
-    assert!(bitmap_get_bit(bitmap, 24));
-    assert!(!bitmap_get_bit(bitmap, 31));
+    debug_assert!(bitmap_get_bit(bitmap, 24));
+    debug_assert!(!bitmap_get_bit(bitmap, 31));
     assert_eq!(bitmap_last_set_bit(bitmap), Some(24));
 
     bitmap_set_bit(&mut bitmap, 30);
-    assert!(bitmap_get_bit(bitmap, 30));
+    debug_assert!(bitmap_get_bit(bitmap, 30));
     assert_eq!(bitmap_last_set_bit(bitmap), Some(30));
 }

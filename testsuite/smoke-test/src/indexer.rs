@@ -176,18 +176,18 @@ impl AptosTest for Indexer {
             // This is a block metadata transaction
             let (tx1, ut1, bmt1, events1, wsc1) = &transactions[0];
             assert_eq!(tx1.type_, "block_metadata_transaction");
-            assert!(ut1.is_none());
-            assert!(bmt1.is_some());
-            assert!(!events1.is_empty());
-            assert!(!wsc1.is_empty());
+            debug_assert!(ut1.is_none());
+            debug_assert!(bmt1.is_some());
+            debug_assert!(!events1.is_empty());
+            debug_assert!(!wsc1.is_empty());
 
             // This is the genesis transaction
             let (tx0, ut0, bmt0, events0, wsc0) = &transactions[1];
             assert_eq!(tx0.type_, "genesis_transaction");
-            assert!(ut0.is_none());
-            assert!(bmt0.is_none());
-            assert!(!events0.is_empty());
-            assert!(wsc0.len() > 10);
+            debug_assert!(ut0.is_none());
+            debug_assert!(bmt0.is_none());
+            debug_assert!(!events0.is_empty());
+            debug_assert!(wsc0.len() > 10);
 
             // This is the transfer
             let (tx2, ut2, bmt2, events2, wsc2) =
@@ -198,16 +198,16 @@ impl AptosTest for Indexer {
             assert_eq!(tx2.hash, t_tx.hash.to_string());
 
             // This is a user transaction, so the bmt should be None
-            assert!(ut2.is_some());
-            assert!(bmt2.is_none());
-            assert!(wsc2.len() > 1);
+            debug_assert!(ut2.is_some());
+            debug_assert!(bmt2.is_none());
+            debug_assert!(wsc2.len() > 1);
             assert_eq!(events2.len(), 2);
             assert_eq!(events2.get(0).unwrap().type_, "0x1::coin::WithdrawEvent");
             assert_eq!(events2.get(1).unwrap().type_, "0x1::coin::DepositEvent");
         }
 
         let latest_version = tailer.set_fetcher_to_lowest_processor_version().await;
-        assert!(latest_version > version);
+        debug_assert!(latest_version > version);
 
         Ok(())
     }

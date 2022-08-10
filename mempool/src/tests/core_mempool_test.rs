@@ -232,7 +232,7 @@ fn test_ignore_same_transaction_submitted_to_mempool() {
     let (mut mempool, _) = setup_mempool();
     let _ = add_txns_to_mempool(&mut mempool, vec![TestTransaction::new(0, 0, 0)]);
     let ret = add_txn(&mut mempool, TestTransaction::new(0, 0, 0));
-    assert!(ret.is_ok())
+    debug_assert!(ret.is_ok())
 }
 
 #[test]
@@ -240,7 +240,7 @@ fn test_ignore_same_transaction_submitted_to_mempool_crsn() {
     let (mut mempool, _) = setup_mempool();
     let _ = add_txns_to_mempool(&mut mempool, vec![TestTransaction::new(0, 0, 0).crsn(0)]);
     let ret = add_txn(&mut mempool, TestTransaction::new(0, 0, 0).crsn(0));
-    assert!(ret.is_ok())
+    debug_assert!(ret.is_ok())
 }
 
 #[test]
@@ -250,7 +250,7 @@ fn test_fail_for_same_gas_amount_and_not_same_expiration_time() {
     let txn = TestTransaction::new(0, 0, 0)
         .make_signed_transaction_with_expiration_time(u64::max_value() - 1000);
     let ret = add_signed_txn(&mut mempool, txn);
-    assert!(ret.is_err())
+    debug_assert!(ret.is_err())
 }
 
 #[test]
@@ -261,7 +261,7 @@ fn test_fail_for_same_gas_amount_and_not_same_expiration_time_crsn() {
         .crsn(0)
         .make_signed_transaction_with_expiration_time(u64::max_value() - 1000);
     let ret = add_signed_txn(&mut mempool, txn);
-    assert!(ret.is_err())
+    debug_assert!(ret.is_err())
 }
 
 #[test]
@@ -387,7 +387,7 @@ fn test_commit_callback() {
     let txns = add_txns_to_mempool(&mut pool, vec![TestTransaction::new(1, 6, 1)]);
 
     // Check that pool is empty.
-    assert!(pool.get_batch(1, HashSet::new()).is_empty());
+    debug_assert!(pool.get_batch(1, HashSet::new()).is_empty());
     // Transaction 5 got back from consensus.
     pool.remove_transaction(&TestTransaction::get_address(1), 5, false);
     // Verify that we can execute transaction 6.
@@ -422,7 +422,7 @@ fn test_reset_sequence_number_on_failure() {
     pool.remove_transaction(&TestTransaction::get_address(1), 1, true);
 
     // Verify that new transaction for this account can be added.
-    assert!(add_txn(&mut pool, TestTransaction::new(1, 0, 1)).is_ok());
+    debug_assert!(add_txn(&mut pool, TestTransaction::new(1, 0, 1)).is_ok());
 }
 
 #[test]
@@ -475,16 +475,16 @@ fn test_capacity() {
 
     // Error on exceeding limit.
     add_txn(&mut pool, TestTransaction::new(1, 0, 1)).unwrap();
-    assert!(add_txn(&mut pool, TestTransaction::new(1, 1, 1)).is_err());
+    debug_assert!(add_txn(&mut pool, TestTransaction::new(1, 1, 1)).is_err());
 
     // Commit transaction and free space.
     pool.remove_transaction(&TestTransaction::get_address(1), 0, false);
-    assert!(add_txn(&mut pool, TestTransaction::new(1, 1, 1)).is_ok());
+    debug_assert!(add_txn(&mut pool, TestTransaction::new(1, 1, 1)).is_ok());
 
     // Fill it up and check that GC routine will clear space.
-    assert!(add_txn(&mut pool, TestTransaction::new(1, 2, 1)).is_err());
+    debug_assert!(add_txn(&mut pool, TestTransaction::new(1, 2, 1)).is_err());
     pool.gc();
-    assert!(add_txn(&mut pool, TestTransaction::new(1, 2, 1)).is_ok());
+    debug_assert!(add_txn(&mut pool, TestTransaction::new(1, 2, 1)).is_ok());
 }
 
 #[test]
@@ -510,7 +510,7 @@ fn test_parking_lot_eviction() {
     assert_eq!(txns, vec![0, 0, 1, 1, 2]);
 
     // Make sure we can't insert any new transactions, cause parking lot supposed to be empty by now.
-    assert!(add_txn(&mut pool, TestTransaction::new(0, 2, 1)).is_err());
+    debug_assert!(add_txn(&mut pool, TestTransaction::new(0, 2, 1)).is_err());
 }
 
 #[test]
@@ -541,7 +541,7 @@ fn test_parking_lot_evict_only_for_ready_txn_insertion() {
     // Trying to insert a tx that would not be ready after inserting should fail.
     let not_ready_seq_nums = vec![6, 8, 12, 14];
     for seq in not_ready_seq_nums {
-        assert!(add_txn(&mut pool, TestTransaction::new(1, seq, 1)).is_err());
+        debug_assert!(add_txn(&mut pool, TestTransaction::new(1, seq, 1)).is_err());
     }
 }
 
@@ -640,7 +640,7 @@ fn test_get_transaction_by_hash() {
     assert_eq!(ret, Some(txn));
 
     let ret = pool.get_by_hash(HashValue::random());
-    assert!(ret.is_none());
+    debug_assert!(ret.is_none());
 }
 
 #[test]
@@ -667,7 +667,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
     let new_txn_hash = new_txn.clone().committed_hash();
 
     let txn_by_old_hash = pool.get_by_hash(hash);
-    assert!(txn_by_old_hash.is_none());
+    debug_assert!(txn_by_old_hash.is_none());
 
     let txn_by_new_hash = pool.get_by_hash(new_txn_hash);
     assert_eq!(txn_by_new_hash, Some(new_txn));

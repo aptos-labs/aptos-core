@@ -71,7 +71,7 @@ impl StateComputer for OrderingStateComputer {
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> Result<(), ExecutionError> {
-        assert!(!blocks.is_empty());
+        debug_assert!(!blocks.is_empty());
 
         if self
             .executor_channel

@@ -26,7 +26,7 @@ fn move_from_across_blocks() {
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
     let output = executor.execute_transaction(rem_txn);
-    assert!(matches!(
+    debug_assert!(matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
@@ -48,7 +48,7 @@ fn move_from_across_blocks() {
     // remove resource fails given it was removed already
     let rem_txn = remove_resource_txn(&sender, 15, vec![module.clone()]);
     let output = executor.execute_transaction(rem_txn);
-    assert!(matches!(
+    debug_assert!(matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
@@ -58,7 +58,7 @@ fn move_from_across_blocks() {
     // borrow resource fail given it was removed
     let borrow_txn = borrow_resource_txn(&sender, 16, vec![module.clone()]);
     let output = executor.execute_transaction(borrow_txn);
-    assert!(matches!(
+    debug_assert!(matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
@@ -81,7 +81,7 @@ fn move_from_across_blocks() {
         output[0].status(),
         &TransactionStatus::Keep(ExecutionStatus::Success)
     );
-    assert!(matches!(
+    debug_assert!(matches!(
         output[1].status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
@@ -106,7 +106,7 @@ fn borrow_after_move() {
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
     let output = executor.execute_transaction(rem_txn);
-    assert!(matches!(
+    debug_assert!(matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
@@ -137,7 +137,7 @@ fn borrow_after_move() {
         &TransactionStatus::Keep(ExecutionStatus::Success)
     );
     println!("HERE!");
-    assert!(matches!(
+    debug_assert!(matches!(
         output[1].status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
@@ -162,7 +162,7 @@ fn change_after_move() {
     // remove resource fails given no resource were published
     let rem_txn = remove_resource_txn(&sender, 11, vec![module.clone()]);
     let output = executor.execute_transaction(rem_txn);
-    assert!(matches!(
+    debug_assert!(matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
@@ -189,7 +189,7 @@ fn change_after_move() {
         output[0].status(),
         &TransactionStatus::Keep(ExecutionStatus::Success)
     );
-    assert!(matches!(
+    debug_assert!(matches!(
         output[1].status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })
@@ -201,7 +201,7 @@ fn change_after_move() {
     // borrow resource
     let borrow_txn = borrow_resource_txn(&sender, 16, vec![module]);
     let output = executor.execute_transaction(borrow_txn);
-    assert!(matches!(
+    debug_assert!(matches!(
         output.status().status(),
         // StatusCode::MISSING_DATA
         Ok(ExecutionStatus::ExecutionFailure { .. })

@@ -145,7 +145,7 @@ pub fn encode_genesis_change_set(
     session1_out.squash(session2_out).unwrap();
     let change_set = session1_out.into_change_set(&mut ()).unwrap();
 
-    assert!(!change_set
+    debug_assert!(!change_set
         .write_set()
         .iter()
         .any(|(_, op)| op.is_deletion()));
@@ -154,31 +154,31 @@ pub fn encode_genesis_change_set(
 }
 
 fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
-    assert!(
+    debug_assert!(
         genesis_config.min_stake <= genesis_config.max_stake,
         "Min stake must be smaller than or equal to max stake"
     );
-    assert!(
+    debug_assert!(
         genesis_config.epoch_duration_secs > 0,
         "Epoch duration must be > 0"
     );
-    assert!(
+    debug_assert!(
         genesis_config.recurring_lockup_duration_secs > 0,
         "Recurring lockup duration must be > 0"
     );
-    assert!(
+    debug_assert!(
         genesis_config.recurring_lockup_duration_secs >= genesis_config.epoch_duration_secs,
         "Recurring lockup duration must be at least as long as epoch duration"
     );
-    assert!(
+    debug_assert!(
         genesis_config.rewards_apy_percentage > 0 && genesis_config.rewards_apy_percentage < 100,
         "Rewards APY must be > 0% and < 100%"
     );
-    assert!(
+    debug_assert!(
         genesis_config.voting_duration_secs > 0,
         "On-chain voting duration must be > 0"
     );
-    assert!(
+    debug_assert!(
         genesis_config.voting_duration_secs < genesis_config.recurring_lockup_duration_secs,
         "Voting duration must be strictly smaller than recurring lockup"
     );

@@ -27,7 +27,7 @@ impl<Fut: Future> FuturesUnorderedX<Fut> {
     /// The returned `FuturesOrderedX` does not contain any futures and, in this
     /// state, `FuturesOrdered::poll_next` will return `Poll::Ready(None)`.
     pub fn new(max_in_progress: usize) -> FuturesUnorderedX<Fut> {
-        assert!(max_in_progress > 0);
+        debug_assert!(max_in_progress > 0);
         FuturesUnorderedX {
             queued: VecDeque::new(),
             in_progress: FuturesUnordered::new(),
@@ -139,7 +139,7 @@ mod tests {
             rt.block_on(async {
                 let num_sleeps = sleeps_ms.len();
                 let mut futures = FuturesUnorderedX::new(max_in_progress);
-                assert!(futures.is_empty());
+                debug_assert!(futures.is_empty());
 
                 let n_running = Arc::new(AtomicUsize::new(0));
                 let seen_max_concurrency = Arc::new(AtomicBool::new(false));
@@ -154,7 +154,7 @@ mod tests {
                         tokio::time::sleep(Duration::from_millis(sleep_ms)).await;
 
                         let r = _n_running.fetch_sub(1, Ordering::SeqCst);
-                        assert!(r > 0 && r <= min(max_in_progress, num_sleeps));
+                        debug_assert!(r > 0 && r <= min(max_in_progress, num_sleeps));
                         if r == max_in_progress {
                             _seen_max_concurrency.store(true, Ordering::SeqCst);
                         }
@@ -163,10 +163,10 @@ mod tests {
                     })
                 }
 
-                assert!(num_sleeps > 0 || futures.is_empty());
+                debug_assert!(num_sleeps > 0 || futures.is_empty());
                 let mut outputs = futures.collect::<Vec<_>>().await;
                 if max_in_progress <= num_sleeps {
-                    assert!(seen_max_concurrency.load(Ordering::Relaxed));
+                    debug_assert!(seen_max_concurrency.load(Ordering::Relaxed));
                 }
 
                 outputs.sort_unstable();

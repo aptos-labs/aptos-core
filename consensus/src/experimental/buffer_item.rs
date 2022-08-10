@@ -178,7 +178,7 @@ impl BufferItem {
                     .map(|b| b.timestamp_usecs())
                     .filter(|ts| *ts != commit_info.timestamp_usecs());
                 if let Some(ts) = reconfig_ts {
-                    assert!(executed_blocks.last().unwrap().is_reconfiguration_suffix());
+                    debug_assert!(executed_blocks.last().unwrap().is_reconfiguration_suffix());
                     debug!(
                         "Reconfig happens, change timestamp of {} to {}",
                         commit_info, ts
@@ -314,7 +314,7 @@ impl BufferItem {
             }
             Self::Ordered(ordered_item) => {
                 let ordered = *ordered_item;
-                assert!(ordered
+                debug_assert!(ordered
                     .ordered_proof
                     .commit_info()
                     .match_ordered_only(commit_proof.commit_info()));

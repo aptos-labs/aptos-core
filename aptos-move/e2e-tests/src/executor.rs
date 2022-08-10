@@ -184,7 +184,7 @@ impl FakeExecutor {
         let mut genesis = Self::no_genesis();
         let blobs = cached_framework_packages::module_blobs();
         let modules = cached_framework_packages::modules();
-        assert!(blobs.len() == modules.len());
+        debug_assert!(blobs.len() == modules.len());
         for (module, bytes) in modules.iter().zip(blobs) {
             let id = module.self_id();
             genesis.add_module(&id, bytes.to_vec());
@@ -308,7 +308,7 @@ impl FakeExecutor {
     /// data store. Panics if execution fails
     pub fn execute_and_apply(&mut self, transaction: SignedTransaction) -> TransactionOutput {
         let mut outputs = self.execute_block(vec![transaction]).unwrap();
-        assert!(outputs.len() == 1, "transaction outputs size mismatch");
+        debug_assert!(outputs.len() == 1, "transaction outputs size mismatch");
         let output = outputs.pop().unwrap();
         match output.status() {
             TransactionStatus::Keep(status) => {
@@ -462,7 +462,7 @@ impl FakeExecutor {
         // check if we emit the expected event, there might be more events for transaction fees
         let event = output.events()[0].clone();
         assert_eq!(event.key(), &new_block_event_key());
-        assert!(bcs::from_bytes::<NewBlockEvent>(event.event_data()).is_ok());
+        debug_assert!(bcs::from_bytes::<NewBlockEvent>(event.event_data()).is_ok());
         self.apply_write_set(output.write_set());
     }
 

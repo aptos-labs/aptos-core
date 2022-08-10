@@ -217,7 +217,7 @@ impl TransactionGenerator {
         init_account_balance: u64,
         block_size: usize,
     ) {
-        assert!(self.block_sender.is_some());
+        debug_assert!(self.block_sender.is_some());
         // Ensure that seed accounts have enough balance to transfer money to at least 1000 account with
         // balance init_account_balance.
         self.create_seed_accounts(
@@ -235,7 +235,7 @@ impl TransactionGenerator {
     }
 
     pub fn run_transfer(&mut self, block_size: usize, num_transfer_blocks: usize) {
-        assert!(self.block_sender.is_some());
+        debug_assert!(self.block_sender.is_some());
         self.gen_transfer_transactions(block_size, num_transfer_blocks);
     }
 

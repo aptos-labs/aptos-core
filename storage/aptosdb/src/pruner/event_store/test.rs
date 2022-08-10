@@ -130,7 +130,7 @@ fn verify_event_by_key_not_in_store(
     event_store: &Arc<EventStore>,
 ) {
     for event in &events[version as usize] {
-        assert!(event_store
+        debug_assert!(event_store
             .get_txn_ver_by_seq_num(event.key(), event.sequence_number())
             .is_err())
     }
@@ -157,7 +157,7 @@ fn verify_event_by_version_not_in_store(
     event_store: &Arc<EventStore>,
 ) {
     for event in events.get(version as usize).unwrap() {
-        assert!(event_store
+        debug_assert!(event_store
             .get_latest_sequence_number(version, event.key())
             .unwrap()
             .is_none());
@@ -170,7 +170,7 @@ fn verify_event_by_version_in_store(
     event_store: &Arc<EventStore>,
 ) {
     for event in events.get(version as usize).unwrap() {
-        assert!(event_store
+        debug_assert!(event_store
             .get_latest_sequence_number(version, event.key())
             .unwrap()
             .is_some());
@@ -178,7 +178,7 @@ fn verify_event_by_version_in_store(
 }
 
 fn verify_events_not_in_store(version: Version, event_store: &Arc<EventStore>) {
-    assert!(event_store
+    debug_assert!(event_store
         .get_events_by_version(version)
         .unwrap()
         .is_empty());

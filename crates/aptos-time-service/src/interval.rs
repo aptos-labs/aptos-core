@@ -28,7 +28,7 @@ pub struct Interval {
 
 impl Interval {
     pub fn new(delay: Sleep, period: Duration) -> Self {
-        assert!(period > ZERO_DURATION, "`period` must be non-zero.");
+        debug_assert!(period > ZERO_DURATION, "`period` must be non-zero.");
 
         Self { delay, period }
     }

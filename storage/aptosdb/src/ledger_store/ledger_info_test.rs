@@ -79,7 +79,7 @@ proptest! {
         let tmp_dir = TempPath::new();
         let db = set_up(&tmp_dir, &ledger_infos_with_sigs);
 
-        assert!(db.ledger_store.get_epoch_state(0).is_err());
+        debug_assert!(db.ledger_store.get_epoch_state(0).is_err());
 
         for li_with_sigs in ledger_infos_with_sigs {
             let li = li_with_sigs.ledger_info();

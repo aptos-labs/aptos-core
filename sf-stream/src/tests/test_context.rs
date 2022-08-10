@@ -60,7 +60,7 @@ pub fn new_test_context(test_name: &str, fake_start_time_usecs: u64) -> TestCont
     let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test_with_indexer(&tmp_dir));
     let ret =
         db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
-    assert!(ret);
+    debug_assert!(ret);
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
 

@@ -127,7 +127,7 @@ fn test_internal_validity() {
         let children = Children::default();
         InternalNode::new(children)
     });
-    assert!(result.is_err());
+    debug_assert!(result.is_err());
 
     let result = panic::catch_unwind(|| {
         let mut children = Children::default();
@@ -137,7 +137,7 @@ fn test_internal_validity() {
         );
         InternalNode::new(children);
     });
-    assert!(result.is_err());
+    debug_assert!(result.is_err());
 }
 
 #[test]
@@ -799,8 +799,8 @@ struct BinaryTreeInternalNode {
 
 impl BinaryTreeInternalNode {
     fn in_left_subtree(&self, n: u8) -> bool {
-        assert!(n >= self.begin);
-        assert!(n < self.begin + self.width);
+        debug_assert!(n >= self.begin);
+        debug_assert!(n < self.begin + self.width);
 
         n < self.begin + self.width / 2
     }

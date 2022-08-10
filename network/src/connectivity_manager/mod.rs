@@ -314,7 +314,7 @@ where
         outbound_connection_limit: Option<usize>,
         mutual_authentication: bool,
     ) -> Self {
-        assert!(
+        debug_assert!(
             eligible.read().is_empty(),
             "Eligible peers must be initially empty. eligible: {:?}",
             eligible
@@ -1008,7 +1008,7 @@ where
     }
 
     fn next_addr<'a>(&mut self, addrs: &'a Addresses) -> &'a NetworkAddress {
-        assert!(!addrs.is_empty());
+        debug_assert!(!addrs.is_empty());
 
         let addr_idx = self.addr_idx;
         self.addr_idx = self.addr_idx.wrapping_add(1);

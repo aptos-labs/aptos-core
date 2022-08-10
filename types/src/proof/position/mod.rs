@@ -166,12 +166,12 @@ impl Position {
     }
 
     pub fn root_from_leaf_count(leaf_count: LeafCount) -> Self {
-        assert!(leaf_count > 0);
+        debug_assert!(leaf_count > 0);
         Self::root_from_leaf_index((leaf_count - 1) as u64)
     }
 
     pub fn root_level_from_leaf_count(leaf_count: LeafCount) -> u32 {
-        assert!(leaf_count > 0);
+        debug_assert!(leaf_count > 0);
         let index = (leaf_count - 1) as u64;
         MAX_ACCUMULATOR_PROOF_DEPTH as u32 + 1 - index.leading_zeros()
     }
@@ -398,13 +398,13 @@ impl FrozenSubtreeSiblingIterator {
     /// Constructs a new `FrozenSubtreeSiblingIterator` given the size of current accumulator and
     /// the size of the bigger accumulator.
     pub fn new(current_num_leaves: LeafCount, new_num_leaves: LeafCount) -> Self {
-        assert!(
+        debug_assert!(
             new_num_leaves <= MAX_ACCUMULATOR_LEAVES,
             "An accumulator can have at most 2^{} leaves. Provided num_leaves: {}.",
             MAX_ACCUMULATOR_PROOF_DEPTH,
             new_num_leaves,
         );
-        assert!(
+        debug_assert!(
             current_num_leaves <= new_num_leaves,
             "Number of leaves needs to be increasing: current_num_leaves: {}, new_num_leaves: {}",
             current_num_leaves,

@@ -291,7 +291,7 @@ macro_rules! assert_success {
 macro_rules! assert_abort {
     ($s:expr, $c:pat) => {{
         use aptos_types::transaction::*;
-        assert!(matches!(
+        debug_assert!(matches!(
             $s,
             TransactionStatus::Keep(ExecutionStatus::MoveAbort { code: $c, .. })
         ));
@@ -303,7 +303,7 @@ macro_rules! assert_abort {
 macro_rules! assert_vm_status {
     ($s:expr, $c:pat) => {{
         use aptos_types::transaction::*;
-        assert!(matches!(
+        debug_assert!(matches!(
             $s,
             TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some($c)))
         ));

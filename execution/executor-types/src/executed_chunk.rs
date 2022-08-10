@@ -35,7 +35,7 @@ impl ExecutedChunk {
     }
 
     pub fn reconfig_suffix(&self) -> Self {
-        assert!(self.next_epoch_state.is_some());
+        debug_assert!(self.next_epoch_state.is_some());
         Self {
             result_view: self.result_view.clone(),
             next_epoch_state: self.next_epoch_state.clone(),

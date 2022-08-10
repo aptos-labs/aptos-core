@@ -76,7 +76,7 @@ impl ApiSpecificConfig {
     pub fn assert_content_type(&self, headers: &HeaderMap) {
         match &self {
             ApiSpecificConfig::V0 => assert_eq!(headers[CONTENT_TYPE], mime_types::JSON,),
-            ApiSpecificConfig::V1(_) => assert!(headers[CONTENT_TYPE]
+            ApiSpecificConfig::V1(_) => debug_assert!(headers[CONTENT_TYPE]
                 .to_str()
                 .unwrap()
                 .starts_with(mime_types::JSON),),
@@ -130,7 +130,7 @@ pub fn new_test_context(test_name: String, api_version: &str) -> TestContext {
     );
     let ret =
         db_bootstrapper::maybe_bootstrap::<AptosVM>(&db_rw, &genesis, genesis_waypoint).unwrap();
-    assert!(ret);
+    debug_assert!(ret);
 
     let mempool = MockSharedMempool::new_in_runtime(&db_rw, VMValidator::new(db.clone()));
 

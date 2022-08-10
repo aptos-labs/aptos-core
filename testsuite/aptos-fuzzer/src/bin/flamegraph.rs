@@ -23,7 +23,7 @@ fn main() {
     corpus_dir.push(fuzz_target.name());
 
     // check if it exists
-    assert!(
+    debug_assert!(
         corpus_dir.exists(),
         "path to fuzzing corpus does not exist: {:?}",
         corpus_dir,

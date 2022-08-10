@@ -132,7 +132,7 @@ proptest! {
                 } else if !known_parent {
                     // We cannot really bring blocks in this test because the block retrieval
                     // functionality invokes event processing, which is not setup here.
-                    assert!(res.is_err());
+                    debug_assert!(res.is_err());
                 }
                 else {
                     // The parent must be present if we get to this line.
@@ -282,7 +282,7 @@ async fn test_insert_vote() {
         .await;
     let mut pending_votes = PendingVotes::new();
 
-    assert!(block_store.get_quorum_cert_for_block(block.id()).is_none());
+    debug_assert!(block_store.get_quorum_cert_for_block(block.id()).is_none());
     for (i, voter) in signers.iter().enumerate().take(10).skip(1) {
         let vote = Vote::new(
             VoteData::new(
@@ -307,7 +307,7 @@ async fn test_insert_vote() {
             VoteReceptionResult::DuplicateVote,
         );
         // qc is still not there
-        assert!(block_store.get_quorum_cert_for_block(block.id()).is_none());
+        debug_assert!(block_store.get_quorum_cert_for_block(block.id()).is_none());
     }
 
     // Add the final vote to form a QC
@@ -358,7 +358,7 @@ async fn test_illegal_timestamp() {
     let result = block_store
         .execute_and_insert_block(block_with_illegal_timestamp)
         .await;
-    assert!(result.is_err());
+    debug_assert!(result.is_err());
 }
 
 #[tokio::test]

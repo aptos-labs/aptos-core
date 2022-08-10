@@ -128,13 +128,13 @@ fn test_add_duplicate_block() {
     block_tree.add_block(id(1), id(2), empty_chunk()).unwrap();
     block_tree.add_block(id(1), id(2), empty_chunk()).unwrap();
     // can't change parent
-    assert!(block_tree.add_block(id(1), id(7), empty_chunk()).is_err());
+    debug_assert!(block_tree.add_block(id(1), id(7), empty_chunk()).is_err());
 }
 
 #[test]
 fn test_add_block_missing_parent() {
     let block_tree = create_tree();
-    assert!(block_tree
+    debug_assert!(block_tree
         .add_block(id(99), id(100), empty_chunk())
         .is_err());
 }

@@ -194,8 +194,8 @@ mod tests {
     #[test]
     fn filter_info() {
         let logger = Builder::new().filter_level(LevelFilter::Info).build();
-        assert!(logger.enabled(&make_metadata(Level::Info, "crate1")));
-        assert!(!logger.enabled(&make_metadata(Level::Debug, "crate1")));
+        debug_assert!(logger.enabled(&make_metadata(Level::Info, "crate1")));
+        debug_assert!(!logger.enabled(&make_metadata(Level::Debug, "crate1")));
     }
 
     #[test]
@@ -205,15 +205,15 @@ mod tests {
             .filter(Some("crate2::mod"), LevelFilter::Debug)
             .filter(Some("crate1::mod1"), LevelFilter::Warn)
             .build();
-        assert!(logger.enabled(&make_metadata(Level::Debug, "crate2::mod1")));
-        assert!(!logger.enabled(&make_metadata(Level::Debug, "crate2")));
+        debug_assert!(logger.enabled(&make_metadata(Level::Debug, "crate2::mod1")));
+        debug_assert!(!logger.enabled(&make_metadata(Level::Debug, "crate2")));
     }
 
     #[test]
     fn parse_default() {
         let logger = Builder::new().parse("info,crate1::mod1=warn").build();
-        assert!(logger.enabled(&make_metadata(Level::Warn, "crate1::mod1")));
-        assert!(logger.enabled(&make_metadata(Level::Info, "crate2::mod2")));
+        debug_assert!(logger.enabled(&make_metadata(Level::Warn, "crate1::mod1")));
+        debug_assert!(logger.enabled(&make_metadata(Level::Info, "crate2::mod2")));
     }
 
     #[test]
@@ -222,10 +222,10 @@ mod tests {
             .filter(Some("crate2"), LevelFilter::Info)
             .filter(Some("crate1::mod1"), LevelFilter::Warn)
             .build();
-        assert!(logger.enabled(&make_metadata(Level::Warn, "crate1::mod1")));
-        assert!(!logger.enabled(&make_metadata(Level::Info, "crate1::mod1")));
-        assert!(logger.enabled(&make_metadata(Level::Info, "crate2")));
-        assert!(!logger.enabled(&make_metadata(Level::Debug, "crate2")));
+        debug_assert!(logger.enabled(&make_metadata(Level::Warn, "crate1::mod1")));
+        debug_assert!(!logger.enabled(&make_metadata(Level::Info, "crate1::mod1")));
+        debug_assert!(logger.enabled(&make_metadata(Level::Info, "crate2")));
+        debug_assert!(!logger.enabled(&make_metadata(Level::Debug, "crate2")));
     }
 
     #[test]
@@ -234,7 +234,7 @@ mod tests {
             .filter(Some("crate2"), LevelFilter::Info)
             .filter(Some("crate1::mod1"), LevelFilter::Warn)
             .build();
-        assert!(!logger.enabled(&make_metadata(Level::Warn, "crate3")));
+        debug_assert!(!logger.enabled(&make_metadata(Level::Warn, "crate3")));
     }
 
     #[test]
@@ -243,7 +243,7 @@ mod tests {
             .filter(Some("crate2"), LevelFilter::Info)
             .filter(Some("crate1::mod1"), LevelFilter::Warn)
             .build();
-        assert!(logger.enabled(&make_metadata(Level::Info, "crate2::mod1")));
+        debug_assert!(logger.enabled(&make_metadata(Level::Info, "crate2::mod1")));
     }
 
     #[test]
@@ -253,8 +253,8 @@ mod tests {
             .filter(Some("crate2::mod"), LevelFilter::Debug)
             .filter(Some("crate1::mod1"), LevelFilter::Warn)
             .build();
-        assert!(logger.enabled(&make_metadata(Level::Debug, "crate2::mod1")));
-        assert!(!logger.enabled(&make_metadata(Level::Debug, "crate2")));
+        debug_assert!(logger.enabled(&make_metadata(Level::Debug, "crate2::mod1")));
+        debug_assert!(!logger.enabled(&make_metadata(Level::Debug, "crate2")));
     }
 
     #[test]
@@ -263,8 +263,8 @@ mod tests {
             .filter(None, LevelFilter::Info)
             .filter(Some("crate1::mod1"), LevelFilter::Warn)
             .build();
-        assert!(logger.enabled(&make_metadata(Level::Warn, "crate1::mod1")));
-        assert!(logger.enabled(&make_metadata(Level::Info, "crate2::mod2")));
+        debug_assert!(logger.enabled(&make_metadata(Level::Warn, "crate1::mod1")));
+        debug_assert!(logger.enabled(&make_metadata(Level::Info, "crate2::mod2")));
     }
 
     #[test]
@@ -273,8 +273,8 @@ mod tests {
             .filter(None, LevelFilter::Info)
             .filter(Some("crate1::mod1"), LevelFilter::Off)
             .build();
-        assert!(!logger.enabled(&make_metadata(Level::Error, "crate1::mod1")));
-        assert!(logger.enabled(&make_metadata(Level::Info, "crate2::mod2")));
+        debug_assert!(!logger.enabled(&make_metadata(Level::Error, "crate1::mod1")));
+        debug_assert!(logger.enabled(&make_metadata(Level::Info, "crate2::mod2")));
     }
 
     #[test]

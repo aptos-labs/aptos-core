@@ -80,7 +80,7 @@ fn test_sender_clone() {
 
         // receiver should not think stream is terminated, since
         // sender_clone is not dropped yet (sender is dropped at this point)
-        assert!(!receiver.is_terminated());
+        debug_assert!(!receiver.is_terminated());
     };
 
     block_on(f1);

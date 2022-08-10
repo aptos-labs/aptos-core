@@ -92,6 +92,6 @@ mod tests {
         let resp = get(&format!("http://127.0.0.1:{}/state_snapshot/1", port,)).unwrap();
         assert_eq!(resp.status(), 200);
         assert_eq!(resp.content_length(), None);
-        assert!(resp.bytes().is_err());
+        debug_assert!(resp.bytes().is_err());
     }
 }

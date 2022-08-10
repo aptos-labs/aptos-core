@@ -41,7 +41,7 @@ proptest! {
     fn test_sign_raw_transaction(raw_txn in any::<RawTransaction>(), keypair in ed25519::keypair_strategy()) {
         let txn = raw_txn.sign(&keypair.private_key, keypair.public_key).unwrap();
         let signed_txn = txn.into_inner();
-        assert!(signed_txn.check_signature().is_ok());
+        debug_assert!(signed_txn.check_signature().is_ok());
     }
 
     #[test]

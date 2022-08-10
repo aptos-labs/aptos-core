@@ -33,7 +33,7 @@ impl StateDelta {
         current_version: Option<Version>,
         updates_since_base: HashMap<StateKey, StateValue>,
     ) -> Self {
-        assert!(base_version.map_or(0, |v| v + 1) <= current_version.map_or(0, |v| v + 1));
+        debug_assert!(base_version.map_or(0, |v| v + 1) <= current_version.map_or(0, |v| v + 1));
         Self {
             base,
             base_version,
@@ -60,7 +60,7 @@ impl StateDelta {
     }
 
     pub fn merge(&mut self, other: StateDelta) {
-        assert!(other.follow(self));
+        debug_assert!(other.follow(self));
         self.updates_since_base.extend(other.updates_since_base);
         self.current = other.current;
         self.current_version = other.current_version;

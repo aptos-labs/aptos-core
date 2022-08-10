@@ -27,7 +27,7 @@
 //! let kp = KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut rng);
 //!
 //! let signature = kp.private_key.sign(&message);
-//! assert!(signature.verify(&message, &kp.public_key).is_ok());
+//! debug_assert!(signature.verify(&message, &kp.public_key).is_ok());
 //! ```
 
 /// The length of the Ed25519PrivateKey

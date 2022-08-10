@@ -107,6 +107,6 @@ where
             ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
                 .execute_transactions_parallel((), self.transactions.clone());
 
-        assert!(self.expected_output.check_output(&output));
+        debug_assert!(self.expected_output.check_output(&output));
     }
 }

@@ -149,7 +149,7 @@ impl FromStr for ChainId {
 
 impl ChainId {
     pub fn new(id: u8) -> Self {
-        assert!(id > 0, "cannot have chain ID with 0");
+        debug_assert!(id > 0, "cannot have chain ID with 0");
         Self(id)
     }
 
@@ -168,10 +168,10 @@ mod test {
 
     #[test]
     fn test_chain_id_from_str() {
-        assert!(ChainId::from_str("").is_err());
-        assert!(ChainId::from_str("0").is_err());
-        assert!(ChainId::from_str("256").is_err());
-        assert!(ChainId::from_str("255255").is_err());
+        debug_assert!(ChainId::from_str("").is_err());
+        debug_assert!(ChainId::from_str("0").is_err());
+        debug_assert!(ChainId::from_str("256").is_err());
+        debug_assert!(ChainId::from_str("255255").is_err());
         assert_eq!(ChainId::from_str("TESTING").unwrap(), ChainId::test());
         assert_eq!(ChainId::from_str("255").unwrap(), ChainId::new(255));
     }

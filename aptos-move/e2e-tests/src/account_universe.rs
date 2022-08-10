@@ -310,7 +310,7 @@ pub fn txn_one_account_result(
 pub fn log_balance_strategy(max_balance: u64) -> impl Strategy<Value = u64> {
     // The logarithmic distribution is modeled by uniformly picking from ranges of powers of 2.
     let minimum = gas_costs::TXN_RESERVED.next_power_of_two();
-    assert!(max_balance >= minimum, "minimum to make sense");
+    debug_assert!(max_balance >= minimum, "minimum to make sense");
     let mut strategies = vec![];
     // Balances below and around the minimum are interesting but don't cover *every* power of 2,
     // just those starting from the minimum.

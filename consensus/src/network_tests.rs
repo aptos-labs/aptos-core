@@ -520,27 +520,27 @@ mod tests {
             2,
             vec![vec![nodes[1]], vec![nodes[2]], vec![nodes[3], nodes[4]]],
         );
-        assert!(playground.split_network_round(&round_partitions));
+        debug_assert!(playground.split_network_round(&round_partitions));
 
         // Round 1 checks (partitions: [0], [1,2])
         // Messages from 0 to 1 should be dropped
-        assert!(playground.is_message_dropped_round(&nodes[0], &nodes[1], 1));
+        debug_assert!(playground.is_message_dropped_round(&nodes[0], &nodes[1], 1));
         // Messages from 1 to 0 should also be dropped
-        assert!(playground.is_message_dropped_round(&nodes[1], &nodes[0], 1));
+        debug_assert!(playground.is_message_dropped_round(&nodes[1], &nodes[0], 1));
         // Messages from 1 to 2 should not be dropped
-        assert!(!playground.is_message_dropped_round(&nodes[1], &nodes[2], 1));
+        debug_assert!(!playground.is_message_dropped_round(&nodes[1], &nodes[2], 1));
         // Messages from 3 to 1 should not be dropped
-        assert!(!playground.is_message_dropped_round(&nodes[3], &nodes[0], 1));
+        debug_assert!(!playground.is_message_dropped_round(&nodes[3], &nodes[0], 1));
 
         // Round 2 checks (partitions: [1], [2], [3,4])
         // Messages from 2 to 4 should be dropped
-        assert!(playground.is_message_dropped_round(&nodes[2], &nodes[4], 2));
+        debug_assert!(playground.is_message_dropped_round(&nodes[2], &nodes[4], 2));
         // Messages from 1 to 2 should be dropped
-        assert!(playground.is_message_dropped_round(&nodes[1], &nodes[2], 2));
+        debug_assert!(playground.is_message_dropped_round(&nodes[1], &nodes[2], 2));
         // Messages from 3 to 4 should not be dropped
-        assert!(!playground.is_message_dropped_round(&nodes[3], &nodes[4], 2));
+        debug_assert!(!playground.is_message_dropped_round(&nodes[3], &nodes[4], 2));
         // Messages from 0 to 3 should not be dropped
-        assert!(!playground.is_message_dropped_round(&nodes[0], &nodes[3], 2));
+        debug_assert!(!playground.is_message_dropped_round(&nodes[0], &nodes[3], 2));
     }
 
     fn add_peer_to_storage(
@@ -803,14 +803,14 @@ mod tests {
             .unwrap();
 
         let f_check = async move {
-            assert!(network_receivers.block_retrieval.next().await.is_some());
+            debug_assert!(network_receivers.block_retrieval.next().await.is_some());
 
             drop(peer_mgr_notifs_tx);
             drop(connection_notifs_tx);
             drop(self_sender);
 
-            assert!(network_receivers.block_retrieval.next().await.is_none());
-            assert!(network_receivers.consensus_messages.next().await.is_none());
+            debug_assert!(network_receivers.block_retrieval.next().await.is_none());
+            debug_assert!(network_receivers.consensus_messages.next().await.is_none());
         };
         let f_network_task = network_task.start();
 

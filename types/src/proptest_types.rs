@@ -1046,7 +1046,7 @@ pub struct BlockInfoGen {
 
 impl BlockInfoGen {
     pub fn materialize(self, universe: &mut AccountInfoUniverse, block_size: usize) -> BlockInfo {
-        assert!(block_size > 0, "No empty blocks are allowed.");
+        debug_assert!(block_size > 0, "No empty blocks are allowed.");
 
         let current_epoch = universe.get_epoch();
         // The first LedgerInfo should always carry a validator set.
@@ -1138,7 +1138,7 @@ impl Arbitrary for BlockGen {
     type Strategy = BoxedStrategy<Self>;
 
     fn arbitrary_with(max_user_txns: Self::Parameters) -> Self::Strategy {
-        assert!(max_user_txns >= 1);
+        debug_assert!(max_user_txns >= 1);
         (
             vec(any::<TransactionToCommitGen>(), 1..=max_user_txns),
             any::<LedgerInfoGen>(),

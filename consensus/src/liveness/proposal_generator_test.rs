@@ -54,7 +54,7 @@ async fn test_proposal_generation_empty_tree() {
         .generate_proposal(1, &mut proposer_election, empty_callback())
         .await
         .err();
-    assert!(proposal_err.is_some());
+    debug_assert!(proposal_err.is_some());
 }
 
 #[tokio::test]
@@ -150,7 +150,7 @@ async fn test_old_proposal_generation() {
         .generate_proposal(1, &mut proposer_election, empty_callback())
         .await
         .err();
-    assert!(proposal_err.is_some());
+    debug_assert!(proposal_err.is_some());
 }
 
 #[tokio::test]

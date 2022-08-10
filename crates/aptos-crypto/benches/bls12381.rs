@@ -85,7 +85,7 @@ fn pop_verify<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     g.bench_function("pop_verify", move |b| {
         b.iter(|| {
             let result = pop.verify(&kp.public_key);
-            assert!(result.is_ok());
+            debug_assert!(result.is_ok());
         })
     });
 }
@@ -111,7 +111,7 @@ fn verify_signature_share<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     g.bench_function("verify_signature_share", move |b| {
         b.iter(|| {
             let result = sig.verify(&msg, &keypair.public_key);
-            assert!(result.is_ok());
+            debug_assert!(result.is_ok());
         })
     });
 }
@@ -139,7 +139,7 @@ fn aggregate_pks<M: Measurement>(g: &mut BenchmarkGroup<M>, size: usize) {
                 },
                 |pks| {
                     let result = bls12381::PublicKey::aggregate(pks);
-                    assert!(result.is_ok());
+                    debug_assert!(result.is_ok());
                 },
                 BatchSize::SmallInput,
             );
@@ -173,7 +173,7 @@ fn aggregate_sigshare<M: Measurement>(g: &mut BenchmarkGroup<M>, size: usize) {
                 },
                 |sigshares| {
                     let result = bls12381::Signature::aggregate(sigshares);
-                    assert!(result.is_ok());
+                    debug_assert!(result.is_ok());
                 },
                 BatchSize::SmallInput,
             );
@@ -225,7 +225,7 @@ fn verify_multisig<M: Measurement>(g: &mut BenchmarkGroup<M>, size: usize) {
 
                     let result = multisig.verify(&msg, &aggpk);
 
-                    assert!(result.is_ok());
+                    debug_assert!(result.is_ok());
                 },
                 BatchSize::SmallInput,
             );
@@ -269,7 +269,7 @@ fn verify_aggsig<M: Measurement>(g: &mut BenchmarkGroup<M>, n: usize) {
 
                 let result = aggsig.verify_aggregate(&msgs_refs, &pks);
 
-                assert!(result.is_ok());
+                debug_assert!(result.is_ok());
             },
             BatchSize::SmallInput,
         );

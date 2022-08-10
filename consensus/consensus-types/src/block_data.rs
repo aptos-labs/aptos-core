@@ -138,7 +138,7 @@ impl BlockData {
     }
 
     pub fn new_genesis_from_ledger_info(ledger_info: &LedgerInfo) -> Self {
-        assert!(ledger_info.ends_epoch());
+        debug_assert!(ledger_info.ends_epoch());
         let ancestor = BlockInfo::new(
             ledger_info.epoch(),
             0,                 /* round */
@@ -270,5 +270,5 @@ fn test_reconfiguration_suffix() {
         2,
         quorum_cert,
     );
-    assert!(reconfig_suffix_block.is_reconfiguration_suffix());
+    debug_assert!(reconfig_suffix_block.is_reconfiguration_suffix());
 }

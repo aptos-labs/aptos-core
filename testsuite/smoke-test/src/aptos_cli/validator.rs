@@ -54,7 +54,7 @@ async fn test_register_and_update_validator() {
         .await
         .unwrap();
 
-    assert!(cli
+    debug_assert!(cli
         .show_validator_config(validator_cli_index)
         .await
         .is_err()); // validator not registered yet

@@ -17,7 +17,7 @@ fn test_sha256_test_vectors() {
         let hkdf_extract = Hkdf::<Sha256>::extract(Option::from(&salt[..]), &ikm[..]).unwrap();
         let hkdf_expand = Hkdf::<Sha256>::expand(&hkdf_extract, Some(&info[..]), t.length);
 
-        assert!(hkdf_expand.is_ok());
+        debug_assert!(hkdf_expand.is_ok());
         assert_eq!(t.prk, hex::encode(hkdf_extract));
         assert_eq!(t.okm, hex::encode(hkdf_expand.unwrap()));
     }
@@ -39,7 +39,7 @@ fn test_extract_then_expand() {
             t.length,
         );
 
-        assert!(hkdf_full.is_ok());
+        debug_assert!(hkdf_full.is_ok());
         assert_eq!(t.okm, hex::encode(hkdf_full.unwrap()));
     }
 }
@@ -54,7 +54,7 @@ fn test_sha256_output_length() {
 
     // Test for max allowed (expected to pass)
     let hkdf_expand = Hkdf::<Sha256>::expand(&hkdf_extract, None, max_hash_length);
-    assert!(hkdf_expand.is_ok());
+    debug_assert!(hkdf_expand.is_ok());
     assert_eq!(hkdf_expand.unwrap().len(), max_hash_length);
 
     // Test for max + 1 (expected to fail)
@@ -94,7 +94,7 @@ fn test_sha3_256_output_length() {
 
     // Test for max allowed (expected to pass)
     let hkdf_expand = Hkdf::<Sha3_256>::expand(&hkdf_extract, None, max_hash_length);
-    assert!(hkdf_expand.is_ok());
+    debug_assert!(hkdf_expand.is_ok());
     assert_eq!(hkdf_expand.unwrap().len(), max_hash_length);
 
     // Test for max + 1 (expected to fail)
@@ -127,7 +127,7 @@ fn test_sha512_output_length() {
 
     // Test for max allowed (expected to pass)
     let hkdf_expand = Hkdf::<Sha512>::expand(&hkdf_extract, None, max_hash_length);
-    assert!(hkdf_expand.is_ok());
+    debug_assert!(hkdf_expand.is_ok());
     assert_eq!(hkdf_expand.unwrap().len(), max_hash_length);
 
     // Test for max + 1 (expected to fail)
@@ -163,11 +163,11 @@ fn unsupported_digest() {
 fn test_ikm_size() {
     // Test for 16 bytes seed.
     let ikm16 = [0u8; 16];
-    assert!(Hkdf::<Sha256>::extract(None, &ikm16).is_ok());
+    debug_assert!(Hkdf::<Sha256>::extract(None, &ikm16).is_ok());
 
     // Test for 32 bytes seed.
     let ikm32 = [0u8; 32];
-    assert!(Hkdf::<Sha256>::extract(None, &ikm32).is_ok());
+    debug_assert!(Hkdf::<Sha256>::extract(None, &ikm32).is_ok());
 
     // Test for 15 bytes seed.
     let ikm15 = [0u8; 15];

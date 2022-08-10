@@ -121,7 +121,7 @@ fn test_state_store_pruner() {
             .wake_and_wait_pruner(prune_batch_size as u64 /* latest_version */)
             .unwrap();
         for i in 0..prune_batch_size {
-            assert!(state_store
+            debug_assert!(state_store
                 .get_state_value_with_proof_by_version(&key, i as u64)
                 .is_err());
         }
@@ -212,8 +212,8 @@ fn test_state_store_pruner_partial_version() {
     // Test for batched pruning, since we use a batch size of 1, updating the latest version to 1
     // should prune 1 stale node with the version 0.
     {
-        assert!(pruner.wake_and_wait_pruner(1 /* latest_version */,).is_ok());
-        assert!(state_store
+        debug_assert!(pruner.wake_and_wait_pruner(1 /* latest_version */,).is_ok());
+        debug_assert!(state_store
             .get_state_value_with_proof_by_version(&key1, 0_u64)
             .is_err());
         // root1 is still there.
@@ -223,14 +223,14 @@ fn test_state_store_pruner_partial_version() {
     }
     // Prune 3 more times. All version 0 and 1 stale nodes should be gone.
     {
-        assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
-        assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
+        debug_assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
+        debug_assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
 
-        assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
-        assert!(state_store
+        debug_assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
+        debug_assert!(state_store
             .get_state_value_with_proof_by_version(&key1, 0_u64)
             .is_err());
-        assert!(state_store
+        debug_assert!(state_store
             .get_state_value_with_proof_by_version(&key2, 1_u64)
             .is_err());
         // root2 is still there.
@@ -289,7 +289,7 @@ fn test_state_store_pruner_disabled() {
     // we expect versions 0 to 9 to be pruned.
     {
         for i in 0..prune_batch_size {
-            assert!(state_store
+            debug_assert!(state_store
                 .get_state_value_with_proof_by_version(&key, i as u64)
                 .is_ok());
         }

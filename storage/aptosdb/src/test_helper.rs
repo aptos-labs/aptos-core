@@ -187,14 +187,14 @@ fn verify_epochs(db: &AptosDB, ledger_infos_with_sigs: &[LedgerInfoWithSignature
         // a version potentially without ledger_info ever committed
         let v1 = (last_ver + this_ver) / 2;
         if v1 != last_ver && v1 != this_ver {
-            assert!(db.get_epoch_ending_ledger_info(v1).is_err());
+            debug_assert!(db.get_epoch_ending_ledger_info(v1).is_err());
         }
 
         // a version where there was a ledger_info once
         if li.ledger_info().ends_epoch() {
             assert_eq!(db.get_epoch_ending_ledger_info(this_ver).unwrap(), *li);
         } else {
-            assert!(db.get_epoch_ending_ledger_info(this_ver).is_err());
+            debug_assert!(db.get_epoch_ending_ledger_info(this_ver).is_err());
         }
         last_ver = this_ver;
     }
@@ -347,7 +347,7 @@ fn verify_snapshots(
     for snapshot_version in snapshot_versions {
         let start = (cur_version - start_version) as usize;
         let end = (snapshot_version - start_version) as usize;
-        assert!(txns_to_commit[end].is_state_checkpoint());
+        debug_assert!(txns_to_commit[end].is_state_checkpoint());
         let expected_root_hash = db
             .ledger_store
             .get_transaction_info(snapshot_version)

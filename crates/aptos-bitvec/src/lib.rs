@@ -47,8 +47,8 @@ const MAX_BUCKETS: usize = 32;
 /// let mut bv = BitVec::default();
 /// bv.set(2);
 /// bv.set(5);
-/// assert!(bv.is_set(2));
-/// assert!(bv.is_set(5));
+/// debug_assert!(bv.is_set(2));
+/// debug_assert!(bv.is_set(5));
 /// assert_eq!(false, bv.is_set(0));
 /// assert_eq!(bv.count_ones(), 2);
 /// assert_eq!(bv.last_set_bit(), Some(5));
@@ -60,7 +60,7 @@ const MAX_BUCKETS: usize = 32;
 /// let mut bv2 = BitVec::default();
 /// bv2.set(2);
 /// let intersection = bv1.bitand(&bv2);
-/// assert!(intersection.is_set(2));
+/// debug_assert!(intersection.is_set(2));
 /// assert_eq!(false, intersection.is_set(3));
 /// ```
 #[derive(Clone, Default, Debug, Eq, PartialEq, Serialize)]
@@ -259,12 +259,12 @@ mod test {
             inner: vec![0b0000_0001, 0b0100_0000],
         };
         assert_eq!(p5.last_set_bit(), Some(9));
-        assert!(p5.is_set(7));
-        assert!(p5.is_set(9));
-        assert!(!p5.is_set(0));
+        debug_assert!(p5.is_set(7));
+        debug_assert!(p5.is_set(9));
+        debug_assert!(!p5.is_set(0));
 
         p5.set(10);
-        assert!(p5.is_set(10));
+        debug_assert!(p5.is_set(10));
         assert_eq!(p5.last_set_bit(), Some(10));
         assert_eq!(p5.inner, vec![0b0000_0001, 0b0110_0000]);
 
@@ -279,7 +279,7 @@ mod test {
     fn test_empty() {
         let p = BitVec::default();
         for i in 0..=std::u8::MAX {
-            assert!(!p.is_set(i));
+            debug_assert!(!p.is_set(i));
         }
     }
 
@@ -288,10 +288,10 @@ mod test {
         let mut p = BitVec::default();
         p.set(std::u8::MAX);
         p.set(0);
-        assert!(p.is_set(std::u8::MAX));
-        assert!(p.is_set(0));
+        debug_assert!(p.is_set(std::u8::MAX));
+        debug_assert!(p.is_set(0));
         for i in 1..std::u8::MAX {
-            assert!(!p.is_set(i));
+            debug_assert!(!p.is_set(i));
         }
         assert_eq!(vec![0, u8::MAX], p.iter_ones().collect::<Vec<_>>());
     }
@@ -302,9 +302,9 @@ mod test {
         // (see comments in BCS crate)
         let mut bytes = [0u8; 47];
         bytes[0] = 46;
-        assert!(bcs::from_bytes::<Vec<u8>>(&bytes).is_ok());
+        debug_assert!(bcs::from_bytes::<Vec<u8>>(&bytes).is_ok());
         // However, 46 > MAX_BUCKET:
-        assert!(bcs::from_bytes::<BitVec>(&bytes).is_err());
+        debug_assert!(bcs::from_bytes::<BitVec>(&bytes).is_err());
         let mut bytes = [0u8; 33];
         bytes[0] = 32;
         let bv = BitVec {
@@ -319,14 +319,14 @@ mod test {
         fn test_and(bv1 in any::<BitVec>(), bv2 in any::<BitVec>()) {
             let intersection = bv1.bitand(&bv2);
 
-            assert!(intersection.count_ones() <= bv1.count_ones());
-            assert!(intersection.count_ones() <= bv2.count_ones());
+            debug_assert!(intersection.count_ones() <= bv1.count_ones());
+            debug_assert!(intersection.count_ones() <= bv2.count_ones());
 
             for i in 0..=std::u8::MAX {
                 if bv1.is_set(i) && bv2.is_set(i) {
-                    assert!(intersection.is_set(i));
+                    debug_assert!(intersection.is_set(i));
                 } else {
-                    assert!(!intersection.is_set(i));
+                    debug_assert!(!intersection.is_set(i));
                 }
             }
         }
@@ -335,14 +335,14 @@ mod test {
         fn test_or(bv1 in any::<BitVec>(), bv2 in any::<BitVec>()) {
             let union = bv1.bitor(&bv2);
 
-            assert!(union.count_ones() >= bv1.count_ones());
-            assert!(union.count_ones() >= bv2.count_ones());
+            debug_assert!(union.count_ones() >= bv1.count_ones());
+            debug_assert!(union.count_ones() >= bv2.count_ones());
 
             for i in 0..=std::u8::MAX {
                 if bv1.is_set(i) || bv2.is_set(i) {
-                    assert!(union.is_set(i));
+                    debug_assert!(union.is_set(i));
                 } else {
-                    assert!(!union.is_set(i));
+                    debug_assert!(!union.is_set(i));
                 }
             }
         }

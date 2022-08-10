@@ -60,7 +60,7 @@ fn add_signing_phase_test_cases(
             commit_ledger_info: commit_ledger_info.clone(),
         },
         Box::new(move |resp| {
-            assert!(resp.signature_result.is_ok());
+            debug_assert!(resp.signature_result.is_ok());
             assert_eq!(resp.commit_ledger_info, commit_ledger_info);
         }),
     );
@@ -76,7 +76,7 @@ fn add_signing_phase_test_cases(
             commit_ledger_info: inconsistent_commit_ledger_info,
         },
         Box::new(move |resp| {
-            assert!(matches!(
+            debug_assert!(matches!(
                 resp.signature_result,
                 Err(Error::InconsistentExecutionResult(_, _))
             ));
@@ -90,7 +90,7 @@ fn add_signing_phase_test_cases(
             commit_ledger_info: executed_ledger_info.ledger_info().clone(),
         },
         Box::new(move |resp| {
-            assert!(matches!(
+            debug_assert!(matches!(
                 resp.signature_result,
                 Err(Error::InvalidOrderedLedgerInfo(_))
             ));
@@ -107,7 +107,7 @@ fn add_signing_phase_test_cases(
             commit_ledger_info: executed_ledger_info.ledger_info().clone(),
         },
         Box::new(move |resp| {
-            assert!(matches!(
+            debug_assert!(matches!(
                 resp.signature_result,
                 Err(Error::InvalidQuorumCertificate(_))
             ));

@@ -170,7 +170,7 @@ mod tests {
         let mut data_writer = Vec::<u8>::new();
         let encoder = JsonEncoder;
         let res = encoder.encode(&metric_family, &mut data_writer);
-        assert!(res.is_ok());
+        debug_assert!(res.is_ok());
 
         let expected: &str = r#"
         {

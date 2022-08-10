@@ -21,7 +21,7 @@ pub struct Nibble(u8);
 
 impl From<u8> for Nibble {
     fn from(nibble: u8) -> Self {
-        assert!(nibble < 16, "Nibble out of range: {}", nibble);
+        debug_assert!(nibble < 16, "Nibble out of range: {}", nibble);
         Self(nibble)
     }
 }

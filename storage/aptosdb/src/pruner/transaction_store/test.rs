@@ -78,7 +78,7 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
             .unwrap();
         // ensure that all transaction up to i * 2 has been pruned
         for j in 0..i {
-            assert!(transaction_store.get_write_set(j as u64).is_err());
+            debug_assert!(transaction_store.get_write_set(j as u64).is_err());
         }
         // ensure all other are valid in DB
         for j in i..num_write_sets {
@@ -153,10 +153,10 @@ fn verify_txn_not_in_store(
     ledger_version: u64,
 ) {
     // Ensure that all transaction from transaction schema store has been pruned
-    assert!(transaction_store.get_transaction(index).is_err());
+    debug_assert!(transaction_store.get_transaction(index).is_err());
     // Ensure that transaction by account store has been pruned
     if let Transaction::UserTransaction(txn) = txns.get(index as usize).unwrap() {
-        assert!(transaction_store
+        debug_assert!(transaction_store
             .get_account_transaction_version(txn.sender(), txn.sequence_number(), ledger_version,)
             .unwrap()
             .is_none());
@@ -186,7 +186,7 @@ fn verify_txn_in_store(
     }
     // Ensure that transaction accumulator is in DB. This can be done by trying
     // to read transaction proof
-    assert!(ledger_store
+    debug_assert!(ledger_store
         .get_transaction_proof(index, ledger_version)
         .is_ok());
 }

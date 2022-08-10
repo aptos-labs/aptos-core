@@ -750,7 +750,7 @@ mod tests {
             module_path!().split("::").next().unwrap()
         );
         assert_eq!(entry.message.as_deref(), Some("This is a log"));
-        assert!(entry.backtrace.is_none());
+        debug_assert!(entry.backtrace.is_none());
 
         // Ensure json formatter works
         // hardcoding a timestamp and hostname to make the tests deterministic and not depend on environment
@@ -769,7 +769,7 @@ mod tests {
         // Log time should be the time the structured log entry was created
         let timestamp = DateTime::parse_from_rfc3339(&entry.timestamp).unwrap();
         let timestamp: DateTime<Utc> = DateTime::from(timestamp);
-        assert!(before <= timestamp && timestamp <= after);
+        debug_assert!(before <= timestamp && timestamp <= after);
 
         // Ensure data stored is the right type
         assert_eq!(
@@ -805,7 +805,7 @@ mod tests {
         // Test error logs contain backtraces
         error!("This is an error log");
         let entry = receiver.recv().unwrap();
-        assert!(entry.backtrace.is_some());
+        debug_assert!(entry.backtrace.is_some());
 
         // Test all log levels work properly
         // Tracing should be skipped because the Logger was setup to skip Tracing events

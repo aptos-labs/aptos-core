@@ -28,7 +28,7 @@ fn test_artifact(artifact_path: &Path) -> datatest_stable::Result<()> {
             |_| {},
             |child, _file| {
                 let status = child.wait().expect("failed to wait for child");
-                assert!(
+                debug_assert!(
                     status.success(),
                     "child exited unsuccessfully with {}",
                     status
@@ -61,7 +61,7 @@ fn test_artifact_impl(artifact_path: &Path) {
     let stats = reg.change();
 
     eprintln!("stats: {:?}", stats);
-    assert!(
+    debug_assert!(
         stats.bytes_allocated <= MEMORY_LIMIT,
         "Deserializer used too much memory: allocated {} bytes (max {} bytes)",
         stats.bytes_allocated,

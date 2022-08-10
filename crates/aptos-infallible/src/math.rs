@@ -36,8 +36,8 @@
 /// assert_eq!(checked!(10_u32 + (1_u32 + 1_u32)).unwrap(), 12);
 ///
 /// let max = u32::max_value();
-/// assert!(checked!(max + 1_u32).is_err());
-/// assert!(checked!(0_u32 - 1_u32).is_err());
+/// debug_assert!(checked!(max + 1_u32).is_err());
+/// debug_assert!(checked!(0_u32 - 1_u32).is_err());
 ///
 /// # struct Foo {
 /// #    pub bar: i32

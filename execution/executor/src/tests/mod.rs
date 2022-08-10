@@ -271,10 +271,10 @@ fn create_transaction_chunks(
     for i in 1..chunk_ranges.len() {
         let previous_range = &chunk_ranges[i - 1];
         let range = &chunk_ranges[i];
-        assert!(previous_range.start <= previous_range.end);
-        assert!(range.start <= range.end);
-        assert!(range.start <= previous_range.end);
-        assert!(previous_range.end <= range.end);
+        debug_assert!(previous_range.start <= previous_range.end);
+        debug_assert!(range.start <= range.end);
+        debug_assert!(range.start <= previous_range.end);
+        debug_assert!(previous_range.end <= range.end);
     }
 
     // To obtain the batches of transactions, we first execute and save all these transactions in a
@@ -468,7 +468,7 @@ fn test_deleted_key_from_state_store() {
     apply_transaction_by_writeset(db, vec![(transaction3, write_set3)]);
 
     // Ensure the latest version of the value in DB is None (which implies its deleted)
-    assert!(db
+    debug_assert!(db
         .reader
         .get_state_value_with_proof_by_version(&dummy_state_key1, 5)
         .unwrap()

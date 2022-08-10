@@ -525,7 +525,7 @@ where
             // Similarly, if the last position is a left child, it needs to be combined with a
             // sibling on the right.
             let remainder = children_iter.remainder();
-            assert!(remainder.len() <= 1);
+            debug_assert!(remainder.len() <= 1);
             if !remainder.is_empty() {
                 let left_hash = remainder[0];
                 let right_hash = *right_sibling_iter.next().ok_or_else(|| {

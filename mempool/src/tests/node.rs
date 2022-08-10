@@ -417,13 +417,13 @@ impl Node {
 
     /// Checks that there are no `SharedMempoolNotification`s on the subscriber
     pub fn check_no_subscriber_events(&mut self) {
-        assert!(self.subscriber.select_next_some().now_or_never().is_none())
+        debug_assert!(self.subscriber.select_next_some().now_or_never().is_none())
     }
 
     /// Checks that a node has no pending messages to send.
     pub fn check_no_network_messages_sent(&mut self, network_id: NetworkId) {
         self.check_no_subscriber_events();
-        assert!(self
+        debug_assert!(self
             .get_network_interface(network_id)
             .network_reqs_rx
             .select_next_some()

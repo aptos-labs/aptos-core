@@ -396,7 +396,7 @@ impl CliTestFramework {
 
     pub async fn assert_account_balance_now(&self, index: usize, expected: u64) {
         let result = self.list_account(index, ListQuery::Balance).await;
-        assert!(
+        debug_assert!(
             result.is_ok(),
             "Account {} not yet created, {}, last 10 transactions: {}",
             self.account_id(index),
@@ -483,7 +483,7 @@ impl CliTestFramework {
     }
 
     pub fn move_dir(&self) -> PathBuf {
-        assert!(self.move_dir.is_some(), "Must have initialized the temp move directory with `CliTestFramework::init_move_dir()` first");
+        debug_assert!(self.move_dir.is_some(), "Must have initialized the temp move directory with `CliTestFramework::init_move_dir()` first");
         self.move_dir.as_ref().cloned().unwrap()
     }
 

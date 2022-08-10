@@ -119,11 +119,11 @@ fn common_protocols() {
 
 #[test]
 fn is_empty() {
-    assert!(ProtocolIdSet::empty().is_empty());
-    assert!(ProtocolIdSet::all_known()
+    debug_assert!(ProtocolIdSet::empty().is_empty());
+    debug_assert!(ProtocolIdSet::all_known()
         .intersect(&ProtocolIdSet::empty())
         .is_empty());
-    assert!(ProtocolIdSet::empty()
+    debug_assert!(ProtocolIdSet::empty()
         .intersect(&ProtocolIdSet::all_known())
         .is_empty());
     assert_eq!(
@@ -134,7 +134,7 @@ fn is_empty() {
         ProtocolIdSet::empty().union(&ProtocolIdSet::all_known()),
         ProtocolIdSet::all_known()
     );
-    assert!(!ProtocolIdSet::all_known().is_empty());
+    debug_assert!(!ProtocolIdSet::all_known().is_empty());
 }
 
 // Ensure we can handshake with a peer advertising some totally unknown ProtocoId's.

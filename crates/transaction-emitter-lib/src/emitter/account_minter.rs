@@ -130,7 +130,7 @@ impl<'t> AccountMinter<'t> {
             .collect();
 
         accounts.append(&mut minted_accounts);
-        assert!(
+        debug_assert!(
             accounts.len() >= num_accounts,
             "Something wrong in mint_account, wanted to mint {}, only have {}",
             total_requested_accounts,

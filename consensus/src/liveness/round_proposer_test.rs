@@ -29,12 +29,12 @@ fn test_round_proposer() {
     // The proposal should win because the map doesn't specify proposer for round 3 hence
     // falling back on the default proposer
 
-    assert!(pe.is_valid_proposer(chosen_author_round1, 1),);
-    assert!(!pe.is_valid_proposer(another_author, 1));
-    assert!(pe.is_valid_proposer(chosen_author_round2, 2));
-    assert!(!pe.is_valid_proposer(another_author, 2));
-    assert!(pe.is_valid_proposer(chosen_author_round1, 3));
-    assert!(!pe.is_valid_proposer(another_author, 3));
+    debug_assert!(pe.is_valid_proposer(chosen_author_round1, 1),);
+    debug_assert!(!pe.is_valid_proposer(another_author, 1));
+    debug_assert!(pe.is_valid_proposer(chosen_author_round2, 2));
+    debug_assert!(!pe.is_valid_proposer(another_author, 2));
+    debug_assert!(pe.is_valid_proposer(chosen_author_round1, 3));
+    debug_assert!(!pe.is_valid_proposer(another_author, 3));
     assert_eq!(pe.get_valid_proposer(1), chosen_author_round1);
     assert_eq!(pe.get_valid_proposer(2), chosen_author_round2);
     assert_eq!(pe.get_valid_proposer(3), chosen_author_round1);

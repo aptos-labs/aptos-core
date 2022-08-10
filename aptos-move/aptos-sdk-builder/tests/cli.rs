@@ -29,7 +29,7 @@ fn test_examples_in_readme() -> std::io::Result<()> {
             .arg(dir.path().join("test.sh"))
             .output()?;
         eprintln!("{}", std::str::from_utf8(&output.stderr).unwrap());
-        assert!(output.status.success());
+        debug_assert!(output.status.success());
         assert_eq!(
             std::str::from_utf8(&output.stdout).unwrap(),
             EXPECTED_OUTPUT
@@ -48,7 +48,7 @@ fn test_examples_in_readme() -> std::io::Result<()> {
         .arg(dir.path().join("test.sh"))
         .output()?;
     eprintln!("{}", std::str::from_utf8(&output.stderr).unwrap());
-    assert!(output.status.success());
+    debug_assert!(output.status.success());
     Ok(())
 }
 

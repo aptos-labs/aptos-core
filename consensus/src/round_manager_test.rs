@@ -427,7 +427,7 @@ fn no_vote_on_mismatch_round() {
             block_skip_round,
             SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
         );
-        assert!(node
+        debug_assert!(node
             .round_manager
             .process_proposal_msg(bad_proposal)
             .await
@@ -489,7 +489,7 @@ fn sync_info_carried_on_timeout_vote() {
             .await
             .unwrap_err();
         let vote_msg_on_timeout = node.next_vote().await;
-        assert!(vote_msg_on_timeout.vote().is_timeout());
+        debug_assert!(vote_msg_on_timeout.vote().is_timeout());
         assert_eq!(
             *vote_msg_on_timeout.sync_info().highest_quorum_cert(),
             block_0_quorum_cert
@@ -529,7 +529,7 @@ fn no_vote_on_invalid_proposer() {
             block_incorrect_proposer,
             SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
         );
-        assert!(node
+        debug_assert!(node
             .round_manager
             .process_proposal_msg(bad_proposal)
             .await
@@ -592,7 +592,7 @@ fn new_round_on_timeout_certificate() {
             correct_block.clone(),
             SyncInfo::new(genesis_qc.clone(), genesis_qc.clone(), None),
         );
-        assert!(node
+        debug_assert!(node
             .round_manager
             .process_proposal_msg(old_good_proposal)
             .await
@@ -653,25 +653,25 @@ fn reject_invalid_failed_authors() {
     );
 
     timed_block_on(&mut runtime, async {
-        assert!(node
+        debug_assert!(node
             .round_manager
             .process_proposal_msg(extra_failed_authors_proposal)
             .await
             .is_err());
 
-        assert!(node
+        debug_assert!(node
             .round_manager
             .process_proposal_msg(missing_failed_authors_proposal)
             .await
             .is_err());
 
-        assert!(node
+        debug_assert!(node
             .round_manager
             .process_proposal_msg(wrong_failed_authors_proposal)
             .await
             .is_err());
 
-        assert!(node
+        debug_assert!(node
             .round_manager
             .process_proposal_msg(not_enough_failed_proposal)
             .await
@@ -752,7 +752,7 @@ fn response_on_block_retrieval() {
                     _ => panic!("block retrieval failure"),
                 };
                 assert_eq!(response.status(), BlockRetrievalStatus::IdNotFound);
-                assert!(response.blocks().is_empty());
+                debug_assert!(response.blocks().is_empty());
             }
             _ => panic!("block retrieval failure"),
         }
@@ -869,7 +869,7 @@ fn nil_vote_on_timeout() {
 
         let vote = vote_msg.vote();
 
-        assert!(vote.is_timeout());
+        debug_assert!(vote.is_timeout());
         // NIL block doesn't change timestamp
         assert_eq!(
             vote.vote_data().proposed().timestamp_usecs(),
@@ -899,7 +899,7 @@ fn vote_resent_on_timeout() {
             .unwrap();
         let vote_msg = node.next_vote().await;
         let vote = vote_msg.vote();
-        assert!(!vote.is_timeout());
+        debug_assert!(!vote.is_timeout());
         assert_eq!(vote.vote_data().proposed().id(), id);
         // Process the outgoing vote message and verify that it contains a round signature
         // and that the vote is the same as above.
@@ -910,7 +910,7 @@ fn vote_resent_on_timeout() {
         let timeout_vote_msg = node.next_vote().await;
         let timeout_vote = timeout_vote_msg.vote();
 
-        assert!(timeout_vote.is_timeout());
+        debug_assert!(timeout_vote.is_timeout());
         assert_eq!(timeout_vote.vote_data(), vote.vote_data());
     });
 }
@@ -1047,11 +1047,11 @@ fn echo_timeout() {
             let result = node_0.round_manager.process_vote_msg(timeout_vote).await;
             // first and third message should not timeout
             if i == 0 || i == 2 {
-                assert!(result.is_ok());
+                debug_assert!(result.is_ok());
             }
             if i == 1 {
                 // timeout is an Error
-                assert!(result.is_err());
+                debug_assert!(result.is_err());
             }
         }
 

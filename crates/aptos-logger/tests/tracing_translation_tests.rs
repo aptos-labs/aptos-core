@@ -51,21 +51,21 @@ fn verify_tracing_kvs() {
 
     tracing::error!(another_value = "hello", "hello world");
     let s = logs.write().pop().unwrap();
-    assert!(s.contains("ERROR"));
-    assert!(s.contains("hello world"));
+    debug_assert!(s.contains("ERROR"));
+    debug_assert!(s.contains("hello world"));
     // have the top-level span...
-    assert!(s.contains("outer"));
+    debug_assert!(s.contains("outer"));
     // ...and the nested spans
-    assert!(s.contains("outer.inner"));
+    debug_assert!(s.contains("outer.inner"));
 
     tracing::info!("foo {} bar", 42);
     let s = logs.write().pop().unwrap();
-    assert!(s.contains("INFO"));
-    assert!(s.contains("foo 42 bar"));
+    debug_assert!(s.contains("INFO"));
+    debug_assert!(s.contains("foo 42 bar"));
 
     tracing::warn!(a = true, b = false);
     let s = logs.write().pop().unwrap();
-    assert!(s.contains("WARN"));
-    assert!(s.contains("true"));
-    assert!(s.contains("false"));
+    debug_assert!(s.contains("WARN"));
+    debug_assert!(s.contains("true"));
+    debug_assert!(s.contains("false"));
 }

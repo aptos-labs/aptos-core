@@ -304,7 +304,7 @@ fn test_validate_module_publishing_non_association() {
     );
     // open publishing is enabled
     let ret = vm_validator.validate_transaction(transaction).unwrap();
-    assert!(ret.status().is_none());
+    debug_assert!(ret.status().is_none());
 }
 
 #[test]

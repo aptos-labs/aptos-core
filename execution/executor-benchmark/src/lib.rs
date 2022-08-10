@@ -111,7 +111,7 @@ pub fn add_accounts(
     pruner_config: StoragePrunerConfig,
     verify_sequence_numbers: bool,
 ) {
-    assert!(source_dir.as_ref() != checkpoint_dir.as_ref());
+    debug_assert!(source_dir.as_ref() != checkpoint_dir.as_ref());
     create_checkpoint(source_dir.as_ref(), checkpoint_dir.as_ref());
     add_accounts_impl(
         num_new_accounts,

@@ -640,7 +640,7 @@ define_hasher! {
 
 fn create_literal_hash(word: &str) -> HashValue {
     let mut s = word.as_bytes().to_vec();
-    assert!(s.len() <= HashValue::LENGTH);
+    debug_assert!(s.len() <= HashValue::LENGTH);
     s.resize(HashValue::LENGTH, 0);
     HashValue::from_slice(&s).expect("Cannot fail")
 }

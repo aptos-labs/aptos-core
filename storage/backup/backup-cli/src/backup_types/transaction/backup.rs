@@ -102,7 +102,7 @@ impl TransactionBackupController {
             current_ver += 1;
         }
 
-        assert!(!chunk_bytes.is_empty());
+        debug_assert!(!chunk_bytes.is_empty());
         assert_eq!(
             current_ver,
             self.start_version + self.num_transactions as u64

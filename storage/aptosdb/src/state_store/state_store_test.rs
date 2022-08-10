@@ -94,7 +94,7 @@ fn test_empty_store() {
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
     let key = StateKey::Raw(String::from("test_key").into_bytes());
-    assert!(store
+    debug_assert!(store
         .get_state_value_with_proof_by_version(&key, 0)
         .is_err());
 }
@@ -303,7 +303,7 @@ fn test_stale_node_index() {
             ),
             1
         );
-        assert!(store
+        debug_assert!(store
             .get_state_value_with_proof_by_version(&key2, 0)
             .is_err());
         // root1 is still there.
@@ -324,7 +324,7 @@ fn test_stale_node_index() {
             2
         );
         // root1 is gone.
-        assert!(store
+        debug_assert!(store
             .get_state_value_with_proof_by_version(&key2, 1)
             .is_err());
         // root2 is still there.
@@ -345,7 +345,7 @@ fn test_stale_node_index() {
             2
         );
         // root1 is gone.
-        assert!(store
+        debug_assert!(store
             .get_state_value_with_proof_by_version(&key2, 1)
             .is_err());
         // root2 is still there.
@@ -431,7 +431,7 @@ fn test_stale_node_index_with_target_version() {
                 .err()
                 .unwrap()
         );
-        assert!(store
+        debug_assert!(store
             .get_state_value_with_proof_by_version(&key2, 0)
             .is_err());
         // root1 is still there.
@@ -530,11 +530,11 @@ fn test_stale_node_index_all_at_once() {
             2
         );
         // root0 is gone.
-        assert!(store
+        debug_assert!(store
             .get_state_value_with_proof_by_version(&key2, 1)
             .is_err());
 
-        assert!(store
+        debug_assert!(store
             .get_state_value_with_proof_by_version(&key2, 1)
             .is_err());
         // root2 is still there.

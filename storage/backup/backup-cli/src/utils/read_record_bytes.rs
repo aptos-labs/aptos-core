@@ -90,21 +90,21 @@ mod tests {
             );
 
             let mut eof: &[u8] = &[];
-            assert!(eof.read_record_bytes().await.unwrap().is_none());
+            debug_assert!(eof.read_record_bytes().await.unwrap().is_none());
 
             let mut empty = &0u32.to_be_bytes()[..];
             assert_eq!(empty.read_record_bytes().await.unwrap().unwrap(), &[][..]);
 
             let mut data_missing = &1u32.to_be_bytes()[..];
-            assert!(data_missing.read_record_bytes().await.is_err());
+            debug_assert!(data_missing.read_record_bytes().await.is_err());
 
             let mut bad_len = 10u32.to_be_bytes().to_vec();
             bad_len.pop();
-            assert!(bad_len.as_slice().read_record_bytes().await.is_err());
+            debug_assert!(bad_len.as_slice().read_record_bytes().await.is_err());
 
             let mut bad_data = 10u32.to_be_bytes().to_vec();
             bad_data.push(0u8);
-            assert!(bad_data.as_slice().read_record_bytes().await.is_err());
+            debug_assert!(bad_data.as_slice().read_record_bytes().await.is_err());
         })
     }
 }

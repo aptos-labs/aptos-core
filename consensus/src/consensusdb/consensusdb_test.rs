@@ -38,11 +38,11 @@ fn test_put_get() {
 
     db.delete_highest_2chain_timeout_certificate().unwrap();
     db.delete_last_vote_msg().unwrap();
-    assert!(db
+    debug_assert!(db
         .get_highest_2chain_timeout_certificate()
         .unwrap()
         .is_none());
-    assert!(db.get_last_vote().unwrap().is_none());
+    debug_assert!(db.get_last_vote().unwrap().is_none());
 }
 
 #[test]

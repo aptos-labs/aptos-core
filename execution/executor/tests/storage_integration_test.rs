@@ -142,7 +142,7 @@ fn test_reconfiguration() {
         .unwrap();
 
     // Make sure the execution result sees the reconfiguration
-    assert!(
+    debug_assert!(
         vm_output.has_reconfiguration(),
         "StateComputeResult does not see a reconfiguration"
     );

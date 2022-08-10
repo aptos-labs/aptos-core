@@ -192,7 +192,7 @@ mod tests {
                 } => {
                     let mut writer = accounts.write();
                     let previous = writer.insert(address, AccountState::new(0));
-                    assert!(previous.is_none(), "should not create account twice");
+                    debug_assert!(previous.is_none(), "should not create account twice");
                 }
                 ScriptFunctionCall::AptosCoinMint {
                     dst_addr, amount, ..

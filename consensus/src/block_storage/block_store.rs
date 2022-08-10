@@ -165,7 +165,7 @@ impl BlockStore {
         let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
 
         //verify root is correct
-        assert!(
+        debug_assert!(
             // decoupled execution allows dummy versions
             root_qc.certified_block().version() == 0
                 || root_qc.certified_block().version() == root_metadata.version(),
@@ -173,7 +173,7 @@ impl BlockStore {
             root_qc.certified_block().version(),
             root_metadata.version(),
         );
-        assert!(
+        debug_assert!(
             // decoupled execution allows dummy executed_state_id
             root_qc.certified_block().executed_state_id() == *ACCUMULATOR_PLACEHOLDER_HASH
                 || root_qc.certified_block().executed_state_id() == root_metadata.accu_hash,
@@ -253,7 +253,7 @@ impl BlockStore {
             .path_from_ordered_root(block_id_to_commit)
             .unwrap_or_default();
 
-        assert!(!blocks_to_commit.is_empty());
+        debug_assert!(!blocks_to_commit.is_empty());
 
         let block_tree = self.inner.clone();
         let storage = self.storage.clone();

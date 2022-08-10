@@ -125,10 +125,10 @@ impl<Framework: TestFramework<Node>, Node: TestNode> TestFrameworkBuilder<Framew
         config: NodeConfig,
         peer_network_ids: &[PeerNetworkId],
     ) -> Self {
-        assert!(owner < self.owners);
+        debug_assert!(owner < self.owners);
 
         let node_id = NodeId { owner, node_type };
-        assert!(!self.nodes.contains_key(&node_id));
+        debug_assert!(!self.nodes.contains_key(&node_id));
 
         let mut node = Framework::build_node(node_id, config, peer_network_ids);
 

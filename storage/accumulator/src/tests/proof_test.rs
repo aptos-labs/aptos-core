@@ -10,8 +10,8 @@ use crate::test_helpers::{
 #[test]
 fn test_error_on_bad_parameters() {
     let store = MockHashStore::new();
-    assert!(TestAccumulator::get_proof(&store, 0, 0).is_err());
-    assert!(TestAccumulator::get_proof(&store, 100, 101).is_err());
+    debug_assert!(TestAccumulator::get_proof(&store, 0, 0).is_err());
+    debug_assert!(TestAccumulator::get_proof(&store, 100, 101).is_err());
 }
 
 #[test]

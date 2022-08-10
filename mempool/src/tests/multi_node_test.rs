@@ -329,7 +329,7 @@ impl TestHarness {
                         let lookup_peer_network_id = match network_id {
                             NetworkId::Vfn => {
                                 // If this is a validator broadcasting on Vfn we have a problem
-                                assert!(!sender
+                                debug_assert!(!sender
                                     .supported_networks()
                                     .contains(&NetworkId::Validator));
                                 // VFN should have same PeerId but different network from validator
@@ -358,7 +358,7 @@ impl TestHarness {
                                 .mempool()
                                 .get_batch(100, HashSet::new());
                             for txn in transactions.iter() {
-                                assert!(block.contains(txn));
+                                debug_assert!(block.contains(txn));
                             }
                         }
 
@@ -399,7 +399,9 @@ impl TestHarness {
                         let lookup_peer_network_id = match network_id {
                             NetworkId::Vfn => {
                                 // If this is a VFN responding to a validator we have a problem
-                                assert!(!sender.supported_networks().contains(&NetworkId::Public));
+                                debug_assert!(!sender
+                                    .supported_networks()
+                                    .contains(&NetworkId::Public));
                                 // VFN should have same PeerId but different network from validator
                                 PeerNetworkId::new(
                                     NetworkId::Public,

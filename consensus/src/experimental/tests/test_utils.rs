@@ -67,7 +67,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
     LedgerInfoWithSignatures,
     Vec<VoteProposal>,
 ) {
-    assert!(num_blocks > 0);
+    debug_assert!(num_blocks > 0);
 
     let p1 = if let Some(parent) = some_parent {
         make_proposal_with_parent(Payload::new_empty(), init_round, &parent, None, signer)

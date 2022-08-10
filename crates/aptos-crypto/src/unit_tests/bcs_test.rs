@@ -44,7 +44,7 @@ fn ed25519_bcs_material() {
 
     // Verify signature
     let verified_signature = signature.verify(&message, &public_key);
-    assert!(verified_signature.is_ok())
+    debug_assert!(verified_signature.is_ok())
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn multi_ed25519_bcs_material() {
     );
 
     // Verify signature
-    assert!(multi_signature_7of10
+    debug_assert!(multi_signature_7of10
         .verify(&message, &multi_public_key_7of10)
         .is_ok());
 }

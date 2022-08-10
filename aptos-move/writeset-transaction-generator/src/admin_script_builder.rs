@@ -29,7 +29,7 @@ pub fn compile_script(source_file_str: String) -> Vec<u8> {
     .set_flags(Flags::empty().set_sources_shadow_deps(false))
     .build_and_report()
     .unwrap();
-    assert!(compiled_program.len() == 1);
+    debug_assert!(compiled_program.len() == 1);
     match compiled_program.pop().unwrap() {
         AnnotatedCompiledUnit::Module(_) => panic!("Unexpected module when compiling script"),
         x @ AnnotatedCompiledUnit::Script(_) => x
@@ -52,7 +52,7 @@ pub fn template_path() -> PathBuf {
 }
 
 pub fn remove_validators_payload(validators: Vec<AccountAddress>) -> WriteSetPayload {
-    assert!(!validators.is_empty(), "Unexpected validator set length");
+    debug_assert!(!validators.is_empty(), "Unexpected validator set length");
     let mut script = template_path();
     script.push("remove_validators.move");
 

@@ -130,7 +130,7 @@ mod tests {
             context.db.clone(),
             context.mempool.ac_client.clone(),
         );
-        assert!(ret.is_ok());
+        debug_assert!(ret.is_ok());
 
         assert_web_server(cfg.api.address.port());
     }

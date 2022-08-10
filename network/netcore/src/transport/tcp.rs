@@ -359,7 +359,7 @@ mod test {
         });
 
         let (outgoing, _incoming) = join(dial, listener).await;
-        assert!(outgoing.is_ok());
+        debug_assert!(outgoing.is_ok());
         Ok(())
     }
 
@@ -368,11 +368,11 @@ mod test {
         let t = TcpTransport::default();
 
         let result = t.listen_on("/memory/0".parse().unwrap());
-        assert!(result.is_err());
+        debug_assert!(result.is_err());
 
         let peer_id = PeerId::random();
         let result = t.dial(peer_id, "/memory/22".parse().unwrap());
-        assert!(result.is_err());
+        debug_assert!(result.is_err());
     }
 
     #[test]
@@ -388,21 +388,21 @@ mod test {
                 .await
                 .unwrap()
                 .collect::<Vec<_>>();
-            assert!(!addrs.is_empty(), "addrs: {:?}", addrs);
+            debug_assert!(!addrs.is_empty(), "addrs: {:?}", addrs);
 
             // we should only get Ip4 addrs
             let addrs = resolve_with_filter(IpFilter::OnlyIp4, "localhost", 1234)
                 .await
                 .unwrap()
                 .collect::<Vec<_>>();
-            assert!(addrs.iter().all(SocketAddr::is_ipv4), "addrs: {:?}", addrs);
+            debug_assert!(addrs.iter().all(SocketAddr::is_ipv4), "addrs: {:?}", addrs);
 
             // we should only get Ip6 addrs
             let addrs = resolve_with_filter(IpFilter::OnlyIp6, "localhost", 1234)
                 .await
                 .unwrap()
                 .collect::<Vec<_>>();
-            assert!(addrs.iter().all(SocketAddr::is_ipv6), "addrs: {:?}", addrs);
+            debug_assert!(addrs.iter().all(SocketAddr::is_ipv6), "addrs: {:?}", addrs);
         };
 
         rt.block_on(f);

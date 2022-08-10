@@ -198,7 +198,7 @@ mod tests {
         storage(memory).unwrap();
 
         let memory = "backend=memory;extra=stuff";
-        assert!(storage(memory).is_err());
+        debug_assert!(storage(memory).is_err());
     }
 
     #[test]
@@ -209,7 +209,7 @@ mod tests {
         storage(&disk).unwrap();
 
         let disk = "backend=disk";
-        assert!(storage(disk).is_err());
+        debug_assert!(storage(disk).is_err());
     }
 
     #[test]

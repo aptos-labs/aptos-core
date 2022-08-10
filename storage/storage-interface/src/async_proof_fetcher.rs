@@ -138,7 +138,7 @@ mod tests {
                 _ => unreachable!(),
             });
             assert_eq!(result.0, Some(expected_value));
-            assert!(result.1.is_none());
+            debug_assert!(result.1.is_none());
         }
 
         let proofs = fetcher.get_proof_cache();

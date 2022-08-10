@@ -518,7 +518,7 @@ fn stop_validator_and_delete_storage(swarm: &mut LocalSwarm, validator: AccountA
         state_db_path.as_path(),
         validator
     );
-    assert!(ledger_db_path.as_path().exists() && state_db_path.as_path().exists());
+    debug_assert!(ledger_db_path.as_path().exists() && state_db_path.as_path().exists());
     fs::remove_dir_all(ledger_db_path).unwrap();
     fs::remove_dir_all(state_db_path).unwrap();
 }

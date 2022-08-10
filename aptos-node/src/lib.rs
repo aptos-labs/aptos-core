@@ -679,7 +679,7 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
 
-    assert!(
+    debug_assert!(
         !node_config.consensus.use_quorum_store,
         "QuorumStore is not yet implemented"
     );

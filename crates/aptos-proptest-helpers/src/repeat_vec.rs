@@ -83,15 +83,15 @@ impl<T> RepeatVec<T> {
     /// let mut repeat_vec = RepeatVec::new();
     ///
     /// // There are no elements in this RepeatVec.
-    /// assert!(repeat_vec.is_empty());
+    /// debug_assert!(repeat_vec.is_empty());
     ///
     /// // Adding 0 logical copies of an element still means it's empty.
     /// repeat_vec.extend("a", 0);
-    /// assert!(repeat_vec.is_empty());
+    /// debug_assert!(repeat_vec.is_empty());
     ///
     /// // Adding non-zero logical copies makes this vector not empty.
     /// repeat_vec.extend("b", 1);
-    /// assert!(!repeat_vec.is_empty());
+    /// debug_assert!(!repeat_vec.is_empty());
     /// ```
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -184,7 +184,7 @@ impl<T> RepeatVec<T> {
                 }
 
                 let next_logical_idx_new = next_logical_idx_old - decrease;
-                assert!(
+                debug_assert!(
                     next_logical_idx_new >= current_logical_idx_new,
                     "too many items removed from next"
                 );
@@ -250,11 +250,11 @@ impl<T> RepeatVec<T> {
                 [(idx1, _), (idx2, _)] => (*idx1, *idx2),
                 _ => panic!("wrong window size"),
             };
-            assert!(idx1 < idx2, "no zero-length elements");
+            debug_assert!(idx1 < idx2, "no zero-length elements");
         }
         match self.items.last() {
             Some(&(idx, _)) => {
-                assert!(
+                debug_assert!(
                     idx < self.len,
                     "length must be greater than last element's start"
                 );

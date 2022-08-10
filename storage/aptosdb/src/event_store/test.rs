@@ -52,7 +52,7 @@ fn test_error_on_get_from_empty() {
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.event_store;
 
-    assert!(store.get_event_by_version_and_index(100, 0).is_err());
+    debug_assert!(store.get_event_by_version_and_index(100, 0).is_err());
 }
 
 proptest! {
@@ -130,7 +130,7 @@ fn traverse_events_by_key(
             .lookup_events_by_key(event_key, seq_num, LIMIT, ledger_version)
             .unwrap();
         if last_batch_len < LIMIT {
-            assert!(batch.is_empty());
+            debug_assert!(batch.is_empty());
         }
         if batch.is_empty() {
             break;
@@ -140,7 +140,7 @@ fn traverse_events_by_key(
         let first_seq = batch.first().unwrap().0;
         let last_seq = batch.last().unwrap().0;
 
-        assert!(last_batch_len <= LIMIT);
+        debug_assert!(last_batch_len <= LIMIT);
         assert_eq!(seq_num, first_seq);
         assert_eq!(seq_num + last_batch_len - 1, last_seq);
 
@@ -299,7 +299,7 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.event_store;
     // error on no blocks
-    assert!(store.get_last_version_before_timestamp(1000, 2000).is_err());
+    debug_assert!(store.get_last_version_before_timestamp(1000, 2000).is_err());
 
     // save events to db
     let mut cs = ChangeSet::new();
@@ -316,10 +316,10 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
     let (first_block_version, first_event) = new_block_events.first().unwrap();
     let first_new_block_event: NewBlockEvent = first_event.try_into().unwrap();
     let first_block_ts = first_new_block_event.proposed_time();
-    assert!(store
+    debug_assert!(store
         .get_last_version_before_timestamp(1000, *first_block_version)
         .is_err());
-    assert!(store
+    debug_assert!(store
         .get_last_version_before_timestamp(first_block_ts, Version::max_value())
         .is_err());
 
@@ -350,7 +350,7 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
     }
 
     // error on no block after required ts
-    assert!(store
+    debug_assert!(store
         .get_last_version_before_timestamp(last_block_ts + 1, ledger_version)
         .is_err());
 }

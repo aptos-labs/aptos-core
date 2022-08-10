@@ -364,7 +364,7 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
     let sender = txn.sender();
     match txn.payload() {
         TransactionPayload::Script(script) => {
-            assert!(script.code().is_empty(), "Code should be empty.");
+            debug_assert!(script.code().is_empty(), "Code should be empty.");
             match script.args().len() {
                 1 => match script.args()[0] {
                     TransactionArgument::U64(amount) => MockVMTransaction::Mint { sender, amount },

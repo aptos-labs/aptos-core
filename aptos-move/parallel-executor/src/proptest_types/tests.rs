@@ -125,7 +125,7 @@ fn dynamic_read_writes() {
     .expect("creating a new value should succeed")
     .current();
 
-    assert!(run_transactions(
+    debug_assert!(run_transactions(
         universe,
         transaction_gen,
         vec![],
@@ -151,7 +151,7 @@ fn dynamic_read_writes_contended() {
     .expect("creating a new value should succeed")
     .current();
 
-    assert!(run_transactions(
+    debug_assert!(run_transactions(
         universe,
         transaction_gen,
         vec![],

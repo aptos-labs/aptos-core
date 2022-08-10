@@ -477,8 +477,8 @@ impl LeaderReputation {
         heuristic: Box<dyn ReputationHeuristic>,
         exclude_round: u64,
     ) -> Self {
-        // assert!(proposers.is_sorted()) implementation from new api
-        assert!(proposers.windows(2).all(|w| {
+        // debug_assert!(proposers.is_sorted()) implementation from new api
+        debug_assert!(proposers.windows(2).all(|w| {
             PartialOrd::partial_cmp(&&w[0], &&w[1])
                 .map(|o| o != Ordering::Greater)
                 .unwrap_or(false)

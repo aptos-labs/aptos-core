@@ -78,7 +78,7 @@ pub fn init_mock_db<V>(kvs: &HashMap<HashValue, (HashValue, V)>) -> (MockTreeSto
 where
     V: TestKey,
 {
-    assert!(!kvs.is_empty());
+    debug_assert!(!kvs.is_empty());
 
     let db = MockTreeStore::default();
     let tree = JellyfishMerkleTree::new(&db);
@@ -190,7 +190,7 @@ fn test_existent_keys_impl<'a, V: TestKey>(
 
     for (key, value) in existent_kvs {
         let (account, proof) = tree.get_with_proof(*key, version).unwrap();
-        assert!(proof
+        debug_assert!(proof
             .verify_by_hash(root_hash, *key, account.as_ref().map(|v| v.0))
             .is_ok());
         assert_eq!((account.as_ref().unwrap().0, account.unwrap().1 .0), *value);
@@ -206,8 +206,8 @@ fn test_nonexistent_keys_impl<'a, V: TestKey>(
 
     for key in nonexistent_keys {
         let (account, proof) = tree.get_with_proof(*key, version).unwrap();
-        assert!(proof.verify_by_hash(root_hash, *key, None).is_ok());
-        assert!(account.is_none());
+        debug_assert!(proof.verify_by_hash(root_hash, *key, None).is_ok());
+        debug_assert!(account.is_none());
     }
 }
 
@@ -340,7 +340,7 @@ fn compute_root_hash(kvs: Vec<(Vec<bool>, HashValue)>) -> HashValue {
 }
 
 fn compute_root_hash_impl(kvs: Vec<(&[bool], HashValue)>) -> HashValue {
-    assert!(!kvs.is_empty());
+    debug_assert!(!kvs.is_empty());
 
     // If there is only one entry, it is the root.
     if kvs.len() == 1 {

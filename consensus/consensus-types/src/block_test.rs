@@ -29,7 +29,7 @@ fn test_genesis() {
     let genesis_block = Block::make_genesis_block();
     assert_eq!(genesis_block.parent_id(), HashValue::zero());
     assert_ne!(genesis_block.id(), HashValue::zero());
-    assert!(genesis_block.is_genesis_block());
+    debug_assert!(genesis_block.is_genesis_block());
 }
 
 #[test]
@@ -45,13 +45,13 @@ fn test_nil_block() {
     assert_eq!(nil_block.round(), 1);
     assert_eq!(nil_block.timestamp_usecs(), genesis_block.timestamp_usecs());
     assert_eq!(nil_block.is_nil_block(), true);
-    assert!(nil_block.author().is_none());
+    debug_assert!(nil_block.author().is_none());
 
     let dummy_verifier = Arc::new(ValidatorVerifier::new(BTreeMap::new()));
-    assert!(nil_block
+    debug_assert!(nil_block
         .validate_signature(dummy_verifier.as_ref())
         .is_ok());
-    assert!(nil_block.verify_well_formed().is_ok());
+    debug_assert!(nil_block.verify_well_formed().is_ok());
 
     let signer = ValidatorSigner::random(None);
     let parent_block_info = nil_block.quorum_cert().certified_block();
@@ -259,49 +259,49 @@ fn test_failed_authors_well_formed() {
         )
     };
 
-    assert!(create_block(1, vec![]).verify_well_formed().is_ok());
-    assert!(create_block(2, vec![]).verify_well_formed().is_ok());
-    assert!(create_block(2, vec![(1, other)])
+    debug_assert!(create_block(1, vec![]).verify_well_formed().is_ok());
+    debug_assert!(create_block(2, vec![]).verify_well_formed().is_ok());
+    debug_assert!(create_block(2, vec![(1, other)])
         .verify_well_formed()
         .is_ok());
-    assert!(create_block(3, vec![(1, other)])
+    debug_assert!(create_block(3, vec![(1, other)])
         .verify_well_formed()
         .is_ok());
-    assert!(create_block(3, vec![(2, other)])
+    debug_assert!(create_block(3, vec![(2, other)])
         .verify_well_formed()
         .is_ok());
-    assert!(create_block(3, vec![(1, other), (2, other)])
+    debug_assert!(create_block(3, vec![(1, other), (2, other)])
         .verify_well_formed()
         .is_ok());
 
-    assert!(create_block(1, vec![(0, other)])
+    debug_assert!(create_block(1, vec![(0, other)])
         .verify_well_formed()
         .is_err());
-    assert!(create_block(2, vec![(0, other)])
+    debug_assert!(create_block(2, vec![(0, other)])
         .verify_well_formed()
         .is_err());
-    assert!(create_block(2, vec![(2, other)])
+    debug_assert!(create_block(2, vec![(2, other)])
         .verify_well_formed()
         .is_err());
-    assert!(create_block(2, vec![(1, other), (1, other)])
+    debug_assert!(create_block(2, vec![(1, other), (1, other)])
         .verify_well_formed()
         .is_err());
-    assert!(create_block(3, vec![(0, other)])
+    debug_assert!(create_block(3, vec![(0, other)])
         .verify_well_formed()
         .is_err());
-    assert!(create_block(3, vec![(3, other)])
+    debug_assert!(create_block(3, vec![(3, other)])
         .verify_well_formed()
         .is_err());
-    assert!(create_block(3, vec![(4, other)])
+    debug_assert!(create_block(3, vec![(4, other)])
         .verify_well_formed()
         .is_err());
-    assert!(create_block(3, vec![(1, other), (1, other), (1, other)])
+    debug_assert!(create_block(3, vec![(1, other), (1, other), (1, other)])
         .verify_well_formed()
         .is_err());
-    assert!(create_block(3, vec![(1, other), (1, other)])
+    debug_assert!(create_block(3, vec![(1, other), (1, other)])
         .verify_well_formed()
         .is_err());
-    assert!(create_block(3, vec![(2, other), (1, other)])
+    debug_assert!(create_block(3, vec![(2, other), (1, other)])
         .verify_well_formed()
         .is_err());
 }

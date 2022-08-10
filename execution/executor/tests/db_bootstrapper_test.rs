@@ -50,7 +50,7 @@ fn test_empty_db() {
     let tmp_dir = TempPath::new();
     let db_rw = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
 
-    assert!(db_rw
+    debug_assert!(db_rw
         .reader
         .get_latest_ledger_info_option()
         .unwrap()
@@ -71,10 +71,10 @@ fn test_empty_db() {
         .get_state_proof(trusted_state.version())
         .unwrap();
     let trusted_state_change = trusted_state.verify_and_ratchet(&state_proof).unwrap();
-    assert!(trusted_state_change.is_epoch_change());
+    debug_assert!(trusted_state_change.is_epoch_change());
 
     // `maybe_bootstrap()` does nothing on non-empty DB.
-    assert!(!maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap());
+    debug_assert!(!maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap());
 }
 
 fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &ValidatorSigner) {
@@ -211,7 +211,7 @@ fn test_new_genesis() {
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
     let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
     let trusted_state_change = trusted_state.verify_and_ratchet(&state_proof).unwrap();
-    assert!(trusted_state_change.is_epoch_change());
+    debug_assert!(trusted_state_change.is_epoch_change());
 
     // New genesis transaction: set validator set, bump epoch and overwrite account1 balance.
     let configuration = get_configuration(&db);
@@ -263,14 +263,14 @@ fn test_new_genesis() {
 
     // Bootstrap DB into new genesis.
     let waypoint = generate_waypoint::<AptosVM>(&db, &genesis_txn).unwrap();
-    assert!(maybe_bootstrap::<AptosVM>(&db, &genesis_txn, waypoint).unwrap());
+    debug_assert!(maybe_bootstrap::<AptosVM>(&db, &genesis_txn, waypoint).unwrap());
     assert_eq!(waypoint.version(), 6);
 
     // Client bootable from waypoint.
     let trusted_state = TrustedState::from_epoch_waypoint(waypoint);
     let state_proof = db.reader.get_state_proof(trusted_state.version()).unwrap();
     let trusted_state_change = trusted_state.verify_and_ratchet(&state_proof).unwrap();
-    assert!(trusted_state_change.is_epoch_change());
+    debug_assert!(trusted_state_change.is_epoch_change());
     let trusted_state = trusted_state_change.new_state().unwrap();
     assert_eq!(trusted_state.version(), 6);
 

@@ -41,7 +41,7 @@ proptest! {
 
 #[test]
 fn test_get_first_seq_num_and_limit() {
-    assert!(get_first_seq_num_and_limit(Order::Ascending, 0, 0).is_err());
+    debug_assert!(get_first_seq_num_and_limit(Order::Ascending, 0, 0).is_err());
 
     // ascending
     assert_eq!(
@@ -77,8 +77,8 @@ fn test_too_many_requested() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
 
-    assert!(db.get_transactions(0, 1001 /* limit */, 0, true).is_err());
-    assert!(db.get_transaction_outputs(0, 1001 /* limit */, 0).is_err());
+    debug_assert!(db.get_transactions(0, 1001 /* limit */, 0, true).is_err());
+    debug_assert!(db.get_transaction_outputs(0, 1001 /* limit */, 0).is_err());
 }
 
 #[test]
@@ -116,14 +116,14 @@ fn test_error_if_version_is_pruned() {
             .to_string(),
         "State version 4 is pruned, min available version is 5."
     );
-    assert!(error_if_version_is_pruned(&state_pruner, "State", 5).is_ok());
+    debug_assert!(error_if_version_is_pruned(&state_pruner, "State", 5).is_ok());
     assert_eq!(
         error_if_version_is_pruned(&ledger_pruner, "Transaction", 9)
             .unwrap_err()
             .to_string(),
         "Transaction version 9 is pruned, min available version is 10."
     );
-    assert!(error_if_version_is_pruned(&ledger_pruner, "Transaction", 10).is_ok());
+    debug_assert!(error_if_version_is_pruned(&ledger_pruner, "Transaction", 10).is_ok());
 }
 
 #[test]
@@ -133,7 +133,7 @@ fn test_get_latest_executed_trees() {
 
     // entirely emtpy db
     let empty = db.get_latest_executed_trees().unwrap();
-    assert!(empty.is_same_view(&ExecutedTrees::new_empty()));
+    debug_assert!(empty.is_same_view(&ExecutedTrees::new_empty()));
 
     // bootstrapped db (any transaction info is in)
     let key = StateKey::Raw(String::from("test_key").into_bytes());
@@ -151,7 +151,7 @@ fn test_get_latest_executed_trees() {
     put_transaction_info(&db, 0, &txn_info);
 
     let bootstrapped = db.get_latest_executed_trees().unwrap();
-    assert!(
+    debug_assert!(
         bootstrapped.is_same_view(&ExecutedTrees::new_at_state_checkpoint(
             txn_info.state_checkpoint_hash().unwrap(),
             vec![txn_info.hash()],

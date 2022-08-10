@@ -291,7 +291,7 @@ impl Inner {
         }
 
         let prev_entry = self.pending.insert((deadline, index), maybe_waker);
-        assert!(
+        debug_assert!(
             prev_entry.is_none(),
             "there can never be an entry at an unused SleepIndex"
         );
@@ -424,41 +424,41 @@ mod test {
 
         // Create a new sleep future. Check that it's registered in the queue.
         let mut sleep = task::spawn(time.sleep(ms(10)));
-        assert!(!sleep.is_woken());
+        debug_assert!(!sleep.is_woken());
         assert_eq!(time.num_waiters(), 1);
         assert_pending!(sleep.poll());
 
         // It won't wake up until we pass its deadline.
         assert_eq!(time.advance_async(ms(5)).await, 0);
-        assert!(!sleep.is_woken());
+        debug_assert!(!sleep.is_woken());
         assert_pending!(sleep.poll());
 
         // When we pass the deadline, the sleep future should be unregistered,
         // woken, and resolved.
         assert_eq!(time.advance_async(ms(5)).await, 1);
         assert_eq!(time.num_waiters(), 0);
-        assert!(sleep.is_woken());
+        debug_assert!(sleep.is_woken());
         assert_ready!(sleep.poll());
 
         // Resetting the sleep future should register it again.
         sleep.enter(|_c, sleep| sleep.reset(ms(5)));
-        assert!(!sleep.is_woken());
+        debug_assert!(!sleep.is_woken());
         assert_eq!(time.num_waiters(), 1);
         assert_pending!(sleep.poll());
 
         // Passing the deadline of a reset sleep future should also work.
         assert_eq!(time.advance_async(ms(5)).await, 1);
         assert_eq!(time.num_waiters(), 0);
-        assert!(sleep.is_woken());
+        debug_assert!(sleep.is_woken());
         assert_ready!(sleep.poll());
 
         // Should still work if we don't poll the sleep future before advance.
         sleep.enter(|_c, sleep| sleep.reset(ms(5)));
-        assert!(!sleep.is_woken());
+        debug_assert!(!sleep.is_woken());
 
         assert_eq!(time.advance_async(ms(5)).await, 1);
         assert_eq!(time.num_waiters(), 0);
-        assert!(!sleep.is_woken());
+        debug_assert!(!sleep.is_woken());
         assert_ready!(sleep.poll());
     }
 
@@ -471,32 +471,32 @@ mod test {
         // Should still work with instants and deadlines.
         let start = time.now();
         let mut sleep = task::spawn(time.sleep_until(start + ms(10)));
-        assert!(!sleep.is_woken());
+        debug_assert!(!sleep.is_woken());
         assert_eq!(time.num_waiters(), 1);
         assert_pending!(sleep.poll());
 
         // It won't wake up until we pass its deadline.
         assert_eq!(time.advance_async(ms(5)).await, 0);
-        assert!(!sleep.is_woken());
+        debug_assert!(!sleep.is_woken());
         assert_pending!(sleep.poll());
 
         // When we pass the deadline, the sleep future should be unregistered,
         // woken, and resolved.
         assert_eq!(time.advance_async(ms(5)).await, 1);
         assert_eq!(time.num_waiters(), 0);
-        assert!(sleep.is_woken());
+        debug_assert!(sleep.is_woken());
         assert_ready!(sleep.poll());
 
         // Resetting the sleep future should register it again.
         sleep.enter(|_c, sleep| sleep.reset_until(time.now() + ms(5)));
-        assert!(!sleep.is_woken());
+        debug_assert!(!sleep.is_woken());
         assert_eq!(time.num_waiters(), 1);
         assert_pending!(sleep.poll());
 
         // Passing the deadline of a reset sleep future should also work.
         assert_eq!(time.advance_async(ms(5)).await, 1);
         assert_eq!(time.num_waiters(), 0);
-        assert!(sleep.is_woken());
+        debug_assert!(sleep.is_woken());
         assert_ready!(sleep.poll());
     }
 
@@ -555,22 +555,22 @@ mod test {
         let mut interval = task::spawn(time.interval(ms(10)));
 
         assert_pending!(interval.poll_next());
-        assert!(!interval.is_woken());
+        debug_assert!(!interval.is_woken());
 
         // Interval should trigger immediately.
         assert_eq!(time.advance_next_async().await, Some(ms(0)));
-        assert!(interval.is_woken());
+        debug_assert!(interval.is_woken());
         assert_ready_eq!(interval.poll_next(), Some(()));
         assert_pending!(interval.poll_next());
 
         // Interval won't trigger until we pass the period.
         assert_eq!(time.advance_async(ms(5)).await, 0);
-        assert!(!interval.is_woken());
+        debug_assert!(!interval.is_woken());
         assert_pending!(interval.poll_next());
 
         // Interval should trigger again.
         assert_eq!(time.advance_async(ms(5)).await, 1);
-        assert!(interval.is_woken());
+        debug_assert!(interval.is_woken());
         assert_ready_eq!(interval.poll_next(), Some(()));
         assert_pending!(interval.poll_next());
     }
@@ -593,7 +593,7 @@ mod test {
 
         tx.send(()).unwrap();
 
-        assert!(timeout.is_woken());
+        debug_assert!(timeout.is_woken());
         assert_ready_ok!(timeout.poll()).unwrap();
 
         // Timeout with future and deadline: timeout wins.
@@ -603,7 +603,7 @@ mod test {
 
         assert_pending!(timeout.poll());
         assert_eq!(time.advance_async(ms(15)).await, 1);
-        assert!(timeout.is_woken());
+        debug_assert!(timeout.is_woken());
 
         assert_ready_err!(timeout.poll());
     }

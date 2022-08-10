@@ -249,14 +249,14 @@ impl<V: Clone + Eq> ExpectedOutput<V> {
                         // Static read-set.
                         &reads[0]
                     } else {
-                        assert!(incarnation > 0, "must run after parallel execution");
+                        debug_assert!(incarnation > 0, "must run after parallel execution");
                         &reads[(incarnation - 1) as usize % reads.len()]
                     };
                     let write_set = if writes.len() == 1 {
                         // Static write-set.
                         &writes[0]
                     } else {
-                        assert!(incarnation > 0, "must run after parallel execution");
+                        debug_assert!(incarnation > 0, "must run after parallel execution");
                         &writes[(incarnation - 1) as usize % writes.len()]
                     };
 

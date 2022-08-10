@@ -320,7 +320,7 @@ fn native_new_aggregator(
     if !cfg!(any(test, feature = "aggregator-extension")) {
         return Err(not_supported_error());
     }
-    assert!(args.len() == 2);
+    debug_assert!(args.len() == 2);
 
     // Extract fields: `limit` of the new aggregator and a `phantom_handle` of
     // the parent factory.
@@ -372,7 +372,7 @@ fn native_add(
     if !cfg!(any(test, feature = "aggregator-extension")) {
         return Err(not_supported_error());
     }
-    assert!(args.len() == 2);
+    debug_assert!(args.len() == 2);
 
     // Get aggregator fields and a value to add.
     let value = pop_arg!(args, u128);
@@ -401,7 +401,7 @@ fn native_read(
     if !cfg!(any(test, feature = "aggregator-extension")) {
         return Err(not_supported_error());
     }
-    assert!(args.len() == 1);
+    debug_assert!(args.len() == 1);
     let aggregator_ref = pop_arg!(args, StructRef);
 
     // Extract fields from aggregator struct reference.
@@ -433,7 +433,7 @@ fn native_sub(
     if !cfg!(any(test, feature = "aggregator-extension")) {
         return Err(not_supported_error());
     }
-    assert!(args.len() == 2);
+    debug_assert!(args.len() == 2);
 
     // Get aggregator fields and a value to subtract.
     let value = pop_arg!(args, u128);
@@ -467,7 +467,7 @@ fn native_destroy(
     if !cfg!(any(test, feature = "aggregator-extension")) {
         return Err(not_supported_error());
     }
-    assert!(args.len() == 1);
+    debug_assert!(args.len() == 1);
 
     // First, unpack the struct.
     let aggregator_struct = pop_arg!(args, Struct);
@@ -530,7 +530,7 @@ fn get_aggregator_fields(aggregator: &StructRef) -> PartialVMResult<(u128, u128,
 /// Given an `Aggregator` Move struct, unpacks it into fields: (`handle`, `key`, `limit`).
 fn unpack_aggregator_struct(aggregator_struct: Struct) -> PartialVMResult<(u128, u128, u128)> {
     let mut fields: Vec<Value> = aggregator_struct.unpack()?.collect();
-    assert!(fields.len() == 3);
+    debug_assert!(fields.len() == 3);
 
     let pop_with_err = |vec: &mut Vec<Value>, msg: &str| {
         vec.pop()
@@ -649,7 +649,7 @@ mod test {
 
         let AggregatorChangeSet { changes } = context.into_change_set();
 
-        assert!(!changes.contains_key(&test_id(0)));
+        debug_assert!(!changes.contains_key(&test_id(0)));
 
         assert_matches!(
             changes.get(&test_id(1)).unwrap(),

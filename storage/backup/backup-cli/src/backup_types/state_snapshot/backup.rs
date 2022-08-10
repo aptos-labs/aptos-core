@@ -112,7 +112,7 @@ impl StateSnapshotBackupController {
             prev_record_bytes = record_bytes;
         }
 
-        assert!(!chunk_bytes.is_empty());
+        debug_assert!(!chunk_bytes.is_empty());
         let chunk = self
             .write_chunk(
                 &backup_handle,

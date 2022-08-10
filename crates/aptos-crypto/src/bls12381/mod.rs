@@ -158,7 +158,7 @@
 //! // that are later used to verify the multisignature against.                                 //
 //! ///////////////////////////////////////////////////////////////////////////////////////////////
 //! for i in 0..pops.len() {
-//!     assert!(pops[i].verify(&key_pairs[i].public_key).is_ok());
+//!     debug_assert!(pops[i].verify(&key_pairs[i].public_key).is_ok());
 //! }
 //!
 //! // Second, now that the aggregator trusts the set of public keys, it can safely aggregate
@@ -185,14 +185,14 @@
 //! let aggpk = PublicKey::aggregate(pubkeys_to_agg.clone()).unwrap();
 //!
 //! // Lastly, the aggregator checks the aggregated multisig verifies successfully.
-//! assert!(multisig.verify(&message, &aggpk).is_ok());
+//! debug_assert!(multisig.verify(&message, &aggpk).is_ok());
 //!
 //! // If the multisig failed verification, the aggregator can individually verify each of the
 //! // signature shares to identify which ones are invalid and exclude them. There are also optimized
 //! // methods for identifying bad signature shares faster when their relative frequency is low [^LM07].
 //! // However, we will not implement these yet.
 //! for (sigshare, pk) in zip(sigshares_received, pubkeys_to_agg) {
-//!     assert!(sigshare.verify(&message, &pk).is_ok());
+//!     debug_assert!(sigshare.verify(&message, &pk).is_ok());
 //! }
 //! ```
 //!
@@ -256,7 +256,7 @@
 //! //                                                                                           //
 //! ///////////////////////////////////////////////////////////////////////////////////////////////
 //! for i in 0..pops.len() {
-//!     assert!(pops[i].verify(&key_pairs[i].public_key).is_ok());
+//!     debug_assert!(pops[i].verify(&key_pairs[i].public_key).is_ok());
 //! }
 //!
 //! // Second, now that the aggregator trusts the set of public keys, it can safely aggregate
@@ -274,7 +274,7 @@
 //! // of the signers whose signature shares were aggregated.
 //! let msgs_refs = messages.iter().map(|m| m).collect::<Vec<&Message>>();
 //! let pks_refs = key_pairs.iter().map(|kp| &kp.public_key).collect::<Vec<&PublicKey>>();
-//! assert!(aggsig.verify_aggregate(&msgs_refs, &pks_refs).is_ok());
+//! debug_assert!(aggsig.verify_aggregate(&msgs_refs, &pks_refs).is_ok());
 //!
 //! // If the aggregate signature failed verification, the aggregator can individually verify each
 //! // of the signature shares to identify which ones are invalid and exclude them. There are also
@@ -282,7 +282,7 @@
 //! // is low [^LM07]. However, we will not implement these yet.
 //! for i in 0..num_signers {
 //!     let (msg, sigshare, pk) = (msgs_refs[i], &sigshares_received[i], pks_refs[i]);
-//!     assert!(sigshare.verify(msg, pk).is_ok());
+//!     debug_assert!(sigshare.verify(msg, pk).is_ok());
 //! }
 //! ```
 //!
