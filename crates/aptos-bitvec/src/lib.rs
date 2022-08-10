@@ -33,8 +33,8 @@ const MAX_BUCKETS: usize = 8192;
 /// * Bits are read from left to right. For instance, in the following bitvec
 ///   [0b0001_0000, 0b0000_0000, 0b0000_0000, 0b0000_0001], the 3rd and 31st positions are set.
 /// * Each bit of a u8 is set to 1 if the position is set and to 0 if it's not.
-/// * We only allow setting positions upto u8::MAX. As a result, the size of the inner vector is
-///   limited to 32 (= 256 / 8).
+/// * We only allow setting positions upto u16::MAX. As a result, the size of the inner vector is
+///   limited to 8192 (= 65536 / 8).
 /// * Once a bit has been set, it cannot be unset. As a result, the inner vector cannot shrink.
 /// * The positions can be set in any order.
 /// * A position can set more than once -- it remains set after the first time.
@@ -73,6 +73,13 @@ impl BitVec {
     fn with_capacity(num_buckets: usize) -> Self {
         Self {
             inner: Vec::with_capacity(num_buckets),
+        }
+    }
+
+    /// Initialize with buckets that can fit in num_bits.
+    pub fn new(num_bits: u16) -> Self {
+        Self {
+            inner: vec![0; Self::require_buckets(num_bits)],
         }
     }
 
@@ -127,6 +134,18 @@ impl BitVec {
     pub fn iter_ones(&self) -> impl Iterator<Item = usize> + '_ {
         (0..self.inner.len() * BUCKET_SIZE).filter(move |idx| self.is_set(*idx as u16))
     }
+
+    /// Return the number of buckets.
+    pub fn num_buckets(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Number of buckets require for num_bits.
+    pub fn require_buckets(num_bits: u16) -> usize {
+        num_bits
+            .checked_sub(1)
+            .map_or(0, |pos| pos as usize / BUCKET_SIZE + 1)
+    }
 }
 
 impl BitAnd for &BitVec {
@@ -169,6 +188,30 @@ impl FromIterator<u8> for BitVec {
     }
 }
 
+impl From<Vec<u8>> for BitVec {
+    fn from(raw_bytes: Vec<u8>) -> Self {
+        Self { inner: raw_bytes }
+    }
+}
+
+impl From<BitVec> for Vec<u8> {
+    fn from(bitvec: BitVec) -> Self {
+        bitvec.inner
+    }
+}
+
+impl From<Vec<bool>> for BitVec {
+    fn from(bits: Vec<bool>) -> Self {
+        let mut bitvec = Self::new(bits.len() as u16);
+        for (index, b) in bits.iter().enumerate() {
+            if *b {
+                bitvec.set(index as u16);
+            }
+        }
+        bitvec
+    }
+}
+
 // We impl custom deserialization to ensure that the length of inner vector does not exceed
 // 32 (= 256 / 8).
 impl<'de> Deserialize<'de> for BitVec {
@@ -176,11 +219,20 @@ impl<'de> Deserialize<'de> for BitVec {
     where
         D: Deserializer<'de>,
     {
-        let v = serde_bytes::ByteBuf::deserialize(deserializer)?.into_vec();
-        if v.len() > MAX_BUCKETS {
-            return Err(D::Error::custom(format!("BitVec too long: {}", v.len())));
+        #[derive(Deserialize)]
+        #[serde(rename = "BitVec")]
+        struct RawBytes {
+            #[serde(with = "serde_bytes")]
+            inner: Vec<u8>,
         }
-        Ok(BitVec { inner: v })
+        let v = RawBytes::deserialize(deserializer)?;
+        if v.inner.len() > MAX_BUCKETS {
+            return Err(D::Error::custom(format!(
+                "BitVec too long: {}",
+                v.inner.len()
+            )));
+        }
+        Ok(BitVec { inner: v.inner })
     }
 }
 
@@ -297,6 +349,25 @@ mod test {
             vec![0, u16::MAX as usize],
             p.iter_ones().collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn test_serde_roundtrip() {
+        let bitvec = BitVec::new(100);
+        let bytes = serde_json::to_vec(&bitvec).unwrap();
+        let deserialized: BitVec = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(bitvec, deserialized);
+    }
+
+    #[test]
+    fn test_conversion() {
+        let bitmaps = vec![
+            false, true, true, false, false, true, true, false, true, true, true,
+        ];
+        let bitvec = BitVec::from(bitmaps.clone());
+        for (index, is_set) in bitmaps.into_iter().enumerate() {
+            assert_eq!(bitvec.is_set(index as u16), is_set);
+        }
     }
 
     #[test]

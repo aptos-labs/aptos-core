@@ -389,7 +389,7 @@ impl Client {
             round: u64,
             #[serde(deserialize_with = "deserialize_from_string")]
             height: u64,
-            previous_block_votes: Vec<bool>,
+            previous_block_votes_bitvec: Vec<u8>,
             proposer: String,
             failed_proposer_indices: Vec<String>,
             #[serde(deserialize_with = "deserialize_from_string")]
@@ -417,7 +417,7 @@ impl Client {
                                 e.epoch,
                                 e.round,
                                 e.height,
-                                e.previous_block_votes,
+                                e.previous_block_votes_bitvec,
                                 AccountAddress::from_hex_literal(&e.proposer)
                                     .map_err(|e| anyhow!(e))?,
                                 e.failed_proposer_indices
