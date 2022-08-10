@@ -157,6 +157,13 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// See [AptosDB::get_first_block_height].
+    ///
+    /// [AptosDB::get_first_block_height]: ../aptosdb/struct.AptosDB.html#method.get_first_block_height
+    fn get_first_block_height(&self) -> Result<Option<u64>> {
+        unimplemented!()
+    }
+
     /// See [AptosDB::get_first_write_set_version].
     ///
     /// [AptosDB::get_first_write_set_version]: ../aptosdb/struct.AptosDB.html#method.get_first_write_set_version

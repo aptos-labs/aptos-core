@@ -235,6 +235,34 @@ impl EventStore {
         }
     }
 
+    pub fn lookup_event_at_or_after_version(
+        &self,
+        event_key: &EventKey,
+        version: Version,
+    ) -> Result<
+        Option<(
+            Version, // version
+            u64,     // index
+            u64,     // sequence number
+        )>,
+    > {
+        let mut iter = self
+            .db
+            .iter::<EventByVersionSchema>(ReadOptions::default())?;
+        iter.seek(&(*event_key, version, 0))?;
+
+        match iter.next().transpose()? {
+            None => Ok(None),
+            Some(((key, ver, seq_num), idx)) => {
+                if key == *event_key {
+                    Ok(Some((ver, idx, seq_num)))
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    }
+
     pub fn lookup_event_after_version(
         &self,
         event_key: &EventKey,
