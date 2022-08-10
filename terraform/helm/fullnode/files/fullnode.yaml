@@ -27,6 +27,10 @@ full_node_networks:
   max_inbound_connections: {{ .Values.fullnode_max_inbound_connections }}
 storage:
   backup_service_address: "0.0.0.0:6186"
+mempool:
+  shared_mempool_max_concurrent_inbound_syncs: {{ .Values.fullnode_shared_mempool_max_concurrent_inbound_syncs }}
+  max_broadcasts_per_peer: {{ .Values.fullnode_max_broadcasts_per_peer }}
+  default_failovers: {{ .Values.fullnode_default_failovers }}
 
 api:
   address: "0.0.0.0:8080"
