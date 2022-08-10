@@ -6,13 +6,13 @@ package:
 imports:
   aptos: ./aptos-firehose-v0.0.1.spkg
 
-protobuf:
-  files:
-    - block_output.proto
-    - timestamp.proto
-  importPaths:
-    - ../../../crates/aptos-protos/proto/indexer
-    - ../../../crates/aptos-protos/proto
+# protobuf:
+#   files:
+#     - block_output.proto
+#     - timestamp.proto
+#   importPaths:
+#     - ../../../crates/aptos-protos/proto/indexer
+#     - ../../../crates/aptos-protos/proto
 
 binaries:
   default:
