@@ -65,6 +65,7 @@ jobs:
           ref: ${{ inputs.GIT_SHA }}
           # get the last 10 commits if IMAGE_TAG is not specified
           fetch-depth: env.IMAGE_TAG != null && 0 || 10
+          persist-credentials: false
       - name: Set kubectl context
         if: env.FORGE_ENABLED == 'true'
         run: aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME

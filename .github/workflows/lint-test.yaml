@@ -26,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
       - run: sudo apt-get install shellcheck --assume-yes --no-install-recommends
       - run: shellcheck scripts/dev_setup.sh
 
@@ -33,6 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v3
         with:
           node-version-file: .node-version
@@ -57,6 +61,8 @@ jobs:
         working-directory: ecosystem/platform/server
     steps:
       - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
       - uses: ruby/setup-ruby@v1
         with:
           working-directory: ecosystem/platform/server
@@ -94,6 +100,8 @@ jobs:
         working-directory: ecosystem/platform/server
     steps:
       - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
       - uses: ruby/setup-ruby@v1
         with:
           working-directory: ecosystem/platform/server
@@ -110,6 +118,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v3
         with:
           node-version-file: .node-version
@@ -120,6 +130,8 @@ jobs:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/rust-setup
       - uses: pre-commit/action@v3.0.0
       - run: cargo xclippy
@@ -141,6 +153,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
+          persist-credentials: false
           fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
       - uses: ./.github/actions/rust-setup
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
@@ -162,6 +175,8 @@ jobs:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/rust-setup
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
       - uses: taiki-e/install-action@v1.5.6

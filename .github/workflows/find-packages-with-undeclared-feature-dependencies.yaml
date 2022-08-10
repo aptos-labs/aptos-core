@@ -10,5 +10,7 @@ jobs:
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/rust-setup
       - run: scripts/find-packages-with-undeclared-feature-dependencies.sh

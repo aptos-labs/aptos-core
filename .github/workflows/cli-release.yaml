@@ -27,6 +27,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
+          persist-credentials: false
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh
       - name: Upload Binary
@@ -42,6 +43,7 @@ jobs:
       - uses: actions/checkout@v3
         with:
           ref: ${{ github.event.inputs.source_git_ref_override }}
+          persist-credentials: false
       - name: Build CLI
         run: scripts/cli/build_cli_release.sh
       - name: Upload Binary
