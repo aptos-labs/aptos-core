@@ -1,0 +1,23 @@
+[package]
+name = "aptos-substreams"
+version = "0.0.1"
+description = "Substreams for Aptos Chain"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "1.0.57"
+bytes = "1.1.0"
+prost = "0.10.1"
+serde = { version = "1.0.137", features = ["derive"], default-features = false }
+serde_json = { version = "1.0.81", features = ["preserve_order"] }
+substreams = "0.0.12"
+
+aptos-protos = { path = "../../../crates/aptos-protos" }
