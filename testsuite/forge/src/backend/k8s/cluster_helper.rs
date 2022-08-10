@@ -7,7 +7,7 @@ use crate::{
     FULLNODE_SERVICE_SUFFIX, VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
-use anyhow::{anyhow, bail, format_err};
+use anyhow::{bail, format_err};
 use aptos_logger::info;
 use aptos_retrier::ExponentWithLimitDelay;
 use aptos_sdk::types::PeerId;
