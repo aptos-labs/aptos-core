@@ -181,6 +181,7 @@ fn main() -> Result<()> {
         .channel_size(1000)
         .is_async(false)
         .level(Level::Info)
+        .dedupe(true)
         .read_env();
     logger.build();
 
@@ -449,7 +450,7 @@ fn pre_release_suite() -> ForgeConfig<'static> {
 
 fn chaos_test_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
         .with_network_tests(&[&NetworkBandwidthTest, &NetworkLatencyTest, &NetworkLossTest])
 }
 

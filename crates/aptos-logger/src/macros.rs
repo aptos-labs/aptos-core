@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Macros for sending logs at predetermined log `Level`s
-
 /// Log at the given level, it's recommended to use a specific level macro instead
 #[macro_export]
 macro_rules! log {

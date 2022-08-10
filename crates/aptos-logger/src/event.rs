@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{Metadata, Schema};
-use std::fmt;
+use std::{
+    hash::{Hash, Hasher},
+    fmt, collections::hash_map::DefaultHasher, cell::RefCell,
+};
+
+// The global hash of the last event
+thread_local!(static LAST_HASH: RefCell<u64> = RefCell::new(0));
 
 /// An individual structured logging event from a log line.  Includes the
 #[derive(Debug)]
@@ -11,6 +17,13 @@ pub struct Event<'a> {
     /// The format message given from the log macros
     message: Option<fmt::Arguments<'a>>,
     keys_and_values: KeysAndValues<'a>,
+}
+
+impl<'a> Hash for Event<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.message().map(fmt::format).hash(state);
+        self.keys_and_values.hash(state);
+    }
 }
 
 impl<'a> Event<'a> {
@@ -26,12 +39,27 @@ impl<'a> Event<'a> {
         }
     }
 
+    pub fn is_duplicate(&self) -> bool {
+        LAST_HASH.with(|last_hash| {
+            self.dedupe_hash() == *last_hash.borrow()
+        })
+    }
+
+    fn dedupe_hash(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
+
     pub fn dispatch(
         metadata: &'a Metadata,
         message: Option<fmt::Arguments<'a>>,
         keys_and_values: &'a [&'a dyn Schema],
     ) {
         let event = Event::new(metadata, message, keys_and_values);
+        LAST_HASH.with(|last_hash| {
+            *last_hash.borrow_mut() = event.dedupe_hash();
+        });
         crate::logger::dispatch(&event)
     }
 
@@ -59,5 +87,11 @@ impl<'a> fmt::Debug for KeysAndValues<'a> {
             key_value.visit(&mut visitor);
         }
         visitor.finish()
+    }
+}
+
+impl<'a> Hash for KeysAndValues<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        "asdf".hash(state);
     }
 }

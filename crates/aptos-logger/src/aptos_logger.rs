@@ -20,7 +20,7 @@ use once_cell::sync::Lazy;
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap},
     env, fmt,
     io::Write,
     str::FromStr,
@@ -207,6 +207,7 @@ pub struct AptosDataBuilder {
     printer: Option<Box<dyn Writer>>,
     is_async: bool,
     custom_format: Option<fn(&LogEntry) -> Result<String, fmt::Error>>,
+    dedupe: bool,
 }
 
 impl AptosDataBuilder {
@@ -222,11 +223,17 @@ impl AptosDataBuilder {
             printer: Some(Box::new(StdoutWriter)),
             is_async: false,
             custom_format: None,
+            dedupe: false,
         }
     }
 
     pub fn address(&mut self, address: String) -> &mut Self {
         self.address = Some(address);
+        self
+    }
+
+    pub fn dedupe(&mut self, dedupe: bool) -> &mut Self {
+        self.dedupe = dedupe;
         self
     }
 
@@ -336,6 +343,7 @@ impl AptosDataBuilder {
                 printer: None,
                 filter: RwLock::new(filter),
                 formatter: self.custom_format.take().unwrap_or(text_format),
+                dedupe: self.dedupe,
             });
             let service = LoggerService {
                 receiver,
@@ -353,6 +361,7 @@ impl AptosDataBuilder {
                 printer: self.printer.take(),
                 filter: RwLock::new(filter),
                 formatter: self.custom_format.take().unwrap_or(text_format),
+                dedupe: self.dedupe,
             })
         };
 
@@ -386,6 +395,7 @@ pub struct AptosData {
     sender: Option<SyncSender<LoggerServiceEvent>>,
     printer: Option<Box<dyn Writer>>,
     filter: RwLock<FilterPair>,
+    dedupe: bool,
     pub(crate) formatter: fn(&LogEntry) -> Result<String, fmt::Error>,
 }
 
@@ -447,6 +457,13 @@ impl Logger for AptosData {
             ::std::thread::current().name(),
             self.enable_backtrace,
         );
+
+        // Compare the hash of the entry with the hash of the last entry we sent.
+        // If they are the same, then we don't need to send the entry again.
+        if self.dedupe && event.is_duplicate() {
+            return;
+        }
+
 
         self.send_entry(entry)
     }

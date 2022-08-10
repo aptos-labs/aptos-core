@@ -29,6 +29,7 @@ impl Metadata {
         target: &'static str,
         module_path: &'static str,
         source_path: &'static str,
+        hash: u64,
     ) -> Self {
         Self {
             level,
