@@ -754,9 +754,13 @@ module aptos_token::token {
 
     public entry fun burn(
         owner: &signer,
-        token_id: TokenId,
+        creators_address: address,
+        collection: String,
+        name: String,
+        property_version: u64,
         amount: u64
     ) acquires Collections, TokenStore {
+        let token_id = create_token_id_raw(creators_address, collection, name, property_version);
         let owner_addr = signer::address_of(owner);
         assert!(balance_of(owner_addr, token_id) >= amount, EINSUFFICIENT_BALANCE);
         let creator_addr = token_id.token_data_id.creator;

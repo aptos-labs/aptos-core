@@ -30,22 +30,12 @@ fn quote_type_as_format(type_tag: &TypeTag) -> Format {
         U64 => Format::U64,
         U128 => Format::U128,
         Address => Format::TypeName("AccountAddress".into()),
-        Vector(type_tag) => match type_tag.as_ref() {
-            U8 => Format::Bytes,
-            Vector(type_tag) => {
-                if type_tag.as_ref() == &U8 {
-                    Format::Seq(Box::new(Format::Bytes))
-                } else {
-                    type_not_allowed(type_tag)
-                }
-            }
-            Bool => Format::Seq(Box::new(Format::Bool)),
-            U64 => Format::Seq(Box::new(Format::U64)),
-            U128 => Format::Seq(Box::new(Format::U128)),
-            Address => Format::Seq(Box::new(Format::TypeName("AccountAddress".into()))),
+        Vector(type_tag) => Format::Seq(Box::new(quote_type_as_format(type_tag))),
+        Struct(struct_tag) => match struct_tag.to_string().as_str() {
+            "0x1::string::String" => Format::Seq(Box::new(Format::U8)),
             _ => type_not_allowed(type_tag),
         },
-        Struct(_) | Signer => type_not_allowed(type_tag),
+        Signer => type_not_allowed(type_tag),
     }
 }
 
@@ -115,7 +105,11 @@ pub(crate) fn mangle_type(type_tag: &TypeTag) -> String {
             }
             _ => format!("vec{}", mangle_type(type_tag)),
         },
-        Struct(_) | Signer => type_not_allowed(type_tag),
+        Struct(struct_tag) => match struct_tag.to_string().as_str() {
+            "0x1::string::String" => "u8vector".into(),
+            _ => type_not_allowed(type_tag),
+        },
+        Signer => type_not_allowed(type_tag),
     }
 }
 
