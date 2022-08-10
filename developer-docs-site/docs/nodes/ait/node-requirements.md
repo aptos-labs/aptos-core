@@ -75,7 +75,7 @@ There are three types of Aptos networks. Your node can be configured so that eac
 
 1. The validator network: A validator node connects to this network.
 2. The public network. A public fullnode connects to this network. 
-3. The validator fullnode network (VFN): A validator fullnode connects to this network. The VFN allows the validator fullnode to connect to the specific validator). 
+3. The validator fullnode network (VFN network): A validator fullnode connects to this network. The VFN network allows the validator fullnode to connect to the specific validator). 
 
 You can configure the port settings on your node using the configuration YAML file. See the [example configuration YAML here](https://github.com/aptos-labs/aptos-core/blob/4ce85456853c7b19b0a751fb645abd2971cc4c0c/docker/compose/aptos-node/fullnode.yaml#L10-L9). With this configuration YAML on your node, the public network connects to your node on port 6182 and the VFN network on 6181. Because these port settings are configurable, we don't explicitly say port X is for network Y.
 
