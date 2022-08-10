@@ -202,10 +202,16 @@ impl Default for CliConfig {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
+pub enum ConfigSearchMode {
+    CurrentDir,
+    CurrentDirAndParents,
+}
+
 impl CliConfig {
     /// Checks if the config exists in the current working directory
-    pub fn config_exists() -> bool {
-        if let Ok(folder) = Self::aptos_folder() {
+    pub fn config_exists(mode: ConfigSearchMode) -> bool {
+        if let Ok(folder) = Self::aptos_folder(mode) {
             let config_file = folder.join(CONFIG_FILE);
             let old_config_file = folder.join(LEGACY_CONFIG_FILE);
             config_file.exists() || old_config_file.exists()
@@ -214,9 +220,9 @@ impl CliConfig {
         }
     }
 
-    /// Loads the config from the current working directory
-    pub fn load() -> CliTypedResult<Self> {
-        let folder = Self::aptos_folder()?;
+    /// Loads the config from the current working directory or one of its parents.
+    pub fn load(mode: ConfigSearchMode) -> CliTypedResult<Self> {
+        let folder = Self::aptos_folder(mode)?;
 
         let config_file = folder.join(CONFIG_FILE);
         let old_config_file = folder.join(LEGACY_CONFIG_FILE);
@@ -238,8 +244,11 @@ impl CliConfig {
         }
     }
 
-    pub fn load_profile(profile: &str) -> CliTypedResult<Option<ProfileConfig>> {
-        let mut config = Self::load()?;
+    pub fn load_profile(
+        profile: &str,
+        mode: ConfigSearchMode,
+    ) -> CliTypedResult<Option<ProfileConfig>> {
+        let mut config = Self::load(mode)?;
         Ok(config.remove_profile(profile))
     }
 
@@ -253,7 +262,7 @@ impl CliConfig {
 
     /// Saves the config to ./.aptos/config.yaml
     pub fn save(&self) -> CliTypedResult<()> {
-        let aptos_folder = Self::aptos_folder()?;
+        let aptos_folder = Self::aptos_folder(ConfigSearchMode::CurrentDir)?;
 
         // Create if it doesn't exist
         create_dir_if_not_exist(aptos_folder.as_path())?;
@@ -275,9 +284,9 @@ impl CliConfig {
     }
 
     /// Finds the current directory's .aptos folder
-    fn aptos_folder() -> CliTypedResult<PathBuf> {
+    fn aptos_folder(mode: ConfigSearchMode) -> CliTypedResult<PathBuf> {
         let global_config = GlobalConfig::load()?;
-        global_config.get_config_location()
+        global_config.get_config_location(mode)
     }
 }
 
@@ -321,7 +330,9 @@ pub struct ProfileOptions {
 
 impl ProfileOptions {
     pub fn account_address(&self) -> CliTypedResult<AccountAddress> {
-        if let Some(profile) = CliConfig::load_profile(&self.profile)? {
+        if let Some(profile) =
+            CliConfig::load_profile(&self.profile, ConfigSearchMode::CurrentDirAndParents)?
+        {
             if let Some(account) = profile.account {
                 return Ok(account);
             }
@@ -547,7 +558,8 @@ impl PrivateKeyInputOptions {
         if let Some(key) = self.extract_private_key_cli(encoding)? {
             Ok(key)
         } else if let Some(Some(private_key)) =
-            CliConfig::load_profile(profile)?.map(|p| p.private_key)
+            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
+                .map(|p| p.private_key)
         {
             Ok(private_key)
         } else {
@@ -659,7 +671,10 @@ impl RestOptions {
     pub fn url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
         if let Some(ref url) = self.url {
             Ok(url.clone())
-        } else if let Some(Some(url)) = CliConfig::load_profile(profile)?.map(|p| p.rest_url) {
+        } else if let Some(Some(url)) =
+            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
+                .map(|p| p.rest_url)
+        {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("Rest URL", err.to_string()))
         } else {
@@ -741,7 +756,9 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
         })
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(account_address)
-    } else if let Some(Some(private_key)) = CliConfig::load_profile(str)?.map(|p| p.private_key) {
+    } else if let Some(Some(private_key)) =
+        CliConfig::load_profile(str, ConfigSearchMode::CurrentDirAndParents)?.map(|p| p.private_key)
+    {
         let public_key = private_key.public_key();
         Ok(account_address_from_public_key(&public_key))
     } else {
@@ -780,7 +797,9 @@ pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, Cl
             })
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(Some(account_address))
-    } else if let Some(Some(private_key)) = CliConfig::load_profile(str)?.map(|p| p.private_key) {
+    } else if let Some(Some(private_key)) =
+        CliConfig::load_profile(str, ConfigSearchMode::CurrentDirAndParents)?.map(|p| p.private_key)
+    {
         let public_key = private_key.public_key();
         Ok(Some(account_address_from_public_key(&public_key)))
     } else {
@@ -936,7 +955,8 @@ impl FaucetOptions {
         if let Some(ref faucet_url) = self.faucet_url {
             Ok(faucet_url.clone())
         } else if let Some(Some(url)) =
-            CliConfig::load_profile(profile)?.map(|profile| profile.faucet_url)
+            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
+                .map(|profile| profile.faucet_url)
         {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))

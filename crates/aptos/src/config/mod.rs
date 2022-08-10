@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliCommand, CliError, CliResult, CliTypedResult, CONFIG_FOLDER};
+use crate::common::types::{
+    CliCommand, CliError, CliResult, CliTypedResult, ConfigSearchMode, CONFIG_FOLDER,
+};
 use crate::common::utils::{
     create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file,
 };
@@ -150,10 +152,10 @@ impl GlobalConfig {
     }
 
     /// Get the config location based on the type
-    pub fn get_config_location(&self) -> CliTypedResult<PathBuf> {
+    pub fn get_config_location(&self, mode: ConfigSearchMode) -> CliTypedResult<PathBuf> {
         match self.config_type.unwrap_or_default() {
             ConfigType::Global => global_folder(),
-            ConfigType::Workspace => Ok(current_dir()?.join(CONFIG_FOLDER)),
+            ConfigType::Workspace => find_workspace_config(current_dir()?, mode),
         }
     }
 
@@ -176,6 +178,31 @@ fn global_folder() -> CliTypedResult<PathBuf> {
         Err(CliError::UnexpectedError(
             "Unable to retrieve home directory".to_string(),
         ))
+    }
+}
+
+fn find_workspace_config(
+    starting_path: PathBuf,
+    mode: ConfigSearchMode,
+) -> CliTypedResult<PathBuf> {
+    match mode {
+        ConfigSearchMode::CurrentDir => Ok(starting_path.join(CONFIG_FOLDER)),
+        ConfigSearchMode::CurrentDirAndParents => {
+            let mut current_path = starting_path.clone();
+            loop {
+                let cand = current_path.join(CONFIG_FOLDER);
+                if cand.is_dir() {
+                    break Ok(cand);
+                }
+                if !current_path.pop() {
+                    return Err(CliError::ConfigNotFoundError(format!(
+                        "Unable to find {} in {} or any parent directory",
+                        CONFIG_FOLDER,
+                        starting_path.display()
+                    )));
+                }
+            }
+        }
     }
 }
 

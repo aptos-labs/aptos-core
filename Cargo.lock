@@ -163,6 +163,7 @@ dependencies = [
  "dirs 4.0.0",
  "executor",
  "framework",
+ "futures",
  "hex",
  "itertools",
  "move-deps",

@@ -5,8 +5,11 @@ mod aptos_debug_natives;
 mod built_package;
 pub use built_package::*;
 mod manifest;
+pub mod package_hooks;
+pub use package_hooks::*;
 pub mod stored_package;
 mod transactional_tests_runner;
+
 pub use stored_package::*;
 
 use crate::common::types::MoveManifestAccountWrapper;
@@ -138,6 +141,8 @@ impl CliCommand<()> for InitPackage {
                 git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
                 rev: Some("devnet".to_string()),
                 subdir: Some("aptos-move/framework/aptos-framework".to_string()),
+                aptos: None,
+                address: None,
             },
         );
         let manifest = MovePackageManifest {
@@ -309,7 +314,7 @@ fn compile_move(build_config: BuildConfig, package_dir: &Path) -> CliTypedResult
     // TODO: Add caching
     build_config
         .compile_package(package_dir, &mut Vec::new())
-        .map_err(|err| CliError::MoveCompilationError(err.to_string()))
+        .map_err(|err| CliError::MoveCompilationError(format!("{:#}", err)))
 }
 
 /// Publishes the modules in a Move package
