@@ -48,18 +48,19 @@ fn test_empty_db() {
     let tmp_dir = TempPath::new();
     let db_rw = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
 
-    assert!(db_rw
-        .reader
-        .get_latest_ledger_info_option()
-        .unwrap()
-        .is_none());
+    // BlockExecutor won't be able to boot on empty db due to lack of StartupInfo.
+    assert!(db_rw.reader.get_startup_info().unwrap().is_none());
 
     // Bootstrap empty DB.
     let waypoint = generate_waypoint::<AptosVM>(&db_rw, &genesis_txn).expect("Should not fail.");
     maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap();
-    let ledger_info = db_rw.reader.get_latest_ledger_info().unwrap();
+    let startup_info = db_rw
+        .reader
+        .get_startup_info()
+        .expect("Should not fail.")
+        .expect("Should not be None.");
     assert_eq!(
-        Waypoint::new_epoch_boundary(ledger_info.ledger_info()).unwrap(),
+        Waypoint::new_epoch_boundary(startup_info.latest_ledger_info.ledger_info()).unwrap(),
         waypoint
     );
 

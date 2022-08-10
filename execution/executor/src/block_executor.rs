@@ -54,11 +54,10 @@ where
             .root_smt()
     }
 
-    fn maybe_initialize(&self) -> Result<()> {
+    fn maybe_initialize(&self) {
         if self.inner.read().is_none() {
-            self.reset()?;
+            self.reset();
         }
-        Ok(())
     }
 }
 
@@ -67,7 +66,7 @@ where
     V: VMExecutor,
 {
     fn committed_block_id(&self) -> HashValue {
-        self.maybe_initialize().expect("Failed to initialize.");
+        self.maybe_initialize();
         self.inner
             .read()
             .as_ref()
@@ -75,9 +74,8 @@ where
             .committed_block_id()
     }
 
-    fn reset(&self) -> Result<()> {
-        *self.inner.write() = Some(BlockExecutorInner::new(self.db.clone())?);
-        Ok(())
+    fn reset(&self) {
+        *self.inner.write() = Some(BlockExecutorInner::new(self.db.clone()));
     }
 
     fn execute_block(
@@ -85,7 +83,7 @@ where
         block: (HashValue, Vec<Transaction>),
         parent_block_id: HashValue,
     ) -> Result<StateComputeResult, Error> {
-        self.maybe_initialize()?;
+        self.maybe_initialize();
         self.inner
             .read()
             .as_ref()
@@ -121,13 +119,13 @@ impl<V> BlockExecutorInner<V>
 where
     V: VMExecutor,
 {
-    pub fn new(db: DbReaderWriter) -> Result<Self> {
-        let block_tree = BlockTree::new(&db.reader)?;
-        Ok(Self {
+    pub fn new(db: DbReaderWriter) -> Self {
+        let block_tree = BlockTree::new(&db.reader).expect("Block tree failed to init.");
+        Self {
             db,
             block_tree,
             phantom: PhantomData,
-        })
+        }
     }
 
     fn root_smt(&self) -> SparseMerkleTree<StateValue> {

@@ -92,7 +92,7 @@ pub trait BlockExecutorTrait: Send + Sync {
     fn committed_block_id(&self) -> HashValue;
 
     /// Reset the internal state including cache with newly fetched latest committed block from storage.
-    fn reset(&self) -> Result<()>;
+    fn reset(&self);
 
     /// Executes a block.
     fn execute_block(
