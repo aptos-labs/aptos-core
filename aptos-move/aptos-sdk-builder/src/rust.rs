@@ -15,14 +15,14 @@ use serde_generate::{
 };
 
 use heck::{CamelCase, ShoutySnakeCase, SnakeCase};
+use move_deps::move_core_types::language_storage::StructTag;
 use serde_reflection::ContainerFormat;
+use std::str::FromStr;
 use std::{
     collections::BTreeMap,
     io::{Result, Write},
     path::PathBuf,
 };
-use std::str::FromStr;
-use move_deps::move_core_types::language_storage::StructTag;
 
 /// Output transaction builders in Rust for the given ABIs.
 /// If `local_types` is true, we generate a file suitable for the Aptos codebase itself

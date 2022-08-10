@@ -84,9 +84,7 @@ test = false
     );
 }
 
-fn test_go(){
-
-}
+fn test_go() {}
 
 #[test]
 // Ignored because transactions require minting/transfering Coin<AptosCoin>, which the
