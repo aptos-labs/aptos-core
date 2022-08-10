@@ -10,6 +10,10 @@ use warp::{http::StatusCode, Rejection, Reply};
 pub enum Error {
     #[error("wrong public key")]
     WrongPublicKey,
+    #[error("invalid custom event")]
+    InvalidCustomEvent,
+    #[error("gcp insert error")]
+    GCPInsertError,
 }
 
 #[derive(Serialize, Debug)]
@@ -26,6 +30,11 @@ pub async fn handle_rejection(err: Rejection) -> std::result::Result<impl Reply,
     } else if let Some(e) = err.find::<Error>() {
         match e {
             Error::WrongPublicKey => (StatusCode::BAD_REQUEST, e.to_string()),
+            Error::InvalidCustomEvent => (StatusCode::BAD_REQUEST, e.to_string()),
+            Error::GCPInsertError => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal Server Error".to_string(),
+            ),
         }
     } else if err.find::<warp::reject::MethodNotAllowed>().is_some() {
         (

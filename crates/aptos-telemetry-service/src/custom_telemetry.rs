@@ -6,6 +6,7 @@ use std::time::Duration;
 use crate::{
     auth::with_auth,
     context::Context,
+    error,
     types::auth::{Claims, TelemetryDump},
 };
 use aptos_config::config::PeerRole;
@@ -14,8 +15,8 @@ use gcp_bigquery_client::model::table_data_insert_all_request::TableDataInsertAl
 use serde_json::json;
 use warp::{filters::BoxedFilter, reject, reply, Filter, Rejection, Reply};
 
-pub fn custom_telemetry(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("telemetry")
+pub fn custom_event(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("custom_event")
         .and(warp::post())
         .and(context.clone().filter())
         .and(with_auth(
@@ -23,16 +24,20 @@ pub fn custom_telemetry(context: Context) -> BoxedFilter<(impl Reply,)> {
             vec![PeerRole::Validator, PeerRole::Unknown],
         ))
         .and(warp::body::json())
-        .and_then(handle_custom_telemetry)
+        .and_then(handle_custom_event)
         .boxed()
 }
 
-pub async fn handle_custom_telemetry(
+pub async fn handle_custom_event(
     context: Context,
     _claims: Claims,
     body: TelemetryDump,
 ) -> anyhow::Result<impl Reply, Rejection> {
     let mut insert_request = TableDataInsertAllRequest::new();
+
+    if body.events.is_empty() {
+        return Err(reject::custom(error::Error::InvalidCustomEvent));
+    }
 
     let telemetry_event = body.events[0].clone();
     let event_params: Vec<serde_json::Value> = telemetry_event
@@ -76,10 +81,10 @@ pub async fn handle_custom_telemetry(
         .await
         .map_err(|e| {
             error!("Error due to {}", e);
-            reject::reject()
+            reject::custom(error::Error::GCPInsertError)
         })?;
 
-    info!("inject succeeded {:?}", row.to_string());
+    info!("insert succeeded {:?}", row.to_string());
 
     Ok(reply::reply())
 }

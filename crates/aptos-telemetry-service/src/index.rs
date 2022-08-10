@@ -7,6 +7,6 @@ use warp::{Filter, Reply};
 
 pub fn routes(context: Context) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
     auth::auth(context.clone())
-        .or(custom_telemetry::custom_telemetry(context))
+        .or(custom_telemetry::custom_event(context))
         .recover(error::handle_rejection)
 }
