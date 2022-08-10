@@ -365,7 +365,7 @@ impl TestContext {
             ));
         }
 
-        let msg = pretty(&txns);
+        let msg = pretty(txns);
         let re = regex::Regex::new("hash\": \".*\"").unwrap();
         let msg = re.replace_all(&msg, "hash\": \"\"");
 

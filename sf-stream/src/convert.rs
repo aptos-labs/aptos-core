@@ -133,10 +133,7 @@ pub fn convert_move_module_bytecode(mmb: &MoveModuleBytecode) -> extractor::Move
             warn!("[sf-stream] Could not decode MoveModuleBytecode ABI: {}", e);
             None
         },
-        |mmb| match mmb.abi {
-            None => None,
-            Some(move_module) => Some(convert_move_module(&move_module)),
-        },
+        |mmb| mmb.abi.map(|move_module| convert_move_module(&move_module)),
     );
     extractor::MoveModuleBytecode {
         bytecode: mmb.bytecode.0.clone(),
@@ -421,10 +418,11 @@ pub fn convert_write_set_change(change: &WriteSetChange) -> extractor::WriteSetC
 }
 
 pub fn convert_move_script_bytecode(msb: &MoveScriptBytecode) -> extractor::MoveScriptBytecode {
-    let abi = match msb.clone().try_parse_abi().abi {
-        None => None,
-        Some(move_func) => Some(convert_move_function(&move_func)),
-    };
+    let abi = msb
+        .clone()
+        .try_parse_abi()
+        .abi
+        .map(|move_func| convert_move_function(&move_func));
 
     extractor::MoveScriptBytecode {
         bytecode: msb.bytecode.0.clone(),

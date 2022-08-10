@@ -21,13 +21,8 @@ fn main() {
                 .join("extractor.proto")
                 .into_os_string()
                 .into_string()
-                .unwrap()
-                .to_string()],
-            &[proto_path
-                .into_os_string()
-                .into_string()
-                .unwrap()
-                .to_string()],
+                .unwrap()],
+            &[proto_path.into_os_string().into_string().unwrap()],
         )
         .unwrap();
 
