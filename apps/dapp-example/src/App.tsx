@@ -12,8 +12,8 @@ function App() {
         setIsConnected(true);
         setAddress(account.address);
       } else {
-        setAddress(undefined);
         setIsConnected(true);
+        setAddress(undefined);
       }
     });
 
@@ -26,9 +26,9 @@ function App() {
       if (flag) {
         const account = await window.aptos.account();
         setAddress(account.address);
+        setNetwork(await window.aptos.network());
       }
       setIsConnected(flag);
-      setNetwork(await window.aptos.network());
     };
     fetchStatus();
   }, []);
@@ -38,10 +38,12 @@ function App() {
       await window.aptos.disconnect();
       setIsConnected(false);
       setAddress(undefined);
+      setNetwork(undefined);
     } else {
       const result = await window.aptos.connect();
-      setAddress(result.address);
       setIsConnected(true);
+      setAddress(result.address);
+      setNetwork(await window.aptos.network());
     }
   };
 

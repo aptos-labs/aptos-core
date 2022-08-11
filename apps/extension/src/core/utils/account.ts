@@ -25,8 +25,8 @@ import pbkdf2 from 'pbkdf2';
 import Browser from 'core/utils/browser';
 import bs58 from 'bs58';
 import {
-  defaultNetworkType, NodeUrl, nodeUrlMap, nodeUrlReverseMap,
-} from './network';
+  defaultNetworkType, defaultNetworks, NetworkType, Network,
+} from 'core/hooks/useNetworks';
 
 const pbkdf2Iterations = 10000;
 const pbkdf2Digest = 'sha256';
@@ -271,25 +271,13 @@ export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
   });
 }
 
-export function getBackgroundNodeUrl(): Promise<string> {
+export function getBackgroundNetwork(): Promise<Network> {
   return new Promise((resolve) => {
     Browser.persistentStorage()?.get([WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY], (result: any) => {
-      const network = result[WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY];
-      if (network) {
-        resolve(network);
-      } else {
-        resolve(nodeUrlMap.Devnet);
-      }
+      const networkType = result[WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY] as NetworkType;
+      resolve(defaultNetworks[networkType ?? defaultNetworkType]);
     });
   });
-}
-
-export async function getBackgroundNetworkName(): Promise<string> {
-  const network = (await getBackgroundNodeUrl()) as NodeUrl;
-  if (network) {
-    return nodeUrlReverseMap[network];
-  }
-  return defaultNetworkType;
 }
 
 export async function loadBackgroundState(): Promise<boolean> {

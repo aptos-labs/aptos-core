@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { StrictMode, useState } from 'react';
+import React, {StrictMode, useEffect, useState} from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Heading,
@@ -17,8 +17,7 @@ import {
 } from '@chakra-ui/react';
 import { InfoIcon } from '@chakra-ui/icons';
 import { PermissionType, PromptMessage } from 'core/types/dappTypes';
-import { isBackgroundWalletLocked } from 'core/utils/account';
-import { useEffect } from 'react';
+import { GlobalStateProvider, useGlobalStateContext } from "../core/hooks/useGlobalState";
 import Password from 'pages/Password';
 
 const theme = extendTheme({
@@ -36,15 +35,13 @@ const theme = extendTheme({
 
 function PromptState() {
   const [permissionInfo, setPermissionInfo] = useState(undefined);
-  const [isUnlocked, setIsUnlocked] = useState(undefined)
+  const { areAccountsReady, areAccountsUnlocked } = useGlobalStateContext();
 
-  useEffect(async () => {
-    setIsUnlocked(!await isBackgroundWalletLocked())
+  useEffect(() => {
+    chrome.runtime.sendMessage(PromptMessage.LOADED, (response) => {
+      setPermissionInfo(response);
+    });
   }, []);
-
-  chrome.runtime.sendMessage(PromptMessage.LOADED, (response) => {
-    setPermissionInfo(response);
-  });
 
   const onApprove = async (data, event) => {
     event?.preventDefault();
@@ -58,7 +55,10 @@ function PromptState() {
     window.close();
   };
 
-  if (permissionInfo && isUnlocked) {
+  if (!areAccountsReady) {
+    return null;
+  }
+  if (areAccountsUnlocked && permissionInfo) {
     const {
       domain, imageURI, promptType, title,
     } = permissionInfo;
@@ -128,21 +128,22 @@ function PromptState() {
         </SimpleGrid>
       </VStack>
     );
-  } else {
-    return (isUnlocked == false 
-      ? <VStack w="100vw" h="100vh">
-          <Password isBackground={true} onUnlock={() => setIsUnlocked(true)} />
-        </VStack>
-      : null);
   }
-  return null;
+
+  return (
+      <VStack w="100vw" h="100vh">
+        <Password/>
+      </VStack>
+  );
 }
 
 const root = createRoot(document.getElementById('prompt'));
 root.render(
   <ChakraProvider theme={theme}>
     <StrictMode>
-      <PromptState />
+      <GlobalStateProvider>
+        <PromptState />
+      </GlobalStateProvider>
     </StrictMode>
   </ChakraProvider>,
 );

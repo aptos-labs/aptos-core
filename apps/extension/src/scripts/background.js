@@ -7,8 +7,7 @@ import { sign } from 'tweetnacl';
 import { MessageMethod, PermissionType } from '../core/types/dappTypes';
 import {
   getBackgroundAptosAccountState,
-  getBackgroundNodeUrl,
-  getBackgroundNetworkName,
+  getBackgroundNetwork,
   getBackgroundCurrentPublicAccount,
 } from '../core/utils/account';
 import Permissions from '../core/utils/permissions';
@@ -52,7 +51,7 @@ function getAccountAddress(publicAccount, sendResponse) {
   if (!checkConnected(publicAccount.address, sendResponse)) {
     return;
   }
-  sendResponse({ address: publicAccount.address, publicKey: publicAccount.pubKey });
+  sendResponse(publicAccount);
 }
 
 async function getChainId(client, sendResponse) {
@@ -66,8 +65,8 @@ async function getChainId(client, sendResponse) {
 
 async function getNetwork(sendResponse) {
   try {
-    const network = await getBackgroundNetworkName();
-    sendResponse(network);
+    const network = await getBackgroundNetwork();
+    sendResponse(network.name);
   } catch (error) {
     sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
   }
@@ -178,14 +177,15 @@ async function signMessage(publicAccount, message, sendResponse) {
 
 async function handleDappRequest(request, sendResponse) {
   const publicAccount = await getBackgroundCurrentPublicAccount();
-  const network = await getBackgroundNodeUrl();
+  const network = await getBackgroundNetwork();
+  console.log('handleDappRequest', publicAccount, network);
   if (publicAccount === undefined) {
     sendResponse({ error: DappErrorType.NO_ACCOUNTS });
     return;
   }
 
   // The fetch adapter is neccessary to use axios from a service worker
-  const client = new AptosClient(network, { adapter: fetchAdapter });
+  const client = new AptosClient(network.nodeUrl, { adapter: fetchAdapter });
   switch (request.method) {
     case MessageMethod.CONNECT:
       connect(publicAccount, sendResponse);
