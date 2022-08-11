@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-mod transaction_converter;
+pub mod transaction_converter;
 
-use aptos_protos::{
+pub use aptos_protos::{
     block_output::v1::{
         transaction_output::TxnData as TxnDataOutput, BlockOutput, TransactionOutput,
     },

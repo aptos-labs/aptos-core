@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{bail, Context, Result};
 use aptos_protos::{
     block_output::v1::{
         BlockMetadataTransactionOutput, EventKeyOutput, EventOutput, SignatureOutput,
@@ -16,6 +15,8 @@ use aptos_protos::{
         UserTransactionRequest,
     },
 };
+
+type Result<T> = std::result::Result<T, substreams::errors::Error>;
 
 pub fn get_transaction_info_output(
     txn: &Transaction,
@@ -81,7 +82,7 @@ pub fn get_user_transaction_output(
         };
         Ok(user_txn_output)
     } else {
-        bail!("Transaction info missing from Transaction")
+        panic!("Transaction info missing from Transaction")
     }
 }
 
@@ -152,7 +153,7 @@ fn parse_single_signature(
     multi_agent_index: u32,
     override_address: Option<&String>,
 ) -> SignatureOutput {
-    let signer = override_address.unwrap_or_else(|| &request.sender);
+    let signer = override_address.unwrap_or(&request.sender);
     SignatureOutput {
         transaction_hash: info.hash.clone(),
         signer: signer.clone(),
@@ -222,7 +223,7 @@ fn parse_multi_agent_signature(
             .unwrap()
             .signature
             .as_ref()
-            .context("Failed to parse index {} for multi agent secondary signers")?;
+            .expect("Failed to parse index {} for multi agent secondary signers");
         signatures.append(&mut parse_multi_agent_signature_helper(
             secondary_sig,
             request,

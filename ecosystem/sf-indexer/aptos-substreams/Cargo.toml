@@ -13,13 +13,13 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-anyhow = "1.0.57"
-bytes = "1.1.0"
-prost = "0.10.1"
-prost-types = "0.10.1"
-serde = { version = "1.0.137", features = ["derive"], default-features = false }
-serde_json = { version = "1.0.81", features = ["preserve_order"] }
-substreams = "0.0.17"
-pbjson = "0.4.0"
-
 aptos-protos = { path = "../../../crates/aptos-protos" }
+
+serde = { version = "1.0.137", default-features = false }
+substreams = "0.0.17"
+
+# This is the difference between a multi MB binary, and a few hundred KB binary
+[profile.release]
+lto = true
+opt-level = 's'
+strip = "debuginfo"
