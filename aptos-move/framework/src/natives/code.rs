@@ -19,6 +19,7 @@ use move_deps::{
 use serde::{Deserialize, Serialize};
 use smallvec::smallvec;
 use std::collections::{BTreeSet, VecDeque};
+use std::fmt;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -36,10 +37,15 @@ pub struct PackageMetadata {
     pub name: String,
     /// The upgrade policy of this package.
     pub upgrade_policy: UpgradePolicy,
+    /// Build info, in BuildInfo.yaml format
+    pub build_info: String,
     /// The package manifest, in the Move.toml format.
     pub manifest: String,
     /// The list of modules installed by this package.
     pub modules: Vec<ModuleMetadata>,
+    /// Error map, in internal encoding
+    #[serde(with = "serde_bytes")]
+    pub error_map: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -49,8 +55,10 @@ pub struct ModuleMetadata {
     /// Source text if available.
     pub source: String,
     /// Source map, in internal encoding.
+    #[serde(with = "serde_bytes")]
     pub source_map: Vec<u8>,
     /// ABI, in JSON byte encoding.
+    #[serde(with = "serde_bytes")]
     pub abi: Vec<u8>,
 }
 
@@ -80,6 +88,16 @@ impl FromStr for UpgradePolicy {
             "immutable" => Ok(UpgradePolicy::immutable()),
             _ => bail!("unknown policy"),
         }
+    }
+}
+
+impl fmt::Display for UpgradePolicy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self.policy {
+            0 => "arbitrary",
+            1 => "compatible",
+            _ => "immutable",
+        })
     }
 }
 

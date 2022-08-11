@@ -179,3 +179,4 @@ debug = true
 lz4 = { git = 'https://github.com/aptos-labs/lz4-rs' }
 rocksdb = { git = 'https://github.com/aptos-labs/rust-rocksdb' }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "839aed62a20ddccf043c08961cfe74875741ccba" }
+diesel = { git = "https://github.com/aptos-labs/diesel", branch = "1.4.x", features = ["chrono", "postgres", "r2d2", "numeric", "serde_json"] }

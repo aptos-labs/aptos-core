@@ -33,7 +33,7 @@
   ],
   "sender": "0xa550c18",
   "sequence_number": "0",
-  "max_gas_amount": "4000000",
+  "max_gas_amount": "2000",
   "gas_unit_price": "0",
   "expiration_timestamp_secs": "18446744073709551615",
   "payload": {
@@ -48,7 +48,7 @@
   "signature": {
     "type": "ed25519_signature",
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x0bfa9f63e494724ef8cf3101978632c2742cd78e61d726ac630105c60b18ac11beeb751ca8db7ed32841063770710ed8fdf4fd9494f1bf5479db8663d4a7bc05"
+    "signature": "0x03b95571547a2042f4685974a4f4a6e7188aef8149be2cfb46b0b2f6f41f392cf6b9be21b23c25df6241d0247e1b921efdd7c9d392ecf27e51723a960bfff404"
   },
   "events": [],
   "timestamp": "1"

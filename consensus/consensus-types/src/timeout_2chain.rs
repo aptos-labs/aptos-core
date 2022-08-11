@@ -206,7 +206,8 @@ fn test_2chain_timeout_certificate() {
     use aptos_crypto::hash::CryptoHash;
     use aptos_types::{
         block_info::BlockInfo,
-        ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+        ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
+        multi_signature::PartialSignatures,
         validator_verifier::random_validator_verifier,
     };
 
@@ -215,15 +216,18 @@ fn test_2chain_timeout_certificate() {
     let quorum_size = validators.quorum_voting_power() as usize;
     let generate_quorum = |round, num_of_signature| {
         let vote_data = VoteData::new(BlockInfo::random(round), BlockInfo::random(0));
-        let mut ledger_info = LedgerInfoWithSignatures::new(
+        let mut ledger_info = LedgerInfoWithPartialSignatures::new(
             LedgerInfo::new(BlockInfo::empty(), vote_data.hash()),
-            BTreeMap::new(),
+            PartialSignatures::empty(),
         );
         for signer in &signers[0..num_of_signature] {
             let signature = signer.sign(ledger_info.ledger_info());
             ledger_info.add_signature(signer.author(), signature);
         }
-        QuorumCert::new(vote_data, ledger_info)
+        QuorumCert::new(
+            vote_data,
+            ledger_info.aggregate_signatures(&validators).unwrap(),
+        )
     };
     let generate_timeout =
         |round, qc_round| TwoChainTimeout::new(1, round, generate_quorum(qc_round, quorum_size));

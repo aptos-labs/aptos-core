@@ -4,6 +4,7 @@
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{hash::HashValue, SigningKey};
 use aptos_mempool::mocks::MockSharedMempool;
+use aptos_protos::extractor::v1::Transaction as TransactionPB;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{account_config::aptos_root_address, transaction::SignedTransaction, LocalAccount},
@@ -30,11 +31,12 @@ use aptos_api::{context::Context, index};
 use aptos_api_types::HexEncodedBytes;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_types::multi_signature::MultiSignature;
 use bytes::Bytes;
 use hyper::Response;
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, collections::BTreeMap, iter::once, sync::Arc, time::Duration};
+use std::{boxed::Box, iter::once, sync::Arc, time::Duration};
 use vm_validator::vm_validator::VMValidator;
 
 pub fn new_test_context(test_name: &str, fake_start_time_usecs: u64) -> TestContext {
@@ -262,7 +264,7 @@ impl TestContext {
             ),
             HashValue::zero(),
         );
-        LedgerInfoWithSignatures::new(info, BTreeMap::new())
+        LedgerInfoWithSignatures::new(info, MultiSignature::empty())
     }
 
     pub async fn api_execute_script_function(
@@ -355,7 +357,7 @@ impl TestContext {
         body
     }
 
-    pub fn check_golden_output(&mut self, msg: Value) {
+    pub fn check_golden_output(&mut self, txns: &[TransactionPB]) {
         if self.golden_output.is_none() {
             self.golden_output = Some(GoldenOutputs::new(
                 self.test_name.replace(':', "_"),
@@ -363,7 +365,7 @@ impl TestContext {
             ));
         }
 
-        let msg = pretty(&msg);
+        let msg = pretty(txns);
         let re = regex::Regex::new("hash\": \".*\"").unwrap();
         let msg = re.replace_all(&msg, "hash\": \"\"");
 

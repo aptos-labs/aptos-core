@@ -7,7 +7,7 @@ class LoginButtonComponent < ViewComponent::Base
   include ActionText::Engine.helpers
 
   PROVIDER_CLASSES = {
-    github: '!bg-[#24292f] !text-white',
+    github: '!bg-[#394251] !text-white',
     discord: '!bg-[#5964f2] !text-white',
     google: '!bg-white !text-neutral-600'
   }.freeze

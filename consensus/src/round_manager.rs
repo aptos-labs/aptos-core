@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
 use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
@@ -17,6 +16,7 @@ use crate::{
     },
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
+    monitor,
     network::NetworkSender,
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
@@ -189,8 +189,16 @@ impl RoundManager {
         self.onchain_config.back_pressure_limit()
     }
 
+    // TODO: Evaluate if creating a block retriever is slow and cache this if needed.
     fn create_block_retriever(&self, author: Author) -> BlockRetriever {
-        BlockRetriever::new(self.network.clone(), author)
+        BlockRetriever::new(
+            self.network.clone(),
+            author,
+            self.epoch_state
+                .verifier
+                .get_ordered_account_addresses_iter()
+                .collect(),
+        )
     }
 
     /// Leader:

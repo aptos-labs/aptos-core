@@ -10,7 +10,7 @@ proptest! {
     #[test]
     fn test_encode_decode(
         epoch in any::<u64>(),
-        ledger_info_with_sigs in any_with::<LedgerInfoWithSignatures>((1..10).into())
+        ledger_info_with_sigs in any::<LedgerInfoWithSignatures>()
     ) {
         assert_encode_decode::<LedgerInfoSchema>(&epoch, &ledger_info_with_sigs);
     }

@@ -20,7 +20,7 @@ use crate::{
 
 #[tokio::test]
 async fn test_auth() {
-    let context = new_test_context();
+    let context = new_test_context().await;
     let server_public_key = context.inner.noise_config().public_key();
 
     let mut rng = rand::thread_rng();
@@ -80,7 +80,7 @@ async fn test_auth() {
     let resp: AuthResponse = serde_json::from_value(resp).unwrap();
 
     let (response_payload, _) = initiator
-        .finalize_connection(initiator_state, resp.handshake_msg.unwrap().as_slice())
+        .finalize_connection(initiator_state, resp.handshake_msg.as_slice())
         .unwrap();
 
     let jwt = String::from_utf8(response_payload).unwrap();
@@ -108,7 +108,7 @@ async fn test_auth() {
 #[tokio::test]
 #[should_panic]
 async fn test_auth_wrong_key() {
-    let context = new_test_context();
+    let context = new_test_context().await;
     let server_public_key = context.inner.noise_config().public_key();
 
     let mut rng = rand::thread_rng();
@@ -169,6 +169,6 @@ async fn test_auth_wrong_key() {
     let resp: AuthResponse = serde_json::from_value(resp).unwrap();
 
     initiator
-        .finalize_connection(initiator_state, resp.handshake_msg.unwrap().as_slice())
+        .finalize_connection(initiator_state, resp.handshake_msg.as_slice())
         .unwrap();
 }

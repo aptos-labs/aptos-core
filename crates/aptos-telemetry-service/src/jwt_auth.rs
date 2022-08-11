@@ -10,9 +10,10 @@ use warp::{
     reject, Rejection,
 };
 
+use crate::error::Error::JWTTokenError;
 use crate::{context::Context, types::auth::Claims};
 
-const BEARER: &str = "BEARER: ";
+const BEARER: &str = "BEARER ";
 
 pub fn create_jwt_token(
     context: Context,
@@ -61,11 +62,11 @@ pub async fn authorize_jwt(
 
     if allow_roles.contains(&claims.peer_role)
         && claims.epoch == current_epoch
-        && claims.exp < Utc::now().timestamp() as usize
+        && claims.exp > Utc::now().timestamp() as usize
     {
         Ok(claims)
     } else {
-        Err(reject::reject())
+        Err(reject::custom(JWTTokenError))
     }
 }
 
@@ -78,8 +79,63 @@ pub async fn jwt_from_header(headers: HeaderMap<HeaderValue>) -> anyhow::Result<
         Ok(v) => v,
         Err(_) => return Err(reject::reject()),
     };
-    if !auth_header.starts_with(BEARER) {
+    if !auth_header
+        .get(..BEARER.len())
+        .unwrap_or_default()
+        .eq_ignore_ascii_case(BEARER)
+    {
         return Err(reject::reject());
     }
-    Ok(auth_header.trim_start_matches(BEARER).to_owned())
+    Ok(auth_header
+        .get(BEARER.len()..)
+        .unwrap_or_default()
+        .to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[tokio::test]
+    async fn jwt_from_header_valid_bearer() {
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, "Bearer token".parse().unwrap());
+        assert_eq!(jwt_from_header(headers).await.unwrap(), "token");
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, "bearer token".parse().unwrap());
+        assert_eq!(jwt_from_header(headers).await.unwrap(), "token");
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, "BEARER token".parse().unwrap());
+        assert_eq!(jwt_from_header(headers).await.unwrap(), "token");
+    }
+
+    #[tokio::test]
+    async fn jwt_from_header_invalid_bearer() {
+        let headers = HeaderMap::new();
+        let jwt = jwt_from_header(headers).await;
+        assert!(jwt.is_err());
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, "Bear token".parse().unwrap());
+        let jwt = jwt_from_header(headers).await;
+        assert!(jwt.is_err());
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, "".parse().unwrap());
+        let jwt = jwt_from_header(headers).await;
+        assert!(jwt.is_err());
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, "Bear".parse().unwrap());
+        let jwt = jwt_from_header(headers).await;
+        assert!(jwt.is_err());
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, "BEARER: token".parse().unwrap());
+        let jwt = jwt_from_header(headers).await;
+        assert!(jwt.is_err());
+    }
 }

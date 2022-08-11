@@ -196,7 +196,7 @@ export class AptosClient {
     const senderAddress = HexString.ensure(sender);
     const account = await this.getAccount(senderAddress);
     const fakeSignature: Gen.TransactionSignature = {
-      type: "ed_25519_signature",
+      type: "ed25519_signature",
       public_key: sender.toString(),
       signature: HexString.fromUint8Array(new Uint8Array(32)).hex(),
     };
@@ -239,7 +239,7 @@ export class AptosClient {
     const signatureHex = accountFrom.signHexString(message.substring(2));
 
     const transactionSignature: Gen.TransactionSignature = {
-      type: "ed_25519_signature",
+      type: "ed25519_signature",
       public_key: accountFrom.pubKey().hex(),
       signature: signatureHex.hex(),
     };
@@ -300,7 +300,7 @@ export class AptosClient {
     txnRequest: Gen.SubmitTransactionRequest,
   ): Promise<Gen.UserTransaction[]> {
     const transactionSignature: Gen.TransactionSignature = {
-      type: "ed_25519_signature",
+      type: "ed25519_signature",
       public_key: accountFrom.pubKey().hex(),
       // use invalid signature for simulation
       signature: HexString.fromUint8Array(new Uint8Array(64)).hex(),

@@ -1,17 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current, start_logger};
-use crate::config::GlobalConfig;
 use crate::{
     common::{
         init::{DEFAULT_FAUCET_URL, DEFAULT_REST_URL},
         utils::{
-            chain_id, check_if_file_exists, get_sequence_number, read_from_file, to_common_result,
+            chain_id, check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
+            get_sequence_number, read_from_file, start_logger, to_common_result,
             to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
     },
+    config::GlobalConfig,
     genesis::git::from_yaml,
 };
 use aptos_crypto::{
@@ -19,10 +19,13 @@ use aptos_crypto::{
     x25519, PrivateKey, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
 };
 use aptos_keygen::KeyGen;
-use aptos_rest_client::aptos_api_types::{
-    DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource, WriteTableItem,
+use aptos_rest_client::{
+    aptos_api_types::{
+        DeleteModule, DeleteResource, DeleteTableItem, WriteModule, WriteResource, WriteSetChange,
+        WriteTableItem,
+    },
+    Client, Transaction,
 };
-use aptos_rest_client::{aptos_api_types::WriteSetChange, Client, Transaction};
 use aptos_sdk::{
     move_types::{
         ident_str,
@@ -166,6 +169,7 @@ impl From<bcs::Error> for CliError {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
     /// Map of profile configs
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub profiles: Option<HashMap<String, ProfileConfig>>,
 }
 
@@ -177,14 +181,19 @@ pub const CONFIG_FOLDER: &str = ".aptos";
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
     /// Private key for commands.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub private_key: Option<Ed25519PrivateKey>,
     /// Public key for commands
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key: Option<Ed25519PublicKey>,
     /// Account for commands
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub account: Option<AccountAddress>,
     /// URL for the Aptos rest endpoint
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub rest_url: Option<String>,
     /// URL for the Faucet endpoint (if applicable)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub faucet_url: Option<String>,
 }
 
@@ -196,10 +205,16 @@ impl Default for CliConfig {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
+pub enum ConfigSearchMode {
+    CurrentDir,
+    CurrentDirAndParents,
+}
+
 impl CliConfig {
     /// Checks if the config exists in the current working directory
-    pub fn config_exists() -> bool {
-        if let Ok(folder) = Self::aptos_folder() {
+    pub fn config_exists(mode: ConfigSearchMode) -> bool {
+        if let Ok(folder) = Self::aptos_folder(mode) {
             let config_file = folder.join(CONFIG_FILE);
             let old_config_file = folder.join(LEGACY_CONFIG_FILE);
             config_file.exists() || old_config_file.exists()
@@ -208,9 +223,9 @@ impl CliConfig {
         }
     }
 
-    /// Loads the config from the current working directory
-    pub fn load() -> CliTypedResult<Self> {
-        let folder = Self::aptos_folder()?;
+    /// Loads the config from the current working directory or one of its parents.
+    pub fn load(mode: ConfigSearchMode) -> CliTypedResult<Self> {
+        let folder = Self::aptos_folder(mode)?;
 
         let config_file = folder.join(CONFIG_FILE);
         let old_config_file = folder.join(LEGACY_CONFIG_FILE);
@@ -232,8 +247,11 @@ impl CliConfig {
         }
     }
 
-    pub fn load_profile(profile: &str) -> CliTypedResult<Option<ProfileConfig>> {
-        let mut config = Self::load()?;
+    pub fn load_profile(
+        profile: &str,
+        mode: ConfigSearchMode,
+    ) -> CliTypedResult<Option<ProfileConfig>> {
+        let mut config = Self::load(mode)?;
         Ok(config.remove_profile(profile))
     }
 
@@ -247,7 +265,7 @@ impl CliConfig {
 
     /// Saves the config to ./.aptos/config.yaml
     pub fn save(&self) -> CliTypedResult<()> {
-        let aptos_folder = Self::aptos_folder()?;
+        let aptos_folder = Self::aptos_folder(ConfigSearchMode::CurrentDir)?;
 
         // Create if it doesn't exist
         create_dir_if_not_exist(aptos_folder.as_path())?;
@@ -269,9 +287,9 @@ impl CliConfig {
     }
 
     /// Finds the current directory's .aptos folder
-    fn aptos_folder() -> CliTypedResult<PathBuf> {
+    fn aptos_folder(mode: ConfigSearchMode) -> CliTypedResult<PathBuf> {
         let global_config = GlobalConfig::load()?;
-        global_config.get_config_location()
+        global_config.get_config_location(mode)
     }
 }
 
@@ -315,7 +333,9 @@ pub struct ProfileOptions {
 
 impl ProfileOptions {
     pub fn account_address(&self) -> CliTypedResult<AccountAddress> {
-        if let Some(profile) = CliConfig::load_profile(&self.profile)? {
+        if let Some(profile) =
+            CliConfig::load_profile(&self.profile, ConfigSearchMode::CurrentDirAndParents)?
+        {
             if let Some(account) = profile.account {
                 return Ok(account);
             }
@@ -395,9 +415,7 @@ impl EncodingType {
 #[derive(Clone, Debug, Parser)]
 pub struct RngArgs {
     /// The seed used for key generation, should be a 64 character hex string and mainly used for testing
-    ///
-    /// This field is hidden from the CLI input for now
-    #[clap(skip)]
+    #[clap(long)]
     random_seed: Option<String>,
 }
 
@@ -541,7 +559,8 @@ impl PrivateKeyInputOptions {
         if let Some(key) = self.extract_private_key_cli(encoding)? {
             Ok(key)
         } else if let Some(Some(private_key)) =
-            CliConfig::load_profile(profile)?.map(|p| p.private_key)
+            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
+                .map(|p| p.private_key)
         {
             Ok(private_key)
         } else {
@@ -653,7 +672,10 @@ impl RestOptions {
     pub fn url(&self, profile: &str) -> CliTypedResult<reqwest::Url> {
         if let Some(ref url) = self.url {
             Ok(url.clone())
-        } else if let Some(Some(url)) = CliConfig::load_profile(profile)?.map(|p| p.rest_url) {
+        } else if let Some(Some(url)) =
+            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
+                .map(|p| p.rest_url)
+        {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("Rest URL", err.to_string()))
         } else {
@@ -685,7 +707,7 @@ pub struct MovePackageDir {
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
-    named_addresses: BTreeMap<String, AccountAddressWrapper>,
+    pub(crate) named_addresses: BTreeMap<String, AccountAddressWrapper>,
 }
 
 impl MovePackageDir {
@@ -735,13 +757,55 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
         })
     } else if let Ok(account_address) = AccountAddress::from_str(str) {
         Ok(account_address)
-    } else if let Some(Some(private_key)) = CliConfig::load_profile(str)?.map(|p| p.private_key) {
+    } else if let Some(Some(private_key)) =
+        CliConfig::load_profile(str, ConfigSearchMode::CurrentDirAndParents)?.map(|p| p.private_key)
+    {
         let public_key = private_key.public_key();
         Ok(account_address_from_public_key(&public_key))
     } else {
         Err(CliError::CommandArgumentError(
             "'--account-address' or '--profile' after using aptos init must be provided"
                 .to_string(),
+        ))
+    }
+}
+
+/// A wrapper around `AccountAddress` to allow for "_"
+#[derive(Clone, Copy, Debug)]
+pub struct MoveManifestAccountWrapper {
+    pub account_address: Option<AccountAddress>,
+}
+
+impl FromStr for MoveManifestAccountWrapper {
+    type Err = CliError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(MoveManifestAccountWrapper {
+            account_address: load_manifest_account_arg(s)?,
+        })
+    }
+}
+
+/// Loads an account arg and allows for naming based on profiles and "_"
+pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, CliError> {
+    if str == "_" {
+        Ok(None)
+    } else if str.starts_with("0x") {
+        AccountAddress::from_hex_literal(str)
+            .map(Some)
+            .map_err(|err| {
+                CliError::CommandArgumentError(format!("Failed to parse AccountAddress {}", err))
+            })
+    } else if let Ok(account_address) = AccountAddress::from_str(str) {
+        Ok(Some(account_address))
+    } else if let Some(Some(private_key)) =
+        CliConfig::load_profile(str, ConfigSearchMode::CurrentDirAndParents)?.map(|p| p.private_key)
+    {
+        let public_key = private_key.public_key();
+        Ok(Some(account_address_from_public_key(&public_key)))
+    } else {
+        Err(CliError::CommandArgumentError(
+            "Invalid manifest account address".to_string(),
         ))
     }
 }
@@ -892,7 +956,8 @@ impl FaucetOptions {
         if let Some(ref faucet_url) = self.faucet_url {
             Ok(faucet_url.clone())
         } else if let Some(Some(url)) =
-            CliConfig::load_profile(profile)?.map(|profile| profile.faucet_url)
+            CliConfig::load_profile(profile, ConfigSearchMode::CurrentDirAndParents)?
+                .map(|profile| profile.faucet_url)
         {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string()))
@@ -905,7 +970,7 @@ impl FaucetOptions {
 }
 
 // TODO(Gas): double check if this is correct
-pub const DEFAULT_MAX_GAS: u64 = 4_000_000;
+pub const DEFAULT_MAX_GAS: u64 = 1_000;
 pub const DEFAULT_GAS_UNIT_PRICE: u64 = 1;
 
 /// Gas price options for manipulating how to prioritize transactions

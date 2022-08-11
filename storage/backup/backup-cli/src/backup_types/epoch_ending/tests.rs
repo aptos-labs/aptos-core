@@ -16,6 +16,7 @@ use crate::{
 };
 use aptos_config::utils::get_available_port;
 use aptos_temppath::TempPath;
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},
@@ -23,7 +24,7 @@ use aptos_types::{
 };
 use aptosdb::AptosDB;
 use backup_service::start_backup_service;
-use proptest::{collection::vec, prelude::*, std_facade::BTreeMap};
+use proptest::{collection::vec, prelude::*};
 use std::{
     convert::TryInto,
     io::Write,
@@ -138,7 +139,7 @@ prop_compose! {
                 if overwrite && li.ledger_info().epoch() != 0 {
                     li = LedgerInfoWithSignatures::new(
                         li.ledger_info().clone(),
-                        BTreeMap::new(),
+                        MultiSignature::empty(),
                     );
                     should_fail_without_waypoints = true;
                 }

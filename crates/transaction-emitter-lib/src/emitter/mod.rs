@@ -19,9 +19,8 @@ use itertools::zip;
 use once_cell::sync::Lazy;
 use rand::prelude::SliceRandom;
 use rand_core::SeedableRng;
-use std::cmp::max;
 use std::{
-    cmp::min,
+    cmp::{max, min},
     collections::HashSet,
     num::NonZeroU64,
     sync::{
@@ -277,10 +276,9 @@ impl<'t> TxnEmitter<'t> {
                 self.txn_factory.clone(),
                 SEND_AMOUNT,
             )),
-            TransactionType::AccountGeneration => Box::new(AccountGeneratorCreator::new(
-                self.from_rng(),
-                self.txn_factory.clone(),
-            )),
+            TransactionType::AccountGeneration => {
+                Box::new(AccountGeneratorCreator::new(self.txn_factory.clone()))
+            }
             TransactionType::NftMint => Box::new(
                 NFTMintGeneratorCreator::new(
                     self.from_rng(),

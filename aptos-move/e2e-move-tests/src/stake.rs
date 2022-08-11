@@ -4,9 +4,10 @@
 use crate::harness::MoveHarness;
 use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_types::{
-    account_address::AccountAddress, stake_pool::StakePool, transaction::TransactionStatus,
+    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
+    on_chain_config::ValidatorSet, stake_pool::StakePool, transaction::TransactionStatus,
+    validator_config::ValidatorConfig,
 };
-use aptos_types::{account_config::CORE_CODE_ADDRESS, on_chain_config::ValidatorSet};
 use cached_framework_packages::aptos_stdlib;
 use language_e2e_tests::account::Account;
 use move_deps::move_core_types::parser::parse_struct_tag;
@@ -102,6 +103,18 @@ pub fn get_stake_pool(harness: &MoveHarness, pool_address: &AccountAddress) -> S
         .read_resource::<StakePool>(
             pool_address,
             parse_struct_tag("0x1::stake::StakePool").unwrap(),
+        )
+        .unwrap()
+}
+
+pub fn get_validator_config(
+    harness: &MoveHarness,
+    pool_address: &AccountAddress,
+) -> ValidatorConfig {
+    harness
+        .read_resource::<ValidatorConfig>(
+            pool_address,
+            parse_struct_tag("0x1::stake::ValidatorConfig").unwrap(),
         )
         .unwrap()
 }

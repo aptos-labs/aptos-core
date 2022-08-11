@@ -15,15 +15,15 @@ use aptos_crypto::{
     hash::{CryptoHash, HashValue},
     PrivateKey, Uniform,
 };
+use aptos_types::ledger_info::generate_ledger_info_with_sig;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::LedgerInfo,
     test_helpers::transaction_test_helpers::get_test_signed_txn,
     validator_signer::{proptests, ValidatorSigner},
 };
 use proptest::prelude::*;
-use std::collections::BTreeMap;
 
 type LinearizedBlockForest = Vec<Block>;
 
@@ -155,14 +155,14 @@ prop_compose! {
 /// vector
 fn block_forest_from_keys(
     depth: u32,
-    keypairs: Vec<bls12381::PrivateKey>,
+    key_pairs: Vec<bls12381::PrivateKey>,
 ) -> impl Strategy<Value = LinearizedBlockForest> {
     let leaf = leaf_strategy().prop_map(|block| vec![block]);
     // Note that having `expected_branch_size` of 1 seems to generate significantly larger trees
     // than desired (this is my understanding after reading the documentation:
     // https://docs.rs/proptest/0.3.0/proptest/strategy/trait.Strategy.html#method.prop_recursive)
     leaf.prop_recursive(depth, depth, 2, move |inner| {
-        child(proptests::mostly_in_keypair_pool(keypairs.clone()), inner)
+        child(proptests::mostly_in_keypair_pool(key_pairs.clone()), inner)
     })
 }
 
@@ -186,7 +186,7 @@ pub fn placeholder_ledger_info() -> LedgerInfo {
 }
 
 pub fn gen_test_certificate(
-    signers: Vec<&ValidatorSigner>,
+    signers: &[ValidatorSigner],
     block: BlockInfo,
     parent_block: BlockInfo,
     committed_block: Option<BlockInfo>,
@@ -201,20 +201,14 @@ pub fn gen_test_certificate(
         }
     };
 
-    let mut signatures = BTreeMap::new();
-    for signer in signers {
-        let li_sig = signer.sign(&ledger_info);
-        signatures.insert(signer.author(), li_sig);
-    }
-
     QuorumCert::new(
         vote_data,
-        LedgerInfoWithSignatures::new(ledger_info, signatures),
+        generate_ledger_info_with_sig(signers, ledger_info),
     )
 }
 
 pub fn placeholder_certificate_for_block(
-    signers: Vec<&ValidatorSigner>,
+    signers: &[ValidatorSigner],
     certified_block_id: HashValue,
     certified_block_round: u64,
     certified_parent_block_id: HashValue,
@@ -249,15 +243,9 @@ pub fn placeholder_certificate_for_block(
 
     ledger_info_placeholder.set_consensus_data_hash(vote_data.hash());
 
-    let mut signatures = BTreeMap::new();
-    for signer in signers {
-        let li_sig = signer.sign(&ledger_info_placeholder);
-        signatures.insert(signer.author(), li_sig);
-    }
-
     QuorumCert::new(
         vote_data,
-        LedgerInfoWithSignatures::new(ledger_info_placeholder, signatures),
+        generate_ledger_info_with_sig(signers, ledger_info_placeholder.clone()),
     )
 }
 

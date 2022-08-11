@@ -103,9 +103,10 @@ async fn test_network() {
     let request = NetworkRequest {
         network_identifier: NetworkIdentifier::from(chain_id),
     };
-    let status = rosetta_client.network_status(&request).await.unwrap();
-    assert!(status.current_block_identifier.index > 0);
-    assert!(status.current_block_timestamp > Y2K_MS);
+    let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+        .await
+        .unwrap();
+    assert!(status.current_block_timestamp >= Y2K_MS);
     assert_eq!(
         BlockIdentifier {
             index: 0,
@@ -352,7 +353,7 @@ async fn test_block() {
     };
 
     let start = Instant::now();
-    let max_wait = Duration::from_secs(1);
+    let max_wait = Duration::from_secs(5);
     let mut successful = false;
     while start.elapsed() < max_wait {
         if rosetta_client
@@ -361,12 +362,12 @@ async fn test_block() {
             .unwrap()
             .current_block_identifier
             .index
-            == latest_block.block_identifier.index
+            >= latest_block.block_identifier.index
         {
             successful = true;
             break;
         }
-        tokio::time::sleep(Duration::from_micros(10)).await
+        tokio::time::sleep(Duration::from_micros(50)).await
     }
 
     assert!(successful, "Failed to get the next block");
@@ -388,8 +389,10 @@ async fn test_block_transactions() {
     let chain_id = swarm.chain_id();
 
     // Make sure first that there's money to transfer
-    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(0).await.unwrap());
-    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(1).await.unwrap());
+    cli.assert_account_balance_now(0, DEFAULT_FUNDED_COINS)
+        .await;
+    cli.assert_account_balance_now(1, DEFAULT_FUNDED_COINS)
+        .await;
 
     // Now let's see some transfers
     const TRANSFER_AMOUNT: u64 = 5000;
@@ -507,7 +510,8 @@ async fn test_invalid_transaction_gas_charged() {
     let chain_id = swarm.chain_id();
 
     // Make sure first that there's money to transfer
-    assert_eq!(DEFAULT_FUNDED_COINS, cli.account_balance(0).await.unwrap());
+    cli.assert_account_balance_now(0, DEFAULT_FUNDED_COINS)
+        .await;
 
     // Now let's see some transfers
     const TRANSFER_AMOUNT: u64 = 5000;

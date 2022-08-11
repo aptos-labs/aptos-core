@@ -7,10 +7,11 @@ use crate::{
     driver_client::{ClientNotificationListener, DriverNotification},
     error::Error,
     logging::{LogEntry, LogSchema},
+    metadata_storage::MetadataStorageInterface,
     metrics,
     metrics::ExecutingComponent,
     notification_handlers::{
-        CommitNotification, CommitNotificationListener, CommittedStates, CommittedTransactions,
+        CommitNotification, CommitNotificationListener, CommittedTransactions,
         ConsensusNotificationHandler, ErrorNotification, ErrorNotificationListener,
         MempoolNotificationHandler,
     },
@@ -63,9 +64,15 @@ impl DriverConfiguration {
 }
 
 /// The state sync driver that drives synchronization progress
-pub struct StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer, StreamingClient> {
+pub struct StateSyncDriver<
+    DataClient,
+    MempoolNotifier,
+    MetadataStorage,
+    StorageSyncer,
+    StreamingClient,
+> {
     // The component that manages the initial bootstrapping of the node
-    bootstrapper: Bootstrapper<StorageSyncer, StreamingClient>,
+    bootstrapper: Bootstrapper<MetadataStorage, StorageSyncer, StreamingClient>,
 
     // The listener for client notifications
     client_notification_listener: ClientNotificationListener,
@@ -107,9 +114,11 @@ pub struct StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer, Streaming
 impl<
         DataClient: AptosDataClient + Send + Clone + 'static,
         MempoolNotifier: MempoolNotificationSender,
+        MetadataStorage: MetadataStorageInterface + Clone,
         StorageSyncer: StorageSynchronizerInterface + Clone,
         StreamingClient: DataStreamingClient + Clone,
-    > StateSyncDriver<DataClient, MempoolNotifier, StorageSyncer, StreamingClient>
+    >
+    StateSyncDriver<DataClient, MempoolNotifier, MetadataStorage, StorageSyncer, StreamingClient>
 {
     pub fn new(
         client_notification_listener: ClientNotificationListener,
@@ -119,6 +128,7 @@ impl<
         error_notification_listener: ErrorNotificationListener,
         event_subscription_service: Arc<Mutex<EventSubscriptionService>>,
         mempool_notification_handler: MempoolNotificationHandler<MempoolNotifier>,
+        metadata_storage: MetadataStorage,
         storage_synchronizer: StorageSyncer,
         aptos_data_client: DataClient,
         streaming_client: StreamingClient,
@@ -126,6 +136,7 @@ impl<
     ) -> Self {
         let bootstrapper = Bootstrapper::new(
             driver_configuration.clone(),
+            metadata_storage,
             streaming_client.clone(),
             storage.clone(),
             storage_synchronizer.clone(),
@@ -367,49 +378,26 @@ impl<
         }
     }
 
-    /// Handles a commit notification sent by the storage synchronizer for new
-    /// state values.
+    /// Handles a commit notification sent by the storage synchronizer for a
+    /// new state snapshot.
     async fn handle_commit_notification(&mut self, commit_notification: CommitNotification) {
-        let CommitNotification::CommittedStates(committed_states) = commit_notification;
+        let CommitNotification::CommittedStateSnapshot(committed_snapshot) = commit_notification;
         info!(
             LogSchema::new(LogEntry::SynchronizerNotification).message(&format!(
-                "Received a state commit notification from the storage synchronizer. \
-                        All synced: {:?}, last committed index: {:?}.",
-                committed_states.all_states_synced, committed_states.last_committed_state_index,
+                "Received a state snapshot commit notification from the storage synchronizer. \
+                        Snapshot version: {:?}. Last committed index: {:?}.",
+                committed_snapshot.version, committed_snapshot.last_committed_state_index,
             ))
         );
-        self.handle_committed_states(committed_states).await;
-    }
 
-    /// Handles a notification sent by the storage synchronizer for committed states
-    async fn handle_committed_states(&mut self, committed_states: CommittedStates) {
-        // Forward the notification to the bootstrapper
-        if let Err(error) = self
-            .bootstrapper
-            .handle_committed_state_values(committed_states.clone())
-        {
-            error!(LogSchema::new(LogEntry::SynchronizerNotification)
-                .error(&error)
-                .message("Failed to handle a state commit notification!"));
-        }
-
-        // If we've finished syncing all state values, we'll have a single new committed
-        // transaction at the syncing version. In this case, we need to handle the
-        // new committed transaction and events.
-        if committed_states.all_states_synced {
-            let committed_transactions = committed_states.committed_transaction.expect(
-                "Committed transaction should exist for last committed state values chunk!",
-            );
-
-            // Handle the commit notification
-            utils::handle_committed_transactions(
-                committed_transactions,
-                self.storage.clone(),
-                self.mempool_notification_handler.clone(),
-                self.event_subscription_service.clone(),
-            )
-            .await;
-        }
+        // Handle the committed transactions and events
+        utils::handle_committed_transactions(
+            committed_snapshot.committed_transaction,
+            self.storage.clone(),
+            self.mempool_notification_handler.clone(),
+            self.event_subscription_service.clone(),
+        )
+        .await;
     }
 
     /// Handles an error notification sent by the storage synchronizer

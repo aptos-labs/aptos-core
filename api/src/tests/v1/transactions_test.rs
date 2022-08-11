@@ -674,7 +674,7 @@ async fn test_signing_message_with_payload(
 
     // assert transaction can be submitted into mempool and execute.
     body["signature"] = json!({
-        "type": "ed_25519_signature",
+        "type": "ed25519_signature",
         "public_key": format!("0x{}", hex::encode(sender.public_key().to_bytes())),
         "signature": format!("0x{}", hex::encode(sig.to_bytes())),
     });

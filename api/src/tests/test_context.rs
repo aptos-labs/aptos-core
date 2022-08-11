@@ -42,9 +42,10 @@ use storage_interface::DbReaderWriter;
 
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_types::multi_signature::MultiSignature;
 use rand::SeedableRng;
 use serde_json::{json, Value};
-use std::{boxed::Box, collections::BTreeMap, iter::once, net::SocketAddr, sync::Arc};
+use std::{boxed::Box, iter::once, net::SocketAddr, sync::Arc};
 use storage_interface::state_view::DbStateView;
 use vm_validator::vm_validator::VMValidator;
 use warp::http::header::CONTENT_TYPE;
@@ -439,12 +440,8 @@ impl TestContext {
             .private_key()
             .sign_arbitrary_message(signing_msg.inner());
 
-        let typ = match self.api_specific_config {
-            ApiSpecificConfig::V0 => "ed25519_signature",
-            ApiSpecificConfig::V1(_) => "ed_25519_signature",
-        };
         request["signature"] = json!({
-            "type": typ,
+            "type": "ed25519_signature",
             "public_key": HexEncodedBytes::from(account.public_key().to_bytes().to_vec()),
             "signature": HexEncodedBytes::from(sig.to_bytes().to_vec()),
         });
@@ -572,6 +569,6 @@ impl TestContext {
             ),
             HashValue::zero(),
         );
-        LedgerInfoWithSignatures::new(info, BTreeMap::new())
+        LedgerInfoWithSignatures::new(info, MultiSignature::empty())
     }
 }

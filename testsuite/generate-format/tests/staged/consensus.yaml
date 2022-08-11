@@ -236,11 +236,7 @@ LedgerInfoWithV0:
     - ledger_info:
         TYPENAME: LedgerInfo
     - signatures:
-        MAP:
-          KEY:
-            TYPENAME: AccountAddress
-          VALUE:
-            TYPENAME: Signature
+        TYPENAME: MultiSignature
 Module:
   STRUCT:
     - code: BYTES
@@ -259,6 +255,13 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
+MultiSignature:
+  STRUCT:
+    - validator_bitmask:
+        SEQ: BOOL
+    - multi_sig:
+        OPTION:
+          TYPENAME: Signature
 Payload:
   ENUM:
     0:
@@ -494,19 +497,16 @@ TypeTag:
           TYPENAME: StructTag
 ValidatorConsensusInfo:
   STRUCT:
+    - address:
+        TYPENAME: AccountAddress
     - public_key:
         TYPENAME: PublicKey
     - voting_power: U64
 ValidatorVerifier:
   STRUCT:
-    - address_to_validator_info:
-        MAP:
-          KEY:
-            TYPENAME: AccountAddress
-          VALUE:
-            TYPENAME: ValidatorConsensusInfo
-    - quorum_voting_power: U64
-    - total_voting_power: U64
+    - validator_infos:
+        SEQ:
+          TYPENAME: ValidatorConsensusInfo
 Vote:
   STRUCT:
     - vote_data:

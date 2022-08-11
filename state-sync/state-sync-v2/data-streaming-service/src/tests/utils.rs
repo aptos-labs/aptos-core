@@ -8,6 +8,7 @@ use aptos_data_client::{
     ResponseCallback, ResponseContext, ResponseError,
 };
 use aptos_logger::Level;
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -29,11 +30,7 @@ use aptos_types::{
 use async_trait::async_trait;
 use futures::StreamExt;
 use rand::{rngs::OsRng, Rng};
-use std::{
-    collections::{BTreeMap, HashMap},
-    thread,
-    time::Duration,
-};
+use std::{collections::HashMap, thread, time::Duration};
 use storage_service_types::responses::CompleteDataRange;
 use storage_service_types::Epoch;
 use tokio::time::timeout;
@@ -56,7 +53,7 @@ pub const MAX_REAL_TRANSACTION_OUTPUT: u64 = MAX_REAL_TRANSACTION;
 pub const MAX_RESPONSE_ID: u64 = 100000;
 
 /// Test timeout constant
-pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 20;
+pub const MAX_NOTIFICATION_TIMEOUT_SECS: u64 = 40;
 
 /// A simple mock of the Aptos Data Client
 #[derive(Clone, Debug)]
@@ -388,7 +385,7 @@ pub fn create_ledger_info(
     );
     LedgerInfoWithSignatures::new(
         LedgerInfo::new(block_info, HashValue::zero()),
-        BTreeMap::new(),
+        MultiSignature::empty(),
     )
 }
 

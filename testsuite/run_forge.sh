@@ -242,7 +242,13 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     kubectl wait -n default --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
 
     # tail the logs and tee them for further parsing
+    echo "=====START FORGE LOGS====="
     kubectl logs -n default -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
+    echo "=====END FORGE COMMENT====="
+
+    # wait for the pod status to change potentially
+    sleep 10
+    while [[ $(kubectl get pods $FORGE_POD_NAME -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == "True" ]]; do echo "waiting for pod to complete: $FORGE_POD_NAME" && sleep 1; done
 
     # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
     forge_pod_status=$(kubectl get pod -n default $FORGE_POD_NAME -o jsonpath="{.status.phase}" 2>&1)
@@ -250,7 +256,7 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
 
     if [ "$forge_pod_status" = "Succeeded" ]; then # the current pod succeeded
         FORGE_EXIT_CODE=0
-    elif echo $forge_pod_status | grep -E "(not found)|(NotFound)"; then # the current test in this namespace was likely preempted and deleted
+    elif echo $forge_pod_status | grep -E "(not found)|(NotFound)|(No such)"; then # the current test in this namespace was likely preempted and deleted
         FORGE_EXIT_CODE=10
     else # it did not succeed
         FORGE_EXIT_CODE=1

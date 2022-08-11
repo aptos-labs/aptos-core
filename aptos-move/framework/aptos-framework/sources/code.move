@@ -22,10 +22,14 @@ module aptos_framework::code {
         name: String,
         /// The upgrade policy of this package.
         upgrade_policy: UpgradePolicy,
+        /// The BuildInfo, in the BuildInfo.yaml format.
+        build_info: String,
         /// The package manifest, in the Move.toml format.
         manifest: String,
         /// The list of modules installed by this package.
         modules: vector<ModuleMetadata>,
+        /// Error map, in internal encoding.
+        error_map: vector<u8>,
     }
 
     /// Metadata about a module in a package.
