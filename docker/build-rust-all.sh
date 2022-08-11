@@ -3,8 +3,12 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
+CMD="--release"
+[ -n "$BUILD_PROFILE" ] && CMD="--profile $BUILD_PROFILE"
+[ -z "$BUILD_PROFILE" ] && BUILD_PROFILE="release"
+
 # Build all the rust release binaries
-RUSTFLAGS="--cfg tokio_unstable" cargo build --profile performance \
+RUSTFLAGS="--cfg tokio_unstable" cargo build $CMD \
         -p aptos \
         -p aptos-faucet \
         -p aptos-indexer \
@@ -37,7 +41,7 @@ mkdir dist
 
 for BIN in "${BINS[@]}"
 do
-    cp target/release/$BIN dist/$BIN
+	cp target/$BUILD_PROFILE/$BIN dist/$BIN
 done
 
 # Build the Aptos Move framework
