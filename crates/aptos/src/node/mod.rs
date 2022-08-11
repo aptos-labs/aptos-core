@@ -575,7 +575,7 @@ impl CliCommand<()> for RunLocalTestnet {
                 Some(test_dir_copy),
                 false,
                 false,
-                cached_framework_packages::module_blobs().to_vec(),
+                framework::current_release_bundle(),
                 rng,
             )
             .map_err(|err| CliError::UnexpectedError(format!("Node failed to run {}", err)))

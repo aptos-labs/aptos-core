@@ -1,4 +1,5 @@
 [
+  "package registry omitted",
   {
     "type": "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>",
     "data": {
