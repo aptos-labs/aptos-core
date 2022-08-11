@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod account;
+pub mod any;
 pub mod code;
 pub mod event;
 pub mod hash;
@@ -125,6 +126,7 @@ pub fn all_natives(
     add_natives_from_module!("hash", hash::make_all(gas_params.hash));
     add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
     add_natives_from_module!("util", util::make_all(gas_params.util));
+    add_natives_from_module!("any", util::make_all(gas_params.util));
     add_natives_from_module!(
         "transaction_context",
         transaction_context::make_all(gas_params.transaction_context)

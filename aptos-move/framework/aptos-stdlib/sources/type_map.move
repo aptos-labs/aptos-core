@@ -1,14 +1,15 @@
-module aptos_framework::type_map {
+module aptos_std::type_map {
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_std::type_info::{Self, TypeInfo};
+    use aptos_std::any;
+
     use std::bcs;
-    use aptos_framework::util;
 
     struct TypeMap has drop, copy, store {
         inner: SimpleMap<TypeInfo, vector<u8>>
     }
 
-    public fun new(): TypeMap {
+    public fun create(): TypeMap {
         TypeMap { inner: simple_map::create() }
     }
 
@@ -26,12 +27,12 @@ module aptos_framework::type_map {
     public fun clone<T: copy>(map: &mut TypeMap): T {
         let ty_info = type_info::type_of<T>();
         let bcs = *simple_map::borrow_mut(&mut map.inner, &ty_info);
-        util::from_bytes<T>(bcs)
+        any::from_bytes<T>(bcs)
     }
 
     public fun move_out<T>(map: &mut TypeMap): T {
         let ty_info = type_info::type_of<T>();
         let (_, bcs) = simple_map::remove(&mut map.inner, &ty_info);
-        util::from_bytes<T>(bcs)
+        any::from_bytes<T>(bcs)
     }
 }
