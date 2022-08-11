@@ -624,6 +624,7 @@ function install_nodejs {
     fi
     install_pkg nodejs "$PACKAGE_MANAGER"
     install_pkg npm "$PACKAGE_MANAGER"
+    curl -fsSL https://yarnpkg.com/install.sh | bash
 }
 
 function install_python3 {
