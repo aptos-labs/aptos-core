@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use core::time;
 use std::{
     collections::HashMap, convert::Infallible, fs::File, io::Read, net::SocketAddr, path::PathBuf,
 };
@@ -10,6 +9,7 @@ use aptos_config::keys::ConfigKey;
 use aptos_crypto::x25519;
 use aptos_types::chain_id::ChainId;
 use clap::Parser;
+use gcp_bigquery_client::Client;
 use serde::{Deserialize, Serialize};
 use warp::{Filter, Reply};
 
@@ -21,6 +21,7 @@ use crate::{
 
 mod auth;
 mod context;
+mod custom_event;
 mod error;
 mod index;
 mod jwt_auth;
@@ -50,7 +51,9 @@ impl AptosTelemetryServiceArgs {
         println!("Using config {:?}", &config);
 
         let cache = ValidatorSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
-        let context = Context::new(&config, cache.clone());
+        let gcp_bigquery_client =
+            Client::from_service_account_key_file(&config.gcp_sa_key_file).await;
+        let context = Context::new(&config, cache.clone(), Some(gcp_bigquery_client));
 
         ValidatorSetCacheUpdater::new(cache, &config).run();
 
@@ -85,10 +88,11 @@ pub struct AptosTelemetryServiceConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tls_key_path: Option<String>,
     pub trusted_full_node_addresses: HashMap<ChainId, String>,
-    #[serde(flatten)]
     pub server_private_key: ConfigKey<x25519::PrivateKey>,
     pub jwt_signing_key: String,
-    pub update_interval: time::Duration,
+    pub update_interval: u64,
+    pub gcp_sa_key_file: String,
+    pub gcp_bq_config: GCPBigQueryConfig,
 }
 
 impl AptosTelemetryServiceConfig {
@@ -117,4 +121,12 @@ impl AptosTelemetryServiceConfig {
             )
         })
     }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct GCPBigQueryConfig {
+    pub project_id: String,
+    pub dataset_id: String,
+    pub table_id: String,
 }
