@@ -306,9 +306,8 @@ mock! {
             &self,
             version: Version,
             output_with_proof: TransactionOutputListWithProof,
+            ledger_infos: &[LedgerInfoWithSignatures],
         ) -> Result<()>;
-
-        fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()>;
 
         fn save_transactions<'a>(
             &self,
@@ -319,8 +318,6 @@ mock! {
             sync_commit: bool,
             in_memory_state: StateDelta,
         ) -> Result<()>;
-
-        fn delete_genesis(&self) -> Result<()>;
     }
 }
 

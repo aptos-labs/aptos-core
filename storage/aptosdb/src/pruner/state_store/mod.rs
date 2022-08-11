@@ -3,7 +3,8 @@
 
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, metrics::PRUNER_LEAST_READABLE_VERSION,
-    pruner::db_pruner::DBPruner, stale_node_index::StaleNodeIndexSchema, OTHER_TIMERS_SECONDS,
+    pruner::db_pruner::DBPruner, stale_node_index::StaleNodeIndexSchema, utils, ChangeSet,
+    OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
 use aptos_jellyfish_merkle::StaleNodeIndex;
@@ -44,7 +45,8 @@ impl DBPruner for StateStorePruner {
         let min_readable_version = self.min_readable_version.load(Ordering::Relaxed);
         let target_version = self.target_version();
 
-        return match self.prune_state_store(min_readable_version, target_version, batch_size) {
+        return match self.prune_state_store(min_readable_version, target_version, batch_size, None)
+        {
             Ok(new_min_readable_version) => Ok(new_min_readable_version),
             Err(e) => {
                 error!(
@@ -115,11 +117,32 @@ impl StateStorePruner {
         pruner
     }
 
+    /// Prunes the genesis state and saves the db alterations to the given change set
+    pub fn prune_genesis(state_merkle_db: Arc<DB>, change_set: &mut ChangeSet) -> Result<()> {
+        let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
+        let max_version = 1; // We should only be pruning a single version
+
+        let state_pruner = utils::create_state_pruner(state_merkle_db);
+        state_pruner.set_target_version(target_version);
+
+        let min_readable_version = state_pruner.min_readable_version.load(Ordering::Relaxed);
+        let target_version = state_pruner.target_version();
+        state_pruner.prune_state_store(
+            min_readable_version,
+            target_version,
+            max_version,
+            Some(&mut change_set.batch),
+        )?;
+
+        Ok(())
+    }
+
     pub fn prune_state_store(
         &self,
         min_readable_version: Version,
         target_version: Version,
         batch_size: usize,
+        existing_schema_batch: Option<&mut SchemaBatch>,
     ) -> anyhow::Result<Version> {
         assert_ne!(batch_size, 0);
         let (indices, is_end_of_target_version) =
@@ -135,15 +158,23 @@ impl StateStorePruner {
                 .start_timer();
             let new_min_readable_version =
                 indices.last().expect("Should exist.").stale_since_version;
-            let batch = SchemaBatch::new();
-            // Delete stale nodes.
-            indices.into_iter().try_for_each(|index| {
-                batch.delete::<JellyfishMerkleNodeSchema>(&index.node_key)?;
-                batch.delete::<StaleNodeIndexSchema>(&index)
-            })?;
 
-            // Delete the stale node indices.
-            self.db.write_schemas(batch)?;
+            // Delete stale nodes.
+            if let Some(existing_schema_batch) = existing_schema_batch {
+                indices.into_iter().try_for_each(|index| {
+                    existing_schema_batch.delete::<JellyfishMerkleNodeSchema>(&index.node_key)?;
+                    existing_schema_batch.delete::<StaleNodeIndexSchema>(&index)
+                })?;
+            } else {
+                let batch = SchemaBatch::new();
+                indices.into_iter().try_for_each(|index| {
+                    batch.delete::<JellyfishMerkleNodeSchema>(&index.node_key)?;
+                    batch.delete::<StaleNodeIndexSchema>(&index)
+                })?;
+
+                // Delete the stale node indices.
+                self.db.write_schemas(batch)?;
+            }
 
             // TODO(zcc): recording progress after writing schemas might provide wrong answers to
             // API calls when they query min_readable_version while the write_schemas are still in

@@ -564,8 +564,8 @@ pub trait DbWriter: Send + Sync {
     }
 
     /// Finalizes a state snapshot that has already been restored to the database through
-    /// a state snapshot receiver. This is required to bootstrap the transaction accumulator
-    /// and populate transaction and event information.
+    /// a state snapshot receiver. This is required to bootstrap the transaction accumulator,
+    /// populate transaction information, save the epoch ending ledger infos and delete genesis.
     ///
     /// Note: this assumes that the output with proof has already been verified and that the
     /// state snapshot was restored at the same version.
@@ -573,14 +573,8 @@ pub trait DbWriter: Send + Sync {
         &self,
         version: Version,
         output_with_proof: TransactionOutputListWithProof,
+        ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
-        unimplemented!()
-    }
-
-    /// Persists the specified ledger infos.
-    ///
-    /// Note: this assumes that the ledger infos have already been verified.
-    fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
         unimplemented!()
     }
 
@@ -598,14 +592,6 @@ pub trait DbWriter: Send + Sync {
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
     ) -> Result<()> {
-        unimplemented!()
-    }
-
-    /// Deletes transaction data associated with the genesis transaction. This is useful for
-    /// cleaning up the database after a node has bootstrapped all accounts through state sync.
-    ///
-    /// TODO(joshlind): find a cleaner (long term) solution to avoid us having to expose this...
-    fn delete_genesis(&self) -> Result<()> {
         unimplemented!()
     }
 }

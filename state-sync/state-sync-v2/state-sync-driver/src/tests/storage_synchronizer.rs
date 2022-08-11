@@ -24,6 +24,7 @@ use crate::{
 use anyhow::format_err;
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_infallible::{Mutex, RwLock};
+use aptos_types::transaction::{TransactionOutputListWithProof, Version};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
 };
@@ -33,7 +34,7 @@ use event_notifications::EventSubscriptionService;
 use executor_types::ChunkCommitNotification;
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationListener;
-use mockall::predicate::{always, eq};
+use mockall::predicate::always;
 use std::{sync::Arc, time::Duration};
 use storage_interface::DbReaderWriter;
 use tokio::task::JoinHandle;
@@ -315,21 +316,21 @@ async fn test_save_states_completion() {
         .expect_get_state_snapshot_receiver()
         .with(always(), always())
         .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
-    db_writer
-        .expect_finalize_state_snapshot()
-        .with(
-            eq(target_ledger_info.ledger_info().version()),
-            eq(output_list_with_proof.clone()),
-        )
-        .returning(|_, _| Ok(()));
+    let target_ledger_info_clone = target_ledger_info.clone();
+    let output_list_with_proof_clone = output_list_with_proof.clone();
     let epoch_change_proofs_clone = epoch_change_proofs.clone();
     db_writer
-        .expect_save_ledger_infos()
-        .withf(move |ledger_infos: &[LedgerInfoWithSignatures]| {
-            ledger_infos == epoch_change_proofs_clone
-        })
-        .returning(|_| Ok(()));
-    db_writer.expect_delete_genesis().returning(|| Ok(()));
+        .expect_finalize_state_snapshot()
+        .withf(
+            move |version: &Version,
+                  output_with_proof: &TransactionOutputListWithProof,
+                  ledger_infos: &[LedgerInfoWithSignatures]| {
+                version == &target_ledger_info_clone.ledger_info().version()
+                    && output_with_proof == &output_list_with_proof_clone
+                    && ledger_infos == epoch_change_proofs_clone
+            },
+        )
+        .returning(|_, _, _| Ok(()));
 
     // Create the storage synchronizer
     let (mut commit_listener, _, _, _, mut storage_synchronizer, _, _) =
