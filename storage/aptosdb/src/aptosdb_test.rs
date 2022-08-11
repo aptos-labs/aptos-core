@@ -85,36 +85,40 @@ fn test_too_many_requested() {
 fn test_storage_config() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let state_pruner = StatePrunerManager::new(
-        Arc::clone(&aptos_db.state_merkle_db),
-        StoragePrunerConfig {
-            enable_state_store_pruner: false,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 20,
-            ledger_prune_window: 100,
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 1,
-            user_pruning_window_offset: 0,
-        },
-    );
+    for enable_ledger in [false, true] {
+        for enable_state in [false, true] {
+            let state_pruner = StatePrunerManager::new(
+                Arc::clone(&aptos_db.state_merkle_db),
+                StoragePrunerConfig {
+                    enable_state_store_pruner: enable_state,
+                    enable_ledger_pruner: enable_ledger,
+                    state_store_prune_window: 20,
+                    ledger_prune_window: 100,
+                    ledger_pruning_batch_size: 1,
+                    state_store_pruning_batch_size: 1,
+                    user_pruning_window_offset: 0,
+                },
+            );
 
-    assert_eq!(state_pruner.is_pruner_enabled(), false);
-    assert_eq!(state_pruner.get_pruner_window(), 20);
+            assert_eq!(state_pruner.is_pruner_enabled(), enable_state);
+            assert_eq!(state_pruner.get_pruner_window(), 20);
 
-    let ledger_pruner = LedgerPrunerManager::new(
-        Arc::clone(&aptos_db.ledger_db),
-        StoragePrunerConfig {
-            enable_state_store_pruner: true,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 20,
-            ledger_prune_window: 100,
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 1,
-            user_pruning_window_offset: 0,
-        },
-    );
-    assert_eq!(ledger_pruner.is_pruner_enabled(), true);
-    assert_eq!(ledger_pruner.get_pruner_window(), 100);
+            let ledger_pruner = LedgerPrunerManager::new(
+                Arc::clone(&aptos_db.ledger_db),
+                StoragePrunerConfig {
+                    enable_state_store_pruner: enable_state,
+                    enable_ledger_pruner: enable_ledger,
+                    state_store_prune_window: 20,
+                    ledger_prune_window: 100,
+                    ledger_pruning_batch_size: 1,
+                    state_store_pruning_batch_size: 1,
+                    user_pruning_window_offset: 0,
+                },
+            );
+            assert_eq!(ledger_pruner.is_pruner_enabled(), enable_ledger);
+            assert_eq!(ledger_pruner.get_pruner_window(), 100);
+        }
+    }
 }
 
 #[test]

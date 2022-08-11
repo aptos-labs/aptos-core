@@ -122,7 +122,7 @@ pub fn all_natives(
 
     add_natives_from_module!("account", account::make_all(gas_params.account));
     add_natives_from_module!("signature", signature::make_all(gas_params.signature));
-    add_natives_from_module!("hash", hash::make_all(gas_params.hash));
+    add_natives_from_module!("aptos_hash", hash::make_all(gas_params.hash));
     add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
     add_natives_from_module!("util", util::make_all(gas_params.util));
     add_natives_from_module!(
