@@ -121,10 +121,10 @@ members = [
     "testsuite/testcases",
     "types",
     "vm-validator",
-    "ecosystem/sf-indexer/aptos-substreams",
 ]
 
 exclude=[
+    "ecosystem/sf-indexer/aptos-substreams",
 ]
 
 # NOTE: default-members is the complete list of binaries that form the "production Aptos codebase". These members should
