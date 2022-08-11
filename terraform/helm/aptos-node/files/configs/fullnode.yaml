@@ -15,6 +15,8 @@ storage:
     state_store_prune_window: {{ int $.Values.validator.config.state_store_prune_window }}
     ledger_pruning_batch_size: {{ int $.Values.validator.config.ledger_pruning_batch_size }}
     state_store_pruning_batch_size: {{ int $.Values.validator.config.state_store_pruning_batch_size }}
+    state_pruner_time_interval_in_ms: {{ int $.Values.validator.config.state_pruner_time_interval_in_ms }}
+    ledger_pruner_time_interval_in_ms: {{ int $.Values.validator.config.ledger_pruner_time_interval_in_ms }}
 
 full_node_networks:
 - network_id:

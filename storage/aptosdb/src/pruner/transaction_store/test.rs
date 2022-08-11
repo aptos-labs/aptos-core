@@ -63,6 +63,8 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
             ledger_pruning_batch_size: 1,
             state_store_pruning_batch_size: 100,
             user_pruning_window_offset: 0,
+            state_pruner_time_interval_in_ms: 1,
+            ledger_pruner_time_interval_in_ms: 1,
         },
     );
 
@@ -112,6 +114,8 @@ fn verify_txn_store_pruner(
             ledger_pruning_batch_size: 1,
             state_store_pruning_batch_size: 100,
             user_pruning_window_offset: 0,
+            state_pruner_time_interval_in_ms: 1,
+            ledger_pruner_time_interval_in_ms: 1,
         },
     );
 

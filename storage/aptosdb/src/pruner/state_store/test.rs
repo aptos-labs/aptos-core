@@ -3,7 +3,6 @@
 
 use aptos_config::config::StoragePrunerConfig;
 use std::collections::HashMap;
-use std::sync::mpsc::channel;
 use std::sync::Arc;
 
 use aptos_crypto::HashValue;
@@ -87,6 +86,8 @@ fn test_state_store_pruner() {
             ledger_pruning_batch_size: prune_batch_size,
             state_store_pruning_batch_size: prune_batch_size,
             user_pruning_window_offset: 0,
+            state_pruner_time_interval_in_ms: 1,
+            ledger_pruner_time_interval_in_ms: 1,
         },
     );
 
@@ -178,6 +179,8 @@ fn test_state_store_pruner_partial_version() {
             ledger_pruning_batch_size: prune_batch_size,
             state_store_pruning_batch_size: prune_batch_size,
             user_pruning_window_offset: 0,
+            state_pruner_time_interval_in_ms: 1,
+            ledger_pruner_time_interval_in_ms: 1,
         },
     );
 
@@ -339,11 +342,9 @@ fn test_worker_quit_eagerly() {
     );
 
     {
-        let (command_sender, command_receiver) = channel();
         let state_pruner = utils::create_state_pruner(Arc::clone(&aptos_db.state_merkle_db));
         let worker = StatePrunerWorker::new(
             state_pruner,
-            command_receiver,
             StoragePrunerConfig {
                 enable_state_store_pruner: true,
                 enable_ledger_pruner: true,
@@ -352,20 +353,14 @@ fn test_worker_quit_eagerly() {
                 ledger_pruning_batch_size: 100,
                 state_store_pruning_batch_size: 100,
                 user_pruning_window_offset: 0,
+                state_pruner_time_interval_in_ms: 1,
+                ledger_pruner_time_interval_in_ms: 1,
             },
         );
-        command_sender
-            .send(db_pruner::Command::Prune {
-                target_db_version: 1,
-            })
-            .unwrap();
-        command_sender
-            .send(db_pruner::Command::Prune {
-                target_db_version: 2,
-            })
-            .unwrap();
-        command_sender.send(db_pruner::Command::Quit).unwrap();
-        // Worker quits immediately although `Command::Quit` is not the first command sent.
+        worker.set_target_db_version_if_needed(/*target_db_version=*/ 1);
+        worker.set_target_db_version_if_needed(/*target_db_version=*/ 2);
+        // Worker quits immediately.
+        worker.stop_pruning();
         worker.work();
         verify_state_in_store(state_store, key.clone(), Some(&value0), 0);
         verify_state_in_store(state_store, key.clone(), Some(&value1), 1);
