@@ -106,14 +106,14 @@ module aptos_framework::account {
     native fun create_signer(addr: address): signer;
 
     public fun initialize(account: &signer,
-                          module_addr: address,
-                          module_name: vector<u8>,
-                          script_prologue_name: vector<u8>,
-                          module_prologue_name: vector<u8>,
-                          writeset_prologue_name: vector<u8>,
-                          multi_agent_prologue_name: vector<u8>,
-                          user_epilogue_name: vector<u8>,
-                          writeset_epilogue_name: vector<u8>,
+        module_addr: address,
+        module_name: vector<u8>,
+        script_prologue_name: vector<u8>,
+        module_prologue_name: vector<u8>,
+        writeset_prologue_name: vector<u8>,
+        multi_agent_prologue_name: vector<u8>,
+        user_epilogue_name: vector<u8>,
+        writeset_epilogue_name: vector<u8>,
     ) {
         system_addresses::assert_aptos_framework(account);
 

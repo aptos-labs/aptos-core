@@ -1,13 +1,13 @@
-use aptos_types::account_address::AccountAddress;
-use e2e_move_tests::{assert_success, enable_golden, MoveHarness};
-use move_deps::move_core_types::parser::parse_struct_tag;
-use serde::{Deserialize, Serialize};
-use aptos_crypto::ed25519::{Ed25519PrivateKey};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{HashValue, PrivateKey, SigningKey, Uniform};
+use aptos_types::account_address::AccountAddress;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use aptos_types::state_store::state_key::StateKey;
 use aptos_types::state_store::table::TableHandle;
 use cached_framework_packages::aptos_stdlib;
+use e2e_move_tests::{assert_success, enable_golden, MoveHarness};
+use move_deps::move_core_types::parser::parse_struct_tag;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 struct OriginatingAddress {
@@ -45,18 +45,29 @@ fn key_rotation() {
     let msg = bcs::to_bytes(&rotation_proof);
     let signature = new_private_key.sign_arbitrary_message(&msg.unwrap());
 
-    assert_success!(harness.run_transaction_payload(&account1,
-        aptos_stdlib::account_rotate_authentication_key_ed25519(new_public_key.to_bytes().to_vec(), signature.to_bytes().to_vec())));
+    assert_success!(harness.run_transaction_payload(
+        &account1,
+        aptos_stdlib::account_rotate_authentication_key_ed25519(
+            new_public_key.to_bytes().to_vec(),
+            signature.to_bytes().to_vec()
+        )
+    ));
 
     let originating_address_handle = TableHandle(get_originating_address(&harness));
-    let state_key = &StateKey::table_item(originating_address_handle, AccountAddress::from_bytes(new_auth_key).unwrap().to_vec());
+    let state_key = &StateKey::table_item(
+        originating_address_handle,
+        AccountAddress::from_bytes(new_auth_key).unwrap().to_vec(),
+    );
     let result = harness.read_state_value(state_key).unwrap();
     assert_eq!(result, address.to_vec());
 }
 
 fn get_originating_address(harness: &MoveHarness) -> u128 {
-    harness.read_resource::<OriginatingAddress>(
-        &CORE_CODE_ADDRESS,
-        parse_struct_tag("0x1::account::OriginatingAddress").unwrap(),
-    ).unwrap().handle
+    harness
+        .read_resource::<OriginatingAddress>(
+            &CORE_CODE_ADDRESS,
+            parse_struct_tag("0x1::account::OriginatingAddress").unwrap(),
+        )
+        .unwrap()
+        .handle
 }
