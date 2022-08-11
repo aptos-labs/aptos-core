@@ -101,7 +101,7 @@ impl SfStreamer {
     }
 
     pub async fn start(&mut self) {
-        println!("DMLOG INIT aptos v1");
+        println!("FIRE INIT aptos v1");
         loop {
             self.convert_next_block().await;
         }
@@ -216,7 +216,7 @@ impl SfStreamer {
         if converted_txns.is_empty() {
             bail!("No transactions")
         }
-        println!("DMLOG BLOCK_START {}", self.current_block_height);
+        println!("FIRE BLOCK_START {}", self.current_block_height);
         let mut curr_version = block_start_version;
         for (index, txn) in converted_txns.iter().enumerate() {
             // First transaction has to be bmt or genesis
@@ -253,7 +253,7 @@ impl SfStreamer {
             curr_version - 1,
             self.current_block_height
         );
-        println!("DMLOG BLOCK_END {}", self.current_block_height);
+        println!("FIRE BLOCK_END {}", self.current_block_height);
         metrics::BLOCKS_SENT.inc();
         Ok(())
     }
@@ -266,7 +266,7 @@ impl SfStreamer {
                 transaction
             )
         });
-        println!("DMLOG TRX {}", base64::encode(buf));
+        println!("FIRE TRX {}", base64::encode(buf));
         metrics::TRANSACTIONS_SENT.inc();
     }
 }
