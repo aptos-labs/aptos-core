@@ -30,7 +30,7 @@ pub struct SipHashGasParameters {
 /// Serialize the MoveValue with BCS and then feed the bytes into SipHasher. This is not
 /// cryptographically secure.
 fn native_sip_hash(
-    _gas_params: &SipHashGasParameters,
+    gas_params: &SipHashGasParameters,
     context: &mut NativeContext,
     mut ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
@@ -38,29 +38,32 @@ fn native_sip_hash(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
-    // TODO(Gas): proper gas metering
+    let mut cost = gas_params.base_cost;
 
     let ref_to_val = pop_arg!(args, Reference);
     let arg_type = ty_args.pop().unwrap();
 
     // delegate to the BCS serialization for `Value`
+    // TODO: I'm confused: what cost will this return with the ? operator
     let serialized_value_opt = match context.type_to_type_layout(&arg_type)? {
         None => None,
+        // TODO: I'm confused: what cost will this return with the ? operator
         Some(layout) => ref_to_val.read_ref()?.simple_serialize(&layout),
     };
     let serialized_value = match serialized_value_opt {
         None => {
-            return Ok(NativeResult::err(0, NFE_BCS_SERIALIZATION_FAILURE));
+            return Ok(NativeResult::err(cost, NFE_BCS_SERIALIZATION_FAILURE));
         }
         Some(serialized_value) => serialized_value,
     };
 
     // SipHash of the serialized bytes
+    cost += gas_params.unit_cost;
     let mut hasher = siphasher::sip::SipHasher::new();
     hasher.write(&serialized_value);
     let hash = hasher.finish();
 
-    Ok(NativeResult::ok(0, smallvec![Value::u64(hash)]))
+    Ok(NativeResult::ok(cost, smallvec![Value::u64(hash)]))
 }
 
 pub fn make_native_sip_hash(gas_params: SipHashGasParameters) -> NativeFunction {
