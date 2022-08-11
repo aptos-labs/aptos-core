@@ -7,13 +7,13 @@ use anyhow::Result;
 use aptos::common::types::MovePackageDir;
 use aptos::move_tool::BuiltPackage;
 use aptos_sdk::transaction_builder::TransactionFactory;
-use forge::AptosContext;
+use forge::AptosPublicInfo;
 use framework::natives::code::UpgradePolicy;
 use std::path::PathBuf;
 
 /// New style publishing via `code::publish_package`
 pub async fn publish_package(
-    ctx: &mut AptosContext<'_>,
+    info: &mut AptosPublicInfo<'_>,
     move_dir: PathBuf,
     upgrade_policy: UpgradePolicy,
 ) -> Result<TransactionFactory> {
@@ -24,10 +24,10 @@ pub async fn publish_package(
         bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
         blobs,
     );
-    let txn_factory = ctx.aptos_transaction_factory();
-    let publish_txn = ctx
+    let txn_factory = info.transaction_factory();
+    let publish_txn = info
         .root_account()
         .sign_with_transaction_builder(txn_factory.payload(payload));
-    ctx.client().submit_and_wait(&publish_txn).await?;
+    info.client().submit_and_wait(&publish_txn).await?;
     Ok(txn_factory)
 }
