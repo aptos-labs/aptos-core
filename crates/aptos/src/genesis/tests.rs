@@ -143,6 +143,7 @@ fn create_layout_file(
         required_proposer_stake: 0,
         rewards_apy_percentage: 1,
         voting_duration_secs: 1,
+        voting_power_increase_limit: 100,
     };
     let file = TempPath::new();
     file.create_as_file().unwrap();

@@ -13,6 +13,7 @@ chain:
   required_proposer_stake: 100000000000 # 1M APTOS coins with 8 decimals
   rewards_apy_percentage: 10
   voting_duration_secs: 43200 # 12 hours
+  voting_power_increase_limit: 100
 
 imageTag: testnet
 
