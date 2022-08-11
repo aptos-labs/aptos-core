@@ -70,6 +70,9 @@ Rails.application.routes.draw do
   get 'it1', to: 'leaderboard#it1'
   get 'it2', to: 'leaderboard#it2'
 
+  # Projects
+  resources :projects
+
   # Static pages
   get 'community', to: 'static_page#community'
   get 'terms', to: 'static_page#terms'

@@ -2,7 +2,8 @@ FactoryBot.define do
   factory :project do
     title { "MyString" }
     short_description { "MyString" }
-    full_description { "MyString" }
+    full_description { "MyText" }
+    website_url { "MyString" }
     github_url { "MyString" }
     discord_url { "MyString" }
     twitter_url { "MyString" }
