@@ -295,6 +295,53 @@ macro_rules! generate_success_response {
                     ))),
                 }
             }
+
+           pub fn try_from_json<E: InternalError>(
+                (value, ledger_info, status): (
+                    T,
+                    &aptos_api_types::LedgerInfo,
+                    [<$enum_name Status>],
+                ),
+            ) -> Result<Self, E> {
+               Ok(Self::from((
+                    poem_openapi::payload::Json(value),
+                    ledger_info,
+                    status
+               )))
+            }
+
+            pub fn try_from_bcs<B: serde::Serialize, E: InternalError>(
+                (value, ledger_info, status): (
+                    B,
+                    &aptos_api_types::LedgerInfo,
+                    [<$enum_name Status>],
+                ),
+            ) -> Result<Self, E> {
+               Ok(Self::from((
+                    $crate::bcs_payload::Bcs(
+                        bcs::to_bytes(&value)
+                            .map_err(|e| E::internal(e.into()).error_code(aptos_api_types::AptosErrorCode::BcsSerializationError))?
+                    ),
+                    ledger_info,
+                    status
+               )))
+            }
+
+            pub fn try_from_encoded<E: InternalError>(
+                (value, ledger_info, status): (
+                    Vec<u8>,
+                    &aptos_api_types::LedgerInfo,
+                    [<$enum_name Status>],
+                ),
+            ) -> Result<Self, E> {
+               Ok(Self::from((
+                    $crate::bcs_payload::Bcs(
+                        value
+                    ),
+                    ledger_info,
+                    status
+               )))
+            }
         }
         }
     };
