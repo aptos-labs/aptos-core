@@ -16,6 +16,7 @@ export type { AccountSignature_MultiEd25519Signature } from './models/AccountSig
 export type { Address } from './models/Address';
 export type { AptosError } from './models/AptosError';
 export { AptosErrorCode } from './models/AptosErrorCode';
+export type { Block } from './models/Block';
 export type { BlockMetadataTransaction } from './models/BlockMetadataTransaction';
 export type { DecodedTableData } from './models/DecodedTableData';
 export type { DeletedTableData } from './models/DeletedTableData';
@@ -103,6 +104,7 @@ export { $AccountSignature_MultiEd25519Signature } from './schemas/$AccountSigna
 export { $Address } from './schemas/$Address';
 export { $AptosError } from './schemas/$AptosError';
 export { $AptosErrorCode } from './schemas/$AptosErrorCode';
+export { $Block } from './schemas/$Block';
 export { $BlockMetadataTransaction } from './schemas/$BlockMetadataTransaction';
 export { $DecodedTableData } from './schemas/$DecodedTableData';
 export { $DeletedTableData } from './schemas/$DeletedTableData';
@@ -184,6 +186,7 @@ export { $WriteSetPayload } from './schemas/$WriteSetPayload';
 export { $WriteTableItem } from './schemas/$WriteTableItem';
 
 export { AccountsService } from './services/AccountsService';
+export { BlocksService } from './services/BlocksService';
 export { EventsService } from './services/EventsService';
 export { GeneralService } from './services/GeneralService';
 export { TablesService } from './services/TablesService';
