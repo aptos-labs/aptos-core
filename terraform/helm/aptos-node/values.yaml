@@ -43,6 +43,7 @@ validator:
     state_store_prune_window: 1000000
     ledger_pruning_batch_size: 10000
     state_store_pruning_batch_size: 10000
+    user_pruning_window_offset: 200000
   enableNetworkPolicy: true
 
 fullnode:
