@@ -81,9 +81,9 @@ jobs:
       - run: docker run -p 8080:8080 -p 8081:8081 --name=local-testnet --detach ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos node run-local-testnet --with-faucet
 
       # Wait for the API and faucet to startup.
-      - run: npm install -g wait-port
-      - run: wait-port -t 60000 http://127.0.0.1:8080/v1
-      - run: wait-port -t 60000 http://127.0.0.1:8081/health
+      - run: npm install -g wait-on
+      - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8080/v1
+      - run: wait-on -t 60000 --httpTimeout 60000 http-get://127.0.0.1:8081/health
 
       # Test and build.
       - run: cd ./ecosystem/typescript/sdk && yarn test
