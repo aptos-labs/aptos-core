@@ -40,7 +40,7 @@ fn test_n_leaves_same_version(n: usize) {
     let mut btree = BTreeMap::new();
     for (index, _) in values.iter().enumerate() {
         let key = HashValue::random_with_rng(&mut rng);
-        assert_eq!(btree.insert(key, &values[index]), None);
+        assert_eq!(btree.insert(key, Some(&values[index])), None);
     }
 
     let (_root_hash, batch) = tree
@@ -50,7 +50,7 @@ fn test_n_leaves_same_version(n: usize) {
     let btree: BTreeMap<_, _> = btree
         .clone()
         .into_iter()
-        .map(|(x, y)| (x, y.clone()))
+        .filter_map(|(x, y)| y.map(|y| (x, y.clone())))
         .collect();
 
     run_tests(db, &btree, 0 /* version */);
@@ -67,7 +67,7 @@ fn test_n_leaves_multiple_versions(n: usize) {
         let key = HashValue::random_with_rng(&mut rng);
         let value = gen_value();
         let (_root_hash, batch) = tree
-            .put_value_set_test(vec![(key, &value)], i as Version)
+            .put_value_set_test(vec![(key, Some(&value))], i as Version)
             .unwrap();
         assert_eq!(btree.insert(key, value), None);
         db.write_tree_update_batch(batch).unwrap();
@@ -81,7 +81,7 @@ fn test_n_consecutive_addresses(n: usize) {
     let values: Vec<_> = (0..n).map(|_i| gen_value()).collect();
 
     let btree: BTreeMap<_, _> = (0..n)
-        .map(|i| (HashValue::from_u64(i as u64), &values[i]))
+        .map(|i| (HashValue::from_u64(i as u64), Some(&values[i])))
         .collect();
 
     let (_root_hash, batch) = tree
@@ -91,7 +91,7 @@ fn test_n_consecutive_addresses(n: usize) {
     let btree: BTreeMap<_, _> = btree
         .clone()
         .into_iter()
-        .map(|(x, y)| (x, y.clone()))
+        .filter_map(|(x, y)| y.map(|y| (x, y.clone())))
         .collect();
 
     run_tests(db, &btree, 0 /* version */);

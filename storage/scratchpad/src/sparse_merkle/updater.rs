@@ -120,7 +120,7 @@ impl<'a, V: Clone + CryptoHash> SubTreeInfo<'a, V> {
 
     fn new_proof_sibling(node_in_proof: &NodeInProof) -> Self {
         match node_in_proof {
-            NodeInProof::Leaf(leaf) => Self::new_proof_leaf(leaf.clone()),
+            NodeInProof::Leaf(leaf) => Self::new_proof_leaf(*leaf),
             NodeInProof::Other(hash) => {
                 if *hash == *SPARSE_MERKLE_PLACEHOLDER_HASH {
                     Self::InMem(InMemSubTreeInfo::Empty)

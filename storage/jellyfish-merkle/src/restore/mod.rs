@@ -720,7 +720,7 @@ impl<K: crate::Key + Hash + Eq, V: crate::Value> StateValueRestore<K, V> {
     pub fn add_chunk(&mut self, chunk: Vec<(K, V)>) -> Result<()> {
         let kv_batch = chunk
             .into_iter()
-            .map(|(k, v)| ((k, self.version), v))
+            .map(|(k, v)| ((k, self.version), Some(v)))
             .collect();
         self.db.write_kv_batch(&kv_batch)
     }

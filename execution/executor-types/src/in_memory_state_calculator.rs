@@ -185,7 +185,7 @@ impl InMemoryStateCalculator {
         let smt_updates: Vec<_> = self
             .updates_after_latest
             .iter()
-            .map(|(key, value)| (key.hash(), value))
+            .map(|(key, value)| (key.hash(), value.as_ref()))
             .collect();
         let latest = self.latest.batch_update(smt_updates, &self.proof_reader)?;
 
@@ -200,14 +200,20 @@ impl InMemoryStateCalculator {
             self.updates_between_checkpoint_and_latest,
         );
 
-        Ok((result_state, self.state_cache))
+        Ok((
+            result_state,
+            self.state_cache
+                .into_iter()
+                .filter_map(|(k, v_opt)| v_opt.map(|v| (k, v)))
+                .collect(),
+        ))
     }
 
     pub fn calculate_for_write_sets_after_snapshot(
         mut self,
         last_checkpoint_index: Option<usize>,
         write_sets: &[WriteSet],
-    ) -> Result<(Option<HashMap<StateKey, StateValue>>, StateDelta)> {
+    ) -> Result<(Option<HashMap<StateKey, Option<StateValue>>>, StateDelta)> {
         let idx_after_last_checkpoint = last_checkpoint_index.map_or(0, |idx| idx + 1);
         let updates_before_last_checkpoint = if idx_after_last_checkpoint != 0 {
             for write_set in write_sets[0..idx_after_last_checkpoint].iter() {

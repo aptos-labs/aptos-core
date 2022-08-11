@@ -5,11 +5,12 @@ use super::{
     deserialize_u64_varint, serialize_u64_varint, Child, Children, InternalNode, NodeDecodeError,
     NodeKey,
 };
-use crate::{node_type::NodeType, test_helper::ValueBlob};
+use crate::{node_type::NodeType, test_helper::ValueBlob, LeafNode, StateKey, TreeReader};
 use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
+use aptos_types::proof::definition::NodeInProof;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
     proof::{SparseMerkleInternalNode, SparseMerkleLeafNode},
@@ -19,6 +20,20 @@ use proptest::prelude::*;
 use std::{io::Cursor, panic, rc::Rc};
 
 type Node = super::Node<crate::test_helper::ValueBlob>;
+
+struct DummyReader {}
+impl TreeReader<StateKey> for DummyReader {
+    fn get_node_option(
+        &self,
+        _node_key: &NodeKey,
+    ) -> anyhow::Result<Option<crate::Node<StateKey>>> {
+        unimplemented!()
+    }
+
+    fn get_rightmost_leaf(&self) -> anyhow::Result<Option<(NodeKey, LeafNode<StateKey>)>> {
+        unimplemented!()
+    }
+}
 
 fn hash_internal(left: HashValue, right: HashValue) -> HashValue {
     SparseMerkleInternalNode::new(left, right).hash()
@@ -179,14 +194,14 @@ proptest! {
 
         for i in 0..8 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
-                (Some(leaf1_node_key.clone()), vec![hash2])
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                (Some(leaf1_node_key.clone()), vec![hash2.into()])
             );
         }
         for i in 8..16 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
-                (Some(leaf2_node_key.clone()), vec![hash1])
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                (Some(leaf2_node_key.clone()), vec![hash1.into()])
             );
         }
 
@@ -226,20 +241,20 @@ proptest! {
 
         for i in 0..4 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
-                (None, vec![*SPARSE_MERKLE_PLACEHOLDER_HASH, hash_x1])
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                (None, vec![(*SPARSE_MERKLE_PLACEHOLDER_HASH).into(), hash_x1.into()])
             );
         }
 
         for i in 4..6 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (
                     Some(leaf1_node_key.clone()),
                     vec![
-                        *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                        *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                        hash2
+                        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                        hash2.into()
                     ]
                 )
             );
@@ -247,13 +262,13 @@ proptest! {
 
         for i in 6..8 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (
                     Some(leaf2_node_key.clone()),
                     vec![
-                        *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                        *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                        hash1
+                        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                        hash1.into()
                     ]
                 )
             );
@@ -261,8 +276,8 @@ proptest! {
 
         for i in 8..16 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
-                (None, vec![hash_x2])
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                (None, vec![hash_x2.into()])
             );
         }
 
@@ -300,22 +315,22 @@ proptest! {
 
         for i in 0..4 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
-                (Some(leaf1_node_key.clone()),vec![hash3, hash2])
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                (Some(leaf1_node_key.clone()),vec![hash3.into(), hash2.into()])
             );
         }
 
         for i in 4..8 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
-                (Some(leaf2_node_key.clone()),vec![hash3, hash1])
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                (Some(leaf2_node_key.clone()),vec![hash3.into(), hash1.into()])
             );
         }
 
         for i in 8..16 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
-                (Some(leaf3_node_key.clone()),vec![hash_x])
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                (Some(leaf3_node_key.clone()),vec![hash_x.into()])
             );
         }
     }
@@ -365,76 +380,76 @@ proptest! {
 
         for i in 0..2 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (
                     Some(leaf1_node_key.clone()),
-                    vec![hash4, hash_x4, hash_x1]
+                    vec![hash4.into(), hash_x4.into(), hash_x1.into()]
                 )
             );
         }
 
         prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, 2.into()),
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, 2.into(), None).unwrap(),
             (
                 Some(internal2_node_key),
                 vec![
-                    hash4,
-                    hash_x4,
-                    hash1,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
+                    hash4.into(),
+                    hash_x4.into(),
+                    hash1.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
                 ]
             )
         );
 
         prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, 3.into()),
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, 3.into(), None).unwrap(),
 
             (
                 None,
-                vec![hash4, hash_x4, hash1, hash2,]
+                vec![hash4.into(), hash_x4.into(), hash1.into(), hash2.into(),]
             )
         );
 
         for i in 4..6 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
                 (
                     None,
-                    vec![hash4, hash_x2, hash_x3]
+                    vec![hash4.into(), hash_x2.into(), hash_x3.into()]
                 )
             );
         }
 
         prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, 6.into()),
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, 6.into(), None).unwrap(),
             (
                 None,
                 vec![
-                    hash4,
-                    hash_x2,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    hash3,
+                    hash4.into(),
+                    hash_x2.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash3.into(),
                 ]
             )
         );
 
         prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, 7.into()),
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, 7.into(), None).unwrap(),
             (
                 Some(internal3_node_key),
                 vec![
-                    hash4,
-                    hash_x2,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
+                    hash4.into(),
+                    hash_x2.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
                 ]
             )
         );
 
         for i in 8..16 {
             prop_assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
-                (Some(leaf4_node_key.clone()), vec![hash_x5])
+                internal_node.get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, i.into(), None).unwrap(),
+                (Some(leaf4_node_key.clone()), vec![hash_x5.into()])
             );
         }
     }
@@ -507,83 +522,131 @@ fn test_internal_hash_and_proof() {
 
         for i in 0..4 {
             assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
-                (None, vec![hash_x6, hash_x2])
+                internal_node
+                    .get_child_with_siblings::<StateKey, DummyReader>(
+                        &internal_node_key,
+                        i.into(),
+                        None
+                    )
+                    .unwrap(),
+                (None, vec![hash_x6.into(), hash_x2.into()])
             );
         }
 
         assert_eq!(
-            internal_node.get_child_with_siblings(&internal_node_key, index1),
+            internal_node
+                .get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, index1, None)
+                .unwrap(),
             (
                 Some(child1_node_key),
                 vec![
-                    hash_x6,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH
+                    hash_x6.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into()
                 ]
             )
         );
 
         assert_eq!(
-            internal_node.get_child_with_siblings(&internal_node_key, 5.into()),
+            internal_node
+                .get_child_with_siblings::<StateKey, DummyReader>(
+                    &internal_node_key,
+                    5.into(),
+                    None
+                )
+                .unwrap(),
             (
                 None,
                 vec![
-                    hash_x6,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    hash1
+                    hash_x6.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash1.into()
                 ]
             )
         );
         for i in 6..8 {
             assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
+                internal_node
+                    .get_child_with_siblings::<StateKey, DummyReader>(
+                        &internal_node_key,
+                        i.into(),
+                        None
+                    )
+                    .unwrap(),
                 (
                     None,
-                    vec![hash_x6, *SPARSE_MERKLE_PLACEHOLDER_HASH, hash_x1]
+                    vec![
+                        hash_x6.into(),
+                        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                        hash_x1.into()
+                    ]
                 )
             );
         }
 
         for i in 8..12 {
             assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
-                (None, vec![hash_x3, hash_x5])
+                internal_node
+                    .get_child_with_siblings::<StateKey, DummyReader>(
+                        &internal_node_key,
+                        i.into(),
+                        None
+                    )
+                    .unwrap(),
+                (None, vec![hash_x3.into(), hash_x5.into()])
             );
         }
 
         for i in 12..14 {
             assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
+                internal_node
+                    .get_child_with_siblings::<StateKey, DummyReader>(
+                        &internal_node_key,
+                        i.into(),
+                        None
+                    )
+                    .unwrap(),
                 (
                     None,
-                    vec![hash_x3, *SPARSE_MERKLE_PLACEHOLDER_HASH, hash_x4]
+                    vec![
+                        hash_x3.into(),
+                        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                        hash_x4.into()
+                    ]
                 )
             );
         }
         assert_eq!(
-            internal_node.get_child_with_siblings(&internal_node_key, 14.into()),
+            internal_node
+                .get_child_with_siblings::<StateKey, DummyReader>(
+                    &internal_node_key,
+                    14.into(),
+                    None
+                )
+                .unwrap(),
             (
                 None,
                 vec![
-                    hash_x3,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    hash2
+                    hash_x3.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash2.into()
                 ]
             )
         );
         assert_eq!(
-            internal_node.get_child_with_siblings(&internal_node_key, index2),
+            internal_node
+                .get_child_with_siblings::<StateKey, DummyReader>(&internal_node_key, index2, None)
+                .unwrap(),
             (
                 Some(child2_node_key),
                 vec![
-                    hash_x3,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH
+                    hash_x3.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
                 ]
             )
         );
@@ -653,81 +716,131 @@ fn test_internal_hash_and_proof() {
         assert_eq!(internal_node.hash(), root_hash);
 
         assert_eq!(
-            internal_node.get_child_with_siblings(&internal_node_key, 0.into()),
+            internal_node
+                .get_child_with_siblings::<StateKey, DummyReader>(
+                    &internal_node_key,
+                    0.into(),
+                    None
+                )
+                .unwrap(),
             (
                 Some(child1_node_key),
                 vec![
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    hash_x4,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash_x4.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
                 ]
             )
         );
 
         assert_eq!(
-            internal_node.get_child_with_siblings(&internal_node_key, 1.into()),
+            internal_node
+                .get_child_with_siblings::<StateKey, DummyReader>(
+                    &internal_node_key,
+                    1.into(),
+                    None
+                )
+                .unwrap(),
             (
                 None,
                 vec![
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    hash_x4,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    hash1,
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash_x4.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash1.into(),
                 ]
             )
         );
 
         for i in 2..4 {
             assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
+                internal_node
+                    .get_child_with_siblings::<StateKey, DummyReader>(
+                        &internal_node_key,
+                        i.into(),
+                        None
+                    )
+                    .unwrap(),
                 (
                     None,
-                    vec![*SPARSE_MERKLE_PLACEHOLDER_HASH, hash_x4, hash_x1]
+                    vec![
+                        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                        hash_x4.into(),
+                        hash_x1.into()
+                    ]
                 )
             );
         }
 
         for i in 4..6 {
             assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
+                internal_node
+                    .get_child_with_siblings::<StateKey, DummyReader>(
+                        &internal_node_key,
+                        i.into(),
+                        None
+                    )
+                    .unwrap(),
                 (
                     None,
-                    vec![*SPARSE_MERKLE_PLACEHOLDER_HASH, hash_x2, hash_x3]
+                    vec![
+                        (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                        hash_x2.into(),
+                        hash_x3.into()
+                    ]
                 )
             );
         }
 
         assert_eq!(
-            internal_node.get_child_with_siblings(&internal_node_key, 6.into()),
+            internal_node
+                .get_child_with_siblings::<StateKey, DummyReader>(
+                    &internal_node_key,
+                    6.into(),
+                    None
+                )
+                .unwrap(),
             (
                 None,
                 vec![
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    hash_x2,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    hash2
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash_x2.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash2.into()
                 ]
             )
         );
 
         assert_eq!(
-            internal_node.get_child_with_siblings(&internal_node_key, 7.into()),
+            internal_node
+                .get_child_with_siblings::<StateKey, DummyReader>(
+                    &internal_node_key,
+                    7.into(),
+                    None
+                )
+                .unwrap(),
             (
                 Some(child2_node_key),
                 vec![
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    hash_x2,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
-                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    hash_x2.into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
+                    (*SPARSE_MERKLE_PLACEHOLDER_HASH).into(),
                 ]
             )
         );
 
         for i in 8..16 {
             assert_eq!(
-                internal_node.get_child_with_siblings(&internal_node_key, i.into()),
-                (None, vec![hash_x5])
+                internal_node
+                    .get_child_with_siblings::<StateKey, DummyReader>(
+                        &internal_node_key,
+                        i.into(),
+                        None
+                    )
+                    .unwrap(),
+                (None, vec![hash_x5.into()])
             );
         }
     }
@@ -863,7 +976,7 @@ impl NaiveInternalNode {
         &self,
         node_key: &NodeKey,
         n: u8,
-    ) -> (Option<NodeKey>, Vec<HashValue>) {
+    ) -> (Option<NodeKey>, Vec<NodeInProof>) {
         let mut current_node = Rc::clone(&self.root);
         let mut siblings = Vec::new();
 
@@ -871,10 +984,10 @@ impl NaiveInternalNode {
             match current_node.as_ref() {
                 BinaryTreeNode::Internal(node) => {
                     if node.in_left_subtree(n) {
-                        siblings.push(node.right.hash());
+                        siblings.push(node.right.hash().into());
                         current_node = Rc::clone(&node.left);
                     } else {
-                        siblings.push(node.left.hash());
+                        siblings.push(node.left.hash().into());
                         current_node = Rc::clone(&node.right);
                     }
                 }
@@ -902,7 +1015,7 @@ proptest! {
     ) {
         for n in 0..16u8 {
             prop_assert_eq!(
-                node.get_child_with_siblings(&node_key, n.into()),
+                node.get_child_with_siblings::<StateKey, DummyReader>(&node_key, n.into(), None).unwrap(),
                 NaiveInternalNode::from_clever_node(&node).get_child_with_siblings(&node_key, n)
             )
         }
