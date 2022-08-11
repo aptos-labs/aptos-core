@@ -52,6 +52,7 @@ impl PayloadManager for MockPayloadManager {
     async fn pull_payload(
         &self,
         _max_size: u64,
+        _max_bytes: u64,
         _exclude: PayloadFilter,
         _wait_callback: BoxFuture<'static, ()>,
         _pending_ordering: bool,
