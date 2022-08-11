@@ -24,7 +24,7 @@ Before you get started with this tutorial, read the following sections:
 
 * [Validator node concepts](/concepts/basics-validator-nodes).
 * [FullNode concepts](/concepts/basics-fullnodes).
-* [REST specifications](/rest-api).
+* [REST specifications](https://fullnode.devnet.aptoslabs.com/v1/spec#/).
 
 
 ## Hardware requirements
