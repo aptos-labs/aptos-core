@@ -16,7 +16,9 @@ use super::{
 use super::{BadRequestError, InsufficientStorageError};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
-use crate::{generate_error_response, generate_success_response};
+use crate::{
+    generate_endpoint_logging_functions, generate_error_response, generate_success_response,
+};
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     Address, AptosErrorCode, AsConverter, EncodeSubmissionRequest, HashValue, HexEncodedBytes,
@@ -32,6 +34,16 @@ use aptos_vm::AptosVM;
 use poem_openapi::param::{Path, Query};
 use poem_openapi::payload::Json;
 use poem_openapi::{ApiRequest, OpenApi};
+
+generate_endpoint_logging_functions!(
+    get_transactions,
+    get_transaction_by_hash,
+    get_transaction_by_version,
+    get_account_transactions,
+    submit_transaction,
+    simulate_transaction,
+    encode_submission
+);
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 generate_error_response!(
@@ -79,7 +91,8 @@ impl TransactionsApi {
         path = "/transactions",
         method = "get",
         operation_id = "get_transactions",
-        tag = "ApiTags::Transactions"
+        tag = "ApiTags::Transactions",
+        transform = "get_transactions_log"
     )]
     async fn get_transactions(
         &self,
@@ -110,7 +123,8 @@ impl TransactionsApi {
         path = "/transactions/by_hash/:txn_hash",
         method = "get",
         operation_id = "get_transaction_by_hash",
-        tag = "ApiTags::Transactions"
+        tag = "ApiTags::Transactions",
+        transform = "get_transaction_by_hash_log"
     )]
     async fn get_transaction_by_hash(
         &self,
@@ -130,7 +144,8 @@ impl TransactionsApi {
         path = "/transactions/by_version/:txn_version",
         method = "get",
         operation_id = "get_transaction_by_version",
-        tag = "ApiTags::Transactions"
+        tag = "ApiTags::Transactions",
+        transform = "get_transaction_by_version_log"
     )]
     async fn get_transaction_by_version(
         &self,
@@ -149,7 +164,8 @@ impl TransactionsApi {
         path = "/accounts/:address/transactions",
         method = "get",
         operation_id = "get_account_transactions",
-        tag = "ApiTags::Transactions"
+        tag = "ApiTags::Transactions",
+        transform = "get_account_transactions_log"
     )]
     // TODO: https://github.com/aptos-labs/aptos-core/issues/2285
     async fn get_accounts_transactions(
@@ -186,7 +202,8 @@ impl TransactionsApi {
         path = "/transactions",
         method = "post",
         operation_id = "submit_transaction",
-        tag = "ApiTags::Transactions"
+        tag = "ApiTags::Transactions",
+        transform = "submit_transaction_log"
     )]
     async fn submit_transaction(
         &self,
@@ -210,7 +227,8 @@ impl TransactionsApi {
         path = "/transactions/simulate",
         method = "post",
         operation_id = "simulate_transaction",
-        tag = "ApiTags::Transactions"
+        tag = "ApiTags::Transactions",
+        transform = "simulate_transaction_log"
     )]
     async fn simulate_transaction(
         &self,
@@ -246,7 +264,8 @@ impl TransactionsApi {
         path = "/transactions/encode_submission",
         method = "post",
         operation_id = "encode_submission",
-        tag = "ApiTags::Transactions"
+        tag = "ApiTags::Transactions",
+        transform = "encode_submission_log"
     )]
     async fn encode_submission(
         &self,

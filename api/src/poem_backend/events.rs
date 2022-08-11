@@ -12,11 +12,14 @@ use super::{
 };
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
+use crate::generate_endpoint_logging_functions;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{Address, EventKey, IdentifierWrapper, MoveStructTag, U64};
 use aptos_api_types::{AsConverter, VersionedEvent};
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
+
+generate_endpoint_logging_functions!(get_events_by_event_key, get_events_by_event_handle);
 
 pub struct EventsApi {
     pub context: Arc<Context>,
@@ -32,7 +35,8 @@ impl EventsApi {
         path = "/events/:event_key",
         method = "get",
         operation_id = "get_events_by_event_key",
-        tag = "ApiTags::Events"
+        tag = "ApiTags::Events",
+        transform = "get_events_by_event_key_log"
     )]
     // TODO: https://github.com/aptos-labs/aptos-core/issues/2284
     async fn get_events_by_event_key(
@@ -57,7 +61,8 @@ impl EventsApi {
         path = "/accounts/:address/events/:event_handle/:field_name",
         method = "get",
         operation_id = "get_events_by_event_handle",
-        tag = "ApiTags::Events"
+        tag = "ApiTags::Events",
+        transform = "get_events_by_event_handle_log"
     )]
     async fn get_events_by_event_handle(
         &self,

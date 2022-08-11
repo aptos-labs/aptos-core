@@ -9,6 +9,7 @@ use super::{
 use super::{BasicErrorWith404, BasicResultWith404};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
+use crate::generate_endpoint_logging_functions;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag, MoveValue,
@@ -27,6 +28,8 @@ use poem_openapi::{param::Path, OpenApi};
 use std::convert::TryInto;
 use std::sync::Arc;
 use storage_interface::state_view::DbStateView;
+
+generate_endpoint_logging_functions!(get_account_resource, get_account_module, get_table_item);
 
 pub struct StateApi {
     pub context: Arc<Context>,
@@ -47,7 +50,8 @@ impl StateApi {
         path = "/accounts/:address/resource/:resource_type",
         method = "get",
         operation_id = "get_account_resource",
-        tag = "ApiTags::Accounts"
+        tag = "ApiTags::Accounts",
+        transform = "get_account_resource_log"
     )]
     async fn get_account_resource(
         &self,
@@ -73,7 +77,8 @@ impl StateApi {
         path = "/accounts/:address/module/:module_name",
         method = "get",
         operation_id = "get_account_module",
-        tag = "ApiTags::Accounts"
+        tag = "ApiTags::Accounts",
+        transform = "get_account_module_log"
     )]
     async fn get_account_module(
         &self,
@@ -99,7 +104,8 @@ impl StateApi {
         path = "/tables/:table_handle/item",
         method = "post",
         operation_id = "get_table_item",
-        tag = "ApiTags::Tables"
+        tag = "ApiTags::Tables",
+        transform = "get_table_item_log"
     )]
     async fn get_table_item(
         &self,

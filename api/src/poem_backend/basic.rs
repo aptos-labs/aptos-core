@@ -9,11 +9,13 @@ use std::{
 use super::{
     AcceptType, ApiTags, BasicError, BasicResponse, BasicResponseStatus, BasicResult, InternalError,
 };
-use crate::context::Context;
+use crate::{context::Context, generate_endpoint_logging_functions};
 use anyhow::Context as AnyhowContext;
 use poem_openapi::{param::Query, payload::Html, Object, OpenApi};
 use serde::{Deserialize, Serialize};
 use std::ops::Sub;
+
+generate_endpoint_logging_functions!(spec, healthy);
 
 const OPEN_API_HTML: &str = include_str!("../../doc/v1/spec.html");
 
@@ -44,7 +46,8 @@ impl BasicApi {
         path = "/spec",
         method = "get",
         operation_id = "spec",
-        tag = "ApiTags::General"
+        tag = "ApiTags::General",
+        transform = "spec_log"
     )]
     async fn spec(&self) -> Html<String> {
         Html(OPEN_API_HTML.to_string())
@@ -63,7 +66,8 @@ impl BasicApi {
         path = "/-/healthy",
         method = "get",
         operation_id = "healthy",
-        tag = "ApiTags::General"
+        tag = "ApiTags::General",
+        transform = "healthy_log"
     )]
     async fn healthy(
         &self,

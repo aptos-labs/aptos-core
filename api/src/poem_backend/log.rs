@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use crate::metrics::{HISTOGRAM, RESPONSE_STATUS};
+use crate::metrics::RESPONSE_STATUS;
 use aptos_logger::{
     debug, error,
     prelude::{sample, SampleRate},
@@ -56,17 +56,6 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
         .with_label_values(&[log.status.to_string().as_str()])
         .observe(elapsed.as_secs_f64());
 
-    // Log response status per-endpoint + method.
-    HISTOGRAM
-        .with_label_values(&[
-            log.method.as_str(),
-            // TODO: Log based on operation_id instead.
-            // https://github.com/poem-web/poem/issues/351
-            log.path.as_str(),
-            log.status.to_string().as_str(),
-        ])
-        .observe(elapsed.as_secs_f64());
-
     Ok(response)
 }
 
@@ -84,4 +73,38 @@ pub struct HttpRequestLog {
     #[schema(debug)]
     pub elapsed: std::time::Duration,
     forwarded: Option<String>,
+}
+
+// This macro helps generate a function that can be used to transform an
+// endpoint such that it does per-endpoint logging based on operation_id.
+// Unfortunately we have to do it this way right now because Poem doesn't
+// support accessing operation_id directly in middleware. See this issue
+// for more information: https://github.com/poem-web/poem/issues/351.
+#[macro_export]
+macro_rules! generate_endpoint_logging_functions {
+    ($($operation_id:ident),*) => {
+        paste::paste! {
+        $(
+        fn [< $operation_id _log >](ep: impl poem::Endpoint + 'static) -> impl poem::Endpoint + 'static {
+            poem::EndpointExt::around(ep, |ep, request| async move {
+                let method = request.method().to_string();
+
+                let start = std::time::Instant::now();
+                let response = ep.get_response(request).await;
+                let elapsed = start.elapsed();
+
+                $crate::metrics::HISTOGRAM
+                    .with_label_values(&[
+                        method.as_str(),
+                        stringify!($operation_id),
+                        response.status().as_u16().to_string().as_str(),
+                    ])
+                    .observe(elapsed.as_secs_f64());
+
+                Ok(response)
+            })
+        }
+        )*
+        }
+    };
 }

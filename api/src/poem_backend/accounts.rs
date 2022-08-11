@@ -9,6 +9,7 @@ use super::{
 use super::{BasicErrorWith404, BasicResultWith404};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
+use crate::generate_endpoint_logging_functions;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     AccountData, Address, AptosErrorCode, AsConverter, LedgerInfo, MoveModuleBytecode,
@@ -31,6 +32,8 @@ use poem_openapi::{param::Path, OpenApi};
 use std::convert::TryInto;
 use std::sync::Arc;
 
+generate_endpoint_logging_functions!(get_account, get_account_resources, get_account_modules);
+
 pub struct AccountsApi {
     pub context: Arc<Context>,
 }
@@ -44,7 +47,8 @@ impl AccountsApi {
         path = "/accounts/:address",
         method = "get",
         operation_id = "get_account",
-        tag = "ApiTags::Accounts"
+        tag = "ApiTags::Accounts",
+        transform = "get_account_log"
     )]
     async fn get_account(
         &self,
@@ -69,7 +73,8 @@ impl AccountsApi {
         path = "/accounts/:address/resources",
         method = "get",
         operation_id = "get_account_resources",
-        tag = "ApiTags::Accounts"
+        tag = "ApiTags::Accounts",
+        transform = "get_account_resources_log"
     )]
     async fn get_account_resources(
         &self,
@@ -94,7 +99,8 @@ impl AccountsApi {
         path = "/accounts/:address/modules",
         method = "get",
         operation_id = "get_account_modules",
-        tag = "ApiTags::Accounts"
+        tag = "ApiTags::Accounts",
+        transform = "get_account_modules_log"
     )]
     async fn get_account_modules(
         &self,

@@ -6,8 +6,11 @@ use std::sync::Arc;
 use super::{AcceptType, ApiTags};
 use super::{BasicResponse, BasicResponseStatus, BasicResult};
 use crate::context::Context;
+use crate::generate_endpoint_logging_functions;
 use aptos_api_types::IndexResponse;
 use poem_openapi::OpenApi;
+
+generate_endpoint_logging_functions!(get_ledger_info);
 
 pub struct IndexApi {
     pub context: Arc<Context>,
@@ -23,7 +26,8 @@ impl IndexApi {
         path = "/",
         method = "get",
         operation_id = "get_ledger_info",
-        tag = "ApiTags::General"
+        tag = "ApiTags::General",
+        transform = "get_ledger_info_log"
     )]
     async fn get_ledger_info(&self, accept_type: AcceptType) -> BasicResult<IndexResponse> {
         let ledger_info = self.context.get_latest_ledger_info_poem()?;
