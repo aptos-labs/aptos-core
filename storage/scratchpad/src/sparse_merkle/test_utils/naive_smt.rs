@@ -127,7 +127,7 @@ impl NaiveSmt {
             if let Some(value) = value_option {
                 leaves.insert(*key, value.hash());
             } else {
-                leaves.remove(key).unwrap();
+                leaves.remove(key);
             }
         }
 

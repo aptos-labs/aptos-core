@@ -16,9 +16,8 @@ use aptos_logger::info;
 use aptos_state_view::StateViewId;
 #[cfg(test)]
 use aptos_types::nibble::nibble_path::NibblePath;
-use aptos_types::proof::SparseMerkleProofExt;
 use aptos_types::{
-    proof::{definition::LeafCount, SparseMerkleProof, SparseMerkleRangeProof},
+    proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
@@ -47,7 +46,7 @@ mod state_snapshot_committer;
 #[cfg(test)]
 mod state_store_test;
 
-type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, StateValue>;
+type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, Option<StateValue>>;
 
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 // We assume TARGET_SNAPSHOT_INTERVAL_IN_VERSION > block size.
@@ -108,19 +107,21 @@ impl DbReader for StateDb {
         read_opts.set_prefix_same_as_start(true);
         let mut iter = self.ledger_db.iter::<StateValueSchema>(read_opts)?;
         iter.seek(&(state_key.clone(), version))?;
-        iter.next()
+        Ok(iter
+            .next()
             .transpose()?
-            .map(|(_, state_value)| Ok(state_value))
-            .transpose()
+            .and_then(|(_, state_value)| (state_value)))
     }
 
     /// Returns the proof of the given state key and version.
-    fn get_state_proof_by_version(
+    fn get_state_proof_by_version_ext(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<SparseMerkleProof> {
-        let (_, proof) = self.state_merkle_db.get_with_proof(state_key, version)?;
+    ) -> Result<SparseMerkleProofExt> {
+        let (_, proof) = self
+            .state_merkle_db
+            .get_with_proof_ext(state_key, version)?;
         Ok(proof)
     }
 
@@ -164,12 +165,13 @@ impl DbReader for StateStore {
     }
 
     /// Returns the proof of the given state key and version.
-    fn get_state_proof_by_version(
+    fn get_state_proof_by_version_ext(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<SparseMerkleProof> {
-        self.deref().get_state_proof_by_version(state_key, version)
+    ) -> Result<SparseMerkleProofExt> {
+        self.deref()
+            .get_state_proof_by_version_ext(state_key, version)
     }
 
     /// Get the state value with proof extension given the state key and version
@@ -363,7 +365,7 @@ impl StateStore {
         let mut result = HashMap::new();
         let mut prev_key = None;
         iter.seek(&(key_prefix))?;
-        while let Some(((state_key, version), state_value)) = iter.next().transpose()? {
+        while let Some(((state_key, version), state_value_opt)) = iter.next().transpose()? {
             // In case the previous seek() ends on the same key with version 0.
             if Some(&state_key) == prev_key.as_ref() {
                 continue;
@@ -380,7 +382,9 @@ impl StateStore {
                 continue;
             }
 
-            result.insert(state_key.clone(), state_value);
+            if let Some(state_value) = state_value_opt {
+                result.insert(state_key.clone(), state_value);
+            }
             // We don't allow fetching arbitrarily large number of values to be fetched as this can
             // potentially slowdown the DB.
             if result.len() > MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX {
@@ -409,7 +413,7 @@ impl StateStore {
     /// Put the `value_state_sets` into its own CF.
     pub fn put_value_sets(
         &self,
-        value_state_sets: Vec<&HashMap<StateKey, StateValue>>,
+        value_state_sets: Vec<&HashMap<StateKey, Option<StateValue>>>,
         first_version: Version,
         cs: &mut ChangeSet,
     ) -> Result<()> {
@@ -429,7 +433,7 @@ impl StateStore {
     #[cfg(test)]
     pub fn merklize_value_set(
         &self,
-        value_set: Vec<(HashValue, &(HashValue, StateKey))>,
+        value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
@@ -535,11 +539,8 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
 }
 
 fn add_kv_batch(batch: &mut SchemaBatch, kv_batch: &StateValueBatch) -> Result<()> {
-    kv_batch
-        .iter()
-        .map(|(k, v)| batch.put::<StateValueSchema>(k, v))
-        .collect::<Result<Vec<_>>>()?;
-
-    // Add kv_batch
+    for (k, v) in kv_batch {
+        batch.put::<StateValueSchema>(k, v)?;
+    }
     Ok(())
 }

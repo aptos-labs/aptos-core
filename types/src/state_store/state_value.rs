@@ -22,9 +22,7 @@ pub struct StateValue {
 impl Arbitrary for StateValue {
     type Parameters = ();
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        any::<Vec<u8>>()
-            .prop_map(|maybe_bytes| StateValue::new(maybe_bytes))
-            .boxed()
+        any::<Vec<u8>>().prop_map(StateValue::new).boxed()
     }
 
     type Strategy = BoxedStrategy<Self>;
@@ -95,15 +93,5 @@ impl StateValueChunkWithProof {
         right_siblings
             .iter()
             .all(|sibling| *sibling == *SPARSE_MERKLE_PLACEHOLDER_HASH)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::state_store::state_value::StateValue;
-
-    #[test]
-    fn test_empty_state_value() {
-        StateValue::new(None);
     }
 }

@@ -12,7 +12,7 @@ use aptos_jellyfish_merkle::{
 use aptos_types::proof::SparseMerkleProofExt;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, ROOT_NIBBLE_HEIGHT},
-    proof::{SparseMerkleProof, SparseMerkleRangeProof},
+    proof::SparseMerkleRangeProof,
     state_store::state_key::StateKey,
     transaction::Version,
 };
@@ -37,14 +37,6 @@ impl Deref for StateMerkleDb {
 impl StateMerkleDb {
     pub fn new(state_merkle_rocksdb: Arc<DB>) -> Self {
         Self(state_merkle_rocksdb)
-    }
-
-    pub fn get_with_proof(
-        &self,
-        state_key: &StateKey,
-        version: Version,
-    ) -> Result<(Option<(HashValue, (StateKey, Version))>, SparseMerkleProof)> {
-        JellyfishMerkleTree::new(self).get_with_proof(state_key.hash(), version)
     }
 
     pub fn get_with_proof_ext(
@@ -76,7 +68,7 @@ impl StateMerkleDb {
 
     pub fn batch_put_value_set(
         &self,
-        value_set: Vec<(HashValue, &(HashValue, StateKey))>,
+        value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         persisted_version: Option<Version>,
         version: Version,
@@ -111,7 +103,7 @@ impl StateMerkleDb {
     /// hashes for each write set.
     pub fn merklize_value_set(
         &self,
-        value_set: Vec<(HashValue, &(HashValue, StateKey))>,
+        value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,

@@ -27,7 +27,7 @@ fn put_value_set(
 ) -> HashValue {
     let value_set: HashMap<_, _> = value_set
         .iter()
-        .map(|(key, value)| (key.clone(), value.clone()))
+        .map(|(key, value)| (key.clone(), Some(value.clone())))
         .collect();
     let jmt_updates = jmt_updates(&value_set);
 

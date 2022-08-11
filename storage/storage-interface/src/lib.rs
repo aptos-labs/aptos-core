@@ -365,11 +365,11 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Returns the proof of the given state key and version.
-    fn get_state_proof_by_version(
+    fn get_state_proof_by_version_ext(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<SparseMerkleProof> {
+    ) -> Result<SparseMerkleProofExt> {
         unimplemented!()
     }
 
@@ -393,9 +393,9 @@ pub trait DbReader: Send + Sync {
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
+    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
         self.get_state_value_with_proof_by_version_ext(state_key, version)
-            .map(|(value, proof_ext)| proof_ext.into())
+            .map(|(value, proof_ext)| (value, proof_ext.into()))
     }
 
     /// Gets the latest ExecutedTrees no matter if db has been bootstrapped.
@@ -520,9 +520,8 @@ impl MoveStorage for &dyn DbReader {
             self.get_state_value_by_version(&StateKey::AccessPath(access_path), version)?;
 
         state_value
-            .ok_or_else(|| format_err!("no value found in DB"))?
-            .maybe_bytes
             .ok_or_else(|| format_err!("no value found in DB"))
+            .map(|value| value.maybe_bytes)
     }
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
@@ -534,7 +533,7 @@ impl MoveStorage for &dyn DbReader {
             version,
         )?;
         config_value_option
-            .and_then(|x| x.maybe_bytes)
+            .map(|x| x.maybe_bytes)
             .ok_or_else(|| anyhow!("no config {} found in aptos root account state", config_id))
     }
 
@@ -679,16 +678,16 @@ impl SaveTransactionsRequest {
 }
 
 pub fn jmt_updates(
-    state_updates: &HashMap<StateKey, StateValue>,
-) -> Vec<(HashValue, (HashValue, StateKey))> {
+    state_updates: &HashMap<StateKey, Option<StateValue>>,
+) -> Vec<(HashValue, Option<(HashValue, StateKey)>)> {
     state_updates
         .iter()
-        .map(|(k, v)| (k.hash(), (v.hash(), (*k).clone())))
+        .map(|(k, v_opt)| (k.hash(), v_opt.as_ref().map(|v| (v.hash(), k.clone()))))
         .collect()
 }
 
-pub fn jmt_update_refs(
-    jmt_updates: &[(HashValue, (HashValue, StateKey))],
-) -> Vec<(HashValue, &(HashValue, StateKey))> {
-    jmt_updates.iter().map(|(x, y)| (*x, y)).collect()
+pub fn jmt_update_refs<K>(
+    jmt_updates: &[(HashValue, Option<(HashValue, K)>)],
+) -> Vec<(HashValue, Option<&(HashValue, K)>)> {
+    jmt_updates.iter().map(|(x, y)| (*x, y.as_ref())).collect()
 }
