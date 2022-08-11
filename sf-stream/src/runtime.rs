@@ -187,11 +187,7 @@ impl SfStreamer {
                 return vec![];
             }
         }
-        match self.print_block_with_validation(
-            &result,
-            block_start_version,
-            block_last_version,
-        ) {
+        match self.print_block_with_validation(&result, block_start_version, block_last_version) {
             Ok(_) => {
                 self.current_block_height += 1;
                 result
@@ -210,7 +206,7 @@ impl SfStreamer {
 
     /// We can consider a block height as valid if these conditions are met:
     /// 1. first transaction is a block metadata or genesis 2. versions are monotonically increasing 3. start and end versions match block boundaries
-    /// Return error if the block is not valid. Panic if there's anything wrong with encoding a transaction. 
+    /// Return error if the block is not valid. Panic if there's anything wrong with encoding a transaction.
     fn print_block_with_validation(
         &self,
         converted_txns: &Vec<TransactionPB>,
@@ -220,10 +216,7 @@ impl SfStreamer {
         if converted_txns.is_empty() {
             bail!("No transactions")
         }
-        println!(
-            "DMLOG BLOCK_START {} {}",
-            self.current_block_height, block_start_version
-        );
+        println!("DMLOG BLOCK_START {}", self.current_block_height);
         let mut curr_version = block_start_version;
         for (index, txn) in converted_txns.iter().enumerate() {
             // First transaction has to be bmt or genesis
@@ -265,7 +258,7 @@ impl SfStreamer {
         Ok(())
     }
 
-    fn print_transaction (&self, transaction: &TransactionPB) {
+    fn print_transaction(&self, transaction: &TransactionPB) {
         let mut buf = vec![];
         transaction.encode(&mut buf).unwrap_or_else(|_| {
             panic!(
