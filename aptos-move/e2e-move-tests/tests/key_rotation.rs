@@ -1,6 +1,3 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{PrivateKey, SigningKey, Uniform};
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey, state_store::table::TableHandle, transaction::authenticator::AuthenticationKey};
