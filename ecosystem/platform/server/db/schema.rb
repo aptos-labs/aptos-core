@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
+ActiveRecord::Schema[7.0].define(version: 2022_08_11_165636) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -57,6 +57,12 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
     t.index ["provider"], name: "index_authorizations_on_provider"
     t.index ["uid"], name: "index_authorizations_on_uid"
     t.index ["user_id"], name: "index_authorizations_on_user_id"
+  end
+
+  create_table "categories", force: :cascade do |t|
+    t.string "title", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "delayed_jobs", force: :cascade do |t|
@@ -290,6 +296,64 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
     t.index ["recipient_type", "recipient_id"], name: "index_notifications_on_recipient"
   end
 
+  create_table "project_categories", force: :cascade do |t|
+    t.bigint "project_id", null: false
+    t.bigint "category_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["category_id", "project_id"], name: "index_project_categories_on_category_id_and_project_id", unique: true
+    t.index ["category_id"], name: "index_project_categories_on_category_id"
+    t.index ["project_id"], name: "index_project_categories_on_project_id"
+  end
+
+  create_table "project_members", force: :cascade do |t|
+    t.bigint "project_id", null: false
+    t.bigint "user_id", null: false
+    t.string "role", null: false
+    t.boolean "public", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["project_id", "user_id"], name: "index_project_members_on_project_id_and_user_id", unique: true
+    t.index ["project_id"], name: "index_project_members_on_project_id"
+    t.index ["user_id"], name: "index_project_members_on_user_id"
+  end
+
+  create_table "project_milestones", force: :cascade do |t|
+    t.bigint "project_id", null: false
+    t.string "title", null: false
+    t.date "start_date"
+    t.date "end_date"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["project_id"], name: "index_project_milestones_on_project_id"
+  end
+
+  create_table "project_screenshots", force: :cascade do |t|
+    t.bigint "project_id", null: false
+    t.string "url", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["project_id"], name: "index_project_screenshots_on_project_id"
+  end
+
+  create_table "projects", force: :cascade do |t|
+    t.string "title", null: false
+    t.string "short_description", null: false
+    t.string "full_description", null: false
+    t.string "website_url", null: false
+    t.string "thumbnail_url", null: false
+    t.string "github_url"
+    t.string "discord_url"
+    t.string "twitter_url"
+    t.string "telegram_url"
+    t.string "linkedin_url"
+    t.string "youtube_url"
+    t.string "forum_url"
+    t.boolean "public", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "username"
     t.string "email"
@@ -333,4 +397,10 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
   add_foreign_key "it3_surveys", "users"
   add_foreign_key "nfts", "nft_offers"
   add_foreign_key "nfts", "users"
+  add_foreign_key "project_categories", "categories"
+  add_foreign_key "project_categories", "projects"
+  add_foreign_key "project_members", "projects"
+  add_foreign_key "project_members", "users"
+  add_foreign_key "project_milestones", "projects"
+  add_foreign_key "project_screenshots", "projects"
 end
