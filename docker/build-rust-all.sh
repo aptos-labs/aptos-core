@@ -5,7 +5,7 @@ set -e
 
 # Build all the rust release binaries
 echo "Building..."
-RUSTFLAGS="--cfg tokio_unstable" time cargo build --release \
+RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
         -p aptos \
         -p aptos-faucet \
         -p aptos-indexer \
