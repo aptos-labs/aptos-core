@@ -1,0 +1,5 @@
+{
+  "message": "resource not found by address(0xf), struct tag(0x1::account::Account) and ledger version(0)",
+  "error_code": null,
+  "aptos_ledger_version": "0"
+}

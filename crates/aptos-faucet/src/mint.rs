@@ -158,12 +158,9 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
         let mut faucet_account = service.faucet_account.lock().await;
 
         if receiver_seq.is_none() {
-            let builder =
-                service
-                    .transaction_factory
-                    .payload(aptos_stdlib::encode_account_create_account(
-                        receiver_address,
-                    ));
+            let builder = service
+                .transaction_factory
+                .payload(aptos_stdlib::account_create_account(receiver_address));
 
             let txn = faucet_account.sign_with_transaction_builder(builder);
             txns.push(txn)
@@ -171,9 +168,11 @@ pub async fn process(service: &Service, params: MintParams) -> Result<Response> 
 
         if amount != 0 {
             txns.push(
-                faucet_account.sign_with_transaction_builder(service.transaction_factory.payload(
-                    aptos_stdlib::encode_aptos_coin_mint(receiver_address, amount),
-                )),
+                faucet_account.sign_with_transaction_builder(
+                    service
+                        .transaction_factory
+                        .payload(aptos_stdlib::aptos_coin_mint(receiver_address, amount)),
+                ),
             );
         }
     }

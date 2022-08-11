@@ -16,7 +16,6 @@ set -eo pipefail
 
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
-GUPPY_GIT='https://github.com/facebookincubator/cargo-guppy@39ec940f36b0a0df96a330243d127cbe2db9f919'
 KUBECTL_VERSION=1.18.6
 TERRAFORM_VERSION=0.12.26
 HELM_VERSION=3.2.4
@@ -28,6 +27,8 @@ BOOGIE_VERSION=2.9.6
 PYRE_CHECK_VERSION=0.0.59
 NUMPY_VERSION=1.20.1
 ALLURE_VERSION=2.15.pr1135
+# this is 3.21.4; the "3" is silent
+PROTOC_VERSION=21.4
 
 SCRIPT_PATH="$( cd "$( dirname "$0" )" >/dev/null 2>&1 && pwd )"
 cd "$SCRIPT_PATH/.." || exit
@@ -37,6 +38,7 @@ function usage {
   echo "Installs or updates necessary dev tools for aptoslabs/aptos-core."
   echo "-b batch mode, no user interactions and miminal output"
   echo "-p update ${HOME}/.profile"
+  echo "-r install protoc and related tools"
   echo "-t install build tools"
   echo "-o install operations tooling as well: helm, terraform, yamllint, vault, docker, kubectl, python3"
   echo "-y installs or updates Move prover tools: z3, cvc5, dotnet, boogie"
@@ -81,6 +83,9 @@ function update_path_and_profile {
   else
     add_to_profile "export PATH=\"${BIN_DIR}:${C_HOME}/bin:\$PATH\""
   fi
+  if [[ "$INSTALL_PROTOC" == "true" ]]; then
+    add_to_profile "export PATH=\$PATH:/usr/local/include"
+  fi
   if [[ "$INSTALL_PROVER" == "true" ]]; then
     add_to_profile "export DOTNET_ROOT=\"${DOTNET_ROOT}\""
     add_to_profile "export PATH=\"${DOTNET_ROOT}/tools:\$PATH\""
@@ -119,6 +124,48 @@ function install_build_essentials {
   #if [[ "$PACKAGE_MANAGER" == "brew" ]]; then
   #  install_pkg pkgconfig "$PACKAGE_MANAGER"
   #fi
+}
+
+function install_protoc {
+  INSTALL_PROTOC="true"
+  echo "Installing protoc and plugins"
+
+  if command -v "${INSTALL_DIR}protoc" &>/dev/null && [[ "$("${INSTALL_DIR}protoc" --version || true)" =~ .*${PROTOC_VERSION}.* ]]; then
+     echo "protoc 3.${PROTOC_VERSION} already installed"
+     return
+  fi
+
+  if [[ "$(uname)" == "Linux" ]]; then
+    PROTOC_PKG="protoc-$PROTOC_VERSION-linux-x86_64"
+  elif [[ "$(uname)" == "Darwin" ]]; then
+    PROTOC_PKG="protoc-$PROTOC_VERSION-osx-universal_binary"
+  else
+    echo "protoc support not configured for this platform (uname=$(uname))"
+    return
+  fi
+
+  TMPFILE=$(mktemp)
+  rm "$TMPFILE"
+  mkdir -p "$TMPFILE"/
+  (
+    cd "$TMPFILE" || exit
+    curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_PKG.zip"
+    sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local bin/protoc
+    sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local 'include/*'
+    sudo chmod +x "/usr/local/bin/protoc"
+  )
+  rm -rf "$TMPFILE"
+
+  # Install the cargo plugins
+  if ! command -v protoc-gen-prost &> /dev/null; then
+    cargo install protoc-gen-prost
+  fi
+  if ! command -v protoc-gen-prost-serde &> /dev/null; then
+    cargo install protoc-gen-prost-serde
+  fi
+  if ! command -v protoc-gen-prost-crate &> /dev/null; then
+    cargo install protoc-gen-prost-crate
+  fi
 }
 
 function install_rustup {
@@ -371,17 +418,15 @@ function install_toolchain {
   fi
 }
 
-function install_cargo_guppy {
-  if ! command -v cargo-guppy &> /dev/null; then
-    git_repo=$( echo "$GUPPY_GIT" | cut -d "@" -f 1 );
-    git_hash=$( echo "$GUPPY_GIT" | cut -d "@" -f 2 );
-    cargo install cargo-guppy --git "$git_repo" --rev "$git_hash" --locked
+function install_cargo_sort {
+  if ! command -v cargo-sort &> /dev/null; then
+    cargo install cargo-sort --locked
   fi
 }
 
-function install_cargo_sort {
-  if ! command -v cargo-sort &> /dev/null; then
-    cargo install cargo-sort
+function install_cargo_nextest {
+  if ! command -v cargo-nextext &> /dev/null; then
+    cargo install cargo-nextest --locked
   fi
 }
 
@@ -629,6 +674,7 @@ Build tools (since -t or no option was provided):
   * pkg-config
   * libssl-dev
   * NodeJS / NPM
+  * protoc (and related tools)
 EOF
   fi
 
@@ -669,6 +715,13 @@ Codegen tools (since -s was provided):
 EOF
   fi
 
+  if [[ "$INSTALL_PROTOC" == "true" ]]; then
+cat <<EOF
+protoc and related plugins (since -r was provided):
+  * protoc
+EOF
+  fi
+
   if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
 cat <<EOF
 API build and testing tools (since -a was provided):
@@ -694,6 +747,7 @@ INSTALL_BUILD_TOOLS=false;
 OPERATIONS=false;
 INSTALL_PROFILE=false;
 INSTALL_PROVER=false;
+INSTALL_PROTOC=false;
 INSTALL_CODEGEN=false;
 INSTALL_API_BUILD_TOOLS=false;
 INSTALL_INDIVIDUAL=false;
@@ -702,7 +756,7 @@ INSTALL_DIR="${HOME}/bin/"
 OPT_DIR="false"
 
 #parse args
-while getopts "btopvysah:i:n" arg; do
+while getopts "btoprvysah:i:n" arg; do
   case "$arg" in
     b)
       BATCH_MODE="true"
@@ -715,6 +769,9 @@ while getopts "btopvysah:i:n" arg; do
       ;;
     p)
       INSTALL_PROFILE="true"
+      ;;
+    r)
+      INSTALL_PROTOC="true"
       ;;
     v)
       VERBOSE=true
@@ -844,13 +901,20 @@ if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   rustup component add rustfmt
   rustup component add clippy
 
-  install_cargo_guppy
   install_cargo_sort
+  install_cargo_nextest
   install_grcov
   install_postgres
   install_pkg git "$PACKAGE_MANAGER"
   install_lcov "$PACKAGE_MANAGER"
   install_nodejs "$PACKAGE_MANAGER"
+  install_protoc
+fi
+
+if [[ "$INSTALL_PROTOC" == "true" ]]; then
+  if [[ "$INSTALL_BUILD_TOOLS" == "false" ]]; then
+    install_protoc
+  fi
 fi
 
 if [[ "$OPERATIONS" == "true" ]]; then
@@ -925,6 +989,10 @@ if [[ "$INSTALL_API_BUILD_TOOLS" == "true" ]]; then
   install_python3
   "${PRE_COMMAND[@]}" python3 -m pip install schemathesis
 fi
+
+install_python3
+pip3 install pre-commit
+pre-commit install
 
 if [[ "${BATCH_MODE}" == "false" ]]; then
 cat <<EOF

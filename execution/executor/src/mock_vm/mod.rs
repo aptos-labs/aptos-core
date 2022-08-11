@@ -305,7 +305,7 @@ fn gen_payment_writeset(
 
 fn gen_events(sender: AccountAddress) -> Vec<ContractEvent> {
     vec![ContractEvent::new(
-        EventKey::new(0, sender),
+        EventKey::new(111, sender),
         0,
         TypeTag::Vector(Box::new(TypeTag::U8)),
         b"event_data".to_vec(),

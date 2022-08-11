@@ -1,9 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{pruner::*, AptosDB, ChangeSet, LedgerStore, TransactionStore};
+use crate::{
+    AptosDB, ChangeSet, LedgerPrunerManager, LedgerStore, PrunerManager, TransactionStore,
+};
 use aptos_temppath::TempPath;
 use proptest::proptest;
+use std::sync::Arc;
 
 use aptos_types::{
     account_address::AccountAddress,
@@ -11,6 +14,9 @@ use aptos_types::{
     transaction::{SignedTransaction, Transaction},
 };
 
+use accumulator::HashReader;
+use aptos_config::config::StoragePrunerConfig;
+use aptos_types::proof::position::Position;
 use aptos_types::{
     transaction::{TransactionInfo, Version},
     write_set::WriteSet,
@@ -47,13 +53,16 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
     let transaction_store = &aptos_db.transaction_store;
     let num_write_sets = write_sets.len();
 
-    let pruner = Pruner::new(
+    let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
-            state_store_prune_window: Some(0),
-            ledger_prune_window: Some(0),
-            pruning_batch_size: 1,
+            enable_state_store_pruner: true,
+            enable_ledger_pruner: true,
+            state_store_prune_window: 0,
+            ledger_prune_window: 0,
+            ledger_pruning_batch_size: 1,
+            state_store_pruning_batch_size: 100,
+            user_pruning_window_offset: 0,
         },
     );
 
@@ -68,10 +77,7 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
     // start pruning write sets in batches of size 2 and verify transactions have been pruned from DB
     for i in (0..=num_write_sets).step_by(2) {
         pruner
-            .wake_and_wait(
-                i as u64, /* latest_version */
-                PrunerIndex::LedgerPrunerIndex as usize,
-            )
+            .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();
         // ensure that all transaction up to i * 2 has been pruned
         for j in 0..i {
@@ -96,13 +102,16 @@ fn verify_txn_store_pruner(
     let ledger_store = LedgerStore::new(Arc::clone(&aptos_db.ledger_db));
     let num_transaction = txns.len();
 
-    let pruner = Pruner::new(
+    let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
-            state_store_prune_window: Some(0),
-            ledger_prune_window: Some(0),
-            pruning_batch_size: 1,
+            enable_state_store_pruner: true,
+            enable_ledger_pruner: true,
+            state_store_prune_window: 0,
+            ledger_prune_window: 0,
+            ledger_pruning_batch_size: 1,
+            state_store_pruning_batch_size: 100,
+            user_pruning_window_offset: 0,
         },
     );
 
@@ -115,21 +124,29 @@ fn verify_txn_store_pruner(
         &txns,
     );
 
-    // start pruning transactions batches of size step_size and verify transactions have been pruned from DB
+    // start pruning transactions batches of size step_size and verify transactions have been pruned
+    // from DB
     for i in (0..=num_transaction).step_by(step_size) {
         pruner
-            .wake_and_wait(
-                i as u64, /* latest_version */
-                PrunerIndex::LedgerPrunerIndex as usize,
-            )
+            .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();
         // ensure that all transaction up to i * 2 has been pruned
         assert_eq!(
-            *pruner.last_version_sent_to_pruners.as_ref().lock(),
+            *pruner.last_version_sent_to_pruner.as_ref().lock(),
             i as u64
         );
         for j in 0..i {
             verify_txn_not_in_store(transaction_store, &txns, j as u64, ledger_version);
+            // Ensure that transaction accumulator is pruned in DB. This can be done by trying to
+            // read transaction proof.
+            // Note: we only prune versions which are odd numbers because the even versions will be
+            // pruned in the iteration of even_version + 1. So if the end version, i - 1, is an even
+            // version, it will not be pruned.
+            if j != i - 1 || j % 2 == 1 {
+                assert!(ledger_store
+                    .get_transaction_proof(j as u64, ledger_version)
+                    .is_err());
+            }
         }
         // ensure all other are valid in DB
         for j in i..num_transaction {
@@ -141,6 +158,7 @@ fn verify_txn_store_pruner(
                 ledger_version,
             );
         }
+        verify_transaction_accumulator_pruned(&ledger_store, i as u64);
     }
 }
 
@@ -187,6 +205,25 @@ fn verify_txn_in_store(
     assert!(ledger_store
         .get_transaction_proof(index, ledger_version)
         .is_ok());
+}
+
+// Ensure that transaction accumulator has been pruned as well. The idea to verify is get the
+// inorder position of the left child of the accumulator root and ensure that all lower index
+// position from the DB should be deleted. We need to make several conversion between inorder and
+// postorder transaction because the DB stores the indices in postorder, while the APIs for the
+// accumulator deals with inorder.
+fn verify_transaction_accumulator_pruned(ledger_store: &LedgerStore, least_readable_version: u64) {
+    let least_readable_position = if least_readable_version > 0 {
+        Position::root_from_leaf_index(least_readable_version).left_child()
+    } else {
+        Position::root_from_leaf_index(least_readable_version)
+    };
+    let least_readable_position_postorder = least_readable_position.to_postorder_index();
+    for i in 0..least_readable_position_postorder {
+        assert!(ledger_store
+            .get(Position::from_postorder_index(i).unwrap())
+            .is_err())
+    }
 }
 
 fn put_txn_in_store(

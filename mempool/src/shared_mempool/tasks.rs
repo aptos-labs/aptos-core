@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Tasks that are executed by coordinators (short-lived compared to coordinators)
+use crate::thread_pool::IO_POOL;
 use crate::{
     core_mempool::{CoreMempool, TimelineState, TxnPointer},
     counters,
@@ -35,6 +36,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
+use storage_interface::state_view::LatestDbStateCheckpointView;
 use tokio::runtime::Handle;
 use vm_validator::vm_validator::{get_account_sequence_number, TransactionValidation};
 
@@ -106,7 +108,14 @@ pub(crate) async fn process_client_transaction_submission<V>(
 {
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer_client();
-    let statuses = process_incoming_transactions(&smp, vec![transaction], TimelineState::NotReady);
+    let ineligible_for_broadcast =
+        !smp.broadcast_within_validator_network() && smp.network_interface.is_validator();
+    let timeline_state = if ineligible_for_broadcast {
+        TimelineState::NonQualified
+    } else {
+        TimelineState::NotReady
+    };
+    let statuses = process_incoming_transactions(&smp, vec![transaction], timeline_state);
     log_txn_process_results(&statuses, None);
 
     if let Some(status) = statuses.get(0) {
@@ -234,17 +243,24 @@ where
     let mut statuses = vec![];
 
     let start_storage_read = Instant::now();
+    let state_view = smp
+        .db
+        .latest_state_checkpoint_view()
+        .expect("Failed to get latest state checkpoint view.");
+
     // Track latency: fetching seq number
-    let seq_numbers = transactions
-        .par_iter()
-        .map(|t| {
-            get_account_sequence_number(smp.db.clone(), t.sender()).map_err(|e| {
-                error!(LogSchema::new(LogEntry::DBError).error(&e));
-                counters::DB_ERROR.inc();
-                e
+    let seq_numbers = IO_POOL.install(|| {
+        transactions
+            .par_iter()
+            .map(|t| {
+                get_account_sequence_number(&state_view, t.sender()).map_err(|e| {
+                    error!(LogSchema::new(LogEntry::DBError).error(&e));
+                    counters::DB_ERROR.inc();
+                    e
+                })
             })
-        })
-        .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+    });
     // Track latency for storage read fetching sequence number
     let storage_read_latency = start_storage_read.elapsed();
     counters::PROCESS_TXN_BREAKDOWN_LATENCY

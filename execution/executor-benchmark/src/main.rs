@@ -12,30 +12,35 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[derive(Debug, StructOpt)]
 struct PrunerOpt {
-    #[structopt(long, default_value = "100000", help = "Set to -1 to disable.")]
-    state_prune_window: i64,
+    #[structopt(long)]
+    enable_state_store_pruner: bool,
 
-    #[structopt(long, default_value = "100000", help = "Set to -1 to disable.")]
-    ledger_prune_window: i64,
+    #[structopt(long)]
+    enable_ledger_pruner: bool,
+
+    #[structopt(long, default_value = "100000")]
+    state_prune_window: u64,
+
+    #[structopt(long, default_value = "100000")]
+    ledger_prune_window: u64,
 
     #[structopt(long, default_value = "500")]
-    pruning_batch_size: usize,
+    ledger_pruning_batch_size: usize,
+
+    #[structopt(long, default_value = "500")]
+    state_store_pruning_batch_size: usize,
 }
 
 impl PrunerOpt {
     fn pruner_config(&self) -> StoragePrunerConfig {
         StoragePrunerConfig {
-            state_store_prune_window: if self.state_prune_window == -1 {
-                None
-            } else {
-                Some(self.state_prune_window as u64)
-            },
-            ledger_prune_window: if self.ledger_prune_window == -1 {
-                None
-            } else {
-                Some(self.ledger_prune_window as u64)
-            },
-            pruning_batch_size: self.pruning_batch_size,
+            enable_state_store_pruner: self.enable_state_store_pruner,
+            enable_ledger_pruner: self.enable_ledger_pruner,
+            state_store_prune_window: self.state_prune_window,
+            ledger_prune_window: self.ledger_prune_window,
+            ledger_pruning_batch_size: self.ledger_pruning_batch_size,
+            state_store_pruning_batch_size: self.state_store_pruning_batch_size,
+            user_pruning_window_offset: 0,
         }
     }
 }

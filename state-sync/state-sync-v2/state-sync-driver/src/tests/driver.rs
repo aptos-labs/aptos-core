@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metadata_storage::PersistentMetadataStorage;
 use crate::{
     driver_factory::DriverFactory,
     tests::utils::{
@@ -14,7 +15,6 @@ use aptos_infallible::RwLock;
 use aptos_time_service::TimeService;
 use aptos_types::{
     event::EventKey,
-    move_resource::MoveStorage,
     on_chain_config::{new_epoch_event_key, ON_CHAIN_CONFIG_REGISTRY},
     transaction::{Transaction, WriteSetPayload},
     waypoint::Waypoint,
@@ -25,8 +25,7 @@ use claim::{assert_err, assert_none};
 use consensus_notifications::{ConsensusNotificationSender, ConsensusNotifier};
 use data_streaming_service::streaming_client::new_streaming_service_client_listener_pair;
 use event_notifications::{
-    EventNotificationListener, EventNotificationSender, EventSubscriptionService,
-    ReconfigNotificationListener,
+    EventNotificationListener, EventSubscriptionService, ReconfigNotificationListener,
 };
 use executor::chunk_executor::ChunkExecutor;
 use executor_test_helpers::bootstrap_genesis;
@@ -34,7 +33,7 @@ use futures::{FutureExt, StreamExt};
 use mempool_notifications::MempoolNotificationListener;
 use network::application::{interface::MultiNetworkSender, storage::PeerMetadataStorage};
 use std::{collections::HashMap, sync::Arc};
-use storage_interface::{DbReader, DbReaderWriter};
+use storage_interface::DbReaderWriter;
 use storage_service_client::StorageServiceClient;
 
 // TODO(joshlind): extend these tests to cover more functionality!
@@ -229,7 +228,7 @@ async fn create_driver_for_tests(
     // Create test aptos database
     let db_path = aptos_temppath::TempPath::new();
     db_path.create_as_dir().unwrap();
-    let (db, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
+    let (_, db_rw) = DbReaderWriter::wrap(AptosDB::new_for_test(db_path.path()));
 
     // Bootstrap the genesis transaction
     let (genesis, _) = vm_genesis::test_genesis_change_set_and_validators(Some(1));
@@ -237,8 +236,6 @@ async fn create_driver_for_tests(
     bootstrap_genesis::<AptosVM>(&db_rw, &genesis_txn).unwrap();
 
     // Create the event subscription service and subscribe to events and reconfigurations
-    let storage: Arc<dyn DbReader> = db;
-    let synced_version = (&*storage).fetch_latest_state_checkpoint_version().unwrap();
     let mut event_subscription_service = EventSubscriptionService::new(
         ON_CHAIN_CONFIG_REGISTRY,
         Arc::new(RwLock::new(db_rw.clone())),
@@ -252,12 +249,6 @@ async fn create_driver_for_tests(
         .subscribe_to_events(event_key_subscriptions)
         .unwrap();
 
-    // Notify subscribers of the initial configs
-    event_subscription_service
-        .notify_initial_configs(synced_version)
-        .unwrap();
-    reconfiguration_subscriber.select_next_some().await;
-
     // Create consensus and mempool notifiers and listeners
     let (consensus_notifier, consensus_listener) =
         consensus_notifications::new_consensus_notifier_listener_pair(5000);
@@ -265,7 +256,7 @@ async fn create_driver_for_tests(
         mempool_notifications::new_mempool_notifier_listener_pair();
 
     // Create the chunk executor
-    let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()).unwrap());
+    let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
 
     // Create a streaming service client
     let (streaming_service_client, _) = new_streaming_service_client_listener_pair();
@@ -284,6 +275,9 @@ async fn create_driver_for_tests(
         None,
     );
 
+    // Create the metadata storage
+    let metadata_storage = PersistentMetadataStorage::new(db_path.path());
+
     // Create and spawn the driver
     let driver_factory = DriverFactory::create_and_spawn_driver(
         false,
@@ -292,11 +286,16 @@ async fn create_driver_for_tests(
         db_rw,
         chunk_executor,
         mempool_notifier,
+        metadata_storage,
         consensus_listener,
         event_subscription_service,
         aptos_data_client,
         streaming_service_client,
     );
+
+    // The driver will notify reconfiguration subscribers of the initial configs.
+    // Verify we've received this notification.
+    reconfiguration_subscriber.select_next_some().await;
 
     (
         driver_factory,

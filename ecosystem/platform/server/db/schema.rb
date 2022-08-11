@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_07_07_181731) do
+ActiveRecord::Schema[7.0].define(version: 2022_08_01_175454) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -110,6 +110,7 @@ ActiveRecord::Schema[7.0].define(version: 2022_07_07_181731) do
     t.boolean "selected", default: false, null: false, comment: "Whether this node is selected for participation in IT1."
     t.boolean "validator_verified_final"
     t.jsonb "metrics_data"
+    t.string "account_address"
     t.index ["user_id"], name: "index_it1_profiles_on_user_id"
   end
 
@@ -135,6 +136,7 @@ ActiveRecord::Schema[7.0].define(version: 2022_07_07_181731) do
     t.datetime "updated_at", null: false
     t.string "nhc_job_id"
     t.text "nhc_output"
+    t.string "account_address"
     t.index ["account_key"], name: "index_it2_profiles_on_account_key", unique: true
     t.index ["consensus_key"], name: "index_it2_profiles_on_consensus_key", unique: true
     t.index ["fullnode_network_key"], name: "index_it2_profiles_on_fullnode_network_key", unique: true
@@ -152,6 +154,51 @@ ActiveRecord::Schema[7.0].define(version: 2022_07_07_181731) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["user_id"], name: "index_it2_surveys_on_user_id"
+  end
+
+  create_table "it3_profiles", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "owner_key", null: false
+    t.string "consensus_key", null: false
+    t.string "account_key", null: false
+    t.string "network_key", null: false
+    t.string "validator_ip"
+    t.string "validator_address", null: false
+    t.integer "validator_port", null: false
+    t.integer "validator_metrics_port", null: false
+    t.integer "validator_api_port", null: false
+    t.boolean "validator_verified", default: false, null: false
+    t.string "fullnode_address"
+    t.integer "fullnode_port"
+    t.string "fullnode_network_key"
+    t.boolean "terms_accepted", default: false, null: false
+    t.boolean "selected", default: false, null: false, comment: "Whether this node is selected for participation in IT3."
+    t.boolean "validator_verified_final"
+    t.jsonb "metrics_data"
+    t.string "nhc_job_id"
+    t.text "nhc_output"
+    t.string "account_address", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["account_address"], name: "index_it3_profiles_on_account_address", unique: true
+    t.index ["account_key"], name: "index_it3_profiles_on_account_key", unique: true
+    t.index ["consensus_key"], name: "index_it3_profiles_on_consensus_key", unique: true
+    t.index ["fullnode_network_key"], name: "index_it3_profiles_on_fullnode_network_key", unique: true
+    t.index ["network_key"], name: "index_it3_profiles_on_network_key", unique: true
+    t.index ["owner_key"], name: "index_it3_profiles_on_owner_key", unique: true
+    t.index ["user_id"], name: "index_it3_profiles_on_user_id", unique: true
+  end
+
+  create_table "it3_surveys", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "persona", null: false
+    t.string "participate_reason", null: false
+    t.string "qualified_reason", null: false
+    t.string "website"
+    t.string "interest_reason", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_it3_surveys_on_user_id"
   end
 
   create_table "locations", force: :cascade do |t|
@@ -205,6 +252,13 @@ ActiveRecord::Schema[7.0].define(version: 2022_07_07_181731) do
     t.index ["item_type", "item_id"], name: "index_locations_on_item"
   end
 
+  create_table "network_operations", force: :cascade do |t|
+    t.string "title", null: false
+    t.text "content", null: false
+    t.datetime "created_at"
+    t.datetime "updated_at"
+  end
+
   create_table "nft_offers", force: :cascade do |t|
     t.string "name", null: false
     t.datetime "valid_from"
@@ -222,6 +276,18 @@ ActiveRecord::Schema[7.0].define(version: 2022_07_07_181731) do
     t.string "explorer_url"
     t.index ["nft_offer_id"], name: "index_nfts_on_nft_offer_id"
     t.index ["user_id"], name: "index_nfts_on_user_id"
+  end
+
+  create_table "notifications", force: :cascade do |t|
+    t.string "recipient_type", null: false
+    t.bigint "recipient_id", null: false
+    t.string "type", null: false
+    t.jsonb "params"
+    t.datetime "read_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["read_at"], name: "index_notifications_on_read_at"
+    t.index ["recipient_type", "recipient_id"], name: "index_notifications_on_recipient"
   end
 
   create_table "users", force: :cascade do |t|
@@ -263,6 +329,8 @@ ActiveRecord::Schema[7.0].define(version: 2022_07_07_181731) do
   add_foreign_key "it1_profiles", "users"
   add_foreign_key "it2_profiles", "users"
   add_foreign_key "it2_surveys", "users"
+  add_foreign_key "it3_profiles", "users"
+  add_foreign_key "it3_surveys", "users"
   add_foreign_key "nfts", "nft_offers"
   add_foreign_key "nfts", "users"
 end

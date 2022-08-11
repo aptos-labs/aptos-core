@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import typing
 
-import ed25519
-from account_address import AccountAddress
-from bcs import Deserializer, Serializer
+from . import ed25519
+from .account_address import AccountAddress
+from .bcs import Deserializer, Serializer
 
 
 class Authenticator:

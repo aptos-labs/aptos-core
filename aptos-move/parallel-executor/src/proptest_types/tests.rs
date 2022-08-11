@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    errors::Error,
     executor::ParallelTransactionExecutor,
     proptest_types::types::{
-        ExpectedOutput, Task, Transaction, TransactionGen, TransactionGenParams,
+        ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams,
     },
 };
 use num_cpus;
@@ -18,11 +19,12 @@ use proptest::{
 use std::{fmt::Debug, hash::Hash};
 
 fn run_transactions<K, V>(
-    key_universe: Vec<K>,
+    key_universe: &[K],
     transaction_gens: Vec<TransactionGen<V>>,
     abort_transactions: Vec<Index>,
     skip_rest_transactions: Vec<Index>,
     num_repeat: usize,
+    module_access: (bool, bool),
 ) -> bool
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
@@ -30,7 +32,7 @@ where
 {
     let mut transactions: Vec<_> = transaction_gens
         .into_iter()
-        .map(|txn_gen| txn_gen.materialize(&key_universe))
+        .map(|txn_gen| txn_gen.materialize(key_universe, module_access))
         .collect();
 
     let length = transactions.len();
@@ -46,8 +48,15 @@ where
     let mut ret = true;
     for _ in 0..num_repeat {
         let output =
-            ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
-                .execute_transactions_parallel((), transactions.clone());
+            ParallelTransactionExecutor::<Transaction<KeyType<K>, V>, Task<KeyType<K>, V>>::new(
+                num_cpus::get(),
+            )
+            .execute_transactions_parallel((), transactions.clone());
+
+        if module_access.0 && module_access.1 {
+            assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
+            continue;
+        }
 
         let baseline = ExpectedOutput::generate_baseline(&transactions);
 
@@ -65,7 +74,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        prop_assert!(run_transactions(universe, transaction_gen, abort_transactions, skip_rest_transactions, 1));
+        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
     }
 
     #[test]
@@ -75,7 +84,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 0),
     ) {
-        prop_assert!(run_transactions(universe, transaction_gen, abort_transactions, skip_rest_transactions, 1));
+        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
     }
 
     #[test]
@@ -85,7 +94,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 0),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        prop_assert!(run_transactions(universe, transaction_gen, abort_transactions, skip_rest_transactions, 1));
+        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
     }
 
     #[test]
@@ -95,7 +104,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 5),
         skip_rest_transactions in vec(any::<Index>(), 5),
     ) {
-        prop_assert!(run_transactions(universe, transaction_gen, abort_transactions, skip_rest_transactions, 1));
+        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
     }
 
     #[test]
@@ -105,7 +114,7 @@ proptest! {
         abort_transactions in vec(any::<Index>(), 3),
         skip_rest_transactions in vec(any::<Index>(), 3),
     ) {
-        prop_assert!(run_transactions(universe, transaction_gen, abort_transactions, skip_rest_transactions, 1));
+        prop_assert!(run_transactions(&universe, transaction_gen, abort_transactions, skip_rest_transactions, 1, (false, false)));
     }
 }
 
@@ -126,11 +135,12 @@ fn dynamic_read_writes() {
     .current();
 
     assert!(run_transactions(
-        universe,
+        &universe,
         transaction_gen,
         vec![],
         vec![],
-        100
+        100,
+        (false, false),
     ));
 }
 
@@ -152,10 +162,53 @@ fn dynamic_read_writes_contended() {
     .current();
 
     assert!(run_transactions(
-        universe,
+        &universe,
         transaction_gen,
         vec![],
         vec![],
-        100
+        100,
+        (false, false),
+    ));
+}
+
+#[test]
+fn module_publishing_fallback() {
+    let mut runner = TestRunner::default();
+
+    let universe = vec(any::<[u8; 32]>(), 100)
+        .new_tree(&mut runner)
+        .expect("creating a new value should succeed")
+        .current();
+    let transaction_gen = vec(
+        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
+        3000,
+    )
+    .new_tree(&mut runner)
+    .expect("creating a new value should succeed")
+    .current();
+
+    assert!(run_transactions(
+        &universe,
+        transaction_gen.clone(),
+        vec![],
+        vec![],
+        2,
+        (false, true),
+    ));
+    assert!(run_transactions(
+        &universe,
+        transaction_gen.clone(),
+        vec![],
+        vec![],
+        2,
+        (false, true),
+    ));
+    assert!(run_transactions(
+        &universe,
+        transaction_gen,
+        vec![],
+        vec![],
+        2,
+        (true, true),
     ));
 }

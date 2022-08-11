@@ -37,6 +37,7 @@ fn verify_tracing_kvs() {
     let logs = writer.logs.clone();
     AptosData::builder()
         .is_async(false)
+        .console_port(None)
         .printer(Box::new(writer.write_to_stderr(false)))
         .build();
 

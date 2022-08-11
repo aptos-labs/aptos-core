@@ -14,7 +14,7 @@ use crate::U64;
 pub struct Error {
     pub code: u16,
     pub message: String,
-    /// Diem blockchain latest onchain ledger version.
+    /// Aptos blockchain latest onchain ledger version.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aptos_ledger_version: Option<U64>,
 }
@@ -74,7 +74,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}: {}", self.status_code(), &self.message)?;
         if let Some(val) = &self.aptos_ledger_version {
-            write!(f, "\ndiem ledger version: {}", val)?;
+            write!(f, "\nAptos ledger version: {}", val)?;
         }
         Ok(())
     }
@@ -117,7 +117,7 @@ mod tests {
             .aptos_ledger_version(123);
         assert_eq!(
             err.to_string(),
-            "400 Bad Request: invalid address\ndiem ledger version: 123"
+            "400 Bad Request: invalid address\nAptos ledger version: 123"
         )
     }
 

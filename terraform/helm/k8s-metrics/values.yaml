@@ -11,11 +11,8 @@ autoscaler:
     repo: k8s.gcr.io/autoscaling/cluster-autoscaler
     tag: v1.21.0
   resources:
-    limits:
-      cpu: 100m
-      memory: 600Mi
     requests:
-      cpu: 100m
-      memory: 600Mi
+      cpu: 1
+      memory: 1Gi
   serviceAccount:
     annotations:

@@ -12,8 +12,6 @@ macro_rules! log {
             $level,
             env!("CARGO_CRATE_NAME"),
             module_path!(),
-            file!(),
-            line!(),
             concat!(file!(), ':', line!()),
         );
 

@@ -1,5 +1,4 @@
 # Aptos Python SDK
-
 [![Discord][discord-image]][discord-url]
 [![PyPI Package Version][pypi-image-version]][pypi-url]
 [![PyPI Package Downloads][pypi-image-downloads]][pypi-url]
@@ -7,31 +6,45 @@
 You need to connect to an [Aptos](https:/github.com/aptos-labs/aptos-core/) node to use this library, or run one
 yourself locally.
 
-## Usage
-
 Currently this is still in development and is unsuitable for directly interfacing with Aptos.
 
-### Requirements
+## Requirements
+We use [Poetry](https://python-poetry.org/docs/#installation) for packaging and dependency management:
 
-- [Black](https://github.com/psf/black)
-- [PyNaCl](https://pypi.org/project/PyNaCl/)
-
-### Testing
-
-```bash
-python3 -m unittest discover -s aptos_sdk/ -p '*.py'
+```
+curl -sSL https://install.python-poetry.org | python3
 ```
 
-### Autoformatting
-
+## Unit testing
 ```bash
-find aptos_sdk -type f -name "*.py" | xargs python -m black
-find aptos_sdk -type f -name "*.py" | xargs python -m autoflake -i -r --remove-all-unused-imports --remove-unused-variables --ignore-init-module-imports
-find aptos_sdk -type f -name "*.py" | xargs python -m isort
+make test
 ```
 
-### Generating types
+## E2E testing
+First, run a local testnet (run this from the root of aptos-core):
+```bash
+cargo run -p aptos -- node run-local-testnet --with-faucet --faucet-port 8081 --force-restart --assume-yes
+```
 
+Next, tell the end-to-end tests to talk to this locally running testnet:
+```bash
+export APTOS_NODE_URL="http://127.0.0.1:8080/v1"
+export APTOS_FAUCET_URL="http://127.0.0.1:8081"
+```
+
+Finally run the tests:
+```bash
+make examples
+```
+
+Note: These end-to-end tests are tested against a node built from the same commit as part of CI, not devnet. For examples tested against devnet, see `developer-docs-site/static/examples/python/` from the root of the repo.
+
+## Autoformatting
+```bash
+make fmt
+```
+
+## Generating types
 The Python `openapi-python-client` tool cannot parse references. Therefore there are three options:
 * Use swagger-cli to dereference, gain a type explosion, and still have missing types
 * Live without missing types
@@ -41,13 +54,12 @@ Currently the team is moving forward with pure python, but leaves the following 
 
 ```bash
 npm install  -g @apidevtools/swagger-cli
-swagger-cli bundle --dereference ../../../api/doc/openapi.yaml  -t yaml > openapi.yaml
-python -m openapi_python_client generate --path openapi.yaml
+swagger-cli bundle --dereference ../../../api/doc/v0/openapi.yaml  -t yaml > openapi.yaml
+python3 -m openapi_python_client generate --path openapi.yaml
 mv aptos-dev-api-specification-client/aptos_dev_api_specification_client/ aptos_sdk/openapi
 ```
 
 ## Semantic versioning
-
 This project follows [semver](https://semver.org/) as closely as possible
 
 [repo]: https://github.com/aptos-labs/aptos-core

@@ -5,6 +5,7 @@ use aptos_types::transaction::{Transaction, Version};
 use schemadb::SchemaBatch;
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub struct TransactionStorePruner {
     transaction_store: Arc<TransactionStore>,
 }
@@ -31,6 +32,11 @@ impl DBSubPruner for TransactionStorePruner {
             db_batch,
         )?;
         self.transaction_store.prune_transaction_info_schema(
+            min_readable_version,
+            target_version,
+            db_batch,
+        )?;
+        self.transaction_store.prune_transaction_accumulator(
             min_readable_version,
             target_version,
             db_batch,

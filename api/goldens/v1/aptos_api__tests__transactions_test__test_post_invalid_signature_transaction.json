@@ -1,0 +1,5 @@
+{
+  "message": "invalid transaction: INVALID_SIGNATURE",
+  "error_code": null,
+  "aptos_ledger_version": null
+}

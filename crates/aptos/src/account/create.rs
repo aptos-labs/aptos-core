@@ -10,7 +10,8 @@ use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
 
-pub const DEFAULT_FUNDED_COINS: u64 = 10000;
+// TODO(Gas): double check if this is correct
+pub const DEFAULT_FUNDED_COINS: u64 = 10_000;
 
 /// Command to create a new account on-chain
 ///
@@ -47,6 +48,7 @@ impl CliCommand<String> for CreateAccount {
                 self.account,
             )
             .await
+            .map(|_| ())
         } else {
             self.create_account_with_key(address).await
         }
@@ -57,7 +59,7 @@ impl CliCommand<String> for CreateAccount {
 impl CreateAccount {
     async fn create_account_with_key(self, address: AccountAddress) -> CliTypedResult<()> {
         self.txn_options
-            .submit_transaction(aptos_stdlib::encode_account_create_account(address))
+            .submit_transaction(aptos_stdlib::account_create_account(address))
             .await?;
         Ok(())
     }

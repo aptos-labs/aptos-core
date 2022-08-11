@@ -6,16 +6,15 @@ base:
 execution:
   genesis_file_location: /opt/aptos/genesis/genesis.blob
 
-state_sync:
-  state_sync_driver:
-    enable_state_sync_v2: {{ $.Values.validator.config.enable_state_sync_v2 }}
-
 storage:
   backup_service_address: "0.0.0.0:6186"
   storage_pruner_config:
+    enable_state_store_pruner: {{ $.Values.validator.config.enable_state_store_pruner }}
+    enable_ledger_pruner: {{ $.Values.validator.config.enable_ledger_pruner }}
     ledger_prune_window: {{ int $.Values.validator.config.ledger_prune_window }}
     state_store_prune_window: {{ int $.Values.validator.config.state_store_prune_window }}
-    pruning_batch_size: {{ int $.Values.validator.config.pruning_batch_size }}
+    ledger_pruning_batch_size: {{ int $.Values.validator.config.ledger_pruning_batch_size }}
+    state_store_pruning_batch_size: {{ int $.Values.validator.config.state_store_pruning_batch_size }}
 
 full_node_networks:
 - network_id:

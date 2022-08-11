@@ -16,6 +16,7 @@ use aptos_sdk::{
     },
 };
 use aptos_transaction_builder::aptos_stdlib;
+use rand::{rngs::OsRng, Rng, SeedableRng};
 use reqwest::Url;
 
 #[async_trait::async_trait]
@@ -83,13 +84,6 @@ impl<'t> AptosContext<'t> {
         self.public_info.mint(addr, amount).await
     }
 
-    pub async fn create_and_fund_user_account(&mut self, amount: u64) -> Result<LocalAccount> {
-        let account = self.random_account();
-        self.create_user_account(account.public_key()).await?;
-        self.mint(account.address(), amount).await?;
-        Ok(account)
-    }
-
     pub async fn transfer(
         &self,
         from_account: &mut LocalAccount,
@@ -115,6 +109,7 @@ pub struct AptosPublicInfo<'t> {
     rest_api_url: Url,
     rest_client: RestClient,
     root_account: &'t mut LocalAccount,
+    rng: ::rand::rngs::StdRng,
 }
 
 impl<'t> AptosPublicInfo<'t> {
@@ -129,7 +124,20 @@ impl<'t> AptosPublicInfo<'t> {
             rest_api_url,
             chain_id,
             root_account,
+            rng: ::rand::rngs::StdRng::from_seed(OsRng.gen()),
         }
+    }
+
+    pub fn client(&self) -> &RestClient {
+        &self.rest_client
+    }
+
+    pub fn url(&self) -> &str {
+        self.rest_api_url.as_str()
+    }
+
+    pub fn root_account(&mut self) -> &mut LocalAccount {
+        &mut self.root_account
     }
 
     pub async fn create_user_account(&mut self, pubkey: &Ed25519PublicKey) -> Result<()> {
@@ -138,7 +146,7 @@ impl<'t> AptosPublicInfo<'t> {
         let create_account_txn =
             self.root_account
                 .sign_with_transaction_builder(self.transaction_factory().payload(
-                    aptos_stdlib::encode_account_create_account(auth_key.derived_address()),
+                    aptos_stdlib::account_create_account(auth_key.derived_address()),
                 ));
         self.rest_client
             .submit_and_wait(&create_account_txn)
@@ -149,7 +157,7 @@ impl<'t> AptosPublicInfo<'t> {
     pub async fn mint(&mut self, addr: AccountAddress, amount: u64) -> Result<()> {
         let mint_txn = self.root_account.sign_with_transaction_builder(
             self.transaction_factory()
-                .payload(aptos_stdlib::encode_aptos_coin_mint(addr, amount)),
+                .payload(aptos_stdlib::aptos_coin_mint(addr, amount)),
         );
         self.rest_client.submit_and_wait(&mint_txn).await?;
         Ok(())
@@ -162,7 +170,7 @@ impl<'t> AptosPublicInfo<'t> {
         amount: u64,
     ) -> Result<PendingTransaction> {
         let tx = from_account.sign_with_transaction_builder(self.transaction_factory().payload(
-            aptos_stdlib::encode_aptos_coin_transfer(to_account.address(), amount),
+            aptos_stdlib::aptos_coin_transfer(to_account.address(), amount),
         ));
         let pending_txn = self.rest_client.submit(&tx).await?.into_inner();
         self.rest_client.wait_for_transaction(&pending_txn).await?;
@@ -172,7 +180,8 @@ impl<'t> AptosPublicInfo<'t> {
     pub fn transaction_factory(&self) -> TransactionFactory {
         TransactionFactory::new(self.chain_id)
             .with_gas_unit_price(1)
-            .with_max_gas_amount(1000)
+            // TODO(Gas): double check if this is correct
+            .with_max_gas_amount(1_000)
     }
 
     pub async fn get_balance(&self, address: AccountAddress) -> Option<u64> {
@@ -194,5 +203,16 @@ impl<'t> AptosPublicInfo<'t> {
                     .as_str()
                     .and_then(|s| s.parse::<u64>().ok())
             })
+    }
+
+    pub fn random_account(&mut self) -> LocalAccount {
+        LocalAccount::generate(&mut self.rng)
+    }
+
+    pub async fn create_and_fund_user_account(&mut self, amount: u64) -> Result<LocalAccount> {
+        let account = self.random_account();
+        self.create_user_account(account.public_key()).await?;
+        self.mint(account.address(), amount).await?;
+        Ok(account)
     }
 }

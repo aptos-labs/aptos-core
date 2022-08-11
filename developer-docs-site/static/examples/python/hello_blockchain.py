@@ -27,17 +27,17 @@ class HelloBlockchainClient(RestClient):
 
 #:!:>section_2
     def get_message(self, contract_address: str, account_address: str) -> Optional[str]:
-        """ Retrieve the resource Message::MessageHolder::message """
-        return self.account_resource(account_address, f"0x{contract_address}::Message::MessageHolder")
+        """ Retrieve the resource message::MessageHolder::message """
+        return self.account_resource(account_address, f"0x{contract_address}::message::MessageHolder")
 #<:!:section_2
 
 #:!:>section_3
     def set_message(self, contract_address: str, account_from: Account, message: str) -> str:
-        """ Potentially initialize and set the resource Message::MessageHolder::message """
+        """ Potentially initialize and set the resource message::MessageHolder::message """
 
         payload = {
             "type": "script_function_payload",
-            "function": f"0x{contract_address}::Message::set_message",
+            "function": f"0x{contract_address}::message::set_message",
             "type_arguments": [],
             "arguments": [
                 message.encode("utf-8").hex(),
@@ -60,8 +60,8 @@ if __name__ == "__main__":
     print(f"Alice: {alice.address()}")
     print(f"Bob: {bob.address()}")
 
-    faucet_client.fund_account(alice.address(), 10_000_000)
-    faucet_client.fund_account(bob.address(), 10_000_000)
+    faucet_client.fund_account(alice.address(), 5_000)
+    faucet_client.fund_account(bob.address(), 5_000)
 
     print("\n=== Initial Balances ===")
     print(f"Alice: {client.account_balance(alice.address())}")

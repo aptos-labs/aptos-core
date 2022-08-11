@@ -8,7 +8,7 @@ const codeInjector = require("./src/remark/code-injector");
 
 /** @type {import("@docusaurus/types").Config} */
 const config = {
-  title: "Aptos Labs",
+  title: "Aptos Docs",
   tagline: "Developer Documentation",
   url: "https://aptos.dev",
   baseUrl: "/",
@@ -39,28 +39,12 @@ const config = {
         },
       }),
     ],
-    [
-      "redocusaurus",
-      {
-        // Plugin Options for loading OpenAPI files
-        specs: [
-          {
-            spec: "../api/doc/openapi.yaml",
-            route: "/rest-api/",
-          },
-        ],
-        // Theme Options for modifying how redoc renders them
-        theme: {
-          // Change with your site colors
-          primaryColor: "#1890ff",
-        },
-      },
-    ],
   ],
 
   themeConfig:
     /** @type {import("@docusaurus/preset-classic").ThemeConfig} */
     ({
+      image: "img/aptos_meta_opengraph_051222.jpg",
       colorMode: {
         defaultMode: "dark",
       },
@@ -71,7 +55,6 @@ const config = {
         },
       },
       navbar: {
-        title: "| Developer Network",
         logo: {
           alt: "Aptos Labs Logo",
           src: "img/aptos_word.svg",
@@ -89,9 +72,9 @@ const config = {
             position: "left",
             items: [
               {
-                label: "Move on Aptos",
+                label: "Move Guides",
                 type: "doc",
-                docId: "guides/move-guides/move-on-aptos",
+                docId: "guides/move-guides/index",
               },
               {
                 label: "Your First Move Module",
@@ -151,18 +134,23 @@ const config = {
               {
                 label: "Local Testnet",
                 type: "doc",
-                docId: "nodes/run-a-local-testnet",
+                docId: "nodes/local-testnet/index",
               },
               {
-                label: "Node Health Checker FAQ",
+                label: "Node Health Checker",
                 type: "doc",
-                docId: "nodes/node-health-checker-faq",
+                docId: "nodes/node-health-checker",
+              },
+              {
+                label: "Staking",
+                type: "doc",
+                docId: "nodes/staking",
               },
             ],
           },
           {
             position: "left",
-            href: "/rest-api",
+            href: "https://fullnode.devnet.aptoslabs.com/spec.html#/",
             label: "REST API",
           },
         ],
@@ -294,6 +282,10 @@ const config = {
               "/basics/basics-validator-nodes",
               "/basics/basics-node-networks-sync",
             ],
+          },
+          {
+            to: "/nodes/local-testnet/run-a-local-testnet",
+            from: "/nodes/run-a-local-testnet",
           },
         ],
       },

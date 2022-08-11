@@ -64,6 +64,16 @@ pub static IN_FLIGHT_POLLS: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+/// Gauge for tracking the number of connected peers (priority and regular)
+pub static CONNECTED_PEERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "aptos_data_client_connected_peers",
+        "Gauge related to the number of connected peers",
+        &["peer_type"]
+    )
+    .unwrap()
+});
+
 /// Gauge for the highest advertised data
 pub static HIGHEST_ADVERTISED_DATA: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -140,8 +150,8 @@ pub fn increment_request_counter(
 }
 
 /// Sets the gauge with the specific label and value
-pub fn set_gauge(counter: &Lazy<IntGaugeVec>, label: String, value: u64) {
-    counter.with_label_values(&[&label]).set(value as i64);
+pub fn set_gauge(counter: &Lazy<IntGaugeVec>, label: &str, value: u64) {
+    counter.with_label_values(&[label]).set(value as i64);
 }
 
 /// Starts the timer for the provided histogram and label values.

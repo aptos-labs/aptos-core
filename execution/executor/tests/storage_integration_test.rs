@@ -112,18 +112,16 @@ fn test_reconfiguration() {
         /* sequence_number = */ 0,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(aptos_stdlib::encode_aptos_coin_mint(
-            validator_account,
-            1_000_000,
-        )),
+        Some(aptos_stdlib::aptos_coin_mint(validator_account, 1_000_000)),
     );
     // txn2 = a dummy block prologue to bump the timer.
     let txn2 = Transaction::BlockMetadata(BlockMetadata::new(
         gen_block_id(1),
         0,
         1,
-        vec![false],
         validator_account,
+        Some(0),
+        vec![false],
         vec![],
         300000001,
     ));
@@ -134,7 +132,7 @@ fn test_reconfiguration() {
         /* sequence_number = */ 1,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(aptos_stdlib::encode_version_set_version(42)),
+        Some(aptos_stdlib::version_set_version(42)),
     );
 
     let txn_block = vec![txn1, txn2, txn3];
@@ -148,7 +146,7 @@ fn test_reconfiguration() {
         vm_output.has_reconfiguration(),
         "StateComputeResult does not see a reconfiguration"
     );
-    let ledger_info_with_sigs = gen_ledger_info_with_sigs(1, &vm_output, block_id, vec![&signer]);
+    let ledger_info_with_sigs = gen_ledger_info_with_sigs(1, &vm_output, block_id, &[signer]);
     executor
         .commit_blocks(vec![block_id], ledger_info_with_sigs)
         .unwrap();

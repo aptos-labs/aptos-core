@@ -16,6 +16,7 @@ use crate::{
     },
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
+    monitor,
     network::NetworkSender,
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,
@@ -24,7 +25,6 @@ use crate::{
 use anyhow::{bail, ensure, Context, Result};
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
-use aptos_metrics_core::monitor;
 use aptos_types::{
     epoch_state::EpochState, on_chain_config::OnChainConsensusConfig,
     validator_verifier::ValidatorVerifier,
@@ -189,8 +189,16 @@ impl RoundManager {
         self.onchain_config.back_pressure_limit()
     }
 
+    // TODO: Evaluate if creating a block retriever is slow and cache this if needed.
     fn create_block_retriever(&self, author: Author) -> BlockRetriever {
-        BlockRetriever::new(self.network.clone(), author)
+        BlockRetriever::new(
+            self.network.clone(),
+            author,
+            self.epoch_state
+                .verifier
+                .get_ordered_account_addresses_iter()
+                .collect(),
+        )
     }
 
     /// Leader:
@@ -227,6 +235,7 @@ impl RoundManager {
             .proposer_election
             .is_valid_proposer(self.proposal_generator.author(), new_round_event.round)
         {
+            self.round_state.setup_leader_timeout();
             let proposal_msg = self.generate_proposal(new_round_event).await?;
             let mut network = self.network.clone();
             #[cfg(feature = "failpoints")]
@@ -673,7 +682,9 @@ impl RoundManager {
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 self.new_2chain_tc_aggregated(tc).await
             }
-            VoteReceptionResult::EchoTimeout(_) => self.process_local_timeout(round).await,
+            VoteReceptionResult::EchoTimeout(_) if !self.round_state.is_vote_timeout() => {
+                self.process_local_timeout(round).await
+            }
             _ => Ok(()),
         }
     }

@@ -1,1 +1,16 @@
-Ok([TransactionOutput { write_set: WriteSet(WriteSetMut { write_set: [] }), events: [], gas_used: 0, status: Discard(UNEXPECTED_VERIFIER_ERROR) }])
+Ok(
+    [
+        TransactionOutput {
+            write_set: WriteSet(
+                WriteSetMut {
+                    write_set: [],
+                },
+            ),
+            events: [],
+            gas_used: 0,
+            status: Discard(
+                UNEXPECTED_VERIFIER_ERROR,
+            ),
+        },
+    ],
+)

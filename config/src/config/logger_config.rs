@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::utils;
 use aptos_logger::{Level, CHANNEL_SIZE};
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +16,8 @@ pub struct LoggerConfig {
     pub is_async: bool,
     // The default logging level for slog.
     pub level: Level,
+    // tokio-console port
+    pub console_port: Option<u16>,
 }
 
 impl Default for LoggerConfig {
@@ -24,6 +27,19 @@ impl Default for LoggerConfig {
             enable_backtrace: false,
             is_async: true,
             level: Level::Info,
+            console_port: Some(6669),
         }
+    }
+}
+
+impl LoggerConfig {
+    pub fn disable_console(&mut self) {
+        self.console_port = None;
+    }
+}
+
+impl LoggerConfig {
+    pub fn randomize_ports(&mut self) {
+        self.console_port = Some(utils::get_available_port());
     }
 }

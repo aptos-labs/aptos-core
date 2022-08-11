@@ -5,10 +5,13 @@ use crate::{Factory, GenesisConfig, Result, Swarm, Version};
 use anyhow::bail;
 use aptos_logger::info;
 use rand::rngs::StdRng;
+use std::time::Duration;
 use std::{convert::TryInto, num::NonZeroUsize};
 
+pub mod chaos;
 mod cluster_helper;
-mod node;
+pub mod node;
+pub mod prometheus;
 mod swarm;
 
 pub use cluster_helper::*;
@@ -23,6 +26,7 @@ pub struct K8sFactory {
     base_image_tag: String,
     kube_namespace: String,
     use_port_forward: bool,
+    reuse: bool,
     keep: bool,
     enable_haproxy: bool,
 }
@@ -39,6 +43,7 @@ impl K8sFactory {
         image_tag: String,
         base_image_tag: String,
         use_port_forward: bool,
+        reuse: bool,
         keep: bool,
         enable_haproxy: bool,
     ) -> Result<K8sFactory> {
@@ -66,6 +71,7 @@ impl K8sFactory {
             base_image_tag,
             kube_namespace,
             use_port_forward,
+            reuse,
             keep,
             enable_haproxy,
         })
@@ -85,10 +91,12 @@ impl Factory for K8sFactory {
     async fn launch_swarm(
         &self,
         _rng: &mut StdRng,
-        node_num: NonZeroUsize,
+        num_validators: NonZeroUsize,
+        num_fullnodes: usize,
         init_version: &Version,
         genesis_version: &Version,
         genesis_config: Option<&GenesisConfig>,
+        cleanup_duration: Duration,
     ) -> Result<Box<dyn Swarm>> {
         let genesis_modules_path = match genesis_config {
             Some(config) => match config {
@@ -100,25 +108,45 @@ impl Factory for K8sFactory {
             None => None,
         };
 
-        // create the forge-management configmap before installing anything
-        create_management_configmap(self.kube_namespace.clone(), self.keep).await?;
-
-        // try installing testnet resources, but clean up if it fails
-        let (_era, validators, fullnodes) = match install_testnet_resources(
-            self.kube_namespace.clone(),
-            node_num.get(),
-            format!("{}", init_version),
-            format!("{}", genesis_version),
-            genesis_modules_path,
-            self.use_port_forward,
-            self.enable_haproxy,
-        )
-        .await
-        {
-            Ok(res) => res,
-            Err(e) => {
-                uninstall_testnet_resources(self.kube_namespace.clone()).await?;
-                bail!(e);
+        let kube_client = create_k8s_client().await;
+        let (validators, fullnodes) = if self.reuse {
+            match collect_running_nodes(
+                &kube_client,
+                self.kube_namespace.clone(),
+                self.use_port_forward,
+                self.enable_haproxy,
+            )
+            .await
+            {
+                Ok(res) => res,
+                Err(e) => {
+                    bail!(e);
+                }
+            }
+        } else {
+            // clear the cluster of resources
+            delete_k8s_resources(kube_client, &self.kube_namespace).await?;
+            // create the forge-management configmap before installing anything
+            create_management_configmap(self.kube_namespace.clone(), self.keep, cleanup_duration)
+                .await?;
+            // try installing testnet resources, but clean up if it fails
+            match install_testnet_resources(
+                self.kube_namespace.clone(),
+                num_validators.get(),
+                num_fullnodes,
+                format!("{}", init_version),
+                format!("{}", genesis_version),
+                genesis_modules_path,
+                self.use_port_forward,
+                self.enable_haproxy,
+            )
+            .await
+            {
+                Ok(res) => res,
+                Err(e) => {
+                    uninstall_testnet_resources(self.kube_namespace.clone()).await?;
+                    bail!(e);
+                }
             }
         };
 

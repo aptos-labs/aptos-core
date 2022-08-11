@@ -18,7 +18,8 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use storage_service_types::{StorageServerSummary, StorageServiceRequest};
+use storage_service_types::requests::{DataRequest, StorageServiceRequest};
+use storage_service_types::responses::StorageServerSummary;
 
 /// Scores for peer rankings based on preferences and behavior.
 const MAX_SCORE: f64 = 100.0;
@@ -142,9 +143,9 @@ impl PeerStates {
         // requests to new peers (who don't have a peer state yet).
         // Likewise, we can always send subscription requests to any peers and
         // all peers should support versioning.
-        if request.is_get_storage_server_summary()
-            || request.is_data_subscription_request()
-            || matches!(request, StorageServiceRequest::GetServerProtocolVersion)
+        if request.data_request.is_get_storage_server_summary()
+            || request.data_request.is_data_subscription_request()
+            || matches!(request.data_request, DataRequest::GetServerProtocolVersion)
         {
             return true;
         }

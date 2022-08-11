@@ -8,8 +8,8 @@ use aptos_types::{state_store::state_key::StateKey, transaction::Version};
 use std::sync::Arc;
 
 pub struct DbStateView {
-    db: Arc<dyn DbReader>,
-    version: Option<Version>,
+    pub db: Arc<dyn DbReader>,
+    pub version: Option<Version>,
 }
 
 impl DbStateView {
@@ -45,7 +45,7 @@ impl LatestDbStateCheckpointView for Arc<dyn DbReader> {
     fn latest_state_checkpoint_view(&self) -> Result<DbStateView> {
         Ok(DbStateView {
             db: self.clone(),
-            version: self.get_latest_state_snapshot()?.map(|(v, _)| v),
+            version: self.get_latest_state_checkpoint_version()?,
         })
     }
 }

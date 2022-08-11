@@ -5,12 +5,39 @@
 
 class HeaderComponent < ViewComponent::Base
   NavItem = Struct.new(:url, :name, :title)
-  NAV_ITEMS = [
-    NavItem.new('/it1', 'AIT1', 'Incentivized Testnet 1 Results'),
-    NavItem.new('/it2', 'AIT2', 'Incentivized Testnet 2'),
-    NavItem.new('https://aptos.dev/', 'Docs', 'Aptos Docs'),
-    NavItem.new('https://forum.aptoslabs.com/', 'Forum', 'Aptos Forum'),
-    NavItem.new('https://explorer.devnet.aptos.dev/', 'Explorer', 'Aptos Explorer')
+  NavGroup = Struct.new(:item, :children)
+
+  NAV_GROUPS = [
+    NavGroup.new(
+      NavItem.new('#', 'Community', 'Aptos Community'),
+      [
+        NavItem.new('/community', 'Aptos Community', 'Aptos Community'),
+        NavItem.new('/it1', 'AIT1', 'Incentivized Testnet 1 Results'),
+        NavItem.new('/it2', 'AIT2', 'Incentivized Testnet 2 Results'),
+        NavItem.new('https://forum.aptoslabs.com/', 'Forum', 'Aptos Forum')
+      ]
+    ),
+    NavGroup.new(
+      NavItem.new('#', 'Developers', 'Aptos Developers'),
+      [
+        NavItem.new('/developers', 'Resources', 'Aptos Developers'),
+        NavItem.new('https://aptos.dev/', 'Documentation', 'Aptos Documentation')
+      ]
+    ),
+    NavGroup.new(
+      NavItem.new('#', 'Network', 'Aptos Network'),
+      [
+        NavItem.new('https://explorer.devnet.aptos.dev/', 'Explorer', 'Aptos Explorer'),
+        NavItem.new('https://status.devnet.aptos.dev/', 'Network Status', 'Aptos Network Status')
+      ]
+    ),
+    NavGroup.new(
+      NavItem.new('#', 'About', 'About Aptos'),
+      [
+        NavItem.new('/currents', 'Currents', 'Aptos Currents'),
+        NavItem.new('/careers', 'Careers', 'Aptos Careers')
+      ]
+    )
   ].freeze
 
   USER_NAV_ITEMS = [
@@ -22,16 +49,17 @@ class HeaderComponent < ViewComponent::Base
     @user = user
     @rest = rest
     @rest[:class] = [
-      'bg-black text-white flex px-4 sm:px-6 items-center sticky top-0 z-10',
-      'flex-wrap gap-4',
+      'bg-neutral-900/[.95] border-b border-neutral-800 text-white flex px-4 sm:px-6 items-center',
+      'sticky top-0 z-10 flex-wrap gap-4 h-20 backdrop-blur-lg',
       @rest[:class]
     ]
     @rest[:data] ||= {}
     @rest[:data][:controller] = 'header'
+    @rest[:data][:action] = 'resize@window->header#windowResize'
   end
 
-  def nav_items
-    NAV_ITEMS
+  def nav_groups
+    NAV_GROUPS
   end
 
   def user_nav_items

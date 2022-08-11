@@ -1,43 +1,37 @@
 module aptos_framework::genesis {
     use std::signer;
     use std::error;
-    use aptos_std::event;
     use std::vector;
 
     use aptos_framework::account;
+    use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::aptos_governance;
-    use aptos_framework::coin;
-    use aptos_framework::consensus_config;
-    use aptos_framework::transaction_publishing_option;
-    use aptos_framework::version;
     use aptos_framework::block;
     use aptos_framework::chain_id;
+    use aptos_framework::coins;
+    use aptos_framework::consensus_config;
+    use aptos_framework::gas_schedule;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
-    use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
-    use aptos_framework::vm_config;
+    use aptos_framework::staking_config;
+    use aptos_framework::version;
 
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;
 
     fun initialize(
-        core_resource_account: signer,
+        core_resource_account: &signer,
         core_resource_account_auth_key: vector<u8>,
-        initial_script_allow_list: vector<vector<u8>>,
-        is_open_module: bool,
-        instruction_schedule: vector<u8>,
-        native_schedule: vector<u8>,
+        gas_schedule: vector<u8>,
         chain_id: u8,
         initial_version: u64,
         consensus_config: vector<u8>,
-        min_price_per_gas_unit: u64,
         epoch_interval: u64,
         minimum_stake: u64,
         maximum_stake: u64,
-        min_lockup_duration_secs: u64,
-        max_lockup_duration_secs: u64,
+        recurring_lockup_duration_secs: u64,
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
@@ -45,48 +39,6 @@ module aptos_framework::genesis {
         // This can fail genesis but is necessary so that any misconfigurations can be corrected before genesis succeeds
         assert!(epoch_interval > 0, error::invalid_argument(EINVALID_EPOCH_DURATION));
 
-        initialize_internal(
-            &core_resource_account,
-            core_resource_account_auth_key,
-            initial_script_allow_list,
-            is_open_module,
-            instruction_schedule,
-            native_schedule,
-            chain_id,
-            initial_version,
-            consensus_config,
-            min_price_per_gas_unit,
-            epoch_interval,
-            minimum_stake,
-            maximum_stake,
-            min_lockup_duration_secs,
-            max_lockup_duration_secs,
-            allow_validator_set_change,
-            rewards_rate,
-            rewards_rate_denominator,
-        )
-    }
-
-    fun initialize_internal(
-        core_resource_account: &signer,
-        core_resource_account_auth_key: vector<u8>,
-        initial_script_allow_list: vector<vector<u8>>,
-        is_open_module: bool,
-        instruction_schedule: vector<u8>,
-        native_schedule: vector<u8>,
-        chain_id: u8,
-        initial_version: u64,
-        consensus_config: vector<u8>,
-        min_price_per_gas_unit: u64,
-        epoch_interval: u64,
-        minimum_stake: u64,
-        maximum_stake: u64,
-        min_lockup_duration_secs: u64,
-        max_lockup_duration_secs: u64,
-        allow_validator_set_change: bool,
-        rewards_rate: u64,
-        rewards_rate_denominator: u64,
-    ) {
         // TODO: Only do create the core resources account in testnets
         account::create_account_internal(signer::address_of(core_resource_account));
         account::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
@@ -107,35 +59,31 @@ module aptos_framework::genesis {
             b"multi_agent_script_prologue",
             b"epilogue",
             b"writeset_epilogue",
-            false,
         );
 
         // Give the decentralized on-chain governance control over the core framework account.
-        aptos_governance::store_signer_cap(&aptos_framework_account, framework_signer_cap);
+        aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, framework_signer_cap);
 
         // Consensus config setup
         consensus_config::initialize(&aptos_framework_account);
         version::initialize(&aptos_framework_account, initial_version);
-        stake::initialize_validator_set(
+        stake::initialize(&aptos_framework_account);
+        staking_config::initialize(
             &aptos_framework_account,
             minimum_stake,
             maximum_stake,
-            min_lockup_duration_secs,
-            max_lockup_duration_secs,
+            recurring_lockup_duration_secs,
             allow_validator_set_change,
             rewards_rate,
             rewards_rate_denominator,
         );
 
-        vm_config::initialize(
+        gas_schedule::initialize(
             &aptos_framework_account,
-            instruction_schedule,
-            native_schedule,
-            min_price_per_gas_unit,
+            gas_schedule
         );
 
         consensus_config::set(&aptos_framework_account, consensus_config);
-        transaction_publishing_option::initialize(&aptos_framework_account, initial_script_allow_list, is_open_module);
 
         // This is testnet-specific configuration and can be skipped for mainnet.
         // Mainnet can call Coin::initialize<MainnetCoin> directly and give mint capability to the Staking module.
@@ -146,12 +94,6 @@ module aptos_framework::genesis {
 
         // Give TransactionFee BurnCapability<AptosCoin> so it can burn gas.
         transaction_fee::store_aptos_coin_burn_cap(&aptos_framework_account, burn_cap);
-
-        // Pad the event counter for the Root account to match DPN. This
-        // _MUST_ match the new epoch event counter otherwise all manner of
-        // things start to break.
-        event::destroy_handle(event::new_event_handle<u64>(&aptos_framework_account));
-        event::destroy_handle(event::new_event_handle<u64>(&aptos_framework_account));
 
         // This needs to be called at the very end.
         chain_id::initialize(&aptos_framework_account, chain_id);
@@ -170,7 +112,7 @@ module aptos_framework::genesis {
     ///
     /// Network address fields are a vector per account, where each entry is a vector of addresses
     /// encoded in a single BCS byte array.
-    public entry fun create_initialize_validators(
+    fun create_initialize_validators(
         aptos_framework_account: signer,
         owners: vector<address>,
         consensus_pubkeys: vector<vector<u8>>,
@@ -178,7 +120,6 @@ module aptos_framework::genesis {
         validator_network_addresses: vector<vector<u8>>,
         full_node_network_addresses: vector<vector<u8>>,
         staking_distribution: vector<u64>,
-        initial_lockup_timestamp: u64,
     ) {
         let num_owners = vector::length(&owners);
         let num_validator_network_addresses = vector::length(&validator_network_addresses);
@@ -198,18 +139,18 @@ module aptos_framework::genesis {
             let cur_full_node_network_addresses = *vector::borrow(&full_node_network_addresses, i);
             let consensus_pubkey = *vector::borrow(&consensus_pubkeys, i);
             let pop = *vector::borrow(&proof_of_possession, i);
-            stake::register_validator_candidate(
+            stake::initialize_validator(
                 &owner_account,
                 consensus_pubkey,
                 pop,
                 cur_validator_network_addresses,
                 cur_full_node_network_addresses,
             );
-            stake::increase_lockup(&owner_account, initial_lockup_timestamp);
+            stake::increase_lockup(&owner_account);
             let amount = *vector::borrow(&staking_distribution, i);
             // Transfer coins from the root account to the validator, so they can stake and have non-zero voting power
             // and can complete consensus on the genesis block.
-            coin::register<AptosCoin>(&owner_account);
+            coins::register<AptosCoin>(&owner_account);
             aptos_coin::mint(&aptos_framework_account, *owner, amount);
             stake::add_stake(&owner_account, amount);
             stake::join_validator_set_internal(&owner_account, *owner);
@@ -221,21 +162,16 @@ module aptos_framework::genesis {
 
     #[test_only]
     public fun setup(core_resource_account: &signer) {
-        initialize_internal(
+        initialize(
             core_resource_account,
             x"0000000000000000000000000000000000000000000000000000000000000000",
-            vector::empty(),
-            true,
-            x"", // instruction_schedule not needed for unit tests
-            x"", // native schedule not needed for unit tests
+            x"00", // empty gas schedule
             4u8, // TESTING chain ID
             0,
             x"",
             1,
-            1,
             0,
             1,
-            0,
             1,
             true,
             1,

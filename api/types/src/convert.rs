@@ -2,20 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    transaction::{ModuleBundlePayload, StateCheckpointTransaction},
+    transaction::{
+        DecodedTableData, DeleteModule, DeleteResource, DeleteTableItem, DeletedTableData,
+        ModuleBundlePayload, StateCheckpointTransaction, UserTransactionRequestInner, WriteModule,
+        WriteResource, WriteTableItem,
+    },
     Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
-    MoveResource, MoveScriptBytecode, MoveValue, ScriptFunctionId, ScriptFunctionPayload,
-    ScriptPayload, ScriptWriteSet, Transaction, TransactionInfo, TransactionOnChainData,
-    TransactionPayload, UserTransactionRequest, WriteSet, WriteSetChange, WriteSetPayload,
+    MoveResource, MoveScriptBytecode, MoveValue, PendingTransaction, ScriptFunctionId,
+    ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
+    TransactionInfo, TransactionOnChainData, TransactionPayload, UserTransactionRequest,
+    VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
 };
-use anyhow::{bail, ensure, format_err, Result};
+use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_transaction_builder::error_explain;
 use aptos_types::state_store::table::TableHandle;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, EventWithVersion},
     state_store::state_key::StateKey,
     transaction::{
         ExecutionStatus, ModuleBundle, RawTransaction, Script, ScriptFunction, SignedTransaction,
@@ -35,20 +40,24 @@ use move_deps::{
     move_resource_viewer::MoveValueAnnotator,
 };
 use serde_json::Value;
+use std::sync::Arc;
 use std::{
     convert::{TryFrom, TryInto},
     iter::IntoIterator,
     rc::Rc,
 };
+use storage_interface::DbReader;
 
 pub struct MoveConverter<'a, R: ?Sized> {
     inner: MoveValueAnnotator<'a, R>,
+    db: Arc<dyn DbReader>,
 }
 
 impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
-    pub fn new(inner: &'a R) -> Self {
+    pub fn new(inner: &'a R, db: Arc<dyn DbReader>) -> Self {
         Self {
             inner: MoveValueAnnotator::new(inner),
+            db,
         }
     }
 
@@ -73,6 +82,14 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     }
 
     pub fn try_into_pending_transaction(&self, txn: SignedTransaction) -> Result<Transaction> {
+        let payload = self.try_into_transaction_payload(txn.payload().clone())?;
+        Ok((txn, payload).into())
+    }
+
+    pub fn try_into_pending_transaction_poem(
+        &self,
+        txn: SignedTransaction,
+    ) -> Result<PendingTransaction> {
         let payload = self.try_into_transaction_payload(txn.payload().clone())?;
         Ok((txn, payload).into())
     }
@@ -167,7 +184,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     arguments: json_args,
                     function: ScriptFunctionId {
                         module: module.into(),
-                        name: function,
+                        name: function.into(),
                     },
                     type_arguments: ty_args.into_iter().map(|arg| arg.into()).collect(),
                 })
@@ -234,28 +251,28 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     ) -> Result<WriteSetChange> {
         let ret = match op {
             WriteOp::Deletion => match access_path.get_path() {
-                Path::Code(module_id) => WriteSetChange::DeleteModule {
+                Path::Code(module_id) => WriteSetChange::DeleteModule(DeleteModule {
                     address: access_path.address.into(),
                     state_key_hash,
                     module: module_id.into(),
-                },
-                Path::Resource(typ) => WriteSetChange::DeleteResource {
+                }),
+                Path::Resource(typ) => WriteSetChange::DeleteResource(DeleteResource {
                     address: access_path.address.into(),
                     state_key_hash,
                     resource: typ.into(),
-                },
+                }),
             },
             WriteOp::Value(val) => match access_path.get_path() {
-                Path::Code(_) => WriteSetChange::WriteModule {
+                Path::Code(_) => WriteSetChange::WriteModule(WriteModule {
                     address: access_path.address.into(),
                     state_key_hash,
                     data: MoveModuleBytecode::new(val).try_parse_abi()?,
-                },
-                Path::Resource(typ) => WriteSetChange::WriteResource {
+                }),
+                Path::Resource(typ) => WriteSetChange::WriteResource(WriteResource {
                     address: access_path.address.into(),
                     state_key_hash,
                     data: self.try_into_resource(&typ, &val)?,
-                },
+                }),
             },
         };
         Ok(ret)
@@ -268,22 +285,71 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         key: Vec<u8>,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let handle = handle.0.to_be_bytes().to_vec().into();
-        let key = key.into();
+        let hex_handle = handle.0.to_be_bytes().to_vec().into();
+        let key: HexEncodedBytes = key.into();
         let ret = match op {
-            WriteOp::Deletion => WriteSetChange::DeleteTableItem {
-                state_key_hash,
-                handle,
-                key,
-            },
-            WriteOp::Value(value) => WriteSetChange::WriteTableItem {
-                state_key_hash,
-                handle,
-                key,
-                value: value.into(),
-            },
+            WriteOp::Deletion => {
+                let data = self.try_delete_table_item_into_deleted_table_data(handle, &key.0)?;
+
+                WriteSetChange::DeleteTableItem(DeleteTableItem {
+                    state_key_hash,
+                    handle: hex_handle,
+                    key,
+                    data,
+                })
+            }
+            WriteOp::Value(value) => {
+                let data =
+                    self.try_write_table_item_into_decoded_table_data(handle, &key.0, &value)?;
+
+                WriteSetChange::WriteTableItem(WriteTableItem {
+                    state_key_hash,
+                    handle: hex_handle,
+                    key,
+                    value: value.into(),
+                    data,
+                })
+            }
         };
         Ok(ret)
+    }
+
+    pub fn try_write_table_item_into_decoded_table_data(
+        &self,
+        handle: TableHandle,
+        key: &[u8],
+        value: &[u8],
+    ) -> Result<Option<DecodedTableData>> {
+        if !self.db.indexer_enabled() {
+            return Ok(None);
+        }
+        let table_info = self.db.get_table_info(handle).unwrap();
+        let key = self.try_into_move_value(&table_info.key_type, key)?;
+        let value = self.try_into_move_value(&table_info.value_type, value)?;
+
+        Ok(Some(DecodedTableData {
+            key: key.json().unwrap(),
+            key_type: table_info.key_type.to_string(),
+            value: value.json().unwrap(),
+            value_type: table_info.value_type.to_string(),
+        }))
+    }
+
+    pub fn try_delete_table_item_into_deleted_table_data(
+        &self,
+        handle: TableHandle,
+        key: &[u8],
+    ) -> Result<Option<DeletedTableData>> {
+        if !self.db.indexer_enabled() {
+            return Ok(None);
+        }
+        let table_info = self.db.get_table_info(handle).unwrap();
+        let key = self.try_into_move_value(&table_info.key_type, key)?;
+
+        Ok(Some(DeletedTableData {
+            key: key.json().unwrap(),
+            key_type: table_info.key_type.to_string(),
+        }))
     }
 
     pub fn try_into_events(&self, events: &[ContractEvent]) -> Result<Vec<Event>> {
@@ -292,6 +358,20 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             let data = self
                 .inner
                 .view_value(event.type_tag(), event.event_data())?;
+            ret.push((event, MoveValue::try_from(data)?.json()?).into());
+        }
+        Ok(ret)
+    }
+
+    pub fn try_into_versioned_events(
+        &self,
+        events: &[EventWithVersion],
+    ) -> Result<Vec<VersionedEvent>> {
+        let mut ret = vec![];
+        for event in events {
+            let data = self
+                .inner
+                .view_value(event.event.type_tag(), event.event.event_data())?;
             ret.push((event, MoveValue::try_from(data)?.json()?).into());
         }
         Ok(ret)
@@ -309,6 +389,20 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         Ok(SignedTransaction::new_with_authenticator(
             self.try_into_raw_transaction(txn, chain_id)?,
             signature.try_into()?,
+        ))
+    }
+
+    pub fn try_into_signed_transaction_poem(
+        &self,
+        submit_transaction_request: SubmitTransactionRequest,
+        chain_id: ChainId,
+    ) -> Result<SignedTransaction> {
+        Ok(SignedTransaction::new_with_authenticator(
+            self.try_into_raw_transaction_poem(
+                submit_transaction_request.user_transaction_request,
+                chain_id,
+            )?,
+            submit_transaction_request.signature.try_into().context("Failed to parse transaction when building SignedTransaction from SubmitTransactionRequest")?,
         ))
     }
 
@@ -337,6 +431,31 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         ))
     }
 
+    pub fn try_into_raw_transaction_poem(
+        &self,
+        user_transaction_request: UserTransactionRequestInner,
+        chain_id: ChainId,
+    ) -> Result<RawTransaction> {
+        let UserTransactionRequestInner {
+            sender,
+            sequence_number,
+            max_gas_amount,
+            gas_unit_price,
+            expiration_timestamp_secs,
+            payload,
+        } = user_transaction_request;
+        Ok(RawTransaction::new(
+            sender.into(),
+            sequence_number.into(),
+            self.try_into_aptos_core_transaction_payload(payload)
+                .context("Failed to parse transaction payload")?,
+            max_gas_amount.into(),
+            gas_unit_price.into(),
+            expiration_timestamp_secs.into(),
+            chain_id,
+        ))
+    }
+
     pub fn try_into_aptos_core_transaction_payload(
         &self,
         payload: TransactionPayload,
@@ -354,7 +473,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                 let module = function.module.clone();
                 let code = self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
                 let func = code
-                    .find_script_function(function.name.as_ident_str())
+                    .find_script_function(function.name.0.as_ident_str())
                     .ok_or_else(|| format_err!("could not find script function by {}", function))?;
                 ensure!(
                     func.generic_type_params.len() == type_arguments.len(),
@@ -371,7 +490,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
 
                 Target::ScriptFunction(ScriptFunction::new(
                     module.into(),
-                    function.name,
+                    function.name.into(),
                     type_arguments
                         .into_iter()
                         .map(|v| v.try_into())
@@ -482,7 +601,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         val: Value,
     ) -> Result<move_core_types::value::MoveValue> {
         use move_deps::move_core_types::value::MoveValue::*;
-
         Ok(match layout {
             MoveTypeLayout::Bool => Bool(serde_json::from_value::<bool>(val)?),
             MoveTypeLayout::U8 => U8(serde_json::from_value::<u8>(val)?),
@@ -546,7 +664,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         } else {
             bail!("Expecting a JSON Map for struct.");
         };
-
         let fields = field_layouts
             .iter()
             .map(|field_layout| {
@@ -581,10 +698,10 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                             )
                         })
                         .unwrap_or_else(|| {
-                            format!("Move abort: code {} at {}", code, location)
+                            format!("Move abort: code {:#x} at {}", code, location)
                         })
                 }
-                AbortLocation::Script => format!("Move abort: code {}", code),
+                AbortLocation::Script => format!("Move abort: code {:#x}", code),
             },
             ExecutionStatus::Success => "Executed successfully".to_owned(),
             ExecutionStatus::OutOfGas => "Out of gas".to_owned(),
@@ -629,12 +746,12 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
 }
 
 pub trait AsConverter<R> {
-    fn as_converter(&self) -> MoveConverter<R>;
+    fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R>;
 }
 
 impl<R: MoveResolverExt> AsConverter<R> for R {
-    fn as_converter(&self) -> MoveConverter<R> {
-        MoveConverter::new(self)
+    fn as_converter(&self, db: Arc<dyn DbReader>) -> MoveConverter<R> {
+        MoveConverter::new(self, db)
     }
 }
 

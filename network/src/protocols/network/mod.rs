@@ -25,7 +25,7 @@ use futures::{
     task::{Context, Poll},
 };
 use pin_project::pin_project;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use short_hex_str::AsShortHexStr;
 use std::{cmp::min, iter::FromIterator, marker::PhantomData, pin::Pin, time::Duration};
 
@@ -382,7 +382,7 @@ pub trait SerializedRequest {
 
     /// Converts the `SerializedMessage` into its deserialized version of `TMessage` based on the
     /// `ProtocolId`.  See: [`ProtocolId::from_bytes`]
-    fn to_message<'a, TMessage: Deserialize<'a>>(&'a self) -> anyhow::Result<TMessage> {
+    fn to_message<TMessage: DeserializeOwned>(&self) -> anyhow::Result<TMessage> {
         self.protocol_id().from_bytes(self.data())
     }
 }

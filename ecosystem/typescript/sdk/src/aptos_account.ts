@@ -4,12 +4,12 @@ import * as bip39 from "@scure/bip39";
 import { Buffer } from "buffer/"; // the trailing slash is important!
 import { derivePath } from "ed25519-hd-key";
 import { HexString, MaybeHexString } from "./hex_string";
-import { Types } from "./types";
+import * as Gen from "./generated/index";
 
 export interface AptosAccountObject {
-  address?: string;
-  publicKeyHex?: Types.HexEncodedBytes;
-  privateKeyHex: Types.HexEncodedBytes;
+  address?: Gen.HexEncodedBytes;
+  publicKeyHex?: Gen.HexEncodedBytes;
+  privateKeyHex: Gen.HexEncodedBytes;
 }
 
 /**

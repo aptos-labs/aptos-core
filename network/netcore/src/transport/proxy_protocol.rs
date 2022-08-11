@@ -66,7 +66,7 @@ pub async fn read_header<T: AsyncRead + std::marker::Unpin>(
 
     // High 4 bits is version, low 4 bits is command
     let version_and_command = header[12];
-    let _ = match version_and_command {
+    match version_and_command {
         PPV2_LOCAL | PPV2_PROXY => (),
         _ => {
             return Err(io::Error::new(

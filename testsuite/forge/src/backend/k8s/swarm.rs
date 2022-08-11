@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    backend::k8s::node::{K8sNode, REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT},
-    create_k8s_client, query_sequence_numbers, set_validator_image_tag,
-    uninstall_testnet_resources, ChainInfo, FullNode, Node, Result, Swarm, Validator, Version,
+    chaos, check_for_container_restart, create_k8s_client, get_free_port,
+    node::{K8sNode, REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT},
+    prometheus::{self, query_with_metadata},
+    query_sequence_numbers, set_validator_image_tag, uninstall_testnet_resources, ChainInfo,
+    FullNode, Node, Result, Swarm, SwarmChaos, Validator, Version,
 };
 use ::aptos_logger::*;
 use anyhow::{anyhow, bail, format_err};
@@ -15,19 +17,26 @@ use aptos_sdk::{
     move_types::account_address::AccountAddress,
     types::{chain_id::ChainId, AccountKey, LocalAccount, PeerId},
 };
-use k8s_openapi::api::core::v1::Service;
+use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service};
 use kube::{
     api::{Api, ListParams},
     client::Client as K8sClient,
 };
-use std::{collections::HashMap, convert::TryFrom, env, net::TcpListener, str, sync::Arc};
+use prometheus_http_query::{response::PromqlResult, Client as PrometheusClient};
+use regex::Regex;
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    convert::TryFrom,
+    env, str,
+    sync::Arc,
+};
 use tokio::{runtime::Runtime, time::Duration};
 
 pub const VALIDATOR_SERVICE_SUFFIX: &str = "validator";
 pub const FULLNODE_SERVICE_SUFFIX: &str = "fullnode";
 pub const VALIDATOR_HAPROXY_SERVICE_SUFFIX: &str = "validator-lb";
 pub const FULLNODE_HAPROXY_SERVICE_SUFFIX: &str = "fullnode-lb";
-const LOCALHOST: &str = "127.0.0.1";
+pub const HAPROXY_SERVICE_SUFFIX: &str = "lb";
 
 pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
@@ -38,6 +47,8 @@ pub struct K8sSwarm {
     pub chain_id: ChainId,
     kube_namespace: String,
     keep: bool,
+    chaoses: HashSet<SwarmChaos>,
+    prom_client: Option<PrometheusClient>,
 }
 
 impl K8sSwarm {
@@ -73,6 +84,14 @@ impl K8sSwarm {
         versions.insert(base_version, base_image_tag.to_string());
         versions.insert(cur_version, image_tag.to_string());
 
+        let prom_client = match prometheus::get_prometheus_client() {
+            Ok(p) => Some(p),
+            Err(e) => {
+                info!("Could not build prometheus client: {}", e);
+                None
+            }
+        };
+
         Ok(K8sSwarm {
             validators,
             fullnodes,
@@ -82,6 +101,8 @@ impl K8sSwarm {
             versions: Arc::new(versions),
             kube_namespace: kube_namespace.to_string(),
             keep,
+            chaoses: HashSet::new(),
+            prom_client,
         })
     }
 
@@ -145,7 +166,7 @@ impl Swarm for K8sSwarm {
             .cloned()
             .ok_or_else(|| anyhow!("Invalid version: {:?}", version))?;
         set_validator_image_tag(
-            validator.sts_name().to_string(),
+            validator.stateful_set_name().to_string(),
             version,
             self.kube_namespace.clone(),
         )
@@ -179,6 +200,15 @@ impl Swarm for K8sSwarm {
         todo!()
     }
 
+    fn add_validator_full_node(
+        &mut self,
+        _version: &Version,
+        _template: NodeConfig,
+        _id: PeerId,
+    ) -> Result<PeerId> {
+        todo!()
+    }
+
     fn add_full_node(&mut self, _version: &Version, _template: NodeConfig) -> Result<PeerId> {
         todo!()
     }
@@ -200,6 +230,65 @@ impl Swarm for K8sSwarm {
     // and instructions to check the actual live logs location from fgi
     fn logs_location(&mut self) -> String {
         "See fgi output for more information.".to_string()
+    }
+
+    fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()> {
+        chaos::inject_swarm_chaos(&self.kube_namespace, &chaos)?;
+        self.chaoses.insert(chaos);
+        Ok(())
+    }
+
+    fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()> {
+        if self.chaoses.remove(&chaos) {
+            chaos::remove_swarm_chaos(&self.kube_namespace, &chaos)?;
+        } else {
+            bail!("Chaos {:?} not found", chaos);
+        }
+        Ok(())
+    }
+
+    async fn ensure_no_validator_restart(&mut self) -> Result<()> {
+        for validator in &self.validators {
+            if let Err(e) = check_for_container_restart(
+                &self.kube_client,
+                &self.kube_namespace.clone(),
+                validator.1.stateful_set_name(),
+            )
+            .await
+            {
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
+
+    async fn ensure_no_fullnode_restart(&mut self) -> Result<()> {
+        for fullnode in &self.fullnodes {
+            if let Err(e) = check_for_container_restart(
+                &self.kube_client,
+                &self.kube_namespace.clone(),
+                fullnode.1.stateful_set_name(),
+            )
+            .await
+            {
+                return Err(e);
+            }
+        }
+        Ok(())
+    }
+
+    async fn query_metrics(
+        &self,
+        query: &str,
+        time: Option<i64>,
+        timeout: Option<i64>,
+    ) -> Result<PromqlResult> {
+        if let Some(c) = &self.prom_client {
+            let mut labels_map = BTreeMap::new();
+            labels_map.insert("namespace".to_string(), self.kube_namespace.clone());
+            return query_with_metadata(c, query, time, timeout, labels_map).await;
+        }
+        bail!("No prom client");
     }
 }
 
@@ -235,63 +324,110 @@ impl TryFrom<Service> for KubeService {
     }
 }
 
-async fn list_services(client: K8sClient, kube_namespace: &str) -> Result<Vec<KubeService>> {
-    let node_api: Api<Service> = Api::namespaced(client, kube_namespace);
+async fn list_stateful_sets(client: K8sClient, kube_namespace: &str) -> Result<Vec<StatefulSet>> {
+    let stateful_set_api: Api<StatefulSet> = Api::namespaced(client, kube_namespace);
     let lp = ListParams::default();
-    let services = node_api.list(&lp).await?.items;
-    services.into_iter().map(KubeService::try_from).collect()
+    let stateful_sets = stateful_set_api.list(&lp).await?.items;
+    Ok(stateful_sets)
 }
 
-fn get_free_port() -> u32 {
-    // get a free port
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    listener.local_addr().unwrap().port() as u32
+fn stateful_set_name_matches(sts: &StatefulSet, suffix: &str) -> bool {
+    if let Some(s) = sts.metadata.name.as_ref() {
+        s.contains(suffix)
+    } else {
+        false
+    }
+}
+
+fn parse_service_name_from_stateful_set_name(
+    stateful_set_name: &str,
+    enable_haproxy: bool,
+) -> String {
+    let re = Regex::new(r"(aptos-node-\d+)-(validator|fullnode)").unwrap();
+    let cap = re.captures(stateful_set_name).unwrap();
+    let service_base_name = format!("{}-{}", &cap[1], &cap[2]);
+    if enable_haproxy {
+        format!("{}-{}", &service_base_name, HAPROXY_SERVICE_SUFFIX)
+    } else {
+        service_base_name
+    }
+}
+
+fn get_k8s_node_from_stateful_set(
+    sts: &StatefulSet,
+    enable_haproxy: bool,
+    use_port_forward: bool,
+) -> K8sNode {
+    let stateful_set_name = sts.metadata.name.as_ref().unwrap();
+    // If HAProxy is enabled, use its Service name. Otherwise the Service name matches the StatefulSet name
+    let mut service_name =
+        parse_service_name_from_stateful_set_name(stateful_set_name, enable_haproxy);
+
+    // the full service name includes the namespace
+    let namespace = sts.metadata.namespace.as_ref().unwrap();
+
+    // if we're not using port-forward and expecting to hit the service directly, we should use the full service name
+    // since the test runner may be in a separate namespace
+    if !use_port_forward {
+        service_name = format!("{}.{}.svc", &service_name, &namespace);
+    }
+
+    // If HAProxy is enabled, use the port on its Service. Otherwise use the port on the validator Service
+    let mut rest_api_port = if enable_haproxy {
+        REST_API_HAPROXY_SERVICE_PORT
+    } else {
+        REST_API_SERVICE_PORT
+    };
+
+    if use_port_forward {
+        rest_api_port = get_free_port();
+    }
+    let index = parse_node_index(stateful_set_name).expect("error to parse node index");
+    let node_type = parse_node_type(stateful_set_name);
+
+    // Extract the image tag from the StatefulSet spec
+    let image_tag = sts
+        .spec
+        .as_ref()
+        .unwrap()
+        .template
+        .spec
+        .as_ref()
+        .unwrap()
+        .containers[0]
+        .image
+        .as_ref()
+        .unwrap()
+        .split(':')
+        .collect::<Vec<&str>>()[1];
+
+    K8sNode {
+        name: format!("{}-{}", &node_type, index),
+        stateful_set_name: stateful_set_name.clone(),
+        // TODO: fetch this from running node
+        peer_id: PeerId::random(),
+        index,
+        service_name,
+        rest_api_port,
+        version: Version::new(0, image_tag.to_string()),
+        namespace: namespace.to_string(),
+        haproxy_enabled: enable_haproxy,
+        port_forward_enabled: use_port_forward,
+    }
 }
 
 pub(crate) async fn get_validators(
     client: K8sClient,
-    image_tag: &str,
     kube_namespace: &str,
     use_port_forward: bool,
     enable_haproxy: bool,
 ) -> Result<HashMap<PeerId, K8sNode>> {
-    let services = list_services(client, kube_namespace).await?;
-    let service_suffix = if enable_haproxy {
-        VALIDATOR_HAPROXY_SERVICE_SUFFIX
-    } else {
-        VALIDATOR_SERVICE_SUFFIX
-    };
-    let validators = services
+    let stateful_sets = list_stateful_sets(client, kube_namespace).await?;
+    let validators = stateful_sets
         .into_iter()
-        .filter(|s| s.name.contains(service_suffix))
-        .map(|s| {
-            let mut port = if enable_haproxy {
-                REST_API_HAPROXY_SERVICE_PORT
-            } else {
-                REST_API_SERVICE_PORT
-            };
-            let mut ip = s.host_ip.clone();
-            if use_port_forward {
-                port = get_free_port();
-                ip = LOCALHOST.to_string();
-            }
-            let node_id = parse_node_id(&s.name).expect("error to parse node id");
-            // the base validator name is the same as that of the StatefulSet, and does not have era
-            let validator_name = format!("aptos-node-{}-validator", node_id);
-            let node = K8sNode {
-                name: validator_name.clone(),
-                sts_name: validator_name,
-                // TODO: fetch this from running node
-                peer_id: PeerId::random(),
-                node_id,
-                ip,
-                port: port as u32,
-                rest_api_port: port as u32,
-                dns: s.name,
-                version: Version::new(0, image_tag.to_string()),
-                namespace: kube_namespace.to_string(),
-                enable_haproxy,
-            };
+        .filter(|sts| stateful_set_name_matches(sts, "validator"))
+        .map(|sts| {
+            let node = get_k8s_node_from_stateful_set(&sts, enable_haproxy, use_port_forward);
             (node.peer_id(), node)
         })
         .collect::<HashMap<_, _>>();
@@ -301,49 +437,16 @@ pub(crate) async fn get_validators(
 
 pub(crate) async fn get_fullnodes(
     client: K8sClient,
-    image_tag: &str,
-    era: &str,
     kube_namespace: &str,
     use_port_forward: bool,
     enable_haproxy: bool,
 ) -> Result<HashMap<PeerId, K8sNode>> {
-    let services = list_services(client, kube_namespace).await?;
-    let service_suffix = if enable_haproxy {
-        FULLNODE_HAPROXY_SERVICE_SUFFIX
-    } else {
-        FULLNODE_SERVICE_SUFFIX
-    };
-    let fullnodes = services
+    let stateful_sets = list_stateful_sets(client, kube_namespace).await?;
+    let fullnodes = stateful_sets
         .into_iter()
-        .filter(|s| s.name.contains(service_suffix))
-        .map(|s| {
-            let mut port = if enable_haproxy {
-                REST_API_HAPROXY_SERVICE_PORT
-            } else {
-                REST_API_SERVICE_PORT
-            };
-            let mut ip = s.host_ip.clone();
-            if use_port_forward {
-                port = get_free_port();
-                ip = LOCALHOST.to_string();
-            }
-            let node_id = parse_node_id(&s.name).expect("error to parse node id");
-            // the base fullnode name is the same as that of the StatefulSet, and includes era
-            let fullnode_name = format!("{}-e{}", &s.name, era);
-            let node = K8sNode {
-                name: fullnode_name.clone(),
-                sts_name: fullnode_name,
-                // TODO: fetch this from running node
-                peer_id: PeerId::random(),
-                node_id,
-                ip,
-                port: port as u32,
-                rest_api_port: port as u32,
-                dns: s.name,
-                version: Version::new(0, image_tag.to_string()),
-                namespace: kube_namespace.to_string(),
-                enable_haproxy,
-            };
+        .filter(|sts| stateful_set_name_matches(sts, "fullnode"))
+        .map(|sts| {
+            let node = get_k8s_node_from_stateful_set(&sts, enable_haproxy, use_port_forward);
             (node.peer_id(), node)
         })
         .collect::<HashMap<_, _>>();
@@ -351,15 +454,24 @@ pub(crate) async fn get_fullnodes(
     Ok(fullnodes)
 }
 
-// gets the node index based on its associated LB service name
-// assumes the input is named <RELEASE>-aptos-node-<INDEX>-<validator|fullnode>[-lb]
-fn parse_node_id(s: &str) -> Result<usize> {
+/// Given a string like the StatefulSet name or Service name, parse the node type,
+/// whether it's a validator or fullnode
+fn parse_node_type(s: &str) -> String {
+    let re = Regex::new(r"(validator|fullnode)").unwrap();
+    let cap = re.captures(s).unwrap();
+    cap[1].to_string()
+}
+
+// gets the node index based on its associated statefulset name
+// e.g. aptos-node-<idx>-validator
+// e.g. aptos-node-<idx>-fullnode-e<era>
+fn parse_node_index(s: &str) -> Result<usize> {
     // first get rid of the prefixes
     let v = s.split("aptos-node-").collect::<Vec<&str>>();
     if v.len() < 2 {
         return Err(format_err!("Failed to parse {:?} node id format", s));
     }
-    // then get rid of the service name suffix
+    // then get rid of the node type suffix
     let v = v[1].split('-').collect::<Vec<&str>>();
     let idx: usize = v[0].parse().unwrap();
     Ok(idx)
@@ -378,17 +490,16 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
         let node_name = node.name().to_string();
         let check = aptos_retrier::retry_async(k8s_wait_nodes_strategy(), || {
             Box::pin(async move {
-                info!("Attempting health check: {:?}", node);
                 match node.rest_client().get_ledger_information().await {
                     Ok(res) => {
                         let version = res.inner().version;
-                        info!("Node {} @ version {}", node.name(), version);
                         // ensure a threshold liveness for each node
                         // we want to guarantee node is making progress without spinning too long
                         if version > 100 {
                             info!("Node {} healthy @ version {} > 100", node.name(), version);
                             return Ok(());
                         }
+                        info!("Node {} @ version {}", node.name(), version);
                         bail!(
                             "Node {} unhealthy: REST API returned version 0",
                             node.name()
@@ -423,5 +534,31 @@ impl Drop for K8sSwarm {
         } else {
             println!("Keeping kube_namespace {}", self.kube_namespace);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_service_name_from_stateful_set_name() {
+        let validator_sts_name = "aptos-node-19-validator";
+        let validator_service_name =
+            parse_service_name_from_stateful_set_name(validator_sts_name, false);
+        assert_eq!("aptos-node-19-validator", &validator_service_name);
+        // with haproxy
+        let validator_service_name =
+            parse_service_name_from_stateful_set_name(validator_sts_name, true);
+        assert_eq!("aptos-node-19-validator-lb", &validator_service_name);
+
+        let fullnode_sts_name = "aptos-node-0-fullnode-eforge195";
+        let fullnode_service_name =
+            parse_service_name_from_stateful_set_name(fullnode_sts_name, false);
+        assert_eq!("aptos-node-0-fullnode", &fullnode_service_name);
+        // with haproxy
+        let fullnode_service_name =
+            parse_service_name_from_stateful_set_name(fullnode_sts_name, true);
+        assert_eq!("aptos-node-0-fullnode-lb", &fullnode_service_name);
     }
 }

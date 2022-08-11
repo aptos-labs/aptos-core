@@ -3,6 +3,7 @@
 
 use crate::tests::utils::{create_empty_epoch_state, create_epoch_ending_ledger_info};
 use crate::{
+    error::Error, metadata_storage::MetadataStorageInterface,
     storage_synchronizer::StorageSynchronizerInterface, tests::utils::create_transaction_info,
 };
 use anyhow::Result;
@@ -38,7 +39,7 @@ use executor_types::{ChunkCommitNotification, ChunkExecutorTrait};
 use mockall::mock;
 use std::sync::Arc;
 use storage_interface::{
-    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order, StartupInfo,
+    state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, ExecutedTrees, Order,
     StateSnapshotReceiver,
 };
 use tokio::task::JoinHandle;
@@ -108,6 +109,9 @@ pub fn create_ready_storage_synchronizer(expect_reset_executor: bool) -> MockSto
         .return_const(false);
     if expect_reset_executor {
         mock_storage_synchronizer
+            .expect_finish_chunk_executor()
+            .return_const(());
+        mock_storage_synchronizer
             .expect_reset_chunk_executor()
             .return_const(Ok(()));
     }
@@ -150,6 +154,8 @@ mock! {
         fn commit_chunk(&self) -> Result<ChunkCommitNotification>;
 
         fn reset(&self) -> Result<()>;
+
+        fn finish(&self);
     }
 }
 
@@ -198,6 +204,7 @@ mock! {
             start: u64,
             order: Order,
             limit: u64,
+            ledger_version: Version,
         ) -> Result<Vec<EventWithVersion>>;
 
         fn get_block_timestamp(&self, version: u64) -> Result<u64>;
@@ -221,8 +228,6 @@ mock! {
         fn get_latest_version(&self) -> Result<Version>;
 
         fn get_latest_commit_metadata(&self) -> Result<(Version, u64)>;
-
-        fn get_startup_info(&self) -> Result<Option<StartupInfo>>;
 
         fn get_account_transaction(
             &self,
@@ -283,7 +288,7 @@ mock! {
             chunk_size: usize,
         ) -> Result<StateValueChunkWithProof>;
 
-        fn get_state_prune_window(&self) -> Result<Option<usize>>;
+        fn get_state_prune_window(&self) -> Result<usize>;
     }
 }
 
@@ -311,10 +316,40 @@ mock! {
             first_version: Version,
             base_state_version: Option<Version>,
             ledger_info_with_sigs: Option<&'a LedgerInfoWithSignatures>,
+            sync_commit: bool,
             in_memory_state: StateDelta,
         ) -> Result<()>;
 
         fn delete_genesis(&self) -> Result<()>;
+    }
+}
+
+// This automatically creates a MockMetadataStorage.
+mock! {
+    pub MetadataStorage {}
+    impl MetadataStorageInterface for MetadataStorage {
+        fn is_snapshot_sync_complete(
+            &self,
+            target_ledger_info: &LedgerInfoWithSignatures,
+        ) -> Result<bool, Error>;
+
+        fn get_last_persisted_state_value_index(
+            &self,
+            target_ledger_info: &LedgerInfoWithSignatures,
+        ) -> Result<u64, Error>;
+
+        fn previous_snapshot_sync_target(&self) -> Result<Option<LedgerInfoWithSignatures>, Error>;
+
+        fn update_last_persisted_state_value_index(
+            &self,
+            target_ledger_info: &LedgerInfoWithSignatures,
+            last_persisted_state_value_index: u64,
+            snapshot_sync_completed: bool,
+        ) -> Result<(), Error>;
+    }
+
+    impl Clone for MetadataStorage {
+        fn clone(&self) -> Self;
     }
 }
 
@@ -422,7 +457,9 @@ mock! {
             state_value_chunk_with_proof: StateValueChunkWithProof,
         ) -> Result<(), crate::error::Error>;
 
-        fn reset_chunk_executor(&mut self) -> Result<(), crate::error::Error>;
+        fn reset_chunk_executor(&self) -> Result<(), crate::error::Error>;
+
+        fn finish_chunk_executor(&self);
     }
     impl Clone for StorageSynchronizer {
         fn clone(&self) -> Self;

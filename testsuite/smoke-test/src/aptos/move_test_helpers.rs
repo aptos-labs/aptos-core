@@ -4,43 +4,30 @@
 //! Helpers for writing Move tests
 
 use anyhow::Result;
+use aptos::common::types::MovePackageDir;
+use aptos::move_tool::BuiltPackage;
 use aptos_sdk::transaction_builder::TransactionFactory;
-use aptos_types::transaction::{ModuleBundle, TransactionPayload};
-use forge::AptosContext;
-use move_deps::move_package;
+use forge::AptosPublicInfo;
+use framework::natives::code::UpgradePolicy;
 use std::path::PathBuf;
 
-pub async fn publish_code(
-    ctx: &mut AptosContext<'_>,
+/// New style publishing via `code::publish_package`
+pub async fn publish_package(
+    info: &mut AptosPublicInfo<'_>,
     move_dir: PathBuf,
+    upgrade_policy: UpgradePolicy,
 ) -> Result<TransactionFactory> {
-    let build_config = move_package::BuildConfig {
-        generate_docs: true,
-        generate_abis: true,
-        install_dir: Some(move_dir.clone()),
-        ..Default::default()
-    };
-
-    let compiled_package = build_config
-        .clone()
-        .compile_package(&move_dir, &mut std::io::stderr())
-        .unwrap();
-
-    let mut blobs = vec![];
-    compiled_package
-        .root_modules_map()
-        .iter_modules()
-        .first()
-        .unwrap()
-        .serialize(&mut blobs)
-        .unwrap();
-
-    let txn_factory = ctx.aptos_transaction_factory();
-    let publish_txn = ctx
+    let package = BuiltPackage::build(MovePackageDir::new(move_dir), true, true)?;
+    let blobs = package.extract_code();
+    let metadata = package.extract_metadata(upgrade_policy)?;
+    let payload = aptos_transaction_builder::aptos_stdlib::code_publish_package_txn(
+        bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+        blobs,
+    );
+    let txn_factory = info.transaction_factory();
+    let publish_txn = info
         .root_account()
-        .sign_with_transaction_builder(txn_factory.payload(TransactionPayload::ModuleBundle(
-            ModuleBundle::singleton(blobs.clone()),
-        )));
-    ctx.client().submit_and_wait(&publish_txn).await?;
+        .sign_with_transaction_builder(txn_factory.payload(payload));
+    info.client().submit_and_wait(&publish_txn).await?;
     Ok(txn_factory)
 }

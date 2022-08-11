@@ -81,7 +81,7 @@ impl<'t> AccountMinter<'t> {
                 &req.rest_clients,
                 expected_num_seed_accounts,
                 coins_per_seed_account,
-                req.vasp,
+                req.reuse_accounts,
             )
             .await?;
         let actual_num_seed_accounts = seed_accounts.len();
@@ -96,7 +96,6 @@ impl<'t> AccountMinter<'t> {
             "Minting additional {} accounts with {} coins each",
             num_accounts, coins_per_account
         );
-        // tokio::time::sleep(Duration::from_secs(10)).await;
 
         let seed_rngs = gen_rng_for_reusable_account(actual_num_seed_accounts);
         // For each seed account, create a future and transfer coins from that seed account to new accounts
@@ -114,8 +113,8 @@ impl<'t> AccountMinter<'t> {
                     20,
                     cur_client,
                     &txn_factory,
-                    req.vasp,
-                    if req.vasp {
+                    req.reuse_accounts,
+                    if req.reuse_accounts {
                         seed_rngs[i].clone()
                     } else {
                         StdRng::from_rng(self.rng()).unwrap()
@@ -337,10 +336,7 @@ pub fn create_and_fund_account_request(
     let preimage = AuthenticationKeyPreimage::ed25519(pubkey);
     let auth_key = AuthenticationKey::from_preimage(&preimage);
     creation_account.sign_with_transaction_builder(txn_factory.payload(
-        aptos_stdlib::encode_account_utils_create_and_fund_account(
-            auth_key.derived_address(),
-            amount,
-        ),
+        aptos_stdlib::account_transfer(auth_key.derived_address(), amount),
     ))
 }
 

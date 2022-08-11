@@ -14,7 +14,7 @@ use aptos_types::{
 };
 use aptos_vm::VMExecutor;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait};
-use storage_interface::{state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter, StartupInfo};
+use storage_interface::{state_delta::StateDelta, DbReader, DbReaderWriter, DbWriter};
 
 fn create_test_executor() -> BlockExecutor<FakeVM> {
     // setup fake db
@@ -28,7 +28,7 @@ pub fn fuzz_execute_and_commit_chunk(
     verified_target_li: LedgerInfoWithSignatures,
 ) {
     let db = DbReaderWriter::new(FakeDb {});
-    let executor = ChunkExecutor::<FakeVM>::new(db).unwrap();
+    let executor = ChunkExecutor::<FakeVM>::new(db);
 
     let _events = executor.execute_and_commit_chunk(txn_list_with_proof, &verified_target_li, None);
 }
@@ -75,10 +75,6 @@ impl DbReader for FakeDb {
         let ledger_info = ledger_info_with_sig.ledger_info();
         Ok((ledger_info.version(), ledger_info.timestamp_usecs()))
     }
-
-    fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
-        Ok(Some(StartupInfo::new_for_testing()))
-    }
 }
 
 impl DbWriter for FakeDb {
@@ -88,6 +84,7 @@ impl DbWriter for FakeDb {
         _first_version: Version,
         _base_state_version: Option<Version>,
         _ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        _sync_commit: bool,
         _in_memory_state: StateDelta,
     ) -> Result<()> {
         Ok(())

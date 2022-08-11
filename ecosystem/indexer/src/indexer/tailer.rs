@@ -1,14 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    database::PgDbPool,
+    database::{execute_with_better_error, PgDbPool},
     indexer::{
-        errors::TransactionProcessingError, fetcher::TransactionFetcher,
-        processing_result::ProcessingResult, transaction_processor::TransactionProcessor,
+        errors::TransactionProcessingError,
+        fetcher::{TransactionFetcher, TransactionFetcherTrait},
+        processing_result::ProcessingResult,
+        transaction_processor::TransactionProcessor,
     },
+    models::ledger_info::LedgerInfo,
+    schema::ledger_infos::{self, dsl},
 };
+use anyhow::{ensure, Context, Result};
 use aptos_logger::info;
 use aptos_rest_client::Transaction;
+use diesel::{prelude::*, RunQueryDsl};
 use serde_json::Value;
 use std::{fmt::Debug, sync::Arc};
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -51,7 +57,7 @@ pub fn remove_null_bytes_from_txn(txn: Arc<Transaction>) -> Arc<Transaction> {
 
 #[derive(Clone)]
 pub struct Tailer {
-    transaction_fetcher: Arc<Mutex<TransactionFetcher>>,
+    transaction_fetcher: Arc<Mutex<dyn TransactionFetcherTrait>>,
     processors: Vec<Arc<dyn TransactionProcessor>>,
     connection_pool: PgDbPool,
 }
@@ -78,6 +84,47 @@ impl Tailer {
         )
         .expect("migrations failed!");
         info!("Migrations complete!");
+    }
+
+    /// If chain id doesn't exist, save it. Otherwise make sure that we're indexing the same chain
+    pub async fn check_or_update_chain_id(&self) -> anyhow::Result<usize> {
+        info!("Checking if chain id is correct");
+        let conn = self
+            .connection_pool
+            .get()
+            .expect("DB connection should be available at this stage");
+
+        let query_chain = dsl::ledger_infos
+            .select(dsl::chain_id)
+            .load::<i64>(&conn)
+            .expect("Error loading chain id from db");
+        let maybe_existing_chain_id = query_chain.first();
+
+        let new_chain_id = self
+            .transaction_fetcher
+            .lock()
+            .await
+            .fetch_ledger_info()
+            .await
+            .chain_id as i64;
+
+        match maybe_existing_chain_id {
+            Some(chain_id) => {
+                ensure!(*chain_id == new_chain_id, "Wrong chain detected! Trying to index chain {} now but existing data is for chain {}", new_chain_id, chain_id);
+                info!("Chain id matches! Continuing to index chain {}", chain_id);
+                Ok(0)
+            }
+            None => {
+                info!("Adding chain id {} to db, continue indexing", new_chain_id);
+                execute_with_better_error(
+                    &conn,
+                    diesel::insert_into(ledger_infos::table).values(LedgerInfo {
+                        chain_id: new_chain_id,
+                    }),
+                )
+                .context(r#"Error updating chain_id!"#)
+            }
+        }
     }
 
     pub fn add_processor(&mut self, processor: Arc<dyn TransactionProcessor>) {
@@ -238,22 +285,68 @@ mod test {
         models::transactions::TransactionModel,
         token_processor::TokenTransactionProcessor,
     };
+    use aptos_rest_client::State;
     use diesel::Connection;
     use serde_json::json;
+
+    struct FakeFetcher {
+        version: u64,
+        chain_id: u8,
+    }
+
+    impl FakeFetcher {
+        fn new(_node_url: Url, _starting_version: Option<u64>) -> Self {
+            Self {
+                version: 0,
+                chain_id: 0,
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl TransactionFetcherTrait for FakeFetcher {
+        fn set_version(&mut self, version: u64) {
+            self.version = version;
+            // Super hacky way of mocking chain_id
+            self.chain_id = version as u8;
+        }
+
+        async fn fetch_ledger_info(&mut self) -> State {
+            State {
+                chain_id: self.chain_id,
+                epoch: 0,
+                version: 0,
+                timestamp_usecs: 0,
+                oldest_ledger_version: 0,
+                oldest_block_height: 0,
+                block_height: 0,
+            }
+        }
+
+        async fn fetch_next(&mut self) -> Transaction {
+            unimplemented!();
+        }
+
+        async fn fetch_version(&self, _version: u64) -> Transaction {
+            unimplemented!();
+        }
+    }
 
     pub fn wipe_database(conn: &PgPoolConnection) {
         for table in [
             "metadatas",
-            "ownerships",
             "token_activities",
-            "tokens",
+            "token_datas",
+            "token_propertys",
             "collections",
+            "ownerships",
             "write_set_changes",
             "events",
             "user_transactions",
             "block_metadata_transactions",
             "transactions",
             "processor_statuses",
+            "ledger_infos",
             "__diesel_schema_migrations",
         ] {
             conn.execute(&format!("DROP TABLE IF EXISTS {}", table))
@@ -268,10 +361,14 @@ mod test {
         wipe_database(&conn_pool.get()?);
 
         let mut tailer = Tailer::new("http://fake-url.aptos.dev", conn_pool.clone())?;
+        tailer.transaction_fetcher = Arc::new(Mutex::new(FakeFetcher::new(
+            Url::parse("http://fake-url.aptos.dev")?,
+            None,
+        )));
         tailer.run_migrations();
 
         let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
-        let token_transaction_processor = TokenTransactionProcessor::new(conn_pool.clone());
+        let token_transaction_processor = TokenTransactionProcessor::new(conn_pool.clone(), false);
         tailer.add_processor(Arc::new(pg_transaction_processor));
         tailer.add_processor(Arc::new(token_transaction_processor));
         Ok((conn_pool, tailer))
@@ -304,7 +401,6 @@ mod test {
                         "type":"0x1::account::Account",
                         "data":{
                            "authentication_key":"0x1e4dcad3d5d94307f30d51ff66d2ce784e0c2822d3138766907179bcb61f9edc",
-                           "self_address":"0x1",
                            "sequence_number":"0"
                         }
                      }
@@ -385,7 +481,6 @@ mod test {
                               "type":"0x1::account::Account",
                               "data":{
                                  "authentication_key":"0x1e4dcad3d5d94307f30d51ff66d2ce784e0c2822d3138766907179bcb61f9edc",
-                                 "self_address":"0x1",
                                  "sequence_number":"0"
                               }
                            }
@@ -529,7 +624,7 @@ mod test {
                   "address": "0xa550c18",
                   "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
                   "data": {
-                    "type": "0x1::block::BlockMetadata",
+                    "type": "0x1::block::BlockResource",
                     "data": {
                       "height": "1",
                       "new_block_events": {
@@ -641,7 +736,7 @@ mod test {
                   "address": "0xa550c18",
                   "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
                   "data": {
-                    "type": "0x1::block::BlockMetadata",
+                    "type": "0x1::block::BlockResource",
                     "data": {
                       "height": "1",
                       "new_block_events": {
@@ -767,5 +862,16 @@ mod test {
             .process_transaction(Arc::new(message_txn.clone()))
             .await
             .unwrap();
+
+        let (_conn_pool, tailer) = setup_indexer().unwrap();
+        tailer.set_fetcher_version(4).await;
+        assert!(tailer.check_or_update_chain_id().await.is_ok());
+        assert!(tailer.check_or_update_chain_id().await.is_ok());
+
+        tailer.set_fetcher_version(10).await;
+        assert!(tailer.check_or_update_chain_id().await.is_err());
+
+        tailer.set_fetcher_version(4).await;
+        assert!(tailer.check_or_update_chain_id().await.is_ok());
     }
 }

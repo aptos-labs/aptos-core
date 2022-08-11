@@ -82,6 +82,7 @@ pub struct TransactionFactory {
 impl TransactionFactory {
     pub fn new(chain_id: ChainId) -> Self {
         Self {
+            // TODO(Gas): double check if this right
             max_gas_amount: 2_000,
             gas_unit_price: 0,
             transaction_expiration_time: 30,
@@ -131,29 +132,29 @@ impl TransactionFactory {
 
     pub fn create_user_account(&self, public_key: &Ed25519PublicKey) -> TransactionBuilder {
         let preimage = AuthenticationKeyPreimage::ed25519(public_key);
-        self.payload(aptos_stdlib::encode_account_create_account(
+        self.payload(aptos_stdlib::account_create_account(
             AuthenticationKey::from_preimage(&preimage).derived_address(),
         ))
     }
 
-    pub fn create_and_fund_user_account(
+    pub fn implicitly_create_user_account_and_transfer(
         &self,
         public_key: &Ed25519PublicKey,
         amount: u64,
     ) -> TransactionBuilder {
         let preimage = AuthenticationKeyPreimage::ed25519(public_key);
-        self.payload(aptos_stdlib::encode_account_utils_create_and_fund_account(
+        self.payload(aptos_stdlib::account_transfer(
             AuthenticationKey::from_preimage(&preimage).derived_address(),
             amount,
         ))
     }
 
     pub fn transfer(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {
-        self.payload(aptos_stdlib::encode_aptos_coin_transfer(to, amount))
+        self.payload(aptos_stdlib::aptos_coin_transfer(to, amount))
     }
 
     pub fn mint(&self, to: AccountAddress, amount: u64) -> TransactionBuilder {
-        self.payload(aptos_stdlib::encode_aptos_coin_mint(to, amount))
+        self.payload(aptos_stdlib::aptos_coin_mint(to, amount))
     }
 
     //

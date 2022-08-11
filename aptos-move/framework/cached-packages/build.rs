@@ -14,7 +14,7 @@ fn main() {
         no_check_layout_compatibility: false,
         no_build_docs: false,
         with_diagram: false,
-        no_script_builder: true, // TODO: consider bringing this back
+        no_script_builder: false,
         no_script_abis: false,
         no_errmap: false,
         package: PathBuf::from("aptos-framework"),
@@ -26,12 +26,24 @@ fn main() {
     };
     release.create_release();
 
+    std::fs::copy(
+        PathBuf::from(std::env::var("OUT_DIR").unwrap())
+            .join("framework")
+            .join("aptos_sdk_builder.rs"),
+        std::env::current_dir()
+            .unwrap()
+            .join("src")
+            .join("aptos_framework_sdk_builder.rs"),
+    )
+    .unwrap();
+
     println!("cargo:rerun-if-changed=../aptos-token/sources");
+    println!("cargo:rerun-if-changed=../aptos-token/Move.toml");
     let token_release = framework::release::ReleaseOptions {
         no_check_layout_compatibility: false,
-        no_build_docs: true,
-        with_diagram: true,
-        no_script_builder: true,
+        no_build_docs: false,
+        with_diagram: false,
+        no_script_builder: false,
         no_script_abis: false,
         no_errmap: false,
         package: PathBuf::from("aptos-token"),
@@ -42,4 +54,15 @@ fn main() {
         )),
     };
     token_release.create_release();
+    // TODO: re-enable file copy after abigen works for string type
+    /* std::fs::copy(
+        PathBuf::from(std::env::var("OUT_DIR").unwrap())
+            .join("token")
+            .join("aptos_sdk_builder.rs"),
+        std::env::current_dir()
+            .unwrap()
+            .join("src")
+            .join("aptos_token_sdk_builder.rs"),
+    )
+    .unwrap();*/
 }

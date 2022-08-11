@@ -3,7 +3,7 @@
 
 use crate::AptosValidatorInterface;
 use anyhow::{anyhow, Result};
-use aptos_config::config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE};
 use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
@@ -25,6 +25,8 @@ impl DBDebuggerInterface {
             true,
             NO_OP_STORAGE_PRUNER_CONFIG,
             RocksdbConfigs::default(),
+            false,
+            TARGET_SNAPSHOT_SIZE,
         )?)))
     }
 }
@@ -36,6 +38,7 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         version: Version,
     ) -> Result<Option<AccountState>> {
         AccountState::from_access_paths_and_values(
+            account,
             &self
                 .0
                 .get_state_values_by_key_prefix(&StateKeyPrefix::from(account), version)?,
@@ -58,9 +61,12 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         key: &EventKey,
         start_seq: u64,
         limit: u64,
+        ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
-        self.0.get_events(key, start_seq, Order::Ascending, limit)
+        self.0
+            .get_events(key, start_seq, Order::Ascending, limit, ledger_version)
     }
+
     fn get_committed_transactions(&self, start: Version, limit: u64) -> Result<Vec<Transaction>> {
         Ok(self
             .0

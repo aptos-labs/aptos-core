@@ -5,12 +5,12 @@ table! {
     block_metadata_transactions (hash) {
         hash -> Varchar,
         id -> Varchar,
-        round -> Int8,
+        round -> Numeric,
         previous_block_votes -> Jsonb,
         proposer -> Varchar,
         timestamp -> Timestamp,
         inserted_at -> Timestamp,
-        epoch -> Int8,
+        epoch -> Numeric,
         previous_block_votes_bitmap -> Jsonb,
         failed_proposer_indices -> Jsonb,
     }
@@ -22,7 +22,7 @@ table! {
         creator -> Varchar,
         name -> Varchar,
         description -> Varchar,
-        max_amount -> Nullable<Int8>,
+        max_amount -> Numeric,
         uri -> Varchar,
         created_at -> Timestamp,
         inserted_at -> Timestamp,
@@ -33,7 +33,7 @@ table! {
     events (key, sequence_number) {
         transaction_hash -> Varchar,
         key -> Varchar,
-        sequence_number -> Int8,
+        sequence_number -> Numeric,
         #[sql_name = "type"]
         type_ -> Text,
         data -> Jsonb,
@@ -42,11 +42,17 @@ table! {
 }
 
 table! {
+    ledger_infos (chain_id) {
+        chain_id -> Int8,
+    }
+}
+
+table! {
     metadatas (token_id) {
         token_id -> Varchar,
         name -> Nullable<Varchar>,
         symbol -> Nullable<Varchar>,
-        seller_fee_basis_points -> Nullable<Int8>,
+        seller_fee_basis_points -> Numeric,
         description -> Nullable<Varchar>,
         image -> Varchar,
         external_url -> Nullable<Varchar>,
@@ -63,7 +69,7 @@ table! {
         ownership_id -> Varchar,
         token_id -> Nullable<Varchar>,
         owner -> Nullable<Varchar>,
-        amount -> Int8,
+        amount -> Numeric,
         updated_at -> Timestamp,
         inserted_at -> Timestamp,
     }
@@ -72,7 +78,7 @@ table! {
 table! {
     processor_statuses (name, version) {
         name -> Varchar,
-        version -> Int8,
+        version -> Numeric,
         success -> Bool,
         details -> Nullable<Text>,
         last_updated -> Timestamp,
@@ -82,7 +88,7 @@ table! {
 table! {
     token_activities (event_key, sequence_number) {
         event_key -> Varchar,
-        sequence_number -> Int8,
+        sequence_number -> Numeric,
         account -> Varchar,
         token_id -> Nullable<Varchar>,
         event_type -> Nullable<Varchar>,
@@ -94,17 +100,36 @@ table! {
 }
 
 table! {
-    tokens (token_id) {
-        token_id -> Varchar,
+    token_datas (token_data_id) {
+        token_data_id -> Varchar,
         creator -> Varchar,
         collection -> Varchar,
         name -> Varchar,
         description -> Varchar,
-        max_amount -> Nullable<Int8>,
-        supply -> Int8,
+        max_amount -> Numeric,
+        supply -> Numeric,
         uri -> Varchar,
+        royalty_payee_address -> Varchar,
+        royalty_points_denominator -> Numeric,
+        royalty_points_numerator -> Numeric,
+        mutability_config -> Varchar,
+        property_keys -> Varchar,
+        property_values -> Varchar,
+        property_types -> Varchar,
         minted_at -> Timestamp,
         last_minted_at -> Timestamp,
+        inserted_at -> Timestamp,
+    }
+}
+
+table! {
+    token_propertys (token_id) {
+        token_id -> Varchar,
+        previous_token_id -> Varchar,
+        property_keys -> Varchar,
+        property_values -> Varchar,
+        property_types -> Varchar,
+        updated_at -> Timestamp,
         inserted_at -> Timestamp,
     }
 }
@@ -114,11 +139,11 @@ table! {
         #[sql_name = "type"]
         type_ -> Varchar,
         payload -> Jsonb,
-        version -> Int8,
+        version -> Numeric,
         hash -> Varchar,
         state_root_hash -> Varchar,
         event_root_hash -> Varchar,
-        gas_used -> Int8,
+        gas_used -> Numeric,
         success -> Bool,
         vm_status -> Text,
         accumulator_root_hash -> Varchar,
@@ -131,10 +156,10 @@ table! {
         hash -> Varchar,
         signature -> Jsonb,
         sender -> Varchar,
-        sequence_number -> Int8,
-        max_gas_amount -> Int8,
+        sequence_number -> Numeric,
+        max_gas_amount -> Numeric,
         expiration_timestamp_secs -> Timestamp,
-        gas_unit_price -> Int8,
+        gas_unit_price -> Numeric,
         timestamp -> Timestamp,
         inserted_at -> Timestamp,
     }
@@ -158,11 +183,13 @@ allow_tables_to_appear_in_same_query!(
     block_metadata_transactions,
     collections,
     events,
+    ledger_infos,
     metadatas,
     ownerships,
     processor_statuses,
     token_activities,
-    tokens,
+    token_datas,
+    token_propertys,
     transactions,
     user_transactions,
     write_set_changes,

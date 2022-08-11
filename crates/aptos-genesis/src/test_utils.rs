@@ -14,10 +14,6 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
         cached_framework_packages::module_blobs().to_vec(),
     )
     .unwrap()
-    .with_template(NodeConfig::default_for_validator())
-    .with_min_lockup_duration_secs(0)
-    .with_max_lockup_duration_secs(86400)
-    .with_initial_lockup_timestamp(0)
     .build(StdRng::from_seed([0; 32]))
     .unwrap();
     let (

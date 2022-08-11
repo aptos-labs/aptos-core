@@ -20,10 +20,10 @@ pub static EPOCH_ENDING_EPOCH: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static STATE_SNAPSHOT_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+pub static STATE_SNAPSHOT_EPOCH: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_db_backup_coordinator_state_snapshot_version",
-        "The version of the latest state snapshot taken."
+        "aptos_db_backup_coordinator_state_snapshot_epoch",
+        "The epoch at the end of which the latest state snapshot was taken."
     )
     .unwrap()
 });

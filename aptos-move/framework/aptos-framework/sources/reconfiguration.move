@@ -14,8 +14,7 @@ module aptos_framework::reconfiguration {
     // TODO: migrate all to callback in block prologue
     friend aptos_framework::consensus_config;
     friend aptos_framework::version;
-    friend aptos_framework::vm_config;
-    friend aptos_framework::transaction_publishing_option;
+    friend aptos_framework::gas_schedule;
 
     /// Event that signals consensus to start a new epoch,
     /// with new configuration information. This is also called a
@@ -59,7 +58,7 @@ module aptos_framework::reconfiguration {
 
         assert!(!exists<Configuration>(@aptos_framework), error::already_exists(ECONFIGURATION));
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
-        assert!(guid::get_next_creation_num(signer::address_of(account)) == 2, error::invalid_state(EINVALID_GUID_FOR_EVENT));
+        assert!(guid::get_next_creation_num(signer::address_of(account)) == 1, error::invalid_state(EINVALID_GUID_FOR_EVENT));
         move_to<Configuration>(
             account,
             Configuration {

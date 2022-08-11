@@ -20,6 +20,8 @@ use std::sync::{atomic::Ordering, Arc};
 
 pub const LEDGER_PRUNER_NAME: &str = "ledger pruner";
 
+#[derive(Debug)]
+/// Responsible for pruning everything except for the state tree.
 pub struct LedgerPruner {
     db: Arc<DB>,
     /// Keeps track of the target version that the pruner needs to achieve.
@@ -36,7 +38,7 @@ impl DBPruner for LedgerPruner {
         LEDGER_PRUNER_NAME
     }
 
-    fn prune(&self, max_versions: u64) -> anyhow::Result<Version> {
+    fn prune(&self, max_versions: usize) -> anyhow::Result<Version> {
         if !self.is_pruning_pending() {
             return Ok(self.min_readable_version());
         }
@@ -44,7 +46,7 @@ impl DBPruner for LedgerPruner {
         let min_readable_version = self.min_readable_version();
         // Current target version might be less than the target version to ensure we don't prune
         // more than max_version in one go.
-        let current_target_version = self.get_currrent_batch_target(max_versions);
+        let current_target_version = self.get_currrent_batch_target(max_versions as Version);
 
         self.transaction_store_pruner.prune(
             &mut db_batch,
@@ -65,9 +67,13 @@ impl DBPruner for LedgerPruner {
             current_target_version,
         )?;
 
-        self.record_progress(current_target_version);
         // Commit all the changes to DB atomically
         self.db.write_schemas(db_batch)?;
+
+        // TODO(zcc): recording progress after writing schemas might provide wrong answers to
+        // API calls when they query min_readable_version while the write_schemas are still in
+        // progress.
+        self.record_progress(current_target_version);
         Ok(current_target_version)
     }
 
@@ -97,10 +103,15 @@ impl DBPruner for LedgerPruner {
             .with_label_values(&["ledger_pruner"])
             .set(min_readable_version as i64);
     }
+
+    /// (For tests only.) Updates the minimal readable version kept by pruner.
+    fn testonly_update_min_version(&self, version: Version) {
+        self.min_readable_version.store(version, Ordering::Relaxed)
+    }
 }
 
 impl LedgerPruner {
-    pub(in crate::pruner) fn new(
+    pub fn new(
         db: Arc<DB>,
         transaction_store: Arc<TransactionStore>,
         event_store: Arc<EventStore>,

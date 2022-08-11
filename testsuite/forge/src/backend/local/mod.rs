@@ -3,7 +3,9 @@
 
 use crate::{Factory, GenesisConfig, Result, Swarm, Version};
 use anyhow::{bail, Context};
+use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use rand::rngs::StdRng;
+use std::time::Duration;
 use std::{
     collections::HashMap,
     num::NonZeroUsize,
@@ -15,7 +17,7 @@ mod cargo;
 mod node;
 mod swarm;
 pub use node::LocalNode;
-pub use swarm::{LocalSwarm, LocalSwarmBuilder, SwarmDirectory};
+pub use swarm::{LocalSwarm, SwarmDirectory};
 
 #[derive(Clone, Debug)]
 pub struct LocalVersion {
@@ -112,7 +114,7 @@ impl LocalFactory {
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
         let version = self.versions.keys().max().unwrap();
-        self.new_swarm_with_version(rng, number_of_validators, version, None, 1)
+        self.new_swarm_with_version(rng, number_of_validators, version, None, None, None)
             .await
     }
 
@@ -122,20 +124,24 @@ impl LocalFactory {
         number_of_validators: NonZeroUsize,
         version: &Version,
         genesis_modules: Option<Vec<Vec<u8>>>,
-        min_price_per_gas_unit: u64,
+        init_config: Option<InitConfigFn>,
+        init_genesis_config: Option<InitGenesisConfigFn>,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        let mut builder = LocalSwarm::builder(self.versions.clone())
-            .number_of_validators(number_of_validators)
-            .initial_version(version.clone())
-            .min_price_per_gas_unit(min_price_per_gas_unit);
-        if let Some(genesis_modules) = genesis_modules {
-            builder = builder.genesis_modules(genesis_modules);
-        }
+        println!("Preparing a new swarm");
+        let mut swarm = LocalSwarm::build(
+            rng,
+            number_of_validators,
+            self.versions.clone(),
+            Some(version.clone()),
+            init_config,
+            init_genesis_config,
+            None,
+            genesis_modules,
+        )?;
 
-        let mut swarm = builder.build(rng)?;
         swarm
             .launch()
             .await
@@ -154,10 +160,13 @@ impl Factory for LocalFactory {
     async fn launch_swarm(
         &self,
         rng: &mut StdRng,
-        node_num: NonZeroUsize,
+        num_validators: NonZeroUsize,
+        // TODO: support fullnodes in local forge
+        _num_fullnodes: usize,
         version: &Version,
         _genesis_version: &Version,
         genesis_config: Option<&GenesisConfig>,
+        _cleanup_duration: Duration,
     ) -> Result<Box<dyn Swarm>> {
         let genesis_modules = match genesis_config {
             Some(config) => match config {
@@ -169,7 +178,7 @@ impl Factory for LocalFactory {
             None => None,
         };
         let swarm = self
-            .new_swarm_with_version(rng, node_num, version, genesis_modules, 1)
+            .new_swarm_with_version(rng, num_validators, version, genesis_modules, None, None)
             .await?;
 
         Ok(Box::new(swarm))

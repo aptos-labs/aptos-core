@@ -4,21 +4,27 @@ module aptos_framework::account {
     use std::hash;
     use std::signer;
     use std::vector;
+    use aptos_std::event::{Self, EventHandle};
+    use aptos_std::type_info::{Self, TypeInfo};
+    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
-    use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
-    use aptos_framework::transaction_publishing_option;
-    use aptos_framework::system_addresses;
 
+    friend aptos_framework::coins;
     friend aptos_framework::genesis;
 
     /// Resource representing an account.
     struct Account has key, store {
         authentication_key: vector<u8>,
         sequence_number: u64,
-        self_address: address,
+        coin_register_events: EventHandle<CoinRegisterEvent>,
+    }
+
+    struct CoinRegisterEvent has drop, store {
+        type_info: TypeInfo,
     }
 
     /// This holds information that will be picked up by the VM to call the
@@ -32,7 +38,6 @@ module aptos_framework::account {
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
         writeset_epilogue_name: vector<u8>,
-        currency_code_required: bool,
     }
 
     struct SignerCapability has drop, store { account: address }
@@ -90,7 +95,6 @@ module aptos_framework::account {
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
         writeset_epilogue_name: vector<u8>,
-        currency_code_required: bool,
     ) {
         system_addresses::assert_aptos_framework(account);
 
@@ -103,7 +107,6 @@ module aptos_framework::account {
             multi_agent_prologue_name,
             user_epilogue_name,
             writeset_epilogue_name,
-            currency_code_required,
         });
     }
 
@@ -150,7 +153,7 @@ module aptos_framework::account {
             Account {
                 authentication_key,
                 sequence_number: 0,
-                self_address: new_address,
+                coin_register_events: event::new_event_handle<CoinRegisterEvent>(&new_account),
             }
         );
 
@@ -245,7 +248,6 @@ module aptos_framework::account {
         txn_expiration_time: u64,
         chain_id: u8,
     ) acquires Account {
-        assert!(transaction_publishing_option::is_module_allowed(), error::invalid_state(PROLOGUE_EMODULE_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
@@ -257,9 +259,8 @@ module aptos_framework::account {
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
         chain_id: u8,
-        script_hash: vector<u8>,
+        _script_hash: vector<u8>,
     ) acquires Account {
-        assert!(transaction_publishing_option::is_script_allowed(&script_hash), error::invalid_state(PROLOGUE_ESCRIPT_NOT_ALLOWED));
         prologue_common(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
@@ -358,9 +359,10 @@ module aptos_framework::account {
     /// Basic account creation methods.
     ///////////////////////////////////////////////////////////////////////////
 
-    public entry fun create_account(auth_key: address) {
+    public entry fun create_account(auth_key: address) acquires Account {
         let signer = create_account_internal(auth_key);
         coin::register<AptosCoin>(&signer);
+        register_coin<AptosCoin>(auth_key);
     }
 
     /// A resource account is used to manage resources independent of an account managed by a user.
@@ -383,6 +385,27 @@ module aptos_framework::account {
         let signer = create_account_unchecked(@aptos_framework);
         let signer_cap = SignerCapability { account: @aptos_framework };
         (signer, signer_cap)
+    }
+
+    public entry fun transfer(source: &signer, to: address, amount: u64) acquires Account {
+        if(!exists<Account>(to)) {
+            create_account(to)
+        };
+        coin::transfer<AptosCoin>(source, to, amount)
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    /// Coin management methods.
+    ///////////////////////////////////////////////////////////////////////////
+
+    public(friend) fun register_coin<CoinType>(account_addr: address) acquires Account {
+        let account = borrow_global_mut<Account>(account_addr);
+        event::emit_event<CoinRegisterEvent>(
+            &mut account.coin_register_events,
+            CoinRegisterEvent {
+                type_info: type_info::type_of<CoinType>(),
+            },
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -455,4 +478,27 @@ module aptos_framework::account {
         assert!(borrow_global<Account>(addr).sequence_number == 10, 2);
     }
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Test account helpers
+    ///////////////////////////////////////////////////////////////////////////
+
+    #[test(alice = @0xa11ce, mint = @0xA550C18, core = @0x1)]
+    public fun test_transfer(alice: signer, mint: signer, core: signer) acquires Account {
+        let bob = create_address(x"0000000000000000000000000000000000000000000000000000000000000b0b");
+        let carol = create_address(x"00000000000000000000000000000000000000000000000000000000000ca501");
+
+        let (mint_cap, burn_cap) = aptos_framework::aptos_coin::initialize(&core, &mint);
+        create_account(signer::address_of(&alice));
+        aptos_framework::aptos_coin::mint(&mint, signer::address_of(&alice), 10000);
+        transfer(&alice, bob, 500);
+        assert!(coin::balance<AptosCoin>(bob) == 500, 0);
+        transfer(&alice, carol, 500);
+        assert!(coin::balance<AptosCoin>(carol) == 500, 1);
+        transfer(&alice, carol, 1500);
+        assert!(coin::balance<AptosCoin>(carol) == 2000, 2);
+
+        coin::destroy_mint_cap(mint_cap);
+        coin::destroy_burn_cap(burn_cap);
+        let _bob = bob;
+    }
 }

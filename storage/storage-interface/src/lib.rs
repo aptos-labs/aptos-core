@@ -3,6 +3,8 @@
 
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_types::account_config::NewBlockEvent;
+use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -38,8 +40,9 @@ use thiserror::Error;
 pub mod async_proof_fetcher;
 pub mod cached_state_view;
 mod executed_trees;
+mod metrics;
+#[cfg(any(feature = "fuzzing"))]
 pub mod mock;
-pub mod no_proof_fetcher;
 pub mod proof_fetcher;
 pub mod state_delta;
 pub mod state_view;
@@ -48,66 +51,6 @@ pub mod sync_proof_fetcher;
 use crate::state_delta::StateDelta;
 pub use executed_trees::ExecutedTrees;
 use scratchpad::SparseMerkleTree;
-
-#[derive(Clone, Debug)]
-pub struct StartupInfo {
-    /// The latest ledger info.
-    pub latest_ledger_info: LedgerInfoWithSignatures,
-    /// If the above ledger info doesn't carry a validator set, the latest validator set. Otherwise
-    /// `None`.
-    pub latest_epoch_state: Option<EpochState>,
-    pub committed_trees: ExecutedTrees,
-    pub synced_trees: Option<ExecutedTrees>,
-}
-
-impl StartupInfo {
-    pub fn new(
-        latest_ledger_info: LedgerInfoWithSignatures,
-        latest_epoch_state: Option<EpochState>,
-        committed_trees: ExecutedTrees,
-        synced_trees: Option<ExecutedTrees>,
-    ) -> Self {
-        Self {
-            latest_ledger_info,
-            latest_epoch_state,
-            committed_trees,
-            synced_trees,
-        }
-    }
-
-    #[cfg(any(feature = "fuzzing"))]
-    pub fn new_for_testing() -> Self {
-        use aptos_types::on_chain_config::ValidatorSet;
-
-        let latest_ledger_info =
-            LedgerInfoWithSignatures::genesis(HashValue::zero(), ValidatorSet::empty());
-        let latest_epoch_state = None;
-        let committed_trees = ExecutedTrees::new_empty();
-        let synced_trees = None;
-
-        Self {
-            latest_ledger_info,
-            latest_epoch_state,
-            committed_trees,
-            synced_trees,
-        }
-    }
-
-    pub fn get_epoch_state(&self) -> &EpochState {
-        self.latest_ledger_info
-            .ledger_info()
-            .next_epoch_state()
-            .unwrap_or_else(|| {
-                self.latest_epoch_state
-                    .as_ref()
-                    .expect("EpochState must exist")
-            })
-    }
-
-    pub fn into_latest_executed_trees(self) -> ExecutedTrees {
-        self.synced_trees.unwrap_or(self.committed_trees)
-    }
-}
 
 pub trait StateSnapshotReceiver<K, V>: Send {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()>;
@@ -214,6 +157,13 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// See [AptosDB::get_first_viable_txn_version].
+    ///
+    /// [AptosDB::get_first_viable_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_txn_version
+    fn get_first_viable_txn_version(&self) -> Result<Version> {
+        unimplemented!()
+    }
+
     /// See [AptosDB::get_first_write_set_version].
     ///
     /// [AptosDB::get_first_write_set_version]: ../aptosdb/struct.AptosDB.html#method.get_first_write_set_version
@@ -251,6 +201,7 @@ pub trait DbReader: Send + Sync {
         start: u64,
         order: Order,
         limit: u64,
+        ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
         unimplemented!()
     }
@@ -259,15 +210,23 @@ pub trait DbReader: Send + Sync {
     ///
     /// [AptosDB::get_block_timestamp]:
     /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
-    fn get_block_timestamp(&self, version: u64) -> Result<u64> {
+    fn get_block_timestamp(&self, version: Version) -> Result<u64> {
         unimplemented!()
     }
 
-    /// See [AptosDB::get_block_boundaries].
-    ///
-    /// [AptosDB::get_block_boundaries]:
-    /// ../aptosdb/struct.AptosDB.html#method.get_block_boundaries
-    fn get_block_boundaries(&self, version: u64, latest_ledger_version: u64) -> Result<(u64, u64)> {
+    fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
+        unimplemented!()
+    }
+
+    /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
+    /// transaction version.
+    fn get_block_info(&self, version: Version) -> Result<(Version, Version, NewBlockEvent)> {
+        unimplemented!()
+    }
+
+    /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
+    /// transaction version.
+    fn get_block_info_by_height(&self, height: u64) -> Result<(Version, Version, NewBlockEvent)> {
         unimplemented!()
     }
 
@@ -330,7 +289,7 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Returns the latest state checkpoint version if any.
-    fn get_latest_state_snapshot(&self) -> Result<Option<(Version, HashValue)>> {
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         unimplemented!()
     }
 
@@ -347,15 +306,6 @@ pub trait DbReader: Send + Sync {
         let ledger_info_with_sig = self.get_latest_ledger_info()?;
         let ledger_info = ledger_info_with_sig.ledger_info();
         Ok((ledger_info.version(), ledger_info.timestamp_usecs()))
-    }
-
-    /// Gets information needed from storage during the main node startup.
-    /// See [AptosDB::get_startup_info].
-    ///
-    /// [AptosDB::get_startup_info]:
-    /// ../aptosdb/struct.AptosDB.html#method.get_startup_info
-    fn get_startup_info(&self) -> Result<Option<StartupInfo>> {
-        unimplemented!()
     }
 
     /// Returns a transaction that is the `seq_num`-th one associated with the given account. If
@@ -515,13 +465,33 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// Returns if the state store pruner is enabled.
+    fn is_state_pruner_enabled(&self) -> Result<bool> {
+        unimplemented!()
+    }
+
     /// Get the state prune window config value.
-    fn get_state_prune_window(&self) -> Result<Option<usize>> {
+    fn get_state_prune_window(&self) -> Result<usize> {
+        unimplemented!()
+    }
+
+    /// Returns if the ledger pruner is enabled.
+    fn is_ledger_pruner_enabled(&self) -> Result<bool> {
         unimplemented!()
     }
 
     /// Get the ledger prune window config value.
-    fn get_ledger_prune_window(&self) -> Result<Option<usize>> {
+    fn get_ledger_prune_window(&self) -> Result<usize> {
+        unimplemented!()
+    }
+
+    /// Get table info from the internal indexer.
+    fn get_table_info(&self, handle: TableHandle) -> Result<TableInfo> {
+        unimplemented!()
+    }
+
+    /// Returns whether the internal indexer DB has been enabled or not
+    fn indexer_enabled(&self) -> bool {
         unimplemented!()
     }
 }
@@ -536,8 +506,8 @@ impl MoveStorage for &dyn DbReader {
         access_path: AccessPath,
         version: Version,
     ) -> Result<Vec<u8>> {
-        let (state_value, _) = self
-            .get_state_value_with_proof_by_version(&StateKey::AccessPath(access_path), version)?;
+        let state_value =
+            self.get_state_value_by_version(&StateKey::AccessPath(access_path), version)?;
 
         state_value
             .ok_or_else(|| format_err!("no value found in DB"))?
@@ -546,15 +516,13 @@ impl MoveStorage for &dyn DbReader {
     }
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
-        let config_value_option = self
-            .get_state_value_with_proof_by_version(
-                &StateKey::AccessPath(AccessPath::new(
-                    CORE_CODE_ADDRESS,
-                    access_path_for_config(config_id).path,
-                )),
-                version,
-            )?
-            .0;
+        let config_value_option = self.get_state_value_by_version(
+            &StateKey::AccessPath(AccessPath::new(
+                CORE_CODE_ADDRESS,
+                access_path_for_config(config_id).path,
+            )),
+            version,
+        )?;
         config_value_option
             .and_then(|x| x.maybe_bytes)
             .ok_or_else(|| anyhow!("no config {} found in aptos root account state", config_id))
@@ -574,9 +542,8 @@ impl MoveStorage for &dyn DbReader {
     }
 
     fn fetch_latest_state_checkpoint_version(&self) -> Result<Version> {
-        self.get_latest_state_snapshot()?
+        self.get_latest_state_checkpoint_version()?
             .ok_or_else(|| format_err!("[MoveStorage] Latest state checkpoint not found."))
-            .map(|(v, _)| v)
     }
 }
 
@@ -621,34 +588,16 @@ pub trait DbWriter: Send + Sync {
     /// See [`AptosDB::save_transactions`].
     ///
     /// [`AptosDB::save_transactions`]: ../aptosdb/struct.AptosDB.html#method.save_transactions
-    fn save_transactions_ext(
-        &self,
-        txns_to_commit: &[TransactionToCommit],
-        first_version: Version,
-        base_state_version: Option<Version>,
-        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
-        save_state_snapshots: bool,
-        latest_in_memory_state: StateDelta,
-    ) -> Result<()> {
-        unimplemented!()
-    }
-
     fn save_transactions(
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        sync_commit: bool,
         latest_in_memory_state: StateDelta,
     ) -> Result<()> {
-        self.save_transactions_ext(
-            txns_to_commit,
-            first_version,
-            base_state_version,
-            ledger_info_with_sigs,
-            true, /* save_state_snapshots */
-            latest_in_memory_state,
-        )
+        unimplemented!()
     }
 
     fn save_state_snapshot_for_bench(

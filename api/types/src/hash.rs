@@ -9,7 +9,7 @@ use std::{
 };
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub struct HashValue(aptos_crypto::hash::HashValue);
+pub struct HashValue(pub aptos_crypto::hash::HashValue);
 
 impl From<aptos_crypto::hash::HashValue> for HashValue {
     fn from(val: aptos_crypto::hash::HashValue) -> Self {
@@ -60,6 +60,12 @@ impl fmt::Display for HashValue {
 impl LowerHex for HashValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{:x}", self.0)
+    }
+}
+
+impl HashValue {
+    pub fn zero() -> Self {
+        Self(aptos_crypto::hash::HashValue::zero())
     }
 }
 

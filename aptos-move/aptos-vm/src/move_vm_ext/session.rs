@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    access_path_cache::AccessPathCache, move_vm_ext::MoveResolverExt,
+    access_path_cache::AccessPathCache,
+    delta_ext::{ChangeSetExt, DeltaChangeSet},
+    move_vm_ext::MoveResolverExt,
     transaction_metadata::TransactionMetadata,
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -14,6 +16,7 @@ use aptos_types::{
     transaction::{ChangeSet, SignatureCheckedTransaction},
     write_set::{WriteOp, WriteSetMut},
 };
+use framework::natives::code::{NativeCodeContext, PublishRequest};
 use move_deps::{
     move_binary_format::errors::{Location, VMResult},
     move_core_types::{
@@ -105,11 +108,26 @@ where
             .into_change_set()
             .map_err(|e| e.finish(Location::Undefined))?;
 
+        // TODO: Once we are ready to connect aggregator with delta writes,
+        // make sure we pass them to the session output.
+        //
+        // Expected changes will be:
+        //   * Use `Aggregator` for gas fees tracking in coin.
+        //   * Pass `aggregator_change_set` further to produce `DeltaChangeSet`.
+        //   * Have e2e tests and benchmarks.
+        // let aggregator_context: NativeAggregatorContext = extensions.remove();
+        // let _ = aggregator_context.into_change_set();
+
         Ok(SessionOutput {
             change_set,
             events,
             table_change_set,
         })
+    }
+
+    pub fn extract_publish_request(&mut self) -> Option<PublishRequest> {
+        let ctx = self.get_native_extensions().get_mut::<NativeCodeContext>();
+        ctx.requested_module_bundle.take()
     }
 }
 
@@ -192,6 +210,16 @@ impl SessionOutput {
             .collect::<Result<Vec<_>, VMStatus>>()?;
 
         Ok(ChangeSet::new(write_set, events))
+    }
+
+    pub fn into_change_set_ext<C: AccessPathCache>(
+        self,
+        ap_cache: &mut C,
+    ) -> Result<ChangeSetExt, VMStatus> {
+        // TODO: extract `DeltaChangeSet` from Aggregator extension (when it lands)
+        // and initialize `ChangeSetExt` properly.
+        self.into_change_set(ap_cache)
+            .map(|change_set| ChangeSetExt::new(DeltaChangeSet::empty(), change_set))
     }
 
     pub fn squash(&mut self, other: Self) -> Result<(), VMStatus> {

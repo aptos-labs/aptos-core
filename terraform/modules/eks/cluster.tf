@@ -7,7 +7,7 @@ resource "aws_cloudwatch_log_group" "eks" {
 resource "aws_eks_cluster" "aptos" {
   name                      = var.eks_cluster_name
   role_arn                  = aws_iam_role.cluster.arn
-  version                   = "1.21"
+  version                   = var.kubernetes_version
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
   tags                      = local.default_tags
 
@@ -18,15 +18,18 @@ resource "aws_eks_cluster" "aptos" {
     security_group_ids      = [aws_security_group.cluster.id]
   }
 
+  lifecycle {
+    ignore_changes = [
+      # ignore autoupgrade version
+      version,
+    ]
+  }
+
   depends_on = [
     aws_iam_role_policy_attachment.cluster-cluster,
     aws_iam_role_policy_attachment.cluster-service,
     aws_cloudwatch_log_group.eks,
   ]
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 data "aws_eks_cluster_auth" "aptos" {
@@ -52,11 +55,21 @@ resource "aws_launch_template" "nodes" {
   for_each      = local.pools
   name          = "aptos-${local.workspace_name}/${each.key}"
   instance_type = each.value.instance_type
-  user_data     = base64encode(
+  user_data = base64encode(
     templatefile("${path.module}/templates/eks_user_data.sh", {
       taints = each.value.taint ? "aptos/nodepool=${each.key}:NoExecute" : ""
     })
   )
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+
+    ebs {
+      delete_on_termination = true
+      volume_size           = 100
+      volume_type           = "gp3"
+    }
+  }
 
   tag_specifications {
     resource_type = "instance"

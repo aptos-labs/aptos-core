@@ -1,34 +1,42 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::{format_err, Result};
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
-use forge::{ForgeConfig, Options, Result, *};
-use std::{env, num::NonZeroUsize, process, time::Duration};
+use forge::success_criteria::SuccessCriteria;
+use forge::{ForgeConfig, Options, *};
+use std::convert::TryInto;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::{env, num::NonZeroUsize, process, thread, time::Duration};
 use structopt::StructOpt;
+use testcases::network_bandwidth_test::NetworkBandwidthTest;
+use testcases::network_latency_test::NetworkLatencyTest;
+use testcases::network_loss_test::NetworkLossTest;
 use testcases::{
-    compatibility_test::SimpleValidatorUpgrade, fixed_tps_test::FixedTpsTest,
-    gas_price_test::NonZeroGasPrice, generate_traffic, partial_nodes_down_test::PartialNodesDown,
-    performance_test::PerformanceBenchmark, reconfiguration_test::ReconfigurationTest,
-    state_sync_performance::StateSyncPerformance,
+    compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
+    network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
+    reconfiguration_test::ReconfigurationTest, state_sync_performance::StateSyncPerformance,
 };
+
+use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use tokio::runtime::Runtime;
 use url::Url;
 
 #[derive(StructOpt, Debug)]
 struct Args {
-    // general options
-    #[structopt(long, default_value = "15")]
-    accounts_per_client: usize,
-    #[structopt(long)]
-    workers_per_ac: Option<usize>,
-    #[structopt(long, default_value = "0")]
-    wait_millis: u64,
-    #[structopt(long)]
-    burst: bool,
+    #[structopt(long, default_value = "30000")]
+    mempool_backlog: u64,
+    #[structopt(long, default_value = "300")]
+    duration_secs: usize,
     #[structopt(flatten)]
     options: Options,
+    #[structopt(long)]
+    num_validators: Option<usize>,
+    #[structopt(flatten)]
+    success_criteria: SuccessCriteriaArgs,
     #[structopt(
         long,
         help = "Specify a test suite to run",
@@ -41,6 +49,16 @@ struct Args {
     // subcommand groups
     #[structopt(flatten)]
     cli_cmd: CliCommand,
+}
+
+#[derive(Debug, StructOpt)]
+#[structopt(about = "Forge success criteria that includes a bunch of performance metrics")]
+pub struct SuccessCriteriaArgs {
+    // general options
+    #[structopt(long, default_value = "3500")]
+    avg_tps: usize,
+    #[structopt(long, default_value = "10000")]
+    max_latency_ms: usize,
 }
 
 #[derive(StructOpt, Debug)]
@@ -93,6 +111,11 @@ struct K8sSwarm {
     port_forward: bool,
     #[structopt(
         long,
+        help = "If set, reuse the forge testnet active in the specified namespace"
+    )]
+    reuse: bool,
+    #[structopt(
+        long,
         help = "If set, keeps the forge testnet active in the specified namespace"
     )]
     keep: bool,
@@ -124,6 +147,8 @@ struct Resize {
     namespace: String,
     #[structopt(long, default_value = "30")]
     num_validators: usize,
+    #[structopt(long, default_value = "1")]
+    num_fullnodes: usize,
     #[structopt(
         long,
         help = "Override the image tag used for validators",
@@ -160,53 +185,71 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::from_args();
-    let mut global_emit_job_request = EmitJobRequest::default()
-        .accounts_per_client(args.accounts_per_client)
-        .thread_params(EmitThreadParams {
-            wait_millis: args.wait_millis,
-            wait_committed: !args.burst,
-            txn_expiration_time_secs: 30,
-            check_stats_at_end: false,
-        });
-    if let Some(workers_per_endpoint) = args.workers_per_ac {
-        global_emit_job_request =
-            global_emit_job_request.workers_per_endpoint(workers_per_endpoint);
-    }
+    let global_emit_job_request = EmitJobRequest::default()
+        .duration(Duration::from_secs(args.duration_secs as u64))
+        .thread_params(EmitThreadParams::default())
+        .mempool_backlog(args.mempool_backlog.try_into().unwrap());
+
+    let success_criteria = SuccessCriteria::new(
+        args.success_criteria.avg_tps,
+        args.success_criteria.max_latency_ms,
+    );
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
         // cmd input for test
-        CliCommand::Test(test_cmd) => match test_cmd {
-            TestCommand::LocalSwarm(..) => run_forge(
-                local_test_suite(),
-                LocalFactory::from_workspace()?,
-                &args.options,
-                args.changelog,
-                global_emit_job_request,
-            ),
-            TestCommand::K8sSwarm(k8s) => {
-                let mut test_suite = get_test_suite(args.suite.as_ref());
-                if let Some(move_modules_dir) = k8s.move_modules_dir {
-                    test_suite = test_suite.with_genesis_modules_path(move_modules_dir);
+        CliCommand::Test(ref test_cmd) => {
+            // Identify the test suite to run
+            let mut test_suite = get_test_suite(args.suite.as_ref())?;
+            if let Some(num_validators) = args.num_validators {
+                match NonZeroUsize::new(num_validators) {
+                    Some(num_validators) => {
+                        test_suite = test_suite.with_initial_validator_count(num_validators)
+                    }
+                    None => {
+                        return Err(format_err!(
+                            "--num-validators must be positive! Given: {:?}!",
+                            num_validators
+                        ))
+                    }
                 }
-                run_forge(
-                    test_suite,
-                    K8sFactory::new(
-                        k8s.namespace.clone(),
-                        k8s.image_tag,
-                        k8s.base_image_tag,
-                        k8s.port_forward,
-                        k8s.keep,
-                        k8s.enable_haproxy,
-                    )
-                    .unwrap(),
-                    &args.options,
-                    args.changelog,
-                    global_emit_job_request,
-                )?;
-                Ok(())
             }
-        },
+
+            // Run the test suite
+            match test_cmd {
+                TestCommand::LocalSwarm(..) => run_forge(
+                    test_suite,
+                    LocalFactory::from_workspace()?,
+                    &args.options,
+                    success_criteria,
+                    args.changelog.clone(),
+                    global_emit_job_request,
+                ),
+                TestCommand::K8sSwarm(k8s) => {
+                    if let Some(move_modules_dir) = &k8s.move_modules_dir {
+                        test_suite = test_suite.with_genesis_modules_path(move_modules_dir.clone());
+                    }
+                    run_forge(
+                        test_suite,
+                        K8sFactory::new(
+                            k8s.namespace.clone(),
+                            k8s.image_tag.clone(),
+                            k8s.base_image_tag.clone(),
+                            k8s.port_forward,
+                            k8s.reuse,
+                            k8s.keep,
+                            k8s.enable_haproxy,
+                        )
+                        .unwrap(),
+                        &args.options,
+                        success_criteria,
+                        args.changelog,
+                        global_emit_job_request,
+                    )?;
+                    Ok(())
+                }
+            }
+        }
         // cmd input for cluster operations
         CliCommand::Operator(op_cmd) => match op_cmd {
             OperatorCommand::SetValidator(set_validator) => set_validator_image_tag(
@@ -226,6 +269,7 @@ fn main() -> Result<()> {
                 runtime.block_on(install_testnet_resources(
                     resize.namespace,
                     resize.num_validators,
+                    resize.num_fullnodes,
                     resize.validator_image_tag,
                     resize.testnet_image_tag,
                     resize.move_modules_dir,
@@ -242,10 +286,17 @@ pub fn run_forge<F: Factory>(
     tests: ForgeConfig<'_>,
     factory: F,
     options: &Options,
+    success_criteria: SuccessCriteria,
     logs: Option<Vec<String>>,
     global_job_request: EmitJobRequest,
 ) -> Result<()> {
-    let forge = Forge::new(options, tests, factory, global_job_request);
+    let forge = Forge::new(
+        options,
+        tests,
+        factory,
+        global_job_request,
+        success_criteria,
+    );
 
     if options.list {
         forge.list()?;
@@ -321,15 +372,26 @@ fn get_changelog(prev_commit: Option<&String>, upstream_commit: &str) -> String 
     }
 }
 
-fn get_test_suite(suite_name: &str) -> ForgeConfig<'static> {
+fn get_test_suite(suite_name: &str) -> Result<ForgeConfig<'static>> {
     match suite_name {
-        "land_blocking_compat" => land_blocking_test_compat_suite(),
-        "land_blocking" => land_blocking_test_suite(),
-        "pre_release" => pre_release_suite(),
+        "land_blocking" => Ok(land_blocking_test_suite()),
+        "local_test_suite" => Ok(local_test_suite()),
+        "pre_release" => Ok(pre_release_suite()),
+        "run_forever" => Ok(run_forever()),
         // TODO(rustielin): verify each test suite
-        "k8s_suite" => k8s_test_suite(),
+        "k8s_suite" => Ok(k8s_test_suite()),
+        "chaos" => Ok(chaos_test_suite()),
         single_test => single_test_suite(single_test),
     }
+}
+
+/// Provides a forge config that runs the swarm forever (unless killed)
+fn run_forever() -> ForgeConfig<'static> {
+    ForgeConfig::default()
+        .with_aptos_tests(&[&FundAccount, &TransferCoins])
+        .with_admin_tests(&[&GetMetadata])
+        .with_genesis_modules_bytes(cached_framework_packages::module_blobs().to_vec())
+        .with_aptos_tests(&[&RunForever])
 }
 
 fn local_test_suite() -> ForgeConfig<'static> {
@@ -348,46 +410,71 @@ fn k8s_test_suite() -> ForgeConfig<'static> {
         .with_network_tests(&[&EmitTransaction, &SimpleValidatorUpgrade])
 }
 
-fn single_test_suite(test_name: &str) -> ForgeConfig<'static> {
+fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
     let config =
         ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(30).unwrap());
-    match test_name {
+    let single_test_suite = match test_name {
         "bench" => config.with_network_tests(&[&PerformanceBenchmark]),
-        "state_sync" => config.with_network_tests(&[&StateSyncPerformance]),
+        "state_sync" => config
+            .with_initial_fullnode_count(1)
+            .with_network_tests(&[&StateSyncPerformance]),
         "compat" => config.with_network_tests(&[&SimpleValidatorUpgrade]),
         "config" => config.with_network_tests(&[&ReconfigurationTest]),
-        _ => config.with_network_tests(&[&PerformanceBenchmark]),
-    }
+        "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
+        "network_latency" => config.with_network_tests(&[&NetworkLatencyTest]),
+        "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
+        "bench_with_fullnode" => config
+            .with_network_tests(&[&PerformanceBenchmarkWithFN])
+            .with_initial_fullnode_count(6),
+        "setup_test" => config
+            .with_initial_fullnode_count(1)
+            .with_network_tests(&[&ForgeSetupTest]),
+        _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
+    };
+    Ok(single_test_suite)
 }
 
 fn land_blocking_test_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
+        .with_initial_fullnode_count(1)
         .with_network_tests(&[&PerformanceBenchmark])
 }
 
-fn land_blocking_test_compat_suite() -> ForgeConfig<'static> {
-    // please keep tests order in this suite
-    // since later tests node version rely on first test
+fn pre_release_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
-        .with_network_tests(&[&SimpleValidatorUpgrade, &PerformanceBenchmark])
-        .with_initial_version(InitialVersion::Oldest)
+        .with_network_tests(&[&NetworkBandwidthTest])
 }
 
-fn pre_release_suite() -> ForgeConfig<'static> {
-    // please keep tests order in this suite
-    // since later tests node version rely on first test
+fn chaos_test_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
-        .with_network_tests(&[
-            &FixedTpsTest,
-            &PerformanceBenchmark,
-            &NonZeroGasPrice,
-            &PartialNodesDown,
-            &ReconfigurationTest,
-            &StateSyncPerformance,
-        ])
+        .with_network_tests(&[&NetworkBandwidthTest, &NetworkLatencyTest, &NetworkLossTest])
+}
+
+/// A simple test that runs the swarm forever. This is useful for
+/// local testing (e.g., deploying a local swarm and interacting
+/// with it).
+#[derive(Debug)]
+struct RunForever;
+
+impl Test for RunForever {
+    fn name(&self) -> &'static str {
+        "run_forever"
+    }
+}
+
+#[async_trait::async_trait]
+impl AptosTest for RunForever {
+    async fn run<'t>(&self, _ctx: &mut AptosContext<'t>) -> Result<()> {
+        println!("The network has been deployed. Hit Ctrl+C to kill this, otherwise it will run forever.");
+        let keep_running = Arc::new(AtomicBool::new(true));
+        while keep_running.load(Ordering::Acquire) {
+            thread::park();
+        }
+        Ok(())
+    }
 }
 
 //TODO Make public test later
@@ -469,10 +556,10 @@ impl AptosTest for TransferCoins {
         ctx.mint(payer.address(), 10000).await?;
         check_account_balance(&client, payer.address(), 10000).await?;
 
-        let transfer_txn =
-            payer.sign_with_transaction_builder(ctx.aptos_transaction_factory().payload(
-                aptos_stdlib::encode_aptos_coin_transfer(payee.address(), 10),
-            ));
+        let transfer_txn = payer.sign_with_transaction_builder(
+            ctx.aptos_transaction_factory()
+                .payload(aptos_stdlib::aptos_coin_transfer(payee.address(), 10)),
+        );
         client.submit_and_wait(&transfer_txn).await?;
         check_account_balance(&client, payee.address(), 10).await?;
 
@@ -495,7 +582,7 @@ impl NetworkTest for RestartValidator {
         runtime.block_on(async {
             let node = ctx.swarm().validators_mut().next().unwrap();
             node.health_check().await.expect("node health check failed");
-            node.stop().unwrap();
+            node.stop().await.unwrap();
             println!("Restarting node {}", node.peer_id());
             node.start().await.unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
@@ -522,9 +609,9 @@ impl NetworkTest for EmitTransaction {
             .validators()
             .map(|v| v.peer_id())
             .collect::<Vec<_>>();
-        let stats = generate_traffic(ctx, &all_validators, duration, 1, None).unwrap();
+        let stats = generate_traffic(ctx, &all_validators, duration, 1).unwrap();
         ctx.report
-            .report_txn_stats(self.name().to_string(), stats, duration);
+            .report_txn_stats(self.name().to_string(), &stats, duration);
 
         Ok(())
     }

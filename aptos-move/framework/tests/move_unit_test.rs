@@ -1,13 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_types::account_config::CORE_CODE_ADDRESS;
-use aptos_vm::move_vm_ext::test_transaction_context_natives;
+use aptos_gas::NativeGasParameters;
+use aptos_vm::natives;
 use framework::path_in_crate;
 use move_deps::move_cli::base::test::run_move_unit_tests;
 use move_deps::{
-    move_stdlib, move_table_extension, move_unit_test::UnitTestingConfig,
-    move_vm_runtime::native_functions::NativeFunctionTable,
+    move_unit_test::UnitTestingConfig, move_vm_runtime::native_functions::NativeFunctionTable,
 };
 use tempfile::tempdir;
 
@@ -20,6 +19,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
             install_dir: Some(tempdir().unwrap().path().to_path_buf()),
             ..Default::default()
         },
+        // TODO(Gas): double check if this is correct
         UnitTestingConfig::default_with_bound(Some(100_000)),
         aptos_test_natives(),
         /* compute_coverage */ false,
@@ -28,21 +28,26 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
     .unwrap();
 }
 
-// move_stdlib has the testing feature enabled to include debug native functions
 pub fn aptos_test_natives() -> NativeFunctionTable {
-    move_stdlib::natives::all_natives(CORE_CODE_ADDRESS)
-        .into_iter()
-        .chain(framework::natives::all_natives(CORE_CODE_ADDRESS))
-        .chain(framework::natives::patch_table_module(
-            move_table_extension::table_natives(CORE_CODE_ADDRESS),
-        ))
-        .chain(test_transaction_context_natives(CORE_CODE_ADDRESS))
-        .collect()
+    // By side effect, configure for unit tests
+    natives::configure_for_unit_test();
+    // move_stdlib has the testing feature enabled to include debug native functions
+    natives::aptos_natives(NativeGasParameters::zeros())
 }
 
 #[test]
-fn move_unit_tests() {
+fn move_framework_unit_tests() {
     run_tests_for_pkg("aptos-framework");
+}
+
+#[test]
+fn move_experimental_unit_tests() {
+    run_tests_for_pkg("aptos-experimental");
+}
+
+#[test]
+fn move_stdlib_unit_tests() {
+    run_tests_for_pkg("aptos-stdlib");
 }
 
 #[test]

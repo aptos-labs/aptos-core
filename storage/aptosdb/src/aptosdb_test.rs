@@ -7,7 +7,9 @@ use proptest::prelude::*;
 
 use crate::{
     error_if_version_is_pruned, get_first_seq_num_and_limit,
-    pruner::{Pruner, PrunerIndex},
+    pruner::{
+        ledger_pruner_manager::LedgerPrunerManager, state_pruner_manager::StatePrunerManager,
+    },
     test_helper,
     test_helper::{arb_blocks_to_commit, put_as_state_root, put_transaction_info},
     AptosDB, ROCKSDB_PROPERTIES,
@@ -27,13 +29,13 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
-    fn test_save_blocks(input in arb_blocks_to_commit()) {
-        test_save_blocks_impl(input);
+    fn test_save_blocks(input in arb_blocks_to_commit(), threshold in 10..20usize) {
+        test_save_blocks_impl(input, threshold);
     }
 
     #[test]
-    fn test_sync_transactions(input in arb_blocks_to_commit()) {
-        test_sync_transactions_impl(input);
+    fn test_sync_transactions(input in arb_blocks_to_commit(), threshold in 10..20usize) {
+        test_sync_transactions_impl(input, threshold);
     }
 }
 
@@ -83,36 +85,47 @@ fn test_too_many_requested() {
 fn test_error_if_version_is_pruned() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let mut pruner = Pruner::new(
-        Arc::clone(&aptos_db.ledger_db),
+    let state_pruner = StatePrunerManager::new(
         Arc::clone(&aptos_db.state_merkle_db),
         StoragePrunerConfig {
-            state_store_prune_window: Some(0),
-            ledger_prune_window: Some(0),
-            pruning_batch_size: 1,
+            enable_state_store_pruner: true,
+            enable_ledger_pruner: true,
+            state_store_prune_window: 0,
+            ledger_prune_window: 0,
+            ledger_pruning_batch_size: 1,
+            state_store_pruning_batch_size: 1,
+            user_pruning_window_offset: 0,
         },
     );
-    pruner.testonly_update_min_version(&[Some(5), Some(10)]);
-    let pruner = Some(pruner);
+
+    let ledger_pruner = LedgerPrunerManager::new(
+        Arc::clone(&aptos_db.ledger_db),
+        StoragePrunerConfig {
+            enable_state_store_pruner: true,
+            enable_ledger_pruner: true,
+            state_store_prune_window: 0,
+            ledger_prune_window: 0,
+            ledger_pruning_batch_size: 1,
+            state_store_pruning_batch_size: 1,
+            user_pruning_window_offset: 0,
+        },
+    );
+    state_pruner.testonly_update_min_version(5);
+    ledger_pruner.testonly_update_min_version(10);
     assert_eq!(
-        error_if_version_is_pruned(&pruner, PrunerIndex::StateStorePrunerIndex, "State", 4)
+        error_if_version_is_pruned(&state_pruner, "State", 4)
             .unwrap_err()
             .to_string(),
         "State version 4 is pruned, min available version is 5."
     );
-    assert!(
-        error_if_version_is_pruned(&pruner, PrunerIndex::StateStorePrunerIndex, "State", 5).is_ok()
-    );
+    assert!(error_if_version_is_pruned(&state_pruner, "State", 5).is_ok());
     assert_eq!(
-        error_if_version_is_pruned(&pruner, PrunerIndex::LedgerPrunerIndex, "Transaction", 9)
+        error_if_version_is_pruned(&ledger_pruner, "Transaction", 9)
             .unwrap_err()
             .to_string(),
         "Transaction version 9 is pruned, min available version is 10."
     );
-    assert!(
-        error_if_version_is_pruned(&pruner, PrunerIndex::LedgerPrunerIndex, "Transaction", 10)
-            .is_ok()
-    );
+    assert!(error_if_version_is_pruned(&ledger_pruner, "Transaction", 10).is_ok());
 }
 
 #[test]

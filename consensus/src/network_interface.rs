@@ -87,9 +87,14 @@ pub struct ConsensusNetworkSender {
 }
 
 /// Supported protocols in preferred order (from highest priority to lowest).
-pub const RPC: &[ProtocolId] = &[ProtocolId::ConsensusRpcBcs, ProtocolId::ConsensusRpcJson];
+pub const RPC: &[ProtocolId] = &[
+    ProtocolId::ConsensusRpcCompressed,
+    ProtocolId::ConsensusRpcBcs,
+    ProtocolId::ConsensusRpcJson,
+];
 /// Supported protocols in preferred order (from highest priority to lowest).
 pub const DIRECT_SEND: &[ProtocolId] = &[
+    ProtocolId::ConsensusDirectSendCompressed,
     ProtocolId::ConsensusDirectSendBcs,
     ProtocolId::ConsensusDirectSendJson,
 ];
@@ -107,8 +112,6 @@ pub fn network_endpoint_config() -> AppConfig {
 }
 
 impl NewNetworkSender for ConsensusNetworkSender {
-    /// Returns a Sender that only sends for the `CONSENSUS_DIRECT_SEND_PROTOCOL` and
-    /// `CONSENSUS_RPC_PROTOCOL` ProtocolId.
     fn new(
         peer_mgr_reqs_tx: PeerManagerRequestSender,
         connection_reqs_tx: ConnectionRequestSender,
@@ -157,28 +160,33 @@ impl ConsensusNetworkSender {
 
 #[async_trait]
 impl ApplicationNetworkSender<ConsensusMsg> for ConsensusNetworkSender {
-    /// Send a single message to the destination peer using available ProtocolId.
+    /// Send a single message to the destination peer using the available ProtocolId.
     fn send_to(&self, recipient: PeerId, message: ConsensusMsg) -> Result<(), NetworkError> {
         let protocol = self.preferred_protocol_for_peer(recipient, DIRECT_SEND)?;
         self.network_sender.send_to(recipient, protocol, message)
     }
 
-    /// Send a single message to the destination peers using available ProtocolId.
+    /// Send a single message to the destination peers using the available ProtocolId.
     fn send_to_many(
         &self,
         recipients: impl Iterator<Item = PeerId>,
         message: ConsensusMsg,
     ) -> Result<(), NetworkError> {
         let mut peers_per_protocol = HashMap::new();
+        let mut not_available = vec![];
         for peer in recipients {
             match self.preferred_protocol_for_peer(peer, DIRECT_SEND) {
                 Ok(protocol) => peers_per_protocol
                     .entry(protocol)
                     .or_insert_with(Vec::new)
                     .push(peer),
-                Err(e) => error!("{}", e),
+                Err(_) => not_available.push(peer),
             }
         }
+        sample!(
+            SampleRate::Duration(Duration::from_secs(10)),
+            error!("Unavailable peers: {:?}", not_available)
+        );
         for (protocol, peers) in peers_per_protocol {
             self.network_sender
                 .send_to_many(peers.into_iter(), protocol, message.clone())?;
@@ -186,7 +194,7 @@ impl ApplicationNetworkSender<ConsensusMsg> for ConsensusNetworkSender {
         Ok(())
     }
 
-    /// Send a RPC to the destination peer using the `CONSENSUS_RPC_PROTOCOL` ProtocolId.
+    /// Send a RPC to the destination peer using the available ProtocolId.
     async fn send_rpc(
         &self,
         recipient: PeerId,

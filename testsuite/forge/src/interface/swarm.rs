@@ -1,12 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ChainInfo, FullNode, NodeExt, Result, Validator, Version};
+use crate::{
+    AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
+};
 use anyhow::{anyhow, bail};
 use aptos_config::config::NodeConfig;
+use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::types::PeerId;
 use futures::future::try_join_all;
+use prometheus_http_query::response::PromqlResult;
 use std::time::{Duration, Instant};
 use tokio::runtime::Runtime;
 
@@ -44,13 +48,20 @@ pub trait Swarm: Sync {
     /// Returns a mutable reference to the FullNode with the provided PeerId
     fn full_node_mut(&mut self, id: PeerId) -> Option<&mut dyn FullNode>;
 
-    /// Adds a Validator to the swarm with the provided PeerId
+    /// Adds a Validator to the swarm and returns the PeerId
     fn add_validator(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId>;
 
     /// Removes the Validator with the provided PeerId
     fn remove_validator(&mut self, id: PeerId) -> Result<()>;
 
-    /// Adds a FullNode to the swarm with the provided PeerId
+    fn add_validator_full_node(
+        &mut self,
+        version: &Version,
+        template: NodeConfig,
+        id: PeerId,
+    ) -> Result<PeerId>;
+
+    /// Adds a FullNode to the swarm and returns the PeerId
     fn add_full_node(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId>;
 
     /// Removes the FullNode with the provided PeerId
@@ -63,6 +74,25 @@ pub trait Swarm: Sync {
     fn chain_info(&mut self) -> ChainInfo<'_>;
 
     fn logs_location(&mut self) -> String;
+
+    /// Injects all types of chaos
+    fn inject_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
+    fn remove_chaos(&mut self, chaos: SwarmChaos) -> Result<()>;
+
+    async fn ensure_no_validator_restart(&mut self) -> Result<()>;
+    async fn ensure_no_fullnode_restart(&mut self) -> Result<()>;
+
+    // Get prometheus metrics from the swarm
+    async fn query_metrics(
+        &self,
+        query: &str,
+        time: Option<i64>,
+        timeout: Option<i64>,
+    ) -> Result<PromqlResult>;
+
+    fn aptos_public_info(&mut self) -> AptosPublicInfo<'_> {
+        self.chain_info().into_aptos_public_info()
+    }
 }
 
 impl<T: ?Sized> SwarmExt for T where T: Swarm {}
@@ -93,7 +123,7 @@ pub trait SwarmExt: Swarm {
 
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
-
+        info!("Swarm liveness check passed");
         Ok(())
     }
 
@@ -118,7 +148,7 @@ pub trait SwarmExt: Swarm {
 
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
-
+        info!("Swarm connectivity check passed");
         Ok(())
     }
 

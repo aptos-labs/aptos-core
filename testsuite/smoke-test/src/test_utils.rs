@@ -29,7 +29,7 @@ pub async fn transfer_coins_non_blocking(
     amount: u64,
 ) -> SignedTransaction {
     let txn = sender.sign_with_transaction_builder(transaction_factory.payload(
-        aptos_stdlib::encode_aptos_coin_transfer(receiver.address(), amount),
+        aptos_stdlib::aptos_coin_transfer(receiver.address(), amount),
     ));
 
     client.submit(&txn).await.unwrap();
@@ -51,6 +51,30 @@ pub async fn transfer_coins(
     txn
 }
 
+pub async fn reconfig(
+    client: &RestClient,
+    transaction_factory: &TransactionFactory,
+    root_account: &mut LocalAccount,
+) {
+    let aptos_version = client.get_aptos_version().await.unwrap();
+    let current_version = *aptos_version.into_inner().major.inner();
+    let txn = root_account.sign_with_transaction_builder(
+        transaction_factory.payload(aptos_stdlib::version_set_version(current_version + 1)),
+    );
+    client
+        .submit_and_wait(&txn)
+        .await
+        .map_err(|e| {
+            panic!(
+                "Couldn't execute {:?}, for account {:?}, error {:?}",
+                txn, root_account, e
+            )
+        })
+        .unwrap();
+
+    println!("Changing aptos version to {}", current_version + 1,);
+}
+
 pub async fn transfer_and_reconfig(
     client: &RestClient,
     transaction_factory: &TransactionFactory,
@@ -62,14 +86,7 @@ pub async fn transfer_and_reconfig(
     for _ in 0..num_transfers {
         // Reconfigurations have a 20% chance of being executed
         if random::<u16>() % 5 == 0 {
-            let aptos_version = client.get_aptos_version().await.unwrap();
-            let current_version = *aptos_version.into_inner().major.inner();
-            let txn = root_account.sign_with_transaction_builder(transaction_factory.payload(
-                aptos_stdlib::encode_version_set_version(current_version + 1),
-            ));
-            client.submit_and_wait(&txn).await.unwrap();
-
-            println!("Changing aptos version to {}", current_version + 1,);
+            reconfig(client, transaction_factory, root_account).await;
         }
 
         transfer_coins(client, transaction_factory, sender, receiver, 1).await;
@@ -91,29 +108,13 @@ pub async fn assert_balance(client: &RestClient, account: &LocalAccount, balance
 /// require a SmokeTestEnvironment, as it provides a generic interface across
 /// AptosSwarms, regardless of if the swarm is a validator swarm, validator full
 /// node swarm, or a public full node swarm.
+#[cfg(test)]
 pub mod swarm_utils {
-    use aptos_config::config::{NodeConfig, SecureBackend, WaypointConfig};
-    use aptos_secure_storage::{KVStorage, Storage};
+    use aptos_config::config::{NodeConfig, WaypointConfig};
     use aptos_types::waypoint::Waypoint;
 
     pub fn insert_waypoint(node_config: &mut NodeConfig, waypoint: Waypoint) {
-        let f = |backend: &SecureBackend| {
-            let mut storage: Storage = backend.into();
-            storage
-                .set(aptos_global_constants::WAYPOINT, waypoint)
-                .expect("Unable to write waypoint");
-            storage
-                .set(aptos_global_constants::GENESIS_WAYPOINT, waypoint)
-                .expect("Unable to write waypoint");
-        };
-        let backend = &node_config.consensus.safety_rules.backend;
-        f(backend);
-        match &node_config.base.waypoint {
-            WaypointConfig::FromStorage(backend) => {
-                f(backend);
-            }
-            _ => panic!("unexpected waypoint from node config"),
-        }
+        node_config.base.waypoint = WaypointConfig::FromConfig(waypoint);
     }
 }
 

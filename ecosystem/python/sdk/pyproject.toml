@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "aptos-sdk"
+version = "0.2.0"
+description = "Aptos SDK"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+license = "Apache-2.0"
+
+[tool.poetry.dependencies]
+python = ">=3.7,<4.0"
+httpx = "^0.23.0"
+PyNaCl = "^1.5.0"
+
+[tool.poetry.dev-dependencies]
+black = "^22.6.0"
+autoflake = "^1.4"
+isort = "^5.10.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

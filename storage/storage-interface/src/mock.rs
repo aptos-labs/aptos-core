@@ -5,11 +5,11 @@
 
 use crate::{DbReader, DbWriter};
 use anyhow::{anyhow, Result};
-use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
     account_state::AccountState,
+    event::EventHandle,
     proof::SparseMerkleProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
@@ -39,9 +39,9 @@ impl DbReader for MockDbReaderWriter {
         Ok(Some(1))
     }
 
-    fn get_latest_state_snapshot(&self) -> Result<Option<(Version, HashValue)>> {
+    fn get_latest_state_checkpoint_version(&self) -> Result<Option<Version>> {
         // return a dummy version for tests
-        Ok(Some((1, HashValue::zero())))
+        Ok(Some(1))
     }
 
     fn get_state_value_by_version(
@@ -63,14 +63,15 @@ impl DbReader for MockDbReaderWriter {
 }
 
 fn get_mock_account_state() -> AccountState {
-    let account_resource = AccountResource::new(0, vec![], AccountAddress::random());
+    let account_resource = AccountResource::new(0, vec![], EventHandle::random(0));
 
-    let mut account_state = AccountState::default();
-    account_state.insert(
-        AccountResource::resource_path(),
-        bcs::to_bytes(&account_resource).unwrap(),
-    );
-    account_state
+    AccountState::new(
+        AccountAddress::random(),
+        std::collections::BTreeMap::from([(
+            AccountResource::resource_path(),
+            bcs::to_bytes(&account_resource).unwrap(),
+        )]),
+    )
 }
 
 impl DbWriter for MockDbReaderWriter {}

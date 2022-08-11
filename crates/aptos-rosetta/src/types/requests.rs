@@ -35,8 +35,15 @@ pub struct AccountBalanceResponse {
     pub block_identifier: BlockIdentifier,
     /// Balances of all known currencies
     pub balances: Vec<Amount>,
+    /// Metadata of account, must have sequence number
+    pub metadata: AccountBalanceMetadata,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct AccountBalanceMetadata {
+    /// Sequence number of the account
+    pub sequence_number: u64,
+}
 /// Reqyest a block (version) on the account
 ///
 /// With neither value for PartialBlockIdentifier, get the latest version
@@ -67,8 +74,8 @@ impl BlockRequest {
         Self::new(chain_id, Some(PartialBlockIdentifier::by_hash(hash)))
     }
 
-    pub fn by_version(chain_id: ChainId, version: u64) -> Self {
-        Self::new(chain_id, Some(PartialBlockIdentifier::by_version(version)))
+    pub fn by_index(chain_id: ChainId, index: u64) -> Self {
+        Self::new(chain_id, Some(PartialBlockIdentifier::block_index(index)))
     }
 }
 

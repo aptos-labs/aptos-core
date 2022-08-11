@@ -97,12 +97,49 @@ async fn test_concurrent_transfers_single_node() {
     assert_balance(&client, &account_1, 10).await;
 
     for _ in 0..20 {
-        let txn = account_0.sign_with_transaction_builder(transaction_factory.payload(
-            aptos_stdlib::encode_aptos_coin_transfer(account_1.address(), 1),
-        ));
+        let txn = account_0.sign_with_transaction_builder(
+            transaction_factory.payload(aptos_stdlib::aptos_coin_transfer(account_1.address(), 1)),
+        );
         client.submit_and_wait(&txn).await.unwrap();
     }
     transfer_coins(&client, &transaction_factory, &mut account_0, &account_1, 1).await;
     // assert_balance(&client, &account_0, 79).await;
     assert_balance(&client, &account_1, 31).await;
+}
+
+#[tokio::test]
+async fn test_latest_events_and_transactions() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let client = swarm.validators().next().unwrap().rest_client();
+    let start_events = client
+        .get_new_block_events(None, Some(2))
+        .await
+        .unwrap()
+        .into_inner();
+    let start_transations = client
+        .get_transactions(None, Some(2))
+        .await
+        .unwrap()
+        .into_inner();
+
+    create_and_fund_account(&mut swarm, 100).await;
+    let cur_events = client
+        .get_new_block_events(None, Some(2))
+        .await
+        .unwrap()
+        .into_inner();
+    let (cur_transations, cur_ledger) = client
+        .get_transactions(None, Some(2))
+        .await
+        .unwrap()
+        .into_parts();
+
+    assert!(start_events[0].round() < cur_events[0].round());
+    assert!(cur_events[0].round() < cur_events[1].round());
+    assert_eq!(cur_events.len(), 2);
+
+    assert!(start_transations[0].version() < cur_transations[0].version());
+    assert!(cur_transations[0].version() < cur_transations[1].version());
+    assert_eq!(cur_transations.len(), 2);
+    assert_eq!(cur_transations[1].version().unwrap(), cur_ledger.version);
 }

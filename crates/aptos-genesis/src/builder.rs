@@ -31,7 +31,7 @@ use std::{
     io::{Read, Write},
     num::NonZeroUsize,
     path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
+    sync::Arc,
 };
 
 const VALIDATOR_IDENTITY: &str = "validator-identity.yaml";
@@ -46,6 +46,7 @@ pub struct ValidatorNodeConfig {
     pub name: String,
     pub config: NodeConfig,
     pub dir: PathBuf,
+    pub genesis_stake_amount: u64,
 }
 
 impl ValidatorNodeConfig {
@@ -54,13 +55,19 @@ impl ValidatorNodeConfig {
         name: String,
         base_dir: &Path,
         mut config: NodeConfig,
+        genesis_stake_amount: u64,
     ) -> anyhow::Result<ValidatorNodeConfig> {
         // Create the data dir and set it appropriately
         let dir = base_dir.join(&name);
         std::fs::create_dir_all(dir.as_path())?;
         config.set_data_dir(dir.clone());
 
-        Ok(ValidatorNodeConfig { name, config, dir })
+        Ok(ValidatorNodeConfig {
+            name,
+            config,
+            dir,
+            genesis_stake_amount,
+        })
     }
 
     /// Initializes keys and identities for a validator config
@@ -174,7 +181,7 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
                 private_identity.full_node_network_private_key.public_key(),
             ),
             full_node_host,
-            stake_amount: 1,
+            stake_amount: config.genesis_stake_amount,
         })
     }
 }
@@ -208,16 +215,17 @@ impl FullnodeNodeConfig {
         name: String,
         config_dir: &Path,
         fullnode_config: NodeConfig,
-        validator_config: &mut NodeConfig,
+        validator_config: &NodeConfig,
         waypoint: &Waypoint,
         genesis: &Transaction,
+        public_network: &NetworkConfig,
     ) -> anyhow::Result<Self> {
         let mut fullnode_config = Self::new(name, config_dir, fullnode_config)?;
 
         fullnode_config.insert_waypoint(waypoint);
         fullnode_config.insert_genesis(genesis)?;
         fullnode_config.config.randomize_ports();
-        fullnode_config.attach_to_validator(validator_config)?;
+        fullnode_config.attach_to_validator(public_network, validator_config)?;
         fullnode_config.save_config()?;
 
         Ok(fullnode_config)
@@ -275,24 +283,15 @@ impl FullnodeNodeConfig {
     }
 
     /// Attaches a Full node to a validator full node
-    fn attach_to_validator(&mut self, validator_config: &mut NodeConfig) -> anyhow::Result<()> {
+    fn attach_to_validator(
+        &mut self,
+        public_network: &NetworkConfig,
+        validator_config: &NodeConfig,
+    ) -> anyhow::Result<()> {
         ensure!(
             matches!(validator_config.base.role, RoleType::Validator),
             "Validator config must be a Validator config"
         );
-
-        // Grab the public network config from the validator and insert it into the VFN's config
-        // The validator's public network identity is the same as the VFN's public network identity
-        // We remove it from the validator so the VFN can hold it
-        let public_network = {
-            let (i, _) = validator_config
-                .full_node_networks
-                .iter()
-                .enumerate()
-                .find(|(_i, config)| config.network_id == NetworkId::Public)
-                .expect("Validator should have a public network");
-            validator_config.full_node_networks.remove(i)
-        };
 
         let fullnode_public_network = self
             .config
@@ -300,8 +299,8 @@ impl FullnodeNodeConfig {
             .iter_mut()
             .find(|config| config.network_id == NetworkId::Public)
             .expect("VFN should have a public network");
-        fullnode_public_network.identity = public_network.identity;
-        fullnode_public_network.listen_address = public_network.listen_address;
+        fullnode_public_network.identity = public_network.identity.clone();
+        fullnode_public_network.listen_address = public_network.listen_address.clone();
 
         // Grab the validator's vfn network information and configure it as a seed for the VFN's
         // vfn network
@@ -357,7 +356,22 @@ fn write_yaml<T: Serialize>(path: &Path, object: &T) -> anyhow::Result<()> {
 }
 
 const ONE_DAY: u64 = 86400;
-const ONE_YEAR: u64 = 31536000;
+
+#[derive(Clone)]
+pub struct GenesisConfiguration {
+    pub allow_new_validators: bool,
+    pub epoch_duration_secs: u64,
+    pub min_stake: u64,
+    pub max_stake: u64,
+    pub min_voting_threshold: u128,
+    pub recurring_lockup_duration_secs: u64,
+    pub required_proposer_stake: u64,
+    pub rewards_apy_percentage: u64,
+    pub voting_duration_secs: u64,
+}
+
+pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut u64) + Send + Sync>;
+pub type InitGenesisConfigFn = Arc<dyn Fn(&mut GenesisConfiguration) + Send + Sync>;
 
 /// Builder that builds a network of validator nodes that can run locally
 #[derive(Clone)]
@@ -366,15 +380,8 @@ pub struct Builder {
     move_modules: Vec<Vec<u8>>,
     num_validators: NonZeroUsize,
     randomize_first_validator_ports: bool,
-    template: NodeConfig,
-    min_price_per_gas_unit: u64,
-    allow_new_validators: bool,
-    min_stake: u64,
-    max_stake: u64,
-    min_lockup_duration_secs: u64,
-    max_lockup_duration_secs: u64,
-    epoch_duration_secs: u64,
-    initial_lockup_timestamp: u64,
+    init_config: Option<InitConfigFn>,
+    init_genesis_config: Option<InitGenesisConfigFn>,
 }
 
 impl Builder {
@@ -382,27 +389,13 @@ impl Builder {
         let config_dir: PathBuf = config_dir.into();
         let config_dir = config_dir.canonicalize()?;
 
-        // Default initial validator lockup expiration to now + 1 day.
-        let now_secs = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let initial_validator_lockup_expiration = now_secs + ONE_DAY;
-
         Ok(Self {
             config_dir,
             move_modules,
             num_validators: NonZeroUsize::new(1).unwrap(),
             randomize_first_validator_ports: true,
-            template: NodeConfig::default_for_validator(),
-            min_price_per_gas_unit: 1,
-            allow_new_validators: false,
-            min_stake: 0,
-            max_stake: u64::MAX,
-            min_lockup_duration_secs: 0,
-            max_lockup_duration_secs: ONE_YEAR,
-            epoch_duration_secs: ONE_DAY,
-            initial_lockup_timestamp: initial_validator_lockup_expiration,
+            init_config: None,
+            init_genesis_config: None,
         })
     }
 
@@ -416,48 +409,16 @@ impl Builder {
         self
     }
 
-    pub fn with_template(mut self, template: NodeConfig) -> Self {
-        self.template = template;
+    pub fn with_init_config(mut self, init_config: Option<InitConfigFn>) -> Self {
+        self.init_config = init_config;
         self
     }
 
-    pub fn with_min_price_per_gas_unit(mut self, min_price_per_gas_unit: u64) -> Self {
-        self.min_price_per_gas_unit = min_price_per_gas_unit;
-        self
-    }
-
-    pub fn with_allow_new_validators(mut self, allow_new_validators: bool) -> Self {
-        self.allow_new_validators = allow_new_validators;
-        self
-    }
-
-    pub fn with_min_stake(mut self, min_stake: u64) -> Self {
-        self.min_stake = min_stake;
-        self
-    }
-
-    pub fn with_max_stake(mut self, max_stake: u64) -> Self {
-        self.max_stake = max_stake;
-        self
-    }
-
-    pub fn with_min_lockup_duration_secs(mut self, min_lockup_duration_secs: u64) -> Self {
-        self.min_lockup_duration_secs = min_lockup_duration_secs;
-        self
-    }
-
-    pub fn with_max_lockup_duration_secs(mut self, max_lockup_duration_secs: u64) -> Self {
-        self.max_lockup_duration_secs = max_lockup_duration_secs;
-        self
-    }
-
-    pub fn with_epoch_duration_secs(mut self, epoch_duration_secs: u64) -> Self {
-        self.epoch_duration_secs = epoch_duration_secs;
-        self
-    }
-
-    pub fn with_initial_lockup_timestamp(mut self, initial_lockup_timestamp: u64) -> Self {
-        self.initial_lockup_timestamp = initial_lockup_timestamp;
+    pub fn with_init_genesis_config(
+        mut self,
+        init_genesis_config: Option<InitGenesisConfigFn>,
+    ) -> Self {
+        self.init_genesis_config = init_genesis_config;
         self
     }
 
@@ -474,14 +435,20 @@ impl Builder {
     where
         R: rand::RngCore + rand::CryptoRng,
     {
+        println!(
+            "Building genesis with {:?} validators. Directory of output: {:?}",
+            self.num_validators.get(),
+            self.config_dir
+        );
         let mut keygen = KeyGen::from_seed(rng.gen());
 
         // Generate root key
         let root_key = keygen.generate_ed25519_private_key();
 
+        let template = NodeConfig::default_for_validator();
         // Generate validator configs
         let mut validators: Vec<ValidatorNodeConfig> = (0..self.num_validators.get())
-            .map(|i| self.generate_validator_config(i, &mut rng))
+            .map(|i| self.generate_validator_config(i, &mut rng, &template))
             .collect::<anyhow::Result<Vec<ValidatorNodeConfig>>>()?;
 
         // Build genesis
@@ -500,14 +467,25 @@ impl Builder {
         &mut self,
         index: usize,
         mut rng: R,
+        template: &NodeConfig,
     ) -> anyhow::Result<ValidatorNodeConfig>
     where
         R: rand::RngCore + rand::CryptoRng,
     {
         let name = index.to_string();
 
-        let mut validator =
-            ValidatorNodeConfig::new(name, self.config_dir.as_path(), self.template.clone())?;
+        let mut config = template.clone();
+        let mut genesis_stake_amount = 1;
+        if let Some(init_config) = &self.init_config {
+            (init_config)(index, &mut config, &mut genesis_stake_amount);
+        }
+
+        let mut validator = ValidatorNodeConfig::new(
+            name,
+            self.config_dir.as_path(),
+            config,
+            genesis_stake_amount,
+        )?;
 
         validator.init_keys(Some(rng.gen()))?;
 
@@ -568,20 +546,36 @@ impl Builder {
             configs.push(validator.try_into()?);
         }
 
+        let mut genesis_config = GenesisConfiguration {
+            allow_new_validators: false,
+            epoch_duration_secs: ONE_DAY,
+            min_stake: 0,
+            min_voting_threshold: 0,
+            max_stake: u64::MAX,
+            recurring_lockup_duration_secs: ONE_DAY,
+            required_proposer_stake: 0,
+            rewards_apy_percentage: 10,
+            voting_duration_secs: ONE_DAY / 24,
+        };
+        if let Some(init_genesis_config) = &self.init_genesis_config {
+            (init_genesis_config)(&mut genesis_config);
+        }
+
         // Build genesis & waypoint
         let mut genesis_info = GenesisInfo::new(
             ChainId::test(),
             root_key,
             configs,
             self.move_modules.clone(),
-            self.min_price_per_gas_unit,
-            self.allow_new_validators,
-            self.min_stake,
-            self.max_stake,
-            self.min_lockup_duration_secs,
-            self.max_lockup_duration_secs,
-            self.epoch_duration_secs,
-            self.initial_lockup_timestamp,
+            genesis_config.allow_new_validators,
+            genesis_config.epoch_duration_secs,
+            genesis_config.min_stake,
+            genesis_config.min_voting_threshold,
+            genesis_config.max_stake,
+            genesis_config.recurring_lockup_duration_secs,
+            genesis_config.required_proposer_stake,
+            genesis_config.rewards_apy_percentage,
+            genesis_config.voting_duration_secs,
         )?;
         let waypoint = genesis_info.generate_waypoint()?;
         let genesis = genesis_info.get_genesis();

@@ -3,6 +3,7 @@
 
 use crate::*;
 use rand::{Rng, SeedableRng};
+use std::time::Duration;
 use std::{
     io::{self, Write},
     num::NonZeroUsize,
@@ -12,6 +13,7 @@ use structopt::{clap::arg_enum, StructOpt};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
 // TODO going to remove random seed once cluster deployment supports re-run genesis
+use crate::success_criteria::SuccessCriteria;
 use rand::rngs::OsRng;
 
 #[derive(Debug, StructOpt)]
@@ -86,7 +88,13 @@ impl Default for Format {
 }
 
 pub fn forge_main<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Options) -> Result<()> {
-    let forge = Forge::new(options, tests, factory, EmitJobRequest::default());
+    let forge = Forge::new(
+        options,
+        tests,
+        factory,
+        EmitJobRequest::default(),
+        SuccessCriteria::default(),
+    );
 
     if options.list {
         forge.list()?;
@@ -117,6 +125,9 @@ pub struct ForgeConfig<'cfg> {
     /// The initial number of validators to spawn when the test harness creates a swarm
     initial_validator_count: NonZeroUsize,
 
+    /// The initial number of fullnodes to spawn when the test harness creates a swarm
+    initial_fullnode_count: usize,
+
     /// The initial version to use when the test harness creates a swarm
     initial_version: InitialVersion,
 
@@ -146,6 +157,11 @@ impl<'cfg> ForgeConfig<'cfg> {
 
     pub fn with_initial_validator_count(mut self, initial_validator_count: NonZeroUsize) -> Self {
         self.initial_validator_count = initial_validator_count;
+        self
+    }
+
+    pub fn with_initial_fullnode_count(mut self, initial_fullnode_count: usize) -> Self {
+        self.initial_fullnode_count = initial_fullnode_count;
         self
     }
 
@@ -184,6 +200,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             admin_tests: &[],
             network_tests: &[],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
+            initial_fullnode_count: 0,
             initial_version: InitialVersion::Newest,
             genesis_config: None,
         }
@@ -195,6 +212,7 @@ pub struct Forge<'cfg, F> {
     tests: ForgeConfig<'cfg>,
     factory: F,
     global_job_request: EmitJobRequest,
+    success_criteria: SuccessCriteria,
 }
 
 impl<'cfg, F: Factory> Forge<'cfg, F> {
@@ -203,12 +221,14 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         tests: ForgeConfig<'cfg>,
         factory: F,
         global_job_request: EmitJobRequest,
+        success_criteria: SuccessCriteria,
     ) -> Self {
         Self {
             options,
             tests,
             factory,
             global_job_request,
+            success_criteria,
         }
     }
 
@@ -267,9 +287,12 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             let mut swarm = runtime.block_on(self.factory.launch_swarm(
                 &mut rng,
                 self.tests.initial_validator_count,
+                self.tests.initial_fullnode_count,
                 &initial_version,
                 &genesis_version,
                 self.tests.genesis_config.as_ref(),
+                self.global_job_request.duration
+                    + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
             ))?;
 
             // Run AptosTests
@@ -300,6 +323,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     &mut *swarm,
                     &mut report,
                     self.global_job_request.clone(),
+                    self.success_criteria.clone(),
                 );
                 let result = run_test(|| test.run(&mut network_ctx));
                 summary.handle_result(test.name().to_owned(), result)?;
@@ -309,7 +333,6 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
 
             io::stdout().flush()?;
             io::stderr().flush()?;
-
             if !summary.success() {
                 println!();
                 println!("Swarm logs can be found here: {}", swarm.logs_location());

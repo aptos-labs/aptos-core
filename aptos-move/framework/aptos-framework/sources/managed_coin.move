@@ -7,6 +7,7 @@ module aptos_framework::managed_coin {
     use std::signer;
 
     use aptos_framework::coin::{Self, BurnCapability, MintCapability};
+    use aptos_framework::coins;
 
     //
     // Errors
@@ -92,7 +93,7 @@ module aptos_framework::managed_coin {
     /// Creating a resource that stores balance of `CoinType` on user's account, withdraw and deposit event handlers.
     /// Required if user wants to start accepting deposits of `CoinType` in his account.
     public entry fun register<CoinType>(account: &signer) {
-        coin::register<CoinType>(account);
+        coins::register<CoinType>(account);
     }
 
     //
@@ -105,16 +106,19 @@ module aptos_framework::managed_coin {
     #[test_only]
     struct FakeMoney { }
 
-    #[test(source = @0x1, destination = @0x2)]
+    #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
     public entry fun test_end_to_end(
         source: signer,
         destination: signer,
+        mod_account: signer
     ) acquires Capabilities {
         let source_addr = signer::address_of(&source);
         let destination_addr = signer::address_of(&destination);
+        aptos_framework::account::create_account(source_addr);
+        aptos_framework::account::create_account(destination_addr);
 
         initialize<FakeMoney>(
-            &source,
+            &mod_account,
             b"Fake Money",
             b"FMD",
             10,
@@ -122,11 +126,12 @@ module aptos_framework::managed_coin {
         );
         assert!(coin::is_coin_initialized<FakeMoney>(), 0);
 
+        coin::register_for_test<FakeMoney>(&mod_account);
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);
 
-        mint<FakeMoney>(&source, source_addr, 50);
-        mint<FakeMoney>(&source, destination_addr, 10);
+        mint<FakeMoney>(&mod_account, source_addr, 50);
+        mint<FakeMoney>(&mod_account, destination_addr, 10);
         assert!(coin::balance<FakeMoney>(source_addr) == 50, 1);
         assert!(coin::balance<FakeMoney>(destination_addr) == 10, 2);
 
@@ -138,7 +143,8 @@ module aptos_framework::managed_coin {
         assert!(coin::balance<FakeMoney>(source_addr) == 40, 3);
         assert!(coin::balance<FakeMoney>(destination_addr) == 20, 4);
 
-        burn<FakeMoney>(&source, 40);
+        coin::transfer<FakeMoney>(&source, signer::address_of(&mod_account), 40);
+        burn<FakeMoney>(&mod_account, 40);
 
         assert!(coin::balance<FakeMoney>(source_addr) == 0, 1);
 
@@ -146,34 +152,44 @@ module aptos_framework::managed_coin {
         assert!(option::extract(&mut new_supply) == 20, 2);
     }
 
-    #[test(source = @0x1, destination = @0x2)]
+    #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
     #[expected_failure(abort_code = 0x60000)]
     public entry fun fail_mint(
         source: signer,
         destination: signer,
+        mod_account: signer,
     ) acquires Capabilities {
         let source_addr = signer::address_of(&source);
 
-        initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
+        aptos_framework::account::create_account(source_addr);
+        aptos_framework::account::create_account(signer::address_of(&destination));
+
+        initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
+        coin::register_for_test<FakeMoney>(&mod_account);
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);
 
         mint<FakeMoney>(&destination, source_addr, 100);
     }
 
-    #[test(source = @0x1, destination = @0x2)]
+    #[test(source = @0xa11ce, destination = @0xb0b, mod_account = @0x1)]
     #[expected_failure(abort_code = 0x60000)]
     public entry fun fail_burn(
         source: signer,
         destination: signer,
+        mod_account: signer,
     ) acquires Capabilities {
         let source_addr = signer::address_of(&source);
 
-        initialize<FakeMoney>(&source, b"Fake money", b"FMD", 1, true);
+        aptos_framework::account::create_account(source_addr);
+        aptos_framework::account::create_account(signer::address_of(&destination));
+
+        initialize<FakeMoney>(&mod_account, b"Fake money", b"FMD", 1, true);
+        coin::register_for_test<FakeMoney>(&mod_account);
         register<FakeMoney>(&source);
         register<FakeMoney>(&destination);
 
-        mint<FakeMoney>(&source, source_addr, 100);
+        mint<FakeMoney>(&mod_account, source_addr, 100);
         burn<FakeMoney>(&destination, 10);
     }
 }

@@ -1,13 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::ops::Deref;
-use std::{collections::BTreeMap, iter::once};
+use std::{iter::once, sync::Arc};
 
 use proptest::prelude::*;
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_state_view::StateViewId;
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -25,7 +25,7 @@ use aptos_types::{
 };
 use aptosdb::AptosDB;
 use executor_types::{BlockExecutorTrait, ChunkExecutorTrait, TransactionReplayer};
-use storage_interface::{DbReaderWriter, ExecutedTrees};
+use storage_interface::{sync_proof_fetcher::SyncProofFetcher, DbReaderWriter, ExecutedTrees};
 
 use crate::{
     block_executor::BlockExecutor,
@@ -129,7 +129,7 @@ fn gen_ledger_info(
         ),
         HashValue::zero(),
     );
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
 }
 
 #[test]
@@ -388,7 +388,11 @@ fn apply_transaction_by_writeset(
         .collect();
 
     let state_view = ledger_view
-        .verified_state_view(StateViewId::Miscellaneous, db.reader.deref())
+        .verified_state_view(
+            StateViewId::Miscellaneous,
+            Arc::clone(&db.reader),
+            Arc::new(SyncProofFetcher::new(db.reader.clone())),
+        )
         .unwrap();
 
     let chunk_output =
@@ -402,6 +406,7 @@ fn apply_transaction_by_writeset(
             ledger_view.txn_accumulator().num_leaves(),
             ledger_view.state().base_version,
             None,
+            true, /* sync_commit */
             executed.result_view.state().clone(),
         )
         .unwrap();
@@ -527,7 +532,11 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
         let out = ChunkOutput::by_transaction_execution::<MockVM>(
             vec![txn],
             ledger_view
-                .verified_state_view(StateViewId::Miscellaneous, db.reader.deref())
+                .verified_state_view(
+                    StateViewId::Miscellaneous,
+                    Arc::clone(&db.reader),
+                    Arc::new(SyncProofFetcher::new(db.reader.clone())),
+                )
                 .unwrap(),
         )
         .unwrap();
@@ -538,6 +547,7 @@ fn run_transactions_naive(transactions: Vec<Transaction>) -> HashValue {
                 ledger_view.txn_accumulator().num_leaves(),
                 ledger_view.state().base_version,
                 None,
+                true, /* sync_commit */
                 executed.result_view.state().clone(),
             )
             .unwrap();
@@ -706,6 +716,7 @@ proptest! {
         prop_assert_eq!(root_hash, expected_root_hash);
     }
 
+    #[ignore]
     #[test]
     fn test_idempotent_commits(chunk_size in 1..30u64, overlap_size in 1..30u64, num_new_txns in 1..30u64) {
         let (chunk_start, chunk_end) = (1, chunk_size + 1);
@@ -722,7 +733,7 @@ proptest! {
 
         // Commit the first chunk without committing the ledger info.
         let TestExecutor { _path, db, executor } = TestExecutor::new();
-        ChunkExecutor::<MockVM>::new(db).unwrap()
+        ChunkExecutor::<MockVM>::new(db)
             .execute_and_commit_chunk(txn_list_with_proof_to_commit, &ledger_info, None).unwrap();
 
         first_block_txns.extend(overlap_txn_list_with_proof.transactions);

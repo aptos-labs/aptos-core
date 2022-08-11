@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{FullNode, HealthCheckError, LocalVersion, Node, NodeExt, Validator, Version};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, ensure, Context, Result};
 use aptos_config::config::NodeConfig;
 use aptos_logger::debug;
 use aptos_sdk::types::{account_address::AccountAddress, PeerId};
@@ -81,6 +81,8 @@ impl LocalNode {
     }
 
     pub fn start(&mut self) -> Result<()> {
+        ensure!(self.process.is_none(), "node {} already running", self.name);
+
         // Ensure log file exists
         let log_file = OpenOptions::new()
             .create(true)
@@ -106,6 +108,12 @@ impl LocalNode {
             )
         })?;
 
+        println!(
+            "Started node {:?} (PID: {:?}) with command: {:?}",
+            self.name,
+            process.id(),
+            node_command
+        );
         self.process = Some(Process(process));
 
         Ok(())
@@ -215,7 +223,7 @@ impl Node for LocalNode {
         self.start()
     }
 
-    fn stop(&mut self) -> Result<()> {
+    async fn stop(&mut self) -> Result<()> {
         self.stop();
         Ok(())
     }

@@ -3,7 +3,8 @@
 
 import assert from "assert";
 import fs from "fs";
-import { Account, RestClient, TESTNET_URL, FAUCET_URL, FaucetClient } from "./first_transaction";
+import { NODE_URL, FAUCET_URL, accountBalance } from "./first_transaction";
+import { AptosAccount, TxnBuilderTypes, BCS, MaybeHexString, HexString, AptosClient, FaucetClient } from "aptos";
 
 const readline = require("readline").createInterface({
   input: process.stdin,
@@ -11,46 +12,82 @@ const readline = require("readline").createInterface({
 });
 
 //:!:>section_1
-export class HelloBlockchainClient extends RestClient {
-  /** Publish a new module to the blockchain within the specified account */
-  async publishModule(accountFrom: Account, moduleHex: string): Promise<string> {
-    const payload = {
-      type: "module_bundle_payload",
-      modules: [{ bytecode: `0x${moduleHex}` }],
-    };
-    const txnRequest = await this.generateTransaction(accountFrom.address(), payload);
-    const signedTxn = await this.signTransaction(accountFrom, txnRequest);
-    const res = await this.submitTransaction(signedTxn);
-    return res["hash"];
-  }
-  //<:!:section_1
-  //:!:>section_2
-  /** Retrieve the resource Message::MessageHolder::message */
-  async getMessage(contractAddress: string, accountAddress: string): Promise<string> {
-    const resource = await this.accountResource(accountAddress, `0x${contractAddress}::Message::MessageHolder`);
-    if (resource == null) {
-      return null;
-    } else {
-      return resource["data"]["message"];
-    }
-  }
-  //<:!:section_2
-  //:!:>section_3
-  /**  Potentially initialize and set the resource Message::MessageHolder::message */
-  async setMessage(contractAddress: string, accountFrom: Account, message: string): Promise<string> {
-    let payload: { function: string; arguments: string[]; type: string; type_arguments: any[] };
-    payload = {
-      type: "script_function_payload",
-      function: `0x${contractAddress}::Message::set_message`,
-      type_arguments: [],
-      arguments: [Buffer.from(message, "utf-8").toString("hex")],
-    };
+const client = new AptosClient(NODE_URL);
+const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
-    const txnRequest = await this.generateTransaction(accountFrom.address(), payload);
-    const signedTxn = await this.signTransaction(accountFrom, txnRequest);
-    const res = await this.submitTransaction(signedTxn);
-    return res["hash"];
+/** Publish a new module to the blockchain within the specified account */
+export async function publishModule(accountFrom: AptosAccount, moduleHex: string): Promise<string> {
+  const moudleBundlePayload = new TxnBuilderTypes.TransactionPayloadModuleBundle(
+    new TxnBuilderTypes.ModuleBundle([new TxnBuilderTypes.Module(new HexString(moduleHex).toUint8Array())]),
+  );
+
+  const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
+    client.getAccount(accountFrom.address()),
+    client.getChainId(),
+  ]);
+
+  const rawTxn = new TxnBuilderTypes.RawTransaction(
+    TxnBuilderTypes.AccountAddress.fromHex(accountFrom.address()),
+    BigInt(sequenceNumber),
+    moudleBundlePayload,
+    1000n,
+    1n,
+    BigInt(Math.floor(Date.now() / 1000) + 10),
+    new TxnBuilderTypes.ChainId(chainId),
+  );
+
+  const bcsTxn = AptosClient.generateBCSTransaction(accountFrom, rawTxn);
+  const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
+
+  return transactionRes.hash;
+}
+//<:!:section_1
+//:!:>section_2
+/** Retrieve the resource Message::MessageHolder::message */
+async function getMessage(contractAddress: HexString, accountAddress: MaybeHexString): Promise<string> {
+  try {
+    const resource = await client.getAccountResource(
+      accountAddress,
+      `${contractAddress.toString()}::message::MessageHolder`,
+    );
+    return (resource as any).data["message"];
+  } catch (_) {
+    return "";
   }
+}
+
+//<:!:section_2
+//:!:>section_3
+/**  Potentially initialize and set the resource Message::MessageHolder::message */
+async function setMessage(contractAddress: HexString, accountFrom: AptosAccount, message: string): Promise<string> {
+  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+    TxnBuilderTypes.ScriptFunction.natural(
+      `${contractAddress.toString()}::message`,
+      "set_message",
+      [],
+      [BCS.bcsSerializeStr(message)],
+    ),
+  );
+
+  const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
+    client.getAccount(accountFrom.address()),
+    client.getChainId(),
+  ]);
+
+  const rawTxn = new TxnBuilderTypes.RawTransaction(
+    TxnBuilderTypes.AccountAddress.fromHex(accountFrom.address()),
+    BigInt(sequenceNumber),
+    scriptFunctionPayload,
+    1000n,
+    1n,
+    BigInt(Math.floor(Date.now() / 1000) + 10),
+    new TxnBuilderTypes.ChainId(chainId),
+  );
+
+  const bcsTxn = AptosClient.generateBCSTransaction(accountFrom, rawTxn);
+  const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
+
+  return transactionRes.hash;
 }
 //<:!:section_3
 
@@ -58,23 +95,20 @@ export class HelloBlockchainClient extends RestClient {
 async function main() {
   assert(process.argv.length == 3, "Expecting an argument that points to the helloblockchain module");
 
-  const restClient = new HelloBlockchainClient(TESTNET_URL);
-  const faucetClient = new FaucetClient(FAUCET_URL, restClient);
-
   // Create two accounts, Alice and Bob, and fund Alice but not Bob
-  const alice = new Account();
-  const bob = new Account();
+  const alice = new AptosAccount();
+  const bob = new AptosAccount();
 
   console.log("\n=== Addresses ===");
   console.log(`Alice: ${alice.address()}`);
   console.log(`Bob: ${bob.address()}`);
 
-  await faucetClient.fundAccount(alice.address(), 10_000_000);
-  await faucetClient.fundAccount(bob.address(), 10_000_000);
+  await faucetClient.fundAccount(alice.address(), 5_000);
+  await faucetClient.fundAccount(bob.address(), 5_000);
 
   console.log("\n=== Initial Balances ===");
-  console.log(`Alice: ${await restClient.accountBalance(alice.address())}`);
-  console.log(`Bob: ${await restClient.accountBalance(bob.address())}`);
+  console.log(`Alice: ${await accountBalance(alice.address())}`);
+  console.log(`Bob: ${await accountBalance(bob.address())}`);
 
   await new Promise<void>((resolve) => {
     readline.question(
@@ -91,21 +125,21 @@ async function main() {
   console.log("\n=== Testing Alice ===");
   console.log("Publishing...");
 
-  let txHash = await restClient.publishModule(alice, moduleHex);
-  await restClient.waitForTransaction(txHash);
-  console.log(`Initial value: ${await restClient.getMessage(alice.address(), alice.address())}`);
+  let txHash = await publishModule(alice, moduleHex);
+  await client.waitForTransaction(txHash);
+  console.log(`Initial value: ${await getMessage(alice.address(), alice.address())}`);
 
   console.log('Setting the message to "Hello, Blockchain"');
-  txHash = await restClient.setMessage(alice.address(), alice, "Hello, Blockchain");
-  await restClient.waitForTransaction(txHash);
-  console.log(`New value: ${await restClient.getMessage(alice.address(), alice.address())}`);
+  txHash = await setMessage(alice.address(), alice, "Hello, Blockchain");
+  await client.waitForTransaction(txHash);
+  console.log(`New value: ${await getMessage(alice.address(), alice.address())}`);
 
   console.log("\n=== Testing Bob ===");
-  console.log(`Initial value: ${await restClient.getMessage(alice.address(), bob.address())}`);
+  console.log(`Initial value: ${await getMessage(alice.address(), bob.address())}`);
   console.log('Setting the message to "Hello, Blockchain"');
-  txHash = await restClient.setMessage(alice.address(), bob, "Hello, Blockchain");
-  await restClient.waitForTransaction(txHash);
-  console.log(`New value: ${await restClient.getMessage(alice.address(), bob.address())}`);
+  txHash = await setMessage(alice.address(), bob, "Hello, Blockchain");
+  await client.waitForTransaction(txHash);
+  console.log(`New value: ${await getMessage(alice.address(), bob.address())}`);
 }
 
 if (require.main === module) {

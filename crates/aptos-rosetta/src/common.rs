@@ -1,18 +1,17 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::aptos_coin_identifier_lower;
+use crate::types::{aptos_coin_module_identifier, aptos_coin_resource_identifier};
 use crate::{
     error::{ApiError, ApiResult},
     types::{
-        aptos_coin_identifier, Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier,
-        PartialBlockIdentifier,
+        Currency, CurrencyMetadata, MetadataRequest, NetworkIdentifier, PartialBlockIdentifier,
     },
     RosettaContext,
 };
 use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
-use aptos_rest_client::{aptos_api_types::BlockInfo, Account, Response};
+use aptos_rest_client::{Account, Response};
 use aptos_sdk::move_types::language_storage::{StructTag, TypeTag};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
@@ -20,8 +19,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{convert::Infallible, fmt::LowerHex, future::Future, str::FromStr};
 use warp::Filter;
 
-/// The year 2000 in seconds, as this is the lower limit for Rosetta API implementations
-const Y2K_SECS: u64 = 946713600000;
+/// The year 2000 in milliseconds, as this is the lower limit for Rosetta API implementations
+pub const Y2K_MS: u64 = 946713600000;
 pub const BLOCKCHAIN: &str = "aptos";
 
 /// Checks the request network matches the server network
@@ -104,13 +103,13 @@ pub async fn get_account(
 }
 
 /// Retrieve the timestamp according ot the Rosetta spec (milliseconds)
-pub fn get_timestamp(block_info: BlockInfo) -> u64 {
+pub fn get_timestamp(timestamp_usecs: u64) -> u64 {
     // note: timestamps are in microseconds, so we convert to milliseconds
-    let mut timestamp = block_info.block_timestamp / 1000;
+    let mut timestamp = timestamp_usecs / 1000;
 
     // Rosetta doesn't like timestamps before 2000
-    if timestamp < Y2K_SECS {
-        timestamp = Y2K_SECS;
+    if timestamp < Y2K_MS {
+        timestamp = Y2K_MS;
     }
     timestamp
 }
@@ -137,7 +136,7 @@ pub fn decode_key<T: DeserializeOwned + ValidCryptoMaterial>(
     T::from_encoded_string(str).map_err(|_| ApiError::deserialization_failed(type_name))
 }
 
-const DEFAULT_COIN: &str = "APTOS";
+const DEFAULT_COIN: &str = "APT";
 const DEFAULT_DECIMALS: u64 = 8;
 
 pub fn native_coin() -> Currency {
@@ -145,7 +144,7 @@ pub fn native_coin() -> Currency {
         symbol: DEFAULT_COIN.to_string(),
         decimals: DEFAULT_DECIMALS,
         metadata: Some(CurrencyMetadata {
-            move_type: native_coin_tag_lower().to_string(),
+            move_type: native_coin_tag().to_string(),
         }),
     }
 }
@@ -153,17 +152,8 @@ pub fn native_coin() -> Currency {
 pub fn native_coin_tag() -> TypeTag {
     TypeTag::Struct(StructTag {
         address: AccountAddress::ONE,
-        module: aptos_coin_identifier(),
-        name: aptos_coin_identifier(),
-        type_params: vec![],
-    })
-}
-
-pub fn native_coin_tag_lower() -> TypeTag {
-    TypeTag::Struct(StructTag {
-        address: AccountAddress::ONE,
-        module: aptos_coin_identifier_lower(),
-        name: aptos_coin_identifier(),
+        module: aptos_coin_module_identifier(),
+        name: aptos_coin_resource_identifier(),
         type_params: vec![],
     })
 }
@@ -197,14 +187,9 @@ pub async fn get_block_index_from_request(
         Some(PartialBlockIdentifier {
             index: None,
             hash: Some(hash),
-        }) => {
-            server_context
-                .block_cache()?
-                .get_block_index_by_hash(&aptos_rest_client::aptos_api_types::HashValue::from_str(
-                    &hash,
-                )?)
-                .await?
-        }
+        }) => server_context.block_cache()?.get_block_height_by_hash(
+            &aptos_rest_client::aptos_api_types::HashValue::from_str(&hash)?,
+        )?,
         // Lookup latest version
         _ => {
             let response = server_context
@@ -213,11 +198,7 @@ pub async fn get_block_index_from_request(
                 .await?;
             let state = response.state();
 
-            server_context
-                .block_cache()?
-                .get_block_info_by_version(state.version)
-                .await?
-                .block_height
+            state.block_height
         }
     })
 }

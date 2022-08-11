@@ -540,6 +540,41 @@ fn test_multithread_branching() {
 }
 
 #[test]
+fn test_multithread_get_oldest_ancestor() {
+    let current_tree = Arc::new(Mutex::new(SparseMerkleTree::new(LEAF.hash())));
+
+    let update_fn = || {
+        let current_tree = current_tree.clone();
+        move || {
+            for _ in 0..100000 {
+                let t = current_tree.lock().clone();
+                *current_tree.lock() = update(&t);
+            }
+        }
+    };
+    let get_ancestor_fn = || {
+        let current_tree = current_tree.clone();
+        move || {
+            let t = current_tree.lock().clone();
+            let mut tree_pair = VecDeque::from(vec![t.clone(), t]);
+            for _ in 0..100000 {
+                assert!(tree_pair[0]
+                    .get_oldest_ancestor()
+                    .is_the_same(&tree_pair[1].get_oldest_ancestor()));
+                tree_pair.pop_front();
+                tree_pair.push_back(current_tree.lock().clone());
+            }
+        }
+    };
+    let update = std::thread::spawn(update_fn());
+    let gets: Vec<_> = (0..3)
+        .map(|_| std::thread::spawn(get_ancestor_fn()))
+        .collect();
+    update.join().unwrap();
+    gets.into_iter().for_each(|t| t.join().unwrap());
+}
+
+#[test]
 fn test_drop() {
     let proof_reader = ProofReader::default();
     let root_smt = SparseMerkleTree::new(*SPARSE_MERKLE_PLACEHOLDER_HASH);

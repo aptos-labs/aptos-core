@@ -186,7 +186,8 @@ impl TransactionGenerator {
         TransactionFactory::new(ChainId::test())
             .with_transaction_expiration_time(300)
             .with_gas_unit_price(1)
-            .with_max_gas_amount(1000)
+            // TODO(Gas): double check if this is correct
+            .with_max_gas_amount(1_000)
     }
 
     // Write metadata
@@ -324,10 +325,11 @@ impl TransactionGenerator {
                         .unwrap()
                         .get_random()
                         .sign_with_transaction_builder(
-                            self.transaction_factory.create_and_fund_user_account(
-                                generator.generate().public_key(),
-                                init_account_balance,
-                            ),
+                            self.transaction_factory
+                                .implicitly_create_user_account_and_transfer(
+                                    generator.generate().public_key(),
+                                    init_account_balance,
+                                ),
                         )
                 })
                 .map(Transaction::UserTransaction)

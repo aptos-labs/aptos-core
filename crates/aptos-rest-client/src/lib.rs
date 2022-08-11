@@ -5,16 +5,19 @@ use anyhow::{anyhow, Result};
 pub use aptos_api_types::{
     self, IndexResponse, MoveModuleBytecode, PendingTransaction, Transaction,
 };
-use aptos_api_types::{mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, BlockInfo};
+use aptos_api_types::{
+    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, Block, BlockInfo, Event,
+};
 use aptos_crypto::HashValue;
 use aptos_types::{
-    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
+    account_address::AccountAddress,
+    account_config::{NewBlockEvent, CORE_CODE_ADDRESS},
     transaction::SignedTransaction,
 };
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
-use state::State;
+pub use state::State;
 use std::time::Duration;
 use url::Url;
 
@@ -23,11 +26,12 @@ pub mod faucet;
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
-mod state;
+pub mod state;
 pub mod types;
 use crate::aptos::{AptosVersion, Balance};
 pub use types::{Account, Resource, RestError};
 pub mod aptos;
+use types::deserialize_from_string;
 
 pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 
@@ -52,6 +56,14 @@ impl Client {
     pub async fn get_aptos_version(&self) -> Result<Response<AptosVersion>> {
         self.get_resource::<AptosVersion>(CORE_CODE_ADDRESS, "0x1::version::Version")
             .await
+    }
+
+    pub async fn get_block(&self, height: u64, with_transactions: bool) -> Result<Response<Block>> {
+        self.get(self.base_url.join(&format!(
+            "v1/blocks/by_height/{}?with_transactions={}",
+            height, with_transactions
+        ))?)
+        .await
     }
 
     pub async fn get_block_info(&self, version: u64) -> Result<Response<BlockInfo>> {
@@ -80,13 +92,18 @@ impl Client {
         #[derive(Deserialize)]
         struct Response {
             chain_id: u8,
+            #[serde(deserialize_with = "types::deserialize_from_string")]
             epoch: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
             ledger_version: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
-            ledger_timestamp: u64,
-            #[serde(deserialize_with = "types::deserialize_from_string")]
             oldest_ledger_version: u64,
+            #[serde(deserialize_with = "types::deserialize_from_string")]
+            block_height: u64,
+            #[serde(deserialize_with = "types::deserialize_from_string")]
+            oldest_block_height: u64,
+            #[serde(deserialize_with = "types::deserialize_from_string")]
+            ledger_timestamp: u64,
         }
 
         let response = self
@@ -97,7 +114,9 @@ impl Client {
                 epoch: r.epoch,
                 version: r.ledger_version,
                 timestamp_usecs: r.ledger_timestamp,
-                oldest_ledger_version: Some(r.oldest_ledger_version),
+                oldest_ledger_version: r.oldest_ledger_version,
+                oldest_block_height: r.oldest_block_height,
+                block_height: r.block_height,
             });
 
         Ok(response)
@@ -346,6 +365,90 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_account_events(
+        &self,
+        address: AccountAddress,
+        struct_tag: &str,
+        field_name: &str,
+        start: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<Response<Vec<Event>>> {
+        let url = self.base_url.join(&format!(
+            "accounts/{}/events/{}/{}",
+            address.to_hex_literal(),
+            struct_tag,
+            field_name
+        ))?;
+        let mut request = self.inner.get(url);
+        if let Some(start) = start {
+            request = request.query(&[("start", start)])
+        }
+
+        if let Some(limit) = limit {
+            request = request.query(&[("limit", limit)])
+        }
+
+        let response = request.send().await?;
+        self.json(response).await
+    }
+
+    pub async fn get_new_block_events(
+        &self,
+        start: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<Response<Vec<NewBlockEvent>>> {
+        #[derive(Clone, Debug, Serialize, Deserialize)]
+        pub struct NewBlockEventResponse {
+            #[serde(deserialize_with = "deserialize_from_string")]
+            epoch: u64,
+            #[serde(deserialize_with = "deserialize_from_string")]
+            round: u64,
+            #[serde(deserialize_with = "deserialize_from_string")]
+            height: u64,
+            previous_block_votes: Vec<bool>,
+            proposer: String,
+            failed_proposer_indices: Vec<String>,
+            #[serde(deserialize_with = "deserialize_from_string")]
+            time_microseconds: u64,
+        }
+
+        let response = self
+            .get_account_events(
+                CORE_CODE_ADDRESS,
+                "0x1::block::BlockResource",
+                "new_block_events",
+                start,
+                limit,
+            )
+            .await?;
+
+        response.and_then(|events| {
+            let new_events: Result<Vec<_>> = events
+                .into_iter()
+                .map(|event| {
+                    serde_json::from_value::<NewBlockEventResponse>(event.data)
+                        .map_err(|e| anyhow!(e))
+                        .and_then(|e| {
+                            Ok(NewBlockEvent::new(
+                                e.epoch,
+                                e.round,
+                                e.height,
+                                e.previous_block_votes,
+                                AccountAddress::from_hex_literal(&e.proposer)
+                                    .map_err(|e| anyhow!(e))?,
+                                e.failed_proposer_indices
+                                    .iter()
+                                    .map(|v| v.parse())
+                                    .collect::<Result<Vec<_>, _>>()?,
+                                e.time_microseconds,
+                            ))
+                        })
+                })
+                .collect();
+            new_events
+        })
+    }
+
     pub async fn get_table_item<K: Serialize>(
         &self,
         table_handle: u128,
@@ -370,6 +473,26 @@ impl Client {
         let url = self.base_url.join(&format!("accounts/{}", address))?;
         let response = self.inner.get(url).send().await?;
         self.json(response).await
+    }
+
+    pub async fn set_failpoint(&self, name: String, actions: String) -> Result<String> {
+        let mut base = self.base_url.join("set_failpoint")?;
+        let url = base
+            .query_pairs_mut()
+            .append_pair("name", &name)
+            .append_pair("actions", &actions)
+            .finish();
+        let response = self.inner.get(url.clone()).send().await?;
+
+        if !response.status().is_success() {
+            let error_response = response.json::<RestError>().await?;
+            return Err(anyhow::anyhow!("Request failed: {:?}", error_response));
+        }
+
+        response
+            .text()
+            .await
+            .map_err(|e| anyhow::anyhow!("To text failed: {:?}", e))
     }
 
     async fn check_response(

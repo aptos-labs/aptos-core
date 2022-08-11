@@ -50,7 +50,7 @@ pub use script::{
 use crate::state_store::{state_key::StateKey, state_value::StateValue};
 use move_deps::move_core_types::vm_status::AbortLocation;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
-pub use transaction_argument::{parse_transaction_argument, TransactionArgument, VecBytes};
+pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
 pub type Version = u64; // Height - also used for MVCC in StateDB
 pub type AtomicVersion = AtomicU64;
@@ -1059,6 +1059,10 @@ impl TransactionInfoV0 {
         self.state_change_hash
     }
 
+    pub fn is_state_checkpoint(&self) -> bool {
+        self.state_checkpoint_hash().is_some()
+    }
+
     pub fn state_checkpoint_hash(&self) -> Option<HashValue> {
         self.state_checkpoint_hash
     }
@@ -1098,6 +1102,7 @@ pub struct TransactionToCommit {
     state_updates: HashMap<StateKey, StateValue>,
     write_set: WriteSet,
     events: Vec<ContractEvent>,
+    is_reconfig: bool,
 }
 
 impl TransactionToCommit {
@@ -1107,6 +1112,7 @@ impl TransactionToCommit {
         state_updates: HashMap<StateKey, StateValue>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
+        is_reconfig: bool,
     ) -> Self {
         TransactionToCommit {
             transaction,
@@ -1114,6 +1120,7 @@ impl TransactionToCommit {
             state_updates,
             write_set,
             events,
+            is_reconfig,
         }
     }
 
@@ -1126,7 +1133,7 @@ impl TransactionToCommit {
     }
 
     pub fn is_state_checkpoint(&self) -> bool {
-        self.transaction_info().state_checkpoint_hash.is_some()
+        self.transaction_info().is_state_checkpoint()
     }
 
     #[cfg(any(test, feature = "fuzzing"))]
@@ -1152,6 +1159,10 @@ impl TransactionToCommit {
 
     pub fn status(&self) -> &ExecutionStatus {
         &self.transaction_info.status
+    }
+
+    pub fn is_reconfig(&self) -> bool {
+        self.is_reconfig
     }
 }
 
@@ -1327,6 +1338,16 @@ impl TransactionOutputListWithProof {
         .map(|((txn, txn_output), txn_info)| {
             // Check the events against the expected events root hash
             verify_events_against_root_hash(&txn_output.events, txn_info)?;
+
+            // Verify the write set matches for both the transaction info and output
+            let write_set_hash = CryptoHash::hash(&txn_output.write_set);
+            ensure!(
+                txn_info.state_change_hash == write_set_hash,
+                "The write set in transaction output does not match the transaction info \
+                     in proof. Hash of write set in transaction output: {}. Write set hash in txn_info: {}.",
+                write_set_hash,
+                txn_info.state_change_hash,
+            );
 
             // Verify the gas matches for both the transaction info and output
             ensure!(

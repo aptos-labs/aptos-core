@@ -1,6 +1,6 @@
 import { Deserializer } from "./deserializer";
 import { Serializer } from "./serializer";
-import { AnyNumber, Bytes, Seq } from "./types";
+import { AnyNumber, Bytes, Seq, Uint16, Uint32, Uint8 } from "./types";
 
 interface Serializable {
   serialize(serializer: Serializer): void;
@@ -14,6 +14,20 @@ export function serializeVector<T extends Serializable>(value: Seq<T>, serialize
   value.forEach((item: T) => {
     item.serialize(serializer);
   });
+}
+
+/**
+ * Serializes a vector with specified item serializaiton function.
+ * Very dynamic function and bypasses static typechecking.
+ */
+export function serializeVectorWithFunc(value: any[], func: string): Bytes {
+  const serializer = new Serializer();
+  serializer.serializeU32AsUleb128(value.length);
+  const f = (serializer as any)[func];
+  value.forEach((item) => {
+    f.call(serializer, item);
+  });
+  return serializer.getBytes();
 }
 
 /**
@@ -40,8 +54,50 @@ export function bcsSerializeUint64(value: AnyNumber): Bytes {
   return serializer.getBytes();
 }
 
+export function bcsSerializeU8(value: Uint8): Bytes {
+  const serializer = new Serializer();
+  serializer.serializeU8(value);
+  return serializer.getBytes();
+}
+
+export function bcsSerializeU16(value: Uint16): Bytes {
+  const serializer = new Serializer();
+  serializer.serializeU16(value);
+  return serializer.getBytes();
+}
+
+export function bcsSerializeU32(value: Uint32): Bytes {
+  const serializer = new Serializer();
+  serializer.serializeU32(value);
+  return serializer.getBytes();
+}
+
+export function bcsSerializeU128(value: AnyNumber): Bytes {
+  const serializer = new Serializer();
+  serializer.serializeU128(value);
+  return serializer.getBytes();
+}
+
+export function bcsSerializeBool(value: boolean): Bytes {
+  const serializer = new Serializer();
+  serializer.serializeBool(value);
+  return serializer.getBytes();
+}
+
 export function bcsSerializeStr(value: string): Bytes {
   const serializer = new Serializer();
   serializer.serializeStr(value);
+  return serializer.getBytes();
+}
+
+export function bcsSerializeBytes(value: Bytes): Bytes {
+  const serializer = new Serializer();
+  serializer.serializeBytes(value);
+  return serializer.getBytes();
+}
+
+export function bcsSerializeFixedBytes(value: Bytes): Bytes {
+  const serializer = new Serializer();
+  serializer.serializeFixedBytes(value);
   return serializer.getBytes();
 }

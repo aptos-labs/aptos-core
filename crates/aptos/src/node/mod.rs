@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::PromptOptions;
+use crate::common::types::{ConfigSearchMode, PromptOptions};
 use crate::common::utils::prompt_yes_with_override;
 use crate::config::GlobalConfig;
 use crate::{
@@ -18,7 +18,8 @@ use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, ValidatorConfiguration};
-use aptos_rest_client::{Response, Transaction};
+use aptos_rest_client::Transaction;
+use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::chain_id::ChainId;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
@@ -29,11 +30,7 @@ use rand::SeedableRng;
 use reqwest::Url;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::{
-    path::PathBuf,
-    thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{path::PathBuf, thread, time::Duration};
 use tokio::time::Instant;
 
 /// Tool for manipulating nodes
@@ -51,6 +48,7 @@ pub enum NodeTool {
     ShowValidatorSet(ShowValidatorSet),
     ShowValidatorStake(ShowValidatorStake),
     RunLocalTestnet(RunLocalTestnet),
+    UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
 }
 
 impl NodeTool {
@@ -68,6 +66,7 @@ impl NodeTool {
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
             RunLocalTestnet(tool) => tool.execute_serialized_without_logger().await,
+            UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -90,13 +89,7 @@ impl CliCommand<Transaction> for AddStake {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "Stake",
-                "add_stake",
-                vec![],
-                vec![bcs::to_bytes(&self.amount)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_add_stake(self.amount))
             .await
     }
 }
@@ -121,13 +114,7 @@ impl CliCommand<Transaction> for UnlockStake {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "Stake",
-                "unlock",
-                vec![],
-                vec![bcs::to_bytes(&self.amount)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_unlock(self.amount))
             .await
     }
 }
@@ -139,6 +126,9 @@ impl CliCommand<Transaction> for UnlockStake {
 pub struct WithdrawStake {
     #[clap(flatten)]
     pub(crate) node_op_options: TransactionOptions,
+    /// Amount of coins to withdraw
+    #[clap(long)]
+    pub amount: u64,
 }
 
 #[async_trait]
@@ -149,7 +139,7 @@ impl CliCommand<Transaction> for WithdrawStake {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         self.node_op_options
-            .submit_script_function(AccountAddress::ONE, "Stake", "withdraw", vec![], vec![])
+            .submit_transaction(aptos_stdlib::stake_withdraw(self.amount))
             .await
     }
 }
@@ -159,11 +149,6 @@ impl CliCommand<Transaction> for WithdrawStake {
 pub struct IncreaseLockup {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    /// Number of seconds to increase the lockup period by
-    ///
-    /// Examples: '1d', '5 days', '1 month'
-    #[clap(long, parse(try_from_str=parse_duration::parse))]
-    pub(crate) lockup_duration: Duration,
 }
 
 #[async_trait]
@@ -173,41 +158,24 @@ impl CliCommand<Transaction> for IncreaseLockup {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
-        if self.lockup_duration.is_zero() {
-            return Err(CliError::CommandArgumentError(
-                "Must provide a non-zero lockup duration".to_string(),
-            ));
-        }
-
-        let lockup_timestamp_secs = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            .saturating_add(self.lockup_duration.as_secs());
-
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "Stake",
-                "increase_lockup",
-                vec![],
-                vec![bcs::to_bytes(&lockup_timestamp_secs)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_increase_lockup())
             .await
     }
 }
 
-/// Register the current account as a Validator candidate
 #[derive(Parser)]
-pub struct RegisterValidatorCandidate {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
+pub struct ValidatorConfigArgs {
     /// Validator Configuration file, created from the `genesis set-validator-configuration` command
     #[clap(long)]
     pub(crate) validator_config_file: Option<PathBuf>,
     /// Hex encoded Consensus public key
     #[clap(long, parse(try_from_str = bls12381::PublicKey::from_encoded_string))]
     pub(crate) consensus_public_key: Option<bls12381::PublicKey>,
+    /// Hex encoded Consensus proof of possession
+    #[clap(long, parse(try_from_str = bls12381::ProofOfPossession::from_encoded_string))]
+    pub(crate) proof_of_possession: Option<bls12381::ProofOfPossession>,
+
     /// Host and port pair for the validator e.g. 127.0.0.1:6180
     #[clap(long)]
     pub(crate) validator_host: Option<HostAndPort>,
@@ -222,18 +190,11 @@ pub struct RegisterValidatorCandidate {
     pub(crate) full_node_network_public_key: Option<x25519::PublicKey>,
 }
 
-impl RegisterValidatorCandidate {
-    fn process_inputs(
+impl ValidatorConfigArgs {
+    fn get_consensus_public_key(
         &self,
-    ) -> CliTypedResult<(
-        bls12381::PublicKey,
-        x25519::PublicKey,
-        Option<x25519::PublicKey>,
-        HostAndPort,
-        Option<HostAndPort>,
-    )> {
-        let validator_config = self.read_validator_config()?;
-
+        validator_config: &Option<ValidatorConfiguration>,
+    ) -> CliTypedResult<bls12381::PublicKey> {
         let consensus_public_key = if let Some(ref consensus_public_key) = self.consensus_public_key
         {
             consensus_public_key.clone()
@@ -244,7 +205,34 @@ impl RegisterValidatorCandidate {
                 "Must provide either --validator-config-file or --consensus-public-key".to_string(),
             ));
         };
+        Ok(consensus_public_key)
+    }
 
+    fn get_consensus_proof_of_possession(
+        &self,
+        validator_config: &Option<ValidatorConfiguration>,
+    ) -> CliTypedResult<bls12381::ProofOfPossession> {
+        let proof_of_possession = if let Some(ref proof_of_possession) = self.proof_of_possession {
+            proof_of_possession.clone()
+        } else if let Some(ref validator_config) = validator_config {
+            validator_config.proof_of_possession.clone()
+        } else {
+            return Err(CliError::CommandArgumentError(
+                "Must provide either --validator-config-file or --proof-of-possession".to_string(),
+            ));
+        };
+        Ok(proof_of_possession)
+    }
+
+    fn get_network_configs(
+        &self,
+        validator_config: &Option<ValidatorConfiguration>,
+    ) -> CliTypedResult<(
+        x25519::PublicKey,
+        Option<x25519::PublicKey>,
+        HostAndPort,
+        Option<HostAndPort>,
+    )> {
         let validator_network_public_key =
             if let Some(public_key) = self.validator_network_public_key {
                 public_key
@@ -285,7 +273,6 @@ impl RegisterValidatorCandidate {
         };
 
         Ok((
-            consensus_public_key,
             validator_network_public_key,
             full_node_network_public_key,
             validator_host,
@@ -304,6 +291,16 @@ impl RegisterValidatorCandidate {
     }
 }
 
+#[derive(Parser)]
+/// Register the current account as a Validator candidate
+pub struct RegisterValidatorCandidate {
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+
+    #[clap(flatten)]
+    pub(crate) validator_config_args: ValidatorConfigArgs,
+}
+
 #[async_trait]
 impl CliCommand<Transaction> for RegisterValidatorCandidate {
     fn command_name(&self) -> &'static str {
@@ -311,34 +308,43 @@ impl CliCommand<Transaction> for RegisterValidatorCandidate {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
+        let validator_config = self.validator_config_args.read_validator_config()?;
+        let consensus_public_key = self
+            .validator_config_args
+            .get_consensus_public_key(&validator_config)?;
+        let consensus_proof_of_possession = self
+            .validator_config_args
+            .get_consensus_proof_of_possession(&validator_config)?;
         let (
-            consensus_public_key,
             validator_network_public_key,
             full_node_network_public_key,
             validator_host,
             full_node_host,
-        ) = self.process_inputs()?;
+        ) = self
+            .validator_config_args
+            .get_network_configs(&validator_config)?;
         let validator_network_addresses =
             vec![validator_host.as_network_address(validator_network_public_key)?];
         let full_node_network_addresses =
             match (full_node_host.as_ref(), full_node_network_public_key) {
                 (Some(host), Some(public_key)) => vec![host.as_network_address(public_key)?],
-                _ => vec![],
+                (None, None) => vec![],
+                _ => {
+                    return Err(CliError::CommandArgumentError(
+                        "If specifying fullnode addresses, both host and public key are required."
+                            .to_string(),
+                    ))
+                }
             };
 
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "Stake",
-                "register_validator_candidate",
-                vec![],
-                vec![
-                    bcs::to_bytes(&consensus_public_key)?,
-                    // Double BCS encode, so that we can hide the original type
-                    bcs::to_bytes(&bcs::to_bytes(&validator_network_addresses)?)?,
-                    bcs::to_bytes(&bcs::to_bytes(&full_node_network_addresses)?)?,
-                ],
-            )
+            .submit_transaction(aptos_stdlib::stake_initialize_validator(
+                consensus_public_key.to_bytes().to_vec(),
+                consensus_proof_of_possession.to_bytes().to_vec(),
+                // BCS encode, so that we can hide the original type
+                bcs::to_bytes(&validator_network_addresses)?,
+                bcs::to_bytes(&full_node_network_addresses)?,
+            ))
             .await
     }
 }
@@ -382,13 +388,7 @@ impl CliCommand<Transaction> for JoinValidatorSet {
             .address(&self.txn_options.profile_options)?;
 
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "Stake",
-                "join_validator_set",
-                vec![],
-                vec![bcs::to_bytes(&address)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_join_validator_set(address))
             .await
     }
 }
@@ -414,13 +414,7 @@ impl CliCommand<Transaction> for LeaveValidatorSet {
             .address(&self.txn_options.profile_options)?;
 
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "Stake",
-                "leave_validator_set",
-                vec![],
-                vec![bcs::to_bytes(&address)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_leave_validator_set(address))
             .await
     }
 }
@@ -445,13 +439,9 @@ impl CliCommand<serde_json::Value> for ShowValidatorStake {
     async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
         let client = self.rest_options.client(&self.profile_options.profile)?;
         let address = self.operator_args.address(&self.profile_options)?;
-        let response = get_resource_migration(
-            &client,
-            address,
-            "0x1::Stake::StakePool",
-            "0x1::stake::StakePool",
-        )
-        .await?;
+        let response = client
+            .get_resource(address, "0x1::stake::StakePool")
+            .await?;
         Ok(response.into_inner())
     }
 }
@@ -476,13 +466,9 @@ impl CliCommand<serde_json::Value> for ShowValidatorConfig {
     async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
         let client = self.rest_options.client(&self.profile_options.profile)?;
         let address = self.operator_args.address(&self.profile_options)?;
-        let response = get_resource_migration(
-            &client,
-            address,
-            "0x1::Stake::ValidatorConfig",
-            "0x1::stake::ValidatorConfig",
-        )
-        .await?;
+        let response = client
+            .get_resource(address, "0x1::stake::ValidatorConfig")
+            .await?;
         Ok(response.into_inner())
     }
 }
@@ -504,27 +490,10 @@ impl CliCommand<serde_json::Value> for ShowValidatorSet {
 
     async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
         let client = self.rest_options.client(&self.profile_options.profile)?;
-        let response = get_resource_migration(
-            &client,
-            CORE_CODE_ADDRESS,
-            "0x1::Stake::ValidatorSet",
-            "0x1::stake::ValidatorSet",
-        )
-        .await?;
+        let response = client
+            .get_resource(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
+            .await?;
         Ok(response.into_inner())
-    }
-}
-
-async fn get_resource_migration(
-    client: &aptos_rest_client::Client,
-    address: AccountAddress,
-    original_resource: &'static str,
-    new_resource: &'static str,
-) -> CliTypedResult<Response<serde_json::Value>> {
-    if let Ok(response) = client.get_resource(address, original_resource).await {
-        Ok(response)
-    } else {
-        Ok(client.get_resource(address, new_resource).await?)
     }
 }
 
@@ -573,7 +542,9 @@ impl CliCommand<()> for RunLocalTestnet {
             .unwrap_or_else(StdRng::from_entropy);
 
         let global_config = GlobalConfig::load()?;
-        let test_dir = global_config.get_config_location()?.join(TESTNET_FOLDER);
+        let test_dir = global_config
+            .get_config_location(ConfigSearchMode::CurrentDirAndParents)?
+            .join(TESTNET_FOLDER);
 
         // Remove the current test directory and start with a new node
         if self.force_restart && test_dir.exists() {
@@ -652,21 +623,20 @@ impl CliCommand<()> for RunLocalTestnet {
             }
 
             // Start the faucet
-            Some(
-                FaucetArgs {
-                    address: "0.0.0.0".to_string(),
-                    port: self.faucet_port,
-                    server_url: rest_url,
-                    mint_key_file_path: test_dir.join("mint.key"),
-                    mint_key: None,
-                    mint_account_address: None,
-                    chain_id: ChainId::test(),
-                    maximum_amount: None,
-                    do_not_delegate: false,
-                }
-                .run()
-                .await,
-            )
+            FaucetArgs {
+                address: "0.0.0.0".to_string(),
+                port: self.faucet_port,
+                server_url: rest_url,
+                mint_key_file_path: test_dir.join("mint.key"),
+                mint_key: None,
+                mint_account_address: None,
+                chain_id: ChainId::test(),
+                maximum_amount: None,
+                do_not_delegate: false,
+            }
+            .run()
+            .await;
+            Some(())
         } else {
             None
         };
@@ -677,5 +647,63 @@ impl CliCommand<()> for RunLocalTestnet {
             std::thread::park();
         }
         Ok(())
+    }
+}
+
+/// Update the current validator's network and fullnode addresses
+#[derive(Parser)]
+pub struct UpdateValidatorNetworkAddresses {
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+
+    #[clap(flatten)]
+    pub(crate) operator_args: OperatorArgs,
+
+    #[clap(flatten)]
+    pub(crate) validator_config_args: ValidatorConfigArgs,
+}
+
+#[async_trait]
+impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
+    fn command_name(&self) -> &'static str {
+        "UpdateValidatorNetworkAddresses"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<Transaction> {
+        let address = self
+            .operator_args
+            .address(&self.txn_options.profile_options)?;
+
+        let validator_config = self.validator_config_args.read_validator_config()?;
+        let (
+            validator_network_public_key,
+            full_node_network_public_key,
+            validator_host,
+            full_node_host,
+        ) = self
+            .validator_config_args
+            .get_network_configs(&validator_config)?;
+        let validator_network_addresses =
+            vec![validator_host.as_network_address(validator_network_public_key)?];
+        let full_node_network_addresses =
+            match (full_node_host.as_ref(), full_node_network_public_key) {
+                (Some(host), Some(public_key)) => vec![host.as_network_address(public_key)?],
+                (None, None) => vec![],
+                _ => {
+                    return Err(CliError::CommandArgumentError(
+                        "If specifying fullnode addresses, both host and public key are required."
+                            .to_string(),
+                    ))
+                }
+            };
+
+        self.txn_options
+            .submit_transaction(aptos_stdlib::stake_update_network_and_fullnode_addresses(
+                address,
+                // BCS encode, so that we can hide the original type
+                bcs::to_bytes(&validator_network_addresses)?,
+                bcs::to_bytes(&full_node_network_addresses)?,
+            ))
+            .await
     }
 }

@@ -135,13 +135,14 @@ fn create_layout_file(
         users,
         chain_id,
         allow_new_validators: false,
+        epoch_duration_secs: 86400,
         min_stake: 0,
+        min_voting_threshold: 0,
         max_stake: u64::MAX,
-        min_lockup_duration_secs: 0,
-        max_lockup_duration_secs: 31536000, // One Year
-        epoch_duration_secs: 86400,         // One Day
-        initial_lockup_timestamp: 0,
-        min_price_per_gas_unit: 1,
+        recurring_lockup_duration_secs: 86400,
+        required_proposer_stake: 0,
+        rewards_apy_percentage: 1,
+        voting_duration_secs: 1,
     };
     let file = TempPath::new();
     file.create_as_file().unwrap();

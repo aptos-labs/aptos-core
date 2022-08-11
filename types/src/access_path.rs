@@ -102,6 +102,10 @@ impl AccessPath {
             Path::Code(_) => None,
         }
     }
+
+    pub fn is_code(&self) -> bool {
+        matches!(self.get_path(), Path::Code(_))
+    }
 }
 
 impl fmt::Debug for AccessPath {

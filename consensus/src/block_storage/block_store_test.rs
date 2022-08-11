@@ -300,7 +300,7 @@ async fn test_insert_vote() {
         let vote_res = pending_votes.insert_vote(&vote, &validator_verifier);
 
         // first vote of an author is accepted
-        assert_eq!(vote_res, VoteReceptionResult::VoteAdded(i as u64));
+        assert_eq!(vote_res, VoteReceptionResult::VoteAdded(i as u128));
         // filter out duplicates
         assert_eq!(
             pending_votes.insert_vote(&vote, &validator_verifier),
@@ -394,7 +394,7 @@ async fn test_need_fetch_for_qc() {
     let a3 = inserter.insert_block(&a2, 3, None).await;
     block_store.prune_tree(a2.id());
     let need_fetch_qc = placeholder_certificate_for_block(
-        vec![inserter.signer()],
+        &[inserter.signer().clone()],
         HashValue::zero(),
         a3.round() + 1,
         HashValue::zero(),
@@ -402,7 +402,7 @@ async fn test_need_fetch_for_qc() {
     );
     let too_old_qc = certificate_for_genesis();
     let can_insert_qc = placeholder_certificate_for_block(
-        vec![inserter.signer()],
+        &[inserter.signer().clone()],
         a3.id(),
         a3.round(),
         a2.id(),
