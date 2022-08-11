@@ -3,12 +3,13 @@
 
 use aptos_infallible::Mutex;
 use crossbeam::utils::CachePadded;
+use parking_lot::Condvar;
 use std::{
     cmp::min,
     hint,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc, Condvar,
+        Arc,
     },
 };
 

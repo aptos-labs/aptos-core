@@ -92,8 +92,8 @@ impl<'a, K: ModulePath + PartialOrd + Send + Clone + Hash + Eq, V: Send + Sync>
                             // eventually finish and lead to unblocking txn_idx, contradiction.
                             let (lock, cvar) = &*dep_condition;
                             let mut dep_resolved = lock.lock();
-                            while !*dep_resolved {
-                                dep_resolved = cvar.wait(dep_resolved).unwrap();
+                            if !*dep_resolved {
+                                cvar.wait(&mut dep_resolved);
                             }
                         }
                         None => continue,

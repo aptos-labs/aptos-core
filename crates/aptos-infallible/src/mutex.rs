@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Mutex as StdMutex;
+use parking_lot::Mutex as StdMutex;
 
-pub use std::sync::MutexGuard;
+pub use parking_lot::{Condvar, MutexGuard};
 
 /// A simple wrapper around the lock() function of a std::sync::Mutex
 /// The only difference is that you don't need to call unwrap() on it.
@@ -17,10 +17,8 @@ impl<T> Mutex<T> {
     }
 
     /// lock the mutex
-    pub fn lock(&self) -> MutexGuard<'_, T> {
-        self.0
-            .lock()
-            .expect("Cannot currently handle a poisoned lock")
+    pub fn lock(&self) -> parking_lot::MutexGuard<'_, T> {
+        self.0.lock()
     }
 }
 

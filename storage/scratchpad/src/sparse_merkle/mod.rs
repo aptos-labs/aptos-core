@@ -88,9 +88,8 @@ use aptos_crypto::{
     hash::{CryptoHash, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, MutexGuard};
 use aptos_types::{nibble::nibble_path::NibblePath, proof::SparseMerkleProof};
-use std::sync::MutexGuard;
 use std::{
     borrow::Borrow,
     collections::{BTreeMap, HashMap},
