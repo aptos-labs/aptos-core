@@ -153,6 +153,11 @@ const config = {
             href: "https://fullnode.devnet.aptoslabs.com/spec.html#/",
             label: "REST API",
           },
+          {
+            position: "left",
+            href: "https://aptos.dev/papers/2022.08.11.10.00.aptos_whitepaper.pdf",
+            label: "Aptos White Paper",
+          },
         ],
       },
       footer: {
