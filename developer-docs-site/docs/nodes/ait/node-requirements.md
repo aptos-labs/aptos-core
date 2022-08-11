@@ -12,7 +12,7 @@ Follow the requirements specified in this document to make your AIT-2 Validator 
 - For the AIT-2, we require that you run the Validator. We recommend that optionally you run a FullNode also. However, a FullNode is not required. 
 - If you run FullNode also, then we strongly recommend that you run the Validator and the FullNode on two separate and independent machines. Make sure that these machines are well-provisioned and isolated from each other. Guaranteeing the resource isolation between the Validator and the FullNode will help ensure smooth deployment of these nodes.
 - For best availability and stability, **we recommend that you deploy your node on the cloud**. We have provided Terraform support for deploying the node on three cloud providers: GCP, AWS and Azure. See [Validators](/nodes/validator-node/validators).
-- Make sure that you open the network ports prior to July 12, before the AIT-2 goes live. See [Networking configuration requirements](#networking-configuration-requirements).
+- Make sure that you open the network ports prior to the date the AIT goes live. See [Networking configuration requirements](#networking-requirements).
 - Make sure that you close these ports after either being accepted or rejected for the AIT-2.
 
 ## Validator node in test mode 
@@ -66,6 +66,20 @@ We recommend nodes have at least 300GB of disk space to ensure adequate storage 
 ## Networking requirements
 
 Bandwidth requirement: 1 Gbps
+
+### Ports
+
+When you are running a validator node, you are required to open network ports on your node to allow other nodes to connect to you. For fullnodes this is optional.
+
+There are three types of Aptos networks. Your node can be configured so that each of these networks can connect to your node using a different port on your node. 
+
+1. The validator network: A validator node connects to this network.
+2. The public network. A public fullnode connects to this network. 
+3. The validator fullnode network (VFN network): A validator fullnode connects to this network. The VFN network allows the validator fullnode to connect to the specific validator. 
+
+You can configure the port settings on your node using the configuration YAML file. See the [example configuration YAML here](https://github.com/aptos-labs/aptos-core/blob/4ce85456853c7b19b0a751fb645abd2971cc4c0c/docker/compose/aptos-node/fullnode.yaml#L10-L9). With this configuration YAML on your node, the public network connects to your node on port 6182 and the VFN network on 6181. Because these port settings are configurable, we don't explicitly say port X is for network Y.
+
+### Port settings
 
 For the Validator:
 

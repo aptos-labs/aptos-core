@@ -16,6 +16,8 @@ pub const X_APTOS_CHAIN_ID: &str = "X-Aptos-Chain-Id";
 pub const X_APTOS_EPOCH: &str = "X-Aptos-Epoch";
 pub const X_APTOS_LEDGER_VERSION: &str = "X-Aptos-Ledger-Version";
 pub const X_APTOS_LEDGER_OLDEST_VERSION: &str = "X-Aptos-Ledger-Oldest-Version";
+pub const X_APTOS_BLOCK_HEIGHT: &str = "X-Aptos-Block-Height";
+pub const X_APTOS_OLDEST_BLOCK_HEIGHT: &str = "X-Aptos-Oldest-Block-Height";
 pub const X_APTOS_LEDGER_TIMESTAMP: &str = "X-Aptos-Ledger-TimestampUsec";
 
 pub struct Response {
@@ -71,6 +73,11 @@ impl warp::Reply for Response {
             self.ledger_info.ledger_timestamp.into(),
         );
         headers.insert(X_APTOS_EPOCH, self.ledger_info.epoch.into());
+        headers.insert(X_APTOS_BLOCK_HEIGHT, self.ledger_info.block_height.into());
+        headers.insert(
+            X_APTOS_OLDEST_BLOCK_HEIGHT,
+            self.ledger_info.oldest_block_height.into(),
+        );
 
         res
     }

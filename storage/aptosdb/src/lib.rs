@@ -983,6 +983,13 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// Get the first version that will likely not be pruned soon
+    fn get_first_viable_txn_version(&self) -> Result<Version> {
+        gauged_api("get_first_viable_txn_version", || {
+            Ok(self.ledger_pruner.get_min_viable_version())
+        })
+    }
+
     /// Get the first version that write set starts existent.
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_write_set_version", || {
@@ -1196,6 +1203,22 @@ impl DbReader for AptosDB {
 
             let (_first_version, new_block_event) = self.event_store.get_block_metadata(version)?;
             Ok(new_block_event.proposed_time())
+        })
+    }
+
+    fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
+        gauged_api("get_next_block_event", || {
+            if let Some((block_version, _, _)) = self
+                .event_store
+                .lookup_event_at_or_after_version(&new_block_event_key(), version)?
+            {
+                self.event_store.get_block_metadata(block_version)
+            } else {
+                bail!(
+                    "Failed to find a block event at or after version {}",
+                    version
+                )
+            }
         })
     }
 

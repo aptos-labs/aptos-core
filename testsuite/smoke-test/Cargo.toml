@@ -62,11 +62,3 @@ aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
 aptos-writeset-generator = { path = "../../aptos-move/writeset-transaction-generator" }
 backup-cli = { path = "../../storage/backup/backup-cli" }
-
-[[test]]
-name = "forge"
-harness = false
-
-[[test]]
-name = "forge-aptos"
-harness = false

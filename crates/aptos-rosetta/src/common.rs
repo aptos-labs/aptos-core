@@ -11,7 +11,7 @@ use crate::{
 };
 use aptos_crypto::{ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_logger::debug;
-use aptos_rest_client::{aptos_api_types::BlockInfo, Account, Response};
+use aptos_rest_client::{Account, Response};
 use aptos_sdk::move_types::language_storage::{StructTag, TypeTag};
 use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use futures::future::BoxFuture;
@@ -103,9 +103,9 @@ pub async fn get_account(
 }
 
 /// Retrieve the timestamp according ot the Rosetta spec (milliseconds)
-pub fn get_timestamp(block_info: BlockInfo) -> u64 {
+pub fn get_timestamp(timestamp_usecs: u64) -> u64 {
     // note: timestamps are in microseconds, so we convert to milliseconds
-    let mut timestamp = block_info.block_timestamp / 1000;
+    let mut timestamp = timestamp_usecs / 1000;
 
     // Rosetta doesn't like timestamps before 2000
     if timestamp < Y2K_MS {
@@ -187,14 +187,9 @@ pub async fn get_block_index_from_request(
         Some(PartialBlockIdentifier {
             index: None,
             hash: Some(hash),
-        }) => {
-            server_context
-                .block_cache()?
-                .get_block_index_by_hash(&aptos_rest_client::aptos_api_types::HashValue::from_str(
-                    &hash,
-                )?)
-                .await?
-        }
+        }) => server_context.block_cache()?.get_block_height_by_hash(
+            &aptos_rest_client::aptos_api_types::HashValue::from_str(&hash)?,
+        )?,
         // Lookup latest version
         _ => {
             let response = server_context
@@ -203,11 +198,7 @@ pub async fn get_block_index_from_request(
                 .await?;
             let state = response.state();
 
-            server_context
-                .block_cache()?
-                .get_block_info_by_version(state.version)
-                .await?
-                .block_height
+            state.block_height
         }
     })
 }

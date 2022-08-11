@@ -164,18 +164,13 @@ prop_compose! {
     )(
         include_epoch_state in any::<bool>(),
         epoch in any::<u64>(),
-        address_to_validator_info in prop::collection::btree_map(
-            any::<AccountAddress>(),
-            arb_validator_consensus_info(),
+        validator_infos in prop::collection::vec(
+            any::<ValidatorConsensusInfo>(),
             0..MAX_NUM_ADDR_TO_VALIDATOR_INFO
         ),
-        quorum_voting_power in any::<u64>(),
-        total_voting_power in any::<u64>(),
     ) -> Option<EpochState> {
-        let verifier = ValidatorVerifier::new_for_testing(
-            address_to_validator_info,
-            quorum_voting_power,
-            total_voting_power
+        let verifier = ValidatorVerifier::new(
+            validator_infos,
         );
         if include_epoch_state {
             Some(EpochState {
@@ -211,17 +206,6 @@ prop_compose! {
         );
         let vote_data = VoteData::new(proposed_block_info, parent_block_info);
         QuorumCert::new(vote_data, signed_ledger_info)
-    }
-}
-
-// This generates an arbitrary ValidatorConsensusInfo.
-prop_compose! {
-    pub fn arb_validator_consensus_info(
-    )(
-        public_key in any::<bls12381::PublicKey>(),
-        voting_power in any::<u64>(),
-    ) -> ValidatorConsensusInfo {
-        ValidatorConsensusInfo::new(public_key, voting_power)
     }
 }
 

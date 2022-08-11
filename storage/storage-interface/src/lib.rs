@@ -15,7 +15,6 @@ use aptos_types::{
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     move_resource::MoveStorage,
-    nibble::nibble_path::NibblePath,
     on_chain_config::{access_path_for_config, ConfigID},
     proof::{
         AccumulatorConsistencyProof, SparseMerkleProof, SparseMerkleRangeProof,
@@ -50,7 +49,6 @@ pub mod sync_proof_fetcher;
 
 use crate::state_delta::StateDelta;
 pub use executed_trees::ExecutedTrees;
-use scratchpad::SparseMerkleTree;
 
 pub trait StateSnapshotReceiver<K, V>: Send {
     fn add_chunk(&mut self, chunk: Vec<(K, V)>, proof: SparseMerkleRangeProof) -> Result<()>;
@@ -157,6 +155,13 @@ pub trait DbReader: Send + Sync {
         unimplemented!()
     }
 
+    /// See [AptosDB::get_first_viable_txn_version].
+    ///
+    /// [AptosDB::get_first_viable_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_txn_version
+    fn get_first_viable_txn_version(&self) -> Result<Version> {
+        unimplemented!()
+    }
+
     /// See [AptosDB::get_first_write_set_version].
     ///
     /// [AptosDB::get_first_write_set_version]: ../aptosdb/struct.AptosDB.html#method.get_first_write_set_version
@@ -204,6 +209,10 @@ pub trait DbReader: Send + Sync {
     /// [AptosDB::get_block_timestamp]:
     /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
     fn get_block_timestamp(&self, version: Version) -> Result<u64> {
+        unimplemented!()
+    }
+
+    fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
         unimplemented!()
     }
 
@@ -586,25 +595,6 @@ pub trait DbWriter: Send + Sync {
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
     ) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn save_state_snapshot_for_bench(
-        &self,
-        jmt_updates: Vec<(HashValue, (HashValue, StateKey))>,
-        node_hashes: Option<&HashMap<NibblePath, HashValue>>,
-        version: Version,
-        base_version: Option<Version>,
-        state_tree_at_snapshot: SparseMerkleTree<StateValue>,
-    ) -> Result<()> {
-        unimplemented!()
-    }
-
-    /// Persists merklized states as authenticated state checkpoint.
-    /// See [`AptosDB::save_state_snapshot`].
-    ///
-    /// [`AptosDB::save_state_snapshot`]: ../aptosdb/struct.AptosDB.html#method.save_state_snapshot
-    fn save_state_snapshot(&self) -> Result<()> {
         unimplemented!()
     }
 

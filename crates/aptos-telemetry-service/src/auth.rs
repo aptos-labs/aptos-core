@@ -108,7 +108,7 @@ pub async fn handle_auth(
         .map_err(|_| reject::reject())?;
 
     Ok(reply::json(&AuthResponse {
-        handshake_msg: Some(server_response.to_owned()),
+        handshake_msg: server_response,
     }))
 }
 

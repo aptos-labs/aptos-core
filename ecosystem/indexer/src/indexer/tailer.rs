@@ -317,7 +317,9 @@ mod test {
                 epoch: 0,
                 version: 0,
                 timestamp_usecs: 0,
-                oldest_ledger_version: None,
+                oldest_ledger_version: 0,
+                oldest_block_height: 0,
+                block_height: 0,
             }
         }
 
