@@ -43,26 +43,25 @@ pub struct PackageMetadata {
     pub manifest: String,
     /// The list of modules installed by this package.
     pub modules: Vec<ModuleMetadata>,
-    /// Error map, in internal encoding
+    /// Error map, in BCS
     #[serde(with = "serde_bytes")]
     pub error_map: Vec<u8>,
+    /// ABIs, in BCS encoding
+    pub abis: Vec<Vec<u8>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModuleMetadata {
     /// Name of the module.
     pub name: String,
     /// Source text if available.
     pub source: String,
-    /// Source map, in internal encoding.
+    /// Source map, in BCS encoding.
     #[serde(with = "serde_bytes")]
     pub source_map: Vec<u8>,
-    /// ABI, in JSON byte encoding.
-    #[serde(with = "serde_bytes")]
-    pub abi: Vec<u8>,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UpgradePolicy {
     pub policy: u8,
 }
