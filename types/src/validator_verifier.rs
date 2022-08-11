@@ -268,14 +268,16 @@ impl ValidatorVerifier {
                 return Ok(());
             }
         }
+        // Verify empty multi signature
+        let multi_sig = multi_signature
+            .multi_sig()
+            .as_ref()
+            .ok_or(VerifyError::EmptySignature)?;
         // Verify the optimistically aggregated signature.
         let aggregated_key =
             PublicKey::aggregate(pub_keys).map_err(|_| VerifyError::FailedToAggregatePubKey)?;
 
-        multi_signature
-            .multi_sig()
-            .as_ref()
-            .ok_or(VerifyError::EmptySignature)?
+        multi_sig
             .verify(message, &aggregated_key)
             .map_err(|_| VerifyError::InvalidSignature)?;
         Ok(())
@@ -567,6 +569,37 @@ mod tests {
         assert_eq!(
             validator.verify_multi_signatures(&dummy_struct, &multi_sig),
             Err(VerifyError::InvalidSignature)
+        );
+    }
+
+    #[test]
+    fn test_verify_empty_signature() {
+        let validator_signer = ValidatorSigner::random(TEST_SEED);
+        let dummy_struct = TestAptosCrypto("Hello, World".to_string());
+        let validator =
+            ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key());
+
+        assert_eq!(
+            validator
+                .verify_multi_signatures(&dummy_struct, &MultiSignature::new(vec![true], None)),
+            Err(VerifyError::EmptySignature)
+        );
+    }
+
+    #[test]
+    fn test_insufficient_voting_power() {
+        let validator_signer = ValidatorSigner::random(TEST_SEED);
+        let dummy_struct = TestAptosCrypto("Hello, World".to_string());
+        let validator =
+            ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key());
+
+        assert_eq!(
+            // This should fail with insufficient quorum voting power.
+            validator.verify_multi_signatures(&dummy_struct, &MultiSignature::empty()),
+            Err(VerifyError::TooLittleVotingPower {
+                voting_power: 0,
+                expected_voting_power: 1
+            })
         );
     }
 
