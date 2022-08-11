@@ -569,7 +569,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-rest-client",
  "async-trait",
- "bigdecimal 0.1.2",
+ "bigdecimal",
  "chrono",
  "clap 3.2.16",
  "diesel",
@@ -1157,22 +1157,6 @@ dependencies = [
  "serde 1.0.141",
  "serde_bytes",
  "serde_json",
-]
-
-[[package]]
-name = "aptos-substreams"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "aptos-protos",
- "bytes 1.2.1",
- "pbjson",
- "pbjson-types",
- "prost 0.10.4",
- "prost-types 0.10.1",
- "serde 1.0.141",
- "serde_json",
- "substreams",
 ]
 
 [[package]]
@@ -1960,17 +1944,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bigdecimal"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6aaf33151a6429fe9211d1b276eafdf70cdff28b071e76c0b0e1503221ea3744"
-dependencies = [
- "num-bigint 0.4.3",
- "num-integer",
- "num-traits 0.2.15",
-]
-
-[[package]]
 name = "bincode"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2411,15 +2384,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 dependencies = [
  "bitflags",
-]
-
-[[package]]
-name = "cmake"
-version = "0.1.48"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8ad8cef104ac57b68b89df3208164d228503abbdce70f6880ffa3d970e7443a"
-dependencies = [
- "cc",
 ]
 
 [[package]]
@@ -3165,7 +3129,7 @@ name = "diesel"
 version = "1.4.8"
 source = "git+https://github.com/aptos-labs/diesel?branch=1.4.x#1346b2087fb11ba2feca1153a88a598a17da0d38"
 dependencies = [
- "bigdecimal 0.1.2",
+ "bigdecimal",
  "bitflags",
  "byteorder",
  "chrono",
@@ -4214,12 +4178,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
-name = "hex-literal"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
 
 [[package]]
 name = "hkdf"
@@ -6714,7 +6672,7 @@ dependencies = [
  "pbjson",
  "pbjson-build",
  "prost 0.11.0",
- "prost-build 0.11.1",
+ "prost-build",
  "serde 1.0.141",
 ]
 
@@ -7344,28 +7302,6 @@ checksum = "399c3c31cdec40583bb68f0b18403400d01ec4289c383aa047560439952c4dd7"
 dependencies = [
  "bytes 1.2.1",
  "prost-derive 0.11.0",
-]
-
-[[package]]
-name = "prost-build"
-version = "0.10.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ae5a4388762d5815a9fc0dea33c56b021cdc8dde0c55e0c9ca57197254b0cab"
-dependencies = [
- "bytes 1.2.1",
- "cfg-if 1.0.0",
- "cmake",
- "heck 0.4.0",
- "itertools",
- "lazy_static 1.4.0",
- "log",
- "multimap",
- "petgraph 0.6.2",
- "prost 0.10.4",
- "prost-types 0.10.1",
- "regex",
- "tempfile",
- "which",
 ]
 
 [[package]]
@@ -8954,35 +8890,6 @@ dependencies = [
  "quote 1.0.20",
  "rustversion",
  "syn 1.0.98",
-]
-
-[[package]]
-name = "substreams"
-version = "0.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cf0b1354a0212595433c76be5c419111253f826fe6030e3a01f90054d2d541e"
-dependencies = [
- "bigdecimal 0.3.0",
- "hex",
- "hex-literal",
- "num-bigint 0.4.3",
- "prost 0.10.4",
- "prost-build 0.10.4",
- "prost-types 0.10.1",
- "substreams-macro",
- "thiserror",
-]
-
-[[package]]
-name = "substreams-macro"
-version = "0.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f98d38372efa37bdfd7e071092f4f4dcdcaed5dc5e7290b0362a56081474867"
-dependencies = [
- "proc-macro2 1.0.42",
- "quote 1.0.20",
- "syn 1.0.98",
- "thiserror",
 ]
 
 [[package]]

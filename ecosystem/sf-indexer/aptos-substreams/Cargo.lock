@@ -29,7 +29,6 @@ dependencies = [
  "aptos-protos",
  "bytes",
  "pbjson",
- "pbjson-types",
  "prost 0.10.4",
  "prost-types 0.10.1",
  "serde",
@@ -509,9 +508,9 @@ dependencies = [
 
 [[package]]
 name = "substreams"
-version = "0.0.12"
+version = "0.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cf0b1354a0212595433c76be5c419111253f826fe6030e3a01f90054d2d541e"
+checksum = "079f02d0767538283c0070b95a26470e7a1bb686690a93661718f184566824f3"
 dependencies = [
  "bigdecimal",
  "hex",
@@ -526,9 +525,9 @@ dependencies = [
 
 [[package]]
 name = "substreams-macro"
-version = "0.0.12"
+version = "0.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f98d38372efa37bdfd7e071092f4f4dcdcaed5dc5e7290b0362a56081474867"
+checksum = "151d43226dd34917af1719f8ced55aff915f620ccb89eca333ff891ac109a2bc"
 dependencies = [
  "proc-macro2",
  "quote",
