@@ -103,9 +103,10 @@ impl Context {
     }
 
     pub fn get_latest_ledger_info(&self) -> Result<LedgerInfo, Error> {
-        let oldest_version = self.db.get_first_viable_txn_version()?;
-        let (_, _, oldest_block_event) = self.db.get_block_info(oldest_version)?;
+        let maybe_oldest_version = self.db.get_first_viable_txn_version()?;
         let ledger_info = self.get_latest_ledger_info_with_signatures()?;
+        let (oldest_version, oldest_block_event) =
+            self.db.get_next_block_event(maybe_oldest_version)?;
         let (_, _, newest_block_event) = self
             .db
             .get_block_info(ledger_info.ledger_info().version())?;
@@ -120,35 +121,29 @@ impl Context {
 
     // TODO: Add error codes to these errors.
     pub fn get_latest_ledger_info_poem<E: InternalError>(&self) -> Result<LedgerInfo, E> {
-        if let Some(oldest_version) = self
+        let maybe_oldest_version = self
             .db
-            .get_first_txn_version()
-            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?
-        {
-            let ledger_info = self
-                .get_latest_ledger_info_with_signatures()
-                .map_err(E::internal)?;
-            let (_, _, oldest_block_event) = self
-                .db
-                .get_block_info(oldest_version)
-                .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
-            let (_, _, newest_block_event) = self
-                .db
-                .get_block_info(ledger_info.ledger_info().version())
-                .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
+            .get_first_viable_txn_version()
+            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
+        let ledger_info = self
+            .get_latest_ledger_info_with_signatures()
+            .map_err(E::internal)?;
+        let (oldest_version, oldest_block_event) = self
+            .db
+            .get_next_block_event(maybe_oldest_version)
+            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
+        let (_, _, newest_block_event) = self
+            .db
+            .get_block_info(ledger_info.ledger_info().version())
+            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
 
-            Ok(LedgerInfo::new(
-                &self.chain_id(),
-                &ledger_info,
-                oldest_version,
-                oldest_block_event.height(),
-                newest_block_event.height(),
-            ))
-        } else {
-            Err(E::internal(anyhow!(
-                "Failed to retrieve latest ledger info"
-            )))
-        }
+        Ok(LedgerInfo::new(
+            &self.chain_id(),
+            &ledger_info,
+            oldest_version,
+            oldest_block_event.height(),
+            newest_block_event.height(),
+        ))
     }
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {

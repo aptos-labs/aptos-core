@@ -1206,6 +1206,22 @@ impl DbReader for AptosDB {
         })
     }
 
+    fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
+        gauged_api("get_next_block_event", || {
+            if let Some((block_version, _, _)) = self
+                .event_store
+                .lookup_event_at_or_after_version(&new_block_event_key(), version)?
+            {
+                self.event_store.get_block_metadata(block_version)
+            } else {
+                bail!(
+                    "Failed to find a block event at or after version {}",
+                    version
+                )
+            }
+        })
+    }
+
     fn get_block_info(&self, version: Version) -> Result<(Version, Version, NewBlockEvent)> {
         gauged_api("get_block_info", || {
             let latest_li = self.get_latest_ledger_info()?;
