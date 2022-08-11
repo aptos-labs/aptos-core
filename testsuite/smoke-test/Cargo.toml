@@ -45,6 +45,7 @@ state-sync-driver = { path = "../../state-sync/state-sync-v2/state-sync-driver" 
 [dev-dependencies]
 base64 = "0.13.0"
 futures = "0.3.21"
+num_cpus = "1.13.1"
 once_cell = "1.10.0"
 rand = "0.7.3"
 regex = "1.5.5"
