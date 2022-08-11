@@ -92,7 +92,7 @@ mod tests {
         let stub = warp::path!("accounts" / String)
             .and(warp::any().map(move || accounts_cloned_0.clone()))
             .and_then(handle_get_account)
-            .or(warp::path!("transactions" / String)
+            .or(warp::path!("transactions" / "by_hash" / String)
                 .and(warp::get())
                 .and(warp::any().map(move || last_txn_0.clone()))
                 .and_then(handle_get_transaction))
@@ -116,7 +116,8 @@ mod tests {
             chain_id,
             faucet_account,
             maximum_amount,
-        );
+        )
+        .configure_for_testing();
         (accounts, Arc::new(service))
     }
 
@@ -511,7 +512,7 @@ mod tests {
         let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
         let service = tokio::task::spawn(async move { future.await });
 
-        let faucet_client = FaucetClient::new(
+        let faucet_client = FaucetClient::new_for_testing(
             Url::parse(&format!("http://{}", address)).unwrap(),
             endpoint,
         );

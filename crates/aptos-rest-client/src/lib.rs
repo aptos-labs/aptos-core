@@ -6,7 +6,7 @@ pub use aptos_api_types::{
     self, IndexResponse, MoveModuleBytecode, PendingTransaction, Transaction,
 };
 use aptos_api_types::{
-    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, Block, BlockInfo, Event,
+    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, BlockInfo, Event,
 };
 use aptos_crypto::HashValue;
 use aptos_types::{
@@ -29,16 +29,18 @@ pub use response::Response;
 pub mod state;
 pub mod types;
 use crate::aptos::{AptosVersion, Balance};
-pub use types::{Account, Resource, RestError};
+pub use types::{Account, Resource};
 pub mod aptos;
 use types::deserialize_from_string;
 
 pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
+pub const DEFAULT_VERSION_PATH_BASE: &str = "v1/";
 
 #[derive(Clone, Debug)]
 pub struct Client {
     inner: ReqwestClient,
     base_url: Url,
+    version_path_base: String,
 }
 
 impl Client {
@@ -50,7 +52,39 @@ impl Client {
             .build()
             .unwrap();
 
-        Self { inner, base_url }
+        // If the user provided no version in the path, use the default. If the
+        // provided version has no trailing slash, add it, otherwise url.join
+        // will ignore the version path base.
+        let version_path_base = match base_url.path() {
+            "/" => DEFAULT_VERSION_PATH_BASE.to_string(),
+            path => {
+                if !path.ends_with('/') {
+                    format!("{}/", path)
+                } else {
+                    path.to_string()
+                }
+            }
+        };
+
+        Self {
+            inner,
+            base_url,
+            version_path_base,
+        }
+    }
+
+    /// Set a different version path base, e.g. "v1/"" See
+    /// DEFAULT_VERSION_PATH_BASE for the default value.
+    pub fn version_path_base(mut self, version_path_base: String) -> Result<Self> {
+        if !version_path_base.ends_with('/') {
+            return Err(anyhow!("version_path_base must end with '/', e.g. 'v1/'"));
+        }
+        self.version_path_base = version_path_base;
+        Ok(self)
+    }
+
+    fn build_path(&self, path: &str) -> Result<Url> {
+        Ok(self.base_url.join(&self.version_path_base)?.join(path)?)
     }
 
     pub async fn get_aptos_version(&self) -> Result<Response<AptosVersion>> {
@@ -59,15 +93,15 @@ impl Client {
     }
 
     pub async fn get_block(&self, height: u64, with_transactions: bool) -> Result<Response<Block>> {
-        self.get(self.base_url.join(&format!(
-            "v1/blocks/by_height/{}?with_transactions={}",
+        self.get(self.build_path(&format!(
+            "blocks/by_height/{}?with_transactions={}",
             height, with_transactions
         ))?)
         .await
     }
 
     pub async fn get_block_info(&self, version: u64) -> Result<Response<BlockInfo>> {
-        self.get(self.base_url.join(&format!("blocks/{}", version))?)
+        self.get(self.build_path(&format!("blocks/{}", version))?)
             .await
     }
 
@@ -85,46 +119,26 @@ impl Client {
     }
 
     pub async fn get_index(&self) -> Result<Response<IndexResponse>> {
-        self.get(self.base_url.clone()).await
+        self.get(self.build_path("")?).await
     }
 
     pub async fn get_ledger_information(&self) -> Result<Response<State>> {
-        #[derive(Deserialize)]
-        struct Response {
-            chain_id: u8,
-            #[serde(deserialize_with = "types::deserialize_from_string")]
-            epoch: u64,
-            #[serde(deserialize_with = "types::deserialize_from_string")]
-            ledger_version: u64,
-            #[serde(deserialize_with = "types::deserialize_from_string")]
-            oldest_ledger_version: u64,
-            #[serde(deserialize_with = "types::deserialize_from_string")]
-            block_height: u64,
-            #[serde(deserialize_with = "types::deserialize_from_string")]
-            oldest_block_height: u64,
-            #[serde(deserialize_with = "types::deserialize_from_string")]
-            ledger_timestamp: u64,
-        }
-
-        let response = self
-            .get::<Response>(self.base_url.clone())
-            .await?
-            .map(|r| State {
-                chain_id: r.chain_id,
-                epoch: r.epoch,
-                version: r.ledger_version,
-                timestamp_usecs: r.ledger_timestamp,
-                oldest_ledger_version: r.oldest_ledger_version,
-                oldest_block_height: r.oldest_block_height,
-                block_height: r.block_height,
-            });
+        let response = self.get_index().await?.map(|r| State {
+            chain_id: r.ledger_info.chain_id,
+            epoch: r.ledger_info.epoch.into(),
+            version: r.ledger_info.ledger_version.into(),
+            timestamp_usecs: r.ledger_info.ledger_timestamp.into(),
+            oldest_ledger_version: r.ledger_info.oldest_ledger_version.into(),
+            oldest_block_height: r.ledger_info.oldest_block_height.into(),
+            block_height: r.ledger_info.block_height.into(),
+        });
 
         Ok(response)
     }
 
     pub async fn submit(&self, txn: &SignedTransaction) -> Result<Response<PendingTransaction>> {
         let txn_payload = bcs::to_bytes(txn)?;
-        let url = self.base_url.join("transactions")?;
+        let url = self.build_path("transactions")?;
 
         let response = self
             .inner
@@ -178,9 +192,7 @@ impl Client {
 
         let start = std::time::Instant::now();
         while start.elapsed() < DEFAULT_TIMEOUT {
-            let resp = self
-                .get_transaction_by_version_or_hash(hash.to_hex_literal())
-                .await?;
+            let resp = self.get_transaction_by_hash_inner(hash).await?;
             if resp.status() != StatusCode::NOT_FOUND {
                 let txn_resp: Response<Transaction> = self.json(resp).await?;
                 let (transaction, state) = txn_resp.into_parts();
@@ -210,7 +222,7 @@ impl Client {
         start: Option<u64>,
         limit: Option<u16>,
     ) -> Result<Response<Vec<Transaction>>> {
-        let url = self.base_url.join("transactions")?;
+        let url = self.build_path("transactions")?;
 
         let mut request = self.inner.get(url);
         if let Some(start) = start {
@@ -226,30 +238,23 @@ impl Client {
         self.json(response).await
     }
 
-    pub async fn get_transaction(&self, hash: HashValue) -> Result<Response<Transaction>> {
-        self.json(
-            self.get_transaction_by_version_or_hash(hash.to_hex_literal())
-                .await?,
-        )
-        .await
+    pub async fn get_transaction_by_hash(&self, hash: HashValue) -> Result<Response<Transaction>> {
+        self.json(self.get_transaction_by_hash_inner(hash).await?)
+            .await
+    }
+
+    async fn get_transaction_by_hash_inner(&self, hash: HashValue) -> Result<reqwest::Response> {
+        let url = self.build_path(&format!("transactions/by_hash/{}", hash.to_hex_literal()))?;
+        Ok(self.inner.get(url).send().await?)
     }
 
     pub async fn get_transaction_by_version(&self, version: u64) -> Result<Response<Transaction>> {
-        self.json(
-            self.get_transaction_by_version_or_hash(version.to_string())
-                .await?,
-        )
-        .await
+        self.json(self.get_transaction_by_version_inner(version).await?)
+            .await
     }
 
-    async fn get_transaction_by_version_or_hash(
-        &self,
-        version_or_hash: String,
-    ) -> Result<reqwest::Response> {
-        let url = self
-            .base_url
-            .join(&format!("transactions/{}", version_or_hash))?;
-
+    async fn get_transaction_by_version_inner(&self, version: u64) -> Result<reqwest::Response> {
+        let url = self.build_path(&format!("transactions/by_version/{}", version))?;
         Ok(self.inner.get(url).send().await?)
     }
 
@@ -259,9 +264,7 @@ impl Client {
         start: Option<u64>,
         limit: Option<u64>,
     ) -> Result<Response<Vec<Transaction>>> {
-        let url = self
-            .base_url
-            .join(&format!("accounts/{}/transactions", address))?;
+        let url = self.build_path(&format!("accounts/{}/transactions", address))?;
 
         let mut request = self.inner.get(url);
         if let Some(start) = start {
@@ -281,9 +284,7 @@ impl Client {
         &self,
         address: AccountAddress,
     ) -> Result<Response<Vec<Resource>>> {
-        let url = self
-            .base_url
-            .join(&format!("accounts/{}/resources", address))?;
+        let url = self.build_path(&format!("accounts/{}/resources", address))?;
 
         let response = self.inner.get(url).send().await?;
 
@@ -295,7 +296,7 @@ impl Client {
         address: AccountAddress,
         version: u64,
     ) -> Result<Response<Vec<Resource>>> {
-        let url = self.base_url.join(&format!(
+        let url = self.build_path(&format!(
             "accounts/{}/resources?version={}",
             address, version
         ))?;
@@ -330,9 +331,7 @@ impl Client {
         address: AccountAddress,
         resource_type: &str,
     ) -> Result<Response<Option<Resource>>> {
-        let url = self
-            .base_url
-            .join(&format!("accounts/{}/resource/{}", address, resource_type))?;
+        let url = self.build_path(&format!("accounts/{}/resource/{}", address, resource_type))?;
 
         let response = self.inner.get(url).send().await?;
         self.json(response).await
@@ -344,7 +343,7 @@ impl Client {
         resource_type: &str,
         version: u64,
     ) -> Result<Response<Option<Resource>>> {
-        let url = self.base_url.join(&format!(
+        let url = self.build_path(&format!(
             "accounts/{}/resource/{}?version={}",
             address, resource_type, version
         ))?;
@@ -357,9 +356,7 @@ impl Client {
         &self,
         address: AccountAddress,
     ) -> Result<Response<Vec<MoveModuleBytecode>>> {
-        let url = self
-            .base_url
-            .join(&format!("accounts/{}/modules", address))?;
+        let url = self.build_path(&format!("accounts/{}/modules", address))?;
 
         let response = self.inner.get(url).send().await?;
         self.json(response).await
@@ -373,7 +370,7 @@ impl Client {
         start: Option<u64>,
         limit: Option<u64>,
     ) -> Result<Response<Vec<Event>>> {
-        let url = self.base_url.join(&format!(
+        let url = self.build_path(&format!(
             "accounts/{}/events/{}/{}",
             address.to_hex_literal(),
             struct_tag,
@@ -456,9 +453,7 @@ impl Client {
         value_type: &str,
         key: K,
     ) -> Result<Response<Value>> {
-        let url = self
-            .base_url
-            .join(&format!("tables/{}/item", table_handle))?;
+        let url = self.build_path(&format!("tables/{}/item", table_handle))?;
         let data = json!({
             "key_type": key_type,
             "value_type": value_type,
@@ -470,13 +465,13 @@ impl Client {
     }
 
     pub async fn get_account(&self, address: AccountAddress) -> Result<Response<Account>> {
-        let url = self.base_url.join(&format!("accounts/{}", address))?;
+        let url = self.build_path(&format!("accounts/{}", address))?;
         let response = self.inner.get(url).send().await?;
         self.json(response).await
     }
 
     pub async fn set_failpoint(&self, name: String, actions: String) -> Result<String> {
-        let mut base = self.base_url.join("set_failpoint")?;
+        let mut base = self.build_path("set_failpoint")?;
         let url = base
             .query_pairs_mut()
             .append_pair("name", &name)
@@ -485,7 +480,7 @@ impl Client {
         let response = self.inner.get(url.clone()).send().await?;
 
         if !response.status().is_success() {
-            let error_response = response.json::<RestError>().await?;
+            let error_response = response.json::<AptosError>().await?;
             return Err(anyhow::anyhow!("Request failed: {:?}", error_response));
         }
 
@@ -500,7 +495,7 @@ impl Client {
         response: reqwest::Response,
     ) -> Result<(reqwest::Response, State)> {
         if !response.status().is_success() {
-            let error_response = response.json::<RestError>().await?;
+            let error_response = response.json::<AptosError>().await?;
             return Err(anyhow::anyhow!("Request failed: {:?}", error_response));
         }
         let state = State::from_headers(response.headers())?;
@@ -518,7 +513,7 @@ impl Client {
     }
 
     pub async fn health_check(&self, seconds: u64) -> Result<()> {
-        let url = self.base_url.join("-/healthy")?;
+        let url = self.build_path("-/healthy")?;
         let response = self
             .inner
             .get(url)
@@ -540,6 +535,10 @@ impl Client {
 
 impl From<(ReqwestClient, Url)> for Client {
     fn from((inner, base_url): (ReqwestClient, Url)) -> Self {
-        Client { inner, base_url }
+        Client {
+            inner,
+            base_url,
+            version_path_base: DEFAULT_VERSION_PATH_BASE.to_string(),
+        }
     }
 }

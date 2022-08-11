@@ -147,7 +147,8 @@ impl Node for K8sNode {
         } else {
             &self.service_name
         };
-        Url::from_str(&format!("http://{}:{}", host, self.rest_api_port())).expect("Invalid URL.")
+        Url::from_str(&format!("http://{}:{}/v1", host, self.rest_api_port()))
+            .expect("Invalid URL.")
     }
 
     // TODO: verify this still works
