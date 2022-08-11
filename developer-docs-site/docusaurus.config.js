@@ -155,7 +155,8 @@ const config = {
           },
           {
             position: "left",
-            href: "https://aptos.dev/papers/2022.08.11.10.00.aptos_whitepaper.pdf",
+            type: "doc",
+            docId: "aptos-white-paper",
             label: "Aptos White Paper",
           },
         ],
