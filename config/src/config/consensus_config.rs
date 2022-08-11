@@ -36,7 +36,7 @@ impl Default for ConsensusConfig {
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
             mempool_txn_pull_timeout_ms: 1000,
-            round_initial_timeout_ms: 1000,
+            round_initial_timeout_ms: 1500,
             safety_rules: SafetyRulesConfig::default(),
             sync_only: false,
             channel_size: 30, // hard-coded

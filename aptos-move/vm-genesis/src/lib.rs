@@ -25,9 +25,8 @@ use aptos_vm::{
     data_cache::{IntoMoveResolver, StateViewCache},
     move_vm_ext::{MoveVmExt, SessionExt, SessionId},
 };
-use move_deps::move_binary_format::access::ModuleAccess;
 use move_deps::{
-    move_binary_format::CompiledModule,
+    move_binary_format::{access::ModuleAccess, CompiledModule},
     move_bytecode_utils::Modules,
     move_core_types::{
         account_address::AccountAddress,
@@ -467,7 +466,7 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
         GenesisOptions::Fresh => framework::aptos::module_blobs(),
     };
 
-    generate_test_genesis(&modules, None).0
+    generate_test_genesis(&modules, Some(1)).0
 }
 
 pub fn test_genesis_transaction() -> Transaction {

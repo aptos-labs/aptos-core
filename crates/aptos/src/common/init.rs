@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::types::ConfigSearchMode;
 use crate::common::{
     types::{
         account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
@@ -52,8 +53,8 @@ impl CliCommand<()> for InitTool {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let mut config = if CliConfig::config_exists() {
-            CliConfig::load()?
+        let mut config = if CliConfig::config_exists(ConfigSearchMode::CurrentDir) {
+            CliConfig::load(ConfigSearchMode::CurrentDir)?
         } else {
             CliConfig::default()
         };

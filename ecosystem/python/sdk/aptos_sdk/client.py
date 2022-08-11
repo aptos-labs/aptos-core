@@ -132,7 +132,7 @@ class RestClient:
         to_sign = bytes.fromhex(res.json()[2:])
         signature = sender.sign(to_sign)
         txn_request["signature"] = {
-            "type": "ed_25519_signature",
+            "type": "ed25519_signature",
             "public_key": f"{sender.public_key()}",
             "signature": f"{signature}",
         }

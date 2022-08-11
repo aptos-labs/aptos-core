@@ -47,20 +47,6 @@ impl Group {
 
             group.throughput(Throughput::Elements(block_size as u64));
 
-            group.bench_function(BenchmarkId::new("serial_update", block_size), |b| {
-                b.iter_batched(
-                    || small_batches.clone(),
-                    // return the resulting smt so the cost of Dropping it is not counted
-                    |small_batches| -> SparseMerkleTree<StateValue> {
-                        block
-                            .smt
-                            .serial_update(small_batches, &block.proof_reader)
-                            .unwrap()
-                            .1
-                    },
-                    BatchSize::LargeInput,
-                )
-            });
             group.bench_function(BenchmarkId::new("batch_update", block_size), |b| {
                 b.iter_batched(
                     || one_large_batch.clone(),

@@ -21,10 +21,11 @@ mod wrappers;
 
 pub use account::AccountData;
 pub use address::Address;
+pub use block::Block;
 pub use block::BlockInfo;
 pub use bytecode::Bytecode;
 pub use convert::{new_vm_utf8_string, AsConverter, MoveConverter};
-pub use error::Error;
+pub use error::{AptosError, AptosErrorCode, Error};
 pub use event_key::EventKey;
 pub use hash::HashValue;
 pub use index::IndexResponse;
@@ -36,7 +37,8 @@ pub use move_types::{
     ScriptFunctionId, U128, U64,
 };
 pub use response::{
-    Response, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
+    Response, X_APTOS_BLOCK_HEIGHT, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_OLDEST_VERSION,
+    X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION, X_APTOS_OLDEST_BLOCK_HEIGHT,
 };
 pub use table::TableItemRequest;
 pub use transaction::{

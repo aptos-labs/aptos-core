@@ -40,6 +40,7 @@ impl PrunerOpt {
             ledger_prune_window: self.ledger_prune_window,
             ledger_pruning_batch_size: self.ledger_pruning_batch_size,
             state_store_pruning_batch_size: self.state_store_pruning_batch_size,
+            user_pruning_window_offset: 0,
         }
     }
 }

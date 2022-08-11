@@ -18,6 +18,7 @@ use crate::{
     },
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
+    monitor,
     network::NetworkSender,
     network_interface::ConsensusMsg,
     pending_votes::VoteReceptionResult,

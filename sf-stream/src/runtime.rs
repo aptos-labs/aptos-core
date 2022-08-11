@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics;
-use crate::protos::extractor;
+use aptos_protos::extractor::v1 as extractor;
 
 use crate::convert::convert_transaction;
 use aptos_api::context::Context;
@@ -13,7 +13,7 @@ use aptos_mempool::MempoolClientSender;
 use aptos_types::chain_id::ChainId;
 use aptos_vm::data_cache::RemoteStorageOwned;
 use futures::channel::mpsc::channel;
-use protobuf::Message;
+use prost::Message;
 use std::sync::Arc;
 use std::time::Duration;
 use storage_interface::state_view::DbStateView;
@@ -218,14 +218,15 @@ impl SfStreamer {
         self.maybe_update_from_block_metadata(&transaction);
         convert_transaction(&transaction, self.block_height, self.current_epoch)
     }
-
     pub async fn print_transaction(&self, transaction: &extractor::Transaction) {
-        let pb_b64 = &base64::encode(transaction.write_to_bytes().unwrap_or_else(|_| {
+        let mut buf = vec![];
+        transaction.encode(&mut buf).unwrap_or_else(|_| {
             panic!(
                 "Could not convert protobuf transaction to bytes '{:?}'",
                 transaction
             )
-        }));
+        });
+        let pb_b64 = &base64::encode(buf);
         println!("DMLOG TRX {}", pb_b64);
         metrics::TRANSACTIONS_SENT.inc();
     }

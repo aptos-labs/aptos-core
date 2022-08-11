@@ -5,7 +5,9 @@ use anyhow::{anyhow, Result};
 pub use aptos_api_types::{
     self, IndexResponse, MoveModuleBytecode, PendingTransaction, Transaction,
 };
-use aptos_api_types::{mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, BlockInfo, Event};
+use aptos_api_types::{
+    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, Block, BlockInfo, Event,
+};
 use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
@@ -56,6 +58,14 @@ impl Client {
             .await
     }
 
+    pub async fn get_block(&self, height: u64, with_transactions: bool) -> Result<Response<Block>> {
+        self.get(self.base_url.join(&format!(
+            "v1/blocks/by_height/{}?with_transactions={}",
+            height, with_transactions
+        ))?)
+        .await
+    }
+
     pub async fn get_block_info(&self, version: u64) -> Result<Response<BlockInfo>> {
         self.get(self.base_url.join(&format!("blocks/{}", version))?)
             .await
@@ -87,9 +97,13 @@ impl Client {
             #[serde(deserialize_with = "types::deserialize_from_string")]
             ledger_version: u64,
             #[serde(deserialize_with = "types::deserialize_from_string")]
-            ledger_timestamp: u64,
-            #[serde(deserialize_with = "types::deserialize_from_string")]
             oldest_ledger_version: u64,
+            #[serde(deserialize_with = "types::deserialize_from_string")]
+            block_height: u64,
+            #[serde(deserialize_with = "types::deserialize_from_string")]
+            oldest_block_height: u64,
+            #[serde(deserialize_with = "types::deserialize_from_string")]
+            ledger_timestamp: u64,
         }
 
         let response = self
@@ -100,7 +114,9 @@ impl Client {
                 epoch: r.epoch,
                 version: r.ledger_version,
                 timestamp_usecs: r.ledger_timestamp,
-                oldest_ledger_version: Some(r.oldest_ledger_version),
+                oldest_ledger_version: r.oldest_ledger_version,
+                oldest_block_height: r.oldest_block_height,
+                block_height: r.block_height,
             });
 
         Ok(response)

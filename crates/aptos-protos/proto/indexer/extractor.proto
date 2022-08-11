@@ -3,14 +3,14 @@
 
 syntax = "proto3";
 
-import "google/protobuf/timestamp.proto";
-
 option go_package = "github.com/streamingfast/firehose-aptos/types/pb/sf/aptos/type/v1;pbaptos";
 
-// Transaction is actually right what will be transported inside the Firehose's Block envelope.
-// meaning we get a 1 transaction == 1 block mapping.
+import "timestamp.proto";
+
+package aptos.extractor.v1;
+
 message Transaction {
-  google.protobuf.Timestamp timestamp = 1;
+  aptos.util.timestamp.Timestamp timestamp = 1;
   uint64 version = 2;
   TransactionInfo info = 3;
   uint64 epoch = 4;
@@ -36,7 +36,7 @@ message Transaction {
 // TransactionTrimmed is a real Transaction with most of the fields removed so that
 // we can easily decode only the few fields that we have interest in in certain situations.
 message TransactionTrimmed {
-  google.protobuf.Timestamp timestamp = 1;
+  aptos.util.timestamp.Timestamp timestamp = 1;
   uint64 version = 2;
 }
 
@@ -90,7 +90,7 @@ message UserTransactionRequest {
   uint64 sequence_number = 2;
   uint64 max_gas_amount = 3;
   uint64 gas_unit_price = 4;
-  google.protobuf.Timestamp expiration_timestamp_secs = 5;
+  aptos.util.timestamp.Timestamp expiration_timestamp_secs = 5;
   TransactionPayload payload = 6;
   Signature signature = 7;
 }
@@ -346,15 +346,15 @@ message MoveStructTag {
 message Signature {
 
   enum Type {
-    ED255198 = 0;
-    MULTI_ED255198 = 1;
+    ED25519 = 0;
+    MULTI_ED25519 = 1;
     MULTI_AGENT = 2;
   }
 
   Type type = 1;
   oneof signature {
-    Ed25519Signature ed255198 = 2;
-    MultiEd25519Signature multi_ed255198 = 3;
+    Ed25519Signature ed25519 = 2;
+    MultiEd25519Signature multi_ed25519 = 3;
     MultiAgentSignature multi_agent = 4;
   }
 }
@@ -379,13 +379,13 @@ message MultiAgentSignature {
 
 message AccountSignature {
   enum Type {
-    ED255198 = 0;
-    MULTI_ED255198 = 1;
+    ED25519 = 0;
+    MULTI_ED25519 = 1;
   }
 
   Type type = 1;
   oneof signature {
-    Ed25519Signature ed255198 = 2;
-    MultiEd25519Signature multi_ed255198 = 3;
+    Ed25519Signature ed25519 = 2;
+    MultiEd25519Signature multi_ed25519 = 3;
   }
 }

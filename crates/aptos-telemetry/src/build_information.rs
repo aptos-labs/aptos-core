@@ -1,8 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_telemetry_service::types::telemetry::TelemetryEvent;
+
 use crate as aptos_telemetry;
-use crate::{service::TelemetryEvent, utils};
+use crate::utils;
 use std::collections::BTreeMap;
 
 /// Build information event name
@@ -29,7 +31,6 @@ pub const BUILD_VERSION: &str = "build_version";
 #[macro_export]
 macro_rules! collect_build_information {
     () => {{
-        println!("calling collect {:?}", std::env::var("GIT_SHA"));
         // Collect and return the build information
         let mut build_information: std::collections::BTreeMap<String, String> = BTreeMap::new();
 

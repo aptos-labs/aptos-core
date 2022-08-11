@@ -47,30 +47,41 @@ When `sf_stream.enabled` is set to `true`, the SF-Stream will be enabled, and tr
 
 ## Installing Protobuf Compiler
 
-1. Install the protobuf compiler `protoc`:
-   On OS X [Homebrew](https://github.com/Homebrew/brew) can be used:
-   
-   ```sh
-   brew install protobuf
+#### Install `protoc`
+
+protoc is a Protocol Buffer compiler. It is needed to generate code for Rust and other languages, out of the protobuf definitions you will create or get through third-party Substreams packages.
+
+There are multiple ways on how to do it. Here is the official documentation of [protocol buffer compiler](https://grpc.io/docs/protoc-installation/).
+
+#### Install `protoc-gen-prost`
+
+This tool helps you render Rust structures out of protobuf definitions, for use in your Substreams modules. It is called by protoc following their plugin system.
+Install it with:
+
+```bash
+  cargo install protoc-gen-prost
+```
+
+> If you forget to install `protoc`, when generating the definitions, you might see error about `cmake` not defined, this is a fallback when `protoc` is not found.
+
+### Install `buf`
+
+[https://buf.build](https://buf.build) is a tool used to simplify the generation of typed structures in any language. It invokes `protoc` and simplifies a good number of things. Substreams packages are compatible with [buf Images](https://docs.buf.build/reference/images).
+
+See the [installation instructions here](https://docs.buf.build/installation).
+
+### Build proto
+cargo build
+
+## Testing
+### Connect to Firehose
+To test with firehose, we need to build aptos-node
    ```
-
-   On Ubuntu the `protobuf-compiler` package can be installed like so:
-   
-   ```sh
-   apt-get install protobuf-compiler
+   cd ../aptos-node
+   cargo install --path .
    ```
-2. Install the `protoc` plugin `protoc-gen-rust` with `cargo install protobuf-codegen`
-
-3. Add the `protoc-gen-rust` plugin to your $PATH
-
-   ```sh
-   PATH="$HOME/.cargo/bin:$PATH"
+   If necessary, set path to aptos-node
    ```
-
-4. Run `protoc` to generate the .rs files:
-
-   ```sh
-   protoc --rust_out src/protos src/protos/*.proto
+   export PATH={path to directory containing aptos-core repo}:$PATH
    ```
-
-   This will generate the requisite .rs files in src/protos directory
+Then follow instructions in https://github.com/streamingfast/firehose-aptos

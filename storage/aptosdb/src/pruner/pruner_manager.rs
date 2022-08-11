@@ -17,6 +17,8 @@ pub trait PrunerManager: Debug + Sync {
 
     fn get_pruner_window(&self) -> Version;
 
+    fn get_min_viable_version(&self) -> Version;
+
     fn get_min_readable_version(&self) -> Version;
 
     /// Sends pruning command to the worker thread when necessary.

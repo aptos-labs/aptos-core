@@ -36,6 +36,7 @@ arc-swap = "1.5.0"
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-infallible = { path = "../crates/aptos-infallible" }
+aptos-keygen = { path = "../crates/aptos-keygen" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-global-constants = { path = "../config/global-constants"}
 aptos-mempool = { path = "../mempool" }

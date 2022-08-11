@@ -1,9 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::ledger_info::generate_ledger_info_with_sig;
-use crate::multi_signature::PartialSignatures;
-use crate::validator_verifier::ValidatorVerifier;
 use crate::{
     access_path::AccessPath,
     account_address::{self, AccountAddress},
@@ -15,7 +12,8 @@ use crate::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
+    multi_signature::PartialSignatures,
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -27,7 +25,7 @@ use crate::{
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
-    validator_verifier::ValidatorConsensusInfo,
+    validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -627,9 +625,8 @@ prop_compose! {
         consensus_keypair in bls12381_keys::keypair_strategy(),
     ) -> (AccountAddress, ValidatorConsensusInfo,  bls12381::Signature) {
         let signature = consensus_keypair.private_key.sign(&ledger_info);
-        (account_address::from_public_key(&account_keypair.public_key),
-                            ValidatorConsensusInfo::new(consensus_keypair.public_key, 1),
-signature)
+        let address = account_address::from_public_key(&account_keypair.public_key);
+        (address, ValidatorConsensusInfo::new(address, consensus_keypair.public_key, 1), signature)
     }
 }
 
@@ -648,8 +645,8 @@ impl Arbitrary for LedgerInfoWithSignatures {
             })
             .prop_map(|(ledger_info, validator_infos)| {
                 let validator_verifier = ValidatorVerifier::new_with_quorum_voting_power(
-                    validator_infos.iter().map(|x| (x.0, x.1.clone())).collect(),
-                    validator_infos.len() as u64 / 2,
+                    validator_infos.iter().map(|x| x.1.clone()).collect(),
+                    validator_infos.len() as u128 / 2,
                 )
                 .unwrap();
                 let partial_sig = PartialSignatures::new(
@@ -1054,11 +1051,13 @@ impl BlockInfoGen {
             let next_validator_set = self.validator_set_gen.materialize(universe);
             let next_validator_infos = next_validator_set
                 .iter()
-                .map(|signer| {
+                .enumerate()
+                .map(|(index, signer)| {
                     ValidatorInfo::new_with_test_network_keys(
                         signer.author(),
                         signer.public_key(),
                         1, /* consensus_voting_power */
+                        index as u64,
                     )
                 })
                 .collect();
@@ -1233,4 +1232,16 @@ pub fn arb_json_value() -> impl Strategy<Value = Value> {
             ]
         },
     )
+}
+
+impl Arbitrary for ValidatorVerifier {
+    type Parameters = ();
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        vec(any::<ValidatorConsensusInfo>(), 1..1000)
+            .prop_map(ValidatorVerifier::new)
+            .boxed()
+    }
+
+    type Strategy = BoxedStrategy<Self>;
 }

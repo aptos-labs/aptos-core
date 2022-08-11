@@ -7,7 +7,7 @@ use crate::state_merkle_db::StateMerkleDb;
 use crate::state_store::buffered_state::CommitMessage;
 use crate::OTHER_TIMERS_SECONDS;
 use aptos_crypto::HashValue;
-use aptos_logger::trace;
+use aptos_logger::{info, trace};
 use schemadb::SchemaBatch;
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
@@ -38,12 +38,16 @@ impl StateMerkleBatchCommitter {
     pub fn run(self) {
         while let Ok(msg) = self.state_merkle_batch_receiver.recv() {
             match msg {
-                CommitMessage::Data(state_merkle_batch) => {
+                CommitMessage::Data {
+                    data,
+                    snapshot_ready_sender,
+                    ..
+                } => {
                     let StateMerkleBatch {
                         batch,
                         root_hash,
                         state_delta,
-                    } = state_merkle_batch;
+                    } = data;
                     // commit jellyfish merkle nodes
                     let _timer = OTHER_TIMERS_SECONDS
                         .with_label_values(&["commit_jellyfish_merkle_nodes"])
@@ -51,7 +55,8 @@ impl StateMerkleBatchCommitter {
                     self.state_merkle_db
                         .write_schemas(batch)
                         .expect("State merkle batch commit failed.");
-                    trace!(
+                    snapshot_ready_sender.send(()).unwrap();
+                    info!(
                         version = state_delta.current_version,
                         base_version = state_delta.base_version,
                         root_hash = root_hash,
