@@ -33,10 +33,10 @@ There are two well-supported approaches for integrating with the Aptos blockchai
 ### Local Testnet
 
 There are two options to run a local testnet:
-1. Drectly run a local testnet is to follow [this guide](/nodes/local-testnet/run-a-local-testnet/).
+1. Directly run a local testnet is to follow [this guide](/nodes/local-testnet/run-a-local-testnet/).
 2. Use the CLI by 1) [installing with the CLI](/cli-tools/aptos-cli-tool/install-aptos-cli) and 2) start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet)
 
-This will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet service at `http://127.0.1:8000` for optoin 1 or `http://127.0.0.1:8081` for option 2. The applications will output the location of the services.
+This will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet service at `http://127.0.1:8000` for option 1 or `http://127.0.0.1:8081` for option 2. The applications will output the location of the services.
 
 ### Access Devnet
 
@@ -54,12 +54,12 @@ Aptos currently has two SDKs:
 Other areas worth being familiar with:
 
 * [Using the CLI](/cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
-* [REST API](/rest-api)
+* [REST API spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
 * [Local testnet development flow](/guides/local-testnet-dev-flow)
 
 ## Accounts on Aptos
 
-An [account](/concepts/basics-accounts) represents a resource on the Aptos blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources. On Aptos, accounts must be created on-chain prior to any blockchain operations involving that account. The Aptos framework supports implicitly creating accounts when transferring Aptos coin via `account::transfer` or explicitly via `account::create_account`.
+An [account](/concepts/basics-accounts) represents a resource on the Aptos blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources. On Aptos, accounts must be created on-chain prior to any blockchain operations involving that account. The Aptos framework supports implicitly creating accounts when transferring Aptos coin via [`account::transfer`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L398) or explicitly via [`account::create_account`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L370).
 
 At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L20) contains:
 * A [resource containing Aptos Coin](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/coin.move#L50) and deposit and withdrawal of coins from that resource.
@@ -81,7 +81,7 @@ This is covered in depth in the [Accounts](https://aptos.dev/concepts/basics-acc
 
 ### Rotating the keys
 
-An Account on Aptos has the ability to rotate keys so that potentially compromised keys cannot be used to access the accounts.
+An Account on Aptos has the ability to rotate keys so that potentially compromised keys cannot be used to access the accounts. Keys can be rotated via [`account::rotate_authentication_key`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L183) function.
 
 :::tip Read more
 See more in [Account address](/concepts/basics-accounts#account-address).
@@ -207,9 +207,9 @@ Events and transactions pruning can be disabled via setting the [`enable_ledger_
 
 The REST API contains the following useful APIs for querying transactions and events:
 
-* [Transactions for an account](https://aptos.dev/rest-api/#tag/transactions/operation/get_account_transactions)
-* [Transactions by version](https://aptos.dev/rest-api/#tag/transactions/operation/get_transaction)
-* [Events by event handle](https://aptos.dev/rest-api/#tag/events/operation/get_events_by_event_handle)
+* [Transactions for an account](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_account_transactions)
+* [Transactions by version](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_version)
+* [Events by event handle](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_events_by_event_handle)
 
 ## Exchanging and tracking coins
 
