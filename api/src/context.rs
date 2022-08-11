@@ -1,8 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, bail, ensure, format_err, Context as AnyhowContext, Result};
-use aptos_api_types::{BlockInfo, Error, LedgerInfo, TransactionOnChainData, U64};
+use crate::poem_backend::{
+    AptosErrorCode, AptosErrorResponse, BasicErrorWith404, InternalError, NotFoundError,
+};
+use anyhow::{anyhow, ensure, format_err, Context as AnyhowContext, Result};
+use aptos_api_types::{AsConverter, Block, BlockInfo, Error, LedgerInfo, TransactionOnChainData};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
@@ -20,15 +23,12 @@ use aptos_types::{
 };
 use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
-use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::Infallible, sync::Arc};
 use storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order,
 };
 use warp::{filters::BoxedFilter, Filter, Reply};
-
-use crate::poem_backend::{AptosErrorCode, InternalError};
 
 // Context holds application scope context
 #[derive(Clone)]
@@ -103,33 +103,47 @@ impl Context {
     }
 
     pub fn get_latest_ledger_info(&self) -> Result<LedgerInfo, Error> {
-        let oldest_version = self.db.get_first_viable_txn_version()?;
+        let maybe_oldest_version = self.db.get_first_viable_txn_version()?;
+        let ledger_info = self.get_latest_ledger_info_with_signatures()?;
+        let (oldest_version, oldest_block_event) =
+            self.db.get_next_block_event(maybe_oldest_version)?;
+        let (_, _, newest_block_event) = self
+            .db
+            .get_block_info(ledger_info.ledger_info().version())?;
         Ok(LedgerInfo::new(
             &self.chain_id(),
-            &self.get_latest_ledger_info_with_signatures()?,
+            &ledger_info,
             oldest_version,
+            oldest_block_event.height(),
+            newest_block_event.height(),
         ))
     }
 
     // TODO: Add error codes to these errors.
     pub fn get_latest_ledger_info_poem<E: InternalError>(&self) -> Result<LedgerInfo, E> {
-        if let Some(oldest_version) = self
+        let maybe_oldest_version = self
             .db
-            .get_first_txn_version()
-            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?
-        {
-            Ok(LedgerInfo::new(
-                &self.chain_id(),
-                &self
-                    .get_latest_ledger_info_with_signatures()
-                    .map_err(E::internal)?,
-                oldest_version,
-            ))
-        } else {
-            Err(E::internal(anyhow!(
-                "Failed to retrieve latest ledger info"
-            )))
-        }
+            .get_first_viable_txn_version()
+            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
+        let ledger_info = self
+            .get_latest_ledger_info_with_signatures()
+            .map_err(E::internal)?;
+        let (oldest_version, oldest_block_event) = self
+            .db
+            .get_next_block_event(maybe_oldest_version)
+            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
+        let (_, _, newest_block_event) = self
+            .db
+            .get_block_info(ledger_info.ledger_info().version())
+            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
+
+        Ok(LedgerInfo::new(
+            &self.chain_id(),
+            &ledger_info,
+            oldest_version,
+            oldest_block_event.height(),
+            newest_block_event.height(),
+        ))
     }
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
@@ -192,25 +206,106 @@ impl Context {
                 .get_transaction_by_version(first_version, ledger_version, false)?;
 
         // TODO: embed block hash into the NewBlockEvent
-        let block_hash = match &txn_with_proof.transaction {
-            Transaction::GenesisTransaction(_) => HashValue::zero(),
-            Transaction::BlockMetadata(inner) => inner.id(),
-            _ => {
-                bail!(
-                    "Genesis or BlockMetadata transaction expected at block first version {}",
-                    first_version,
-                );
-            }
-        };
+        let (block_hash, timestamp) =
+            get_block_hash_and_timestamp(&txn_with_proof.transaction, first_version)?;
 
         Ok(BlockInfo {
             block_height: new_block_event.height(),
             start_version: first_version,
             end_version: last_version,
             block_hash: block_hash.into(),
-            block_timestamp: new_block_event.proposed_time(),
+            block_timestamp: timestamp,
             num_transactions: (last_version + 1 - first_version) as u16,
         })
+    }
+
+    pub fn get_block_by_height(
+        &self,
+        height: u64,
+        ledger_version: u64,
+        with_transactions: bool,
+    ) -> Result<Block, BasicErrorWith404> {
+        let (first_version, last_version, new_block_event) = self
+            .db
+            .get_block_info_by_height(height)
+            .context("Failed to find block")
+            .map_err(BasicErrorWith404::not_found)?;
+
+        if last_version > ledger_version {
+            return Err(BasicErrorWith404::not_found(anyhow!("Block not found")));
+        }
+
+        let (block_hash, timestamp, txns) = if with_transactions {
+            let txns = self
+                .get_transactions(
+                    first_version,
+                    (last_version - first_version + 1) as u16,
+                    ledger_version,
+                )
+                .context("Failed to read raw transactions from storage")
+                .map_err(BasicErrorWith404::internal)
+                .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
+
+            // TODO: embed block hash into the NewBlockEvent
+            let (block_hash, timestamp) = if let Some(txn) = txns.first() {
+                get_block_hash_and_timestamp(&txn.transaction, first_version)
+                    .map_err(BasicErrorWith404::internal)?
+            } else {
+                return Err(BasicErrorWith404::internal(anyhow!(
+                    "No transactions found for block"
+                )));
+            };
+            (block_hash, timestamp, Some(txns))
+        } else {
+            let txn = self
+                .get_transaction_by_version(first_version, ledger_version)
+                .context("Failed to read raw transactions from storage")
+                .map_err(BasicErrorWith404::internal)
+                .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
+            let (block_hash, timestamp) =
+                get_block_hash_and_timestamp(&txn.transaction, first_version)
+                    .map_err(BasicErrorWith404::internal)?;
+            (block_hash, timestamp, None)
+        };
+
+        let transactions = if let Some(inner) = txns {
+            Some(self.render_transactions(inner, timestamp)?)
+        } else {
+            None
+        };
+
+        Ok(Block {
+            block_height: new_block_event.height().into(),
+            block_hash: block_hash.into(),
+            block_timestamp: new_block_event.proposed_time().into(),
+            first_version: first_version.into(),
+            last_version: last_version.into(),
+            transactions,
+        })
+    }
+
+    pub fn render_transactions<E: InternalError>(
+        &self,
+        data: Vec<TransactionOnChainData>,
+        timestamp: u64,
+    ) -> Result<Vec<aptos_api_types::Transaction>, E> {
+        if data.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let resolver = self.move_resolver_poem()?;
+        let converter = resolver.as_converter(self.db.clone());
+        let txns: Vec<aptos_api_types::Transaction> = data
+            .into_iter()
+            .map(|t| {
+                let txn = converter.try_into_onchain_transaction(timestamp, t)?;
+                Ok(txn)
+            })
+            .collect::<Result<_, anyhow::Error>>()
+            .context("Failed to convert transaction data from storage")
+            .map_err(E::internal)?;
+
+        Ok(txns)
     }
 
     pub fn get_transactions(
@@ -367,8 +462,15 @@ impl Context {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BlockMetadataState {
-    epoch_interval: U64,
-    height: U64,
+pub fn get_block_hash_and_timestamp(txn: &Transaction, version: u64) -> Result<(HashValue, u64)> {
+    match txn {
+        Transaction::GenesisTransaction(_) => Ok((HashValue::zero(), 0)),
+        Transaction::BlockMetadata(ref inner) => Ok((inner.id(), inner.timestamp_usecs())),
+        _ => {
+            return Err(anyhow!(
+                "Genesis or BlockMetadata transaction expected at block first version {}",
+                version,
+            ))
+        }
+    }
 }

@@ -103,9 +103,10 @@ async fn test_network() {
     let request = NetworkRequest {
         network_identifier: NetworkIdentifier::from(chain_id),
     };
-    let status = rosetta_client.network_status(&request).await.unwrap();
-    assert!(status.current_block_identifier.index > 0);
-    assert!(status.current_block_timestamp > Y2K_MS);
+    let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+        .await
+        .unwrap();
+    assert!(status.current_block_timestamp >= Y2K_MS);
     assert_eq!(
         BlockIdentifier {
             index: 0,

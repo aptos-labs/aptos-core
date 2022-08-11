@@ -5,6 +5,7 @@ use std::{net::SocketAddr, sync::Arc};
 
 use super::{middleware_log, AccountsApi, BasicApi, EventsApi, IndexApi};
 
+use crate::poem_backend::blocks::BlocksApi;
 use crate::{
     context::Context,
     poem_backend::{
@@ -37,6 +38,7 @@ pub fn get_api_service(
     (
         AccountsApi,
         BasicApi,
+        BlocksApi,
         EventsApi,
         IndexApi,
         StateApi,
@@ -50,6 +52,9 @@ pub fn get_api_service(
             context: context.clone(),
         },
         BasicApi {
+            context: context.clone(),
+        },
+        BlocksApi {
             context: context.clone(),
         },
         EventsApi {
