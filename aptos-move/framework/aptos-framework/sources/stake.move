@@ -930,17 +930,20 @@ module aptos_framework::stake {
         let num_successful_proposals = cur_validator_perf.successful_proposals;
         let num_total_proposals = cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals;
 
+        let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(staking_config);
         let rewards_amount = distribute_rewards(
              &mut stake_pool.active,
             num_successful_proposals,
             num_total_proposals,
-            staking_config,
+            rewards_rate,
+            rewards_rate_denominator
         );
         rewards_amount = rewards_amount + distribute_rewards(
             &mut stake_pool.pending_inactive,
             num_successful_proposals,
             num_total_proposals,
-            staking_config,
+            rewards_rate,
+            rewards_rate_denominator
         );
 
         // Pending active stake can now be active.
@@ -964,33 +967,45 @@ module aptos_framework::stake {
         );
     }
 
-    /// Mint rewards corresponding to current epoch's `voting_power` and `num_successful_votes`.
+    /// Calculate the rewards amount.
+    fun calculate_rewards_amount(
+        stake_amount: u64,
+        num_successful_proposals: u64,
+        num_total_proposals: u64,
+        rewards_rate: u64,
+        rewards_rate_denominator: u64,
+    ): u64 {
+        // The rewards amount is equal to (stake amount * rewards rate * performance multiplier).
+        // We do multiplication in u128 before division to avoid the overflow and minimize the rounding error.
+        let rewards_numerator = (stake_amount as u128) * (rewards_rate as u128) * (num_successful_proposals as u128);
+        let rewards_denominator = (rewards_rate_denominator as u128) * (num_total_proposals as u128);
+        if (rewards_denominator > 0) {
+            ((rewards_numerator / rewards_denominator) as u64)
+        } else {
+            0
+        }
+    }
+
+    /// Mint rewards corresponding to current epoch's `stake` and `num_successful_votes`.
     fun distribute_rewards(
         stake: &mut Coin<AptosCoin>,
         num_successful_proposals: u64,
         num_total_proposals: u64,
-        config: &StakingConfig,
+        rewards_rate: u64,
+        rewards_rate_denominator: u64,
     ): u64 acquires AptosCoinCapabilities {
         let stake_amount = coin::value<AptosCoin>(stake);
-        // Short-circuit early.
-        if (stake_amount == 0) {
-            return 0
+        let rewards_amount = if (stake_amount > 0) {
+            calculate_rewards_amount(stake_amount, num_successful_proposals, num_total_proposals, rewards_rate, rewards_rate_denominator)
+        } else {
+            0
         };
-
-        // Validators receive rewards based on their performance (number of successful votes) and how long is their
-        // remaining lockup time.
-        // The total rewards = base rewards * performance multiplier * lockup multiplier.
-        // Here we do multiplication before division to minimize rounding errors.
-        let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(config);
-        let base_rewards = stake_amount * rewards_rate / rewards_rate_denominator;
-        if (base_rewards > 0 && num_successful_proposals > 0) {
-            let rewards_amount = base_rewards * num_successful_proposals / num_total_proposals;
+        if (rewards_amount > 0) {
             let mint_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
             let rewards = coin::mint<AptosCoin>(rewards_amount, mint_cap);
             coin::merge(stake, rewards);
-            return rewards_amount
         };
-        0
+        rewards_amount
     }
 
     fun append<T>(v1: &mut vector<T>, v2: &mut vector<T>) {
@@ -1864,6 +1879,44 @@ module aptos_framework::stake {
 
         // Join the validator set with enough stake.
         join_validator_set(&validator, validator_address);
+    }
+
+    #[test]
+    public entry fun test_rewards_calculation() {
+        let stake_amount = 2000;
+        let num_successful_proposals = 199;
+        let num_total_proposals = 200;
+        let rewards_rate = 700;
+        let rewards_rate_denominator = 777;
+        let rewards_amount = calculate_rewards_amount(
+            stake_amount,
+            num_successful_proposals,
+            num_total_proposals,
+            rewards_rate,
+            rewards_rate_denominator
+        );
+        // Consider `amount_imprecise` and `amount_precise` defined as follows:
+        // amount_imprecise = (stake_amount * rewards_rate / rewards_rate_denominator) * num_successful_proposals / num_total_proposals
+        // amount_precise = stake_amount * rewards_rate * num_successful_proposals / (rewards_rate_denominator * num_total_proposals)
+        // Although they are equivalent in the real arithmetic, they are not in the integer arithmetic due to a rounding error.
+        // With the test parameters above, `amount_imprecise` is equal to 1791 because of an unbounded rounding error
+        // while `amount_precise` is equal to 1792. We expect the output of `calculate_rewards_amount` to be 1792.
+        assert!(rewards_amount == 1792, 0);
+
+        let stake_amount = 100000000000000000;
+        let num_successful_proposals = 9999;
+        let num_total_proposals = 10000;
+        let rewards_rate = 3141592;
+        let rewards_rate_denominator = 10000000;
+        // This should not abort due to an arithmetic overflow.
+        let rewards_amount = calculate_rewards_amount(
+            stake_amount,
+            num_successful_proposals,
+            num_total_proposals,
+            rewards_rate,
+            rewards_rate_denominator
+        );
+        assert!(rewards_amount == 31412778408000000, 0);
     }
 
     #[test_only]
