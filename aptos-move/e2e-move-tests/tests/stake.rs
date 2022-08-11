@@ -91,10 +91,10 @@ fn test_staking_rewards() {
     let validator_2_address = *validator_2.address();
 
     // Initialize the validators.
-    let rewards_per_epoch = 1141;
-    let mut stake_amount_2 = 100_000_000;
+    let rewards_per_epoch = 570;
+    let mut stake_amount_2 = 50_000_000;
     setup_staking(&mut harness, &validator_2, stake_amount_2);
-    let mut stake_amount_1 = 100_000_000;
+    let mut stake_amount_1 = 50_000_000;
     setup_staking(&mut harness, &validator_1, stake_amount_1);
     harness.new_epoch();
 
