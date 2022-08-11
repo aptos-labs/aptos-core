@@ -163,7 +163,7 @@ impl MockSharedMempool {
 
     pub fn get_txns(&self, size: u64) -> Vec<SignedTransaction> {
         let pool = self.mempool.lock();
-        pool.get_batch(size, HashSet::new())
+        pool.get_batch(size, size * 1024, HashSet::new())
     }
 
     pub fn remove_txn(&self, txn: &SignedTransaction) {

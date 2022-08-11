@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Tasks that are executed by coordinators (short-lived compared to coordinators)
-use crate::thread_pool::IO_POOL;
 use crate::{
     core_mempool::{CoreMempool, TimelineState, TxnPointer},
     counters,
@@ -12,6 +11,7 @@ use crate::{
         notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification,
         SubmissionStatusBundle,
     },
+    thread_pool::IO_POOL,
     QuorumStoreRequest, QuorumStoreResponse, SubmissionStatus,
 };
 use anyhow::Result;
@@ -385,7 +385,12 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
     debug!(LogSchema::event_log(LogEntry::QuorumStore, LogEvent::Received).quorum_store_msg(&req));
 
     let (resp, callback, counter_label) = match req {
-        QuorumStoreRequest::GetBatchRequest(max_batch_size, transactions, callback) => {
+        QuorumStoreRequest::GetBatchRequest(
+            max_batch_size,
+            max_byte_size,
+            transactions,
+            callback,
+        ) => {
             let exclude_transactions: HashSet<TxnPointer> = transactions
                 .iter()
                 .map(|txn| (txn.sender, txn.sequence_number))
@@ -398,7 +403,7 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
                 let curr_time = aptos_infallible::duration_since_epoch();
                 mempool.gc_by_expiration_time(curr_time);
                 let batch_size = cmp::max(max_batch_size, 1);
-                txns = mempool.get_batch(batch_size, exclude_transactions);
+                txns = mempool.get_batch(batch_size, max_byte_size, exclude_transactions);
             }
             counters::mempool_service_transactions(counters::GET_BLOCK_LABEL, txns.len());
 
