@@ -10,8 +10,11 @@ use aptos_types::{
 };
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver};
 
-use crate::test_helper::{arb_state_kv_sets, update_store};
-use crate::{pruner::state_store::StateMerklePruner, AptosDB};
+use crate::{
+    pruner::state_store::StateMerklePruner,
+    test_helper::{arb_state_kv_sets, update_store},
+    AptosDB,
+};
 
 use super::*;
 
@@ -254,7 +257,7 @@ fn test_stale_node_index() {
     let value3_update = StateValue::from(String::from("test_val3_update").into_bytes());
 
     let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test_no_cache(&tmp_dir);
     let store = &db.state_store;
 
     // Update.
@@ -376,7 +379,7 @@ fn test_stale_node_index_with_target_version() {
     let value3_update = StateValue::from(String::from("test_val3_update").into_bytes());
 
     let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test_no_cache(&tmp_dir);
     let store = &db.state_store;
 
     // Update.
@@ -485,7 +488,7 @@ fn test_stale_node_index_all_at_once() {
     let value3_update = StateValue::from(String::from("test_val3_update").into_bytes());
 
     let tmp_dir = TempPath::new();
-    let db = AptosDB::new_for_test(&tmp_dir);
+    let db = AptosDB::new_for_test_no_cache(&tmp_dir);
     let store = &db.state_store;
     let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
 
