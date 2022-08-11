@@ -20,6 +20,7 @@ module aptos_framework::genesis {
 
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;
+    const EINVALID_ADDRESSES: u64 = 2;
 
     fun initialize(
         core_resource_account: &signer,
@@ -35,6 +36,7 @@ module aptos_framework::genesis {
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
+        voting_power_increase_limit: u64,
     ) {
         // This can fail genesis but is necessary so that any misconfigurations can be corrected before genesis succeeds
         assert!(epoch_interval > 0, error::invalid_argument(EINVALID_EPOCH_DURATION));
@@ -76,6 +78,7 @@ module aptos_framework::genesis {
             allow_validator_set_change,
             rewards_rate,
             rewards_rate_denominator,
+            voting_power_increase_limit,
         );
 
         gas_schedule::initialize(
@@ -124,9 +127,12 @@ module aptos_framework::genesis {
         let num_owners = vector::length(&owners);
         let num_validator_network_addresses = vector::length(&validator_network_addresses);
         let num_full_node_network_addresses = vector::length(&full_node_network_addresses);
-        assert!(num_validator_network_addresses == num_full_node_network_addresses, 0);
+        assert!(
+            num_validator_network_addresses == num_full_node_network_addresses,
+            error::invalid_argument(EINVALID_ADDRESSES),
+        );
         let num_staking = vector::length(&staking_distribution);
-        assert!(num_full_node_network_addresses == num_staking, 0);
+        assert!(num_full_node_network_addresses == num_staking, error::invalid_argument(EINVALID_ADDRESSES));
 
         let i = 0;
         while (i < num_owners) {
@@ -176,6 +182,7 @@ module aptos_framework::genesis {
             true,
             1,
             1,
+            30,
         )
     }
 

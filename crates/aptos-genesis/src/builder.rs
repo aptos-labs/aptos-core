@@ -368,6 +368,7 @@ pub struct GenesisConfiguration {
     pub required_proposer_stake: u64,
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
+    pub voting_power_increase_limit: u64,
 }
 
 pub type InitConfigFn = Arc<dyn Fn(usize, &mut NodeConfig, &mut u64) + Send + Sync>;
@@ -556,6 +557,7 @@ impl Builder {
             required_proposer_stake: 0,
             rewards_apy_percentage: 10,
             voting_duration_secs: ONE_DAY / 24,
+            voting_power_increase_limit: 50,
         };
         if let Some(init_genesis_config) = &self.init_genesis_config {
             (init_genesis_config)(&mut genesis_config);
@@ -567,15 +569,7 @@ impl Builder {
             root_key,
             configs,
             self.move_modules.clone(),
-            genesis_config.allow_new_validators,
-            genesis_config.epoch_duration_secs,
-            genesis_config.min_stake,
-            genesis_config.min_voting_threshold,
-            genesis_config.max_stake,
-            genesis_config.recurring_lockup_duration_secs,
-            genesis_config.required_proposer_stake,
-            genesis_config.rewards_apy_percentage,
-            genesis_config.voting_duration_secs,
+            &genesis_config,
         )?;
         let waypoint = genesis_info.generate_waypoint()?;
         let genesis = genesis_info.get_genesis();

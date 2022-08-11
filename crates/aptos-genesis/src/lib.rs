@@ -10,6 +10,7 @@ pub mod keys;
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
+use crate::builder::GenesisConfiguration;
 use crate::config::ValidatorConfiguration;
 use aptos_config::config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE};
 use aptos_crypto::ed25519::Ed25519PublicKey;
@@ -53,6 +54,8 @@ pub struct GenesisInfo {
     pub rewards_apy_percentage: u64,
     /// Voting duration for a proposal in seconds.
     pub voting_duration_secs: u64,
+    /// % of current epoch's total voting power that can be added in this epoch.
+    pub voting_power_increase_limit: u64,
 }
 
 impl GenesisInfo {
@@ -61,15 +64,7 @@ impl GenesisInfo {
         root_key: Ed25519PublicKey,
         configs: Vec<ValidatorConfiguration>,
         modules: Vec<Vec<u8>>,
-        allow_new_validators: bool,
-        epoch_duration_secs: u64,
-        min_stake: u64,
-        min_voting_threshold: u128,
-        max_stake: u64,
-        recurring_lockup_duration_secs: u64,
-        required_proposer_stake: u64,
-        rewards_apy_percentage: u64,
-        voting_duration_secs: u64,
+        genesis_config: &GenesisConfiguration,
     ) -> anyhow::Result<GenesisInfo> {
         let mut validators = Vec::new();
 
@@ -83,15 +78,16 @@ impl GenesisInfo {
             validators,
             modules,
             genesis: None,
-            allow_new_validators,
-            epoch_duration_secs,
-            min_stake,
-            min_voting_threshold,
-            max_stake,
-            recurring_lockup_duration_secs,
-            required_proposer_stake,
-            rewards_apy_percentage,
-            voting_duration_secs,
+            allow_new_validators: genesis_config.allow_new_validators,
+            epoch_duration_secs: genesis_config.epoch_duration_secs,
+            min_stake: genesis_config.min_stake,
+            min_voting_threshold: genesis_config.min_voting_threshold,
+            max_stake: genesis_config.max_stake,
+            recurring_lockup_duration_secs: genesis_config.recurring_lockup_duration_secs,
+            required_proposer_stake: genesis_config.required_proposer_stake,
+            rewards_apy_percentage: genesis_config.rewards_apy_percentage,
+            voting_duration_secs: genesis_config.voting_duration_secs,
+            voting_power_increase_limit: genesis_config.voting_power_increase_limit,
         })
     }
 
@@ -120,6 +116,7 @@ impl GenesisInfo {
                 required_proposer_stake: self.required_proposer_stake,
                 rewards_apy_percentage: self.rewards_apy_percentage,
                 voting_duration_secs: self.voting_duration_secs,
+                voting_power_increase_limit: self.voting_power_increase_limit,
             },
         )
     }
