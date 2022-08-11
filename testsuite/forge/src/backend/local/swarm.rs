@@ -11,6 +11,7 @@ use aptos_config::config::NetworkConfig;
 use aptos_config::network_id::NetworkId;
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
 use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
+use aptos_infallible::Mutex;
 use aptos_logger::{info, warn};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
@@ -93,6 +94,8 @@ pub struct LocalSwarm {
     root_key: ConfigKey<Ed25519PrivateKey>,
 
     launched: bool,
+    #[allow(dead_code)]
+    guard: ActiveNodesGuard,
 }
 
 impl LocalSwarm {
@@ -105,6 +108,7 @@ impl LocalSwarm {
         init_genesis_config: Option<InitGenesisConfigFn>,
         dir: Option<PathBuf>,
         genesis_framework: Option<ReleaseBundle>,
+        guard: ActiveNodesGuard,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
@@ -213,6 +217,7 @@ impl LocalSwarm {
             chain_id: ChainId::test(),
             root_key,
             launched: false,
+            guard,
         })
     }
 
@@ -549,5 +554,50 @@ impl Swarm for LocalSwarm {
         _threshold: SystemMetricsThreshold,
     ) -> Result<()> {
         todo!()
+    }
+}
+
+#[derive(Debug)]
+pub struct ActiveNodesGuard {
+    counter: Arc<Mutex<usize>>,
+    slots: usize,
+}
+
+impl ActiveNodesGuard {
+    pub async fn grab(slots: usize, counter: Arc<Mutex<usize>>) -> Self {
+        let max = num_cpus::get();
+        let mut idx = 0;
+        loop {
+            {
+                let mut guard = counter.lock();
+                // first check is so that if test needs more slots than cores,
+                // we still allow it to run (during low contention)
+                if *guard <= 2 || *guard + slots <= max {
+                    info!(
+                        "Grabbed {} node slots to start test, already active {} swarm nodes",
+                        slots, *guard
+                    );
+                    *guard += slots;
+                    drop(guard);
+                    return Self { counter, slots };
+                }
+                idx += 1;
+                // log only if idx is power of two, to reduce logs
+                if (idx & (idx - 1)) == 0 {
+                    info!(
+                        "Too many active swarm nodes ({}), max allowed is {}, waiting to start {} new ones",
+                        *guard, max, slots,
+                    );
+                }
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    }
+}
+
+impl Drop for ActiveNodesGuard {
+    fn drop(&mut self) {
+        let mut guard = self.counter.lock();
+        *guard -= self.slots;
     }
 }
