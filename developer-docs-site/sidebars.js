@@ -159,6 +159,7 @@ const sidebars = {
       items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
     },
     "reference/telemetry",
+    "aptos-white-paper",
     "reference/glossary",
   ],
 };
