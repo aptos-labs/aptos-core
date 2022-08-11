@@ -7,6 +7,8 @@ slug: "whats-new-in-docs"
 
 # 11 August 2022
 
+- The [Aptos White Paper](aptos-white-paper) is released.
+
 - A section explaining the network [Port settings](/nodes/ait/node-requirements#ports) for the nodes connecting to an Aptos network is added.
 
 ## 08 August 2022
