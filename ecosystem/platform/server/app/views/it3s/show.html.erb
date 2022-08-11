@@ -17,6 +17,7 @@
       </h2>
     <% end %>
 
+    <%= turbo_frame_tag 'it3_steps', target: '_top' do %>
     <div class="flex flex-wrap flex-col gap-8 max-w-prose" data-controller="shake">
       <% @steps.each_with_index do |step, i| %>
         <div data-action="<%= step.disabled ? 'click->shake#shake' : '' %>" data-target="<%= !step.disabled && !step.completed ? 'shake.content' : '' %>" class="bg-neutral-800 rounded-md flex flex-col flex-1 <%= step.disabled ? 'cursor-not-allowed select-none opacity-25' : '' %>">
@@ -77,9 +78,9 @@
 
             <div class="w-full lg:flex-1">
               <% if step.name == :connect_wallet %>
-                <%= form_with url: it3_path, method: :put, data: { controller: 'connect-wallet', action: 'connect-wallet#submit', connect_wallet_dialog_value: step.dialog&.id } do |form| %>
-                  <%= form.hidden_field :address, data: { connect_wallet_target: 'address' } %>
-                  <%= render ButtonComponent.new(type: :submit, class: step.completed ? 'bg-neutral-700/50 text-teal-600 w-full mt-auto' : 'w-full mt-auto', disabled: step.disabled) do %>
+                <%= form_with url: it3_path, method: :put, data: { controller: 'connect-wallet', action: 'connect-wallet#beforeSubmit:capture', connect_wallet_dialog_value: step.dialog&.id, turbo_frame: 'it3-steps' } do |form| %>
+                  <%= form.hidden_field :owner_key, data: { connect_wallet_target: 'ownerKey' } %>
+                  <%= render ButtonComponent.new(type: :submit, class: step.completed ? 'bg-neutral-700/50 text-teal-600 w-full mt-auto' : 'w-full mt-auto', disabled: step.disabled, data: { connect_wallet_target: 'button' }) do %>
                     <% if step.completed %>
                       <%= render IconComponent.new(:check_circle, size: :medium) %>
                     <% else %>
@@ -107,5 +108,6 @@
         </div>
       <% end %>
     </div>
+    <% end %>
   </div>
 </div>

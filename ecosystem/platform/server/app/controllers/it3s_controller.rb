@@ -30,13 +30,13 @@ class It3sController < ApplicationController
 
   # Updates the owner key when the wallet is connected.
   def update
-    address = params.require(:address)
+    owner_key = params.require(:owner_key)
 
-    if !address.is_a?(String) || !address.match(/\A0x[a-f0-9]{64}\z/i)
+    if !owner_key.is_a?(String) || !owner_key.match(/\A0x[a-f0-9]{64}\z/i)
       return render plain: 'Invalid request', status: :unprocessable_entity
     end
 
-    session[:it3_owner_key] = address
+    session[:it3_owner_key] = owner_key
     redirect_to it3_path
   end
 

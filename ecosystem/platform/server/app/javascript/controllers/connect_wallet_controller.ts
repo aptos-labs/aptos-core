@@ -5,41 +5,49 @@ import { Controller } from "./controller";
 
 // Connects to data-controller="connect-wallet"
 export default class extends Controller<HTMLFormElement> {
-  static targets = ["address"];
+  static targets = ["ownerKey", "button"];
 
   static values = {
     dialog: String,
   };
 
   declare readonly dialogValue: string;
-  declare readonly addressTarget: HTMLInputElement;
+  declare readonly ownerKeyTarget: HTMLInputElement;
+  declare readonly buttonTarget: HTMLButtonElement;
 
-  async submit(event: SubmitEvent) {
+  async beforeSubmit(event: SubmitEvent) {
+    if (this.ownerKeyTarget.value?.length > 0) {
+      // The form is ready for submit. Allow the event to propagate.
+      return;
+    }
+
+    // Prevent the form submission and get the owner key.
     event.preventDefault();
 
-    // If the wallet isn't set up, show the "Install Wallet" modal.
-    const isInstalled = 'aptos' in window;
-    if (!isInstalled) return this.showInstallDialog();
-
-    try {
-      // TODO: The connect() promise never resolves if an account isn't set up.
-      const account = await window.aptos?.connect();
-      if (!account) return this.showInstallDialog();
-      const {address} = account;
-      this.addressTarget.value = address;
-      this.element.submit();
-    } catch (err) {
-      console.error(err);
-      return this.showInstallDialog();
+    if ('aptos' in window) {
+      const initialButtonText = this.buttonTarget.textContent;
+      try {
+        const account = await window.aptos?.connect();
+        if (account) {
+          // Populate the owner_key input and re-trigger the submit event.
+          const {publicKey} = account;
+          this.ownerKeyTarget.value = publicKey;
+          this.buttonTarget.textContent = '...';
+          this.element.requestSubmit();
+          return;
+        }
+      } catch (err) {
+        this.buttonTarget.textContent = initialButtonText;
+        console.error(err);
+      }
     }
-  }
 
-  showInstallDialog() {
+    // Something went wrong; show the install dialog.
     const dialog = document.getElementById(this.dialogValue);
     if (dialog instanceof HTMLDialogElement) {
       dialog.showModal();
     } else {
-      console.error('Install Wallet dialog not found.');
+      throw new Error('Install Wallet dialog not found.');
     }
   }
 }
