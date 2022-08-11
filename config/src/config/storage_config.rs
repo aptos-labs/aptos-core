@@ -92,6 +92,8 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig
     ledger_pruning_batch_size: 10_000,
     state_store_pruning_batch_size: 10_000,
     user_pruning_window_offset: 0,
+    state_pruner_time_interval_in_ms: 200,
+    ledger_pruner_time_interval_in_ms: 200,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -118,6 +120,12 @@ pub struct StoragePrunerConfig {
     pub state_store_pruning_batch_size: usize,
     /// The offset for user pruning window to adjust
     pub user_pruning_window_offset: u64,
+    /// The pruning interval of state pruner. The state pruner will sleep for this period of time
+    /// after pruning each batch.
+    pub state_pruner_time_interval_in_ms: u64,
+    /// The pruning interval of ledger pruner. The ledger pruner will sleep for this period of time
+    /// after pruning each batch.
+    pub ledger_pruner_time_interval_in_ms: u64,
 }
 
 impl Default for StoragePrunerConfig {
@@ -132,6 +140,8 @@ impl Default for StoragePrunerConfig {
             // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
             state_store_pruning_batch_size: 1_000,
             user_pruning_window_offset: 200_000,
+            state_pruner_time_interval_in_ms: 200,
+            ledger_pruner_time_interval_in_ms: 200,
         }
     }
 }

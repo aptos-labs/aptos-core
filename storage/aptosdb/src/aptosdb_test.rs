@@ -97,6 +97,8 @@ fn test_storage_config() {
                     ledger_pruning_batch_size: 1,
                     state_store_pruning_batch_size: 1,
                     user_pruning_window_offset: 0,
+                    state_pruner_time_interval_in_ms: 1,
+                    ledger_pruner_time_interval_in_ms: 1,
                 },
             );
 
@@ -113,6 +115,8 @@ fn test_storage_config() {
                     ledger_pruning_batch_size: 1,
                     state_store_pruning_batch_size: 1,
                     user_pruning_window_offset: 0,
+                    state_pruner_time_interval_in_ms: 1,
+                    ledger_pruner_time_interval_in_ms: 1,
                 },
             );
             assert_eq!(ledger_pruner.is_pruner_enabled(), enable_ledger);
@@ -135,6 +139,8 @@ fn test_error_if_version_is_pruned() {
             ledger_pruning_batch_size: 1,
             state_store_pruning_batch_size: 1,
             user_pruning_window_offset: 0,
+            state_pruner_time_interval_in_ms: 1,
+            ledger_pruner_time_interval_in_ms: 1,
         },
     );
 
@@ -148,6 +154,8 @@ fn test_error_if_version_is_pruned() {
             ledger_pruning_batch_size: 1,
             state_store_pruning_batch_size: 1,
             user_pruning_window_offset: 0,
+            state_pruner_time_interval_in_ms: 1,
+            ledger_pruner_time_interval_in_ms: 1,
         },
     );
     state_pruner.testonly_update_min_version(5);

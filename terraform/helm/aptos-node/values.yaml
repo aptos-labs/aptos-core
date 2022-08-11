@@ -43,6 +43,8 @@ validator:
     state_store_prune_window: 1000000
     ledger_pruning_batch_size: 10000
     state_store_pruning_batch_size: 10000
+    state_pruner_time_interval_in_ms: 200
+    ledger_pruner_time_interval_in_ms: 200
   enableNetworkPolicy: true
 
 fullnode:

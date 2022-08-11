@@ -72,11 +72,3 @@ pub trait DBPruner: Send + Sync {
     /// (For tests only.) Updates the minimal readable version kept by pruner.
     fn testonly_update_min_version(&self, version: Version);
 }
-
-pub enum Command {
-    Quit,
-    Prune {
-        /// The target DB version for the pruner.
-        target_db_version: Version,
-    },
-}
