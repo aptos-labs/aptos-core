@@ -17,7 +17,7 @@ impl DbStateView {
         Ok(if let Some(version) = self.version {
             self.db
                 .get_state_value_by_version(key, version)?
-                .map(|value| value.maybe_bytes)
+                .map(|value| value.bytes)
         } else {
             None
         })

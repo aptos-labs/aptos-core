@@ -1,11 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashSet;
-
 use proptest::{
     collection::{hash_map, vec},
     prelude::*,
+    sample::Index,
 };
 
 use aptos_jellyfish_merkle::{restore::StateSnapshotRestore, TreeReader};
@@ -13,7 +12,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, state_store::state_key::StateKeyTag,
 };
-use storage_interface::{jmt_update_refs, jmt_updates, DbReader, StateSnapshotReceiver};
+use storage_interface::{jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver};
 
 use crate::{pruner::state_store::StateStorePruner, AptosDB};
 
@@ -568,6 +567,19 @@ pub fn test_get_state_snapshot_before() {
     assert_eq!(store.get_state_snapshot_before(1).unwrap(), Some((0, hash)));
     assert_eq!(store.get_state_snapshot_before(2).unwrap(), Some((0, hash)));
 
+    // hack: VersionData expected on every version, so duplicate the data at version 1
+    let (state_items, total_state_bytes) = store.get_usage(Some(0)).unwrap();
+    store
+        .ledger_db
+        .put::<VersionDataSchema>(
+            &1,
+            &VersionData {
+                state_items,
+                total_state_bytes,
+            },
+        )
+        .unwrap();
+
     // put in another version
     put_value_set(store, kv, 2, Some(0));
     assert_eq!(store.get_state_snapshot_before(4).unwrap(), Some((2, hash)));
@@ -752,17 +764,71 @@ proptest! {
     }
 
     #[test]
-    fn test_get_account_count(
-        input in vec((any::<StateKey>(), any::<StateValue>()), 1..200)
+    fn test_get_usage(
+        input in (
+            vec(any::<StateKey>(), 10),
+            vec(vec((any::<Index>(), any::<StateValue>()), 1..5), 1..5)
+        ).prop_map(|(keys, input)| {
+            input
+            .into_iter()
+            .map(|kvs|
+                kvs
+                .into_iter()
+                .map(|(idx, value)| (idx.get(&keys).clone(), value))
+                .collect::<Vec<_>>()
+            )
+            .collect::<Vec<_>>()
+        }),
     ) {
-        let version = (input.len() - 1) as Version;
-        let account_count = input.iter().map(|(k, _)| k).collect::<HashSet<_>>().len();
-
         let tmp_dir = TempPath::new();
         let db = AptosDB::new_for_test(&tmp_dir);
         let store = &db.state_store;
-        init_store(store, input.into_iter());
-        assert_eq!(store.get_value_count(version).unwrap(), account_count);
+
+        let mut version = 0;
+        for batch in input {
+            let next_version = version + batch.len() as Version;
+            let root_hash = update_store(store, batch.into_iter(), version);
+
+            let last_version = next_version - 1;
+            let snapshot = db
+                .get_backup_handler()
+                .get_account_iter(last_version)
+                .unwrap()
+                .collect::<Result<Vec<_>>>()
+                .unwrap();
+            let (items, bytes) = snapshot.iter().fold((0, 0), |(items, bytes), (k, v)| {
+                (items + 1, bytes + k.size() + v.size())
+            });
+            prop_assert_eq!(
+                (items, bytes),
+                store.get_usage(Some(last_version)).unwrap(),
+                "version: {} next_version: {}",
+                version,
+                next_version,
+            );
+
+            // Check db-restore calculates usage correctly as well.
+            let tmp_dir = TempPath::new();
+            let db2 = AptosDB::new_for_test(&tmp_dir);
+            let mut restore = db2.get_state_snapshot_receiver(100, root_hash).unwrap();
+            let proof = if let Some((k, _v)) = snapshot.last() {
+                db.get_backup_handler().get_account_state_range_proof(k.hash(), last_version).unwrap()
+            } else {
+                SparseMerkleRangeProof::new(vec![])
+            };
+            restore.add_chunk(snapshot, proof).unwrap();
+            restore.finish_box().unwrap();
+            prop_assert_eq!(
+                (items, bytes),
+                db2.state_store.get_usage(Some(100)).unwrap(),
+                "version: {} next_version: {}",
+                version,
+                next_version,
+            );
+
+            version = next_version;
+        }
+
     }
 }
 
@@ -775,12 +841,13 @@ fn update_store(
     store: &StateStore,
     input: impl Iterator<Item = (StateKey, StateValue)>,
     first_version: Version,
-) {
+) -> HashValue {
+    let mut root_hash = *SPARSE_MERKLE_PLACEHOLDER_HASH;
     for (i, (key, value)) in input.enumerate() {
         let value_state_set = vec![(key, Some(value))].into_iter().collect();
         let jmt_updates = jmt_updates(&value_state_set);
         let version = first_version + i as Version;
-        store
+        root_hash = store
             .merklize_value_set(
                 jmt_update_refs(&jmt_updates),
                 None,
@@ -794,4 +861,5 @@ fn update_store(
             .unwrap();
         store.ledger_db.write_schemas(cs.batch).unwrap();
     }
+    root_hash
 }

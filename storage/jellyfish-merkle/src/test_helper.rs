@@ -46,8 +46,16 @@ impl From<Vec<u8>> for ValueBlob {
     }
 }
 
-impl crate::Key for ValueBlob {}
-impl crate::Value for ValueBlob {}
+impl crate::Key for ValueBlob {
+    fn key_size(&self) -> usize {
+        self.0.len()
+    }
+}
+impl crate::Value for ValueBlob {
+    fn value_size(&self) -> usize {
+        self.0.len()
+    }
+}
 impl crate::TestKey for ValueBlob {}
 impl crate::TestValue for ValueBlob {}
 
