@@ -92,6 +92,14 @@ impl StateKey {
     pub fn table_item(handle: TableHandle, key: Vec<u8>) -> Self {
         StateKey::TableItem { handle, key }
     }
+
+    pub fn size(&self) -> usize {
+        match self {
+            StateKey::AccessPath(access_path) => access_path.size(),
+            StateKey::TableItem { handle, key } => handle.size() + key.len(),
+            StateKey::Raw(bytes) => bytes.len(),
+        }
+    }
 }
 
 impl CryptoHash for StateKey {

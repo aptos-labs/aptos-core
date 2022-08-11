@@ -13,7 +13,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Debug, Default, CryptoHasher, Eq, PartialEq, Serialize, Ord, PartialOrd, Hash)]
 pub struct StateValue {
-    pub maybe_bytes: Vec<u8>,
+    pub bytes: Vec<u8>,
     #[serde(skip)]
     hash: HashValue,
 }
@@ -35,21 +35,25 @@ impl<'de> Deserialize<'de> for StateValue {
     {
         #[derive(Deserialize)]
         #[serde(rename = "StateValue")]
-        struct MaybeBytes {
-            maybe_bytes: Vec<u8>,
+        struct Bytes {
+            bytes: Vec<u8>,
         }
-        let bytes = MaybeBytes::deserialize(deserializer)?;
+        let bytes = Bytes::deserialize(deserializer)?;
 
-        Ok(Self::new(bytes.maybe_bytes))
+        Ok(Self::new(bytes.bytes))
     }
 }
 
 impl StateValue {
-    fn new(maybe_bytes: Vec<u8>) -> Self {
+    fn new(bytes: Vec<u8>) -> Self {
         let mut hasher = StateValueHasher::default();
-        hasher.update(maybe_bytes.as_slice());
+        hasher.update(bytes.as_slice());
         let hash = hasher.finish();
-        Self { maybe_bytes, hash }
+        Self { bytes, hash }
+    }
+
+    pub fn size(&self) -> usize {
+        self.bytes.len()
     }
 }
 

@@ -146,13 +146,18 @@ pub trait TreeWriter<K>: Send + Sync {
 pub trait StateValueWriter<K, V>: Send + Sync {
     /// Writes a kv batch into storage.
     fn write_kv_batch(&self, kv_batch: &StateValueBatch<K, Option<V>>) -> Result<()>;
+
+    fn write_usage(&self, version: Version, items: usize, total_bytes: usize) -> Result<()>;
 }
 
-/// `Key` defines the types of data key that can be stored in a Jellyfish Merkle tree.
-pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync {}
+pub trait Key: Clone + Serialize + DeserializeOwned + Send + Sync {
+    fn key_size(&self) -> usize;
+}
 
 /// `Value` defines the types of data that can be stored in a Jellyfish Merkle tree.
-pub trait Value: Clone + CryptoHash + Serialize + DeserializeOwned + Send + Sync {}
+pub trait Value: Clone + CryptoHash + Serialize + DeserializeOwned + Send + Sync {
+    fn value_size(&self) -> usize;
+}
 
 /// `TestKey` defines the types of data that can be stored in a Jellyfish Merkle tree and used in
 /// tests.
@@ -167,9 +172,17 @@ pub trait TestKey:
 #[cfg(any(test, feature = "fuzzing"))]
 pub trait TestValue: Value + Arbitrary + std::fmt::Debug + Eq + PartialEq + 'static {}
 
-impl Key for StateKey {}
+impl Key for StateKey {
+    fn key_size(&self) -> usize {
+        self.size()
+    }
+}
 
-impl Value for StateValue {}
+impl Value for StateValue {
+    fn value_size(&self) -> usize {
+        self.size()
+    }
+}
 
 #[cfg(any(test, feature = "fuzzing"))]
 impl TestKey for StateKey {}
