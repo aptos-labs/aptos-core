@@ -330,7 +330,8 @@ paths:
       tags:
       - General
       summary: Show OpenAPI explorer
-      description: Provides a UI that you can use to explore the API. You can also
+      description: |-
+        Provides a UI that you can use to explore the API. You can also
         retrieve the API directly at `/spec.yaml` and `/spec.json`.
       responses:
         '200':
@@ -340,6 +341,96 @@ paths:
               schema:
                 type: string
       operationId: spec
+  /-/healthy:
+    get:
+      tags:
+      - General
+      summary: Check basic node health
+      description: |-
+        By default this endpoint just checks that it can get the latest ledger
+        info and then returns 200.
+
+        If the duration_secs param is provided, this endpoint will return a
+        200 if the following condition is true:
+
+        `server_latest_ledger_info_timestamp >= server_current_time_timestamp - duration_secs`
+      parameters:
+      - name: duration_secs
+        schema:
+          type: integer
+          format: uint32
+        in: query
+        required: false
+        deprecated: false
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckSuccess'
+            application/x-bcs:
+              schema:
+                type: array
+                items:
+                  type: integer
+                  format: uint8
+          headers:
+            X-APTOS-CHAIN-ID:
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint16
+            X-APTOS-LEDGER-VERSION:
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              required: true
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+        '400':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+        '500':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+      operationId: healthy
   /blocks/by_height/{block_height}:
     get:
       tags:
@@ -2127,6 +2218,13 @@ components:
             $ref: '#/components/schemas/Event'
     HashValue:
       type: string
+    HealthCheckSuccess:
+      type: object
+      required:
+      - message
+      properties:
+        message:
+          type: string
     HexEncodedBytes:
       type: string
       format: hex

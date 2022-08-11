@@ -32,67 +32,10 @@
 use std::fmt::Display;
 
 use super::accept_type::AcceptType;
-use aptos_api_types::U64;
-use poem_openapi::{payload::Json, types::ToJSON, Enum, Object, ResponseContent};
+use aptos_api_types::{AptosError, AptosErrorCode};
+use poem_openapi::{payload::Json, types::ToJSON, ResponseContent};
 
 use super::bcs_payload::Bcs;
-
-/// This is the generic struct we use for all API errors, it contains a string
-/// message and an Aptos API specific error code.
-#[derive(Debug, Object)]
-pub struct AptosError {
-    message: String,
-    error_code: Option<AptosErrorCode>,
-    aptos_ledger_version: Option<U64>,
-}
-
-impl AptosError {
-    pub fn new(message: String) -> Self {
-        Self {
-            message,
-            error_code: None,
-            aptos_ledger_version: None,
-        }
-    }
-    pub fn error_code(mut self, error_code: AptosErrorCode) -> Self {
-        self.error_code = Some(error_code);
-        self
-    }
-
-    pub fn aptos_ledger_version(mut self, ledger_version: u64) -> Self {
-        self.aptos_ledger_version = Some(ledger_version.into());
-        self
-    }
-}
-
-impl From<anyhow::Error> for AptosError {
-    fn from(error: anyhow::Error) -> Self {
-        AptosError::new(format!("{:#}", error))
-    }
-}
-
-/// These codes provide more granular error information beyond just the HTTP
-/// status code of the response.
-// Make sure the integer codes increment one by one.
-#[derive(Debug, Enum)]
-#[oai(rename_all = "snake_case")]
-pub enum AptosErrorCode {
-    /// The API failed to read from storage for this request, not because of a
-    /// bad request, but because of some internal error.
-    ReadFromStorageError = 1,
-
-    /// The data we read from the DB was not valid BCS.
-    InvalidBcsInStorageError = 2,
-
-    /// We were unexpectedly unable to convert a Rust type to BCS.
-    BcsSerializationError = 3,
-
-    /// The start param given for paging is invalid.
-    InvalidStartParam = 4,
-
-    /// The limit param given for paging is invalid.
-    InvalidLimitParam = 5,
-}
 
 #[derive(ResponseContent)]
 pub enum AptosResponseContent<T: ToJSON + Send + Sync> {
@@ -174,7 +117,7 @@ macro_rules! generate_error_response {
         pub enum $enum_name {
             $(
             #[oai(status = $status)]
-            $name(poem_openapi::payload::Json<$crate::poem_backend::AptosError>),
+            $name(poem_openapi::payload::Json<aptos_api_types::AptosError>),
             )*
         }
 
@@ -185,13 +128,13 @@ macro_rules! generate_error_response {
         $(
         impl $crate::poem_backend::[<$name Error>] for $enum_name {
             fn [<$name:snake>](error: anyhow::Error) -> Self where Self: Sized {
-                let error = $crate::poem_backend::AptosError::from(error);
+                let error = aptos_api_types::AptosError::from(error);
                 let payload = poem_openapi::payload::Json(error);
                 Self::from($enum_name::$name(payload))
             }
 
             fn [<$name:snake _str>](error_str: &str) -> Self where Self: Sized {
-                let error = $crate::poem_backend::AptosError::new(error_str.to_string());
+                let error = aptos_api_types::AptosError::new(error_str.to_string());
                 let payload = poem_openapi::payload::Json(error);
                 Self::from($enum_name::$name(payload))
             }
@@ -201,7 +144,7 @@ macro_rules! generate_error_response {
 
         // Generate a function that helps get the AptosError within.
         impl $crate::poem_backend::AptosErrorResponse for $enum_name {
-            fn inner_mut(&mut self) -> &mut $crate::poem_backend::AptosError {
+            fn inner_mut(&mut self) -> &mut aptos_api_types::AptosError {
                 match self {
                     $(
                     $enum_name::$name(poem_openapi::payload::Json(inner)) => inner,
@@ -340,7 +283,7 @@ macro_rules! generate_success_response {
                     AcceptType::Bcs => Ok(Self::from((
                         $crate::poem_backend::bcs_payload::Bcs(
                             bcs::to_bytes(&value)
-                                .map_err(|e| E::internal(e.into()).error_code($crate::poem_backend::AptosErrorCode::BcsSerializationError))?
+                                .map_err(|e| E::internal(e.into()).error_code(aptos_api_types::AptosErrorCode::BcsSerializationError))?
                         ),
                         ledger_info,
                         status
