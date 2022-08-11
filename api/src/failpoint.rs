@@ -4,9 +4,9 @@
 #![allow(unused_imports)]
 
 use anyhow::{format_err, Result};
-use aptos_api_types::Error;
+use aptos_api_types::{AptosError, Error};
 
-use crate::poem_backend::{AptosError, InternalError};
+use crate::poem_backend::InternalError;
 use poem_openapi::payload::Json;
 
 #[allow(unused_variables)]
