@@ -591,7 +591,7 @@
         },
         {
           "key": "txn.max_transaction_size_in_bytes",
-          "val": "8192"
+          "val": "6291456"
         },
         {
           "key": "txn.gas_unit_scaling_factor",
