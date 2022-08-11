@@ -9,8 +9,8 @@ use aptos_rest_client::{
 };
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
-use cached_framework_packages::aptos_stdlib;
 use clap::Parser;
+use framework::aptos_stdlib;
 use serde::Serialize;
 use std::collections::BTreeMap;
 

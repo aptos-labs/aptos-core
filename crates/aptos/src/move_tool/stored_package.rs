@@ -4,6 +4,7 @@
 use anyhow::bail;
 use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
+use aptos_types::transaction::ScriptABI;
 use framework::natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
@@ -97,6 +98,10 @@ impl<'a> CachedPackageMetadata<'a> {
         &self.metadata.error_map
     }
 
+    pub fn abis(&self) -> &[Vec<u8>] {
+        self.metadata.abis.as_slice()
+    }
+
     pub fn module_names(&self) -> Vec<String> {
         self.metadata
             .modules
@@ -137,11 +142,24 @@ impl<'a> CachedPackageMetadata<'a> {
         }
         if with_derived_artifacts {
             let abis_dir = path.join(CompiledPackageLayout::CompiledABIs.path());
-            fs::create_dir_all(&abis_dir)?;
+            for abi_blob in &self.metadata.abis {
+                let abi = bcs::from_bytes::<ScriptABI>(abi_blob.as_slice())?;
+                let path = match abi {
+                    ScriptABI::TransactionScript(abi) => {
+                        PathBuf::from(format!("{}.abi", abi.name()))
+                    }
+                    ScriptABI::ScriptFunction(abi) => {
+                        PathBuf::from(abi.module_name().name().as_str())
+                            .join(format!("{}.abi", abi.name()))
+                    }
+                };
+                let dest = abis_dir.join(path);
+                fs::create_dir_all(&dest.parent().unwrap())?;
+                fs::write(dest, abi_blob)?
+            }
             let source_map_dir = path.join(CompiledPackageLayout::SourceMaps.path());
             fs::create_dir_all(&source_map_dir)?;
             for module in &self.metadata.modules {
-                fs::write(abis_dir.join(format!("{}.abi", module.name)), &module.abi)?;
                 fs::write(
                     source_map_dir.join(format!("{}.mvsm", module.name)),
                     &module.source_map,
@@ -159,10 +177,6 @@ impl<'a> CachedModuleMetadata<'a> {
 
     pub fn source(&self) -> &str {
         &self.metadata.source
-    }
-
-    pub fn abi_raw(&self) -> &[u8] {
-        &self.metadata.abi
     }
 
     pub fn source_map_raw(&self) -> &[u8] {

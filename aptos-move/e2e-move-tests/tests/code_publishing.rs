@@ -203,3 +203,34 @@ fn code_publishing_upgrade_loader_cache_consistency() {
     assert_success!(result[1]);
     assert_vm_status!(result[2], StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
+
+#[test]
+fn code_publishing_framework_upgrade() {
+    let mut h = MoveHarness::new_no_parallel();
+    enable_golden!(h);
+    let acc = h.aptos_root_account();
+
+    // We should be able to upgrade move-stdlib, as our local package has only
+    // compatible changes. (We added a new function to string.move.)
+    assert_success!(h.publish_package(
+        &acc,
+        &common::package_path("code_publishing.data/pack_stdlib"),
+        UpgradePolicy::compat(),
+    ));
+}
+
+#[test]
+fn code_publishing_framework_upgrade_fail() {
+    let mut h = MoveHarness::new_no_parallel();
+    enable_golden!(h);
+    let acc = h.aptos_root_account();
+
+    // We should not be able to upgrade move-stdlib because we removed a function
+    // from the string module.
+    let result = h.publish_package(
+        &acc,
+        &common::package_path("code_publishing.data/pack_stdlib_incompat"),
+        UpgradePolicy::compat(),
+    );
+    assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
+}

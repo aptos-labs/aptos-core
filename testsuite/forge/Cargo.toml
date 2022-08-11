@@ -44,6 +44,6 @@ aptos-sdk = { path = "../../sdk" }
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 
-cached-framework-packages = { path = "../../aptos-move/framework/cached-packages" }
+framework = { path = "../../aptos-move/framework" }
 inspection-service = { path = "../../crates/inspection-service" }
 transaction-emitter-lib = { path = "../../crates/transaction-emitter-lib" }
