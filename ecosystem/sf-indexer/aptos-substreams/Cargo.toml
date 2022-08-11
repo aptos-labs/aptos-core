@@ -16,6 +16,7 @@ crate-type = ["cdylib"]
 aptos-protos = { path = "../../../crates/aptos-protos" }
 
 serde = { version = "1.0.137", default-features = false }
+serde_json = "1.0.81"
 substreams = "0.0.17"
 
 # This is the difference between a multi MB binary, and a few hundred KB binary

@@ -29,8 +29,7 @@ fn block_to_block_output(input_txn: Transaction) -> Result<BlockOutput, Error> {
             )));
         }
         Some(info) => {
-            transaction_info = transaction_converter::get_transaction_info_output(&input_txn, info)
-                .map_err(|e| Error::Unexpected(e.to_string()))?;
+            transaction_info = transaction_converter::get_transaction_info_output(&input_txn, info);
             write_set_changes = transaction_converter::get_write_set_changes_output(&input_txn)
                 .map_err(|e| Error::Unexpected(e.to_string()))?;
         }
@@ -45,8 +44,7 @@ fn block_to_block_output(input_txn: Transaction) -> Result<BlockOutput, Error> {
         }
         Some(TxnDataInput::BlockMetadata(bmt)) => {
             txn_data = Some(TxnDataOutput::BlockMetadata(
-                transaction_converter::get_block_metadata_output(bmt, &transaction_info)
-                    .map_err(|e| Error::Unexpected(e.to_string()))?,
+                transaction_converter::get_block_metadata_output(bmt, &transaction_info),
             ));
             events_input = Some(&bmt.events);
         }
@@ -58,14 +56,16 @@ fn block_to_block_output(input_txn: Transaction) -> Result<BlockOutput, Error> {
             events_input = Some(&user_txn.events);
         }
         Some(TxnDataInput::Genesis(genesis_txn)) => {
+            txn_data = Some(TxnDataOutput::Genesis(
+                transaction_converter::get_genesis_output(genesis_txn),
+            ));
             events_input = Some(&genesis_txn.events);
         }
         Some(TxnDataInput::StateCheckpoint(_)) => {}
     };
     let events = match events_input {
         None => vec![],
-        Some(e) => transaction_converter::get_events_output(e, &transaction_info)
-            .map_err(|e| Error::Unexpected(e.to_string()))?,
+        Some(e) => transaction_converter::get_events_output(e, &transaction_info),
     };
 
     transactions.push(TransactionOutput {

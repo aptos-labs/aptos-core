@@ -16,10 +16,11 @@ message TransactionOutput {
   oneof txn_data {
     BlockMetadataTransactionOutput block_metadata = 2;
     UserTransactionOutput user = 3;
+    GenesisTransactionOutput genesis = 4;
   }
 
-  repeated EventOutput events = 4;
-  repeated WriteSetChangeOutput write_set_changes = 5;
+  repeated EventOutput events = 5;
+  repeated WriteSetChangeOutput write_set_changes = 6;
 }
 
 message TransactionInfoOutput {
@@ -58,6 +59,11 @@ message UserTransactionOutput {
   uint64 gas_unit_price = 7;
   aptos.util.timestamp.Timestamp timestamp = 8;
   repeated SignatureOutput signatures = 9;
+  string payload = 10;
+}
+
+message GenesisTransactionOutput {
+  string payload = 1;
 }
 
 message SignatureOutput {

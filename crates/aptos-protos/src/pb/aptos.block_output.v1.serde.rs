@@ -642,6 +642,106 @@ impl<'de> serde::Deserialize<'de> for EventOutput {
         )
     }
 }
+impl serde::Serialize for GenesisTransactionOutput {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if !self.payload.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser =
+            serializer.serialize_struct("aptos.block_output.v1.GenesisTransactionOutput", len)?;
+        if !self.payload.is_empty() {
+            struct_ser.serialize_field("payload", &self.payload)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for GenesisTransactionOutput {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["payload"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Payload,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "payload" => Ok(GeneratedField::Payload),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = GenesisTransactionOutput;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.block_output.v1.GenesisTransactionOutput")
+            }
+
+            fn visit_map<V>(
+                self,
+                mut map: V,
+            ) -> std::result::Result<GenesisTransactionOutput, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut payload__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::Payload => {
+                            if payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("payload"));
+                            }
+                            payload__ = Some(map.next_value()?);
+                        }
+                    }
+                }
+                Ok(GenesisTransactionOutput {
+                    payload: payload__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct(
+            "aptos.block_output.v1.GenesisTransactionOutput",
+            FIELDS,
+            GeneratedVisitor,
+        )
+    }
+}
 impl serde::Serialize for MoveModuleOutput {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -1932,6 +2032,9 @@ impl serde::Serialize for TransactionOutput {
                 transaction_output::TxnData::User(v) => {
                     struct_ser.serialize_field("user", v)?;
                 }
+                transaction_output::TxnData::Genesis(v) => {
+                    struct_ser.serialize_field("genesis", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -1949,6 +2052,7 @@ impl<'de> serde::Deserialize<'de> for TransactionOutput {
             "writeSetChanges",
             "blockMetadata",
             "user",
+            "genesis",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -1958,6 +2062,7 @@ impl<'de> serde::Deserialize<'de> for TransactionOutput {
             WriteSetChanges,
             BlockMetadata,
             User,
+            Genesis,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1987,6 +2092,7 @@ impl<'de> serde::Deserialize<'de> for TransactionOutput {
                             "writeSetChanges" => Ok(GeneratedField::WriteSetChanges),
                             "blockMetadata" => Ok(GeneratedField::BlockMetadata),
                             "user" => Ok(GeneratedField::User),
+                            "genesis" => Ok(GeneratedField::Genesis),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2046,6 +2152,13 @@ impl<'de> serde::Deserialize<'de> for TransactionOutput {
                             }
                             txn_data__ = Some(transaction_output::TxnData::User(map.next_value()?));
                         }
+                        GeneratedField::Genesis => {
+                            if txn_data__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("genesis"));
+                            }
+                            txn_data__ =
+                                Some(transaction_output::TxnData::Genesis(map.next_value()?));
+                        }
                     }
                 }
                 Ok(TransactionOutput {
@@ -2098,6 +2211,9 @@ impl serde::Serialize for UserTransactionOutput {
         if !self.signatures.is_empty() {
             len += 1;
         }
+        if !self.payload.is_empty() {
+            len += 1;
+        }
         let mut struct_ser =
             serializer.serialize_struct("aptos.block_output.v1.UserTransactionOutput", len)?;
         if !self.hash.is_empty() {
@@ -2137,6 +2253,9 @@ impl serde::Serialize for UserTransactionOutput {
         if !self.signatures.is_empty() {
             struct_ser.serialize_field("signatures", &self.signatures)?;
         }
+        if !self.payload.is_empty() {
+            struct_ser.serialize_field("payload", &self.payload)?;
+        }
         struct_ser.end()
     }
 }
@@ -2156,6 +2275,7 @@ impl<'de> serde::Deserialize<'de> for UserTransactionOutput {
             "gasUnitPrice",
             "timestamp",
             "signatures",
+            "payload",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -2169,6 +2289,7 @@ impl<'de> serde::Deserialize<'de> for UserTransactionOutput {
             GasUnitPrice,
             Timestamp,
             Signatures,
+            Payload,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -2204,6 +2325,7 @@ impl<'de> serde::Deserialize<'de> for UserTransactionOutput {
                             "gasUnitPrice" => Ok(GeneratedField::GasUnitPrice),
                             "timestamp" => Ok(GeneratedField::Timestamp),
                             "signatures" => Ok(GeneratedField::Signatures),
+                            "payload" => Ok(GeneratedField::Payload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -2235,6 +2357,7 @@ impl<'de> serde::Deserialize<'de> for UserTransactionOutput {
                 let mut gas_unit_price__ = None;
                 let mut timestamp__ = None;
                 let mut signatures__ = None;
+                let mut payload__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Hash => {
@@ -2307,6 +2430,12 @@ impl<'de> serde::Deserialize<'de> for UserTransactionOutput {
                             }
                             signatures__ = Some(map.next_value()?);
                         }
+                        GeneratedField::Payload => {
+                            if payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("payload"));
+                            }
+                            payload__ = Some(map.next_value()?);
+                        }
                     }
                 }
                 Ok(UserTransactionOutput {
@@ -2319,6 +2448,7 @@ impl<'de> serde::Deserialize<'de> for UserTransactionOutput {
                     gas_unit_price: gas_unit_price__.unwrap_or_default(),
                     timestamp: timestamp__,
                     signatures: signatures__.unwrap_or_default(),
+                    payload: payload__.unwrap_or_default(),
                 })
             }
         }

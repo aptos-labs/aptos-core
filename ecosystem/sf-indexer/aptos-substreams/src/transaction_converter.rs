@@ -3,14 +3,14 @@
 
 use aptos_protos::{
     block_output::v1::{
-        BlockMetadataTransactionOutput, EventKeyOutput, EventOutput, SignatureOutput,
-        TransactionInfoOutput, UserTransactionOutput, WriteSetChangeOutput,
+        BlockMetadataTransactionOutput, EventKeyOutput, EventOutput, GenesisTransactionOutput,
+        SignatureOutput, TransactionInfoOutput, UserTransactionOutput, WriteSetChangeOutput,
     },
     extractor::v1::{
         account_signature::Signature as AccountSignature,
         signature::{Signature, Type as SignatureType},
         transaction::TransactionType,
-        BlockMetadataTransaction, Ed25519Signature, Event, MultiAgentSignature,
+        BlockMetadataTransaction, Ed25519Signature, Event, GenesisTransaction, MultiAgentSignature,
         MultiEd25519Signature, Transaction, TransactionInfo, UserTransaction,
         UserTransactionRequest,
     },
@@ -21,8 +21,8 @@ type Result<T> = std::result::Result<T, substreams::errors::Error>;
 pub fn get_transaction_info_output(
     txn: &Transaction,
     info: &TransactionInfo,
-) -> Result<TransactionInfoOutput> {
-    let transaction_info = TransactionInfoOutput {
+) -> TransactionInfoOutput {
+    TransactionInfoOutput {
         hash: info.hash.clone(),
         r#type: get_transaction_type(txn.r#type()),
         version: txn.version,
@@ -35,15 +35,14 @@ pub fn get_transaction_info_output(
         vm_status: info.vm_status.clone(),
         accumulator_root_hash: info.accumulator_root_hash.clone(),
         timestamp: txn.timestamp.clone(),
-    };
-    Ok(transaction_info)
+    }
 }
 
 pub fn get_block_metadata_output(
     bmt: &BlockMetadataTransaction,
     info: &TransactionInfoOutput,
-) -> Result<BlockMetadataTransactionOutput> {
-    let bmt_output = BlockMetadataTransactionOutput {
+) -> BlockMetadataTransactionOutput {
+    BlockMetadataTransactionOutput {
         hash: info.hash.clone(),
         id: bmt.id.clone(),
         round: bmt.round,
@@ -52,8 +51,7 @@ pub fn get_block_metadata_output(
         failed_proposer_indices: bmt.failed_proposer_indices.clone(),
         timestamp: info.timestamp.clone(),
         epoch: info.epoch,
-    };
-    Ok(bmt_output)
+    }
 }
 
 pub fn get_user_transaction_output(
@@ -79,6 +77,7 @@ pub fn get_user_transaction_output(
             timestamp: info.timestamp.clone(),
             parent_signature_type: signature_type,
             signatures,
+            payload: serde_json::to_string(&user_request.payload).unwrap_or_default(),
         };
         Ok(user_txn_output)
     } else {
@@ -86,11 +85,17 @@ pub fn get_user_transaction_output(
     }
 }
 
+pub fn get_genesis_output(genesis_txn: &GenesisTransaction) -> GenesisTransactionOutput {
+    GenesisTransactionOutput {
+        payload: serde_json::to_string(&genesis_txn.payload).unwrap_or_default(),
+    }
+}
+
 pub fn get_events_output(
     events: &[Event],
     transaction_info: &TransactionInfoOutput,
-) -> Result<Vec<EventOutput>> {
-    Ok(events
+) -> Vec<EventOutput> {
+    events
         .iter()
         .map(|event| {
             let key = event.key.as_ref().map(|k| EventKeyOutput {
@@ -101,11 +106,11 @@ pub fn get_events_output(
                 transaction_hash: transaction_info.hash.clone(),
                 key,
                 sequence_number: event.sequence_number,
-                move_type: String::from(""),
+                move_type: serde_json::to_string(&event.r#type).unwrap_or_default(),
                 data: event.data.clone(),
             }
         })
-        .collect())
+        .collect()
 }
 
 pub fn get_write_set_changes_output(_input_txn: &Transaction) -> Result<Vec<WriteSetChangeOutput>> {
