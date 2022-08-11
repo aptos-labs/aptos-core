@@ -155,6 +155,8 @@ pub enum QuorumStoreRequest {
     GetBatchRequest(
         // max batch size
         u64,
+        // max byte size
+        u64,
         // transactions to exclude from the requested batch
         Vec<TransactionSummary>,
         // callback to respond to
@@ -172,14 +174,14 @@ pub enum QuorumStoreRequest {
 impl fmt::Display for QuorumStoreRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let payload = match self {
-            QuorumStoreRequest::GetBatchRequest(batch_size, excluded_txns, _) => {
+            QuorumStoreRequest::GetBatchRequest(max_txns, max_bytes, excluded_txns, _) => {
                 let mut txns_str = "".to_string();
                 for tx in excluded_txns.iter() {
                     write!(txns_str, "{} ", tx)?;
                 }
                 format!(
-                    "GetBatchRequest [batch_size: {}, excluded_txns: {}]",
-                    batch_size, txns_str
+                    "GetBatchRequest [max_txns: {}, max_bytes: {}, excluded_txns: {}]",
+                    max_txns, max_bytes, txns_str
                 )
             }
             QuorumStoreRequest::RejectNotification(rejected_txns, _) => {

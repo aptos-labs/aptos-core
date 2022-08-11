@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
-use crate::quorum_store::counters;
+use crate::{monitor, quorum_store::counters};
 use anyhow::Result;
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
@@ -42,11 +41,12 @@ impl DirectMempoolQuorumStore {
 
     async fn pull_internal(
         &self,
-        max_size: u64,
+        max_items: u64,
+        max_bytes: u64,
         exclude_txns: Vec<TransactionSummary>,
     ) -> Result<Vec<SignedTransaction>, anyhow::Error> {
         let (callback, callback_rcv) = oneshot::channel();
-        let msg = QuorumStoreRequest::GetBatchRequest(max_size, exclude_txns, callback);
+        let msg = QuorumStoreRequest::GetBatchRequest(max_items, max_bytes, exclude_txns, callback);
         self.mempool_sender
             .clone()
             .try_send(msg)
@@ -74,14 +74,15 @@ impl DirectMempoolQuorumStore {
 
     async fn handle_block_request(
         &self,
-        max_size: u64,
+        max_txns: u64,
+        max_bytes: u64,
         payload_filter: PayloadFilter,
         callback: oneshot::Sender<Result<ConsensusResponse>>,
     ) {
         let get_batch_start_time = Instant::now();
         let (txns, result) = match payload_filter {
             PayloadFilter::DirectMempool(exclude_txns) => {
-                match self.pull_internal(max_size, exclude_txns).await {
+                match self.pull_internal(max_txns, max_bytes, exclude_txns).await {
                     Err(_) => {
                         error!("GetBatch failed");
                         (vec![], counters::REQUEST_FAIL_LABEL)
@@ -127,8 +128,8 @@ impl DirectMempoolQuorumStore {
 
     async fn handle_consensus_request(&self, req: ConsensusRequest) {
         match req {
-            ConsensusRequest::GetBlockRequest(max_size, payload_filter, callback) => {
-                self.handle_block_request(max_size, payload_filter, callback)
+            ConsensusRequest::GetBlockRequest(max_txns, max_bytes, payload_filter, callback) => {
+                self.handle_block_request(max_txns, max_bytes, payload_filter, callback)
                     .await;
             }
             ConsensusRequest::CleanRequest(_, _, callback) => {
