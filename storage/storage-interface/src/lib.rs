@@ -521,7 +521,7 @@ impl MoveStorage for &dyn DbReader {
 
         state_value
             .ok_or_else(|| format_err!("no value found in DB"))
-            .map(|value| value.maybe_bytes)
+            .map(|value| value.bytes)
     }
 
     fn fetch_config_by_version(&self, config_id: ConfigID, version: Version) -> Result<Vec<u8>> {
@@ -533,7 +533,7 @@ impl MoveStorage for &dyn DbReader {
             version,
         )?;
         config_value_option
-            .map(|x| x.maybe_bytes)
+            .map(|x| x.bytes)
             .ok_or_else(|| anyhow!("no config {} found in aptos root account state", config_id))
     }
 

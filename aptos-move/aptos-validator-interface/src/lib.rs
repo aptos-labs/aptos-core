@@ -120,7 +120,7 @@ impl<'a> DebuggerStateView<'a> {
         Ok(self
             .db
             .get_state_value_by_version(state_key, version)?
-            .map(|v| v.maybe_bytes))
+            .map(|v| v.bytes))
     }
 }
 

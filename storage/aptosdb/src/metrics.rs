@@ -51,6 +51,18 @@ pub static NEXT_BLOCK_EPOCH: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static STATE_ITEMS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!("aptos_storage_state_items", "Total number of state items.").unwrap()
+});
+
+pub static TOTAL_STATE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_storage_total_state_bytes",
+        "Total size in bytes of all state items."
+    )
+    .unwrap()
+});
+
 pub static PRUNER_WINDOW: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
         // metric name

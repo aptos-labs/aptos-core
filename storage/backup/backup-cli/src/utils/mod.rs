@@ -142,6 +142,10 @@ impl StateValueWriter<StateKey, StateValue> for MockStore {
     ) -> Result<()> {
         Ok(())
     }
+
+    fn write_usage(&self, _version: Version, _items: usize, _total_bytes: usize) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl RestoreRunMode {

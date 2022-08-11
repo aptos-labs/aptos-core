@@ -40,8 +40,6 @@ pub struct Indexer {
 }
 
 impl Indexer {
-    // FIXME(aldenhu): remove
-
     pub fn open(
         db_root_path: impl AsRef<std::path::Path>,
         rocksdb_config: RocksdbConfig,
