@@ -3,12 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
-CMD="--release"
-[ -n "$BUILD_PROFILE" ] && CMD="--profile $BUILD_PROFILE"
-[ -z "$BUILD_PROFILE" ] && BUILD_PROFILE="release"
-
 # Build all the rust release binaries
-echo "RUSTFLAGS=\"--cfg tokio_unstable\" cargo build $CMD ... $@"
 RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
         -p aptos \
         -p aptos-faucet \
@@ -21,8 +16,6 @@ RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
         -p forge-cli \
         -p transaction-emitter \
         "$@"
-
-BUILD_PROFILE="release"
 
 # After building, copy the binaries we need to `dist` since the `target` directory is used as docker cache mount and only available during the RUN step
 BINS=(
@@ -44,7 +37,7 @@ mkdir dist
 
 for BIN in "${BINS[@]}"
 do
-	cp target/$BUILD_PROFILE/$BIN dist/$BIN
+    cp target/release/$BIN dist/$BIN
 done
 
 # Build the Aptos Move framework
