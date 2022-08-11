@@ -1,7 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::pb::aptos::{
+use anyhow::{bail, Context, Result};
+use aptos_protos::{
     block_output::v1::{
         BlockMetadataTransactionOutput, EventKeyOutput, EventOutput, SignatureOutput,
         TransactionInfoOutput, UserTransactionOutput, WriteSetChangeOutput,
@@ -15,21 +16,6 @@ use crate::pb::aptos::{
         UserTransactionRequest,
     },
 };
-use anyhow::{bail, Context, Result};
-// use aptos_protos::{
-//     block_output::v1::{
-//         BlockMetadataTransactionOutput, EventKeyOutput, EventOutput, SignatureOutput,
-//         TransactionInfoOutput, UserTransactionOutput, WriteSetChangeOutput,
-//     },
-//     extractor::v1::{
-//         account_signature::Signature as AccountSignature,
-//         signature::{Signature, Type as SignatureType},
-//         transaction::TransactionType,
-//         BlockMetadataTransaction, Ed25519Signature, Event, MultiAgentSignature,
-//         MultiEd25519Signature, Transaction, TransactionInfo, UserTransaction,
-//         UserTransactionRequest,
-//     },
-// };
 
 pub fn get_transaction_info_output(
     txn: &Transaction,
@@ -151,7 +137,9 @@ pub fn get_signature_outputs(
         Signature::Ed25519(sig) => Ok(vec![parse_single_signature(
             sig, request, info, true, 0, None,
         )]),
-        Signature::MultiEd25519(sig) => Ok(parse_multi_signature(sig, request, info, true, 0, None)),
+        Signature::MultiEd25519(sig) => {
+            Ok(parse_multi_signature(sig, request, info, true, 0, None))
+        }
         Signature::MultiAgent(sig) => parse_multi_agent_signature(sig, request, info),
     }
 }

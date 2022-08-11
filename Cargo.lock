@@ -569,7 +569,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-rest-client",
  "async-trait",
- "bigdecimal",
+ "bigdecimal 0.1.2",
  "chrono",
  "clap 3.2.16",
  "diesel",
@@ -915,7 +915,7 @@ dependencies = [
  "bytes 1.2.1",
  "chrono",
  "pbjson",
- "prost",
+ "prost 0.10.4",
  "serde 1.0.141",
  "serde_json",
 ]
@@ -1134,7 +1134,7 @@ dependencies = [
  "mempool-notifications",
  "move-deps",
  "once_cell",
- "prost",
+ "prost 0.10.4",
  "rand 0.7.3",
  "regex",
  "serde 1.0.141",
@@ -1157,6 +1157,22 @@ dependencies = [
  "serde 1.0.141",
  "serde_bytes",
  "serde_json",
+]
+
+[[package]]
+name = "aptos-substreams"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "aptos-protos",
+ "bytes 1.2.1",
+ "pbjson",
+ "pbjson-types",
+ "prost 0.10.4",
+ "prost-types 0.10.1",
+ "serde 1.0.141",
+ "serde_json",
+ "substreams",
 ]
 
 [[package]]
@@ -1944,6 +1960,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bigdecimal"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6aaf33151a6429fe9211d1b276eafdf70cdff28b071e76c0b0e1503221ea3744"
+dependencies = [
+ "num-bigint 0.4.3",
+ "num-integer",
+ "num-traits 0.2.15",
+]
+
+[[package]]
 name = "bincode"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2387,6 +2414,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmake"
+version = "0.1.48"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e8ad8cef104ac57b68b89df3208164d228503abbdce70f6880ffa3d970e7443a"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "codespan"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2563,8 +2599,8 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06c5fd425783d81668ed68ec98408a80498fb4ae2fd607797539e1a9dfa3618f"
 dependencies = [
- "prost",
- "prost-types",
+ "prost 0.10.4",
+ "prost-types 0.10.1",
  "tonic",
  "tracing-core",
 ]
@@ -2581,7 +2617,7 @@ dependencies = [
  "futures",
  "hdrhistogram",
  "humantime 2.1.0",
- "prost-types",
+ "prost-types 0.10.1",
  "serde 1.0.141",
  "serde_json",
  "thread_local",
@@ -3129,7 +3165,7 @@ name = "diesel"
 version = "1.4.8"
 source = "git+https://github.com/aptos-labs/diesel?branch=1.4.x#1346b2087fb11ba2feca1153a88a598a17da0d38"
 dependencies = [
- "bigdecimal",
+ "bigdecimal 0.1.2",
  "bitflags",
  "byteorder",
  "chrono",
@@ -4178,6 +4214,12 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hex-literal"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ebdb29d2ea9ed0083cd8cece49bbd968021bd99b0849edb4a9a7ee0fdf6a4e0"
 
 [[package]]
 name = "hkdf"
@@ -6012,6 +6054,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "multimap"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
+
+[[package]]
 name = "multipart"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6644,6 +6692,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "pbjson-build"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b237671f44cffe48853b93cba79d2613a62c8250b902a93f11f4be4539c84287"
+dependencies = [
+ "heck 0.4.0",
+ "itertools",
+ "prost 0.11.0",
+ "prost-types 0.11.1",
+]
+
+[[package]]
+name = "pbjson-types"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "588ae4a372e9fa9c20524dacd39e666b6abd29ff2830b9ebec5437e41634067d"
+dependencies = [
+ "bytes 1.2.1",
+ "chrono",
+ "pbjson",
+ "pbjson-build",
+ "prost 0.11.0",
+ "prost-build 0.11.1",
+ "serde 1.0.141",
+]
+
+[[package]]
 name = "peeking_take_while"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7258,7 +7333,59 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71adf41db68aa0daaefc69bb30bcd68ded9b9abaad5d1fbb6304c4fb390e083e"
 dependencies = [
  "bytes 1.2.1",
- "prost-derive",
+ "prost-derive 0.10.1",
+]
+
+[[package]]
+name = "prost"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "399c3c31cdec40583bb68f0b18403400d01ec4289c383aa047560439952c4dd7"
+dependencies = [
+ "bytes 1.2.1",
+ "prost-derive 0.11.0",
+]
+
+[[package]]
+name = "prost-build"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ae5a4388762d5815a9fc0dea33c56b021cdc8dde0c55e0c9ca57197254b0cab"
+dependencies = [
+ "bytes 1.2.1",
+ "cfg-if 1.0.0",
+ "cmake",
+ "heck 0.4.0",
+ "itertools",
+ "lazy_static 1.4.0",
+ "log",
+ "multimap",
+ "petgraph 0.6.2",
+ "prost 0.10.4",
+ "prost-types 0.10.1",
+ "regex",
+ "tempfile",
+ "which",
+]
+
+[[package]]
+name = "prost-build"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f835c582e6bd972ba8347313300219fed5bfa52caf175298d860b61ff6069bb"
+dependencies = [
+ "bytes 1.2.1",
+ "heck 0.4.0",
+ "itertools",
+ "lazy_static 1.4.0",
+ "log",
+ "multimap",
+ "petgraph 0.6.2",
+ "prost 0.11.0",
+ "prost-types 0.11.1",
+ "regex",
+ "tempfile",
+ "which",
 ]
 
 [[package]]
@@ -7275,13 +7402,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "prost-derive"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7345d5f0e08c0536d7ac7229952590239e77abf0a0100a1b1d890add6ea96364"
+dependencies = [
+ "anyhow",
+ "itertools",
+ "proc-macro2 1.0.42",
+ "quote 1.0.20",
+ "syn 1.0.98",
+]
+
+[[package]]
 name = "prost-types"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d0a014229361011dc8e69c8a1ec6c2e8d0f2af7c91e3ea3f5b2170298461e68"
 dependencies = [
  "bytes 1.2.1",
- "prost",
+ "prost 0.10.4",
+]
+
+[[package]]
+name = "prost-types"
+version = "0.11.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dfaa718ad76a44b3415e6c4d53b17c8f99160dcb3a99b10470fce8ad43f6e3e"
+dependencies = [
+ "bytes 1.2.1",
+ "prost 0.11.0",
 ]
 
 [[package]]
@@ -8807,6 +8957,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "substreams"
+version = "0.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2cf0b1354a0212595433c76be5c419111253f826fe6030e3a01f90054d2d541e"
+dependencies = [
+ "bigdecimal 0.3.0",
+ "hex",
+ "hex-literal",
+ "num-bigint 0.4.3",
+ "prost 0.10.4",
+ "prost-build 0.10.4",
+ "prost-types 0.10.1",
+ "substreams-macro",
+ "thiserror",
+]
+
+[[package]]
+name = "substreams-macro"
+version = "0.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f98d38372efa37bdfd7e071092f4f4dcdcaed5dc5e7290b0362a56081474867"
+dependencies = [
+ "proc-macro2 1.0.42",
+ "quote 1.0.20",
+ "syn 1.0.98",
+ "thiserror",
+]
+
+[[package]]
 name = "subtle"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9335,8 +9514,8 @@ dependencies = [
  "hyper-timeout",
  "percent-encoding",
  "pin-project",
- "prost",
- "prost-derive",
+ "prost 0.10.4",
+ "prost-derive 0.10.1",
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.3",

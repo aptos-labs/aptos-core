@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 // @generated
 impl serde::Serialize for BlockMetadataTransactionOutput {
     #[allow(deprecated)]
