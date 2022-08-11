@@ -9,7 +9,22 @@
 ///     as per the [IETF BLS draft standard](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature#section-2.1).
 ///     TODO: Describe APIs
 module aptos_std::signature {
+    use std::bcs;
     use std::option::Option;
+    use aptos_std::type_info::{Self, TypeInfo};
+
+    struct Proof<ProofType> has drop {
+        type_info: TypeInfo,
+        inner: ProofType,
+    }
+
+    public fun ed25519_verify_t<T: drop> (signature: vector<u8>, public_key: vector<u8>, data: T): bool {
+        let encoded = Proof {
+            type_info: type_info::type_of<T>(),
+            inner: data,
+        };
+        ed25519_verify(signature, public_key, bcs::to_bytes(&encoded))
+    }
 
     /// CRYPTOGRAPHY WARNING: This function assumes that the caller verified all public keys have a valid
     /// proof-of-possesion (PoP) using `bls12381_verify_proof_of_possession`.

@@ -1,8 +1,5 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_crypto::{PrivateKey, SigningKey, Uniform};
+use aptos_crypto::{Length, PrivateKey, SigningKey, Uniform};
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, state_store::state_key::StateKey, state_store::table::TableHandle, transaction::authenticator::AuthenticationKey};
 use cached_framework_packages::aptos_stdlib;
 use e2e_move_tests::{assert_success, enable_golden, MoveHarness};
@@ -33,8 +30,6 @@ fn key_rotation() {
     let new_private_key = Ed25519PrivateKey::generate_for_testing();
     let new_public_key = new_private_key.public_key();
     let new_auth_key = AuthenticationKey::ed25519(&new_public_key);
-    let mut scheme: Vec<u8> = Vec::new();
-    scheme.push(0);
 
     let rotation_proof = Proof {
         account_address: CORE_CODE_ADDRESS,
@@ -50,9 +45,8 @@ fn key_rotation() {
     assert_success!(harness.run_transaction_payload(
         &account1,
         aptos_stdlib::account_rotate_authentication_key_ed25519(
-            new_public_key.to_bytes().to_vec(),
             signature.to_bytes().to_vec(),
-            scheme,
+            new_public_key.to_bytes().to_vec(),
         )
     ));
 
