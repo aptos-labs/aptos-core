@@ -3,20 +3,21 @@
 
 //! This file defines the state merkle snapshot committer running in background thread.
 
-use crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema;
-use crate::metrics::LATEST_SNAPSHOT_VERSION;
-use crate::state_store::buffered_state::CommitMessage;
-use crate::state_store::StateDb;
-use crate::version_data::{VersionData, VersionDataSchema};
-use crate::OTHER_TIMERS_SECONDS;
+use crate::{
+    jellyfish_merkle_node::JellyfishMerkleNodeSchema,
+    metrics::LATEST_SNAPSHOT_VERSION,
+    state_merkle_db::StateMerkleDb,
+    state_store::{buffered_state::CommitMessage, StateDb},
+    version_data::{VersionData, VersionDataSchema},
+    OTHER_TIMERS_SECONDS,
+};
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::node_type::NodeKey;
 use aptos_logger::{info, trace, warn};
 use aptos_types::transaction::Version;
 use schemadb::SchemaBatch;
-use std::sync::mpsc::Receiver;
-use std::sync::Arc;
+use std::sync::{mpsc::Receiver, Arc};
 use storage_interface::state_delta::StateDelta;
 
 pub struct StateMerkleBatch {
@@ -62,6 +63,11 @@ impl StateMerkleBatchCommitter {
                         .state_merkle_db
                         .write_schemas(batch)
                         .expect("State merkle batch commit failed.");
+                    self.state_merkle_db
+                        .version_cache()
+                        .maybe_evict_version(&self.state_merkle_db.lru_cache());
+                    // TODO(grao): Consider remove the following sender once we verified the
+                    // version cache correctly cached all nodes we need.
                     snapshot_ready_sender.send(()).unwrap();
                     info!(
                         version = state_delta.current_version,

@@ -8,6 +8,9 @@ use std::{
     path::PathBuf,
 };
 
+// Lru cache will consume about 2G RAM based on this default value.
+pub const DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD: usize = 1 << 13;
+
 pub const TARGET_SNAPSHOT_SIZE: usize = 100_000;
 
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
@@ -76,6 +79,8 @@ pub struct StorageConfig {
     data_dir: PathBuf,
     /// The threshold that determine whether a snapshot should be committed to state merkle db.
     pub target_snapshot_size: usize,
+    /// The max # of nodes for a lru cache shard.
+    pub max_num_nodes_per_lru_cache_shard: usize,
     /// Rocksdb-specific configurations
     pub rocksdb_configs: RocksdbConfigs,
     /// Try to enable the internal indexer. The indexer expects to have seen all transactions
@@ -180,6 +185,7 @@ impl Default for StorageConfig {
             rocksdb_configs: RocksdbConfigs::default(),
             enable_indexer: false,
             target_snapshot_size: TARGET_SNAPSHOT_SIZE,
+            max_num_nodes_per_lru_cache_shard: DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
         }
     }
 }
