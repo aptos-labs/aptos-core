@@ -4,8 +4,7 @@
 set -e
 
 # Build all the rust release binaries
-echo "Building..."
-RUSTFLAGS="--cfg tokio_unstable" time cargo build --release \
+RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
         -p aptos \
         -p aptos-faucet \
         -p aptos-indexer \
@@ -17,8 +16,6 @@ RUSTFLAGS="--cfg tokio_unstable" time cargo build --release \
         -p forge-cli \
         -p transaction-emitter \
         "$@"
-
-echo "Build Finished"
 
 # After building, copy the binaries we need to `dist` since the `target` directory is used as docker cache mount and only available during the RUN step
 BINS=(
