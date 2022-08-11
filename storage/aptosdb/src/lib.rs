@@ -265,7 +265,7 @@ pub struct AptosDB {
     state_pruner: StatePrunerManager,
     ledger_pruner: LedgerPrunerManager,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
-    ledger_commit_lock: std::sync::Mutex<()>,
+    ledger_commit_lock: Mutex<()>,
     indexer: Option<Indexer>,
 }
 
@@ -303,7 +303,7 @@ impl AptosDB {
                 Arc::clone(&arc_ledger_rocksdb),
                 Arc::clone(&arc_state_merkle_rocksdb),
             ),
-            ledger_commit_lock: std::sync::Mutex::new(()),
+            ledger_commit_lock: Mutex::new(()),
             indexer: None,
         }
     }

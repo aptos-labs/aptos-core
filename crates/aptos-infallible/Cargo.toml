@@ -10,4 +10,5 @@ publish = false
 edition = "2018"
 
 [dependencies]
+parking_lot = "0.12.1"
 

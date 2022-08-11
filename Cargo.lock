@@ -586,6 +586,9 @@ dependencies = [
 [[package]]
 name = "aptos-infallible"
 version = "0.1.0"
+dependencies = [
+ "parking_lot 0.12.1",
+]
 
 [[package]]
 name = "aptos-jellyfish-merkle"
@@ -891,6 +894,7 @@ dependencies = [
  "mvhashmap",
  "num_cpus",
  "once_cell",
+ "parking_lot 0.12.1",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
