@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
-use crate::{error::QuorumStoreError, state_replication::PayloadManager};
+use crate::{error::QuorumStoreError, monitor, state_replication::PayloadManager};
 use anyhow::Result;
 use aptos_logger::prelude::*;
 use consensus_types::{
@@ -47,11 +46,17 @@ impl QuorumStoreClient {
 
     async fn pull_internal(
         &self,
-        max_size: u64,
+        max_items: u64,
+        max_bytes: u64,
         exclude_payloads: PayloadFilter,
     ) -> Result<Payload, QuorumStoreError> {
         let (callback, callback_rcv) = oneshot::channel();
-        let req = ConsensusRequest::GetBlockRequest(max_size, exclude_payloads.clone(), callback);
+        let req = ConsensusRequest::GetBlockRequest(
+            max_items,
+            max_bytes,
+            exclude_payloads.clone(),
+            callback,
+        );
         // send to shared mempool
         self.consensus_to_quorum_store_sender
             .clone()
@@ -79,7 +84,8 @@ impl QuorumStoreClient {
 impl PayloadManager for QuorumStoreClient {
     async fn pull_payload(
         &self,
-        max_size: u64,
+        max_items: u64,
+        max_bytes: u64,
         exclude_payloads: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
@@ -93,7 +99,7 @@ impl PayloadManager for QuorumStoreClient {
         let payload = loop {
             count -= 1;
             let payload = self
-                .pull_internal(max_size, exclude_payloads.clone())
+                .pull_internal(max_items, max_bytes, exclude_payloads.clone())
                 .await?;
             if payload.is_empty() && !pending_ordering && count > 0 {
                 if let Some(callback) = callback_wrapper.take() {
