@@ -27,6 +27,7 @@ pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
         TRANSACTION_BY_ACCOUNT_CF_NAME,
         TRANSACTION_BY_HASH_CF_NAME,
         TRANSACTION_INFO_CF_NAME,
+        VERSION_DATA_CF_NAME,
         WRITE_SET_CF_NAME,
     ]
 }

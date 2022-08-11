@@ -3,9 +3,8 @@
 
 //! This file defines state store buffered state that has been committed.
 
-use crate::{
-    state_merkle_db::StateMerkleDb, state_store::state_snapshot_committer::StateSnapshotCommitter,
-};
+use crate::state_store::state_snapshot_committer::StateSnapshotCommitter;
+use crate::state_store::StateDb;
 use anyhow::{ensure, Result};
 use aptos_logger::info;
 use aptos_types::state_store::state_key::StateKey;
@@ -50,20 +49,19 @@ pub(crate) enum CommitMessage<T> {
 }
 
 impl BufferedState {
-    pub fn new(
-        state_merkle_db: &Arc<StateMerkleDb>,
+    pub(crate) fn new(
+        state_db: &Arc<StateDb>,
         state_after_checkpoint: StateDelta,
         target_snapshot_size: usize,
     ) -> Self {
         let (state_commit_sender, state_commit_receiver) =
             mpsc::sync_channel(ASYNC_COMMIT_CHANNEL_BUFFER_SIZE as usize);
-        let arc_state_merkle_db = Arc::clone(state_merkle_db);
+        let arc_state_db = Arc::clone(state_db);
         let (initial_snapshot_ready_sender, initial_snapshot_ready_receiver) = mpsc::channel();
         let join_handle = std::thread::Builder::new()
             .name("state_snapshot_committer".to_string())
             .spawn(move || {
-                let committer =
-                    StateSnapshotCommitter::new(arc_state_merkle_db, state_commit_receiver);
+                let committer = StateSnapshotCommitter::new(arc_state_db, state_commit_receiver);
                 committer.run();
             })
             .expect("Failed to spawn state committer thread.");

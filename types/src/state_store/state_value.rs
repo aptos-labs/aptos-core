@@ -22,9 +22,7 @@ pub struct StateValue {
 impl Arbitrary for StateValue {
     type Parameters = ();
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        any::<Vec<u8>>()
-            .prop_map(|maybe_bytes| StateValue::new(Some(maybe_bytes)))
-            .boxed()
+        any::<Option<Vec<u8>>>().prop_map(StateValue::new).boxed()
     }
 
     type Strategy = BoxedStrategy<Self>;
@@ -60,6 +58,10 @@ impl StateValue {
 
     pub fn empty() -> Self {
         StateValue::new(None)
+    }
+
+    pub fn size(&self) -> usize {
+        self.maybe_bytes.as_ref().map_or(0, |bytes| bytes.len())
     }
 }
 
