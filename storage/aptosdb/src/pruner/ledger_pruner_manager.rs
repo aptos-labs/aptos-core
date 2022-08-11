@@ -178,7 +178,7 @@ impl LedgerPrunerManager {
         let min_readable_version = ledger_pruner.min_readable_version();
 
         Self {
-            pruner_enabled: storage_pruner_config.enable_state_store_pruner,
+            pruner_enabled: storage_pruner_config.enable_ledger_pruner,
             prune_window: storage_pruner_config.ledger_prune_window,
             pruner: ledger_pruner,
             worker_thread: ledger_pruner_worker_thread,
