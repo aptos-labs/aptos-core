@@ -150,7 +150,7 @@ const config = {
           },
           {
             position: "left",
-            href: "https://fullnode.devnet.aptoslabs.com/spec.html#/",
+            href: "https://fullnode.devnet.aptoslabs.com/v1/spec#/",
             label: "REST API",
           },
           {
