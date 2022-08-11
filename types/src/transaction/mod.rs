@@ -1109,7 +1109,7 @@ impl Display for TransactionInfo {
 pub struct TransactionToCommit {
     transaction: Transaction,
     transaction_info: TransactionInfo,
-    state_updates: HashMap<StateKey, StateValue>,
+    state_updates: HashMap<StateKey, Option<StateValue>>,
     write_set: WriteSet,
     events: Vec<ContractEvent>,
     is_reconfig: bool,
@@ -1119,7 +1119,7 @@ impl TransactionToCommit {
     pub fn new(
         transaction: Transaction,
         transaction_info: TransactionInfo,
-        state_updates: HashMap<StateKey, StateValue>,
+        state_updates: HashMap<StateKey, Option<StateValue>>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
         is_reconfig: bool,
@@ -1151,7 +1151,7 @@ impl TransactionToCommit {
         self.transaction_info = txn_info
     }
 
-    pub fn state_updates(&self) -> &HashMap<StateKey, StateValue> {
+    pub fn state_updates(&self) -> &HashMap<StateKey, Option<StateValue>> {
         &self.state_updates
     }
 

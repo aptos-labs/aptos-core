@@ -85,8 +85,8 @@ impl AsyncProofFetcher {
         let reader = self.reader.clone();
         let data_sender = self.data_sender.clone();
         IO_POOL.spawn(move || {
-            let proof = reader
-                .get_state_proof_by_version_ext(&state_key, version)
+            let (_, proof) = reader
+                .get_state_value_with_proof_by_version_ext(&state_key, version)
                 .expect("Proof reading should succeed.");
             data_sender
                 .send(Proof {

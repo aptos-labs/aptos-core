@@ -32,14 +32,14 @@ use proptest::{collection::hash_map, prelude::*};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 
-use crate::{Key, TreeReader};
+use crate::TreeReader;
+use aptos_types::proof::definition::NodeInProof;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::hash_map::HashMap,
     io::{prelude::*, Cursor, Read, SeekFrom, Write},
     mem::size_of,
 };
-use storage_interface::DbReader;
 use thiserror::Error;
 
 /// The unique key of each node.
@@ -321,14 +321,11 @@ impl InternalNode {
     }
 
     pub fn hash(&self) -> HashValue {
-        self.gen_node_in_proof(
+        self.merkle_hash(
             0,  /* start index */
             16, /* the number of leaves in the subtree of which we want the hash of root */
             self.generate_bitmaps(),
-            None,
         )
-        .expect("cannot fail")
-        .hash()
     }
 
     pub fn children_sorted(&self) -> impl Iterator<Item = (&Nibble, &Child)> {
@@ -443,12 +440,53 @@ impl InternalNode {
         (bitmaps.0 & mask, bitmaps.1 & mask)
     }
 
+    fn merkle_hash(
+        &self,
+        start: u8,
+        width: u8,
+        (existence_bitmap, leaf_bitmap): (u16, u16),
+    ) -> HashValue {
+        // Given a bit [start, 1 << nibble_height], return the value of that range.
+        let (range_existence_bitmap, range_leaf_bitmap) =
+            Self::range_bitmaps(start, width, (existence_bitmap, leaf_bitmap));
+        if range_existence_bitmap == 0 {
+            // No child under this subtree
+            *SPARSE_MERKLE_PLACEHOLDER_HASH
+        } else if width == 1 || (range_existence_bitmap.count_ones() == 1 && range_leaf_bitmap != 0)
+        {
+            // Only 1 leaf child under this subtree or reach the lowest level
+            let only_child_index = Nibble::from(range_existence_bitmap.trailing_zeros() as u8);
+            self.child(only_child_index)
+                .with_context(|| {
+                    format!(
+                        "Corrupted internal node: existence_bitmap indicates \
+                         the existence of a non-exist child at index {:x}",
+                        only_child_index
+                    )
+                })
+                .unwrap()
+                .hash
+        } else {
+            let left_child = self.merkle_hash(
+                start,
+                width / 2,
+                (range_existence_bitmap, range_leaf_bitmap),
+            );
+            let right_child = self.merkle_hash(
+                start + width / 2,
+                width / 2,
+                (range_existence_bitmap, range_leaf_bitmap),
+            );
+            SparseMerkleInternalNode::new(left_child, right_child).hash()
+        }
+    }
+
     fn gen_node_in_proof<K: crate::Key, R: TreeReader<K>>(
         &self,
         start: u8,
         width: u8,
         (existence_bitmap, leaf_bitmap): (u16, u16),
-        reader_and_node_key: Option<(&R, &NodeKey)>,
+        (tree_reader, node_key): (&R, &NodeKey),
     ) -> Result<NodeInProof> {
         // Given a bit [start, 1 << nibble_height], return the value of that range.
         let (range_existence_bitmap, range_leaf_bitmap) =
@@ -471,36 +509,30 @@ impl InternalNode {
                 })
                 .unwrap();
             if matches!(only_child.node_type, NodeType::Leaf) {
-                if let Some((tree_reader, node_key)) = reader_and_node_key {
-                    let only_child_node_key =
-                        node_key.gen_child_node_key(only_child.version, only_child_index);
-                    match tree_reader.get_node(&only_child_node_key)? {
-                        Node::Internal(_) => unreachable!("Corrupted internal node: in-memory leaf child is internal node on disk"),
-                        Node::Leaf(leaf_node) => NodeInProof::Leaf(SparseMerkleLeafNode::from(leaf_node))
+                let only_child_node_key =
+                    node_key.gen_child_node_key(only_child.version, only_child_index);
+                match tree_reader.get_node(&only_child_node_key)? {
+                    Node::Internal(_) => unreachable!(
+                        "Corrupted internal node: in-memory leaf child is internal node on disk"
+                    ),
+                    Node::Leaf(leaf_node) => {
+                        NodeInProof::Leaf(SparseMerkleLeafNode::from(leaf_node))
                     }
-                } else {
-                    NodeInProof::Other(only_child.hash)
                 }
             } else {
                 NodeInProof::Other(only_child.hash)
             }
         } else {
-            let left_child = self
-                .gen_node_in_proof(
-                    start,
-                    width / 2,
-                    (range_existence_bitmap, range_leaf_bitmap),
-                    None,
-                )?
-                .hash();
-            let right_child = self
-                .gen_node_in_proof(
-                    start + width / 2,
-                    width / 2,
-                    (range_existence_bitmap, range_leaf_bitmap),
-                    None,
-                )?
-                .hash();
+            let left_child = self.merkle_hash(
+                start,
+                width / 2,
+                (range_existence_bitmap, range_leaf_bitmap),
+            );
+            let right_child = self.merkle_hash(
+                start + width / 2,
+                width / 2,
+                (range_existence_bitmap, range_leaf_bitmap),
+            );
             NodeInProof::Other(SparseMerkleInternalNode::new(left_child, right_child).hash())
         })
     }
@@ -529,8 +561,8 @@ impl InternalNode {
         &self,
         node_key: &NodeKey,
         n: Nibble,
-        reader: &R,
-    ) -> (Option<NodeKey>, Vec<HashValue>) {
+        reader: Option<&R>,
+    ) -> Result<(Option<NodeKey>, Vec<NodeInProof>)> {
         let mut siblings = vec![];
         let (existence_bitmap, leaf_bitmap) = self.generate_bitmaps();
 
@@ -541,19 +573,26 @@ impl InternalNode {
             let width = 1 << h;
             let (child_half_start, sibling_half_start) = get_child_and_sibling_half_start(n, h);
             // Compute the root hash of the subtree rooted at the sibling of `r`.
-            siblings.push(self.gen_node_in_proof(
-                sibling_half_start,
-                width,
-                (existence_bitmap, leaf_bitmap),
-                Some((reader, node_key)),
-            ));
+            if let Some(reader) = reader {
+                siblings.push(self.gen_node_in_proof(
+                    sibling_half_start,
+                    width,
+                    (existence_bitmap, leaf_bitmap),
+                    (reader, node_key),
+                )?);
+            } else {
+                siblings.push(
+                    self.merkle_hash(sibling_half_start, width, (existence_bitmap, leaf_bitmap))
+                        .into(),
+                );
+            }
 
             let (range_existence_bitmap, range_leaf_bitmap) =
                 Self::range_bitmaps(child_half_start, width, (existence_bitmap, leaf_bitmap));
 
             if range_existence_bitmap == 0 {
                 // No child in this range.
-                return (None, siblings);
+                return Ok((None, siblings));
             } else if width == 1
                 || (range_existence_bitmap.count_ones() == 1 && range_leaf_bitmap != 0)
             {
@@ -562,7 +601,7 @@ impl InternalNode {
                 // `None` because it's existence indirectly proves the n-th child doesn't exist.
                 // Please read proof format for details.
                 let only_child_index = Nibble::from(range_existence_bitmap.trailing_zeros() as u8);
-                return (
+                return Ok((
                     {
                         let only_child_version = self
                             .child(only_child_index)
@@ -579,7 +618,7 @@ impl InternalNode {
                         Some(node_key.gen_child_node_key(only_child_version, only_child_index))
                     },
                     siblings,
-                );
+                ));
             }
         }
         unreachable!("Impossible to get here without returning even at the lowest level.")

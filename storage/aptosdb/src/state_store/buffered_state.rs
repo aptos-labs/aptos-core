@@ -147,7 +147,9 @@ impl BufferedState {
 
     pub fn update(
         &mut self,
-        updates_until_next_checkpoint_since_current_option: Option<HashMap<StateKey, StateValue>>,
+        updates_until_next_checkpoint_since_current_option: Option<
+            HashMap<StateKey, Option<StateValue>>,
+        >,
         mut new_state_after_checkpoint: StateDelta,
         sync_commit: bool,
     ) -> Result<()> {
