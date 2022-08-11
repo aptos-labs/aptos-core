@@ -77,6 +77,7 @@ pub fn get_api_service(
         .url("https://github.com/aptos-labs/aptos-core");
 
     OpenApiService::new(apis, "Aptos Node API", version.trim())
+        .server("/v1")
         .description("The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.")
         .license(license)
         .contact(contact)

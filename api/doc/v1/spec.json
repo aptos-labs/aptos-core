@@ -13,11 +13,19 @@
       "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
     }
   },
-  "servers": [],
+  "servers": [
+    {
+      "url": "/v1"
+    }
+  ],
   "tags": [
     {
       "name": "Accounts",
       "description": "Access to account resources and modules"
+    },
+    {
+      "name": "Blocks",
+      "description": "Access to blocks"
     },
     {
       "name": "Events",
@@ -117,6 +125,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -249,6 +273,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -375,6 +415,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -432,6 +488,146 @@
           }
         },
         "operationId": "spec"
+      }
+    },
+    "/blocks/by_height/{block_height}": {
+      "get": {
+        "tags": [
+          "Blocks"
+        ],
+        "summary": "Get blocks by height",
+        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information.",
+        "parameters": [
+          {
+            "name": "block_height",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false
+          },
+          {
+            "name": "with_transactions",
+            "schema": {
+              "type": "boolean"
+            },
+            "in": "query",
+            "required": false,
+            "deprecated": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Block"
+                }
+              },
+              "application/x-bcs": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint16"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_block_by_height"
       }
     },
     "/events/{event_key}": {
@@ -527,6 +723,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -687,6 +899,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -784,6 +1012,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -906,6 +1150,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1038,6 +1298,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1177,6 +1453,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1304,6 +1596,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1418,6 +1726,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1548,6 +1872,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1656,6 +1996,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1798,6 +2154,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1923,6 +2295,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -2040,6 +2428,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2181,6 +2585,39 @@
           "invalid_start_param",
           "invalid_limit_param"
         ]
+      },
+      "Block": {
+        "type": "object",
+        "required": [
+          "block_height",
+          "block_hash",
+          "block_timestamp",
+          "first_version",
+          "last_version"
+        ],
+        "properties": {
+          "block_height": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "block_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "block_timestamp": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "first_version": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "last_version": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            }
+          }
+        }
       },
       "BlockMetadataTransaction": {
         "type": "object",
@@ -2572,6 +3009,8 @@
           "epoch",
           "ledger_version",
           "oldest_ledger_version",
+          "block_height",
+          "oldest_block_height",
           "ledger_timestamp",
           "node_role"
         ],
@@ -2587,6 +3026,12 @@
             "$ref": "#/components/schemas/U64"
           },
           "oldest_ledger_version": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "block_height": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "oldest_block_height": {
             "$ref": "#/components/schemas/U64"
           },
           "ledger_timestamp": {
