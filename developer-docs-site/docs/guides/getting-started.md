@@ -63,8 +63,9 @@ Now your basic Aptos development environment is ready.
 
 ### Aptos devnet
 
-- **Faucet service:** [https://faucet.devnet.aptoslabs.com](https://faucet.devnet.aptoslabs.com).
+- [REST API Open API Spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/).
 - **REST service:** [https://fullnode.devnet.aptoslabs.com/v1](https://fullnode.devnet.aptoslabs.com/v1).
+- **Faucet service:** [https://faucet.devnet.aptoslabs.com](https://faucet.devnet.aptoslabs.com).
 - [Genesis](https://devnet.aptoslabs.com/genesis.blob).
 - [Waypoint](https://devnet.aptoslabs.com/waypoint.txt).
 - [ChainID](http://fullnode.devnet.aptoslabs.com/).
