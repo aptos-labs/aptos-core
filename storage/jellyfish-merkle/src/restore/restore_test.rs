@@ -51,6 +51,15 @@ where
         }
         Ok(())
     }
+
+    fn write_utilization(
+        &self,
+        _version: Version,
+        _items: usize,
+        _total_bytes: usize,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl<K, V> TreeReader<K> for MockSnapshotStore<K, V>

@@ -139,6 +139,15 @@ impl StateValueWriter<StateKey, StateValue> for MockStore {
     fn write_kv_batch(&self, _kv_batch: &StateValueBatch<StateKey, StateValue>) -> Result<()> {
         Ok(())
     }
+
+    fn write_utilization(
+        &self,
+        _version: Version,
+        _items: usize,
+        _total_bytes: usize,
+    ) -> Result<()> {
+        Ok(())
+    }
 }
 
 impl RestoreRunMode {
