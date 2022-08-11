@@ -47,7 +47,7 @@ mod state_snapshot_committer;
 #[cfg(test)]
 mod state_store_test;
 
-type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, StateValue>;
+type StateValueBatch = aptos_jellyfish_merkle::StateValueBatch<StateKey, Option<StateValue>>;
 
 pub const MAX_VALUES_TO_FETCH_FOR_KEY_PREFIX: usize = 10_000;
 // We assume TARGET_SNAPSHOT_INTERVAL_IN_VERSION > block size.
@@ -407,7 +407,7 @@ impl StateStore {
     /// Put the `value_state_sets` into its own CF.
     pub fn put_value_sets(
         &self,
-        value_state_sets: Vec<&HashMap<StateKey, StateValue>>,
+        value_state_sets: Vec<&HashMap<StateKey, Option<StateValue>>>,
         first_version: Version,
         cs: &mut ChangeSet,
     ) -> Result<()> {
@@ -533,11 +533,12 @@ impl StateValueWriter<StateKey, StateValue> for StateStore {
 }
 
 fn add_kv_batch(batch: &mut SchemaBatch, kv_batch: &StateValueBatch) -> Result<()> {
-    kv_batch
-        .iter()
-        .map(|(k, v)| batch.put::<StateValueSchema>(k, v))
-        .collect::<Result<Vec<_>>>()?;
-
+    for (k, v_opt) in kv_batch {
+        if let Some(v) = v_opt {
+            batch.put::<StateValueSchema>(k, v)?;
+        }
+        // todo(lightmark): else prune
+    }
     // Add kv_batch
     Ok(())
 }

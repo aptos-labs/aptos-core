@@ -1234,12 +1234,12 @@ impl DbReader for AptosDB {
         state_store_key: &StateKey,
         version: Version,
     ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
-        gauged_api("get_state_value_with_proof_by_version", || {
+        gauged_api("get_state_value_with_proof_by_version_ext", || {
             if let Some(state_pruner) = &self.state_pruner {
                 error_if_version_is_pruned(state_pruner, "State", version)?;
             }
             self.state_store
-                .get_state_value_with_proof_by_version(state_store_key, version)
+                .get_state_value_with_proof_by_version_ext(state_store_key, version)
         })
     }
 

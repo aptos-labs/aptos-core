@@ -85,7 +85,7 @@ where
 
     for (i, (key, value)) in kvs.iter().enumerate() {
         let (_root_hash, write_batch) = tree
-            .put_value_set_test(vec![(*key, value)], i as Version)
+            .put_value_set_test(vec![(*key, Some(value))], i as Version)
             .unwrap();
         db.write_tree_update_batch(write_batch).unwrap();
     }

@@ -76,7 +76,7 @@ impl StateMerkleDb {
 
     pub fn batch_put_value_set(
         &self,
-        value_set: Vec<(HashValue, &(HashValue, StateKey))>,
+        value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         persisted_version: Option<Version>,
         version: Version,
@@ -111,7 +111,7 @@ impl StateMerkleDb {
     /// hashes for each write set.
     pub fn merklize_value_set(
         &self,
-        value_set: Vec<(HashValue, &(HashValue, StateKey))>,
+        value_set: Vec<(HashValue, Option<&(HashValue, StateKey)>)>,
         node_hashes: Option<&HashMap<NibblePath, HashValue>>,
         version: Version,
         base_version: Option<Version>,
