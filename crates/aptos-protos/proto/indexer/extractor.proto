@@ -12,6 +12,7 @@ package aptos.extractor.v1;
 message Block {
   aptos.util.timestamp.Timestamp timestamp = 1;
   uint64 block_height = 2;
+  repeated Transaction transactions = 3;
 }
 
 message Transaction {
