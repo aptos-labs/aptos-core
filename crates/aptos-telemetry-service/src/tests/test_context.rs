@@ -4,9 +4,7 @@
 use std::collections::HashMap;
 
 use crate::GCPBigQueryConfig;
-use crate::{
-    context::Context, index, validator_cache::ValidatorSetCache, AptosTelemetryServiceConfig,
-};
+use crate::{context::Context, index, validator_cache::ValidatorSetCache, TelemetryServiceConfig};
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::{x25519, Uniform};
 use aptos_rest_client::aptos_api_types::mime_types;
@@ -20,7 +18,7 @@ pub async fn new_test_context() -> TestContext {
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let server_private_key = x25519::PrivateKey::generate(&mut rng);
 
-    let config = &AptosTelemetryServiceConfig {
+    let config = &TelemetryServiceConfig {
         address: format!("{}:{}", "127.0.0.1", 80).parse().unwrap(),
         tls_cert_path: None,
         tls_key_path: None,
