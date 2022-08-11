@@ -1,9 +1,9 @@
-import { MemoizeExpiring } from "typescript-memoize";
+import { Memoize } from "typescript-memoize";
 import { HexString, MaybeHexString } from "./hex_string";
 import { sleep } from "./util";
 import { AptosAccount } from "./aptos_account";
 import * as Gen from "./generated/index";
-import { TxnBuilderTypes, TransactionBuilderEd25519 } from "./transaction_builder";
+import { TxnBuilderTypes, TransactionBuilderEd25519, BCS } from "./transaction_builder";
 
 /**
  * Provides methods for retrieving data from Aptos node.
@@ -481,10 +481,9 @@ export class AptosClient {
   }
 
   /**
-   * @param params Request params
    * @returns Current chain id
    */
-  @MemoizeExpiring(5 * 60 * 1000) // cache result for 5 minutes
+  @Memoize()
   async getChainId(): Promise<number> {
     const result = await this.getLedgerInfo();
     return result.chain_id;
@@ -504,5 +503,40 @@ export class AptosClient {
   async getTableItem(handle: string, data: Gen.TableItemRequest, query?: { ledgerVersion?: BigInt }): Promise<any> {
     const tableItem = await this.client.tables.getTableItem(handle, data, query?.ledgerVersion?.toString());
     return tableItem;
+  }
+
+  /**
+   * Generates a raw transaction out of a transaction payload
+   * @param accountFrom
+   * @param payload
+   * @param extraArgs
+   * @returns
+   */
+  async generateRawTransaction(
+    accountFrom: HexString,
+    payload: TxnBuilderTypes.TransactionPayload,
+    extraArgs?: { maxGasAmount?: BCS.Uint64; gastUnitPrice?: BCS.Uint64; expireTimestamp?: BCS.Uint64 },
+  ): Promise<TxnBuilderTypes.RawTransaction> {
+    const { maxGasAmount, gastUnitPrice, expireTimestamp } = {
+      maxGasAmount: 2000n,
+      gastUnitPrice: 1n,
+      expireTimestamp: BigInt(Math.floor(Date.now() / 1000) + 20),
+      ...extraArgs,
+    };
+
+    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
+      this.getAccount(accountFrom),
+      this.getChainId(),
+    ]);
+
+    return new TxnBuilderTypes.RawTransaction(
+      TxnBuilderTypes.AccountAddress.fromHex(accountFrom),
+      BigInt(sequenceNumber),
+      payload,
+      maxGasAmount,
+      gastUnitPrice,
+      expireTimestamp,
+      new TxnBuilderTypes.ChainId(chainId),
+    );
   }
 }

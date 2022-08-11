@@ -87,20 +87,7 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
-      client.getAccount(account1.address()),
-      client.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      TxnBuilderTypes.AccountAddress.fromHex(account1.address()),
-      BigInt(sequnceNumber),
-      scriptFunctionPayload,
-      10000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
+    const rawTxn = await client.generateRawTransaction(account1.address(), scriptFunctionPayload);
 
     const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
     const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
@@ -158,20 +145,7 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
-      client.getAccount(mutisigAccountAddress),
-      client.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      TxnBuilderTypes.AccountAddress.fromHex(mutisigAccountAddress),
-      BigInt(sequnceNumber),
-      scriptFunctionPayload,
-      1000000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
+    const rawTxn = await client.generateRawTransaction(mutisigAccountAddress, scriptFunctionPayload);
 
     const txnBuilder = new TransactionBuilderMultiEd25519((signingMessage: TxnBuilderTypes.SigningMessage) => {
       const sigHexStr1 = account1.signBuffer(signingMessage);
@@ -287,20 +261,7 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
-      client.getAccount(account1.address()),
-      client.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      TxnBuilderTypes.AccountAddress.fromHex(account1.address()),
-      BigInt(sequnceNumber),
-      scriptFunctionPayload,
-      10000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
+    const rawTxn = await client.generateRawTransaction(account1.address(), scriptFunctionPayload);
 
     const bcsTxn = AptosClient.generateBCSSimulation(account1, rawTxn);
     const transactionRes = (await client.submitBCSSimulation(bcsTxn))[0];
@@ -398,20 +359,7 @@ test(
       ),
     );
 
-    const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
-      client.getAccount(alice.address()),
-      client.getChainId(),
-    ]);
-
-    const rawTxn = new TxnBuilderTypes.RawTransaction(
-      aliceAccountAddress,
-      BigInt(sequnceNumber),
-      scriptFunctionPayload,
-      10000n,
-      1n,
-      BigInt(Math.floor(Date.now() / 1000) + 10),
-      new TxnBuilderTypes.ChainId(chainId),
-    );
+    const rawTxn = await client.generateRawTransaction(alice.address(), scriptFunctionPayload);
 
     const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [bobAccountAddress]);
 
