@@ -23,8 +23,10 @@ test("generates derive path accounts", () => {
   expect(a1.address().hex()).toBe(address);
 });
 
-test('generates derive path accounts', () => {
-  expect(() => { AptosAccount.fromDerivePath('', mnemonic); }).toThrow(new Error('Invalid derivation path'));
+test("generates derive path accounts", () => {
+  expect(() => {
+    AptosAccount.fromDerivePath("", mnemonic);
+  }).toThrow(new Error("Invalid derivation path"));
 });
 
 test("accepts custom address", () => {
