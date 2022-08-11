@@ -140,7 +140,7 @@ async fn test_block_height_and_ts_work() {
     ]);
 
     let context = Arc::new(test_context.clone().context);
-    
+
     let streamer = SfStreamer::new(context, 0, None);
     let converted = fetch_all_stream(streamer).await;
 

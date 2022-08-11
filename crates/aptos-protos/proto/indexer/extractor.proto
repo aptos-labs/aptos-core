@@ -9,6 +9,11 @@ import "timestamp.proto";
 
 package aptos.extractor.v1;
 
+message Block {
+  aptos.util.timestamp.Timestamp timestamp = 1;
+  uint64 block_height = 2;
+}
+
 message Transaction {
   aptos.util.timestamp.Timestamp timestamp = 1;
   uint64 version = 2;
