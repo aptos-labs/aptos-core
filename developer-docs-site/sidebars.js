@@ -19,7 +19,7 @@ const sidebars = {
     "index",
     "whats-new-in-docs",
     "guides/getting-started",
-    
+
     {
       type: "category",
       label: "Aptos Quickstarts",
