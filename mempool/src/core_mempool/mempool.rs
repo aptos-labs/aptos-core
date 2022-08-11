@@ -183,6 +183,7 @@ impl Mempool {
     pub(crate) fn get_batch(
         &self,
         batch_size: u64,
+        max_bytes: u64,
         mut seen: HashSet<TxnPointer>,
     ) -> Vec<SignedTransaction> {
         let mut result = vec![];
@@ -193,6 +194,7 @@ impl Mempool {
         // but can't be executed before first txn. Once observed, such txn will be saved in
         // `skipped` DS and rechecked once it's ancestor becomes available
         let mut skipped = HashSet::new();
+        let mut total_bytes = 0;
         let seen_size = seen.len();
         let mut txn_walked = 0usize;
         // iterate over the queue of transactions based on gas price
@@ -235,23 +237,26 @@ impl Mempool {
             }
         }
         let result_size = result.len();
-        // convert transaction pointers to real values
-        let mut block_log = TxnsLog::new();
-        let block: Vec<_> = result
-            .into_iter()
-            .filter_map(|(address, tx_seq)| {
-                block_log.add(address, tx_seq);
-                self.transactions.get(&address, tx_seq)
-            })
-            .collect();
+        let mut block = Vec::with_capacity(result_size);
+        for (address, seq) in result {
+            if let Some(txn) = self.transactions.get(&address, seq) {
+                let txn_size = txn.raw_txn_bytes_len();
+                if total_bytes + txn_size > max_bytes as usize {
+                    break;
+                }
+                total_bytes += txn_size;
+                block.push(txn);
+            }
+        }
 
         debug!(
-            LogSchema::new(LogEntry::GetBlock).txns(block_log),
+            LogSchema::new(LogEntry::GetBlock),
             seen_consensus = seen_size,
             walked = txn_walked,
             seen_after = seen.len(),
             result_size = result_size,
-            block_size = block.len()
+            block_size = block.len(),
+            byte_size = total_bytes,
         );
         for transaction in &block {
             self.log_latency(

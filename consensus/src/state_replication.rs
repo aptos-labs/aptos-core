@@ -21,7 +21,8 @@ pub type StateComputerCommitCallBackType =
 pub trait PayloadManager: Send + Sync {
     async fn pull_payload(
         &self,
-        max_size: u64,
+        max_items: u64,
+        max_bytes: u64,
         exclude: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
