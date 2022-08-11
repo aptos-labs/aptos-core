@@ -149,11 +149,6 @@ default-members = [
 ]
 
 [profile.release]
-debug = true
-overflow-checks = true
-
-[profile.performance]
-inherits = "release"
 opt-level = 3
 debug = true
 overflow-checks = false
