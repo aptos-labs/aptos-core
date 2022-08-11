@@ -8,7 +8,19 @@
 ///     where public keys are BLS12-381 elliptic-curve points in $\mathbb{G}_1$ and signatures are in $\mathbb{G}_2$,
 ///     as per the [IETF BLS draft standard](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature#section-2.1)
 module aptos_std::signature {
+    use std::bcs;
     use std::option::Option;
+    use aptos_std::type_info::{Self, TypeInfo};
+
+    struct RotationProof has drop {
+        originator: address, // originating address
+        current_auth_key: address, // current auth key
+    }
+
+    struct Proof<RotationProof> has drop {
+        type_info: TypeInfo,
+        inner: RotationProof,
+    }
 
     /// Given a vector of serialized public keys, combines them into an aggregated public key which can be used to verify
     /// multisignatures using `bls12381_verify_signature`.
@@ -90,6 +102,15 @@ module aptos_std::signature {
         recovery_id: u8,
         signature: vector<u8>
     ): (vector<u8>, bool);
+
+    public fun ed25519_verify_t<T: drop> (signature: vector<u8>, public_key: vector<u8>, data: T): bool {
+        let encoded = Proof {
+            type_info: type_info::type_of<T>(),
+            inner:data,
+        };
+        ed25519_verify(signature, public_key, bcs::to_bytes(&encoded))
+    }
+
 
     #[test_only]
     use std::vector;

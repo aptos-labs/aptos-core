@@ -45,6 +45,7 @@ pub enum ScriptFunctionCall {
     AccountRotateAuthenticationKeyEd25519 {
         new_public_key: Bytes,
         signature: Bytes,
+        scheme: Bytes,
     },
 
     AccountTransfer {
@@ -242,7 +243,8 @@ impl ScriptFunctionCall {
             AccountRotateAuthenticationKeyEd25519 {
                 new_public_key,
                 signature,
-            } => account_rotate_authentication_key_ed25519(new_public_key, signature),
+                scheme,
+            } => account_rotate_authentication_key_ed25519(new_public_key, signature, scheme),
             AccountTransfer { to, amount } => account_transfer(to, amount),
             AptosCoinClaimMintCapability {} => aptos_coin_claim_mint_capability(),
             AptosCoinDelegateMintCapability { to } => aptos_coin_delegate_mint_capability(to),
@@ -392,6 +394,7 @@ pub fn account_rotate_authentication_key(new_auth_key: Vec<u8>) -> TransactionPa
 pub fn account_rotate_authentication_key_ed25519(
     new_public_key: Vec<u8>,
     signature: Vec<u8>,
+    scheme: Vec<u8>,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
@@ -406,6 +409,7 @@ pub fn account_rotate_authentication_key_ed25519(
         vec![
             bcs::to_bytes(&new_public_key).unwrap(),
             bcs::to_bytes(&signature).unwrap(),
+            bcs::to_bytes(&scheme).unwrap(),
         ],
     ))
 }
@@ -1005,6 +1009,7 @@ mod decoder {
             Some(ScriptFunctionCall::AccountRotateAuthenticationKeyEd25519 {
                 new_public_key: bcs::from_bytes(script.args().get(0)?).ok()?,
                 signature: bcs::from_bytes(script.args().get(1)?).ok()?,
+                scheme: bcs::from_bytes(script.args().get(2)?).ok()?,
             })
         } else {
             None

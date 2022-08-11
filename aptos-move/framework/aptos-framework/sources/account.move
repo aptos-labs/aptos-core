@@ -80,6 +80,7 @@ module aptos_framework::account {
     const EMALFORMED_PUBLIC_KEY: u64 = 12;
     const EMALFORMED_PROOF_OF_KNOWLEDGE: u64 = 13;
     const EINVALID_PROOF_OF_KNOWLEDGE: u64 = 14;
+    const EINVALID_SCHEME: u64 = 15;
 
     /// Prologue errors. These are separated out from the other errors in this
     /// module since they are mapped separately to major VM statuses, and are
@@ -215,15 +216,7 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    fun ed25519_verify_t<T: drop> (signature: vector<u8>, public_key: vector<u8>, data: T): bool {
-        let encoded = Proof {
-            type_info: type_info::type_of<T>(),
-            inner: data,
-        };
-        signature::ed25519_verify(signature, public_key, bcs::to_bytes(&encoded))
-    }
-
-    public entry fun rotate_authentication_key_ed25519(account: &signer, new_public_key: vector<u8>, signature: vector<u8>) acquires Account, OriginatingAddress {
+    public entry fun rotate_authentication_key_ed25519(account: &signer, new_public_key: vector<u8>, signature: vector<u8>, scheme: vector<u8>) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT));
         assert!(
@@ -234,6 +227,15 @@ module aptos_framework::account {
             vector::length(&signature) == 64,
             error::invalid_argument(EMALFORMED_PROOF_OF_KNOWLEDGE)
         );
+        assert!(
+            vector::length(&scheme) == 1,
+            error::invalid_argument(EINVALID_SCHEME)
+        );
+        // TODO change this to include 1 once we have support for multied25519
+        assert!(
+            *vector::borrow(&scheme, 0) == 0,
+            error::invalid_argument(EINVALID_SCHEME)
+        );
 
         let account_resource = borrow_global_mut<Account>(addr);
         let current_auth_key = create_address(account_resource.authentication_key);
@@ -243,12 +245,13 @@ module aptos_framework::account {
             current_auth_key: current_auth_key,
         };
 
-        assert!(ed25519_verify_t(signature, new_public_key, proof), EINVALID_PROOF_OF_KNOWLEDGE);
+        assert!(signature::ed25519_verify_t(signature, new_public_key, proof), EINVALID_PROOF_OF_KNOWLEDGE);
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
         if (table::contains(address_map, current_auth_key)) {
             table::remove(address_map, current_auth_key);
         };
 
+        vector::append(&mut new_public_key, scheme);
         let new_auth_key = hash::sha3_256(new_public_key);
         let new_address = create_address(new_auth_key);
         table::add(address_map, new_address, addr);
@@ -541,6 +544,41 @@ module aptos_framework::account {
         set_sequence_number(addr, 10); // Set mock sequence number
         // Assert correct mock value post-modification
         assert!(borrow_global<Account>(addr).sequence_number == 10, 2);
+    }
+
+    #[test(alice = @0xa11ce)]
+    #[expected_failure(abort_code = 65548)]
+    public entry fun test_invalid_public_key(alice: signer) acquires Account, OriginatingAddress {
+        create_account(signer::address_of(&alice));
+        let test_public_key = vector::empty<u8>();
+        let test_signature = vector::empty<u8>();
+        let scheme = vector::empty<u8>();
+        vector::push_back(&mut scheme, 0);
+        rotate_authentication_key_ed25519(&alice, test_public_key, test_signature, scheme);
+    }
+
+    #[test(alice = @0xa11ce)]
+    #[expected_failure(abort_code = 65549)]
+    public entry fun test_invalid_signature(alice: signer) acquires Account, OriginatingAddress {
+        create_account(signer::address_of(&alice));
+        let account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
+        let test_signature = vector::empty<u8>();
+        let scheme = vector::empty<u8>();
+        vector::push_back(&mut scheme, 0);
+        rotate_authentication_key_ed25519(&alice, account_resource.authentication_key, test_signature, scheme);
+    }
+
+    #[test(alice = @0xa11ce)]
+    #[expected_failure(abort_code = 65551)]
+    public entry fun test_invalid_scheme(alice: signer) acquires Account, OriginatingAddress {
+        create_account(signer::address_of(&alice));
+        let account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
+        let auth_key = account_resource.authentication_key;
+        let test_signature = account_resource.authentication_key;
+        vector::append(&mut test_signature, copy auth_key);
+        let scheme = vector::empty<u8>();
+        vector::push_back(&mut scheme, 2);
+        rotate_authentication_key_ed25519(&alice, account_resource.authentication_key, test_signature, scheme);
     }
 
     ///////////////////////////////////////////////////////////////////////////
