@@ -168,7 +168,7 @@ jobs:
         with:
           tool: nextest
       # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
-      - run: cargo nextest run --profile ci --package smoke-test --test-threads 6 --retries 3
+      - run: cargo nextest run --profile ci --package smoke-test --test-threads 12 --retries 3
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
 
