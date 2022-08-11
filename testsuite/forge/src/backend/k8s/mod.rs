@@ -100,7 +100,7 @@ impl Factory for K8sFactory {
     ) -> Result<Box<dyn Swarm>> {
         let genesis_modules_path = match genesis_config {
             Some(config) => match config {
-                GenesisConfig::Bytes(_) => {
+                GenesisConfig::Bundle(_) => {
                     bail!("k8s forge backend does not support raw bytes as genesis modules. please specify a path instead")
                 }
                 GenesisConfig::Path(path) => Some(path.clone()),

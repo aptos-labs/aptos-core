@@ -18,6 +18,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
+use framework::ReleaseBundle;
 use std::convert::TryInto;
 use storage_interface::DbReaderWriter;
 use vm_genesis::Validator;
@@ -31,8 +32,8 @@ pub struct GenesisInfo {
     root_key: Ed25519PublicKey,
     /// Set of configurations for validators on the network
     validators: Vec<Validator>,
-    /// Compiled bytecode of framework modules
-    modules: Vec<Vec<u8>>,
+    /// Released framework packages
+    framework: ReleaseBundle,
     /// The genesis transaction, once it's been generated
     genesis: Option<Transaction>,
 
@@ -64,7 +65,7 @@ impl GenesisInfo {
         chain_id: ChainId,
         root_key: Ed25519PublicKey,
         configs: Vec<ValidatorConfiguration>,
-        modules: Vec<Vec<u8>>,
+        framework: ReleaseBundle,
         genesis_config: &GenesisConfiguration,
     ) -> anyhow::Result<GenesisInfo> {
         let mut validators = Vec::new();
@@ -77,7 +78,7 @@ impl GenesisInfo {
             chain_id,
             root_key,
             validators,
-            modules,
+            framework,
             genesis: None,
             allow_new_validators: genesis_config.allow_new_validators,
             epoch_duration_secs: genesis_config.epoch_duration_secs,
@@ -106,7 +107,7 @@ impl GenesisInfo {
         vm_genesis::encode_genesis_transaction(
             self.root_key.clone(),
             &self.validators,
-            &self.modules,
+            &self.framework,
             self.chain_id,
             vm_genesis::GenesisConfiguration {
                 allow_new_validators: self.allow_new_validators,

@@ -4,6 +4,7 @@
 use crate::{Factory, GenesisConfig, Result, Swarm, Version};
 use anyhow::{bail, Context};
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
+use framework::ReleaseBundle;
 use rand::rngs::StdRng;
 use std::time::Duration;
 use std::{
@@ -123,7 +124,7 @@ impl LocalFactory {
         rng: R,
         number_of_validators: NonZeroUsize,
         version: &Version,
-        genesis_modules: Option<Vec<Vec<u8>>>,
+        genesis_framework: Option<ReleaseBundle>,
         init_config: Option<InitConfigFn>,
         init_genesis_config: Option<InitGenesisConfigFn>,
     ) -> Result<LocalSwarm>
@@ -139,7 +140,7 @@ impl LocalFactory {
             init_config,
             init_genesis_config,
             None,
-            genesis_modules,
+            genesis_framework,
         )?;
 
         swarm
@@ -168,9 +169,9 @@ impl Factory for LocalFactory {
         genesis_config: Option<&GenesisConfig>,
         _cleanup_duration: Duration,
     ) -> Result<Box<dyn Swarm>> {
-        let genesis_modules = match genesis_config {
+        let framework = match genesis_config {
             Some(config) => match config {
-                GenesisConfig::Bytes(bytes) => Some(bytes.clone()),
+                GenesisConfig::Bundle(bundle) => Some(bundle.clone()),
                 GenesisConfig::Path(_) => {
                     bail!("local forge backend does not support flattened dir for genesis")
                 }
@@ -178,7 +179,7 @@ impl Factory for LocalFactory {
             None => None,
         };
         let swarm = self
-            .new_swarm_with_version(rng, num_validators, version, genesis_modules, None, None)
+            .new_swarm_with_version(rng, num_validators, version, framework, None, None)
             .await?;
 
         Ok(Box::new(swarm))

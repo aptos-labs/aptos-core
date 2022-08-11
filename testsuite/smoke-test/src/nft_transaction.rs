@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use cached_framework_packages::aptos_stdlib::aptos_token_stdlib;
 use forge::{AptosContext, AptosTest, Result, Test};
+use framework::aptos_stdlib::aptos_token_stdlib;
 
 pub struct NFTTransaction;
 

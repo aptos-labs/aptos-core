@@ -23,6 +23,7 @@ use aptos_crypto::{
 };
 use aptos_keygen::KeyGen;
 use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
+use framework::ReleaseBundle;
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -379,7 +380,7 @@ pub type InitGenesisConfigFn = Arc<dyn Fn(&mut GenesisConfiguration) + Send + Sy
 #[derive(Clone)]
 pub struct Builder {
     config_dir: PathBuf,
-    move_modules: Vec<Vec<u8>>,
+    framework: ReleaseBundle,
     num_validators: NonZeroUsize,
     randomize_first_validator_ports: bool,
     init_config: Option<InitConfigFn>,
@@ -387,13 +388,13 @@ pub struct Builder {
 }
 
 impl Builder {
-    pub fn new(config_dir: &Path, move_modules: Vec<Vec<u8>>) -> anyhow::Result<Self> {
+    pub fn new(config_dir: &Path, framework: ReleaseBundle) -> anyhow::Result<Self> {
         let config_dir: PathBuf = config_dir.into();
         let config_dir = config_dir.canonicalize()?;
 
         Ok(Self {
             config_dir,
-            move_modules,
+            framework,
             num_validators: NonZeroUsize::new(1).unwrap(),
             randomize_first_validator_ports: true,
             init_config: None,
@@ -571,7 +572,7 @@ impl Builder {
             ChainId::test(),
             root_key,
             configs,
-            self.move_modules.clone(),
+            self.framework.clone(),
             &genesis_config,
         )?;
         let waypoint = genesis_info.generate_waypoint()?;

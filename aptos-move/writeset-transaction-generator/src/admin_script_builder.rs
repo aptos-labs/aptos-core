@@ -23,8 +23,8 @@ pub const SCRIPTS_DIR_PATH: &str = "templates";
 pub fn compile_script(source_file_str: String) -> Vec<u8> {
     let (_files, mut compiled_program) = Compiler::from_files(
         vec![source_file_str],
-        framework::aptos::files(),
-        framework::aptos::named_addresses(),
+        framework::current_release_bundle().files().unwrap(),
+        framework::current_release_bundle().named_addresses(),
     )
     .set_flags(Flags::empty().set_sources_shadow_deps(false))
     .build_and_report()
