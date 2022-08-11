@@ -15,10 +15,12 @@ class Project < ApplicationRecord
     forum_url: 'forum.aptoslabs.com'
   }.freeze
 
-  has_many :categories, through: :project_categories, dependent: :destroy
-  has_many :members, through: :project_members, dependent: :destroy
-  has_many :milestones, class_name: 'ProjectMilestone', dependent: :destroy
-  has_many :screenshots, class_name: 'ProjectScreenshot', dependent: :destroy
+  has_many :project_categories, dependent: :destroy
+  has_many :categories, through: :project_categories
+  has_many :project_members, dependent: :destroy
+  has_many :members, through: :project_members, source: :user
+  has_many :project_screenshots, dependent: :destroy
+  accepts_nested_attributes_for :project_categories, :project_members, :project_screenshots
 
   validates :title, presence: true, length: { maximum: 140 }
   validates :short_description, presence: true, length: { maximum: 140 }
@@ -32,10 +34,10 @@ class Project < ApplicationRecord
   validates :linkedin_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
   validates :youtube_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
   validates :forum_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
-  validates_each VALID_HOSTS.keys do |record, attr, value|
+  validates_each VALID_HOSTS.keys, allow_nil: true, allow_blank: true do |record, attr, value|
     host = VALID_HOSTS[attr]
     record.errors.add(attr, "must point to #{host}") unless URI.parse(value).host == host
   end
-  validates :categories, length: { minimum: 1, maximum: 4 }
-  validates :project_screenshots, length: { maximum: 5 }
+  validates :project_categories, length: { minimum: 1, maximum: 4 }
+  validates :project_screenshots, length: { minimum: 1, maximum: 5 }
 end
