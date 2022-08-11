@@ -10,6 +10,7 @@ N/A
 ## 1.3.6 (2022-08-10)
 - Switch back to representing certain move types (MoveModuleId, MoveStructTag, ScriptFunctionId) as strings, for both requests and responses. This reverts the change made in 1.3.2. See [#2663](https://github.com/aptos-labs/aptos-core/pull/2663) for more.
 - Represent certain fields with slightly different snake casing, e.g. `ed25519_signature` now instead of `ed_25519_signature`.
+- Add generated types for healthcheck endpoint.
 
 ## 1.3.5 (2022-08-08)
 - Re-expose BCS and items from `transaction_builder/builder` from the root of the module.

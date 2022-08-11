@@ -82,7 +82,7 @@ target-out-docker
 \#*\#
 
 # Aptos CLI files
-.aptos/
+.aptos
 
 # VSCode settings
 .vscode/

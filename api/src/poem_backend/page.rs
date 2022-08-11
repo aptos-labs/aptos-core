@@ -1,7 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{AptosErrorCode, BadRequestError};
+use super::BadRequestError;
+use aptos_api_types::AptosErrorCode;
 use serde::Deserialize;
 
 const DEFAULT_PAGE_SIZE: u16 = 25;
