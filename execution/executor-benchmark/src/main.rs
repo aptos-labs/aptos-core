@@ -29,6 +29,9 @@ struct PrunerOpt {
 
     #[structopt(long, default_value = "500")]
     state_store_pruning_batch_size: usize,
+
+    #[structopt(long, default_value = "0")]
+    user_pruning_window_offset: u64,
 }
 
 impl PrunerOpt {
@@ -40,7 +43,7 @@ impl PrunerOpt {
             ledger_prune_window: self.ledger_prune_window,
             ledger_pruning_batch_size: self.ledger_pruning_batch_size,
             state_store_pruning_batch_size: self.state_store_pruning_batch_size,
-            user_pruning_window_offset: 0,
+            user_pruning_window_offset: self.user_pruning_window_offset,
         }
     }
 }
