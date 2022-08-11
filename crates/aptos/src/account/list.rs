@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{
-    CliCommand, CliConfig, CliError, CliTypedResult, ProfileOptions, RestOptions,
+    CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, ProfileOptions, RestOptions,
 };
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
@@ -74,8 +74,11 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
     async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
         let account = if let Some(account) = self.account {
             account
-        } else if let Some(Some(account)) =
-            CliConfig::load_profile(&self.profile_options.profile)?.map(|p| p.account)
+        } else if let Some(Some(account)) = CliConfig::load_profile(
+            &self.profile_options.profile,
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.account)
         {
             account
         } else {

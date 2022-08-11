@@ -1,10 +1,10 @@
 ---
-title: "System Integrators' Guide"
+title: "System Integrators Guide"
 slug: "guide-for-system-integrators"
 ---
 
-:::tip
-This is documentation is currently under construction with more being added on a regular basis.
+:::tip 
+This documentation is currently under construction with more being added on a regular basis.
 :::
 
 # System Integrators Guide
@@ -25,16 +25,34 @@ This guide will overview the following topics for integrating with Aptos:
 
 ## Getting Started
 
-* Obtain the [Aptos CLI](../cli-tools/aptos-cli-tool/install-aptos-cli/) -- recommend by source and targeting the `main` branch as the codebase will be under many changes for the next couple of weeks.
-* Start a [local node with a Faucet](../cli-tools/aptos-cli-tool/use-aptos-cli#running-a-local-testnet): `aptos node run-local-testnet --with-faucet`.
-* Export the appropriate `FAUCET_URL`: `export FAUCET_URL=http://127.0.0.1:8081"`.
-* Export the appropriate `NODE_URL`: `export NODE_URL=http://127.0.0.1:8080"`.
+To get started, you will need:
+
+1. The Aptos CLI tool.
+2. A local testnet with a validator node that has the faucet service turned on, and
+3. The Aptos SDK. You can use either the Typescript SDK or the Python SDK. For Typescript SDK, the version of the SDK is important to ensure that the TS SDK code builds the clients that talk to the local testnet, and not to the Aptos devnet. 
+
+Follow the below steps to set up the above three:
+
+1. Follow the instructions for Aptos CLI in [Install with cargo](/cli-tools/aptos-cli-tool/install-aptos-cli#install-with-cargo) and install the CLI tool. 
+
+   :::caution
+   Make sure that when you execute Step 2, you use `--branch main` to target the `main` branch, and not the `--branch devnet`. The `main` branch should be used for your local development, i.e., on the local node with the faucet, and the `devnet` branch is for development on the Aptos devnet.
+2. Start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet): `aptos node run-local-testnet --with-faucet`. See the [Starting a local testnet with a faucet, using CLI](https://aptos.dev/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet) for more.
+3. Install the SDK. 
+   - **Typescript SDK**: Install the Typescript SDK from the `aptos-core`. Follow the steps described in [Use the SDK from aptos-core](/guides/local-testnet-dev-flow#typescript-use-the-sdk-from-aptos-core).
+   - **Python SDK**: Install the Python SDK as described in this [Python SDK](/sdks/python-sdk).
 
 This will start a local testnet with a faucet and cause SDKs to automatically point toward this node as the default endpoint, if one is not specified.
 
-There are a plethora of ways to build on top of Aptos. This guide takes an opinionated approach to help onboard but this is not the only methodology or definitive route. The specific goals are to drive a level of ownership, understanding, and stability.
+There are a plethora of ways to build on top of the Aptos blockchain. This guide takes an opinionated approach to help onboard the developer. However, the approach described here is not the only methodology or a definitive route. The specific goals for this approach are to drive a level of ownership, understanding, and stability.
+
+:::caution Source of truth for local testnet development
+
+When in doubt, consider the document [Local testnet development flow](/guides/local-testnet-dev-flow) as the source of truth.
+:::
 
 Other areas worth being familiar with:
+
 * [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
 * [Typescript SDK](../transactions-with-ts-sdk)
 * [Python SDK](../sdks/python-sdk)
@@ -137,7 +155,18 @@ BCS encoded transactions can be submitted to the `/transactions` endpoint but 
 
 ### Types of Transactions
 
-Within a given transaction, the target of execution can be one of two types: an entry point (formerly known as script function) and or a script (payload). Currently the SDKs ([Python](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/python/sdk/aptos_sdk/client.py#L248) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98)) only support the generation of transactions that target entry points and the entirety of this guide points out many of those entry points, such as `coin::transfer` and `account::create_account`. All operations on the blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. A script payload transaction can call any entry point or public function defined within any module. Currently there are no tutorials on script payloads, but the [Move book](https://move-language.github.io/move/modules-and-scripts.html?highlight=script#scripts) does go in some depth.
+Within a given transaction, the target of execution can be one of two types: 
+
+- An entry point (formerly known as script function), and/or
+- A script (payload). 
+
+Currently the SDKs: [Python](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/python/sdk/aptos_sdk/client.py#L248) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) only support the generation of transactions that target entry points. This guide points out many of those entry points, such as `coin::transfer` and `account::create_account`. 
+
+All operations on the Aptos blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. A script payload transaction can call any entry point or public function defined within any module. 
+
+:::tip Move book
+Currently there are no tutorials in this guide on script payloads, but the [Move book](https://move-language.github.io/move/modules-and-scripts.html?highlight=script#scripts) does go in some depth.
+:::
 
 ### Status of a transaction
 
@@ -167,25 +196,44 @@ The simulation API works identical to the transaction submission API, except tha
 Here's an example showing how to use the simulation API in the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L413). Note that the gas use may change based upon the state of the account. We recommend that the maximum gas amount be larger than the amount quoted by this API.
 :::
 
-## Viewing Current and Historical State
+## Viewing current and historical state
 
-Most integrations into Aptos benefit from a holistic and comprehensive overview of the current and historical state of the blockchain. Aptos provides historical transactions, state, and events which are the result of transaction execution.
+Most integrations into the Aptos blockchain benefit from a holistic and comprehensive overview of the current and historical state of the blockchain. Aptos provides historical transactions, state, and events, which are the result of transaction execution.
 
 * Historical transactions specify the execution status, output, and tie to related events. Each transaction has a unique version number associated with it that dictates its global sequential ordering in the history of the blockchain ledger.
 * The state is the representation of all transaction outputs up to a specific version. In otherwords, a state version is the accumulation of all transactions inclusive of that transaction version.
-* As transactions execute, they may emit events. [Events](../concepts/basics-events) are hints about changes in on-chain data.
+* As transactions execute, they may emit events. [Events](/concepts/basics-events) are hints about changes in on-chain data.
 
-The storage service on a node employs two forms of pruning that erase data from nodes: 1) state and 2) events, transactions, and everything else. While either of these may be disabled, storing state versions is not particularly sustainable. Events and transactions pruning can be disabled via setting the [`ledger_prune_window`](https://github.com/aptos-labs/aptos-core/blob/b718154c93b3556658c8c06341be0cf47957188c/config/src/config/storage_config.rs#L106) to `None`. In the near future, Aptos will provide indexers that mitigate the need to directly query from a node. The REST API contains the following useful APIs for querying transactions and events:
+The storage service on a node employs two forms of pruning that erase data from nodes: 
+
+1. state, and 
+2. events, transactions, and everything else. 
+
+While either of these may be disabled, storing the state versions is not particularly sustainable. 
+
+Events and transactions pruning can be disabled via setting the [`ledger_prune_window`](https://github.com/aptos-labs/aptos-core/blob/b718154c93b3556658c8c06341be0cf47957188c/config/src/config/storage_config.rs#L106) to `None`. In the near future, Aptos will provide indexers that mitigate the need to directly query from a node. 
+
+The REST API contains the following useful APIs for querying transactions and events:
 
 * [Transactions for an account](https://aptos.dev/rest-api/#tag/transactions/operation/get_account_transactions)
 * [Transactions by version](https://aptos.dev/rest-api/#tag/transactions/operation/get_transaction)
 * [Events by event handle](https://aptos.dev/rest-api/#tag/events/operation/get_events_by_event_handle)
 
-## Exchanging and Tracking Coins
+## Exchanging and tracking coins
 
-Aptos has a standard [Coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that represent the type parameter or generic for `Coin<T>`. Coins are stored within an account under the resource `CoinStore<T>`. At account creation, each user has the resource `CoinStore<0x1::aptos_coin::AptosCoin>` or `CoinStore<AptosCoin>`, for short. Within this resource is the Aptos coin: `Coin<AptosCoin>`.
+Aptos has a standard [Coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/sources/coin.move). Different types of coins can be represented in this type through the use of distinct structs that represent the type parameter or generic for `Coin<T>`. 
 
-Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`account::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/account.move#L398) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist. It is important to note, that if an account has not registered a `CoinStore<T>` for a given `T`, then any transfer of type `T` to that account will fail.
+Coins are stored within an account under the resource `CoinStore<T>`. At account creation, each user has the resource `CoinStore<0x1::aptos_coin::AptosCoin>` or `CoinStore<AptosCoin>`, for short. Within this resource is the Aptos coin: `Coin<AptosCoin>`.
+
+### Transferring coins between users
+
+Coins can be transferred between users via the [`coin::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/coin.move#L307) function for all coins and [`account::transfer`](https://github.com/aptos-labs/aptos-core/blob/36a7c00b29a457469264187d8e44070b2d5391fe/aptos-move/framework/aptos-framework/sources/account.move#L398) for Aptos coins. The advantage of the latter function is that it creates the destination account if it does not exist. 
+
+:::caution
+It is important to note, that if an account has not registered a `CoinStore<T>` for a given `T`, then any transfer of type `T` to that account will fail.
+:::
+
+### Current balance for a coin
 
 The current balance for a `Coin<T>` where T is the Aptos coin is available at the account resources url: `https://{rest_api_server}/accounts/{address}/resource/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>`. The balance is stored within `coin::amount`. The resource also contains the total number of deposit and withdraw events, the `counter` value within `deposit_event` and `withdraw_event`, respectively.
 
@@ -217,6 +265,8 @@ The current balance for a `Coin<T>` where T is the Aptos coin is available at th
   }
 }
 ```
+
+### Querying events
 
 Events can be queried by the events by handle url: `https://{rest_api_server}/accounts/{address}/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`
 
