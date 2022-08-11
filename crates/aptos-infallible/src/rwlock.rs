@@ -1,9 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::RwLock as StdRwLock;
+use parking_lot::RwLock as StdRwLock;
 
-pub use std::sync::{RwLockReadGuard, RwLockWriteGuard};
+pub use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
 
 /// A simple wrapper around the lock() function of a std::sync::RwLock
 /// The only difference is that you don't need to call unwrap() on it.
@@ -18,23 +18,17 @@ impl<T> RwLock<T> {
 
     /// lock the rwlock in read mode
     pub fn read(&self) -> RwLockReadGuard<'_, T> {
-        self.0
-            .read()
-            .expect("Cannot currently handle a poisoned lock")
+        self.0.read()
     }
 
     /// lock the rwlock in write mode
     pub fn write(&self) -> RwLockWriteGuard<'_, T> {
-        self.0
-            .write()
-            .expect("Cannot currently handle a poisoned lock")
+        self.0.write()
     }
 
     /// return the owned type consuming the lock
     pub fn into_inner(self) -> T {
-        self.0
-            .into_inner()
-            .expect("Cannot currently handle a poisoned lock")
+        self.0.into_inner()
     }
 }
 
