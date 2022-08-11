@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version};
+use crate::{
+    AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
+};
 use anyhow::{anyhow, bail};
 use aptos_config::config::NodeConfig;
 use aptos_logger::info;
@@ -87,6 +89,10 @@ pub trait Swarm: Sync {
         time: Option<i64>,
         timeout: Option<i64>,
     ) -> Result<PromqlResult>;
+
+    fn aptos_public_info(&mut self) -> AptosPublicInfo<'_> {
+        self.chain_info().into_aptos_public_info()
+    }
 }
 
 impl<T: ?Sized> SwarmExt for T where T: Swarm {}

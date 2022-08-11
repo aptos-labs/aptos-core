@@ -497,19 +497,16 @@ TypeTag:
           TYPENAME: StructTag
 ValidatorConsensusInfo:
   STRUCT:
+    - address:
+        TYPENAME: AccountAddress
     - public_key:
         TYPENAME: PublicKey
     - voting_power: U64
 ValidatorVerifier:
   STRUCT:
-    - address_to_validator_info:
-        MAP:
-          KEY:
-            TYPENAME: AccountAddress
-          VALUE:
-            TYPENAME: ValidatorConsensusInfo
-    - quorum_voting_power: U64
-    - total_voting_power: U64
+    - validator_infos:
+        SEQ:
+          TYPENAME: ValidatorConsensusInfo
 Vote:
   STRUCT:
     - vote_data:

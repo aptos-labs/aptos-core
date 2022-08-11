@@ -9,6 +9,7 @@ mod constants;
 mod core_metrics;
 mod metrics;
 mod network_metrics;
+mod sender;
 pub mod service;
 mod system_information;
 pub mod utils;

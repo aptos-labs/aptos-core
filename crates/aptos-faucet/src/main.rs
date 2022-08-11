@@ -227,6 +227,8 @@ mod tests {
             epoch: 1.into(),
             ledger_version: 5.into(),
             oldest_ledger_version: 0.into(),
+            block_height: 4.into(),
+            oldest_block_height: 0.into(),
             ledger_timestamp: 5.into(),
         };
         Response::new(li, body).unwrap().into_response()

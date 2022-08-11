@@ -71,12 +71,9 @@ pub struct StorageConfig {
     pub address: SocketAddr,
     pub backup_service_address: SocketAddr,
     pub dir: PathBuf,
-    pub grpc_max_receive_len: Option<i32>,
     pub storage_pruner_config: StoragePrunerConfig,
     #[serde(skip)]
     data_dir: PathBuf,
-    /// Read, Write, Connect timeout for network operations in milliseconds
-    pub timeout_ms: u64,
     /// The threshold that determine whether a snapshot should be committed to state merkle db.
     pub target_snapshot_size: usize,
     /// Rocksdb-specific configurations
@@ -94,10 +91,11 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig
     ledger_prune_window: 0,
     ledger_pruning_batch_size: 10_000,
     state_store_pruning_batch_size: 10_000,
+    user_pruning_window_offset: 0,
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct StoragePrunerConfig {
     /// Boolean to enable/disable the state store pruner. The state pruner is responsible for
     /// pruning state tree nodes.
@@ -118,24 +116,22 @@ pub struct StoragePrunerConfig {
     /// Similar to the variable above but for state store pruner. It means the number of stale
     /// nodes to prune a time.
     pub state_store_pruning_batch_size: usize,
+    /// The offset for user pruning window to adjust
+    pub user_pruning_window_offset: u64,
 }
 
-impl StoragePrunerConfig {
-    pub fn new(
-        enable_state_store_pruner: bool,
-        enable_ledger_pruner: bool,
-        state_store_prune_window: u64,
-        ledger_store_prune_window: u64,
-        ledger_pruning_batch_size: usize,
-        state_store_pruning_batch_size: usize,
-    ) -> Self {
+impl Default for StoragePrunerConfig {
+    fn default() -> Self {
         StoragePrunerConfig {
-            enable_state_store_pruner,
-            enable_ledger_pruner,
-            state_store_prune_window,
-            ledger_prune_window: ledger_store_prune_window,
-            ledger_pruning_batch_size,
-            state_store_pruning_batch_size,
+            enable_state_store_pruner: true,
+            enable_ledger_pruner: true,
+            state_store_prune_window: 1_000_000,
+            ledger_prune_window: 10_000_000,
+            ledger_pruning_batch_size: 500,
+            // A 10k transaction block (touching 60k state values, in the case of the account
+            // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
+            state_store_pruning_batch_size: 1_000,
+            user_pruning_window_offset: 200_000,
         }
     }
 }
@@ -146,26 +142,14 @@ impl Default for StorageConfig {
             address: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6666),
             backup_service_address: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6186),
             dir: PathBuf::from("db"),
-            grpc_max_receive_len: Some(100_000_000),
             // The prune window must at least out live a RPC request because its sub requests are
             // to return a consistent view of the DB at exactly same version. Considering a few
             // thousand TPS we are potentially going to achieve, and a few minutes a consistent view
             // of the DB might require, 10k (TPS)  * 100 (seconds)  =  1 Million might be a
             // conservatively safe minimal prune window. It'll take a few Gigabytes of disk space
             // depending on the size of an average account blob.
-            storage_pruner_config: StoragePrunerConfig {
-                enable_state_store_pruner: true,
-                enable_ledger_pruner: true,
-                state_store_prune_window: 1_000_000,
-                ledger_prune_window: 10_000_000,
-                ledger_pruning_batch_size: 500,
-                // A 10k transaction block (touching 60k state values, in the case of the account
-                // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
-                state_store_pruning_batch_size: 1_000,
-            },
+            storage_pruner_config: StoragePrunerConfig::default(),
             data_dir: PathBuf::from("/opt/aptos/data"),
-            // Default read/write/connection timeout, in milliseconds
-            timeout_ms: 30_000,
             rocksdb_configs: RocksdbConfigs::default(),
             enable_indexer: false,
             target_snapshot_size: TARGET_SNAPSHOT_SIZE,

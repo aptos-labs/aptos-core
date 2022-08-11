@@ -2,16 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::mime_types::JSON;
+use aptos_api_types::AptosError;
 use poem::http::header::{HeaderValue, CONTENT_TYPE};
 use poem::{IntoResponse, Response};
 use poem_openapi::payload::Json;
 
-use super::AptosError;
-
 // The way I'm determining which errors are framework errors is very janky, as
 // is the way I'm building the response. See:
 // - https://github.com/poem-web/poem/issues/343
-// - https://github.com/poem-web/poem/pull/349
 
 /// In the OpenAPI spec for this API, we say that every response we return will
 /// be a JSON representation of AptosError. For our own code, this is exactly
@@ -23,7 +21,7 @@ pub async fn convert_error(error: poem::Error) -> impl poem::IntoResponse {
     // those returned by the framework do. As such, if we cannot downcast the
     // error we know it's one of ours and we just return it directly.
     let error_string = error.to_string();
-    let is_framework_error = error_string != "response";
+    let is_framework_error = error.has_source();
     if is_framework_error {
         // Build the response.
         let mut response = error.into_response();

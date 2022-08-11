@@ -11,17 +11,16 @@ use crate::{
     vote_data::VoteData,
 };
 use aptos_crypto::hash::HashValue;
-use aptos_types::ledger_info::LedgerInfoWithPartialSignatures;
-use aptos_types::multi_signature::PartialSignatures;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::{BlockInfo, Round},
-    ledger_info::LedgerInfo,
+    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
+    multi_signature::PartialSignatures,
     on_chain_config::ValidatorSet,
     validator_signer::ValidatorSigner,
     validator_verifier::{random_validator_verifier, ValidatorVerifier},
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 #[test]
 fn test_genesis() {
@@ -47,7 +46,7 @@ fn test_nil_block() {
     assert_eq!(nil_block.is_nil_block(), true);
     assert!(nil_block.author().is_none());
 
-    let dummy_verifier = Arc::new(ValidatorVerifier::new(BTreeMap::new()));
+    let dummy_verifier = Arc::new(ValidatorVerifier::new(vec![]));
     assert!(nil_block
         .validate_signature(dummy_verifier.as_ref())
         .is_ok());

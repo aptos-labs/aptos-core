@@ -12,7 +12,7 @@ use aptos_infallible::Mutex;
 use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, restore::StateSnapshotRestore, StateValueWriter,
 };
-use aptos_logger::{debug, info};
+use aptos_logger::info;
 use aptos_state_view::StateViewId;
 #[cfg(test)]
 use aptos_types::nibble::nibble_path::NibblePath;
@@ -315,9 +315,11 @@ impl StateStore {
             )?;
         }
 
-        debug!(
-            latest_version = buffered_state.current_state().current_version,
-            root_hash = buffered_state.current_state().current.root_hash(),
+        info!(
+            latest_snapshot_version = buffered_state.current_state().base_version,
+            latest_snapshot_root_hash = buffered_state.current_state().base.root_hash(),
+            latest_in_memory_version = buffered_state.current_state().current_version,
+            latest_in_memory_root_hash = buffered_state.current_state().current.root_hash(),
             "StateStore initialization finished.",
         );
         Ok(buffered_state)

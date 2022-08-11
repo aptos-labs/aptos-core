@@ -300,7 +300,7 @@ async fn test_insert_vote() {
         let vote_res = pending_votes.insert_vote(&vote, &validator_verifier);
 
         // first vote of an author is accepted
-        assert_eq!(vote_res, VoteReceptionResult::VoteAdded(i as u64));
+        assert_eq!(vote_res, VoteReceptionResult::VoteAdded(i as u128));
         // filter out duplicates
         assert_eq!(
             pending_votes.insert_vote(&vote, &validator_verifier),

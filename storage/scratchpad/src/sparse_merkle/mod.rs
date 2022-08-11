@@ -399,17 +399,6 @@ impl<V> SparseMerkleTree<V>
 where
     V: Clone + CryptoHash + Send + Sync,
 {
-    pub fn serial_update(
-        &self,
-        update_batch: Vec<Vec<(HashValue, &V)>>,
-        proof_reader: &impl ProofRead,
-    ) -> Result<(Vec<(HashValue, HashMap<NibblePath, HashValue>)>, Self), UpdateError> {
-        self.clone()
-            .freeze()
-            .serial_update(update_batch, proof_reader)
-            .map(|(hashes, smt)| (hashes, smt.unfreeze()))
-    }
-
     pub fn batch_update(
         &self,
         updates: Vec<(HashValue, &V)>,
@@ -486,27 +475,6 @@ where
 
     pub fn root_hash(&self) -> HashValue {
         self.smt.root_hash()
-    }
-
-    /// Constructs a new Sparse Merkle Tree as if we are updating the existing tree multiple
-    /// times with the `batch_update`. The function will return the root hash after each
-    /// update and a Sparse Merkle Tree of the final state.
-    ///
-    /// The `serial_update` applies `batch_update' method many times. It takes in a reference of
-    /// value instead of an owned instance to be consistent with the `batches_update' interface.
-    pub fn serial_update(
-        &self,
-        update_batch: Vec<Vec<(HashValue, &V)>>,
-        proof_reader: &impl ProofRead,
-    ) -> Result<(Vec<(HashValue, HashMap<NibblePath, HashValue>)>, Self), UpdateError> {
-        let mut cur = self.clone();
-        let mut result = Vec::with_capacity(update_batch.len());
-        for updates in update_batch {
-            let new = cur.batch_update(updates, proof_reader)?;
-            result.push((new.smt.root_hash(), new.new_node_hashes_since(&cur)));
-            cur = new;
-        }
-        Ok((result, cur))
     }
 
     /// Compares an old and a new SMTs and return the newly created node hashes in between.
@@ -594,8 +562,7 @@ where
     }
 
     /// Constructs a new Sparse Merkle Tree by applying `updates`, which are considered to happen
-    /// all at once. See `serial_update` which take in multiple batches of updates and yields
-    /// intermediate results.
+    /// all at once.
     /// Since the tree is immutable, existing tree remains the same and may share parts with the
     /// new, returned tree.
     pub fn batch_update(

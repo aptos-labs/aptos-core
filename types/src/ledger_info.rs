@@ -16,8 +16,8 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::{
+    collections::HashMap,
     fmt::{Display, Formatter},
     ops::{Deref, DerefMut},
 };
@@ -390,9 +390,7 @@ impl Arbitrary for LedgerInfoWithV0 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::validator_signer::ValidatorSigner;
-    use crate::validator_verifier::ValidatorConsensusInfo;
-    use std::collections::BTreeMap;
+    use crate::{validator_signer::ValidatorSigner, validator_verifier::ValidatorConsensusInfo};
 
     #[test]
     fn test_signatures_hash() {
@@ -404,19 +402,20 @@ mod tests {
             .map(|i| ValidatorSigner::random([i; 32]))
             .collect();
         let mut partial_sig = PartialSignatures::new(HashMap::new());
-        let mut author_to_public_key_map = BTreeMap::new();
+        let mut validator_infos = vec![];
 
         for validator in validator_signers.iter() {
-            author_to_public_key_map.insert(
+            validator_infos.push(ValidatorConsensusInfo::new(
                 validator.author(),
-                ValidatorConsensusInfo::new(validator.public_key(), 1),
-            );
+                validator.public_key(),
+                1,
+            ));
             partial_sig.add_signature(validator.author(), validator.sign(&ledger_info));
         }
 
         // Let's assume our verifier needs to satisfy at least 5 quorum voting power
         let validator_verifier =
-            ValidatorVerifier::new_with_quorum_voting_power(author_to_public_key_map, 5)
+            ValidatorVerifier::new_with_quorum_voting_power(validator_infos, 5)
                 .expect("Incorrect quorum size.");
 
         let mut aggregated_signature = validator_verifier

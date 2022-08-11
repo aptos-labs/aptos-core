@@ -22,6 +22,14 @@ export const $IndexResponse = {
             type: 'U64',
             isRequired: true,
         },
+        block_height: {
+            type: 'U64',
+            isRequired: true,
+        },
+        oldest_block_height: {
+            type: 'U64',
+            isRequired: true,
+        },
         ledger_timestamp: {
             type: 'U64',
             isRequired: true,
