@@ -65,6 +65,16 @@ resource "aws_launch_template" "nodes" {
     })
   )
 
+  block_device_mappings {
+    device_name = "/dev/xvda"
+
+    ebs {
+      delete_on_termination = true
+      volume_size           = 100
+      volume_type           = "gp3"
+    }
+  }
+
   tag_specifications {
     resource_type = "instance"
     tags = merge(local.default_tags, {
