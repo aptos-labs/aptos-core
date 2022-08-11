@@ -217,21 +217,18 @@ impl serde::Serialize for Block {
         if self.timestamp.is_some() {
             len += 1;
         }
-        if self.height != 0 {
-            len += 1;
-        }
-        if !self.transactions.is_empty() {
+        if self.block_height != 0 {
             len += 1;
         }
         let mut struct_ser = serializer.serialize_struct("aptos.extractor.v1.Block", len)?;
         if let Some(v) = self.timestamp.as_ref() {
             struct_ser.serialize_field("timestamp", v)?;
         }
-        if self.height != 0 {
-            struct_ser.serialize_field("height", ToString::to_string(&self.height).as_str())?;
-        }
-        if !self.transactions.is_empty() {
-            struct_ser.serialize_field("transactions", &self.transactions)?;
+        if self.block_height != 0 {
+            struct_ser.serialize_field(
+                "blockHeight",
+                ToString::to_string(&self.block_height).as_str(),
+            )?;
         }
         struct_ser.end()
     }
@@ -242,13 +239,12 @@ impl<'de> serde::Deserialize<'de> for Block {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["timestamp", "height", "transactions"];
+        const FIELDS: &[&str] = &["timestamp", "blockHeight"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Timestamp,
-            Height,
-            Transactions,
+            BlockHeight,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -274,8 +270,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                     {
                         match value {
                             "timestamp" => Ok(GeneratedField::Timestamp),
-                            "height" => Ok(GeneratedField::Height),
-                            "transactions" => Ok(GeneratedField::Transactions),
+                            "blockHeight" => Ok(GeneratedField::BlockHeight),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -296,8 +291,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                 V: serde::de::MapAccess<'de>,
             {
                 let mut timestamp__ = None;
-                let mut height__ = None;
-                let mut transactions__ = None;
+                let mut block_height__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Timestamp => {
@@ -306,27 +300,20 @@ impl<'de> serde::Deserialize<'de> for Block {
                             }
                             timestamp__ = Some(map.next_value()?);
                         }
-                        GeneratedField::Height => {
-                            if height__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("height"));
+                        GeneratedField::BlockHeight => {
+                            if block_height__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("blockHeight"));
                             }
-                            height__ = Some(
+                            block_height__ = Some(
                                 map.next_value::<::pbjson::private::NumberDeserialize<_>>()?
                                     .0,
                             );
-                        }
-                        GeneratedField::Transactions => {
-                            if transactions__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("transactions"));
-                            }
-                            transactions__ = Some(map.next_value()?);
                         }
                     }
                 }
                 Ok(Block {
                     timestamp: timestamp__,
-                    height: height__.unwrap_or_default(),
-                    transactions: transactions__.unwrap_or_default(),
+                    block_height: block_height__.unwrap_or_default(),
                 })
             }
         }
