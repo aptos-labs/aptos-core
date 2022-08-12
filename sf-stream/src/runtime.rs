@@ -101,7 +101,10 @@ impl SfStreamer {
     }
 
     pub async fn start(&mut self) {
-        println!("FIRE INIT aptos-node {} aptos 0 0", env!("CARGO_PKG_VERSION"));
+        println!(
+            "FIRE INIT aptos-node {} aptos 0 0",
+            env!("CARGO_PKG_VERSION")
+        );
         loop {
             self.convert_next_block().await;
         }
