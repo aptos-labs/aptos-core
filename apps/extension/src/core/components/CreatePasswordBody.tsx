@@ -10,6 +10,7 @@ import {
   Input,
   InputGroup,
   InputRightElement,
+  Link,
   Tag,
   Text,
   useColorMode,
@@ -137,7 +138,11 @@ export default function CreatePasswordBody() {
           color={secondaryTextColor[colorMode]}
           {...register('termsOfService')}
         >
-          I agree to the Terms of Service
+          I agree to the
+          {' '}
+          <Link color="teal.500" href="https://petra.app/terms">
+            Terms of Service
+          </Link>
         </Checkbox>
       </Center>
     </VStack>
