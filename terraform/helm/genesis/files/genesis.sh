@@ -59,7 +59,8 @@ aptos genesis generate-keys --output-dir $user_dir
 aptos genesis set-validator-configuration --keys-dir $user_dir --local-repository-dir $WORKSPACE \
     --username $username \
     --validator-host $validator_host \
-    --full-node-host $fullnode_host
+    --full-node-host $fullnode_host \
+    --stake-amount 100000000000000
 done
 
 # get the framework
