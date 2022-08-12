@@ -16,7 +16,7 @@ use clap::Parser;
 use reqwest::Url;
 use std::collections::HashMap;
 
-pub const DEFAULT_REST_URL: &str = "https://fullnode.devnet.aptoslabs.com";
+pub const DEFAULT_REST_URL: &str = "https://fullnode.devnet.aptoslabs.com/v1";
 pub const DEFAULT_FAUCET_URL: &str = "https://faucet.devnet.aptoslabs.com";
 const NUM_DEFAULT_COINS: u64 = 10000;
 
