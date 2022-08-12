@@ -37,11 +37,7 @@ use tokio::time::Instant;
 ///
 #[derive(Parser)]
 pub enum NodeTool {
-    AddStake(AddStake),
-    UnlockStake(UnlockStake),
-    WithdrawStake(WithdrawStake),
-    IncreaseLockup(IncreaseLockup),
-    RegisterValidatorCandidate(RegisterValidatorCandidate),
+    InitializeValidator(InitializeValidator),
     JoinValidatorSet(JoinValidatorSet),
     LeaveValidatorSet(LeaveValidatorSet),
     ShowValidatorConfig(ShowValidatorConfig),
@@ -55,11 +51,7 @@ impl NodeTool {
     pub async fn execute(self) -> CliResult {
         use NodeTool::*;
         match self {
-            AddStake(tool) => tool.execute_serialized().await,
-            UnlockStake(tool) => tool.execute_serialized().await,
-            WithdrawStake(tool) => tool.execute_serialized().await,
-            IncreaseLockup(tool) => tool.execute_serialized().await,
-            RegisterValidatorCandidate(tool) => tool.execute_serialized().await,
+            InitializeValidator(tool) => tool.execute_serialized().await,
             JoinValidatorSet(tool) => tool.execute_serialized().await,
             LeaveValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorSet(tool) => tool.execute_serialized().await,
@@ -71,126 +63,35 @@ impl NodeTool {
     }
 }
 
-/// Stake coins for an account to the stake pool
 #[derive(Parser)]
-pub struct AddStake {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-    /// Amount of coins to add to stake
-    #[clap(long)]
-    pub amount: u64,
-}
-
-#[async_trait]
-impl CliCommand<Transaction> for AddStake {
-    fn command_name(&self) -> &'static str {
-        "AddStake"
-    }
-
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
-        self.txn_options
-            .submit_transaction(aptos_stdlib::stake_add_stake(self.amount))
-            .await
-    }
-}
-
-/// Unlock staked coins
-///
-/// Coins can only be unlocked if they no longer have an applied lockup period
-#[derive(Parser)]
-pub struct UnlockStake {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-    /// Amount of coins to unlock
-    #[clap(long)]
-    pub amount: u64,
-}
-
-#[async_trait]
-impl CliCommand<Transaction> for UnlockStake {
-    fn command_name(&self) -> &'static str {
-        "UnlockStake"
-    }
-
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
-        self.txn_options
-            .submit_transaction(aptos_stdlib::stake_unlock(self.amount))
-            .await
-    }
-}
-
-/// Withdraw all unlocked staked coins
-///
-/// Before calling `WithdrawStake`, `UnlockStake` must be called first.
-#[derive(Parser)]
-pub struct WithdrawStake {
-    #[clap(flatten)]
-    pub(crate) node_op_options: TransactionOptions,
-    /// Amount of coins to withdraw
-    #[clap(long)]
-    pub amount: u64,
-}
-
-#[async_trait]
-impl CliCommand<Transaction> for WithdrawStake {
-    fn command_name(&self) -> &'static str {
-        "WithdrawStake"
-    }
-
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
-        self.node_op_options
-            .submit_transaction(aptos_stdlib::stake_withdraw(self.amount))
-            .await
-    }
-}
-
-/// Increase lockup of all staked coins in an account
-#[derive(Parser)]
-pub struct IncreaseLockup {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-}
-
-#[async_trait]
-impl CliCommand<Transaction> for IncreaseLockup {
-    fn command_name(&self) -> &'static str {
-        "IncreaseLockup"
-    }
-
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
-        self.txn_options
-            .submit_transaction(aptos_stdlib::stake_increase_lockup())
-            .await
-    }
-}
-
-#[derive(Parser)]
-pub struct ValidatorConfigArgs {
+pub struct ValidatorConfigFileArgs {
     /// Validator Configuration file, created from the `genesis set-validator-configuration` command
     #[clap(long)]
     pub(crate) validator_config_file: Option<PathBuf>,
+}
+
+impl ValidatorConfigFileArgs {
+    fn read_validator_config(&self) -> CliTypedResult<Option<ValidatorConfiguration>> {
+        if let Some(ref file) = self.validator_config_file {
+            Ok(from_yaml(
+                &String::from_utf8(read_from_file(file)?).map_err(CliError::from)?,
+            )?)
+        } else {
+            Ok(None)
+        }
+    }
+}
+#[derive(Parser)]
+pub struct ValidatorConsnensusKeyArgs {
     /// Hex encoded Consensus public key
     #[clap(long, parse(try_from_str = bls12381::PublicKey::from_encoded_string))]
     pub(crate) consensus_public_key: Option<bls12381::PublicKey>,
     /// Hex encoded Consensus proof of possession
     #[clap(long, parse(try_from_str = bls12381::ProofOfPossession::from_encoded_string))]
     pub(crate) proof_of_possession: Option<bls12381::ProofOfPossession>,
-
-    /// Host and port pair for the validator e.g. 127.0.0.1:6180
-    #[clap(long)]
-    pub(crate) validator_host: Option<HostAndPort>,
-    /// Validator x25519 public network key
-    #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
-    pub(crate) validator_network_public_key: Option<x25519::PublicKey>,
-    /// Host and port pair for the fullnode e.g. 127.0.0.1:6180.  Optional
-    #[clap(long)]
-    pub(crate) full_node_host: Option<HostAndPort>,
-    /// Full node x25519 public network key
-    #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
-    pub(crate) full_node_network_public_key: Option<x25519::PublicKey>,
 }
 
-impl ValidatorConfigArgs {
+impl ValidatorConsnensusKeyArgs {
     fn get_consensus_public_key(
         &self,
         validator_config: &Option<ValidatorConfiguration>,
@@ -223,7 +124,25 @@ impl ValidatorConfigArgs {
         };
         Ok(proof_of_possession)
     }
+}
 
+#[derive(Parser)]
+pub struct ValidatorNetworkAddressesArgs {
+    /// Host and port pair for the validator e.g. 127.0.0.1:6180
+    #[clap(long)]
+    pub(crate) validator_host: Option<HostAndPort>,
+    /// Validator x25519 public network key
+    #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
+    pub(crate) validator_network_public_key: Option<x25519::PublicKey>,
+    /// Host and port pair for the fullnode e.g. 127.0.0.1:6180.  Optional
+    #[clap(long)]
+    pub(crate) full_node_host: Option<HostAndPort>,
+    /// Full node x25519 public network key
+    #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
+    pub(crate) full_node_network_public_key: Option<x25519::PublicKey>,
+}
+
+impl ValidatorNetworkAddressesArgs {
     fn get_network_configs(
         &self,
         validator_config: &Option<ValidatorConfiguration>,
@@ -279,41 +198,39 @@ impl ValidatorConfigArgs {
             full_node_host,
         ))
     }
-
-    fn read_validator_config(&self) -> CliTypedResult<Option<ValidatorConfiguration>> {
-        if let Some(ref file) = self.validator_config_file {
-            Ok(from_yaml(
-                &String::from_utf8(read_from_file(file)?).map_err(CliError::from)?,
-            )?)
-        } else {
-            Ok(None)
-        }
-    }
 }
 
+/// Register the current account as a validator node operator
+/// of it's own owned stake.
+///
+/// Use InitializeStakeOwner whenever stake owner
+/// and validator operator are different accounts.
 #[derive(Parser)]
-/// Register the current account as a Validator candidate
-pub struct RegisterValidatorCandidate {
+pub struct InitializeValidator {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
 
     #[clap(flatten)]
-    pub(crate) validator_config_args: ValidatorConfigArgs,
+    pub(crate) validator_config_file_args: ValidatorConfigFileArgs,
+    #[clap(flatten)]
+    pub(crate) validator_consensus_key_args: ValidatorConsnensusKeyArgs,
+    #[clap(flatten)]
+    pub(crate) validator_network_addresses_args: ValidatorNetworkAddressesArgs,
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for RegisterValidatorCandidate {
+impl CliCommand<Transaction> for InitializeValidator {
     fn command_name(&self) -> &'static str {
-        "RegisterValidatorCandidate"
+        "InitializeValidator"
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
-        let validator_config = self.validator_config_args.read_validator_config()?;
+        let validator_config = self.validator_config_file_args.read_validator_config()?;
         let consensus_public_key = self
-            .validator_config_args
+            .validator_consensus_key_args
             .get_consensus_public_key(&validator_config)?;
         let consensus_proof_of_possession = self
-            .validator_config_args
+            .validator_consensus_key_args
             .get_consensus_proof_of_possession(&validator_config)?;
         let (
             validator_network_public_key,
@@ -321,7 +238,7 @@ impl CliCommand<Transaction> for RegisterValidatorCandidate {
             validator_host,
             full_node_host,
         ) = self
-            .validator_config_args
+            .validator_network_addresses_args
             .get_network_configs(&validator_config)?;
         let validator_network_addresses =
             vec![validator_host.as_network_address(validator_network_public_key)?];
@@ -358,11 +275,25 @@ pub struct OperatorArgs {
 }
 
 impl OperatorArgs {
-    fn address(&self, profile_options: &ProfileOptions) -> CliTypedResult<AccountAddress> {
+    fn address_fallback_to_profle(
+        &self,
+        profile_options: &ProfileOptions,
+    ) -> CliTypedResult<AccountAddress> {
         if let Some(address) = self.pool_address {
             Ok(address)
         } else {
             profile_options.account_address()
+        }
+    }
+
+    fn address_fallback_to_txn(
+        &self,
+        transaction_options: &TransactionOptions,
+    ) -> CliTypedResult<AccountAddress> {
+        if let Some(address) = self.pool_address {
+            Ok(address)
+        } else {
+            transaction_options.sender_address()
         }
     }
 }
@@ -385,7 +316,7 @@ impl CliCommand<Transaction> for JoinValidatorSet {
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         let address = self
             .operator_args
-            .address(&self.txn_options.profile_options)?;
+            .address_fallback_to_txn(&self.txn_options)?;
 
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_join_validator_set(address))
@@ -411,7 +342,7 @@ impl CliCommand<Transaction> for LeaveValidatorSet {
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         let address = self
             .operator_args
-            .address(&self.txn_options.profile_options)?;
+            .address_fallback_to_txn(&self.txn_options)?;
 
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_leave_validator_set(address))
@@ -438,7 +369,9 @@ impl CliCommand<serde_json::Value> for ShowValidatorStake {
 
     async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
         let client = self.rest_options.client(&self.profile_options.profile)?;
-        let address = self.operator_args.address(&self.profile_options)?;
+        let address = self
+            .operator_args
+            .address_fallback_to_profle(&self.profile_options)?;
         let response = client
             .get_resource(address, "0x1::stake::StakePool")
             .await?;
@@ -465,7 +398,9 @@ impl CliCommand<serde_json::Value> for ShowValidatorConfig {
 
     async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
         let client = self.rest_options.client(&self.profile_options.profile)?;
-        let address = self.operator_args.address(&self.profile_options)?;
+        let address = self
+            .operator_args
+            .address_fallback_to_profle(&self.profile_options)?;
         let response = client
             .get_resource(address, "0x1::stake::ValidatorConfig")
             .await?;
@@ -650,6 +585,47 @@ impl CliCommand<()> for RunLocalTestnet {
     }
 }
 
+#[derive(Parser)]
+pub struct UpdateConsensusKey {
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+
+    #[clap(flatten)]
+    pub(crate) operator_args: OperatorArgs,
+
+    #[clap(flatten)]
+    pub(crate) validator_config_file_args: ValidatorConfigFileArgs,
+    #[clap(flatten)]
+    pub(crate) validator_consensus_key_args: ValidatorConsnensusKeyArgs,
+}
+
+#[async_trait]
+impl CliCommand<Transaction> for UpdateConsensusKey {
+    fn command_name(&self) -> &'static str {
+        "UpdateConsensusKey"
+    }
+    async fn execute(mut self) -> CliTypedResult<Transaction> {
+        let address = self
+            .operator_args
+            .address_fallback_to_txn(&self.txn_options)?;
+
+        let validator_config = self.validator_config_file_args.read_validator_config()?;
+        let consensus_public_key = self
+            .validator_consensus_key_args
+            .get_consensus_public_key(&validator_config)?;
+        let consensus_proof_of_possession = self
+            .validator_consensus_key_args
+            .get_consensus_proof_of_possession(&validator_config)?;
+        self.txn_options
+            .submit_transaction(aptos_stdlib::stake_rotate_consensus_key(
+                address,
+                consensus_public_key.to_bytes().to_vec(),
+                consensus_proof_of_possession.to_bytes().to_vec(),
+            ))
+            .await
+    }
+}
+
 /// Update the current validator's network and fullnode addresses
 #[derive(Parser)]
 pub struct UpdateValidatorNetworkAddresses {
@@ -660,7 +636,9 @@ pub struct UpdateValidatorNetworkAddresses {
     pub(crate) operator_args: OperatorArgs,
 
     #[clap(flatten)]
-    pub(crate) validator_config_args: ValidatorConfigArgs,
+    pub(crate) validator_config_file_args: ValidatorConfigFileArgs,
+    #[clap(flatten)]
+    pub(crate) validator_network_addresses_args: ValidatorNetworkAddressesArgs,
 }
 
 #[async_trait]
@@ -672,16 +650,16 @@ impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         let address = self
             .operator_args
-            .address(&self.txn_options.profile_options)?;
+            .address_fallback_to_txn(&self.txn_options)?;
 
-        let validator_config = self.validator_config_args.read_validator_config()?;
+        let validator_config = self.validator_config_file_args.read_validator_config()?;
         let (
             validator_network_public_key,
             full_node_network_public_key,
             validator_host,
             full_node_host,
         ) = self
-            .validator_config_args
+            .validator_network_addresses_args
             .get_network_configs(&validator_config)?;
         let validator_network_addresses =
             vec![validator_host.as_network_address(validator_network_public_key)?];

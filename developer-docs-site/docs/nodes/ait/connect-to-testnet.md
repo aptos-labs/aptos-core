@@ -91,10 +91,10 @@ All the selected validator node will be receiving sufficient amount of test coin
       }
     ```
 
-3. Register validator candidate on chain
+3. Initialize validator on chain
 
     ```
-    aptos node register-validator-candidate \
+    aptos node initialize-validator \
     --profile ait2 \
     --validator-config-file aptosbot.yaml
     ```
@@ -104,7 +104,7 @@ All the selected validator node will be receiving sufficient amount of test coin
 4. Add stake to your validator node
 
     ```
-    aptos node add-stake --amount 100000000 --profile ait2
+    aptos stake add-stake --amount 100000000 --profile ait2
     ```
 
     Please don't add too much stake to make sure you still have sufficient token to pay gas fee.
@@ -112,7 +112,7 @@ All the selected validator node will be receiving sufficient amount of test coin
 5. Set lockup time for your stake. Longer lockup time will result in more staking reward. Minimal lockup time is 24 hours, and maximal is 5 days.
 
     ```
-    aptos node increase-lockup \
+    aptos stake increase-lockup \
     --profile ait2 \
     --lockup-duration 72h
     ```
@@ -187,13 +187,13 @@ A node can choose to leave validator set at anytime, or it would happen automati
 2. Unlock the stake amount as you want. (will take effect in next epoch)
 
     ```
-    aptos node unlock-stake --amount 100000000 --profile ait2
+    aptos stake unlock-stake --amount 100000000 --profile ait2
     ```
 
 3. Withdraw stake back to your account. (This will withdraw all the unlocked stake from your validator staking pool)
 
     ```
-    aptos node withdraw-stake --profile ait2
+    aptos stake withdraw-stake --profile ait2
     ```
 
 4. Once you're done withdrawing your fund, now you can safely shutdown the node, following the doc [here](https://aptos.dev/nodes/ait/additional-doc#shutdown-nodes-for-incentivized-testnet)

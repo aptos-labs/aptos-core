@@ -340,7 +340,6 @@ impl ProfileOptions {
                 return Ok(account);
             }
         }
-
         Err(CliError::ConfigNotFoundError(self.profile.clone()))
     }
 }
@@ -1026,6 +1025,12 @@ impl TransactionOptions {
         self.rest_options.client(&self.profile_options.profile)
     }
 
+    pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
+        let sender_key = self.private_key()?;
+        let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
+        Ok(AccountAddress::new(*sender_address))
+    }
+
     /// Submits a script function based on module name and function inputs
     pub async fn submit_script_function(
         &self,
@@ -1053,8 +1058,7 @@ impl TransactionOptions {
         let client = self.rest_client()?;
 
         // Get sender address
-        let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
-        let sender_address = AccountAddress::new(*sender_address);
+        let sender_address = self.sender_address()?;
 
         // Get sequence number for account
         let sequence_number = get_sequence_number(&client, sender_address).await?;
