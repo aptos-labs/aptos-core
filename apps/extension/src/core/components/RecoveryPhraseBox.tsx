@@ -20,7 +20,7 @@ export default function RecoveryPhraseBox() {
   return (
     <VStack align="flex-start">
       <Box width="100%" borderRadius=".5rem" borderWidth="1px" borderColor={secondaryBorderColor[colorMode]} p={4} rounded="md" bg="white">
-        <Text>
+        <Text fontSize="md">
           { activeAccount?.mnemonic }
         </Text>
       </Box>
