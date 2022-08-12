@@ -10,7 +10,7 @@ import {
   useColorMode,
   VStack,
 } from '@chakra-ui/react';
-import { UserTransaction } from 'aptos/src/api/data-contracts';
+import { UserTransaction } from 'aptos/dist/generated';
 import { secondaryBorderColor } from 'core/colors';
 import ActivityItem from 'core/components/ActivityItem';
 

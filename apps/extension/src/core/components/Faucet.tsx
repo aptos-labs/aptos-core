@@ -15,7 +15,7 @@ import useFundAccount from 'core/mutations/faucet';
 import { NodeUrl } from 'core/utils/network';
 import { toast } from './Toast';
 
-const defaultFundAmount = 5000;
+const defaultFundAmount = 50000;
 
 export default function Faucet() {
   const {

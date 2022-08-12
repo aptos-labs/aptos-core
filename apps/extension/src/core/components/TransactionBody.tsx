@@ -14,7 +14,7 @@ import {
 } from '@chakra-ui/react';
 import { FaRegCheckCircle } from '@react-icons/all-files/fa/FaRegCheckCircle';
 import { FaRegTimesCircle } from '@react-icons/all-files/fa/FaRegTimesCircle';
-import { ScriptFunctionPayload } from 'aptos/dist/api/data-contracts';
+import { ScriptFunctionPayload } from 'aptos/dist/generated';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { collapseHexString } from 'core/utils/hex';
 import { HexString, MaybeHexString } from 'aptos';
@@ -38,7 +38,7 @@ function DetailItem({ children, label }: DetailItemProps) {
   );
 }
 
-function useTransactionDetails(version: string) {
+function useTransactionDetails(version?: bigint) {
   const { data: txn } = useTransaction(version);
   if (!txn) {
     return null;
@@ -71,7 +71,7 @@ function TransactionBody() {
   const { activeAccountAddress } = useGlobalStateContext();
   const { version } = useParams();
 
-  const txn = useTransactionDetails(version!);
+  const txn = useTransactionDetails(version ? BigInt(version) : undefined);
   const userAddress = activeAccountAddress
     && HexString.ensure(activeAccountAddress).toShortString();
 

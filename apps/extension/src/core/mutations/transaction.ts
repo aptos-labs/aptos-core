@@ -4,7 +4,6 @@
 import {
   AptosClient,
   MaybeHexString,
-  RequestError,
 } from 'aptos';
 import { toast } from 'core/components/Toast';
 import { useSequenceNumber } from 'core/queries/account';
@@ -12,7 +11,12 @@ import queryKeys from 'core/queries/queryKeys';
 import Analytics from 'core/utils/analytics/analytics';
 import { coinEvents } from 'core/utils/analytics/events';
 import { useMutation, useQuery, useQueryClient } from 'react-query';
-import { AptosError, ScriptFunctionPayload, UserTransaction } from 'aptos/dist/api/data-contracts';
+import {
+  ApiError,
+  AptosError,
+  ScriptFunctionPayload,
+  UserTransaction,
+} from 'aptos/dist/generated';
 import { useChainId } from 'core/queries/network';
 import { MoveExecutionStatus, parseMoveVmStatus } from 'core/utils/move';
 import {
@@ -87,7 +91,8 @@ export function useCoinTransferSimulation({
       });
 
       const simulatedTxn = AptosClient.generateBCSSimulation(aptosAccount!, rawTxn);
-      const userTxn = (await aptosClient!.submitBCSSimulation(simulatedTxn)) as UserTransaction;
+      const userTxns = (await aptosClient!.submitBCSSimulation(simulatedTxn)) as UserTransaction[];
+      const userTxn = userTxns[0];
       if (!userTxn.success) {
         // Miscellaneous error is probably associated with invalid sequence number
         if (parseMoveVmStatus(userTxn.vm_status) === MoveExecutionStatus.MiscellaneousError) {
@@ -111,7 +116,7 @@ export function useCoinTransferSimulation({
  * Mutation for submitting a coin transfer transaction
  */
 export function useCoinTransferTransaction() {
-  const { aptosAccount, aptosClient } = useGlobalStateContext();
+  const { activeNetwork, aptosAccount, aptosClient } = useGlobalStateContext();
   const {
     increment: incrementSeqNumber,
     refetch: refetchSeqNumber,
@@ -131,12 +136,11 @@ export function useCoinTransferTransaction() {
 
     try {
       const { hash } = await aptosClient!.submitSignedBCSTransaction(signedTxn);
-      await aptosClient!.waitForTransaction(hash);
-      return (await aptosClient!.getTransaction(hash)) as UserTransaction;
-    } catch (err) {
-      if (err instanceof RequestError) {
-        const errorMsg = (err.response?.data as AptosError)?.message;
-        if (errorMsg && errorMsg.indexOf('SEQUENCE_NUMBER_TOO_OLD') >= 0) {
+      return (await aptosClient!.waitForTransactionWithResult(hash) as UserTransaction);
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        const errorMsg = (err.body as AptosError).message;
+        if (errorMsg.indexOf('SEQUENCE_NUMBER_TOO_OLD') >= 0) {
           await refetchSeqNumber();
         }
       }
@@ -161,7 +165,7 @@ export function useCoinTransferTransaction() {
         amount,
         coinType,
         fromAddress: txn.sender,
-        network: aptosClient!.nodeUrl as NodeUrl,
+        network: activeNetwork?.nodeUrl as NodeUrl,
         ...txn,
       };
 

@@ -3,7 +3,7 @@
 
 import { AptosClient } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
-import { ScriptFunctionPayload, UserTransaction } from 'aptos/dist/api/data-contracts';
+import { ScriptFunctionPayload, UserTransaction } from 'aptos/dist/generated';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
 import { coinNamespace } from 'core/constants';
 
@@ -21,9 +21,9 @@ export const transactionQueryKeys = Object.freeze({
 export async function getUserTransactions(aptosClient: AptosClient, address: string) {
   const transactions = await aptosClient!.getAccountTransactions(address!, { limit: 200 });
   return transactions
-    .filter((txn) => txn.success)
     .filter((t) => t.type === 'user_transaction')
-    .map((t) => t as UserTransaction);
+    .map((t) => t as UserTransaction)
+    .filter((t) => t.success);
 }
 
 export async function getScriptFunctionTransactions(
@@ -78,17 +78,17 @@ export function useCoinTransferTransactions(
 // endregion
 
 export const useTransaction = (
-  txnHashOrVersion: string | undefined,
+  version: bigint | undefined,
   options?: UseQueryOptions<UserTransaction>,
 ) => {
   const { aptosClient } = useGlobalStateContext();
 
   return useQuery<UserTransaction>(
-    [transactionQueryKeys.getTransaction, txnHashOrVersion],
-    async () => aptosClient!.getTransaction(txnHashOrVersion!) as Promise<UserTransaction>,
+    [transactionQueryKeys.getTransaction, version],
+    async () => aptosClient!.getTransactionByVersion(version!) as Promise<UserTransaction>,
     {
       ...options,
-      enabled: Boolean(aptosClient && txnHashOrVersion) && options?.enabled,
+      enabled: Boolean(aptosClient && version) && options?.enabled,
     },
   );
 };

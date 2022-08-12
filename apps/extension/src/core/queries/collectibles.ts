@@ -3,7 +3,6 @@
 
 import {
   AptosClient,
-  HexString,
   TokenClient,
 } from 'aptos';
 import axios from 'axios';
@@ -12,7 +11,7 @@ import { validStorageUris } from 'core/constants';
 import { MetadataJson } from 'core/types/tokenMetadata';
 import { useCallback } from 'react';
 import { getTokenIdDictFromString, TokenId } from 'core/utils/token';
-import { ScriptFunctionPayload } from 'aptos/dist/api/data-contracts';
+import { ScriptFunctionPayload } from 'aptos/dist/generated';
 import {
   getScriptFunctionTransactions,
 } from 'core/queries/transaction';
@@ -45,7 +44,7 @@ export function useGalleryItems(
     const createTokenTxns = await getScriptFunctionTransactions(
       aptosClient!,
       activeAccountAddress!,
-      '0x1::token::create_unlimited_token_script',
+      '0x3::token::create_token_script',
     );
 
     const collectionDict: CollectionDict = {};
@@ -55,9 +54,9 @@ export function useGalleryItems(
 
       // TODO: do we need to go through HexString to deserialize the parameters?
       const creator = txn.sender;
-      const collectionName = new HexString(payload.arguments[0]).toBuffer().toString();
-      const name = new HexString(payload.arguments[1]).toBuffer().toString();
-      const uri = new HexString(payload.arguments[5]).toBuffer().toString();
+      const collectionName = payload.arguments[0];
+      const name = payload.arguments[1];
+      const uri = payload.arguments[5];
 
       const isSupportedStorage = validStorageUris.some((storageUri) => uri.includes(storageUri));
       const metadata = isSupportedStorage ? (await axios.get<MetadataJson>(uri)).data : undefined;

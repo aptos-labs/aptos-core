@@ -13,7 +13,7 @@ import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
 import { useParams } from 'react-router-dom';
 import { useCoinTransferTransactions } from 'core/queries/transaction';
-import { ScriptFunctionPayload, UserTransaction } from 'aptos/dist/api/data-contracts';
+import { UserTransaction, ScriptFunctionPayload } from 'aptos/dist/generated';
 import { MaybeHexString } from 'aptos';
 import GraceHopperBoringAvatar from 'core/components/BoringAvatar';
 import Copyable from 'core/components/Copyable';

@@ -5,7 +5,6 @@ import {
   AptosAccount,
   AptosClient,
   TokenClient,
-  RequestError,
 } from 'aptos';
 import { getIsValidMetadataStructure } from 'core/queries/collectibles';
 import queryKeys from 'core/queries/queryKeys';
@@ -15,6 +14,7 @@ import { NodeUrl } from 'core/utils/network';
 import { useCallback } from 'react';
 import { useMutation, useQueryClient } from 'react-query';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { UserTransaction } from 'aptos/dist/generated';
 
 export const defaultRequestErrorAttributes = {
   config: {},
@@ -31,6 +31,13 @@ const ERROR_CODES = Object.freeze({
 export interface RaiseForErrorProps {
   error?: string;
   vmStatus?: string
+}
+
+// TODO: map to ApiError, seems to complicated to be worth it now
+class RequestError extends Error {
+  constructor(msg: string, public response: any) {
+    super(msg);
+  }
 }
 
 const raiseForError = ({
@@ -92,11 +99,12 @@ export const createTokenAndCollection = async (
     collectionName,
     description,
     uri,
+    1,
   );
 
   // Move abort errors do not throw so we need to check them manually
-  const collectionTxn: any = await aptosClient.getTransaction(collectionTxnHash);
-  let vmStatus: string = collectionTxn.vm_status;
+  const collectionTxn = await aptosClient.waitForTransactionWithResult(collectionTxnHash);
+  let vmStatus: string = (collectionTxn as UserTransaction).vm_status;
   raiseForError({ vmStatus });
 
   const tokenTxnHash = await tokenClient.createToken(
@@ -106,9 +114,12 @@ export const createTokenAndCollection = async (
     description,
     supply,
     uri,
+    supply,
+    account.address(),
     royalty_points_per_million,
+    0,
   );
-  const tokenTxn: any = await aptosClient.getTransaction(tokenTxnHash);
+  const tokenTxn: any = await aptosClient.waitForTransactionWithResult(tokenTxnHash);
   vmStatus = tokenTxn.vm_status;
   raiseForError({ vmStatus });
 

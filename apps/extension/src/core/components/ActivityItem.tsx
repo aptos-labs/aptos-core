@@ -13,8 +13,7 @@ import {
 } from '@chakra-ui/react';
 import { HiDownload } from '@react-icons/all-files/hi/HiDownload';
 import { BsArrowUpRight } from '@react-icons/all-files/bs/BsArrowUpRight';
-import { UserTransaction } from 'aptos/src/api/data-contracts';
-import { ScriptFunctionPayload } from 'aptos/dist/api/data-contracts';
+import { UserTransaction, ScriptFunctionPayload } from 'aptos/dist/generated';
 import ChakraLink from 'core/components/ChakraLink';
 import { collapseHexString } from 'core/utils/hex';
 import {
