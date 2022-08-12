@@ -49,11 +49,12 @@ Aptos currently has two SDKs:
 1. [Python](/sdks/python-sdk)
 2. [Typescript](/sdks/transactions-with-ts-sdk)
 
+
 ### Other Areas
 
-Other areas worth being familiar with:
-
-* [Using the CLI](/cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
+* [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
+* [Typescript SDK](../transactions-with-ts-sdk)
+* [Python SDK](../sdks/python-sdk)
 * [REST API spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
 * [Local testnet development flow](/guides/local-testnet-dev-flow)
 
@@ -133,7 +134,7 @@ Aptos supports two methods for constructing transactions:
 
 #### JSON-encoded transactions
 
-JSON-encoded transactions can be generated via the [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#), following these steps:
+JSON-encoded transactions can be generated via the [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/), following these steps:
 
 - First construct an appropriate JSON payload for the `/transactions/encode_submission` endpoint as demonstrated in the [Python SDK](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L128).
 - The output of the above contains an object containing a `message` and this must be signed with the sender’s private key locally.
@@ -182,7 +183,7 @@ A reasonable strategy for submitting transactions is to limit their lifetime to 
 
 To facilitate evaluation of transactions, Aptos supports a simulation API that does not require and should not contain valid signatures on transactions.
 
-The simulation API works identical to the transaction submission API, except that it executes the transaction and returns back the results along with the gas used. The simulation API can be accessed by submitting a transaction to [`/transactions/simulate`](https://aptos.dev/rest-api/#tag/transactions/operation/simulate_transaction).
+The simulation API works identical to the transaction submission API, except that it executes the transaction and returns back the results along with the gas used. The simulation API can be accessed by submitting a transaction to [`/transactions/simulate`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction).
 
 :::tip Read more
 Here's an example showing how to use the simulation API in the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L413). Note that the gas use may change based upon the state of the account. We recommend that the maximum gas amount be larger than the amount quoted by this API.

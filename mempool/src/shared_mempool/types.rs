@@ -27,7 +27,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
     fmt,
-    fmt::Write,
     pin::Pin,
     sync::Arc,
     task::Waker,
@@ -173,21 +172,17 @@ impl fmt::Display for QuorumStoreRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let payload = match self {
             QuorumStoreRequest::GetBatchRequest(batch_size, excluded_txns, _) => {
-                let mut txns_str = "".to_string();
-                for tx in excluded_txns.iter() {
-                    write!(txns_str, "{} ", tx)?;
-                }
                 format!(
-                    "GetBatchRequest [batch_size: {}, excluded_txns: {}]",
-                    batch_size, txns_str
+                    "GetBatchRequest [batch_size: {}, excluded_txns_length: {}]",
+                    batch_size,
+                    excluded_txns.len()
                 )
             }
             QuorumStoreRequest::RejectNotification(rejected_txns, _) => {
-                let mut txns_str = "".to_string();
-                for tx in rejected_txns.iter() {
-                    write!(txns_str, "{} ", tx)?;
-                }
-                format!("RejectNotification [rejected_txns: {}]", txns_str)
+                format!(
+                    "RejectNotification [rejected_txns_length: {}]",
+                    rejected_txns.len()
+                )
             }
         };
         write!(f, "{}", payload)

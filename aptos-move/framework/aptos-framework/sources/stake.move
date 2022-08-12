@@ -23,7 +23,6 @@ module aptos_framework::stake {
     use std::option::{Self, Option};
     use std::signer;
     use std::vector;
-    use aptos_std::comparator;
     use aptos_std::event::{Self, EventHandle};
     use aptos_std::signature;
     use aptos_framework::aptos_coin::AptosCoin;
@@ -69,12 +68,18 @@ module aptos_framework::stake {
     const EINVALID_PUBLIC_KEY: u64 = 16;
     /// Invalid stake amount (usuaully 0).
     const EINVALID_STAKE_AMOUNT: u64 = 17;
+    /// Validator set exceeds the limit
+    const EVALIDATOR_SET_TOO_LARGE: u64 = 18;
 
     /// Validator status enum. We can switch to proper enum later once Move supports it.
     const VALIDATOR_STATUS_PENDING_ACTIVE: u64 = 1;
     const VALIDATOR_STATUS_ACTIVE: u64 = 2;
     const VALIDATOR_STATUS_PENDING_INACTIVE: u64 = 3;
     const VALIDATOR_STATUS_INACTIVE: u64 = 4;
+
+    /// Limit the maximum size to u16::max, it's the current limit of the bitvec
+    /// https://github.com/aptos-labs/aptos-core/blob/main/crates/aptos-bitvec/src/lib.rs#L20
+    const MAX_VALIDATOR_SET_SIZE: u64 = 65536;
 
     /// Capability that represents ownership and can be used to control the validator and the associated stake pool.
     /// Having this be separate from the signer for the account that the validator resources are hosted at allows
@@ -668,6 +673,8 @@ module aptos_framework::stake {
         assert!(!vector::is_empty(&validator_config.consensus_pubkey), error::invalid_argument(EINVALID_PUBLIC_KEY));
 
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
+        let validator_set_size = vector::length(&validator_set.active_validators) + vector::length(&validator_set.pending_active);
+        assert!( validator_set_size <= MAX_VALIDATOR_SET_SIZE, error::invalid_argument(EVALIDATOR_SET_TOO_LARGE));
         vector::push_back(&mut validator_set.pending_active, generate_validator_info(pool_address, stake_pool, *validator_config));
 
         event::emit_event<JoinValidatorSetEvent>(
@@ -878,6 +885,7 @@ module aptos_framework::stake {
         let recurring_lockup_duration_secs = staking_config::get_recurring_lockup_duration(&config);
         // Reset performance scores and update active validator set (so network address/public key change takes effect).
         let i = 0;
+        let validator_index = 0;
         let len = vector::length(&validator_set.active_validators);
         let next_epoch_validators = vector::empty();
         validator_perf.validators = vector::empty();
@@ -885,6 +893,7 @@ module aptos_framework::stake {
             let old_validator_info = vector::borrow_mut(&mut validator_set.active_validators, i);
             let pool_address = old_validator_info.addr;
             let validator_config = borrow_global_mut<ValidatorConfig>(pool_address);
+            validator_config.validator_index = validator_index;
             let stake_pool = borrow_global_mut<StakePool>(pool_address);
             let new_validator_info = generate_validator_info(pool_address, stake_pool, *validator_config);
 
@@ -893,6 +902,8 @@ module aptos_framework::stake {
             if (new_validator_info.voting_power < minimum_stake) {
                 continue
             };
+            // index only increments if the node joins the validator set
+            validator_index = validator_index + 1;
 
             vector::push_back(&mut next_epoch_validators, new_validator_info);
             vector::push_back(&mut validator_perf.validators, IndividualValidatorPerformance {
@@ -909,46 +920,7 @@ module aptos_framework::stake {
             };
         };
 
-        // Sort the validator set, so we can ensure stable order and validator indices.
-        sort_validators(&mut next_epoch_validators);
-
-        // Store the validator index in the validator's ValidatorConfig resource, so we can look it up later.
-        // We can't rely on the validator set in CoreResource's ValidatorSet because some validators might choose
-        // to leave and get moved to pending_inactive later on.
-        let i = 0;
-        let len = vector::length(&next_epoch_validators);
-        while (i < len) {
-            let validator_info = vector::borrow_mut(&mut next_epoch_validators, i);
-            let pool_address = validator_info.addr;
-            let validator_config = borrow_global_mut<ValidatorConfig>(pool_address);
-            validator_config.validator_index = i;
-            validator_info.config.validator_index = i;
-            i = i + 1;
-        };
-
         validator_set.active_validators = next_epoch_validators;
-    }
-
-    fun sort_validators(validators: &mut vector<ValidatorInfo>) {
-        let length = vector::length(validators);
-        if (length == 0) {
-            return
-        };
-
-        let ordered = false;
-        while (!ordered) {
-            ordered = true;
-            let idx = 0;
-            while (idx < length - 1) {
-                let left = vector::borrow(validators, idx);
-                let right = vector::borrow(validators, idx + 1);
-                if (comparator::is_greater_than(&comparator::compare(left, right))) {
-                    ordered = false;
-                    vector::swap(validators, idx, idx + 1);
-                };
-                idx = idx + 1;
-            }
-        }
     }
 
     /// Update individual validator's stake pool
@@ -966,17 +938,20 @@ module aptos_framework::stake {
         let num_successful_proposals = cur_validator_perf.successful_proposals;
         let num_total_proposals = cur_validator_perf.successful_proposals + cur_validator_perf.failed_proposals;
 
+        let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(staking_config);
         let rewards_amount = distribute_rewards(
              &mut stake_pool.active,
             num_successful_proposals,
             num_total_proposals,
-            staking_config,
+            rewards_rate,
+            rewards_rate_denominator
         );
         rewards_amount = rewards_amount + distribute_rewards(
             &mut stake_pool.pending_inactive,
             num_successful_proposals,
             num_total_proposals,
-            staking_config,
+            rewards_rate,
+            rewards_rate_denominator
         );
 
         // Pending active stake can now be active.
@@ -1000,33 +975,45 @@ module aptos_framework::stake {
         );
     }
 
-    /// Mint rewards corresponding to current epoch's `voting_power` and `num_successful_votes`.
+    /// Calculate the rewards amount.
+    fun calculate_rewards_amount(
+        stake_amount: u64,
+        num_successful_proposals: u64,
+        num_total_proposals: u64,
+        rewards_rate: u64,
+        rewards_rate_denominator: u64,
+    ): u64 {
+        // The rewards amount is equal to (stake amount * rewards rate * performance multiplier).
+        // We do multiplication in u128 before division to avoid the overflow and minimize the rounding error.
+        let rewards_numerator = (stake_amount as u128) * (rewards_rate as u128) * (num_successful_proposals as u128);
+        let rewards_denominator = (rewards_rate_denominator as u128) * (num_total_proposals as u128);
+        if (rewards_denominator > 0) {
+            ((rewards_numerator / rewards_denominator) as u64)
+        } else {
+            0
+        }
+    }
+
+    /// Mint rewards corresponding to current epoch's `stake` and `num_successful_votes`.
     fun distribute_rewards(
         stake: &mut Coin<AptosCoin>,
         num_successful_proposals: u64,
         num_total_proposals: u64,
-        config: &StakingConfig,
+        rewards_rate: u64,
+        rewards_rate_denominator: u64,
     ): u64 acquires AptosCoinCapabilities {
         let stake_amount = coin::value<AptosCoin>(stake);
-        // Short-circuit early.
-        if (stake_amount == 0) {
-            return 0
+        let rewards_amount = if (stake_amount > 0) {
+            calculate_rewards_amount(stake_amount, num_successful_proposals, num_total_proposals, rewards_rate, rewards_rate_denominator)
+        } else {
+            0
         };
-
-        // Validators receive rewards based on their performance (number of successful votes) and how long is their
-        // remaining lockup time.
-        // The total rewards = base rewards * performance multiplier * lockup multiplier.
-        // Here we do multiplication before division to minimize rounding errors.
-        let (rewards_rate, rewards_rate_denominator) = staking_config::get_reward_rate(config);
-        let base_rewards = stake_amount * rewards_rate / rewards_rate_denominator;
-        if (base_rewards > 0 && num_successful_proposals > 0) {
-            let rewards_amount = base_rewards * num_successful_proposals / num_total_proposals;
+        if (rewards_amount > 0) {
             let mint_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).mint_cap;
             let rewards = coin::mint<AptosCoin>(rewards_amount, mint_cap);
             coin::merge(stake, rewards);
-            return rewards_amount
         };
-        0
+        rewards_amount
     }
 
     fun append<T>(v1: &mut vector<T>, v2: &mut vector<T>) {
@@ -1465,29 +1452,29 @@ module aptos_framework::stake {
         leave_validator_set(&validator, validator_address);
         // Validator is in pending_inactive state but is technically still part of the validator set.
         assert!(get_validator_state(validator_address) == VALIDATOR_STATUS_PENDING_INACTIVE, 2);
-        assert_validator_state(validator_address, 100, 0, 0, 0, 0);
+        assert_validator_state(validator_address, 100, 0, 0, 0, 1);
         end_epoch();
 
         // Epoch has ended so validator is no longer part of the validator set.
         assert!(get_validator_state(validator_address) == VALIDATOR_STATUS_INACTIVE, 3);
         // However, their stake, including rewards, should still subject to the existing lockup.
-        assert_validator_state(validator_address, 101, 0, 0, 0, 0);
+        assert_validator_state(validator_address, 101, 0, 0, 0, 1);
         assert!(get_remaining_lockup_secs(validator_address) == LOCKUP_CYCLE_SECONDS - EPOCH_DURATION, 4);
 
         // If they try to unlock, their stake is moved to pending_inactive and would only be withdrawable after the
         // lockup has expired.
         unlock(&validator, 50);
-        assert_validator_state(validator_address, 51, 0, 0, 50, 0);
+        assert_validator_state(validator_address, 51, 0, 0, 50, 1);
         // A couple of epochs passed but lockup has not expired so the validator's stake remains the same.
         end_epoch();
         end_epoch();
         end_epoch();
-        assert_validator_state(validator_address, 51, 0, 0, 50, 0);
+        assert_validator_state(validator_address, 51, 0, 0, 50, 1);
         // Fast forward enough so the lockup expires. Now the validator can just call withdraw directly to withdraw
         // pending_inactive stakes.
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         withdraw(&validator, 50);
-        assert_validator_state(validator_address, 51, 0, 0, 0, 0);
+        assert_validator_state(validator_address, 51, 0, 0, 0, 1);
     }
 
     #[test(aptos_framework = @aptos_framework, core_resources = @core_resources, validator = @0x123, validator_2 = @0x234)]
@@ -1557,7 +1544,7 @@ module aptos_framework::stake {
         assert!(get_validator_state(validator_1_address) == VALIDATOR_STATUS_ACTIVE, 0);
         assert!(get_validator_state(validator_2_address) == VALIDATOR_STATUS_ACTIVE, 1);
 
-        // Validator indices should be ordered by validator addresses. In this case, validator 1 has a smaller address.
+        // Validator indices is the reverse order of the joining order.
         assert_validator_state(validator_1_address, 100, 0, 0, 0, 0);
         assert_validator_state(validator_2_address, 100, 0, 0, 0, 1);
         let validator_set = borrow_global<ValidatorSet>(@aptos_framework);
@@ -1589,7 +1576,7 @@ module aptos_framework::stake {
         // validator set, their index will get set correctly.
         assert_validator_state(validator_2_address, 101, 0, 0, 0, 1);
         assert!(get_validator_state(validator_3_address) == VALIDATOR_STATUS_ACTIVE, 10);
-        //assert_validator_state(validator_3_address, 100, 0, 0, 0, 1);
+        assert_validator_state(validator_3_address, 100, 0, 0, 0, 1);
         assert!(vector::borrow(&borrow_global<ValidatorSet>(@aptos_framework).active_validators, 0).config.consensus_pubkey == CONSENSUS_KEY_2, 0);
 
         // Validators without enough stake will be removed.
@@ -1704,7 +1691,7 @@ module aptos_framework::stake {
         validator_4 = @0x4,
         validator_5 = @0x5
     )]
-    public entry fun test_staking_is_sorted_by_address(
+    public entry fun test_staking_validator_index(
         aptos_framework: signer,
         core_resources: signer,
         validator_1: signer,
@@ -1741,25 +1728,31 @@ module aptos_framework::stake {
         assert!(validator_index(v4_addr) == 1, 2);
 
         join_validator_set(&validator_1, v1_addr);
-        end_epoch();
-        assert!(validator_index(v1_addr) == 0, 3);
-        assert!(validator_index(v3_addr) == 1, 4);
-        assert!(validator_index(v4_addr) == 2, 5);
-
         join_validator_set(&validator_2, v2_addr);
+        // pending_inactive is appended in reverse order
         end_epoch();
-        assert!(validator_index(v1_addr) == 0, 6);
-        assert!(validator_index(v2_addr) == 1, 7);
-        assert!(validator_index(v3_addr) == 2, 8);
-        assert!(validator_index(v4_addr) == 3, 9);
+        assert!(validator_index(v3_addr) == 0, 6);
+        assert!(validator_index(v4_addr) == 1, 7);
+        assert!(validator_index(v2_addr) == 2, 8);
+        assert!(validator_index(v1_addr) == 3, 9);
 
         join_validator_set(&validator_5, v5_addr);
         end_epoch();
-        assert!(validator_index(v1_addr) == 0, 10);
-        assert!(validator_index(v2_addr) == 1, 11);
-        assert!(validator_index(v3_addr) == 2, 12);
-        assert!(validator_index(v4_addr) == 3, 13);
+        assert!(validator_index(v3_addr) == 0, 10);
+        assert!(validator_index(v4_addr) == 1, 11);
+        assert!(validator_index(v2_addr) == 2, 12);
+        assert!(validator_index(v1_addr) == 3, 13);
         assert!(validator_index(v5_addr) == 4, 14);
+
+        // after swap remove, it's 3,4,2,5
+        leave_validator_set(&validator_1, v1_addr);
+        // after swap remove, it's 5,4,2
+        leave_validator_set(&validator_3, v3_addr);
+        end_epoch();
+
+        assert!(validator_index(v5_addr) == 0, 15);
+        assert!(validator_index(v4_addr) == 1, 16);
+        assert!(validator_index(v2_addr) == 2, 17);
     }
 
     #[test(aptos_framework = @0x1, core_resources = @core_resources, validator_1 = @0x123, validator_2 = @0x234)]
@@ -1795,8 +1788,8 @@ module aptos_framework::stake {
         end_epoch();
 
         // Validator 2 received no rewards. Validator 1 didn't fail proposals, so it still receives rewards.
-        assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
-        assert_validator_state(validator_2_address, 100, 0, 0, 0, 1);
+        assert_validator_state(validator_1_address, 101, 0, 0, 0, 1);
+        assert_validator_state(validator_2_address, 100, 0, 0, 0, 0);
 
         // Validator 2 decides to leave. Both validators failed proposals.
         unlock(&validator_2, 100);
@@ -1813,7 +1806,7 @@ module aptos_framework::stake {
 
         // Validator 1 and 2 received no additional rewards due to failed proposals
         assert_validator_state(validator_1_address, 101, 0, 0, 0, 0);
-        assert_validator_state(validator_2_address, 0, 100, 0, 0, 1);
+        assert_validator_state(validator_2_address, 0, 100, 0, 0, 0);
     }
 
     #[test(aptos_framework = @0x1, core_resources = @core_resources, validator = @0x123)]
@@ -1894,6 +1887,44 @@ module aptos_framework::stake {
 
         // Join the validator set with enough stake.
         join_validator_set(&validator, validator_address);
+    }
+
+    #[test]
+    public entry fun test_rewards_calculation() {
+        let stake_amount = 2000;
+        let num_successful_proposals = 199;
+        let num_total_proposals = 200;
+        let rewards_rate = 700;
+        let rewards_rate_denominator = 777;
+        let rewards_amount = calculate_rewards_amount(
+            stake_amount,
+            num_successful_proposals,
+            num_total_proposals,
+            rewards_rate,
+            rewards_rate_denominator
+        );
+        // Consider `amount_imprecise` and `amount_precise` defined as follows:
+        // amount_imprecise = (stake_amount * rewards_rate / rewards_rate_denominator) * num_successful_proposals / num_total_proposals
+        // amount_precise = stake_amount * rewards_rate * num_successful_proposals / (rewards_rate_denominator * num_total_proposals)
+        // Although they are equivalent in the real arithmetic, they are not in the integer arithmetic due to a rounding error.
+        // With the test parameters above, `amount_imprecise` is equal to 1791 because of an unbounded rounding error
+        // while `amount_precise` is equal to 1792. We expect the output of `calculate_rewards_amount` to be 1792.
+        assert!(rewards_amount == 1792, 0);
+
+        let stake_amount = 100000000000000000;
+        let num_successful_proposals = 9999;
+        let num_total_proposals = 10000;
+        let rewards_rate = 3141592;
+        let rewards_rate_denominator = 10000000;
+        // This should not abort due to an arithmetic overflow.
+        let rewards_amount = calculate_rewards_amount(
+            stake_amount,
+            num_successful_proposals,
+            num_total_proposals,
+            rewards_rate,
+            rewards_rate_denominator
+        );
+        assert!(rewards_amount == 31412778408000000, 0);
     }
 
     #[test_only]

@@ -1,12 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::multi_signature::{MultiSignature, PartialSignatures};
 use crate::{
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    multi_signature::{MultiSignature, PartialSignatures},
     proof::accumulator::mock::MockTransactionAccumulator,
     transaction::Version,
     trusted_state::{TrustedState, TrustedStateChange, TrustedStateHasher},
@@ -59,9 +59,10 @@ fn into_epoch_state(epoch: u64, signers: &[ValidatorSigner]) -> EpochState {
             signers
                 .iter()
                 .map(|signer| {
-                    (
+                    ValidatorConsensusInfo::new(
                         signer.author(),
-                        ValidatorConsensusInfo::new(signer.public_key(), 1 /* voting power */),
+                        signer.public_key(),
+                        1, /* voting power */
                     )
                 })
                 .collect(),

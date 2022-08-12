@@ -193,13 +193,9 @@ fn find_workspace_config(
                 let cand = current_path.join(CONFIG_FOLDER);
                 if cand.is_dir() {
                     break Ok(cand);
-                }
-                if !current_path.pop() {
-                    return Err(CliError::ConfigNotFoundError(format!(
-                        "Unable to find {} in {} or any parent directory",
-                        CONFIG_FOLDER,
-                        starting_path.display()
-                    )));
+                } else if !current_path.pop() {
+                    // If we aren't able to find the folder, we'll create a new one right here
+                    break Ok(starting_path.join(CONFIG_FOLDER));
                 }
             }
         }

@@ -23,7 +23,8 @@ pub struct BlockMetadata {
     round: u64,
     proposer: AccountAddress,
     proposer_index: Option<u32>,
-    previous_block_votes: Vec<bool>,
+    #[serde(with = "serde_bytes")]
+    previous_block_votes_bitvec: Vec<u8>,
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,
 }
@@ -35,7 +36,7 @@ impl BlockMetadata {
         round: u64,
         proposer: AccountAddress,
         proposer_index: Option<u32>,
-        previous_block_votes: Vec<bool>,
+        previous_block_votes_bitvec: Vec<u8>,
         failed_proposer_indices: Vec<u32>,
         timestamp_usecs: u64,
     ) -> Self {
@@ -45,7 +46,7 @@ impl BlockMetadata {
             round,
             proposer,
             proposer_index,
-            previous_block_votes,
+            previous_block_votes_bitvec,
             failed_proposer_indices,
             timestamp_usecs,
         }
@@ -73,9 +74,9 @@ impl BlockMetadata {
                     .collect(),
             ),
             MoveValue::Vector(
-                self.previous_block_votes
+                self.previous_block_votes_bitvec
                     .into_iter()
-                    .map(MoveValue::Bool)
+                    .map(MoveValue::U8)
                     .collect(),
             ),
             MoveValue::U64(self.timestamp_usecs),
@@ -94,8 +95,8 @@ impl BlockMetadata {
         self.proposer_index
     }
 
-    pub fn previous_block_votes(&self) -> &Vec<bool> {
-        &self.previous_block_votes
+    pub fn previous_block_votes_bitvec(&self) -> &Vec<u8> {
+        &self.previous_block_votes_bitvec
     }
 
     pub fn failed_proposer_indices(&self) -> &Vec<u32> {

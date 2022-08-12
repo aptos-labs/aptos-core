@@ -206,6 +206,133 @@ impl<'de> serde::Deserialize<'de> for account_signature::Type {
         deserializer.deserialize_any(GeneratedVisitor)
     }
 }
+impl serde::Serialize for Block {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.timestamp.is_some() {
+            len += 1;
+        }
+        if self.height != 0 {
+            len += 1;
+        }
+        if !self.transactions.is_empty() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.extractor.v1.Block", len)?;
+        if let Some(v) = self.timestamp.as_ref() {
+            struct_ser.serialize_field("timestamp", v)?;
+        }
+        if self.height != 0 {
+            struct_ser.serialize_field("height", ToString::to_string(&self.height).as_str())?;
+        }
+        if !self.transactions.is_empty() {
+            struct_ser.serialize_field("transactions", &self.transactions)?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for Block {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["timestamp", "height", "transactions"];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            Timestamp,
+            Height,
+            Transactions,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "timestamp" => Ok(GeneratedField::Timestamp),
+                            "height" => Ok(GeneratedField::Height),
+                            "transactions" => Ok(GeneratedField::Transactions),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = Block;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.extractor.v1.Block")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<Block, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut timestamp__ = None;
+                let mut height__ = None;
+                let mut transactions__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::Timestamp => {
+                            if timestamp__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("timestamp"));
+                            }
+                            timestamp__ = Some(map.next_value()?);
+                        }
+                        GeneratedField::Height => {
+                            if height__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("height"));
+                            }
+                            height__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?
+                                    .0,
+                            );
+                        }
+                        GeneratedField::Transactions => {
+                            if transactions__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("transactions"));
+                            }
+                            transactions__ = Some(map.next_value()?);
+                        }
+                    }
+                }
+                Ok(Block {
+                    timestamp: timestamp__,
+                    height: height__.unwrap_or_default(),
+                    transactions: transactions__.unwrap_or_default(),
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.extractor.v1.Block", FIELDS, GeneratedVisitor)
+    }
+}
 impl serde::Serialize for BlockMetadataTransaction {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -223,7 +350,7 @@ impl serde::Serialize for BlockMetadataTransaction {
         if !self.events.is_empty() {
             len += 1;
         }
-        if !self.previous_block_votes.is_empty() {
+        if !self.previous_block_votes_bitvec.is_empty() {
             len += 1;
         }
         if !self.proposer.is_empty() {
@@ -243,8 +370,11 @@ impl serde::Serialize for BlockMetadataTransaction {
         if !self.events.is_empty() {
             struct_ser.serialize_field("events", &self.events)?;
         }
-        if !self.previous_block_votes.is_empty() {
-            struct_ser.serialize_field("previousBlockVotes", &self.previous_block_votes)?;
+        if !self.previous_block_votes_bitvec.is_empty() {
+            struct_ser.serialize_field(
+                "previousBlockVotesBitvec",
+                pbjson::private::base64::encode(&self.previous_block_votes_bitvec).as_str(),
+            )?;
         }
         if !self.proposer.is_empty() {
             struct_ser.serialize_field("proposer", &self.proposer)?;
@@ -265,7 +395,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
             "id",
             "round",
             "events",
-            "previousBlockVotes",
+            "previousBlockVotesBitvec",
             "proposer",
             "failedProposerIndices",
         ];
@@ -275,7 +405,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
             Id,
             Round,
             Events,
-            PreviousBlockVotes,
+            PreviousBlockVotesBitvec,
             Proposer,
             FailedProposerIndices,
         }
@@ -305,7 +435,9 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
                             "id" => Ok(GeneratedField::Id),
                             "round" => Ok(GeneratedField::Round),
                             "events" => Ok(GeneratedField::Events),
-                            "previousBlockVotes" => Ok(GeneratedField::PreviousBlockVotes),
+                            "previousBlockVotesBitvec" => {
+                                Ok(GeneratedField::PreviousBlockVotesBitvec)
+                            }
                             "proposer" => Ok(GeneratedField::Proposer),
                             "failedProposerIndices" => Ok(GeneratedField::FailedProposerIndices),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
@@ -333,7 +465,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
                 let mut id__ = None;
                 let mut round__ = None;
                 let mut events__ = None;
-                let mut previous_block_votes__ = None;
+                let mut previous_block_votes_bitvec__ = None;
                 let mut proposer__ = None;
                 let mut failed_proposer_indices__ = None;
                 while let Some(k) = map.next_key()? {
@@ -359,13 +491,16 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
                             }
                             events__ = Some(map.next_value()?);
                         }
-                        GeneratedField::PreviousBlockVotes => {
-                            if previous_block_votes__.is_some() {
+                        GeneratedField::PreviousBlockVotesBitvec => {
+                            if previous_block_votes_bitvec__.is_some() {
                                 return Err(serde::de::Error::duplicate_field(
-                                    "previousBlockVotes",
+                                    "previousBlockVotesBitvec",
                                 ));
                             }
-                            previous_block_votes__ = Some(map.next_value()?);
+                            previous_block_votes_bitvec__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
+                                    .0,
+                            );
                         }
                         GeneratedField::Proposer => {
                             if proposer__.is_some() {
@@ -392,7 +527,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransaction {
                     id: id__.unwrap_or_default(),
                     round: round__.unwrap_or_default(),
                     events: events__.unwrap_or_default(),
-                    previous_block_votes: previous_block_votes__.unwrap_or_default(),
+                    previous_block_votes_bitvec: previous_block_votes_bitvec__.unwrap_or_default(),
                     proposer: proposer__.unwrap_or_default(),
                     failed_proposer_indices: failed_proposer_indices__.unwrap_or_default(),
                 })

@@ -721,10 +721,8 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
     }
 
     // Create the telemetry service
-    let telemetry_runtime = aptos_telemetry::service::start_telemetry_service(
-        node_config.clone(),
-        chain_id.to_string(),
-    );
+    let telemetry_runtime =
+        aptos_telemetry::service::start_telemetry_service(node_config.clone(), chain_id);
 
     Ok(AptosHandle {
         _api: api_runtime,

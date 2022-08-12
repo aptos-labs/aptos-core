@@ -3,7 +3,7 @@
 
 use std::{convert::Infallible, sync::Arc};
 
-use crate::{validator_cache::ValidatorSetCache, AptosTelemetryServiceConfig, GCPBigQueryConfig};
+use crate::{validator_cache::ValidatorSetCache, GCPBigQueryConfig, TelemetryServiceConfig};
 use aptos_crypto::noise;
 use gcp_bigquery_client::Client as BQClient;
 use jsonwebtoken::{DecodingKey, EncodingKey};
@@ -23,7 +23,7 @@ pub struct Context {
 
 impl Context {
     pub fn new(
-        config: &AptosTelemetryServiceConfig,
+        config: &TelemetryServiceConfig,
         validator_cache: ValidatorSetCache,
         gcp_bigquery_client: Option<BQClient>,
     ) -> Self {

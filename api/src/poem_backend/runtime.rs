@@ -5,6 +5,8 @@ use std::{net::SocketAddr, sync::Arc};
 
 use super::{middleware_log, AccountsApi, BasicApi, EventsApi, IndexApi};
 
+use crate::poem_backend::blocks::BlocksApi;
+use crate::set_failpoints;
 use crate::{
     context::Context,
     poem_backend::{
@@ -37,6 +39,7 @@ pub fn get_api_service(
     (
         AccountsApi,
         BasicApi,
+        BlocksApi,
         EventsApi,
         IndexApi,
         StateApi,
@@ -50,6 +53,9 @@ pub fn get_api_service(
             context: context.clone(),
         },
         BasicApi {
+            context: context.clone(),
+        },
+        BlocksApi {
             context: context.clone(),
         },
         EventsApi {
@@ -72,6 +78,7 @@ pub fn get_api_service(
         .url("https://github.com/aptos-labs/aptos-core");
 
     OpenApiService::new(apis, "Aptos Node API", version.trim())
+        .server("/v1")
         .description("The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.")
         .license(license)
         .contact(contact)
@@ -88,7 +95,7 @@ pub fn attach_poem_to_runtime(
 
     let size_limit = context.content_length_limit();
 
-    let api_service = get_api_service(context);
+    let api_service = get_api_service(context.clone());
 
     let spec_json = api_service.spec_endpoint();
     let spec_yaml = api_service.spec_endpoint_yaml();
@@ -138,6 +145,12 @@ pub fn attach_poem_to_runtime(
             .nest("/", api_service)
             .at("/spec.json", spec_json)
             .at("/spec.yaml", spec_yaml)
+            // TODO: We add this manually outside of the OpenAPI spec for now.
+            // https://github.com/poem-web/poem/issues/364
+            .at(
+                "/set_failpoint",
+                poem::get(set_failpoints::set_failpoint_poem).data(context.clone()),
+            )
             .with(cors)
             .with(PostSizeLimit::new(size_limit))
             // NOTE: Make sure to keep this after all the `with` middleware.

@@ -19,6 +19,7 @@ const sidebars = {
     "index",
     "whats-new-in-docs",
     "guides/getting-started",
+
     {
       type: "category",
       label: "Aptos Quickstarts",
@@ -157,15 +158,8 @@ const sidebars = {
       link: { type: "doc", id: "cli-tools/aptos-cli-tool/index" },
       items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
     },
-    {
-      type: "category",
-      label: "API",
-      collapsible: true,
-      collapsed: true,
-      link: { type: "doc", id: "api/index" },
-      items: ["api/index"],
-    },
     "reference/telemetry",
+    "aptos-white-paper",
     "reference/glossary",
   ],
 };

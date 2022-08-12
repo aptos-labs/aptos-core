@@ -9,6 +9,7 @@ use crate::{
     liveness::proposer_election::{choose_index, ProposerElection},
 };
 use anyhow::{ensure, Result};
+use aptos_bitvec::BitVec;
 use aptos_infallible::{Mutex, MutexGuard};
 use aptos_logger::prelude::*;
 use aptos_types::{
@@ -18,7 +19,7 @@ use aptos_types::{
 };
 use consensus_types::common::{Author, Round};
 use short_hex_str::AsShortHexStr;
-use std::{cmp::Ordering, collections::HashMap, convert::TryFrom, sync::Arc};
+use std::{collections::HashMap, convert::TryFrom, sync::Arc};
 use storage_interface::{DbReader, Order};
 
 /// Interface to query committed NewBlockEvent.
@@ -164,22 +165,28 @@ impl NewBlockEventAggregation {
         }
     }
 
-    pub fn bitmap_to_voters<'a>(
+    pub fn bitvec_to_voters<'a>(
         validators: &'a [Author],
-        bitmap: &[bool],
+        bitvec: &BitVec,
     ) -> Result<Vec<&'a Author>, String> {
-        if validators.len() != bitmap.len() {
+        if BitVec::required_buckets(validators.len() as u16) != bitvec.num_buckets() {
             return Err(format!(
-                "bitmap {} does not match validators {}",
-                bitmap.len(),
+                "bitvec bucket {} does not match validators len {}",
+                bitvec.num_buckets(),
                 validators.len()
             ));
         }
 
         Ok(validators
             .iter()
-            .zip(bitmap.iter())
-            .filter_map(|(validator, &voted)| if voted { Some(validator) } else { None })
+            .enumerate()
+            .filter_map(|(index, validator)| {
+                if bitvec.is_set(index as u16) {
+                    Some(validator)
+                } else {
+                    None
+                }
+            })
             .collect())
     }
 
@@ -259,9 +266,9 @@ impl NewBlockEventAggregation {
         Self::history_iter(history, epoch_to_candidates, self.voter_window_size).fold(
             HashMap::new(),
             |mut map, meta| {
-                match Self::bitmap_to_voters(
+                match Self::bitvec_to_voters(
                     &epoch_to_candidates[&meta.epoch()],
-                    meta.previous_block_votes(),
+                    &meta.previous_block_votes_bitvec().clone().into(),
                 ) {
                     Ok(voters) => {
                         for &voter in voters {
@@ -435,15 +442,6 @@ impl LeaderReputation {
         heuristic: Box<dyn ReputationHeuristic>,
         exclude_round: u64,
     ) -> Self {
-        for proposers in epoch_to_proposers.values() {
-            // assert!(proposers.is_sorted()) implementation from new api
-            assert!(proposers.windows(2).all(|w| {
-                PartialOrd::partial_cmp(&&w[0], &&w[1])
-                    .map(|o| o != Ordering::Greater)
-                    .unwrap_or(false)
-            }));
-        }
-
         assert!(epoch_to_proposers.contains_key(&epoch));
         assert_eq!(epoch_to_proposers[&epoch].len(), voting_powers.len());
 

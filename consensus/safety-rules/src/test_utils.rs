@@ -7,18 +7,17 @@ use crate::{
 };
 use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
 use aptos_secure_storage::{InMemoryStorage, Storage};
-use aptos_types::ledger_info::LedgerInfoWithPartialSignatures;
-use aptos_types::multi_signature::{MultiSignature, PartialSignatures};
-use aptos_types::validator_verifier::generate_validator_verifier;
 use aptos_types::{
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
+    multi_signature::{MultiSignature, PartialSignatures},
     on_chain_config::ValidatorSet,
     proof::AccumulatorExtensionProof,
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
+    validator_verifier::generate_validator_verifier,
     waypoint::Waypoint,
 };
 use consensus_types::{
@@ -39,7 +38,7 @@ pub fn empty_proof() -> Proof {
 
 pub fn make_genesis(signer: &ValidatorSigner) -> (EpochChangeProof, QuorumCert) {
     let validator_info =
-        ValidatorInfo::new_with_test_network_keys(signer.author(), signer.public_key(), 1);
+        ValidatorInfo::new_with_test_network_keys(signer.author(), signer.public_key(), 1, 0);
     let validator_set = ValidatorSet::new(vec![validator_info]);
     let li = LedgerInfo::mock_genesis(Some(validator_set));
     let block = Block::make_genesis_block_from_ledger_info(&li);
@@ -212,9 +211,9 @@ pub fn make_timeout_cert(
 }
 
 pub fn validator_signers_to_ledger_info(signers: &[&ValidatorSigner]) -> LedgerInfo {
-    let infos = signers
-        .iter()
-        .map(|v| ValidatorInfo::new_with_test_network_keys(v.author(), v.public_key(), 1));
+    let infos = signers.iter().enumerate().map(|(index, v)| {
+        ValidatorInfo::new_with_test_network_keys(v.author(), v.public_key(), 1, index as u64)
+    });
     let validator_set = ValidatorSet::new(infos.collect());
     LedgerInfo::mock_genesis(Some(validator_set))
 }
