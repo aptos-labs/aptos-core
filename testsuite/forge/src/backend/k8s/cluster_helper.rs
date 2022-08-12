@@ -3,22 +3,24 @@
 
 use crate::{
     get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
-    nodes_healthcheck, K8sNode, Result, DEFAULT_ROOT_KEY, FULLNODE_HAPROXY_SERVICE_SUFFIX,
-    FULLNODE_SERVICE_SUFFIX, VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
+    nodes_healthcheck, wait_stateful_set, Create, K8sApi, K8sNode, Result,
+    APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_ROOT_KEY,
+    FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX, GENESIS_HELM_CHART_PATH,
+    GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
+    NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
+    VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
 use anyhow::{bail, format_err};
 use aptos_logger::info;
-use aptos_retrier::ExponentWithLimitDelay;
 use aptos_sdk::types::PeerId;
-use async_trait::async_trait;
 use k8s_openapi::api::{
     apps::v1::{Deployment, StatefulSet},
     batch::{v1::Job, v1beta1::CronJob},
     core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod},
 };
 use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, Patch, PatchParams, PostParams},
+    api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, PostParams},
     client::Client as K8sClient,
     Config, Error as KubeError,
 };
@@ -40,24 +42,6 @@ use std::{
 use tempfile::TempDir;
 use thiserror::Error;
 use tokio::time::Duration;
-
-// binaries expected to be present on test runner
-const HELM_BIN: &str = "helm";
-pub const KUBECTL_BIN: &str = "kubectl";
-
-// helm release names and helm chart paths
-const APTOS_NODE_HELM_RELEASE_NAME: &str = "aptos-node";
-const GENESIS_HELM_RELEASE_NAME: &str = "genesis";
-const APTOS_NODE_HELM_CHART_PATH: &str = "terraform/helm/aptos-node";
-const GENESIS_HELM_CHART_PATH: &str = "terraform/helm/genesis";
-
-// cleanup namespaces after 30 minutes unless "keep = true"
-const NAMESPACE_CLEANUP_THRESHOLD_SECS: u64 = 1800;
-// Leave a buffer of around 20 minutes for test provisioning and cleanup to be done before cleaning
-// up underlying resources.
-pub const NAMESPACE_CLEANUP_DURATION_BUFFER_SECS: u64 = 1200;
-const POD_CLEANUP_THRESHOLD_SECS: u64 = 86400;
-pub const MANAGEMENT_CONFIGMAP_PREFIX: &str = "forge-management";
 
 // We use the macros below to get around the current limitations of the
 // "include_str!" macro (which loads the file content at compile time, rather
@@ -162,113 +146,26 @@ async fn wait_node_haproxy(
     .await
 }
 
-pub async fn check_for_container_restart(
-    kube_client: &K8sClient,
-    kube_namespace: &str,
-    sts_name: &str,
-) -> Result<()> {
-    aptos_retrier::retry_async(
-        ExponentWithLimitDelay::new(1000, 10 * 1000, 60 * 1000),
-        || {
-            let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), kube_namespace);
-            Box::pin(async move {
-                // Get the StatefulSet's Pod status
-                return if let Some(status) = pod_api
-                    .get_status(format!("{}-0", sts_name).as_str())
-                    .await?
-                    .status
-                {
-                    if let Some(container_statuses) = status.container_statuses {
-                        for container_status in container_statuses {
-                            if container_status.restart_count > 0 {
-                                bail!(
-                                    "Container {} restarted {} times ",
-                                    container_status.name,
-                                    container_status.restart_count
-                                );
-                            }
-                        }
-                        return Ok(());
-                    }
-                    // In case of no restarts, k8 apis returns no container statuses
-                    Ok(())
-                } else {
-                    bail!("Can't query the pod status for {}", sts_name)
-                };
-            })
-        },
-    )
-    .await
-}
-
-/// Waits for a single K8s StatefulSet to be ready
-async fn wait_stateful_set(
-    kube_client: &K8sClient,
-    kube_namespace: &str,
-    sts_name: &str,
-    desired_replicas: u64,
-) -> Result<()> {
-    aptos_retrier::retry_async(k8s_wait_nodes_strategy(), || {
-        let sts_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
-        let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), kube_namespace);
-        Box::pin(async move {
-            match sts_api.get_status(sts_name).await {
-                Ok(s) => {
-                    let sts_name = &s.name();
-                    // get the StatefulSet status
-                    if let Some(sts_status) = s.status {
-                        let ready_replicas = sts_status.ready_replicas.unwrap_or(0) as u64;
-                        let replicas = sts_status.replicas as u64;
-                        if ready_replicas == replicas && replicas == desired_replicas {
-                            info!(
-                                "StatefulSet {} has scaled to {}",
-                                sts_name, desired_replicas
-                            );
-                            return Ok(());
-                        }
-                    }
-                    // Get the StatefulSet's Pod status
-                    if let Some(status) = pod_api
-                        .get_status(format!("{}-0", sts_name).as_str())
-                        .await?
-                        .status
-                    {
-                        if let Some(phase) = status.phase.as_ref() {
-                            info!("StatefulSet {} not ready yet, at phase {}", sts_name, phase)
-                        }
-                    }
-                    bail!("STS not ready");
-                }
-                Err(e) => {
-                    info!("Failed to get sts: {}", e);
-                    bail!("Failed to get sts: {}", e);
-                }
-            }
-        })
-    })
-    .await
-}
-
-/// Waits for all given K8sNodes to be ready
+/// Waits for all given K8sNodes to be ready. Called when the testnet is first started.
 async fn wait_nodes_stateful_set(
     kube_client: &K8sClient,
     kube_namespace: &str,
     nodes: &HashMap<PeerId, K8sNode>,
 ) -> Result<()> {
-    // wait for all validators healthy
+    // wait for all nodes healthy
     for node in nodes.values() {
-        wait_stateful_set(kube_client, kube_namespace, node.stateful_set_name(), 1).await?
+        // retry for ~20 min exponentially
+        let retry_policy = RetryPolicy::exponential(Duration::from_secs(5)).with_max_retries(5);
+        wait_stateful_set(
+            kube_client,
+            kube_namespace,
+            node.stateful_set_name(),
+            1,
+            retry_policy,
+        )
+        .await?
     }
     Ok(())
-}
-
-// TODO: set validator image tag by kube api rather than helm
-pub fn set_validator_image_tag(
-    _validator_name: String,
-    _image_tag: String,
-    _kube_namespace: String,
-) -> Result<()> {
-    todo!()
 }
 
 /// Deletes a collection of resources in k8s as part of aptos-node
@@ -658,35 +555,8 @@ pub async fn collect_running_nodes(
 
 pub async fn create_k8s_client() -> K8sClient {
     // get the client from the local kube context
-    // TODO(rustielin|geekflyer): use proxy or port-forward to make REST API available
     let config_infer = Config::infer().await.unwrap();
     K8sClient::try_from(config_infer).unwrap()
-}
-
-// TODO: replace this with rust kube api call
-pub async fn scale_stateful_set_replicas(
-    sts_name: &str,
-    kube_namespace: &str,
-    replica_num: u64,
-) -> Result<()> {
-    let kube_client = create_k8s_client().await;
-    let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
-    let pp = PatchParams::apply("forge").force();
-    let patch = serde_json::json!({
-        "apiVersion": "apps/v1",
-        "kind": "StatefulSet",
-        "metadata": {
-            "name": sts_name,
-        },
-        "spec": {
-            "replicas": replica_num,
-        }
-    });
-    let patch = Patch::Apply(&patch);
-    stateful_set_api.patch(sts_name, &pp, &patch).await?;
-    wait_stateful_set(&kube_client, kube_namespace, sts_name, replica_num).await?;
-
-    Ok(())
 }
 
 /// Gets the result of helm status command as JSON
@@ -740,37 +610,6 @@ fn dump_helm_values_to_file(helm_release_name: &str, tmp_dir: &TempDir) -> Resul
     dump_string_to_file(file_name, content, tmp_dir)
 }
 
-struct K8sNamespacesApi {
-    api: Api<Namespace>,
-}
-
-#[async_trait]
-trait CreateNamespace: Send + Sync {
-    async fn create(&self, pp: &PostParams, namespace: &Namespace) -> Result<Namespace, KubeError>;
-}
-
-#[async_trait]
-impl CreateNamespace for Api<Namespace> {
-    async fn create(&self, pp: &PostParams, namespace: &Namespace) -> Result<Namespace, KubeError> {
-        self.create(pp, namespace).await
-    }
-}
-
-impl K8sNamespacesApi {
-    fn from_client(kube_client: K8sClient) -> Self {
-        K8sNamespacesApi {
-            api: Api::all(kube_client),
-        }
-    }
-}
-
-#[async_trait]
-impl CreateNamespace for K8sNamespacesApi {
-    async fn create(&self, pp: &PostParams, namespace: &Namespace) -> Result<Namespace, KubeError> {
-        self.api.create(pp, namespace).await
-    }
-}
-
 #[derive(Error, Debug)]
 #[error("{0}")]
 enum ApiError {
@@ -779,7 +618,7 @@ enum ApiError {
 }
 
 async fn create_namespace(
-    namespace_creator: Arc<dyn CreateNamespace>,
+    namespace_api: Arc<dyn Create<Namespace>>,
     kube_namespace: String,
 ) -> Result<(), ApiError> {
     let kube_namespace_name = kube_namespace.clone();
@@ -791,7 +630,7 @@ async fn create_namespace(
         spec: None,
         status: None,
     };
-    if let Err(KubeError::Api(api_err)) = namespace_creator
+    if let Err(KubeError::Api(api_err)) = namespace_api
         .create(&PostParams::default(), &namespace)
         .await
     {
@@ -822,7 +661,7 @@ pub async fn create_management_configmap(
     cleanup_duration: Duration,
 ) -> Result<()> {
     let kube_client = create_k8s_client().await;
-    let namespaces_api = Arc::new(K8sNamespacesApi::from_client(kube_client.clone()));
+    let namespaces_api = Arc::new(K8sApi::<Namespace>::from_client(kube_client.clone(), None));
     let other_kube_namespace = kube_namespace.clone();
 
     // try to create a new namespace
@@ -836,7 +675,10 @@ pub async fn create_management_configmap(
         )
         .await?;
 
-    let configmap: Api<ConfigMap> = Api::namespaced(kube_client.clone(), &kube_namespace);
+    let configmap_api = Arc::new(K8sApi::<ConfigMap>::from_client(
+        kube_client.clone(),
+        Some(kube_namespace.clone()),
+    ));
 
     let management_configmap_name = format!("{}-{}", MANAGEMENT_CONFIGMAP_PREFIX, &kube_namespace);
     let mut data: BTreeMap<String, String> = BTreeMap::new();
@@ -857,7 +699,9 @@ pub async fn create_management_configmap(
             ..ObjectMeta::default()
         },
     };
-    if let Err(KubeError::Api(api_err)) = configmap.create(&PostParams::default(), &config).await {
+    if let Err(KubeError::Api(api_err)) =
+        configmap_api.create(&PostParams::default(), &config).await
+    {
         if api_err.code == 409 {
             info!(
                 "Configmap {} already exists, continuing with it",
@@ -1000,6 +844,7 @@ fn check_namespace_for_cleanup(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
     use hyper::http::StatusCode;
     use kube::error::ErrorResponse;
 
@@ -1014,7 +859,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl CreateNamespace for FailedNamespacesApi {
+    impl Create<Namespace> for FailedNamespacesApi {
         async fn create(
             &self,
             _pp: &PostParams,

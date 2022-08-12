@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    chaos, check_for_container_restart, create_k8s_client, get_free_port,
-    node::{K8sNode, REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT},
+    chaos, check_for_container_restart, create_k8s_client, get_free_port, get_stateful_set_image,
+    node::K8sNode,
     prometheus::{self, query_with_metadata},
-    query_sequence_numbers, set_validator_image_tag, uninstall_testnet_resources, ChainInfo,
-    FullNode, Node, Result, Swarm, SwarmChaos, Validator, Version,
+    query_sequence_numbers, set_stateful_set_image_tag, uninstall_testnet_resources, ChainInfo,
+    FullNode, Node, Result, Swarm, SwarmChaos, Validator, Version, HAPROXY_SERVICE_SUFFIX,
+    REST_API_HAPROXY_SERVICE_PORT, REST_API_SERVICE_PORT,
 };
 use ::aptos_logger::*;
 use anyhow::{anyhow, bail, format_err};
@@ -17,7 +18,7 @@ use aptos_sdk::{
     move_types::account_address::AccountAddress,
     types::{chain_id::ChainId, AccountKey, LocalAccount, PeerId},
 };
-use k8s_openapi::api::{apps::v1::StatefulSet, core::v1::Service};
+use k8s_openapi::api::apps::v1::StatefulSet;
 use kube::{
     api::{Api, ListParams},
     client::Client as K8sClient,
@@ -31,12 +32,6 @@ use std::{
     sync::Arc,
 };
 use tokio::{runtime::Runtime, time::Duration};
-
-pub const VALIDATOR_SERVICE_SUFFIX: &str = "validator";
-pub const FULLNODE_SERVICE_SUFFIX: &str = "fullnode";
-pub const VALIDATOR_HAPROXY_SERVICE_SUFFIX: &str = "validator-lb";
-pub const FULLNODE_HAPROXY_SERVICE_SUFFIX: &str = "fullnode-lb";
-pub const HAPROXY_SERVICE_SUFFIX: &str = "lb";
 
 pub struct K8sSwarm {
     validators: HashMap<PeerId, K8sNode>,
@@ -55,7 +50,7 @@ impl K8sSwarm {
     pub async fn new(
         root_key: &[u8],
         image_tag: &str,
-        base_image_tag: &str,
+        upgrade_image_tag: &str,
         kube_namespace: &str,
         validators: HashMap<AccountAddress, K8sNode>,
         fullnodes: HashMap<AccountAddress, K8sNode>,
@@ -79,9 +74,9 @@ impl K8sSwarm {
         let root_account = LocalAccount::new(address, account_key, sequence_number);
 
         let mut versions = HashMap::new();
-        let base_version = Version::new(0, base_image_tag.to_string());
-        let cur_version = Version::new(1, image_tag.to_string());
-        versions.insert(base_version, base_image_tag.to_string());
+        let cur_version = Version::new(0, image_tag.to_string());
+        let upgrade_version = Version::new(1, upgrade_image_tag.to_string());
+        versions.insert(upgrade_version, upgrade_image_tag.to_string());
         versions.insert(cur_version, image_tag.to_string());
 
         let prom_client = match prometheus::get_prometheus_client() {
@@ -155,7 +150,8 @@ impl Swarm for K8sSwarm {
             .map(|v| v as &mut dyn Validator)
     }
 
-    fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
+    /// TODO: this should really be a method on Node rather than Swarm
+    async fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
         let validator = self
             .validators
             .get_mut(&id)
@@ -165,11 +161,20 @@ impl Swarm for K8sSwarm {
             .get(version)
             .cloned()
             .ok_or_else(|| anyhow!("Invalid version: {:?}", version))?;
-        set_validator_image_tag(
+        set_stateful_set_image_tag(
             validator.stateful_set_name().to_string(),
-            version,
+            // the container name for the validator in its StatefulSet is "validator"
+            "validator".to_string(),
+            // extract the image tag from the "version"
+            version.to_string(),
             self.kube_namespace.clone(),
         )
+        .await?;
+
+        // To ensure that the validator is fully spun back up
+        // If port-forward is enabled, this ensures that the pod is back before attempting a port-forward
+        validator.start().await?;
+        Ok(())
     }
 
     fn full_nodes<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn FullNode> + 'a> {
@@ -302,28 +307,6 @@ pub fn k8s_wait_nodes_strategy() -> impl Iterator<Item = Duration> {
     ExponentWithLimitDelay::new(1000, 10 * 1000, 15 * 60 * 1000)
 }
 
-#[derive(Clone, Debug)]
-pub struct KubeService {
-    pub name: String,
-    pub host_ip: String,
-}
-
-impl TryFrom<Service> for KubeService {
-    type Error = anyhow::Error;
-
-    fn try_from(service: Service) -> Result<Self, Self::Error> {
-        let metadata = service.metadata;
-        let name = metadata
-            .name
-            .ok_or_else(|| format_err!("node name not found"))?;
-        let spec = service
-            .spec
-            .ok_or_else(|| format_err!("spec not found for node"))?;
-        let host_ip = spec.cluster_ip.unwrap_or_default();
-        Ok(Self { name, host_ip })
-    }
-}
-
 async fn list_stateful_sets(client: K8sClient, kube_namespace: &str) -> Result<Vec<StatefulSet>> {
     let stateful_set_api: Api<StatefulSet> = Api::namespaced(client, kube_namespace);
     let lp = ListParams::default();
@@ -386,20 +369,9 @@ fn get_k8s_node_from_stateful_set(
     let node_type = parse_node_type(stateful_set_name);
 
     // Extract the image tag from the StatefulSet spec
-    let image_tag = sts
-        .spec
-        .as_ref()
-        .unwrap()
-        .template
-        .spec
-        .as_ref()
-        .unwrap()
-        .containers[0]
-        .image
-        .as_ref()
-        .unwrap()
-        .split(':')
-        .collect::<Vec<&str>>()[1];
+    let image_tag = get_stateful_set_image(sts)
+        .expect("Failed to get StatefulSet image")
+        .tag;
 
     K8sNode {
         name: format!("{}-{}", &node_type, index),
@@ -409,7 +381,7 @@ fn get_k8s_node_from_stateful_set(
         index,
         service_name,
         rest_api_port,
-        version: Version::new(0, image_tag.to_string()),
+        version: Version::new(0, image_tag),
         namespace: namespace.to_string(),
         haproxy_enabled: enable_haproxy,
         port_forward_enabled: use_port_forward,
