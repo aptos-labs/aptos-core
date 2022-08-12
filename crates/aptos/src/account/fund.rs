@@ -17,7 +17,7 @@ use clap::Parser;
 /// Command to fund an account with tokens from a faucet
 ///
 #[derive(Debug, Parser)]
-pub struct FundAccount {
+pub struct FundWithFaucet {
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
     /// Address to fund
@@ -33,9 +33,9 @@ pub struct FundAccount {
 }
 
 #[async_trait]
-impl CliCommand<String> for FundAccount {
+impl CliCommand<String> for FundWithFaucet {
     fn command_name(&self) -> &'static str {
-        "FundAccount"
+        "FundWithFaucet"
     }
 
     async fn execute(self) -> CliTypedResult<String> {

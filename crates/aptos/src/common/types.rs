@@ -1063,6 +1063,11 @@ impl TransactionOptions {
         self.rest_options.client(&self.profile_options.profile)
     }
 
+    pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
+        let sender_key = self.private_key()?;
+        Ok(account_address_from_public_key(&sender_key.public_key()))
+    }
+
     /// Submits a script function based on module name and function inputs
     pub async fn submit_script_function(
         &self,
@@ -1090,8 +1095,7 @@ impl TransactionOptions {
         let client = self.rest_client()?;
 
         // Get sender address
-        let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
-        let sender_address = AccountAddress::new(*sender_address);
+        let sender_address = self.sender_address()?;
 
         // Get sequence number for account
         let sequence_number = get_sequence_number(&client, sender_address).await?;

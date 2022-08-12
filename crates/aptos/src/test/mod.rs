@@ -3,7 +3,7 @@
 
 use crate::account::{
     create::{CreateAccount, DEFAULT_FUNDED_COINS},
-    fund::FundAccount,
+    fund::FundWithFaucet,
     list::{ListAccount, ListQuery},
     transfer::{TransferCoins, TransferSummary},
 };
@@ -19,12 +19,16 @@ use crate::move_tool::{
     ArgWithType, CompilePackage, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
 };
 use crate::node::{
-    AddStake, AnalyzeMode, AnalyzeValidatorPerformance, IncreaseLockup, JoinValidatorSet,
-    LeaveValidatorSet, OperatorArgs, RegisterValidatorCandidate, ShowValidatorConfig,
-    ShowValidatorSet, ShowValidatorStake, UnlockStake, UpdateValidatorNetworkAddresses,
-    ValidatorConfigArgs, WithdrawStake,
+    AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
+    LeaveValidatorSet, OperatorArgs, ShowValidatorConfig, ShowValidatorSet, ShowValidatorStake,
+    UpdateConsensusKey, UpdateValidatorNetworkAddresses, ValidatorConfigFileArgs,
+    ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
 use crate::op::key::{ExtractPeer, GenerateKey, SaveKey};
+use crate::stake::{
+    AddStake, IncreaseLockup, InitializeStakeOwner, SetDelegatedVoter, SetOperator, UnlockStake,
+    WithdrawStake,
+};
 use crate::CliCommand;
 use aptos_config::config::Peer;
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
@@ -102,7 +106,7 @@ impl CliTestFramework {
 
         for _ in 0..num_accounts {
             framework
-                .add_cli_account(keygen.generate_ed25519_private_key())
+                .create_cli_account_from_faucet(keygen.generate_ed25519_private_key(), None)
                 .await
                 .unwrap();
         }
@@ -110,66 +114,58 @@ impl CliTestFramework {
         framework
     }
 
-    pub async fn add_cli_account(
-        &mut self,
-        private_key: Ed25519PrivateKey,
-    ) -> CliTypedResult<usize> {
-        let index = self.add_private_key(private_key);
-
+    async fn check_account_exists(&self, index: usize) -> bool {
         // Create account if it doesn't exist (and there's a faucet)
         let client = aptos_rest_client::Client::new(self.endpoint.clone());
         let address = self.account_id(index);
-        if client.get_account(address).await.is_err() {
-            self.fund_account(index, None).await?;
-            warn!("Funded account {:?}", address);
-        } else {
-            warn!("Account {:?} already exists", address);
-        }
-
-        Ok(index)
+        return client.get_account(address).await.is_ok();
     }
 
-    pub fn add_private_key(&mut self, private_key: Ed25519PrivateKey) -> usize {
+    pub fn add_account_to_cli(&mut self, private_key: Ed25519PrivateKey) -> usize {
         self.account_keys.push(private_key);
         self.account_keys.len() - 1
     }
 
-    pub async fn create_account(
-        &self,
-        index: usize,
-        mint_key: &Ed25519PrivateKey,
-    ) -> CliTypedResult<String> {
+    pub async fn create_cli_account(
+        &mut self,
+        private_key: Ed25519PrivateKey,
+        sender_index: usize,
+    ) -> CliTypedResult<usize> {
+        let index = self.add_account_to_cli(private_key);
+        if self.check_account_exists(index).await {
+            return Err(CliError::UnexpectedError(
+                "Account already exists".to_string(),
+            ));
+        }
         CreateAccount {
-            txn_options: TransactionOptions {
-                private_key_options: PrivateKeyInputOptions::from_private_key(mint_key)?,
-                encoding_options: Default::default(),
-                profile_options: Default::default(),
-                rest_options: self.rest_options(),
-                gas_options: Default::default(),
-            },
+            txn_options: self.transaction_options(sender_index, None),
             account: self.account_id(index),
-            use_faucet: false,
-            faucet_options: Default::default(),
-            initial_coins: DEFAULT_FUNDED_COINS,
         }
         .execute()
-        .await
+        .await?;
+
+        Ok(index)
     }
 
-    pub async fn create_account_with_faucet(&self, index: usize) -> CliTypedResult<String> {
-        CreateAccount {
-            txn_options: Default::default(),
-            account: self.account_id(index),
-            use_faucet: true,
-            faucet_options: self.faucet_options(),
-            initial_coins: 0,
+    pub async fn create_cli_account_from_faucet(
+        &mut self,
+        private_key: Ed25519PrivateKey,
+        amount: Option<u64>,
+    ) -> CliTypedResult<usize> {
+        let index = self.add_account_to_cli(private_key);
+        if self.check_account_exists(index).await {
+            return Err(CliError::UnexpectedError(
+                "Account already exists".to_string(),
+            ));
         }
-        .execute()
-        .await
+
+        self.fund_account(index, amount).await?;
+        warn!("Funded account {:?}", self.account_id(index));
+        Ok(index)
     }
 
     pub async fn fund_account(&self, index: usize, amount: Option<u64>) -> CliTypedResult<String> {
-        FundAccount {
+        FundWithFaucet {
             profile_options: Default::default(),
             account: self.account_id(index),
             faucet_options: self.faucet_options(),
@@ -222,11 +218,14 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn show_validator_config(&self, index: usize) -> CliTypedResult<ValidatorConfig> {
+    pub async fn show_validator_config(
+        &self,
+        pool_index: usize,
+    ) -> CliTypedResult<ValidatorConfig> {
         ShowValidatorConfig {
             rest_options: self.rest_options(),
             profile_options: Default::default(),
-            operator_args: self.operator_args(index),
+            operator_args: self.operator_args(Some(pool_index)),
         }
         .execute()
         .await
@@ -243,17 +242,17 @@ impl CliTestFramework {
         .map(|v| to_validator_set(&v))
     }
 
-    pub async fn show_validator_stake(&self, index: usize) -> CliTypedResult<Value> {
+    pub async fn show_validator_stake(&self, pool_index: usize) -> CliTypedResult<Value> {
         ShowValidatorStake {
             rest_options: self.rest_options(),
             profile_options: Default::default(),
-            operator_args: self.operator_args(index),
+            operator_args: self.operator_args(Some(pool_index)),
         }
         .execute()
         .await
     }
 
-    pub async fn register_validator_candidate(
+    pub async fn initialize_validator(
         &self,
         index: usize,
         consensus_public_key: bls12381::PublicKey,
@@ -261,12 +260,16 @@ impl CliTestFramework {
         validator_host: HostAndPort,
         validator_network_public_key: x25519::PublicKey,
     ) -> CliTypedResult<Transaction> {
-        RegisterValidatorCandidate {
+        InitializeValidator {
             txn_options: self.transaction_options(index, None),
-            validator_config_args: ValidatorConfigArgs {
+            validator_config_file_args: ValidatorConfigFileArgs {
                 validator_config_file: None,
+            },
+            validator_consensus_key_args: ValidatorConsensusKeyArgs {
                 consensus_public_key: Some(consensus_public_key),
                 proof_of_possession: Some(proof_of_possession),
+            },
+            validator_network_addresses_args: ValidatorNetworkAddressesArgs {
                 validator_host: Some(validator_host),
                 validator_network_public_key: Some(validator_network_public_key),
                 full_node_host: None,
@@ -312,19 +315,27 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn join_validator_set(&self, index: usize) -> CliTypedResult<Transaction> {
+    pub async fn join_validator_set(
+        &self,
+        operator_index: usize,
+        pool_index: Option<usize>,
+    ) -> CliTypedResult<Transaction> {
         JoinValidatorSet {
-            txn_options: self.transaction_options(index, None),
-            operator_args: self.operator_args(index),
+            txn_options: self.transaction_options(operator_index, None),
+            operator_args: self.operator_args(pool_index),
         }
         .execute()
         .await
     }
 
-    pub async fn leave_validator_set(&self, index: usize) -> CliTypedResult<Transaction> {
+    pub async fn leave_validator_set(
+        &self,
+        operator_index: usize,
+        pool_index: Option<usize>,
+    ) -> CliTypedResult<Transaction> {
         LeaveValidatorSet {
-            txn_options: self.transaction_options(index, None),
-            operator_args: self.operator_args(index),
+            txn_options: self.transaction_options(operator_index, None),
+            operator_args: self.operator_args(pool_index),
         }
         .execute()
         .await
@@ -332,17 +343,18 @@ impl CliTestFramework {
 
     pub async fn update_validator_network_addresses(
         &self,
-        index: usize,
+        operator_index: usize,
+        pool_index: Option<usize>,
         validator_host: HostAndPort,
         validator_network_public_key: x25519::PublicKey,
     ) -> CliTypedResult<Transaction> {
         UpdateValidatorNetworkAddresses {
-            txn_options: self.transaction_options(index, None),
-            operator_args: self.operator_args(index),
-            validator_config_args: ValidatorConfigArgs {
+            txn_options: self.transaction_options(operator_index, None),
+            operator_args: self.operator_args(pool_index),
+            validator_config_file_args: ValidatorConfigFileArgs {
                 validator_config_file: None,
-                consensus_public_key: None,
-                proof_of_possession: None,
+            },
+            validator_network_addresses_args: ValidatorNetworkAddressesArgs {
                 validator_host: Some(validator_host),
                 validator_network_public_key: Some(validator_network_public_key),
                 full_node_host: None,
@@ -369,6 +381,28 @@ impl CliTestFramework {
         .await
     }
 
+    pub async fn update_consensus_key(
+        &self,
+        operator_index: usize,
+        pool_index: Option<usize>,
+        consensus_public_key: bls12381::PublicKey,
+        proof_of_possession: bls12381::ProofOfPossession,
+    ) -> CliTypedResult<Transaction> {
+        UpdateConsensusKey {
+            txn_options: self.transaction_options(operator_index, None),
+            operator_args: self.operator_args(pool_index),
+            validator_config_file_args: ValidatorConfigFileArgs {
+                validator_config_file: None,
+            },
+            validator_consensus_key_args: ValidatorConsensusKeyArgs {
+                consensus_public_key: Some(consensus_public_key),
+                proof_of_possession: Some(proof_of_possession),
+            },
+        }
+        .execute()
+        .await
+    }
+
     pub async fn init(&self, private_key: &Ed25519PrivateKey) -> CliTypedResult<()> {
         InitTool {
             rest_url: Some(self.endpoint.clone()),
@@ -379,6 +413,49 @@ impl CliTestFramework {
             prompt_options: PromptOptions::yes(),
             encoding_options: EncodingOptions::default(),
             skip_faucet: false,
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn initialize_stake_owner(
+        &self,
+        owner_index: usize,
+        initial_stake_amount: u64,
+        voter_index: Option<usize>,
+        operator_index: Option<usize>,
+    ) -> CliTypedResult<Transaction> {
+        InitializeStakeOwner {
+            txn_options: self.transaction_options(owner_index, None),
+            initial_stake_amount,
+            operator_address: operator_index.map(|idx| self.account_id(idx)),
+            voter_address: voter_index.map(|idx| self.account_id(idx)),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn set_operator(
+        &self,
+        owner_index: usize,
+        operator_index: usize,
+    ) -> CliTypedResult<Transaction> {
+        SetOperator {
+            txn_options: self.transaction_options(owner_index, None),
+            operator_address: self.account_id(operator_index),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn set_delegated_voter(
+        &self,
+        owner_index: usize,
+        voter_index: usize,
+    ) -> CliTypedResult<Transaction> {
+        SetDelegatedVoter {
+            txn_options: self.transaction_options(owner_index, None),
+            voter_address: self.account_id(voter_index),
         }
         .execute()
         .await
@@ -689,9 +766,9 @@ impl CliTestFramework {
         }
     }
 
-    fn operator_args(&self, index: usize) -> OperatorArgs {
+    fn operator_args(&self, pool_index: Option<usize>) -> OperatorArgs {
         OperatorArgs {
-            pool_address: Some(self.account_id(index)),
+            pool_address: pool_index.map(|idx| self.account_id(idx)),
         }
     }
 
