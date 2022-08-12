@@ -2,17 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { usePersistentStorageState, useSessionStorageState } from 'core/hooks/useStorageState';
-import { useState } from 'react';
 import bs58 from 'bs58';
 import { randomBytes, secretbox } from 'tweetnacl';
 import pbkdf2 from 'pbkdf2';
 import { Account } from 'core/types/stateTypes';
+import { WALLET_ACCOUNTS_KEY } from 'core/constants';
 
 const pbkdf2Iterations = 10000;
 const pbkdf2Digest = 'sha256';
 const pbkdf2SaltSize = 16;
-
-const accountsStorageKey = 'accounts';
 
 export type Accounts = Record<string, Account>;
 
@@ -49,15 +47,19 @@ export default function useEncryptedStorageState() {
     encryptedState,
     setEncryptedState,
     isEncryptedStateReady,
-  ] = usePersistentStorageState<EncryptedState>(`${accountsStorageKey}.encryptedState`);
+  ] = usePersistentStorageState<EncryptedState>(`${WALLET_ACCOUNTS_KEY}.encryptedState`);
   const [
     encryptionKey,
     setEncryptionKey,
     isEncryptionKeyReady,
-  ] = useSessionStorageState<string | undefined>(`${accountsStorageKey}.encryptionKey`);
-  const [value, setValue] = useState<Accounts>();
+  ] = useSessionStorageState<string | undefined>(`${WALLET_ACCOUNTS_KEY}.encryptionKey`);
+  const [
+    value,
+    setValue,
+    isValueReady,
+  ] = useSessionStorageState<Accounts>(`${WALLET_ACCOUNTS_KEY}`);
 
-  const isReady = isEncryptedStateReady && isEncryptionKeyReady;
+  const isReady = isEncryptedStateReady && isEncryptionKeyReady && isValueReady;
   const isInitialized = encryptedState !== undefined;
   const isUnlocked = isInitialized && encryptionKey !== undefined && value !== undefined;
 
@@ -81,7 +83,7 @@ export default function useEncryptedStorageState() {
 
     // Initialize encrypted data
     const newValue = initialValue;
-    setValue(newValue);
+    await setValue(newValue);
 
     const plaintext = JSON.stringify(newValue);
     const ciphertext = secretbox(Buffer.from(plaintext), nonce, newEncryptionKey);
@@ -112,7 +114,7 @@ export default function useEncryptedStorageState() {
 
     // check that data is unencrypted correctly
     const newValue = JSON.parse(decodedPlaintext) as Accounts;
-    setValue(newValue);
+    await setValue(newValue);
 
     // save decryption key to session
     await setEncryptionKey(bs58.encode(newEncryptionKey));
@@ -130,12 +132,12 @@ export default function useEncryptedStorageState() {
     };
 
     await setEncryptedState(newEncryptedState);
-    setValue(newValue);
+    await setValue(newValue);
   };
 
   const lock = async () => {
     await setEncryptionKey(undefined);
-    setValue(undefined);
+    await setValue(undefined);
   };
 
   return {

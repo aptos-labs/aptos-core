@@ -2,10 +2,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosAccount } from 'aptos';
+import { AptosAccount, HexString } from 'aptos';
 import {
   WALLET_ENCRYPTED_ACCOUNTS_KEY,
-  WALLET_SESSION_ACCOUNTS_KEY,
+  WALLET_ACCOUNTS_KEY,
   WALLET_STATE_ACCOUNT_ADDRESS_KEY,
   WALLET_STATE_LOADED_KEY,
   WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY,
@@ -28,6 +28,7 @@ import { HDKey } from '@scure/bip32';
 import {
   defaultNetworkType, defaultNetworks, NetworkType, Network,
 } from 'core/hooks/useNetworks';
+import { Accounts } from 'core/hooks/useEncryptedStorageState';
 
 // https://github.com/satoshilabs/slips/blob/master/slip-0044.md
 const bip44Coin = 637;
@@ -104,7 +105,7 @@ export async function getBackgroundEncryptedAccounts(): Promise<EncryptedAccount
 }
 
 export function getDecryptedAccounts(): AccountsState | null {
-  const item = window.sessionStorage.getItem(WALLET_SESSION_ACCOUNTS_KEY);
+  const item = window.sessionStorage.getItem(WALLET_ACCOUNTS_KEY);
   if (item) {
     const decryptedState: DecryptedState = JSON.parse(item);
     return decryptedState?.accounts ?? null;
@@ -113,9 +114,9 @@ export function getDecryptedAccounts(): AccountsState | null {
 }
 
 export async function getBackgroundDecryptedState(): Promise<DecryptedState | null> {
-  const result = await Browser.sessionStorage()?.get([WALLET_SESSION_ACCOUNTS_KEY]);
-  if (result && result[WALLET_SESSION_ACCOUNTS_KEY]) {
-    return JSON.parse(result[WALLET_SESSION_ACCOUNTS_KEY]);
+  const result = await Browser.sessionStorage()?.get([WALLET_ACCOUNTS_KEY]);
+  if (result && result[WALLET_ACCOUNTS_KEY]) {
+    return JSON.parse(result[WALLET_ACCOUNTS_KEY]);
   }
   return null;
 }
@@ -125,7 +126,7 @@ export async function getBackgroundDecryptedAccounts(): Promise<AccountsState | 
 }
 
 export function getDecryptionKeyFromSession(): Uint8Array | null {
-  const item = window.sessionStorage.getItem(WALLET_SESSION_ACCOUNTS_KEY);
+  const item = window.sessionStorage.getItem(WALLET_ACCOUNTS_KEY);
   if (item) {
     const decryptedState: DecryptedState = JSON.parse(item);
     return decryptedState ? bs58.decode(decryptedState.decryptionKey) : null;
@@ -200,8 +201,8 @@ export async function storeEncryptedAccounts(
   const decryptedState: DecryptedState = { accounts, decryptionKey: bs58.encode(decryptionKey) };
   const decryptedString = JSON.stringify(decryptedState);
   localStorage.setItem(WALLET_ENCRYPTED_ACCOUNTS_KEY, JSON.stringify(encryptedAccounts));
-  window.sessionStorage.setItem(WALLET_SESSION_ACCOUNTS_KEY, decryptedString);
-  Browser.sessionStorage()?.set({ [WALLET_SESSION_ACCOUNTS_KEY]: decryptedString });
+  window.sessionStorage.setItem(WALLET_ACCOUNTS_KEY, decryptedString);
+  Browser.sessionStorage()?.set({ [WALLET_ACCOUNTS_KEY]: decryptedString });
 }
 
 export async function unlockAccounts(
@@ -228,8 +229,8 @@ export async function unlockAccounts(
       const accounts: AccountsState = JSON.parse(decodedPlaintext);
       const decryptedState: DecryptedState = { accounts, decryptionKey: bs58.encode(key) };
       const decryptedString = JSON.stringify(decryptedState);
-      window.sessionStorage.setItem(WALLET_SESSION_ACCOUNTS_KEY, decryptedString);
-      Browser.sessionStorage()?.set({ [WALLET_SESSION_ACCOUNTS_KEY]: decryptedString });
+      window.sessionStorage.setItem(WALLET_ACCOUNTS_KEY, decryptedString);
+      Browser.sessionStorage()?.set({ [WALLET_ACCOUNTS_KEY]: decryptedString });
       return accounts;
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -240,12 +241,12 @@ export async function unlockAccounts(
   return null;
 }
 
-export function getAptosAccountState(accounts: AccountsState, address: string): AptosAccountState {
-  if (address && accounts) {
-    const aptosAccountObject = accounts[address].aptosAccount;
-    return aptosAccountObject ? AptosAccount.fromAptosAccountObject(aptosAccountObject) : undefined;
-  }
-  return undefined;
+export function getAptosAccountState(accounts: Accounts, address: string): AptosAccountState {
+  const account = address && accounts ? accounts[address] : undefined;
+  return account ? new AptosAccount(
+    HexString.ensure(account.privateKey).toUint8Array(),
+    account.publicKey,
+  ) : undefined;
 }
 
 export function getMnemonicState(address: string): MnemonicState {
@@ -260,13 +261,11 @@ export function getMnemonicState(address: string): MnemonicState {
 export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
   return new Promise((resolve) => {
     getBackgroundCurrentPublicAccount().then((publicAccount) => {
-      Browser.sessionStorage()?.get([WALLET_SESSION_ACCOUNTS_KEY], (accountResult: any) => {
-        if (!accountResult[WALLET_SESSION_ACCOUNTS_KEY]) {
+      Browser.sessionStorage()?.get([WALLET_ACCOUNTS_KEY], (accountResult: any) => {
+        if (!accountResult[WALLET_ACCOUNTS_KEY]) {
           resolve(undefined);
         }
-        const result = accountResult[WALLET_SESSION_ACCOUNTS_KEY];
-        const decryptedState: DecryptedState = JSON.parse(result);
-        const accounts = decryptedState?.accounts;
+        const accounts = JSON.parse(accountResult[WALLET_ACCOUNTS_KEY]);
         if (accounts && publicAccount?.address) {
           const aptosAccount = getAptosAccountState(accounts, publicAccount.address);
           resolve(aptosAccount);
@@ -281,7 +280,10 @@ export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
 export function getBackgroundNetwork(): Promise<Network> {
   return new Promise((resolve) => {
     Browser.persistentStorage()?.get([WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY], (result: any) => {
-      const networkType: NetworkType = JSON.parse(result[WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY]);
+      const serializedNetworkType = result[WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY];
+      const networkType = serializedNetworkType
+        ? JSON.parse(serializedNetworkType) as NetworkType
+        : undefined;
       resolve(defaultNetworks[networkType ?? defaultNetworkType]);
     });
   });
@@ -290,7 +292,7 @@ export function getBackgroundNetwork(): Promise<Network> {
 export async function loadBackgroundState(): Promise<boolean> {
   if (!getDecryptedAccounts()) {
     const state = await getBackgroundDecryptedState();
-    window.sessionStorage.setItem(WALLET_SESSION_ACCOUNTS_KEY, JSON.stringify(state));
+    window.sessionStorage.setItem(WALLET_ACCOUNTS_KEY, JSON.stringify(state));
   }
   sessionStorage.setItem(WALLET_STATE_LOADED_KEY, String(true));
   return true;
