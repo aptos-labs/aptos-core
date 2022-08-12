@@ -12,10 +12,12 @@ pub mod chaos;
 mod cluster_helper;
 pub mod node;
 pub mod prometheus;
+mod stateful_set;
 mod swarm;
 
 pub use cluster_helper::*;
 pub use node::K8sNode;
+pub use stateful_set::*;
 pub use swarm::*;
 
 use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
@@ -23,7 +25,7 @@ use aptos_sdk::crypto::ed25519::ED25519_PRIVATE_KEY_LENGTH;
 pub struct K8sFactory {
     root_key: [u8; ED25519_PRIVATE_KEY_LENGTH],
     image_tag: String,
-    base_image_tag: String,
+    upgrade_image_tag: String,
     kube_namespace: String,
     use_port_forward: bool,
     reuse: bool,
@@ -41,7 +43,7 @@ impl K8sFactory {
     pub fn new(
         kube_namespace: String,
         image_tag: String,
-        base_image_tag: String,
+        upgrade_image_tag: String,
         use_port_forward: bool,
         reuse: bool,
         keep: bool,
@@ -68,7 +70,7 @@ impl K8sFactory {
         Ok(Self {
             root_key,
             image_tag,
-            base_image_tag,
+            upgrade_image_tag,
             kube_namespace,
             use_port_forward,
             reuse,
@@ -82,8 +84,8 @@ impl K8sFactory {
 impl Factory for K8sFactory {
     fn versions<'a>(&'a self) -> Box<dyn Iterator<Item = Version> + 'a> {
         let version = vec![
-            Version::new(0, self.base_image_tag.clone()),
-            Version::new(1, self.image_tag.clone()),
+            Version::new(0, self.image_tag.clone()),
+            Version::new(1, self.upgrade_image_tag.clone()),
         ];
         Box::new(version.into_iter())
     }
@@ -153,7 +155,7 @@ impl Factory for K8sFactory {
         let swarm = K8sSwarm::new(
             &self.root_key,
             &self.image_tag,
-            &self.base_image_tag,
+            &self.upgrade_image_tag,
             &self.kube_namespace,
             validators,
             fullnodes,

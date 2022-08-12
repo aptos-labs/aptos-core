@@ -3,13 +3,13 @@
 
 use crate::{
     get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
-    nodes_healthcheck, K8sNode, Result, DEFAULT_ROOT_KEY, FULLNODE_HAPROXY_SERVICE_SUFFIX,
-    FULLNODE_SERVICE_SUFFIX, VALIDATOR_HAPROXY_SERVICE_SUFFIX, VALIDATOR_SERVICE_SUFFIX,
+    nodes_healthcheck, wait_stateful_set, K8sNode, Result, DEFAULT_ROOT_KEY,
+    FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
+    VALIDATOR_SERVICE_SUFFIX,
 };
 use again::RetryPolicy;
 use anyhow::{bail, format_err};
 use aptos_logger::info;
-use aptos_retrier::ExponentWithLimitDelay;
 use aptos_sdk::types::PeerId;
 use async_trait::async_trait;
 use k8s_openapi::api::{
@@ -18,7 +18,7 @@ use k8s_openapi::api::{
     core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod},
 };
 use kube::{
-    api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, Patch, PatchParams, PostParams},
+    api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, PostParams},
     client::Client as K8sClient,
     Config, Error as KubeError,
 };
@@ -162,113 +162,17 @@ async fn wait_node_haproxy(
     .await
 }
 
-pub async fn check_for_container_restart(
-    kube_client: &K8sClient,
-    kube_namespace: &str,
-    sts_name: &str,
-) -> Result<()> {
-    aptos_retrier::retry_async(
-        ExponentWithLimitDelay::new(1000, 10 * 1000, 60 * 1000),
-        || {
-            let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), kube_namespace);
-            Box::pin(async move {
-                // Get the StatefulSet's Pod status
-                return if let Some(status) = pod_api
-                    .get_status(format!("{}-0", sts_name).as_str())
-                    .await?
-                    .status
-                {
-                    if let Some(container_statuses) = status.container_statuses {
-                        for container_status in container_statuses {
-                            if container_status.restart_count > 0 {
-                                bail!(
-                                    "Container {} restarted {} times ",
-                                    container_status.name,
-                                    container_status.restart_count
-                                );
-                            }
-                        }
-                        return Ok(());
-                    }
-                    // In case of no restarts, k8 apis returns no container statuses
-                    Ok(())
-                } else {
-                    bail!("Can't query the pod status for {}", sts_name)
-                };
-            })
-        },
-    )
-    .await
-}
-
-/// Waits for a single K8s StatefulSet to be ready
-async fn wait_stateful_set(
-    kube_client: &K8sClient,
-    kube_namespace: &str,
-    sts_name: &str,
-    desired_replicas: u64,
-) -> Result<()> {
-    aptos_retrier::retry_async(k8s_wait_nodes_strategy(), || {
-        let sts_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
-        let pod_api: Api<Pod> = Api::namespaced(kube_client.clone(), kube_namespace);
-        Box::pin(async move {
-            match sts_api.get_status(sts_name).await {
-                Ok(s) => {
-                    let sts_name = &s.name();
-                    // get the StatefulSet status
-                    if let Some(sts_status) = s.status {
-                        let ready_replicas = sts_status.ready_replicas.unwrap_or(0) as u64;
-                        let replicas = sts_status.replicas as u64;
-                        if ready_replicas == replicas && replicas == desired_replicas {
-                            info!(
-                                "StatefulSet {} has scaled to {}",
-                                sts_name, desired_replicas
-                            );
-                            return Ok(());
-                        }
-                    }
-                    // Get the StatefulSet's Pod status
-                    if let Some(status) = pod_api
-                        .get_status(format!("{}-0", sts_name).as_str())
-                        .await?
-                        .status
-                    {
-                        if let Some(phase) = status.phase.as_ref() {
-                            info!("StatefulSet {} not ready yet, at phase {}", sts_name, phase)
-                        }
-                    }
-                    bail!("STS not ready");
-                }
-                Err(e) => {
-                    info!("Failed to get sts: {}", e);
-                    bail!("Failed to get sts: {}", e);
-                }
-            }
-        })
-    })
-    .await
-}
-
 /// Waits for all given K8sNodes to be ready
 async fn wait_nodes_stateful_set(
     kube_client: &K8sClient,
     kube_namespace: &str,
     nodes: &HashMap<PeerId, K8sNode>,
 ) -> Result<()> {
-    // wait for all validators healthy
+    // wait for all nodes healthy
     for node in nodes.values() {
         wait_stateful_set(kube_client, kube_namespace, node.stateful_set_name(), 1).await?
     }
     Ok(())
-}
-
-// TODO: set validator image tag by kube api rather than helm
-pub fn set_validator_image_tag(
-    _validator_name: String,
-    _image_tag: String,
-    _kube_namespace: String,
-) -> Result<()> {
-    todo!()
 }
 
 /// Deletes a collection of resources in k8s as part of aptos-node
@@ -658,35 +562,8 @@ pub async fn collect_running_nodes(
 
 pub async fn create_k8s_client() -> K8sClient {
     // get the client from the local kube context
-    // TODO(rustielin|geekflyer): use proxy or port-forward to make REST API available
     let config_infer = Config::infer().await.unwrap();
     K8sClient::try_from(config_infer).unwrap()
-}
-
-// TODO: replace this with rust kube api call
-pub async fn scale_stateful_set_replicas(
-    sts_name: &str,
-    kube_namespace: &str,
-    replica_num: u64,
-) -> Result<()> {
-    let kube_client = create_k8s_client().await;
-    let stateful_set_api: Api<StatefulSet> = Api::namespaced(kube_client.clone(), kube_namespace);
-    let pp = PatchParams::apply("forge").force();
-    let patch = serde_json::json!({
-        "apiVersion": "apps/v1",
-        "kind": "StatefulSet",
-        "metadata": {
-            "name": sts_name,
-        },
-        "spec": {
-            "replicas": replica_num,
-        }
-    });
-    let patch = Patch::Apply(&patch);
-    stateful_set_api.patch(sts_name, &pp, &patch).await?;
-    wait_stateful_set(&kube_client, kube_namespace, sts_name, replica_num).await?;
-
-    Ok(())
 }
 
 /// Gets the result of helm status command as JSON

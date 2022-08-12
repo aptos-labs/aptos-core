@@ -3673,6 +3673,7 @@ dependencies = [
  "inspection-service",
  "k8s-openapi",
  "kube",
+ "once_cell",
  "prometheus-http-query",
  "rand 0.7.3",
  "rayon",
