@@ -21,7 +21,6 @@ use channel::aptos_channel;
 use consensus_types::proof_of_store::SignedDigestInfo;
 use consensus_types::{common::Round, proof_of_store::LogicalTime};
 use std::sync::Arc;
-use futures::executor::block_on;
 use tokio::sync::{
     mpsc::{channel, Receiver, Sender},
     oneshot,
@@ -264,7 +263,7 @@ impl QuorumStore {
                 QuorumStoreCommand::AppendToBatch(fragment_payload, batch_id) => {
                     debug!("QS: end batch cmd received, batch id {}", batch_id);
                     let msg = self.handle_append_to_batch(fragment_payload, batch_id);
-                    block_on(self.network_sender.broadcast_without_self(msg));
+                    self.network_sender.broadcast_without_self(msg).await;
 
                     self.fragment_id = self.fragment_id + 1;
                 }
@@ -280,8 +279,8 @@ impl QuorumStore {
                         .handle_end_batch(fragment_payload, batch_id, logical_time, proof_tx)
                         .await;
 
-                    block_on(self.network_sender
-                        .broadcast_without_self(ConsensusMsg::FragmentMsg(Box::new(fragment))));
+                    self.network_sender
+                         .broadcast_without_self(ConsensusMsg::FragmentMsg(Box::new(fragment))).await;
 
                     self.batch_store_tx
                         .send(batch_store_command)

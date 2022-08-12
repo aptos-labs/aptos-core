@@ -382,7 +382,7 @@ pub(crate) fn process_quorum_store_request<V: TransactionValidation>(
 ) {
     // Start latency timer
     let start_time = Instant::now();
-    debug!(LogSchema::event_log(LogEntry::QuorumStore, LogEvent::Received).quorum_store_msg(&req));
+    // debug!(LogSchema::event_log(LogEntry::QuorumStore, LogEvent::Received).quorum_store_msg(&req));
 
     let (resp, callback, counter_label) = match req {
         QuorumStoreRequest::GetBatchRequest(max_batch_size, transactions, callback) => {
