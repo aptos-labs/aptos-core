@@ -147,6 +147,58 @@ This will build a release binary: `aptos-core/target/release/aptos-node`. The re
 
 :::
 
+9.1 You can create a service file for `aptos-node`, and control node state with a `systemctl`
+
+**Create service file**
+```shell
+sudo tee <<EOF >/dev/null /etc/systemd/system/aptos-node.service
+[Unit]
+Description=Sui node
+After=network-online.target
+[Service]
+User=$USER
+WorkingDirectory=/$HOME/aptos-core
+ExecStart=/$HOME/.cargo/bin/cargo run --release --bin aptos-node -- -f /$HOME/path_to_you_config/fullnode.yaml
+Restart=on-failure
+RestartSec=3
+LimitNOFILE=65535
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+> Important! You must change a `WorkinDirectory` and path to `config file` according to your preferences!
+
+To init your service run:
+```shell
+sudo systemctl enable aptos-node
+sudo systemctl daemon-reload
+sudo systemctl start aptos-node
+```
+
+Now, you can control `aptos-node` with **systemctl**:
+
+```shell
+sudo systemctl start aptos-node
+```
+
+```shell
+sudo systemctl stop aptos-node
+```
+
+```shell
+sudo systemctl restart aptos-node
+```
+
+```shell
+sudo systemctl status aptos-node
+```
+
+Also, you can read logs with a `journalctl` command:
+```shell
+journalctl -u aptos-node.service -f
+```
+
 ### Approach #2: Using Docker
 
 This section describes how to configure and run your FullNode using Docker.
