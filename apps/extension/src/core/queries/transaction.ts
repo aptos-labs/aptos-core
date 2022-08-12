@@ -78,14 +78,14 @@ export function useCoinTransferTransactions(
 // endregion
 
 export const useTransaction = (
-  version: bigint | undefined,
+  version: number | undefined,
   options?: UseQueryOptions<UserTransaction>,
 ) => {
   const { aptosClient } = useGlobalStateContext();
 
   return useQuery<UserTransaction>(
     [transactionQueryKeys.getTransaction, version],
-    async () => aptosClient!.getTransactionByVersion(version!) as Promise<UserTransaction>,
+    async () => aptosClient!.getTransactionByVersion(BigInt(version!)) as Promise<UserTransaction>,
     {
       ...options,
       enabled: Boolean(aptosClient && version) && options?.enabled,

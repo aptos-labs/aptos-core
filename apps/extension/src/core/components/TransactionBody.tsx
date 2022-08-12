@@ -38,7 +38,7 @@ function DetailItem({ children, label }: DetailItemProps) {
   );
 }
 
-function useTransactionDetails(version?: bigint) {
+function useTransactionDetails(version?: number) {
   const { data: txn } = useTransaction(version);
   if (!txn) {
     return null;
@@ -71,7 +71,7 @@ function TransactionBody() {
   const { activeAccountAddress } = useGlobalStateContext();
   const { version } = useParams();
 
-  const txn = useTransactionDetails(version ? BigInt(version) : undefined);
+  const txn = useTransactionDetails(version ? Number(version) : undefined);
   const userAddress = activeAccountAddress
     && HexString.ensure(activeAccountAddress).toShortString();
 
