@@ -16,7 +16,9 @@ export function useFundAccount() {
   const queryClient = useQueryClient();
 
   const fundAccount = faucetClient
-    && (({ address, amount }: UseFundAccountParams) => faucetClient.fundAccount(address, amount));
+    ? ({ address, amount }: UseFundAccountParams) => faucetClient.fundAccount(address, amount)
+    : undefined;
+
   const {
     isLoading,
     mutateAsync,

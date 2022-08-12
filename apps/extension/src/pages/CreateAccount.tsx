@@ -15,7 +15,7 @@ import { createAccountErrorToast, createAccountToast } from 'core/components/Toa
 
 function CreateAccount() {
   const navigate = useNavigate();
-  const { addAccount } = useGlobalStateContext();
+  const { addAccount, faucetClient } = useGlobalStateContext();
   const { fundAccount } = useFundAccount();
   const newMnemonic = useMemo(() => generateMnemonic(), []);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -43,7 +43,7 @@ function CreateAccount() {
           publicKey: publicKeyHex!,
         });
 
-        if (fundAccount) {
+        if (faucetClient) {
           await fundAccount({ address: address!, amount: 0 });
         }
 
