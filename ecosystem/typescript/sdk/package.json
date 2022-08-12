@@ -8,14 +8,15 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "rm -rf dist && tsc -p .",
+    "prepack": "tsdx build",
+    "build": "tsdx build",
     "lint": "eslint \"**/*.ts\"",
     "test": "jest",
     "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
     "fmt": "yarn _fmt --write",
     "fmt:check": "yarn _fmt --check",
     "cov:clean": "rm -rf coverage",
-    "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
+    "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true && cp -f ./AxiosHttpRequest.ts.patch ./src/generated/core/AxiosHttpRequest.ts",
     "checked-publish": "./checked_publish.sh"
   },
   "repository": {
@@ -60,6 +61,7 @@
     "ts-jest": "^28.0.7",
     "ts-loader": "^9.3.1",
     "ts-node": "^10.9.1",
+    "tsdx": "^0.14.1",
     "typescript": "4.7.4"
   },
   "version": "1.3.10"
