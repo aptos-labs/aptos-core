@@ -20,8 +20,8 @@ const secondaryIconColor = {
 };
 
 const secondaryIconUnpressedColor = {
-  dark: 'blue.400',
-  light: 'blue.400',
+  dark: 'teal.400',
+  light: 'teal.400',
 };
 
 export default function WalletFooter() {

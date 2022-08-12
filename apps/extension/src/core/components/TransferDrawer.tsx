@@ -90,7 +90,7 @@ function TransferDrawer() {
 
   const { activeAccountAddress } = useGlobalStateContext();
   const { data: coinBalance } = useAccountCoinBalance(activeAccountAddress);
-  const coinBalanceString = numeral(coinBalance).format('0,0.0000');
+  const coinBalanceString = numeral(coinBalance).format('0,0');
 
   const {
     data: simulatedTxn,
@@ -147,6 +147,7 @@ function TransferDrawer() {
         disabled={!coinBalance}
         leftIcon={<IoIosSend />}
         onClick={openDrawer}
+        colorScheme="teal"
       >
         Send
       </Button>

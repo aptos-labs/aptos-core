@@ -88,3 +88,8 @@ export const secondaryDividerColor = {
   dark: 'whiteAlpha.300',
   light: 'gray.200',
 };
+
+export const secondaryWalletHomeCardBgColor = {
+  dark: 'gray.800',
+  light: 'gray.50',
+};
