@@ -285,7 +285,7 @@ test(
   30 * 1000,
 );
 
-test.skip(
+test(
   "submits multiagent transaction",
   async () => {
     const client = new AptosClient(NODE_URL);
@@ -331,13 +331,14 @@ test.skip(
       ),
     );
 
+    const propertyVersion = 0;
     const tokenId = {
       token_data_id: {
         creator: alice.address().hex(),
         collection: collectionName,
         name: tokenName,
       },
-      property_version: "0",
+      property_version: `${propertyVersion}`,
     };
 
     // Transfer Token from Alice's Account to Bob's Account
@@ -354,8 +355,8 @@ test.skip(
           BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(alice.address())),
           BCS.bcsSerializeStr(collectionName),
           BCS.bcsSerializeStr(tokenName),
+          BCS.bcsSerializeUint64(propertyVersion),
           BCS.bcsSerializeUint64(1),
-          BCS.bcsSerializeUint64(0),
         ],
       ),
     );
