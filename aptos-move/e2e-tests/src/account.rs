@@ -107,10 +107,10 @@ impl Account {
 
     /// Creates a new account representing the aptos root account in memory.
     ///
-    /// The address will be [`aptos_root_address`][account_config::aptos_root_address], and
+    /// The address will be [`aptos_test_root_address`][account_config::aptos_test_root_address], and
     /// the account will use [`GENESIS_KEYPAIR`][struct@GENESIS_KEYPAIR] as its keypair.
     pub fn new_aptos_root() -> Self {
-        Self::new_genesis_account(account_config::aptos_root_address())
+        Self::new_genesis_account(account_config::aptos_test_root_address())
     }
 
     /// Returns the address of the account. This is a hash of the public key the account was created

@@ -6,8 +6,11 @@ module aptos_framework::aptos_coin {
     use std::signer;
     use std::vector;
     use std::option::{Self, Option};
+
     use aptos_framework::coin::{Self, BurnCapability, MintCapability};
     use aptos_framework::system_addresses;
+
+    friend aptos_framework::genesis;
 
     /// Error codes
     const ENO_CAPABILITIES: u64 = 1;
@@ -30,10 +33,8 @@ module aptos_framework::aptos_coin {
         inner: vector<DelegatedMintCapability>,
     }
 
-    public fun initialize(
-        aptos_framework: &signer,
-        core_resource: &signer,
-    ): (MintCapability<AptosCoin>, BurnCapability<AptosCoin>) {
+    /// Can only called during genesis to initialize the Aptos coin.
+    public(friend) fun initialize(aptos_framework: &signer): (MintCapability<AptosCoin>, BurnCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         let (mint_cap, burn_cap) = coin::initialize<AptosCoin>(
@@ -44,25 +45,35 @@ module aptos_framework::aptos_coin {
             false, /* monitor_supply */
         );
 
+        (mint_cap, burn_cap)
+    }
+
+    /// Can only be called during genesis for tests to grant mint capability to aptos framework and core resources
+    /// accounts.
+    public(friend) fun configure_accounts_for_test(
+        aptos_framework: &signer,
+        core_resources: &signer,
+        mint_cap: MintCapability<AptosCoin>,
+    ) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+
         // Aptos framework needs mint cap to mint coins to initial validators.
-        move_to(aptos_framework, Capabilities { mint_cap: copy mint_cap });
+        move_to(aptos_framework, Capabilities { mint_cap });
 
         // Mint the core resource account AptosCoin for gas so it can execute system transactions.
-        // TODO: Only do this for testnets.
-        coin::register<AptosCoin>(core_resource);
+        coin::register<AptosCoin>(core_resources);
         let coins = coin::mint<AptosCoin>(
             18446744073709551615,
             &mint_cap,
         );
-        coin::deposit<AptosCoin>(signer::address_of(core_resource), coins);
+        coin::deposit<AptosCoin>(signer::address_of(core_resources), coins);
 
-        move_to(core_resource, Capabilities { mint_cap: copy mint_cap });
-        move_to(core_resource, Delegations { inner: vector::empty() });
-
-        (mint_cap, burn_cap)
+        move_to(core_resources, Capabilities { mint_cap });
+        move_to(core_resources, Delegations { inner: vector::empty() });
     }
 
-    /// Create new test coins and deposit them into dst_addr's account.
+    /// Only callable in tests and testnets where the core resources account exists.
+    /// Create new coins and deposit them into dst_addr's account.
     public entry fun mint(
         account: &signer,
         dst_addr: address,
@@ -80,6 +91,7 @@ module aptos_framework::aptos_coin {
         coin::deposit<AptosCoin>(dst_addr, coins_minted);
     }
 
+    /// Only callable in tests and testnets where the core resources account exists.
     /// Create delegated token for the address so the account could claim MintCapability later.
     public entry fun delegate_mint_capability(account: signer, to: address) acquires Delegations {
         system_addresses::assert_core_resource(&account);
@@ -93,6 +105,7 @@ module aptos_framework::aptos_coin {
         vector::push_back(delegations, DelegatedMintCapability { to });
     }
 
+    /// Only callable in tests and testnets where the core resources account exists.
     /// Claim the delegated mint capability and destroy the delegated token.
     public entry fun claim_mint_capability(account: &signer) acquires Delegations, Capabilities {
         let maybe_index = find_delegation(signer::address_of(account));
@@ -120,5 +133,20 @@ module aptos_framework::aptos_coin {
             i = i + 1;
         };
         index
+    }
+
+    #[test_only]
+    public fun initialize_for_test(aptos_framework: &signer): (MintCapability<AptosCoin>, BurnCapability<AptosCoin>) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+
+        let (mint_cap, burn_cap) = coin::initialize<AptosCoin>(
+            aptos_framework,
+            string::utf8(b"Aptos Coin"),
+            string::utf8(b"APT"),
+            8, /* decimals */
+            false, /* monitor_supply */
+        );
+
+        (mint_cap, burn_cap)
     }
 }

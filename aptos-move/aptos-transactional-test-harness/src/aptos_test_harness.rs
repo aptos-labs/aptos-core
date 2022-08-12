@@ -12,7 +12,7 @@ use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{aptos_root_address, AccountResource, CoinStoreResource},
+    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -492,11 +492,11 @@ impl<'a> AptosTestAdapter<'a> {
 
     fn create_and_fund_account(&mut self, account_addr: AccountAddress, amount: u64) {
         let parameters = self
-            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
+            .fetch_transaction_parameters(&aptos_test_root_address(), None, None, None, None)
             .unwrap();
 
         let txn = RawTransaction::new(
-            aptos_root_address(),
+            aptos_test_root_address(),
             parameters.sequence_number,
             aptos_transaction_builder::aptos_stdlib::account_create_account(account_addr),
             parameters.max_gas_amount,
@@ -512,7 +512,7 @@ impl<'a> AptosTestAdapter<'a> {
             .expect("Failed to create an account. This should not happen.");
 
         let txn = RawTransaction::new(
-            aptos_root_address(),
+            aptos_test_root_address(),
             parameters.sequence_number + 1,
             aptos_transaction_builder::aptos_stdlib::aptos_coin_mint(account_addr, amount),
             parameters.max_gas_amount,

@@ -13,6 +13,7 @@ module aptos_framework::reconfiguration {
     friend aptos_framework::block;
     // TODO: migrate all to callback in block prologue
     friend aptos_framework::consensus_config;
+    friend aptos_framework::genesis;
     friend aptos_framework::version;
     friend aptos_framework::gas_schedule;
 
@@ -37,26 +38,24 @@ module aptos_framework::reconfiguration {
     struct DisableReconfiguration has key {}
 
     /// The `Configuration` resource is in an invalid state
-    const ECONFIGURATION: u64 = 0;
+    const ECONFIGURATION: u64 = 1;
     /// A `Reconfiguration` resource is in an invalid state
-    const ECONFIG: u64 = 1;
+    const ECONFIG: u64 = 2;
     /// A `ModifyConfigCapability` is in a different state than was expected
-    const EMODIFY_CAPABILITY: u64 = 2;
+    const EMODIFY_CAPABILITY: u64 = 3;
     /// An invalid block time was encountered.
-    const EINVALID_BLOCK_TIME: u64 = 3;
+    const EINVALID_BLOCK_TIME: u64 = 4;
     /// An invalid block time was encountered.
-    const EINVALID_GUID_FOR_EVENT: u64 = 4;
-    /// The largest possible u64 value
-    const MAX_U64: u64 = 18446744073709551615;
+    const EINVALID_GUID_FOR_EVENT: u64 = 5;
 
+    /// Only called during genesis.
     /// Publishes `Configuration` resource. Can only be invoked by aptos framework account, and only a single time in Genesis.
-    public fun initialize(
+    public(friend) fun initialize(
         account: &signer,
     ) {
         timestamp::assert_genesis();
         system_addresses::assert_aptos_framework(account);
 
-        assert!(!exists<Configuration>(@aptos_framework), error::already_exists(ECONFIGURATION));
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
         assert!(guid::get_next_creation_num(signer::address_of(account)) == 1, error::invalid_state(EINVALID_GUID_FOR_EVENT));
         move_to<Configuration>(
@@ -106,12 +105,12 @@ module aptos_framework::reconfiguration {
         borrow_global<Configuration>(@aptos_framework).last_reconfiguration_time
     }
 
-    /// Private function to do reconfiguration.  Updates reconfiguration status resource
+    /// Private function to do reconfiguration. Updates reconfiguration status resource
     /// `Configuration` and emits a `NewEpochEvent`
     fun reconfigure_() acquires Configuration {
         // Do not do anything if genesis has not finished.
         if (timestamp::is_genesis() || timestamp::now_microseconds() == 0 || !reconfiguration_enabled()) {
-            return ()
+            return
         };
 
         let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
@@ -148,7 +147,6 @@ module aptos_framework::reconfiguration {
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
     fun emit_genesis_reconfiguration_event() acquires Configuration {
-        assert!(exists<Configuration>(@aptos_framework), error::not_found(ECONFIGURATION));
         let config_ref = borrow_global_mut<Configuration>(@aptos_framework);
         assert!(config_ref.epoch == 0 && config_ref.last_reconfiguration_time == 0, error::invalid_state(ECONFIGURATION));
         config_ref.epoch = 1;
