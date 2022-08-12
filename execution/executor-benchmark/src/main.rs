@@ -7,8 +7,10 @@ use aptos_vm::AptosVM;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+use tikv_jemallocator::Jemalloc;
+
 #[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+static ALLOC: Jemalloc = Jemalloc;
 
 #[derive(Debug, StructOpt)]
 struct PrunerOpt {
