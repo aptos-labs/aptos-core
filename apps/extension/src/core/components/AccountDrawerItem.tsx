@@ -129,7 +129,10 @@ function AccountDrawerItem(
           <DeleteIcon
             fontSize="lg"
             cursor="pointer"
-            onClick={onOpen}
+            onClick={(e: React.MouseEvent) => {
+              e.preventDefault();
+              onOpen();
+            }}
             _hover={{
               color: 'red.400',
             }}
