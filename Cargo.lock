@@ -520,7 +520,6 @@ dependencies = [
  "aptos-crypto",
  "aptos-global-constants",
  "aptos-keygen",
- "aptos-management",
  "aptos-secure-storage",
  "aptos-state-view",
  "aptos-temppath",
@@ -657,27 +656,6 @@ dependencies = [
  "tokio 1.19.2",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "aptos-management"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-crypto",
- "aptos-global-constants",
- "aptos-secure-storage",
- "aptos-temppath",
- "aptos-time-service",
- "aptos-transaction-builder",
- "aptos-types",
- "bcs",
- "hex",
- "serde 1.0.141",
- "serde_yaml 0.8.26",
- "structopt 0.3.26",
- "thiserror",
 ]
 
 [[package]]
@@ -841,41 +819,6 @@ dependencies = [
  "aptos-types",
  "clap 3.2.16",
  "storage-interface",
-]
-
-[[package]]
-name = "aptos-operational-tool"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-crypto",
- "aptos-global-constants",
- "aptos-infallible",
- "aptos-management",
- "aptos-rest-client",
- "aptos-secure-storage",
- "aptos-temppath",
- "aptos-transaction-builder",
- "aptos-types",
- "base64 0.13.0",
- "bcs",
- "futures",
- "hex",
- "itertools",
- "move-deps",
- "netcore",
- "network",
- "rand 0.7.3",
- "serde 1.0.141",
- "serde_json",
- "serde_yaml 0.8.26",
- "structopt 0.3.26",
- "thiserror",
- "tokio 1.19.2",
- "tokio-util 0.7.3",
- "toml",
- "url",
 ]
 
 [[package]]
@@ -8231,27 +8174,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "seed-peer-generator"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-config",
- "aptos-crypto",
- "aptos-logger",
- "aptos-rest-client",
- "aptos-temppath",
- "aptos-types",
- "bcs",
- "hex",
- "rand 0.7.3",
- "serde_yaml 0.8.26",
- "structopt 0.3.26",
- "thiserror",
- "tokio 1.19.2",
- "url",
-]
-
-[[package]]
 name = "semver"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8708,8 +8630,6 @@ dependencies = [
  "aptos-infallible",
  "aptos-keygen",
  "aptos-logger",
- "aptos-management",
- "aptos-operational-tool",
  "aptos-rest-client",
  "aptos-rosetta",
  "aptos-sdk",
@@ -9190,7 +9110,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "aptos-logger",
- "aptos-operational-tool",
  "aptos-rest-client",
  "aptos-sdk",
  "forge",

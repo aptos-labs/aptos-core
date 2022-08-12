@@ -557,6 +557,24 @@ impl PrivateKeyInputOptions {
         })
     }
 
+    pub fn from_x25519_private_key(private_key: &x25519::PrivateKey) -> CliTypedResult<Self> {
+        Ok(PrivateKeyInputOptions {
+            private_key: Some(
+                private_key
+                    .to_encoded_string()
+                    .map_err(|err| CliError::UnexpectedError(err.to_string()))?,
+            ),
+            private_key_file: None,
+        })
+    }
+
+    pub fn from_file(file: PathBuf) -> Self {
+        PrivateKeyInputOptions {
+            private_key: None,
+            private_key_file: Some(file),
+        }
+    }
+
     /// Extract private key from CLI args with fallback to config
     pub fn extract_private_key(
         &self,
