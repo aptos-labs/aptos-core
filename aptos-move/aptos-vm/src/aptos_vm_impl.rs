@@ -1,11 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::ed25519;
 use crate::{
     access_path_cache::AccessPathCache,
     counters::*,
     data_cache::RemoteStorage,
     delta_ext::TransactionOutputExt,
+    ed25519::Ed25519PublicKey,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
@@ -19,6 +21,7 @@ use aptos_types::{
     account_config::{ChainSpecificAccountInfo, APTOS_CHAIN_INFO, CORE_CODE_ADDRESS},
     on_chain_config::{GasSchedule, OnChainConfig, Version, APTOS_VERSION_3},
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
+    transaction::authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
     vm_status::{StatusCode, VMStatus},
 };
 use fail::fail_point;
@@ -35,6 +38,8 @@ use move_deps::{
     move_vm_types::gas::UnmeteredGasMeter,
 };
 use std::sync::Arc;
+use aptos_crypto::ed25519::{Ed25519PublicKey, PublicKey};
+use aptos_types::transaction::authenticator::Scheme;
 
 #[derive(Clone)]
 /// A wrapper to make VMRuntime standalone and thread safe.
@@ -305,7 +310,8 @@ impl AptosVMImpl {
         let chain_specific_info = self.chain_info();
 
         let txn_sequence_number = txn_data.sequence_number();
-        let txn_public_key = txn_data.authentication_key_preimage().to_vec();
+        let public_key = Ed25519PublicKey::from_bytes_unchecked(&txn_data.authentication_key_preimage().to_vec()).unwrap_or_else(|| panic!("invalid public key {}", tnx_data.authentication_key_preimage()));
+        let txn_authentication_key = AuthenticationKey::from_preimage(&AuthenticationKeyPreimage::ed25519(PublicKey::try_from(txn_data.authentication_key_preimage().to_vec())));
         let txn_gas_price = txn_data.gas_unit_price().get();
         let txn_max_gas_units = txn_data.max_gas_amount();
         let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
@@ -320,7 +326,7 @@ impl AptosVMImpl {
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(txn_sequence_number),
-                    MoveValue::vector_u8(txn_public_key),
+                    MoveValue::vector_u8(txn_authentication_key.to_vec()),
                     MoveValue::U64(txn_gas_price),
                     MoveValue::U64(txn_max_gas_units),
                     MoveValue::U64(txn_expiration_timestamp_secs),

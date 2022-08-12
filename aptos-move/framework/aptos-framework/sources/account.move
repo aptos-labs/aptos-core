@@ -188,7 +188,7 @@ module aptos_framework::account {
     fun prologue_common(
         sender: signer,
         txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
+        txn_authentication_key: vector<u8>,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
@@ -203,7 +203,7 @@ module aptos_framework::account {
         assert!(exists<Account>(transaction_sender), error::invalid_argument(PROLOGUE_EACCOUNT_DNE));
         let sender_account = borrow_global<Account>(transaction_sender);
         assert!(
-            hash::sha3_256(txn_public_key) == *&sender_account.authentication_key,
+            txn_authentication_key == *&sender_account.authentication_key,
             error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
         );
         assert!(
