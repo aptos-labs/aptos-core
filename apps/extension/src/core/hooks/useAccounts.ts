@@ -6,6 +6,7 @@ import useEncryptedAccounts from 'core/hooks/useEncryptedStorageState';
 import { AptosAccount, HexString } from 'aptos';
 import { Account, PublicAccount } from 'core/types/stateTypes';
 import { WALLET_STATE_ACCOUNT_ADDRESS_KEY } from 'core/constants';
+import { ProviderEvent, sendProviderEvent } from 'core/utils/providerEvents';
 
 /**
  * Hook for managing wallet accounts
@@ -69,8 +70,9 @@ export default function useAccounts() {
 
   const switchAccount = async (address: string) => {
     if (address in accounts!) {
-      const { publicKey } = accounts![address];
-      await setActivePublicAccount({ address, publicKey });
+      const account = accounts![address];
+      await setActivePublicAccount({ address, publicKey: account.publicKey });
+      await sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED);
     }
   };
 

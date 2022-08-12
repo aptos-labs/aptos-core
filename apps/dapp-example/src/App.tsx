@@ -11,12 +11,13 @@ function App() {
   const [isSigningMessage, setIsSigningMessage] = useState<boolean>(false);
 
   useEffect(() => {
-    window.aptos.on('accountChanged', (account: any) => {
+    window.aptos.on('accountChanged', async (account: any) => {
       if (account.address) {
         setIsConnected(true);
         setAddress(account.address);
+        setNetwork(await window.aptos.network());
       } else {
-        setIsConnected(true);
+        setIsConnected(false);
         setAddress(undefined);
       }
     });

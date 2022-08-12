@@ -5,6 +5,7 @@ import { usePersistentStorageState } from 'core/hooks/useStorageState';
 import { useMemo } from 'react';
 import { AptosClient, FaucetClient } from 'aptos';
 import { WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY } from 'core/constants';
+import { ProviderEvent, sendProviderEvent } from 'core/utils/providerEvents';
 
 export enum NetworkType {
   Devnet = 'devnet',
@@ -62,6 +63,11 @@ export default function useNetworks() {
     [activeNetwork],
   );
 
+  const switchNetwork = async (network: NetworkType) => {
+    await setActiveNetworkType(network);
+    await sendProviderEvent(ProviderEvent.NETWORK_CHANGED);
+  };
+
   return {
     activeNetwork,
     activeNetworkType,
@@ -69,6 +75,6 @@ export default function useNetworks() {
     areNetworksReady: isNetworkTypeReady,
     faucetClient,
     networks: defaultNetworks,
-    switchNetwork: setActiveNetworkType,
+    switchNetwork,
   };
 }

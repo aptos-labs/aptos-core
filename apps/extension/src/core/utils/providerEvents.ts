@@ -1,9 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosAccount } from 'aptos';
+import { getBackgroundCurrentPublicAccount, getBackgroundNetwork } from './account';
 import Browser from './browser';
-import { getLocalStorageNodeNetworkUrl, nodeUrlReverseMap } from './network';
 import Permissions from './permissions';
 
 export const ProviderEvent = Object.freeze({
@@ -32,25 +31,26 @@ async function sendToTabs(
   }
 }
 
-export async function sendProviderEvent(event: string, account: AptosAccount | undefined) {
+export async function sendProviderEvent(event: string) {
+  const publicAccount = await getBackgroundCurrentPublicAccount();
   switch (event) {
     case ProviderEvent.ACCOUNT_CHANGED:
       await sendToTabs(
-        account?.address().hex(),
+        publicAccount?.address,
         { event, params: {} },
         {
           event,
           params: {
-            address: account?.address().hex(),
-            publicKey: account?.pubKey().hex(),
+            address: publicAccount?.address,
+            publicKey: publicAccount?.publicKey,
           },
         },
       );
       break;
     case ProviderEvent.NETWORK_CHANGED: {
-      const network = nodeUrlReverseMap[getLocalStorageNodeNetworkUrl()];
+      const network = (await getBackgroundNetwork()).name;
       await sendToTabs(
-        account?.address().hex(),
+        publicAccount?.address,
         { event, params: network },
         { event, params: network },
       );

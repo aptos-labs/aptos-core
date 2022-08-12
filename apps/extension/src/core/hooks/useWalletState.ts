@@ -126,7 +126,7 @@ export default function useWalletStateRecorder() {
         address: account.address().hex(),
         publicKey: account.pubKey().hex(),
       });
-      sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED, account);
+      sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED);
       if (isImport) {
         importAccountToast();
       } else {
@@ -160,7 +160,7 @@ export default function useWalletStateRecorder() {
         publicKey: account.pubKey().hex(),
       });
       switchAccountToast(accountAddress);
-      sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED, account);
+      sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED);
     } catch (error) {
       switchAccountErrorToast();
       console.error(error);
@@ -172,11 +172,11 @@ export default function useWalletStateRecorder() {
       setNodeUrl(network);
       window.localStorage.setItem(WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY, network);
       Browser.persistentStorage()?.set({ [WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY]: network });
-      sendProviderEvent(ProviderEvent.NETWORK_CHANGED, aptosAccount);
+      sendProviderEvent(ProviderEvent.NETWORK_CHANGED);
     } catch (error) {
       console.error(error);
     }
-  }, [aptosAccount]);
+  }, []);
 
   const removeAccount = useCallback(async ({
     accountAddress,

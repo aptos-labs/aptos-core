@@ -281,7 +281,7 @@ export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
 export function getBackgroundNetwork(): Promise<Network> {
   return new Promise((resolve) => {
     Browser.persistentStorage()?.get([WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY], (result: any) => {
-      const networkType = result[WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY] as NetworkType;
+      const networkType: NetworkType = JSON.parse(result[WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY]);
       resolve(defaultNetworks[networkType ?? defaultNetworkType]);
     });
   });
