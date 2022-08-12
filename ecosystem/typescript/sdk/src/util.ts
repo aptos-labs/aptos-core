@@ -7,3 +7,16 @@ export async function sleep(timeMs: number): Promise<null> {
     setTimeout(resolve, timeMs);
   });
 }
+
+export const DEFAULT_VERSION_PATH_BASE = "/v1";
+
+export function fixNodeUrl(nodeUrl: string): string {
+  let out = `${nodeUrl}`;
+  if (out.endsWith("/")) {
+    out = out.substring(0, out.length - 1);
+  }
+  if (!out.endsWith(DEFAULT_VERSION_PATH_BASE)) {
+    out = `${out}${DEFAULT_VERSION_PATH_BASE}`;
+  }
+  return out;
+}
