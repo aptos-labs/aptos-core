@@ -26,10 +26,8 @@ message Block {
   // Height represents the block number and ultimately, is the count of `BlockMetadataTransaction` that happened on the chain.
   uint64 height = 2;
 
-  // Transactions holds all transactions that happened in the Block, which is transactions that happened between (and including)
-  // a `BlockMetadataTransaction` at version `V` and every other transactions up to the previous (excluded)
-  // `BlockMetadataTransaction` at `V - N` so you get transactions versioned
-  // [`V`, `V - 1`, `V - 2`, `V - 3`, ..., `V-(N - 1)`].
+  // Transactions holds all transactions that happened in the Block, which is transactions that happened starting with (and including)
+  // a `BlockMetadataTransaction`, and every other transaction up to (but excluding) the next `BlockMetadataTransaction`
   repeated Transaction transactions = 3;
 }
 
