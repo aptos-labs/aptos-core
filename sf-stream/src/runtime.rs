@@ -195,7 +195,8 @@ impl SfStreamer {
                         sleep(Duration::from_millis(500)).await;
                         return vec![];
                     }
-                    let txn_proto = self.convert_transaction(txn);
+                    let txn_proto =
+                        convert_transaction(&txn, self.current_block_height, self.current_epoch);
                     self.print_transaction(&txn_proto);
                     result.push(txn_proto);
                     curr_version += 1;
@@ -223,19 +224,12 @@ impl SfStreamer {
         result
     }
 
-    pub fn convert_transaction(&self, transaction: Transaction) -> TransactionPB {
-        convert_transaction(&transaction, self.current_block_height, self.current_epoch)
-    }
-
     /// First, and only first, transaction in a block has to be bmt or genesis
     fn validate_transaction_type(&self, is_first_txn: bool, transaction: &Transaction) -> bool {
-        let is_bm_or_genesis = match transaction {
-            Transaction::BlockMetadataTransaction(_) => true,
-            Transaction::GenesisTransaction(_) => true,
-            Transaction::UserTransaction(_) => false,
-            Transaction::StateCheckpointTransaction(_) => false,
-            Transaction::PendingTransaction(_) => false,
-        };
+        let is_bm_or_genesis = matches!(
+            transaction,
+            Transaction::BlockMetadataTransaction(_) | Transaction::GenesisTransaction(_)
+        );
         is_first_txn == is_bm_or_genesis
     }
 
