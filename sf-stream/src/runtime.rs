@@ -5,7 +5,6 @@ use crate::metrics;
 use aptos_protos::extractor::v1 as extractor;
 
 use crate::convert::convert_transaction;
-use anyhow::{bail, ensure};
 use aptos_api::context::Context;
 use aptos_api_types::{AsConverter, Transaction};
 use aptos_config::config::NodeConfig;
@@ -13,7 +12,7 @@ use aptos_logger::{debug, error, warn};
 use aptos_mempool::MempoolClientSender;
 use aptos_types::chain_id::ChainId;
 use aptos_vm::data_cache::RemoteStorageOwned;
-use extractor::{transaction::TransactionType, Transaction as TransactionPB};
+use extractor::Transaction as TransactionPB;
 use futures::channel::mpsc::channel;
 use prost::Message;
 use std::convert::TryInto;
@@ -134,6 +133,19 @@ impl SfStreamer {
         }
 
         let ledger_info = self.context.get_latest_ledger_info().unwrap();
+        let block_timestamp = self
+            .context
+            .get_block_timestamp(block_start_version)
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Could not get timestamp for version {}",
+                    block_start_version
+                )
+            });
+        // We are validating the block as we convert and print each transactions. The rules are as follows:
+        // 1. first (and only first) transaction is a block metadata or genesis 2. versions are monotonically increasing 3. start and end versions match block boundaries
+        // Retry if the block is not valid. Panic if there's anything wrong with encoding a transaction.
+        println!("FIRE BLOCK_START {}", self.current_block_height);
         match self.context.get_transactions(
             block_start_version,
             (block_last_version - block_start_version + 1)
@@ -154,34 +166,49 @@ impl SfStreamer {
                     block_last_version,
                     transactions.last().map(|txn| txn.version).unwrap_or(0)
                 );
-                let mut block_timestamp = None;
+                let mut curr_version = block_start_version;
                 for onchain_txn in transactions {
-                    if block_timestamp.is_none() {
-                        block_timestamp = Some(
-                            self.context
-                                .get_block_timestamp(onchain_txn.version)
-                                .unwrap_or_else(|_| {
-                                    panic!(
-                                        "Could not get timestamp for version {}",
-                                        onchain_txn.version
-                                    )
-                                }),
-                        );
-                    }
                     let txn_version = onchain_txn.version;
                     let txn = self
                         .resolver
                         .as_converter(self.context.db.clone())
-                        .try_into_onchain_transaction(block_timestamp.unwrap(), onchain_txn)
+                        .try_into_onchain_transaction(block_timestamp, onchain_txn)
                         .unwrap_or_else(|e| {
                             panic!(
                                 "Could not convert onchain transaction version {} into transaction: {:?}",
                                 txn_version, e
                             )
                         });
-
+                    if !self.validate_transaction_type(curr_version == block_start_version, &txn) {
+                        error!(
+                            "Block {} failed validation: first transaction has to be block metadata or genesis",
+                            self.current_block_height
+                        );
+                        sleep(Duration::from_millis(500)).await;
+                        return vec![];
+                    }
+                    if curr_version != txn_version {
+                        error!(
+                            "Block {} failed validation: missing version {}",
+                            self.current_block_height, curr_version,
+                        );
+                        sleep(Duration::from_millis(500)).await;
+                        return vec![];
+                    }
                     let txn_proto = self.convert_transaction(txn);
+                    self.print_transaction(&txn_proto);
                     result.push(txn_proto);
+                    curr_version += 1;
+                }
+                if curr_version - 1 != block_last_version {
+                    error!(
+                        "Block {} failed validation: last version supposed to be {} but getting {}",
+                        self.current_block_height,
+                        block_last_version,
+                        curr_version - 1,
+                    );
+                    sleep(Duration::from_millis(500)).await;
+                    return vec![];
                 }
             }
             Err(err) => {
@@ -190,81 +217,26 @@ impl SfStreamer {
                 return vec![];
             }
         }
-        match self.print_block_with_validation(&result, block_start_version, block_last_version) {
-            Ok(_) => {
-                self.current_block_height += 1;
-                result
-            }
-            Err(err) => {
-                error!("[sf-stream] Validation failed: {}", err);
-                sleep(Duration::from_millis(500)).await;
-                vec![]
-            }
-        }
+        println!("FIRE BLOCK_END {}", self.current_block_height);
+        metrics::BLOCKS_SENT.inc();
+        self.current_block_height += 1;
+        result
     }
 
     pub fn convert_transaction(&self, transaction: Transaction) -> TransactionPB {
         convert_transaction(&transaction, self.current_block_height, self.current_epoch)
     }
 
-    /// We can consider a block height as valid if these conditions are met:
-    /// 1. first (and only first) transaction is a block metadata or genesis 2. versions are monotonically increasing 3. start and end versions match block boundaries
-    /// Return error if the block is not valid. Panic if there's anything wrong with encoding a transaction.
-    fn print_block_with_validation(
-        &self,
-        converted_txns: &Vec<TransactionPB>,
-        block_start_version: u64,
-        block_last_version: u64,
-    ) -> anyhow::Result<()> {
-        if converted_txns.is_empty() {
-            bail!("No transactions")
-        }
-        println!("FIRE BLOCK_START {}", self.current_block_height);
-        let mut curr_version = block_start_version;
-        for (index, txn) in converted_txns.iter().enumerate() {
-            // First, and only first, transaction has to be bmt or genesis
-            let is_bm_or_genesis = match txn.r#type() {
-                TransactionType::BlockMetadata => true,
-                TransactionType::Genesis => true,
-                TransactionType::User => false,
-                TransactionType::StateCheckpoint => false,
-            };
-            if index == 0 {
-                ensure!(
-                    is_bm_or_genesis,
-                    "First transaction has to be block metadata for block {}, found {}",
-                    self.current_block_height,
-                    txn.r#type
-                );
-            } else {
-                ensure!(
-                    !is_bm_or_genesis,
-                    "Multiple {} detected for block {}",
-                    txn.r#type,
-                    self.current_block_height
-                );
-            }
-            // Start version has to be first version and versions have to be monotonically increasing
-            ensure!(
-                curr_version == txn.version,
-                "Missing version {} for block {}",
-                block_start_version,
-                self.current_block_height
-            );
-            self.print_transaction(txn);
-            curr_version += 1
-        }
-        // Last version has to match last version of transaction
-        ensure!(
-            curr_version - 1 == block_last_version,
-            "Last version supposed to be {} but getting {} for block {}",
-            block_start_version,
-            curr_version - 1,
-            self.current_block_height
-        );
-        println!("FIRE BLOCK_END {}", self.current_block_height);
-        metrics::BLOCKS_SENT.inc();
-        Ok(())
+    /// First, and only first, transaction in a block has to be bmt or genesis
+    fn validate_transaction_type(&self, is_first_txn: bool, transaction: &Transaction) -> bool {
+        let is_bm_or_genesis = match transaction {
+            Transaction::BlockMetadataTransaction(_) => true,
+            Transaction::GenesisTransaction(_) => true,
+            Transaction::UserTransaction(_) => false,
+            Transaction::StateCheckpointTransaction(_) => false,
+            Transaction::PendingTransaction(_) => false,
+        };
+        is_first_txn == is_bm_or_genesis
     }
 
     fn print_transaction(&self, transaction: &TransactionPB) {
