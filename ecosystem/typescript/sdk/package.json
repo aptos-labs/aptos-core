@@ -16,7 +16,7 @@
     "fmt": "yarn _fmt --write",
     "fmt:check": "yarn _fmt --check",
     "cov:clean": "rm -rf coverage",
-    "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true && cp -f ./AxiosHttpRequest.ts.patch ./src/generated/core/AxiosHttpRequest.ts",
+    "generate-client": "openapi -i ../../../api/doc/spec.yaml -o ./src/generated -c axios --name AptosGeneratedClient --exportSchemas true",
     "checked-publish": "./checked_publish.sh"
   },
   "repository": {
@@ -40,8 +40,7 @@
     "ed25519-hd-key": "^1.2.0",
     "js-sha3": "^0.8.0",
     "tweetnacl": "^1.0.3",
-    "typescript-memoize": "^1.1.0",
-    "yarn": "^1.22.19"
+    "typescript-memoize": "^1.1.0"
   },
   "devDependencies": {
     "@types/jest": "^28.1.8",
@@ -55,7 +54,7 @@
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-import": "^2.25.4",
     "jest": "^29.0.0",
-    "openapi-typescript-codegen": "^0.23.0",
+    "openapi-typescript-codegen": "https://github.com/aptos-labs/openapi-typescript-codegen/releases/download/v0.23.0/openapi-typescript-codegen-v0.23.0.tgz",
     "prettier": "^2.6.2",
     "standard-version": "^9.5.0",
     "ts-jest": "^28.0.7",
