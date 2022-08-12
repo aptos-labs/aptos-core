@@ -48,10 +48,6 @@ use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519};
 use aptos_types::account_address::AccountAddress;
 use poem_openapi::Enum as PoemEnum;
 
-/// Represents a deprecated config that provides no field verification.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct DeprecatedConfig {}
-
 /// Config pulls in configuration information from the config file.
 /// This is used to set up the nodes and configure various parameters.
 /// The config file is broken up into sections for each module
@@ -73,8 +69,6 @@ pub struct NodeConfig {
     pub logger: LoggerConfig,
     #[serde(default)]
     pub mempool: MempoolConfig,
-    #[serde(default)]
-    pub metrics: DeprecatedConfig,
     #[serde(default)]
     pub peer_monitoring_service: PeerMonitoringServiceConfig,
     #[serde(default)]
