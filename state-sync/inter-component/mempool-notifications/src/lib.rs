@@ -376,7 +376,7 @@ mod tests {
             300000001,
             AccountAddress::random(),
             Some(0),
-            vec![false],
+            vec![0],
             vec![],
             1,
         ))

@@ -49,6 +49,7 @@ pub use script::{
 
 use crate::state_store::{state_key::StateKey, state_value::StateValue};
 use move_deps::move_core_types::vm_status::AbortLocation;
+use once_cell::sync::OnceCell;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
@@ -471,18 +472,21 @@ impl WriteSetPayload {
 /// **IMPORTANT:** The signature of a `SignedTransaction` is not guaranteed to be verified. For a
 /// transaction whose signature is statically guaranteed to be verified, see
 /// [`SignatureCheckedTransaction`].
-#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SignedTransaction {
     /// The raw transaction
     raw_txn: RawTransaction,
 
     /// Public key and signature to authenticate
     authenticator: TransactionAuthenticator,
+
+    #[serde(skip)]
+    bytes: OnceCell<Vec<u8>>,
 }
 
 /// A transaction for which the signature has been verified. Created by
 /// [`SignedTransaction::check_signature`] and [`RawTransaction::sign`].
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignatureCheckedTransaction(SignedTransaction);
 
 impl SignatureCheckedTransaction {
@@ -529,6 +533,7 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
+            bytes: OnceCell::new(),
         }
     }
 
@@ -541,6 +546,7 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
+            bytes: OnceCell::new(),
         }
     }
 
@@ -557,6 +563,7 @@ impl SignedTransaction {
                 secondary_signer_addresses,
                 secondary_signers,
             ),
+            bytes: OnceCell::new(),
         }
     }
 
@@ -567,6 +574,7 @@ impl SignedTransaction {
         Self {
             raw_txn,
             authenticator,
+            bytes: OnceCell::new(),
         }
     }
 
@@ -607,8 +615,10 @@ impl SignedTransaction {
     }
 
     pub fn raw_txn_bytes_len(&self) -> usize {
-        bcs::to_bytes(&self.raw_txn)
-            .expect("Unable to serialize RawTransaction")
+        self.bytes
+            .get_or_init(|| {
+                bcs::to_bytes(&self.raw_txn).expect("Unable to serialize RawTransaction")
+            })
             .len()
     }
 

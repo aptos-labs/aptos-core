@@ -14,6 +14,7 @@ use crate::multi_signature::{MultiSignature, PartialSignatures};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_signer::ValidatorSigner;
 use anyhow::{ensure, Result};
+use aptos_bitvec::BitVec;
 use aptos_crypto::bls12381::PublicKey;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
@@ -33,15 +34,6 @@ pub enum VerifyError {
         voting_power: u128,
         expected_voting_power: u128,
     },
-    #[error(
-        "The number of voters ({}) is greater than total number of authors ({})",
-        num_of_voters,
-        num_of_authors
-    )]
-    TooManyVoters {
-        num_of_voters: usize,
-        num_of_authors: usize,
-    },
     #[error("Signature is empty")]
     /// The signature is empty
     EmptySignature,
@@ -56,6 +48,8 @@ pub enum VerifyError {
     FailedToAggregateSignature,
     #[error("Failed to verify multi-signature")]
     FailedToVerifyMultiSignature,
+    #[error("Invalid bitvec from the multi-signature")]
+    InvalidBitVec,
 }
 
 /// Helper struct to manage validator information for validation
@@ -198,13 +192,13 @@ impl ValidatorVerifier {
     ) -> Result<(MultiSignature, PublicKey), VerifyError> {
         let mut pub_keys = vec![];
         let mut sigs = vec![];
-        let mut masks = vec![false; self.validator_infos.len()];
+        let mut masks = BitVec::with_num_bits(self.len() as u16);
         for (addr, sig) in partial_signatures.signatures() {
             let index = *self
                 .address_to_validator_index
                 .get(addr)
                 .ok_or(VerifyError::UnknownAuthor)?;
-            masks[index] = true;
+            masks.set(index as u16);
             pub_keys.push(self.validator_infos[index].public_key());
             sigs.push(sig.clone());
         }
@@ -248,14 +242,16 @@ impl ValidatorVerifier {
         multi_signature: &MultiSignature,
     ) -> std::result::Result<(), VerifyError> {
         // Verify the number of signature is not greater than expected.
-        self.check_num_of_voters(multi_signature)?;
+        Self::check_num_of_voters(self.len() as u16, multi_signature.get_voters_bitvec())?;
         let mut pub_keys = vec![];
         let mut authors = vec![];
-        for (index, exist) in multi_signature.get_voters_bitmap().iter().enumerate() {
-            if *exist {
-                authors.push(self.validator_infos[index].address);
-                pub_keys.push(self.validator_infos[index].public_key());
-            }
+        for index in multi_signature.get_voters_bitvec().iter_ones() {
+            let validator = self
+                .validator_infos
+                .get(index)
+                .ok_or(VerifyError::UnknownAuthor)?;
+            authors.push(validator.address);
+            pub_keys.push(validator.public_key());
         }
         // Verify the quorum voting power of the authors
         self.check_voting_power(authors.iter())?;
@@ -285,15 +281,16 @@ impl ValidatorVerifier {
 
     /// Ensure there are not more than the maximum expected voters (all possible signatures).
     fn check_num_of_voters(
-        &self,
-        multi_signature: &MultiSignature,
+        num_validators: u16,
+        bitvec: &BitVec,
     ) -> std::result::Result<(), VerifyError> {
-        let num_of_voters = multi_signature.get_num_voters();
-        if num_of_voters > self.len() {
-            return Err(VerifyError::TooManyVoters {
-                num_of_voters,
-                num_of_authors: self.len(),
-            });
+        if bitvec.num_buckets() != BitVec::required_buckets(num_validators as u16) {
+            return Err(VerifyError::InvalidBitVec);
+        }
+        if let Some(last_bit) = bitvec.last_set_bit() {
+            if last_bit >= num_validators {
+                return Err(VerifyError::InvalidBitVec);
+            }
         }
         Ok(())
     }
@@ -490,6 +487,7 @@ mod tests {
     use super::*;
     use crate::validator_signer::ValidatorSigner;
     use aptos_crypto::test_utils::{TestAptosCrypto, TEST_SEED};
+    use proptest::{collection::vec, prelude::*};
     use std::collections::{BTreeMap, HashMap};
 
     #[test]
@@ -516,6 +514,21 @@ mod tests {
             validator_verifier.check_voting_power(author_to_signature_map.keys()),
             Ok(())
         );
+    }
+
+    proptest! {
+        #[test]
+        fn test_check_num_of_voters(
+            num_validator in any::<u16>(),
+            bits in vec(any::<bool>(), 0..u16::MAX as usize),
+        ) {
+            let bitvec = BitVec::from(bits);
+            if BitVec::required_buckets(num_validator) == bitvec.num_buckets() && num_validator > bitvec.last_set_bit().unwrap_or(0) {
+                assert_eq!(ValidatorVerifier::check_num_of_voters(num_validator, &bitvec), Ok(()));
+            } else {
+                assert_eq!(ValidatorVerifier::check_num_of_voters(num_validator, &bitvec), Err(VerifyError::InvalidBitVec));
+            }
+        }
     }
 
     #[test]
@@ -580,8 +593,10 @@ mod tests {
             ValidatorVerifier::new_single(validator_signer.author(), validator_signer.public_key());
 
         assert_eq!(
-            validator
-                .verify_multi_signatures(&dummy_struct, &MultiSignature::new(vec![true], None)),
+            validator.verify_multi_signatures(
+                &dummy_struct,
+                &MultiSignature::new(BitVec::from(vec![true]), None)
+            ),
             Err(VerifyError::EmptySignature)
         );
     }
@@ -595,7 +610,10 @@ mod tests {
 
         assert_eq!(
             // This should fail with insufficient quorum voting power.
-            validator.verify_multi_signatures(&dummy_struct, &MultiSignature::empty()),
+            validator.verify_multi_signatures(
+                &dummy_struct,
+                &MultiSignature::new(BitVec::from(vec![false]), None)
+            ),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 0,
                 expected_voting_power: 1
@@ -638,6 +656,10 @@ mod tests {
             .aggregate_multi_signature(&partial_signature)
             .unwrap()
             .0;
+        assert_eq!(
+            aggregated_signature.get_voters_bitvec().num_buckets(),
+            BitVec::required_buckets(validator_verifier.validator_infos.len() as u16)
+        );
         // Check against signatures == N; this will pass.
         assert_eq!(
             validator_verifier.verify_multi_signatures(&dummy_struct, &aggregated_signature),
@@ -665,6 +687,10 @@ mod tests {
             .unwrap()
             .0;
         assert_eq!(
+            aggregated_signature.get_voters_bitvec().num_buckets(),
+            BitVec::required_buckets(validator_verifier.validator_infos.len() as u16)
+        );
+        assert_eq!(
             validator_verifier.verify_multi_signatures(&dummy_struct, &aggregated_signature),
             Ok(())
         );
@@ -688,6 +714,10 @@ mod tests {
             .aggregate_multi_signature(&partial_signature)
             .unwrap()
             .0;
+        assert_eq!(
+            aggregated_signature.get_voters_bitvec().num_buckets(),
+            BitVec::required_buckets(validator_verifier.validator_infos.len() as u16)
+        );
         assert_eq!(
             validator_verifier.verify_multi_signatures(&dummy_struct, &aggregated_signature),
             Err(VerifyError::TooLittleVotingPower {

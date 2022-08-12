@@ -71,17 +71,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "1",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "1"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
