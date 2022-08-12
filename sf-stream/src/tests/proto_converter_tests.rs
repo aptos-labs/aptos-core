@@ -11,6 +11,7 @@ use aptos_protos::extractor::v1::{
     transaction::{TransactionType, TxnData},
     transaction_payload::{Payload, Type as PayloadType},
     write_set_change::Change::WriteTableItem,
+    Transaction as TransactionPB,
 };
 
 use aptos_sdk::types::{account_config::aptos_root_address, LocalAccount};
@@ -27,7 +28,7 @@ async fn test_genesis_works() {
 
     let context = Arc::new(test_context.context);
     let mut streamer = SfStreamer::new(context, 0, None);
-    let converted = streamer.batch_convert(10).await;
+    let converted = streamer.convert_next_block().await;
 
     // position 0 should be genesis
     let txn = converted.first().unwrap().clone();
@@ -55,22 +56,22 @@ async fn test_block_transactions_work() {
     let mut streamer = SfStreamer::new(context, 0, None);
 
     // emulating real stream, getting first block
-    let converted_0 = streamer.batch_convert(1).await;
-    let txn = converted_0.first().unwrap().clone();
+    let block_0 = streamer.convert_next_block().await;
+    let txn = block_0.first().unwrap().clone();
     assert_eq!(txn.version, 0);
     assert_eq!(txn.r#type(), TransactionType::Genesis);
 
     // getting second block
-    let converted_1 = streamer.batch_convert(3).await;
+    let block_1 = streamer.convert_next_block().await;
     // block metadata expected
-    let txn = converted_1[0].clone();
+    let txn = block_1[0].clone();
     assert_eq!(txn.version, 1);
     assert_eq!(txn.r#type(), TransactionType::BlockMetadata);
     if let TxnData::BlockMetadata(txn) = txn.txn_data.unwrap() {
         assert_eq!(txn.round, 1);
     }
     // user txn expected
-    let txn = converted_1[1].clone();
+    let txn = block_1[1].clone();
     assert_eq!(txn.version, 2);
     assert_eq!(txn.r#type(), TransactionType::User);
     if let TxnData::User(txn) = txn.txn_data.as_ref().unwrap() {
@@ -105,7 +106,7 @@ async fn test_block_transactions_work() {
     // test_context.check_golden_output(&converted_1);
 
     // state checkpoint expected
-    let txn = converted_1[2].clone();
+    let txn = block_1[2].clone();
     assert_eq!(txn.version, 3);
     assert_eq!(txn.r#type(), TransactionType::StateCheckpoint);
 }
@@ -139,9 +140,11 @@ async fn test_block_height_and_ts_work() {
     ]);
 
     let context = Arc::new(test_context.clone().context);
-    let mut streamer = SfStreamer::new(context, 0, None);
 
-    let converted = streamer.batch_convert(100).await;
+    let streamer = SfStreamer::new(context, 0, None);
+    let converted = fetch_all_stream(streamer).await;
+
+    assert_eq!(converted.len(), 9);
     // Making sure that version - block height mapping is correct and that version is in order
     for (i, txn) in converted.iter().enumerate() {
         assert_eq!(txn.version as usize, i);
@@ -189,9 +192,9 @@ async fn test_table_item_parsing_works() {
     ]);
 
     let context = Arc::new(test_context.clone().context);
-    let mut streamer = SfStreamer::new(context, 0, None);
+    let streamer = SfStreamer::new(context, 0, None);
+    let converted = fetch_all_stream(streamer).await;
 
-    let converted = streamer.batch_convert(100).await;
     let mut table_kv: HashMap<String, String> = HashMap::new();
     for parsed_txn in &converted {
         if parsed_txn.r#type() != TransactionType::User {
@@ -258,4 +261,13 @@ async fn build_test_module(account: AccountAddress) -> Vec<u8> {
         .serialize(&mut out)
         .unwrap();
     out
+}
+
+async fn fetch_all_stream(mut streamer: SfStreamer) -> Vec<TransactionPB> {
+    // Overfetching should work
+    let mut res = streamer.convert_next_block().await;
+    for _ in 0..20 {
+        res.append(&mut streamer.convert_next_block().await);
+    }
+    res
 }
