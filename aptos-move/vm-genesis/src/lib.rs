@@ -53,6 +53,8 @@ const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
 pub struct GenesisConfiguration {
     pub allow_new_validators: bool,
     pub epoch_duration_secs: u64,
+    // If true, genesis will create a special core resources account that can mint coins.
+    pub is_test: bool,
     pub max_stake: u64,
     pub min_stake: u64,
     pub min_voting_threshold: u128,
@@ -89,7 +91,7 @@ pub fn encode_genesis_transaction(
 }
 
 pub fn encode_genesis_change_set(
-    aptos_root_key: &Ed25519PublicKey,
+    core_resources_key: &Ed25519PublicKey,
     validators: &[Validator],
     stdlib_module_bytes: &[Vec<u8>],
     consensus_config: OnChainConsensusConfig,
@@ -99,7 +101,7 @@ pub fn encode_genesis_change_set(
     validate_genesis_config(genesis_config);
 
     let mut stdlib_modules = Vec::new();
-    // create a data view for move_vm
+    // Create a Move VM session so we can invoke on-chain genesis intializations.
     let mut state_view = GenesisStateView::new();
     for module_bytes in stdlib_module_bytes {
         let module = CompiledModule::deserialize(module_bytes).unwrap();
@@ -107,23 +109,19 @@ pub fn encode_genesis_change_set(
         stdlib_modules.push(module)
     }
     let data_cache = StateViewCache::new(&state_view).into_move_resolver();
-
     let move_vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
 
-    create_and_initialize_main_accounts(
-        &mut session,
-        aptos_root_key,
-        consensus_config,
-        chain_id,
-        genesis_config,
-    );
-    // generate the genesis WriteSet
-    create_and_initialize_validators(&mut session, validators);
-
-    // Initialize on-chain governance.
+    // On-chain genesis process.
+    initialize(&mut session, consensus_config, chain_id, genesis_config);
+    if genesis_config.is_test {
+        initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
+    } else {
+        initialize_aptos_coin(&mut session);
+    }
     initialize_on_chain_governance(&mut session, genesis_config);
+    create_and_initialize_validators(&mut session, validators);
 
     // Reconfiguration should happen after all on-chain invocations.
     emit_new_block_and_epoch_event(&mut session);
@@ -211,16 +209,12 @@ fn exec_function(
         });
 }
 
-/// Create and initialize Association and Core Code accounts.
-fn create_and_initialize_main_accounts(
+fn initialize(
     session: &mut SessionExt<impl MoveResolver>,
-    aptos_root_key: &Ed25519PublicKey,
     consensus_config: OnChainConsensusConfig,
     chain_id: ChainId,
     genesis_config: &GenesisConfiguration,
 ) {
-    let aptos_root_auth_key = AuthenticationKey::ed25519(aptos_root_key);
-
     let genesis_gas_params = AptosGasParameters::initial();
     let gas_schedule_blob = bcs::to_bytes(&genesis_gas_params.to_on_chain_gas_schedule())
         .expect("Failure serializing genesis gas schedule");
@@ -246,8 +240,6 @@ fn create_and_initialize_main_accounts(
         "initialize",
         vec![],
         serialize_values(&vec![
-            MoveValue::Signer(account_config::aptos_root_address()),
-            MoveValue::vector_u8(aptos_root_auth_key.to_vec()),
             MoveValue::vector_u8(gas_schedule_blob),
             MoveValue::U8(chain_id.id()),
             MoveValue::U64(APTOS_MAX_KNOWN_VERSION.major),
@@ -259,6 +251,33 @@ fn create_and_initialize_main_accounts(
             MoveValue::Bool(genesis_config.allow_new_validators),
             MoveValue::U64(rewards_rate_numerator),
             MoveValue::U64(rewards_rate_denominator),
+        ]),
+    );
+}
+
+fn initialize_aptos_coin(session: &mut SessionExt<impl MoveResolver>) {
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "initialize_aptos_coin",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_core_resources_and_aptos_coin(
+    session: &mut SessionExt<impl MoveResolver>,
+    core_resources_key: &Ed25519PublicKey,
+) {
+    let core_resources_auth_key = AuthenticationKey::ed25519(core_resources_key);
+    exec_function(
+        session,
+        GENESIS_MODULE_NAME,
+        "initialize_core_resources_and_aptos_coin",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::vector_u8(core_resources_auth_key.to_vec()),
         ]),
     );
 }
@@ -559,6 +578,7 @@ pub fn generate_test_genesis(
         &GenesisConfiguration {
             allow_new_validators: true,
             epoch_duration_secs: 3600,
+            is_test: true,
             min_stake: 0,
             min_voting_threshold: 0,
             // 1M APTOS coins (with 8 decimals).

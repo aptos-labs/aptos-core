@@ -1,7 +1,10 @@
 /// Provides the configuration for staking and rewards
 module aptos_framework::staking_config {
     use std::error;
+
     use aptos_framework::system_addresses;
+
+    friend aptos_framework::genesis;
 
     /// Invalid required stake lockup value.
     const EINVALID_LOCKUP_VALUE: u64 = 1;
@@ -29,7 +32,8 @@ module aptos_framework::staking_config {
         rewards_rate_denominator: u64,
     }
 
-    public fun initialize(
+    /// Only called during genesis.
+    public(friend) fun initialize(
         aptos_framework: &signer,
         minimum_stake: u64,
         maximum_stake: u64,
@@ -189,5 +193,25 @@ module aptos_framework::staking_config {
     #[expected_failure(abort_code = 0x10002)]
     public entry fun test_update_rewards_invalid_denominator_should_fail(aptos_framework: signer) acquires StakingConfig {
         update_rewards_rate(&aptos_framework, 1, 0);
+    }
+
+    public fun initialize_for_test(
+        aptos_framework: &signer,
+        minimum_stake: u64,
+        maximum_stake: u64,
+        recurring_lockup_duration_secs: u64,
+        allow_validator_set_change: bool,
+        rewards_rate: u64,
+        rewards_rate_denominator: u64,
+    ) {
+        initialize(
+            aptos_framework,
+            minimum_stake,
+            maximum_stake,
+            recurring_lockup_duration_secs,
+            allow_validator_set_change,
+            rewards_rate,
+            rewards_rate_denominator,
+        );
     }
 }

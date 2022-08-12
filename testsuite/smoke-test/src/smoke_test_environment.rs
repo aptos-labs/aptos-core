@@ -7,7 +7,7 @@ use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use aptos_logger::info;
-use aptos_types::{account_config::aptos_root_address, chain_id::ChainId};
+use aptos_types::{account_config::aptos_test_root_address, chain_id::ChainId};
 use forge::Node;
 use forge::{Factory, LocalFactory, LocalSwarm};
 use once_cell::sync::Lazy;
@@ -150,7 +150,7 @@ pub fn launch_faucet(
         server_url: endpoint,
         mint_key_file_path: PathBuf::new(),
         mint_key: Some(ConfigKey::new(mint_key)),
-        mint_account_address: Some(aptos_root_address()),
+        mint_account_address: Some(aptos_test_root_address()),
         chain_id,
         maximum_amount: None,
         do_not_delegate: true,

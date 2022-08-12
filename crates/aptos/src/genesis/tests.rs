@@ -136,6 +136,7 @@ fn create_layout_file(
         chain_id,
         allow_new_validators: false,
         epoch_duration_secs: 86400,
+        is_test: true,
         min_stake: 0,
         min_voting_threshold: 0,
         max_stake: u64::MAX,

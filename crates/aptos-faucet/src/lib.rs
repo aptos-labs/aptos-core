@@ -27,8 +27,8 @@ use aptos_rest_client::Client;
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
-        account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
-        LocalAccount,
+        account_address::AccountAddress, account_config::aptos_test_root_address,
+        chain_id::ChainId, LocalAccount,
     },
 };
 use clap::Parser;
@@ -108,8 +108,9 @@ impl FaucetArgs {
             .expect("Failed to deserialize mint key file")
         };
 
-        let faucet_address: AccountAddress =
-            self.mint_account_address.unwrap_or_else(aptos_root_address);
+        let faucet_address: AccountAddress = self
+            .mint_account_address
+            .unwrap_or_else(aptos_test_root_address);
         let faucet_account = LocalAccount::new(faucet_address, key, 0);
 
         // Do not use maximum amount on delegation, this allows the new delegated faucet to

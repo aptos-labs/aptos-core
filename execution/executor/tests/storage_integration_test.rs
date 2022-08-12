@@ -6,7 +6,7 @@ use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{aptos_root_address, AccountResource, CORE_CODE_ADDRESS},
+    account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
     account_view::AccountView,
     block_metadata::BlockMetadata,
     state_store::state_key::StateKey,
@@ -108,7 +108,7 @@ fn test_reconfiguration() {
 
     // txn1 = give the validator some money so they can send a tx
     let txn1 = get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ 0,
         genesis_key.clone(),
         genesis_key.public_key(),
@@ -128,7 +128,7 @@ fn test_reconfiguration() {
 
     // txn3 = set the aptos version
     let txn3 = get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ 1,
         genesis_key.clone(),
         genesis_key.public_key(),
@@ -156,7 +156,7 @@ fn test_reconfiguration() {
 
     let t3 = db
         .reader
-        .get_account_transaction(aptos_root_address(), 1, true, current_version)
+        .get_account_transaction(aptos_test_root_address(), 1, true, current_version)
         .unwrap();
     verify_committed_txn_status(t3.as_ref(), &txn_block[2]).unwrap();
 

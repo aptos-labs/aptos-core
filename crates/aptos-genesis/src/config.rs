@@ -36,6 +36,7 @@ pub struct Layout {
     pub allow_new_validators: bool,
     /// Duration of an epoch
     pub epoch_duration_secs: u64,
+    pub is_test: bool,
     /// Minimum stake to be in the validator set
     pub min_stake: u64,
     /// Minimum number of votes to consider a proposal valid.
