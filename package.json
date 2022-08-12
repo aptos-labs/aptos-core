@@ -1,6 +1,6 @@
 {
   "name": "petra",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "workspaces": {
     "packages": [
@@ -35,7 +35,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\""
   },
   "devDependencies": {
-    "eslint-config-custom": "*",
+    "@petra/eslint-config": "*",
     "prettier": "latest",
     "turbo": "latest"
   },
