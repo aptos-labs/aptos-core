@@ -21,28 +21,36 @@ use std::{
 type TxnInput<K> = Vec<ReadDescriptor<K>>;
 type TxnOutput<T, E> = ExecutionStatus<T, Error<E>>;
 
-// If an entry was read from the multi-version data-structure, then kind is
-// MVHashMap(txn_idx, incarnation), with transaction index and incarnation number
-// of the execution associated with the write of the entry. Otherwise, if the read
-// occured from storage, and kind is set to Storage.
+// If an entry was read from the multi-version data-structure, then its kind can
+// be MVHashMapVersion(txn_idx, incarnation), with transaction index and incarnation
+// number of the execution associated with the write of the entry. Alternatively,
+// the kind can be MVHashMapValue(value) which is used by aggregator. Otherwise,
+// if the read occured from storage, and kind is set to Storage.
 #[derive(Clone, PartialEq)]
 enum ReadKind {
-    MVHashMap(TxnIndex, Incarnation),
+    MVHashMapValue(u128),
+    MVHashMapVersion(TxnIndex, Incarnation),
     Storage,
 }
 
 #[derive(Clone)]
 pub struct ReadDescriptor<K> {
     access_path: K,
-
     kind: ReadKind,
 }
 
 impl<K: ModulePath> ReadDescriptor<K> {
-    pub fn from(access_path: K, txn_idx: TxnIndex, incarnation: Incarnation) -> Self {
+    pub fn from_value(access_path: K, value: u128) -> Self {
         Self {
             access_path,
-            kind: ReadKind::MVHashMap(txn_idx, incarnation),
+            kind: ReadKind::MVHashMapValue(value),
+        }
+    }
+
+    pub fn from_version(access_path: K, txn_idx: TxnIndex, incarnation: Incarnation) -> Self {
+        Self {
+            access_path,
+            kind: ReadKind::MVHashMapVersion(txn_idx, incarnation),
         }
     }
 
@@ -61,10 +69,15 @@ impl<K: ModulePath> ReadDescriptor<K> {
         &self.access_path
     }
 
+    // Does the read descriptor describe a read from MVHashMap w. a specified value.
+    pub fn validate_value(&self, value: u128) -> bool {
+        self.kind == ReadKind::MVHashMapValue(value)
+    }
+
     // Does the read descriptor describe a read from MVHashMap w. a specified version.
     pub fn validate_version(&self, version: Version) -> bool {
         let (txn_idx, incarnation) = version;
-        self.kind == ReadKind::MVHashMap(txn_idx, incarnation)
+        self.kind == ReadKind::MVHashMapVersion(txn_idx, incarnation)
     }
 
     // Does the read descriptor describe a read from storage.

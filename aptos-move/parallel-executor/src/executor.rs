@@ -50,11 +50,13 @@ impl<'a, K: ModulePath + PartialOrd + Send + Clone + Hash + Eq, V: Into<Vec<u8>>
             match self.versioned_map.read(key, self.txn_idx) {
                 Ok((version, v)) => {
                     let (txn_idx, incarnation) = version;
-                    self.captured_reads.lock().push(ReadDescriptor::from(
-                        key.clone(),
-                        txn_idx,
-                        incarnation,
-                    ));
+                    self.captured_reads
+                        .lock()
+                        .push(ReadDescriptor::from_version(
+                            key.clone(),
+                            txn_idx,
+                            incarnation,
+                        ));
                     return Some(v);
                 }
                 Err(None) => {
