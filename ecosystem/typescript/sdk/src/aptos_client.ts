@@ -1,6 +1,6 @@
 import { Memoize } from "typescript-memoize";
 import { HexString, MaybeHexString } from "./hex_string";
-import { sleep } from "./util";
+import { fixNodeUrl, sleep } from "./util";
 import { AptosAccount } from "./aptos_account";
 import * as Gen from "./generated/index";
 import { TxnBuilderTypes, TransactionBuilderEd25519, BCS } from "./transaction_builder";
@@ -14,12 +14,21 @@ export class AptosClient {
 
   /**
    * Build a client configured to connect to an Aptos node at the given URL.
+   *
+   * Note: If you forget to append `/v1` to the URL, the client constructor
+   * will automatically append it. If you don't want this URL processing to
+   * take place, set doNotFixNodeUrl to true.
+   *
    * @param nodeUrl URL of the Aptos Node API endpoint.
    * @param config Additional configuration options for the generated Axios client.
    */
-  constructor(nodeUrl: string, config?: Partial<Gen.OpenAPIConfig>) {
+  constructor(nodeUrl: string, config?: Partial<Gen.OpenAPIConfig>, doNotFixNodeUrl: boolean = false) {
     const conf = config === undefined || config === null ? {} : { ...config };
-    conf.BASE = nodeUrl;
+    if (doNotFixNodeUrl) {
+      conf.BASE = nodeUrl;
+    } else {
+      conf.BASE = fixNodeUrl(nodeUrl);
+    }
     this.client = new Gen.AptosGeneratedClient(conf);
   }
 
