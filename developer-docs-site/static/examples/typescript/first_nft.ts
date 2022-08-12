@@ -276,7 +276,7 @@ async function getTokenBalance(
     token_id,
   );
 
-  return token.data.amount;
+  return token.amount;
 }
 
 async function getTokenData(creator: HexString, collection_name: string, token_name: string): Promise<any> {
@@ -294,7 +294,7 @@ async function getTokenData(creator: HexString, collection_name: string, token_n
     "0x3::token::TokenData",
     token_data_id,
   );
-  return token.data;
+  return token;
 }
 //<:!:section_3
 
