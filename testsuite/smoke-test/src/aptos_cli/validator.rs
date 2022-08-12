@@ -16,6 +16,39 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[tokio::test]
+async fn test_analyze_validators() {
+    let (mut swarm, cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .with_init_config(Arc::new(|_i, _conf, genesis_stake_amount| {
+            *genesis_stake_amount = 100000;
+        }))
+        .build_with_cli(0)
+        .await;
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await;
+
+    tokio::time::sleep(Duration::from_secs(3)).await;
+
+    reconfig(
+        &rest_client,
+        &transaction_factory,
+        swarm.chain_info().root_account(),
+    )
+    .await;
+
+    cli.analyze_validator_performance(None, None).await.unwrap();
+}
+
+#[tokio::test]
 async fn test_show_validator_set() {
     let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()

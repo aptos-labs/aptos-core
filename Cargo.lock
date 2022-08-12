@@ -134,6 +134,7 @@ name = "aptos"
 version = "0.2.4"
 dependencies = [
  "anyhow",
+ "aptos-bitvec",
  "aptos-config",
  "aptos-crypto",
  "aptos-faucet",

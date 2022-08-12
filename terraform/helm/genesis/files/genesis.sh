@@ -17,6 +17,7 @@ USERNAME_PREFIX=${USERNAME_PREFIX:-aptos-node}
 VALIDATOR_INTERNAL_HOST_SUFFIX=${VALIDATOR_INTERNAL_HOST_SUFFIX:-validator-lb}
 FULLNODE_INTERNAL_HOST_SUFFIX=${FULLNODE_INTERNAL_HOST_SUFFIX:-fullnode-lb}
 MOVE_MODULES_DIR=${MOVE_MODULES_DIR:-"/aptos-framework/move/modules"}
+STAKE_AMOUNT=${STAKE_AMOUNT:-1}
 
 if [ -z ${ERA} ] || [ -z ${NUM_VALIDATORS} ]; then
     echo "ERA (${ERA:-null}) and NUM_VALIDATORS (${NUM_VALIDATORS:-null}) must be set"
@@ -35,6 +36,7 @@ echo "WORKSPACE=${WORKSPACE}"
 echo "USERNAME_PREFIX=${USERNAME_PREFIX}"
 echo "VALIDATOR_INTERNAL_HOST_SUFFIX=${VALIDATOR_INTERNAL_HOST_SUFFIX}"
 echo "FULLNODE_INTERNAL_HOST_SUFFIX=${FULLNODE_INTERNAL_HOST_SUFFIX}"
+echo "STAKE_AMOUNT=${STAKE_AMOUNT}"
 
 # generate all validator configurations
 for i in $(seq 0 $(($NUM_VALIDATORS-1))); do
@@ -59,7 +61,8 @@ aptos genesis generate-keys --output-dir $user_dir
 aptos genesis set-validator-configuration --keys-dir $user_dir --local-repository-dir $WORKSPACE \
     --username $username \
     --validator-host $validator_host \
-    --full-node-host $fullnode_host
+    --full-node-host $fullnode_host \
+    --stake-amount $STAKE_AMOUNT
 done
 
 # get the framework
