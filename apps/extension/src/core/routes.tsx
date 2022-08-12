@@ -130,8 +130,11 @@ export const mainRoutes = Object.freeze([
 ]);
 
 export const noAccountsRoutes = Object.freeze([
+  Routes.addAccount,
   Routes.createAccount,
-  { path: '*', element: <Navigate to={Routes.createAccount.path} replace /> },
+  Routes.importWalletMnemonic,
+  Routes.importWalletPrivateKey,
+  { path: '*', element: <Navigate to={Routes.addAccount.path} replace /> },
 ]);
 
 export const lockedWalletRoutes = Object.freeze([
