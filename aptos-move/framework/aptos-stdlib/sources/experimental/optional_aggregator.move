@@ -29,7 +29,7 @@ module aptos_std::optional_aggregator {
 
     fun add_integer(base: &mut Integer, value: u128) {
         assert!(
-            base.limit >= base.value && value <= (base.limit - base.value),
+            value <= (base.limit - base.value),
             error::out_of_range(EAGGREGATOR_OVERFLOW)
         );
         base.value = base.value + value;
