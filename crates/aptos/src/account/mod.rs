@@ -18,7 +18,7 @@ pub mod transfer;
 pub enum AccountTool {
     Create(create::CreateAccount),
     CreateResourceAccount(create_resource_account::CreateResourceAccount),
-    Fund(fund::FundAccount),
+    FundWithFaucet(fund::FundWithFaucet),
     List(list::ListAccount),
     Transfer(transfer::TransferCoins),
 }
@@ -28,7 +28,7 @@ impl AccountTool {
         match self {
             AccountTool::Create(tool) => tool.execute_serialized().await,
             AccountTool::CreateResourceAccount(tool) => tool.execute_serialized().await,
-            AccountTool::Fund(tool) => tool.execute_serialized().await,
+            AccountTool::FundWithFaucet(tool) => tool.execute_serialized().await,
             AccountTool::List(tool) => tool.execute_serialized().await,
             AccountTool::Transfer(tool) => tool.execute_serialized().await,
         }

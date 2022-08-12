@@ -48,7 +48,7 @@ async fn test_account_flow() {
         .await;
 
     // Create another cli account:
-    cli.add_cli_account(KeyGen::from_os_rng().generate_ed25519_private_key())
+    cli.create_cli_account_from_faucet(KeyGen::from_os_rng().generate_ed25519_private_key(), None)
         .await
         .unwrap();
     cli.assert_account_balance_now(2, DEFAULT_FUNDED_COINS)
