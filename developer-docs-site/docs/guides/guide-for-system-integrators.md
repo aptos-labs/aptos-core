@@ -56,7 +56,7 @@ Other areas worth being familiar with:
 * [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
 * [Typescript SDK](../transactions-with-ts-sdk)
 * [Python SDK](../sdks/python-sdk)
-* [REST API](../rest-api)
+* [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
 
 Useful guides:
 * [Local testnet development flow](./local-testnet-dev-flow)
@@ -141,7 +141,7 @@ Aptos supports two methods for constructing transactions:
 
 #### JSON-encoded transactions
 
-JSON-encoded transactions can be generated via the [REST API](https://aptos.dev/rest-api), following these steps:
+JSON-encoded transactions can be generated via the [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/), following these steps:
 
 - First construct an appropriate JSON payload for the `/transactions/signing_message` endpoint as demonstrated in the [Python SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L111).
 - The output of the above contains an object containing a `message` and this must be signed with the sender’s private key locally.
@@ -190,7 +190,7 @@ See the following documentation for generating valid transactions:
 
 To facilitate evaluation of transactions, Aptos supports a simulation API that does not require and should not contain valid signatures on transactions.
 
-The simulation API works identical to the transaction submission API, except that it executes the transaction and returns back the results along with the gas used. The simulation API can be accessed by submitting a transaction to [`/transactions/simulate`](https://aptos.dev/rest-api/#tag/transactions/operation/simulate_transaction).
+The simulation API works identical to the transaction submission API, except that it executes the transaction and returns back the results along with the gas used. The simulation API can be accessed by submitting a transaction to [`/transactions/simulate`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/simulate_transaction).
 
 :::tip Read more
 Here's an example showing how to use the simulation API in the [Typescript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L413). Note that the gas use may change based upon the state of the account. We recommend that the maximum gas amount be larger than the amount quoted by this API.
@@ -215,9 +215,9 @@ Events and transactions pruning can be disabled via setting the [`ledger_prune_w
 
 The REST API contains the following useful APIs for querying transactions and events:
 
-* [Transactions for an account](https://aptos.dev/rest-api/#tag/transactions/operation/get_account_transactions)
-* [Transactions by version](https://aptos.dev/rest-api/#tag/transactions/operation/get_transaction)
-* [Events by event handle](https://aptos.dev/rest-api/#tag/events/operation/get_events_by_event_handle)
+* [Transactions for an account](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_account_transactions)
+* [Transactions by version](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_version)
+* [Events by event handle](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_events_by_event_handle)
 
 ## Exchanging and tracking coins
 

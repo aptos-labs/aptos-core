@@ -10,6 +10,7 @@ use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::StateView;
+use aptos_types::account_config::NewBlockEvent;
 use aptos_types::transaction::Transaction;
 use aptos_types::{
     account_address::AccountAddress,
@@ -109,7 +110,7 @@ impl Context {
             self.db.get_next_block_event(maybe_oldest_version)?;
         let (_, _, newest_block_event) = self
             .db
-            .get_block_info(ledger_info.ledger_info().version())?;
+            .get_block_info_by_version(ledger_info.ledger_info().version())?;
         Ok(LedgerInfo::new(
             &self.chain_id(),
             &ledger_info,
@@ -134,7 +135,7 @@ impl Context {
             .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
         let (_, _, newest_block_event) = self
             .db
-            .get_block_info(ledger_info.ledger_info().version())
+            .get_block_info_by_version(ledger_info.ledger_info().version())
             .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
 
         Ok(LedgerInfo::new(
@@ -192,7 +193,8 @@ impl Context {
 
     /// Retrieves information about a block
     pub fn get_block_info(&self, version: u64, ledger_version: u64) -> Result<BlockInfo> {
-        let (first_version, last_version, new_block_event) = self.db.get_block_info(version)?;
+        let (first_version, last_version, new_block_event) =
+            self.db.get_block_info_by_version(version)?;
         ensure!(
             last_version <= ledger_version,
             "Block last version {} for txn version {} < ledger version {}",
@@ -231,6 +233,44 @@ impl Context {
             .context("Failed to find block")
             .map_err(BasicErrorWith404::not_found)?;
 
+        self.get_block(
+            ledger_version,
+            with_transactions,
+            first_version,
+            last_version,
+            new_block_event,
+        )
+    }
+
+    pub fn get_block_by_version(
+        &self,
+        version: u64,
+        ledger_version: u64,
+        with_transactions: bool,
+    ) -> Result<Block, BasicErrorWith404> {
+        let (first_version, last_version, new_block_event) = self
+            .db
+            .get_block_info_by_version(version)
+            .context("Failed to find block")
+            .map_err(BasicErrorWith404::not_found)?;
+
+        self.get_block(
+            ledger_version,
+            with_transactions,
+            first_version,
+            last_version,
+            new_block_event,
+        )
+    }
+
+    fn get_block(
+        &self,
+        ledger_version: Version,
+        with_transactions: bool,
+        first_version: Version,
+        last_version: Version,
+        new_block_event: NewBlockEvent,
+    ) -> Result<Block, BasicErrorWith404> {
         if last_version > ledger_version {
             return Err(BasicErrorWith404::not_found(anyhow!("Block not found")));
         }

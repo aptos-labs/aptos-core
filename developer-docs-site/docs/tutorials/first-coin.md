@@ -246,6 +246,6 @@ The data can be verified by visiting either a REST interface or the explorer:
 - Bob's account on the [explorer][bob_account_explorer].
 
 [account_basics]: /concepts/basics-accounts
-[alice_account_rest]: /rest-api/#tag/accounts/a52671f10dc3479b09d0a11ce47694c0/
+[alice_account_rest]: https://fullnode.devnet.aptoslabs.com/v1/accounts/a52671f10dc3479b09d0a11ce47694c0/
 [bob_account_explorer]: https://explorer.devnet.aptos.dev/account/ec6ec14e4abe10aaa6ad53b0b63a1806
-[rest_spec]: /rest-api
+[rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/

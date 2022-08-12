@@ -19,6 +19,18 @@ impl FaucetClient {
         }
     }
 
+    pub fn new_for_testing(faucet_url: Url, rest_url: Url) -> Self {
+        Self {
+            faucet_url,
+            rest_client: Client::new(rest_url)
+                // By default the path is prefixed with the version, e.g. `v1`.
+                // The fake API used in the faucet tests doesn't have a
+                // versioned API however, so we just set it to `/`.
+                .version_path_base("/".to_string())
+                .unwrap(),
+        }
+    }
+
     pub fn create_account(&self, address: AccountAddress) -> Result<()> {
         let client = reqwest::blocking::Client::new();
         let mut url = self.faucet_url.clone();

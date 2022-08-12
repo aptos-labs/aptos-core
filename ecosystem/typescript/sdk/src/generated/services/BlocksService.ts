@@ -35,4 +35,29 @@ export class BlocksService {
         });
     }
 
+    /**
+     * Get blocks by version
+     * This endpoint allows you to get the transactions in a block
+     * and the corresponding block information given a version in the block.
+     * @param version
+     * @param withTransactions
+     * @returns Block
+     * @throws ApiError
+     */
+    public getBlockByVersion(
+        version: number,
+        withTransactions?: boolean,
+    ): CancelablePromise<Block> {
+        return this.httpRequest.request({
+            method: 'GET',
+            url: '/blocks/by_version/{version}',
+            path: {
+                'version': version,
+            },
+            query: {
+                'with_transactions': withTransactions,
+            },
+        });
+    }
+
 }

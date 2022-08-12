@@ -40,7 +40,7 @@ async fn test_basic_client() {
         .unwrap();
 
     info.client()
-        .get_transaction(pending_txn.hash.into())
+        .get_transaction_by_hash(pending_txn.hash.into())
         .await
         .unwrap();
 
