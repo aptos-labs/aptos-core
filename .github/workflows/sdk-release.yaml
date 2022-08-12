@@ -64,7 +64,7 @@ jobs:
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: docker run --mount=type=bind,source=/tmp,target=/specs --name=yaml-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json -o /specs/spec.json
+          command: docker run --mount=type=bind,source=/tmp,target=/specs --name=json-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json -o /specs/spec.json
 
       # Confirm that the specs we built here are the same as those checked in.
       - run: echo "If this step fails, run the following commands locally to fix it:"
