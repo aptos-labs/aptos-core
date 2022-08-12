@@ -33,6 +33,7 @@ use storage_service_types::responses::CompleteDataRange;
 use tokio::time::timeout;
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_blocked() {
     // Create a state value stream
     let streaming_service_config = DataStreamingServiceConfig::default();
@@ -106,6 +107,7 @@ async fn test_stream_blocked() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_garbage_collection() {
     // Create a transaction stream
     let streaming_service_config = DataStreamingServiceConfig::default();
@@ -146,6 +148,7 @@ async fn test_stream_garbage_collection() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_initialization() {
     // Create an epoch ending data stream
     let streaming_service_config = DataStreamingServiceConfig::default();
@@ -169,6 +172,7 @@ async fn test_stream_initialization() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_data_error() {
     // Create an epoch ending data stream
     let streaming_service_config = DataStreamingServiceConfig::default();
@@ -203,6 +207,7 @@ async fn test_stream_data_error() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_invalid_response() {
     // Create an epoch ending data stream
     let streaming_service_config = DataStreamingServiceConfig::default();
@@ -240,6 +245,7 @@ async fn test_stream_invalid_response() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_out_of_order_responses() {
     // Create an epoch ending data stream
     let max_concurrent_requests = 3;
@@ -314,6 +320,7 @@ async fn test_stream_out_of_order_responses() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_listener_dropped() {
     // Create an epoch ending data stream
     let max_concurrent_requests = 3;
@@ -532,6 +539,7 @@ fn verify_client_request_resubmitted(
 
 /// Verifies that a single epoch ending notification is received by the
 /// data listener and that it contains the `expected_ledger_info`.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn verify_epoch_ending_notification(
     stream_listener: &mut DataStreamListener,
     expected_ledger_info: LedgerInfoWithSignatures,

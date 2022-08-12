@@ -154,6 +154,7 @@ mod test {
         SystemInformation(inner)
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_evaluator(
         baseline_build_commit_hash: Option<&str>,
         target_build_commit_hash: Option<&str>,
@@ -186,22 +187,26 @@ mod test {
     }
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_same() {
         test_evaluator(Some("aaaaaaaaaa"), Some("aaaaaaaaaa"), 100).await;
     }
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_different() {
         test_evaluator(Some("aaaaaaaaaa"), Some("bbbbbbbbbb"), 50).await;
     }
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_missing_target_metric() {
         test_evaluator(Some("aaaaaaaaaa"), None, 0).await;
     }
 
     #[tokio::test]
     #[should_panic(expected = "did not contain the necessary key")]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_both_missing_metrics() {
         test_evaluator(None, None, 0).await;
     }

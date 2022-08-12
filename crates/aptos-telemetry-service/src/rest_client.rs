@@ -24,6 +24,7 @@ impl RestClient {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get_resource<T: DeserializeOwned>(
         &self,
         address: AccountAddress,
@@ -62,6 +63,7 @@ impl RestClient {
             .map_err(|e| anyhow!("unable to parse network address {}", e.to_string()))
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn validator_set_addresses<F: Fn(ValidatorInfo) -> Result<Vec<NetworkAddress>>>(
         &self,
         address_accessor: F,

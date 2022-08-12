@@ -79,6 +79,7 @@ pub async fn setup_test(
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_network() {
     let (swarm, _, _, rosetta_client) = setup_test(1, 1).await;
     let chain_id = swarm.chain_id();
@@ -121,6 +122,7 @@ async fn test_network() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_account_balance() {
     let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 2).await;
 
@@ -223,6 +225,7 @@ async fn test_account_balance() {
     .unwrap();
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn account_has_balance(
     rosetta_client: &RosettaClient,
     chain_id: ChainId,
@@ -247,6 +250,7 @@ async fn account_has_balance(
     }
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_balance(
     rosetta_client: &RosettaClient,
     chain_id: ChainId,
@@ -263,6 +267,7 @@ async fn get_balance(
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_block() {
     let (swarm, _cli, _faucet, rosetta_client) = setup_test(1, 2).await;
     let chain_id = swarm.chain_id();
@@ -386,6 +391,7 @@ async fn test_block() {
 // TODO: Unignore this when we have get_block_info for the v1 API.
 #[ignore]
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_block_transactions() {
     let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 2).await;
     let chain_id = swarm.chain_id();
@@ -509,6 +515,7 @@ async fn test_block_transactions() {
 // TODO: Unignore this when we have get_block_info for the v1 API.
 #[ignore]
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_invalid_transaction_gas_charged() {
     let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 1).await;
     let chain_id = swarm.chain_id();
@@ -735,6 +742,7 @@ fn assert_genesis_block(block: &Block) {
     );
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_block(rosetta_client: &RosettaClient, chain_id: ChainId, index: u64) -> Block {
     let rosetta_client = (*rosetta_client).clone();
     let request = BlockRequest::by_index(chain_id, index);
@@ -745,6 +753,7 @@ async fn get_block(rosetta_client: &RosettaClient, chain_id: ChainId, index: u64
         .unwrap()
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_block_by_hash(
     rosetta_client: &RosettaClient,
     chain_id: ChainId,
@@ -760,6 +769,7 @@ async fn get_block_by_hash(
 }
 
 /// Try for 2 seconds to get a response.  This handles the fact that it's starting async
+#[tracing::instrument(skip_all, level = "trace")]
 async fn try_until_ok_default<F, Fut, T>(function: F) -> anyhow::Result<T>
 where
     F: Fn() -> Fut,
@@ -773,6 +783,7 @@ where
     .await
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn try_until_ok<F, Fut, T>(
     total_wait: Duration,
     interval: Duration,

@@ -119,6 +119,7 @@ impl RosettaClient {
         self.make_call("network/status", request).await
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn make_call<'a, I: Serialize + Debug, O: DeserializeOwned>(
         &'a self,
         path: &'static str,

@@ -8,6 +8,7 @@ use forge::Swarm;
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_get_index() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let info = swarm.aptos_public_info();
@@ -17,6 +18,7 @@ async fn test_get_index() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_basic_client() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();

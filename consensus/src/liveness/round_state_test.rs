@@ -39,6 +39,7 @@ fn test_round_time_interval() {
 
 #[tokio::test]
 /// Verify that RoundState properly outputs local timeout events upon timeout
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_basic_timeout() {
     let (mut pm, mut timeout_rx) = make_round_state();
 

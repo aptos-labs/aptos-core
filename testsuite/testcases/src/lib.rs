@@ -21,6 +21,7 @@ use rand::SeedableRng;
 use std::time::{Duration, Instant};
 use tokio::runtime::Builder;
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn batch_update(
     ctx: &mut NetworkContext<'_>,
     validators_to_update: &[PeerId],

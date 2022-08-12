@@ -370,17 +370,20 @@ mock! {
     pub StreamingClient {}
     #[async_trait]
     impl DataStreamingClient for StreamingClient {
+#[tracing::instrument(skip_all, level = "trace")]
         async fn get_all_state_values(
             &self,
             version: Version,
             start_index: Option<u64>,
         ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
 
+#[tracing::instrument(skip_all, level = "trace")]
         async fn get_all_epoch_ending_ledger_infos(
             &self,
             start_epoch: Epoch,
         ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
 
+#[tracing::instrument(skip_all, level = "trace")]
         async fn get_all_transaction_outputs(
             &self,
             start_version: Version,
@@ -388,6 +391,7 @@ mock! {
             proof_version: Version,
         ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
 
+#[tracing::instrument(skip_all, level = "trace")]
         async fn get_all_transactions(
             &self,
             start_version: Version,
@@ -396,6 +400,7 @@ mock! {
             include_events: bool,
         ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
 
+#[tracing::instrument(skip_all, level = "trace")]
         async fn continuously_stream_transaction_outputs(
             &self,
             start_version: Version,
@@ -403,6 +408,7 @@ mock! {
             target: Option<LedgerInfoWithSignatures>,
         ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
 
+#[tracing::instrument(skip_all, level = "trace")]
         async fn continuously_stream_transactions(
             &self,
             start_version: Version,
@@ -411,6 +417,7 @@ mock! {
             target: Option<LedgerInfoWithSignatures>,
         ) -> Result<DataStreamListener, data_streaming_service::error::Error>;
 
+#[tracing::instrument(skip_all, level = "trace")]
         async fn terminate_stream_with_feedback(
             &self,
             notification_id: NotificationId,

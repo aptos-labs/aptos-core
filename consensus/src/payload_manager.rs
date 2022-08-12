@@ -45,6 +45,7 @@ impl QuorumStoreClient {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn pull_internal(
         &self,
         max_size: u64,

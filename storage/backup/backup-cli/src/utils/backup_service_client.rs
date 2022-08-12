@@ -41,6 +41,7 @@ impl BackupServiceClient {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get(&self, path: &str) -> Result<impl AsyncRead> {
         let url = format!("{}/{}", self.address, path);
         Ok(self

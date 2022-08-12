@@ -25,6 +25,7 @@ thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["full", "time"] }
 url = "2.2.2"
 warp = "0.3.2"
+tracing = "0.1.34"
 
 aptos-api = { path = "../../api" }
 aptos-config = { path = "../../config" }

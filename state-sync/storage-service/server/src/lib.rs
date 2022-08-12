@@ -254,6 +254,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
     }
 
     /// Spawns a non-terminating task that refreshes the cached storage server summary
+#[tracing::instrument(skip_all, level = "trace")]
     async fn spawn_storage_summary_refresher(&mut self) {
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
         let config = self.config;
@@ -290,6 +291,7 @@ impl<T: StorageReaderInterface> StorageServiceServer<T> {
     }
 
     /// Spawns a non-terminating task that handles subscriptions
+#[tracing::instrument(skip_all, level = "trace")]
     async fn spawn_subscription_handler(&mut self) {
         let cached_storage_server_summary = self.cached_storage_server_summary.clone();
         let config = self.config;

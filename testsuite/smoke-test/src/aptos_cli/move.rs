@@ -13,6 +13,7 @@ const PACKAGE_NAME: &str = "AwesomePackage";
 const HELLO_BLOCKCHAIN: &str = "HelloBlockchain";
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_move_compile_flow() {
     let mut cli = CliTestFramework::local_new(1);
 
@@ -76,6 +77,7 @@ async fn test_move_compile_flow() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_move_publish_flow() {
     let (_swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()

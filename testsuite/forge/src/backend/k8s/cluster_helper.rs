@@ -81,6 +81,7 @@ pub fn get_free_port() -> u32 {
 }
 
 /// Waits for the testnet's genesis job to complete, while tailing the job's logs
+#[tracing::instrument(skip_all, level = "trace")]
 async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &str) -> Result<()> {
     aptos_retrier::retry_async(k8s_wait_genesis_strategy(), || {
         let jobs: Api<Job> = Api::namespaced(kube_client.clone(), kube_namespace);
@@ -122,6 +123,7 @@ async fn wait_genesis_job(kube_client: &K8sClient, era: &str, kube_namespace: &s
 }
 
 /// Waits for a given number of HAProxy K8s Deployments to be ready
+#[tracing::instrument(skip_all, level = "trace")]
 async fn wait_node_haproxy(
     kube_client: &K8sClient,
     kube_namespace: &str,
@@ -202,6 +204,7 @@ pub async fn check_for_container_restart(
 }
 
 /// Waits for a single K8s StatefulSet to be ready
+#[tracing::instrument(skip_all, level = "trace")]
 async fn wait_stateful_set(
     kube_client: &K8sClient,
     kube_namespace: &str,
@@ -250,6 +253,7 @@ async fn wait_stateful_set(
 }
 
 /// Waits for all given K8sNodes to be ready
+#[tracing::instrument(skip_all, level = "trace")]
 async fn wait_nodes_stateful_set(
     kube_client: &K8sClient,
     kube_namespace: &str,
@@ -272,6 +276,7 @@ pub fn set_validator_image_tag(
 }
 
 /// Deletes a collection of resources in k8s as part of aptos-node
+#[tracing::instrument(skip_all, level = "trace")]
 async fn delete_k8s_collection<T: Clone + DeserializeOwned + Meta>(
     api: Api<T>,
     name: &'static str,
@@ -333,6 +338,7 @@ pub(crate) async fn delete_k8s_resources(client: K8sClient, kube_namespace: &str
 /// Deletes all Forge resources from the given namespace. If the namespace is "default", delete the management configmap
 /// as well as all compute resources. If the namespace is a Forge namespace (has the "forge-*" prefix), then simply delete
 /// the entire namespace
+#[tracing::instrument(skip_all, level = "trace")]
 async fn delete_k8s_cluster(kube_namespace: String) -> Result<()> {
     let client: K8sClient = create_k8s_client().await;
 
@@ -778,6 +784,7 @@ enum ApiError {
     FinalError(String),
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn create_namespace(
     namespace_creator: Arc<dyn CreateNamespace>,
     kube_namespace: String,
@@ -1015,6 +1022,7 @@ mod tests {
 
     #[async_trait]
     impl CreateNamespace for FailedNamespacesApi {
+#[tracing::instrument(skip_all, level = "trace")]
         async fn create(
             &self,
             _pp: &PostParams,
@@ -1031,6 +1039,7 @@ mod tests {
     }
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_create_namespace_final_error() {
         let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(401));
         let result = create_namespace(namespace_creator, "banana".to_string()).await;
@@ -1041,6 +1050,7 @@ mod tests {
     }
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_create_namespace_retryable_error() {
         let namespace_creator = Arc::new(FailedNamespacesApi::from_status_code(403));
         let result = create_namespace(namespace_creator, "banana".to_string()).await;
@@ -1051,6 +1061,7 @@ mod tests {
     }
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_check_namespace_for_cleanup() {
         let start = SystemTime::now();
         let time_since_the_epoch = start

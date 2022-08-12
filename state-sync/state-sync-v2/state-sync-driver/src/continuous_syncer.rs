@@ -90,6 +90,7 @@ impl<
     }
 
     /// Initializes an active data stream so that we can begin to process notifications
+#[tracing::instrument(skip_all, level = "trace")]
     async fn initialize_active_data_stream(
         &mut self,
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
@@ -143,6 +144,7 @@ impl<
     }
 
     /// Attempts to fetch a data notification from the active stream
+#[tracing::instrument(skip_all, level = "trace")]
     async fn fetch_next_data_notification(&mut self) -> Result<DataNotification, Error> {
         let max_stream_wait_time_ms = self.driver_configuration.config.max_stream_wait_time_ms;
         let result =
@@ -157,6 +159,7 @@ impl<
     }
 
     /// Processes any notifications already pending on the active stream
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_active_stream_notifications(
         &mut self,
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
@@ -220,6 +223,7 @@ impl<
     }
 
     /// Process a single transaction or transaction output data payload
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_transaction_or_output_payload(
         &mut self,
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
@@ -302,6 +306,7 @@ impl<
     }
 
     /// Verifies the first payload version matches the version we wish to sync
+#[tracing::instrument(skip_all, level = "trace")]
     async fn verify_payload_start_version(
         &mut self,
         notification_id: NotificationId,
@@ -336,6 +341,7 @@ impl<
 
     /// Verifies the given ledger info to be used as a transaction or transaction
     /// output chunk proof. If verification fails, the active stream is terminated.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn verify_proof_ledger_info(
         &mut self,
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
@@ -378,6 +384,7 @@ impl<
 
     /// Handles the end of stream notification or an invalid payload by
     /// terminating the stream appropriately.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn handle_end_of_stream_or_invalid_payload(
         &mut self,
         data_notification: DataNotification,

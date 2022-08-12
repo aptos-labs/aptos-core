@@ -22,6 +22,7 @@ where
 }
 
 /// Read a u16 (encoded as BE bytes) from `Stream` and return the length.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn read_u16frame_len<TSocket>(stream: &mut TSocket) -> Result<u16>
 where
     TSocket: AsyncRead + Unpin,
@@ -58,6 +59,7 @@ where
 /// Write a u16 `len` as BE bytes to `stream`.
 ///
 /// Caller is responsible for flushing the write to `stream`.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn write_u16frame_len<TSocket>(stream: &mut TSocket, len: u16) -> Result<()>
 where
     TSocket: AsyncWrite + Unpin,

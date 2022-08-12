@@ -68,6 +68,7 @@ impl StateSnapshotBackupController {
         Ok(ret)
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn run_impl(mut self) -> Result<FileHandle> {
         self.version = Some(self.get_version_for_epoch_ending(self.epoch).await?);
         let backup_handle = self
@@ -165,6 +166,7 @@ impl StateSnapshotBackupController {
         Ok(key.hash())
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get_version_for_epoch_ending(&self, epoch: u64) -> Result<u64> {
         let ledger_info: LedgerInfoWithSignatures = bcs::from_bytes(
             self.client
@@ -180,6 +182,7 @@ impl StateSnapshotBackupController {
         Ok(ledger_info.ledger_info().version())
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn write_chunk(
         &self,
         backup_handle: &BackupHandleRef,
@@ -219,6 +222,7 @@ impl StateSnapshotBackupController {
         })
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn write_manifest(
         &self,
         backup_handle: &BackupHandleRef,

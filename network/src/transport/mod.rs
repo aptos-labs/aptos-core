@@ -175,6 +175,7 @@ pub struct Connection<TSocket> {
 }
 
 /// Convenience function for adding a timeout to a Future that returns an `io::Result`.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn timeout_io<F, T>(time_service: TimeService, duration: Duration, fut: F) -> io::Result<T>
 where
     F: Future<Output = io::Result<T>>,
@@ -230,6 +231,7 @@ fn add_pp_addr(proxy_protocol_enabled: bool, error: io::Error, addr: &NetworkAdd
 /// `ctxt.trusted_peers` is `Some(_)`, then we will only allow connections from
 /// peers with a pubkey in this set. Otherwise, we will allow inbound connections
 /// from any pubkey.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn upgrade_inbound<T: TSocket>(
     ctxt: Arc<UpgradeContext>,
     fut_socket: impl Future<Output = io::Result<T>>,

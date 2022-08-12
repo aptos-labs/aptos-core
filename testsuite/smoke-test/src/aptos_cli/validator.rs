@@ -16,6 +16,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_show_validator_set() {
     let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
@@ -37,6 +38,7 @@ async fn test_show_validator_set() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_register_and_update_validator() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
@@ -128,6 +130,7 @@ async fn test_register_and_update_validator() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_join_and_leave_validator() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
@@ -301,6 +304,7 @@ impl ValidatorNodeKeys {
     }
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn init_validator_account(
     cli: &mut CliTestFramework,
     keygen: &mut KeyGen,
@@ -320,6 +324,7 @@ async fn init_validator_account(
     (validator_cli_index, validator_node_keys)
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn assert_validator_set_sizes(
     cli: &CliTestFramework,
     active: usize,

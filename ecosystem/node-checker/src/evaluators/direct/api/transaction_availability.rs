@@ -31,6 +31,7 @@ impl TransactionAvailabilityEvaluator {
     }
 
     /// Fetch a transaction by version and return it.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get_transaction_by_version(
         client: &AptosRestClient,
         version: u64,

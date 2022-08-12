@@ -241,6 +241,7 @@ impl LocalSwarm {
         Ok(())
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn wait_for_startup(&mut self) -> Result<()> {
         let num_attempts = 10;
         let mut done = vec![false; self.validators.len()];

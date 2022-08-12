@@ -113,6 +113,7 @@ pub async fn execute_nft_txns<'t>(
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_indexer() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();

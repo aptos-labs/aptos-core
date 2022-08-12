@@ -35,6 +35,7 @@ use mockall::{predicate::eq, Sequence};
 use std::sync::Arc;
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_bootstrap_genesis_waypoint() {
     // Create a driver configuration with a genesis waypoint
     let driver_configuration = create_full_node_driver_configuration();
@@ -70,6 +71,7 @@ async fn test_bootstrap_genesis_waypoint() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_bootstrap_immediate_notification() {
     // Create a driver configuration with a genesis waypoint
     let driver_configuration = create_full_node_driver_configuration();
@@ -98,6 +100,7 @@ async fn test_bootstrap_immediate_notification() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_bootstrap_no_notification() {
     // Create a driver configuration with a genesis waypoint
     let driver_configuration = create_full_node_driver_configuration();
@@ -132,6 +135,7 @@ async fn test_bootstrap_no_notification() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_critical_timeout() {
     // Create a driver configuration with a genesis waypoint and a stream timeout of 1 second
     let mut driver_configuration = create_full_node_driver_configuration();
@@ -189,6 +193,7 @@ async fn test_critical_timeout() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_data_stream_state_values() {
     // Create test data
     let notification_id = 50043;
@@ -259,6 +264,7 @@ async fn test_data_stream_state_values() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_data_stream_transactions() {
     // Create test data
     let notification_id = 0;
@@ -326,6 +332,7 @@ async fn test_data_stream_transactions() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_data_stream_transaction_outputs() {
     // Create test data
     let notification_id = 1235;
@@ -395,6 +402,7 @@ async fn test_data_stream_transaction_outputs() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_fetch_epoch_ending_ledger_infos() {
     // Create a driver configuration with a genesis waypoint and a stream timeout of 1 second
     let mut driver_configuration = create_full_node_driver_configuration();
@@ -431,6 +439,7 @@ async fn test_fetch_epoch_ending_ledger_infos() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_snapshot_sync_epoch_change() {
     // Create test data
     let synced_version = GENESIS_TRANSACTION_VERSION; // Genesis is the highest synced
@@ -495,6 +504,7 @@ async fn test_snapshot_sync_epoch_change() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_snapshot_sync_existing_state() {
     // Create test data
     let synced_version = GENESIS_TRANSACTION_VERSION; // Genesis is the highest synced
@@ -594,6 +604,7 @@ async fn test_snapshot_sync_existing_state() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_snapshot_sync_fresh_state() {
     // Create test data
     let synced_version = GENESIS_TRANSACTION_VERSION; // Genesis is the highest synced
@@ -650,6 +661,7 @@ async fn test_snapshot_sync_fresh_state() {
 #[should_panic(
     expected = "The snapshot sync for the target was marked as complete but the highest synced version is genesis!"
 )]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_snapshot_sync_invalid_state() {
     // Create test data
     let synced_version = GENESIS_TRANSACTION_VERSION; // Genesis is the highest synced
@@ -696,6 +708,7 @@ async fn test_snapshot_sync_invalid_state() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_snapshot_sync_lag() {
     // Create test data
     let num_versions_behind = 1000;
@@ -748,6 +761,7 @@ async fn test_snapshot_sync_lag() {
 #[should_panic(
     expected = "Snapshot syncing is currently unsupported for nodes with existing state!"
 )]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_snapshot_sync_lag_panic() {
     // Create test data
     let num_versions_behind = 10000;
@@ -794,6 +808,7 @@ async fn test_snapshot_sync_lag_panic() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_waypoint_mismatch() {
     // Create a waypoint
     let waypoint_version = 1;
@@ -851,6 +866,7 @@ async fn test_waypoint_mismatch() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_waypoint_must_be_verified() {
     // Create a driver configuration with a genesis waypoint and a stream timeout of 1 second
     let mut driver_configuration = create_full_node_driver_configuration();
@@ -887,6 +903,7 @@ async fn test_waypoint_must_be_verified() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_waypoint_satisfiable() {
     // Create a driver configuration with a non-genesis waypoint
     let mut driver_configuration = create_full_node_driver_configuration();
@@ -996,6 +1013,7 @@ fn create_bootstrapper_with_storage(
 /// Drives progress for the given bootstrapper. If `until_bootstrapped`
 /// is true this method will continue to drive the bootstrapper until
 /// bootstrapping is complete.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn drive_progress(
     bootstrapper: &mut Bootstrapper<
         MockMetadataStorage,

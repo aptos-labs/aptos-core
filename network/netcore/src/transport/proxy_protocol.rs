@@ -153,6 +153,7 @@ mod test {
     const IPV4_ADDR_SIZE: &[u8; 2] = &[0x00, IPV4_SIZE as u8];
     const IPV6_ADDR_SIZE: &[u8; 2] = &[0x00, IPV6_SIZE as u8];
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send_v4(sender: &mut MemorySocket) -> io::Result<()> {
         sender.write_all(&PPV2_SIGNATURE).await?; // V2 signature
         sender.write_all(&[PPV2_PROXY]).await?; // Version 2, Proxy
@@ -165,6 +166,7 @@ mod test {
         sender.write_all(TEST_DATA).await // Data
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send_v6(sender: &mut MemorySocket) -> io::Result<()> {
         sender.write_all(&PPV2_SIGNATURE).await?; // V2 signature
         sender.write_all(&[PPV2_PROXY]).await?; // Version 2, Proxy

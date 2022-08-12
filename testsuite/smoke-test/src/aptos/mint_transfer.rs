@@ -6,6 +6,7 @@ use aptos_transaction_builder::aptos_stdlib;
 use forge::Swarm;
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_mint_transfer() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();

@@ -7,6 +7,7 @@ use forge::Swarm;
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_account_creation() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();

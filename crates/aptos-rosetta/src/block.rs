@@ -32,6 +32,7 @@ pub fn block_route(
 /// transaction `hash`.
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/BlockApi.html#block)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResult<BlockResponse> {
     debug!("/block");
     trace!(
@@ -58,6 +59,7 @@ async fn block(request: BlockRequest, server_context: RosettaContext) -> ApiResu
 }
 
 /// Build up the transaction, which should contain the `operations` as the change set
+#[tracing::instrument(skip_all, level = "trace")]
 async fn build_block(
     parent_block_identifier: BlockIdentifier,
     block: aptos_rest_client::aptos_api_types::Block,
@@ -83,6 +85,7 @@ async fn build_block(
 }
 
 /// Retrieves a block by its index
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_block_by_index(
     block_cache: &BlockCache,
     block_height: u64,

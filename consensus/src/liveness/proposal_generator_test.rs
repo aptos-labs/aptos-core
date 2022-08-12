@@ -23,6 +23,7 @@ fn empty_callback() -> BoxFuture<'static, ()> {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_proposal_generation_empty_tree() {
     let signer = ValidatorSigner::random(None);
     let block_store = build_empty_tree();
@@ -58,6 +59,7 @@ async fn test_proposal_generation_empty_tree() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_proposal_generation_parent() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
@@ -125,6 +127,7 @@ async fn test_proposal_generation_parent() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_old_proposal_generation() {
     let mut inserter = TreeInserter::default();
     let block_store = inserter.block_store();
@@ -154,6 +157,7 @@ async fn test_old_proposal_generation() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_correct_failed_authors() {
     let inserter = TreeInserter::default();
     let author = inserter.signer().author();

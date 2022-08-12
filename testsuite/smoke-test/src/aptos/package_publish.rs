@@ -7,6 +7,7 @@ use forge::Swarm;
 use framework::natives::code::UpgradePolicy;
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_package_publish() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();

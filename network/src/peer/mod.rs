@@ -401,6 +401,7 @@ where
         (write_reqs_tx, close_tx)
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn handle_inbound_message(
         &mut self,
         message: Result<NetworkMessage, ReadError>,
@@ -513,6 +514,7 @@ where
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn handle_outbound_request(
         &mut self,
         request: PeerRequest,
@@ -595,6 +597,7 @@ where
         self.state = State::ShuttingDown(reason);
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn do_shutdown(mut self, writer_close_tx: oneshot::Sender<()>, reason: DisconnectReason) {
         let remote_peer_id = self.remote_peer_id();
 

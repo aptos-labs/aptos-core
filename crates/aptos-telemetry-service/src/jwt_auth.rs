@@ -98,6 +98,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn jwt_from_header_valid_bearer() {
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, "Bearer token".parse().unwrap());
@@ -113,6 +114,7 @@ mod tests {
     }
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn jwt_from_header_invalid_bearer() {
         let headers = HeaderMap::new();
         let jwt = jwt_from_header(headers).await;

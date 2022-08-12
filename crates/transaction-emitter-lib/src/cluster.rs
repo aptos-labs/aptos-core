@@ -119,6 +119,7 @@ impl Cluster {
         AccountKey::from_private_key(clone(&self.mint_key_pair.private_key))
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn load_account_with_mint_key(
         &self,
         client: &RestClient,

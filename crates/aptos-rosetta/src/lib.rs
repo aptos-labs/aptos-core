@@ -148,6 +148,7 @@ pub fn routes(
 }
 
 /// Handle error codes from warp
+#[tracing::instrument(skip_all, level = "trace")]
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     let code;
     let body;
@@ -205,6 +206,7 @@ pub fn health_check_route(
 }
 
 /// Calls the underlying REST health check
+#[tracing::instrument(skip_all, level = "trace")]
 async fn health_check(
     params: HealthCheckParams,
     server_context: RosettaContext,

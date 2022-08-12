@@ -142,6 +142,7 @@ pub fn submit_route(
 /// This combines signatures, and a raw txn
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructioncombine)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn construction_combine(
     request: ConstructionCombineRequest,
     server_context: RosettaContext,
@@ -186,6 +187,7 @@ async fn construction_combine(
 /// both account and key.
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionderive)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn construction_derive(
     request: ConstructionDeriveRequest,
     server_context: RosettaContext,
@@ -210,6 +212,7 @@ async fn construction_derive(
 /// Hash a transaction to get it's identifier for lookup in mempool
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionhash)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn construction_hash(
     request: ConstructionHashRequest,
     server_context: RosettaContext,
@@ -230,6 +233,7 @@ async fn construction_hash(
 /// Retrieve sequence number for submitting transactions
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionmetadata)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn construction_metadata(
     request: ConstructionMetadataRequest,
     server_context: RosettaContext,
@@ -280,6 +284,7 @@ async fn construction_metadata(
 /// Parses operations from a transaction, used for verifying transaction construction
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionparse)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn construction_parse(
     request: ConstructionParseRequest,
     server_context: RosettaContext,
@@ -425,6 +430,7 @@ fn parse_transfer_operation(
 /// Constructs payloads for given known operations
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionpayloads)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn construction_payloads(
     request: ConstructionPayloadsRequest,
     server_context: RosettaContext,
@@ -489,6 +495,7 @@ const DEFAULT_MAX_GAS_PRICE: u64 = 10000;
 /// This creates the request needed to fetch metadata
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionpreprocess)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn construction_preprocess(
     request: ConstructionPreprocessRequest,
     server_context: RosettaContext,
@@ -537,6 +544,7 @@ async fn construction_preprocess(
 /// Submits a transaction to the blockchain
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/ConstructionApi.html#constructionsubmit)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn construction_submit(
     request: ConstructionSubmitRequest,
     server_context: RosettaContext,
