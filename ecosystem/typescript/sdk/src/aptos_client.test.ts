@@ -285,7 +285,7 @@ test(
   30 * 1000,
 );
 
-test(
+test.skip(
   "submits multiagent transaction",
   async () => {
     const client = new AptosClient(NODE_URL);

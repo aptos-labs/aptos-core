@@ -1,34 +1,30 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    account::{
-        create::{CreateAccount, DEFAULT_FUNDED_COINS},
-        fund::FundAccount,
-        list::{ListAccount, ListQuery},
-        transfer::{TransferCoins, TransferSummary},
-    },
-    common::{
-        init::InitTool,
-        types::{
-            account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
-            EncodingOptions, FaucetOptions, GasOptions, MoveManifestAccountWrapper, MovePackageDir,
-            PrivateKeyInputOptions, PromptOptions, RestOptions, RngArgs, TransactionOptions,
-            TransactionSummary,
-        },
-        utils::write_to_file,
-    },
-    move_tool::{
-        ArgWithType, CompilePackage, InitPackage, MemberId, PublishPackage, RunFunction,
-        TestPackage,
-    },
-    node::{
-        AddStake, IncreaseLockup, JoinValidatorSet, LeaveValidatorSet, OperatorArgs,
-        RegisterValidatorCandidate, ShowValidatorConfig, ShowValidatorSet, ShowValidatorStake,
-        UnlockStake, UpdateValidatorNetworkAddresses, ValidatorConfigArgs, WithdrawStake,
-    },
-    CliCommand,
+use crate::account::{
+    create::{CreateAccount, DEFAULT_FUNDED_COINS},
+    fund::FundAccount,
+    list::{ListAccount, ListQuery},
+    transfer::{TransferCoins, TransferSummary},
 };
+use crate::common::init::InitTool;
+use crate::common::types::{
+    account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
+    EncodingOptions, FaucetOptions, GasOptions, MoveManifestAccountWrapper, MovePackageDir,
+    PrivateKeyInputOptions, PromptOptions, RestOptions, RngArgs, TransactionOptions,
+    TransactionSummary,
+};
+use crate::common::utils::write_to_file;
+use crate::move_tool::{
+    ArgWithType, CompilePackage, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
+};
+use crate::node::{
+    AddStake, AnalyzeMode, AnalyzeValidatorPerformance, IncreaseLockup, JoinValidatorSet,
+    LeaveValidatorSet, OperatorArgs, RegisterValidatorCandidate, ShowValidatorConfig,
+    ShowValidatorSet, ShowValidatorStake, UnlockStake, UpdateValidatorNetworkAddresses,
+    ValidatorConfigArgs, WithdrawStake,
+};
+use crate::CliCommand;
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
@@ -349,6 +345,22 @@ impl CliTestFramework {
                 full_node_host: None,
                 full_node_network_public_key: None,
             },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn analyze_validator_performance(
+        &self,
+        start_epoch: Option<u64>,
+        end_epoch: Option<u64>,
+    ) -> CliTypedResult<()> {
+        AnalyzeValidatorPerformance {
+            start_epoch,
+            end_epoch,
+            rest_options: self.rest_options(),
+            profile_options: Default::default(),
+            analyze_mode: AnalyzeMode::All,
         }
         .execute()
         .await
