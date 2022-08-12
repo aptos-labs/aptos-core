@@ -7,6 +7,7 @@ use move_deps::move_core_types::{
     account_address::AccountAddress,
     value::{serialize_values, MoveValue},
 };
+use move_deps::move_core_types::vm_status::StatusCode;
 
 #[test]
 fn test_timestamp_time_has_started() {
@@ -36,7 +37,7 @@ fn test_timestamp_time_has_started() {
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );
 
-    assert_eq!(output.unwrap_err().move_abort_code(), Some(196608));
+    assert_eq!(output.unwrap_err().move_abort_code(), Some(196609));
 }
 
 #[test]
@@ -45,23 +46,23 @@ fn test_block_double_init() {
 
     executor.exec(
         "block",
-        "initialize_block_metadata",
+        "initialize",
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
-            MoveValue::U64(0),
+            MoveValue::U64(1),
         ]),
     );
 
     let output = executor.try_exec(
         "block",
-        "initialize_block_metadata",
+        "initialize",
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
-            MoveValue::U64(0),
+            MoveValue::U64(1),
         ]),
     );
 
-    assert_eq!(output.unwrap_err().move_abort_code(), Some(524288));
+    assert_eq!(output.unwrap_err().status_code(), StatusCode::RESOURCE_ALREADY_EXISTS);
 }

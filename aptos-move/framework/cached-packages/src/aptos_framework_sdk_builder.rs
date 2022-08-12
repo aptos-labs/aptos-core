@@ -47,15 +47,18 @@ pub enum ScriptFunctionCall {
         amount: u64,
     },
 
+    /// Only callable in tests and testnets where the core resources account exists.
     /// Claim the delegated mint capability and destroy the delegated token.
     AptosCoinClaimMintCapability {},
 
+    /// Only callable in tests and testnets where the core resources account exists.
     /// Create delegated token for the address so the account could claim MintCapability later.
     AptosCoinDelegateMintCapability {
         to: AccountAddress,
     },
 
-    /// Create new test coins and deposit them into dst_addr's account.
+    /// Only callable in tests and testnets where the core resources account exists.
+    /// Create new coins and deposit them into dst_addr's account.
     AptosCoinMint {
         dst_addr: AccountAddress,
         amount: u64,
@@ -395,6 +398,7 @@ pub fn account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
     ))
 }
 
+/// Only callable in tests and testnets where the core resources account exists.
 /// Claim the delegated mint capability and destroy the delegated token.
 pub fn aptos_coin_claim_mint_capability() -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -411,6 +415,7 @@ pub fn aptos_coin_claim_mint_capability() -> TransactionPayload {
     ))
 }
 
+/// Only callable in tests and testnets where the core resources account exists.
 /// Create delegated token for the address so the account could claim MintCapability later.
 pub fn aptos_coin_delegate_mint_capability(to: AccountAddress) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -427,7 +432,8 @@ pub fn aptos_coin_delegate_mint_capability(to: AccountAddress) -> TransactionPay
     ))
 }
 
-/// Create new test coins and deposit them into dst_addr's account.
+/// Only callable in tests and testnets where the core resources account exists.
+/// Create new coins and deposit them into dst_addr's account.
 pub fn aptos_coin_mint(dst_addr: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(

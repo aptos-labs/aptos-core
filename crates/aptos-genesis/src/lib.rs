@@ -20,6 +20,7 @@ use aptosdb::AptosDB;
 use std::convert::TryInto;
 use storage_interface::DbReaderWriter;
 use vm_genesis::Validator;
+use crate::builder::GenesisConfiguration;
 
 /// Holder object for all pieces needed to generate a genesis transaction
 #[derive(Clone)]
@@ -39,6 +40,7 @@ pub struct GenesisInfo {
     pub allow_new_validators: bool,
     /// Duration of an epoch
     pub epoch_duration_secs: u64,
+    pub is_test: bool,
     /// Minimum stake to be in the validator set
     pub min_stake: u64,
     /// Minimum number of votes to consider a proposal valid.
@@ -61,15 +63,7 @@ impl GenesisInfo {
         root_key: Ed25519PublicKey,
         configs: Vec<ValidatorConfiguration>,
         modules: Vec<Vec<u8>>,
-        allow_new_validators: bool,
-        epoch_duration_secs: u64,
-        min_stake: u64,
-        min_voting_threshold: u128,
-        max_stake: u64,
-        recurring_lockup_duration_secs: u64,
-        required_proposer_stake: u64,
-        rewards_apy_percentage: u64,
-        voting_duration_secs: u64,
+        genesis_config: &GenesisConfiguration,
     ) -> anyhow::Result<GenesisInfo> {
         let mut validators = Vec::new();
 
@@ -83,15 +77,16 @@ impl GenesisInfo {
             validators,
             modules,
             genesis: None,
-            allow_new_validators,
-            epoch_duration_secs,
-            min_stake,
-            min_voting_threshold,
-            max_stake,
-            recurring_lockup_duration_secs,
-            required_proposer_stake,
-            rewards_apy_percentage,
-            voting_duration_secs,
+            allow_new_validators: genesis_config.allow_new_validators,
+            epoch_duration_secs: genesis_config.epoch_duration_secs,
+            is_test: genesis_config.is_test,
+            min_stake: genesis_config.min_stake,
+            min_voting_threshold: genesis_config.min_voting_threshold,
+            max_stake: genesis_config.max_stake,
+            recurring_lockup_duration_secs: genesis_config.recurring_lockup_duration_secs,
+            required_proposer_stake: genesis_config.required_proposer_stake,
+            rewards_apy_percentage: genesis_config.rewards_apy_percentage,
+            voting_duration_secs: genesis_config.voting_duration_secs,
         })
     }
 
@@ -113,6 +108,7 @@ impl GenesisInfo {
             vm_genesis::GenesisConfiguration {
                 allow_new_validators: self.allow_new_validators,
                 epoch_duration_secs: self.epoch_duration_secs,
+                is_test: true,
                 min_stake: self.min_stake,
                 min_voting_threshold: self.min_voting_threshold,
                 max_stake: self.max_stake,

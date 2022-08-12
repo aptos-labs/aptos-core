@@ -27,7 +27,7 @@ use aptos_rest_client::Client;
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
-        account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
+        account_address::AccountAddress, account_config::aptos_test_root_address, chain_id::ChainId,
         LocalAccount,
     },
 };
@@ -109,7 +109,7 @@ impl FaucetArgs {
         };
 
         let faucet_address: AccountAddress =
-            self.mint_account_address.unwrap_or_else(aptos_root_address);
+            self.mint_account_address.unwrap_or_else(aptos_test_root_address);
         let faucet_account = LocalAccount::new(faucet_address, key, 0);
 
         // Do not use maximum amount on delegation, this allows the new delegated faucet to
