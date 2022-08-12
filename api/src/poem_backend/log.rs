@@ -11,6 +11,7 @@ use aptos_logger::{
     Schema,
 };
 use poem::{http::header, Endpoint, Request, Response, Result};
+use poem_openapi::OperationId;
 
 /// Logs information about the request and response if the response status code
 /// is >= 500, to help us debug since this will be an error on our side.
@@ -60,9 +61,10 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
     HISTOGRAM
         .with_label_values(&[
             log.method.as_str(),
-            // TODO: Log based on operation_id instead.
-            // https://github.com/poem-web/poem/issues/351
-            log.path.as_str(),
+            response
+                .data::<OperationId>()
+                .map(|operation_id| operation_id.0)
+                .unwrap_or("operation_id_not_set"),
             log.status.to_string().as_str(),
         ])
         .observe(elapsed.as_secs_f64());
