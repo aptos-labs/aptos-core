@@ -36,17 +36,17 @@ macro_rules! collect_build_information {
 
         // Get Git metadata from environment variables set during build-time.
         // This is applicable for docker based builds.
-        if let Ok(git_branch) = std::env::var("GIT_SHA") {
+        if let Ok(git_sha) = std::env::var("GIT_SHA") {
             build_information.insert(
                 aptos_telemetry::build_information::BUILD_COMMIT_HASH.into(),
-                git_branch,
+                git_sha,
             );
         }
 
-        if let Ok(git_hash) = std::env::var("GIT_BRANCH") {
+        if let Ok(git_branch) = std::env::var("GIT_BRANCH") {
             build_information.insert(
                 aptos_telemetry::build_information::BUILD_BRANCH.into(),
-                git_hash,
+                git_branch,
             );
         }
 
