@@ -1222,7 +1222,10 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_block_info(&self, version: Version) -> Result<(Version, Version, NewBlockEvent)> {
+    fn get_block_info_by_version(
+        &self,
+        version: Version,
+    ) -> Result<(Version, Version, NewBlockEvent)> {
         gauged_api("get_block_info", || {
             let latest_li = self.get_latest_ledger_info()?;
             let committed_version = latest_li.ledger_info().version();

@@ -153,8 +153,8 @@ pub fn create_nft_transfer_request(
             creation_account.address(),
             collection_name.to_vec(),
             token_name.to_vec(),
-            1,
             0,
+            1,
         )),
     )
 }

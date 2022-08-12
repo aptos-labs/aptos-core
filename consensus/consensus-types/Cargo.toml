@@ -20,6 +20,7 @@ rand = { version = "0.7.3", default-features = false }
 serde = { version = "1.0.137", default-features = false }
 tokio = { version = "1.18.2", features = ["full"] }
 
+aptos-bitvec = { path = "../../crates/aptos-bitvec" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }

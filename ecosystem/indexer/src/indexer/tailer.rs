@@ -592,15 +592,9 @@ mod test {
               "accumulator_root_hash": "0xb0ad602f805eb20c398f0f29a3504a9ef38bcc52c9c451deb9ec4a2d18807b49",
               "id": "0xeef99391a3fc681f16963a6c03415bc0b1b12b56c00429308fa8bf46ac9eddf0",
               "round": "57600",
-              "previous_block_votes": [],
               "failed_proposer_indices": [],
               "epoch": "1",
-              "previous_block_votes_bitmap": [
-                true,
-                true,
-                false,
-                true
-              ],
+              "previous_block_votes_bitvec": [],
               "proposer": "0x68f04222bd9f8846cda028ea5ba3846a806b04a47e1f1a4f0939f350d713b2eb",
               "timestamp": "1649395495746947",
               "events": [
@@ -611,7 +605,7 @@ mod test {
                     "data": {
                       "epoch": "1",
                       "failed_proposer_indices": [],
-                      "previous_block_votes": [false],
+                      "previous_block_votes_bitvec": [],
                       "proposer": "0xf7c109be515785bba951fc8c51063515d474f78cad150457d6ebd08c4faf2f3b",
                       "round": "1",
                       "time_microseconds": "1656565270489235"

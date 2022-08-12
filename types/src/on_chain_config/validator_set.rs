@@ -59,6 +59,10 @@ impl ValidatorSet {
     pub fn empty() -> Self {
         ValidatorSet::new(Vec::new())
     }
+
+    pub fn num_validators(&self) -> usize {
+        self.active_validators.len() + self.pending_inactive.len()
+    }
 }
 
 impl OnChainConfig for ValidatorSet {

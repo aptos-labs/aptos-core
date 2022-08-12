@@ -218,7 +218,10 @@ pub trait DbReader: Send + Sync {
 
     /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
     /// transaction version.
-    fn get_block_info(&self, version: Version) -> Result<(Version, Version, NewBlockEvent)> {
+    fn get_block_info_by_version(
+        &self,
+        version: Version,
+    ) -> Result<(Version, Version, NewBlockEvent)> {
         unimplemented!()
     }
 

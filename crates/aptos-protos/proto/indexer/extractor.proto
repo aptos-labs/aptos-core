@@ -44,7 +44,7 @@ message BlockMetadataTransaction {
   string id = 1;
   uint64 round = 2;
   repeated Event events = 3;
-  repeated bool previous_block_votes = 4;
+  bytes previous_block_votes_bitvec = 4;
   string proposer = 5;
   repeated uint32 failed_proposer_indices = 6;
 }

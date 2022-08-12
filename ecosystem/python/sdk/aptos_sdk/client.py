@@ -409,8 +409,8 @@ class RestClient:
             TransactionArgument(creators_address, Serializer.struct),
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(token_name, Serializer.str),
-            TransactionArgument(amount, Serializer.u64),
             TransactionArgument(property_version, Serializer.u64),
+            TransactionArgument(amount, Serializer.u64),
         ]
 
         payload = ScriptFunction.natural(

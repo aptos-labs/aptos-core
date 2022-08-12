@@ -33,6 +33,7 @@ chrono = "0.4.19"
 aptos-crypto-derive = { path = "../crates/aptos-crypto-derive" }
 arc-swap = "1.5.0"
 
+aptos-bitvec = { path = "../crates/aptos-bitvec" }
 aptos-config = { path = "../config" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-infallible = { path = "../crates/aptos-infallible" }

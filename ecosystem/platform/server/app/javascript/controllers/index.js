@@ -4,17 +4,20 @@
 
 import { application } from "./application"
 
-import DialogController from "./dialog_controller.ts"
+import ConnectWalletController from "./connect_wallet_controller"
+application.register("connect-wallet", ConnectWalletController)
+
+import DialogController from "./dialog_controller"
 application.register("dialog", DialogController)
 
-import HeaderController from "./header_controller.ts"
+import HeaderController from "./header_controller"
 application.register("header", HeaderController)
 
-import RecaptchaController from "./recaptcha_controller.ts"
+import RecaptchaController from "./recaptcha_controller"
 application.register("recaptcha", RecaptchaController)
 
-import RefreshController from "./refresh_controller.ts"
+import RefreshController from "./refresh_controller"
 application.register("refresh", RefreshController)
 
-import ShakeController from "./shake_controller.ts"
+import ShakeController from "./shake_controller"
 application.register("shake", ShakeController)

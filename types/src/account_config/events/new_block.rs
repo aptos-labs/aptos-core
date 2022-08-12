@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account_address::AccountAddress;
 use crate::{
+    account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,
     event::{EventHandle, EventKey},
 };
@@ -22,7 +22,7 @@ pub struct NewBlockEvent {
     epoch: u64,
     round: u64,
     height: u64,
-    previous_block_votes: Vec<bool>,
+    previous_block_votes_bitvec: Vec<u8>,
     proposer: AccountAddress,
     failed_proposer_indices: Vec<u64>,
     timestamp: u64,
@@ -41,8 +41,8 @@ impl NewBlockEvent {
         self.height
     }
 
-    pub fn previous_block_votes(&self) -> &Vec<bool> {
-        &self.previous_block_votes
+    pub fn previous_block_votes_bitvec(&self) -> &Vec<u8> {
+        &self.previous_block_votes_bitvec
     }
 
     pub fn proposer(&self) -> AccountAddress {
@@ -68,7 +68,7 @@ impl NewBlockEvent {
         epoch: u64,
         round: u64,
         height: u64,
-        previous_block_votes: Vec<bool>,
+        previous_block_votes_bitvec: Vec<u8>,
         proposer: AccountAddress,
         failed_proposer_indices: Vec<u64>,
         timestamp: u64,
@@ -77,7 +77,7 @@ impl NewBlockEvent {
             epoch,
             round,
             height,
-            previous_block_votes,
+            previous_block_votes_bitvec,
             proposer,
             failed_proposer_indices,
             timestamp,
