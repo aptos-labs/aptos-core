@@ -48,9 +48,7 @@ jobs:
           node-version-file: .node-version
           registry-url: 'https://registry.npmjs.org'
 
-      # Run package install. If install fails, it probably means the lockfile
-      # was not included in the commit.
-      - run: cd ./developer-docs-site/static/examples/typescript && yarn install --frozen-lockfile
+      - run: cd ./developer-docs-site/static/examples/typescript && yarn install
 
       - run: cd ./developer-docs-site/static/examples/typescript && yarn first_transaction
       - run: cd ./developer-docs-site/static/examples/typescript && yarn first_nft
