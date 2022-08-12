@@ -77,7 +77,7 @@ impl SfStreamer {
         let resolver = Arc::new(context.move_resolver().unwrap());
         let (_block_start_version, _block_last_versionn, block_event) = context
             .db
-            .get_block_info(starting_version)
+            .get_block_info_by_version(starting_version)
             .unwrap_or_else(|_| {
                 panic!(
                     "Could not get block_info for starting version {}",
