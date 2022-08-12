@@ -217,7 +217,7 @@ impl serde::Serialize for Block {
         if self.timestamp.is_some() {
             len += 1;
         }
-        if self.block_height != 0 {
+        if self.height != 0 {
             len += 1;
         }
         if !self.transactions.is_empty() {
@@ -227,11 +227,8 @@ impl serde::Serialize for Block {
         if let Some(v) = self.timestamp.as_ref() {
             struct_ser.serialize_field("timestamp", v)?;
         }
-        if self.block_height != 0 {
-            struct_ser.serialize_field(
-                "blockHeight",
-                ToString::to_string(&self.block_height).as_str(),
-            )?;
+        if self.height != 0 {
+            struct_ser.serialize_field("height", ToString::to_string(&self.height).as_str())?;
         }
         if !self.transactions.is_empty() {
             struct_ser.serialize_field("transactions", &self.transactions)?;
@@ -245,12 +242,12 @@ impl<'de> serde::Deserialize<'de> for Block {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["timestamp", "blockHeight", "transactions"];
+        const FIELDS: &[&str] = &["timestamp", "height", "transactions"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Timestamp,
-            BlockHeight,
+            Height,
             Transactions,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
@@ -277,7 +274,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                     {
                         match value {
                             "timestamp" => Ok(GeneratedField::Timestamp),
-                            "blockHeight" => Ok(GeneratedField::BlockHeight),
+                            "height" => Ok(GeneratedField::Height),
                             "transactions" => Ok(GeneratedField::Transactions),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -299,7 +296,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                 V: serde::de::MapAccess<'de>,
             {
                 let mut timestamp__ = None;
-                let mut block_height__ = None;
+                let mut height__ = None;
                 let mut transactions__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
@@ -309,11 +306,11 @@ impl<'de> serde::Deserialize<'de> for Block {
                             }
                             timestamp__ = Some(map.next_value()?);
                         }
-                        GeneratedField::BlockHeight => {
-                            if block_height__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("blockHeight"));
+                        GeneratedField::Height => {
+                            if height__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("height"));
                             }
-                            block_height__ = Some(
+                            height__ = Some(
                                 map.next_value::<::pbjson::private::NumberDeserialize<_>>()?
                                     .0,
                             );
@@ -328,7 +325,7 @@ impl<'de> serde::Deserialize<'de> for Block {
                 }
                 Ok(Block {
                     timestamp: timestamp__,
-                    block_height: block_height__.unwrap_or_default(),
+                    height: height__.unwrap_or_default(),
                     transactions: transactions__.unwrap_or_default(),
                 })
             }
