@@ -10,7 +10,7 @@ use aptos_types::{
 };
 use consensus_types::{
     block_data::BlockData,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithSignatures},
     vote::Vote,
     vote_proposal::VoteProposal,
 };
@@ -24,9 +24,12 @@ pub enum SafetyRulesInput {
     SignProposal(Box<BlockData>),
     SignTimeoutWithQC(
         Box<TwoChainTimeout>,
-        Box<Option<TwoChainTimeoutCertificate>>,
+        Box<Option<TwoChainTimeoutWithSignatures>>,
     ),
-    ConstructAndSignVoteTwoChain(Box<VoteProposal>, Box<Option<TwoChainTimeoutCertificate>>),
+    ConstructAndSignVoteTwoChain(
+        Box<VoteProposal>,
+        Box<Option<TwoChainTimeoutWithSignatures>>,
+    ),
     SignCommitVote(Box<LedgerInfoWithSignatures>, Box<LedgerInfo>),
 }
 
@@ -116,7 +119,7 @@ impl TSafetyRules for SerializerClient {
     fn sign_timeout_with_qc(
         &mut self,
         timeout: &TwoChainTimeout,
-        timeout_cert: Option<&TwoChainTimeoutCertificate>,
+        timeout_cert: Option<&TwoChainTimeoutWithSignatures>,
     ) -> Result<bls12381::Signature, Error> {
         let _timer = counters::start_timer("external", LogEntry::SignTimeoutWithQC.as_str());
         let response = self.request(SafetyRulesInput::SignTimeoutWithQC(
@@ -129,7 +132,7 @@ impl TSafetyRules for SerializerClient {
     fn construct_and_sign_vote_two_chain(
         &mut self,
         vote_proposal: &VoteProposal,
-        timeout_cert: Option<&TwoChainTimeoutCertificate>,
+        timeout_cert: Option<&TwoChainTimeoutWithSignatures>,
     ) -> Result<Vote, Error> {
         let _timer =
             counters::start_timer("external", LogEntry::ConstructAndSignVoteTwoChain.as_str());

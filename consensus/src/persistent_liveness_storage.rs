@@ -11,7 +11,8 @@ use aptos_types::{
     epoch_change::EpochChangeProof, ledger_info::LedgerInfoWithSignatures, transaction::Version,
 };
 use consensus_types::{
-    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutWithSignatures,
+    vote::Vote,
 };
 use std::{cmp::max, collections::HashSet, sync::Arc};
 use storage_interface::DbReader;
@@ -41,7 +42,7 @@ pub trait PersistentLivenessStorage: Send + Sync {
     /// to jump to this round
     fn save_highest_2chain_timeout_cert(
         &self,
-        highest_timeout_cert: &TwoChainTimeoutCertificate,
+        highest_timeout_cert: &TwoChainTimeoutWithSignatures,
     ) -> Result<()>;
 
     /// Retrieve a epoch change proof for SafetyRules so it can instantiate its
@@ -180,7 +181,7 @@ pub struct RecoveryData {
     blocks_to_prune: Option<Vec<HashValue>>,
 
     // Liveness data
-    highest_2chain_timeout_certificate: Option<TwoChainTimeoutCertificate>,
+    highest_2chain_timeout_certificate: Option<TwoChainTimeoutWithSignatures>,
 }
 
 impl RecoveryData {
@@ -190,7 +191,7 @@ impl RecoveryData {
         mut blocks: Vec<Block>,
         root_metadata: RootMetadata,
         mut quorum_certs: Vec<QuorumCert>,
-        highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
+        highest_2chain_timeout_cert: Option<TwoChainTimeoutWithSignatures>,
     ) -> Result<Self> {
         let root = ledger_recovery_data
             .find_root(&mut blocks, &mut quorum_certs)
@@ -262,7 +263,7 @@ impl RecoveryData {
             .expect("blocks_to_prune already taken")
     }
 
-    pub fn highest_2chain_timeout_certificate(&self) -> Option<TwoChainTimeoutCertificate> {
+    pub fn highest_2chain_timeout_certificate(&self) -> Option<TwoChainTimeoutWithSignatures> {
         self.highest_2chain_timeout_certificate.clone()
     }
 
@@ -410,7 +411,7 @@ impl PersistentLivenessStorage for StorageWriteProxy {
 
     fn save_highest_2chain_timeout_cert(
         &self,
-        highest_timeout_cert: &TwoChainTimeoutCertificate,
+        highest_timeout_cert: &TwoChainTimeoutWithSignatures,
     ) -> Result<()> {
         Ok(self
             .db
