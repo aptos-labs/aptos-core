@@ -13,7 +13,7 @@ import { IoIosDocument } from '@react-icons/all-files/io/IoIosDocument';
 import { FaDiscord } from '@react-icons/all-files/fa/FaDiscord';
 import React from 'react';
 
-const aptosDevWalletExtensionUrl = 'https://aptos.dev/guides/building-wallet-extension';
+const aptosDevWalletExtensionUrl = 'https://petra.app/docs/petra-intro';
 const aptosWalletDiscordUrl = 'https://discord.gg/rt2tQSFd';
 
 export default function ConfirmOnboardBody() {
