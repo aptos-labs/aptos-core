@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@petra/web-ui": "*",
-    "@chakra-ui/icons": "^2.0.2",
-    "@chakra-ui/react": "^2.2.1",
+    "@chakra-ui/icons": "^2.0.6",
+    "@chakra-ui/react": "^2.2.6",
     "@emotion/react": "^11",
     "@emotion/styled": "^11",
     "@mapbox/rehype-prism": "^0.8.0",

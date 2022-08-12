@@ -3,9 +3,9 @@
   "version": "0.1.4",
   "private": true,
   "dependencies": {
-    "@chakra-ui/icons": "^2.0.1",
-    "@chakra-ui/react": "^2.1.2",
-    "@chakra-ui/toast": "^3.0.2",
+    "@chakra-ui/icons": "^2.0.6",
+    "@chakra-ui/react": "^2.2.6",
+    "@chakra-ui/toast": "^3.0.4",
     "@emotion/react": "^11",
     "@emotion/styled": "^11",
     "@fortawesome/fontawesome-svg-core": "^6.1.1",
@@ -79,7 +79,10 @@
     ]
   },
   "devDependencies": {
+    "@babel/core": "^7.18.10",
     "@babel/preset-react": "^7.17.12",
+    "@chakra-ui/styled-system": "^2.2.5",
+    "@chakra-ui/system": "^2.2.4",
     "@petra/eslint-config": "*",
     "@tauri-apps/cli": "^1.0.0-rc.13",
     "@types/chrome": "^0.0.183",
