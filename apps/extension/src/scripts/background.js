@@ -178,7 +178,6 @@ async function signMessage(publicAccount, message, sendResponse) {
 async function handleDappRequest(request, sendResponse) {
   const publicAccount = await getBackgroundCurrentPublicAccount();
   const network = await getBackgroundNetwork();
-  console.log('handleDappRequest', publicAccount, network);
   if (publicAccount === undefined) {
     sendResponse({ error: DappErrorType.NO_ACCOUNTS });
     return;
