@@ -111,16 +111,13 @@ impl SfStreamer {
 
     pub async fn convert_next_block(&mut self) -> Vec<TransactionPB> {
         let mut result: Vec<TransactionPB> = vec![];
-        let block_start_version;
-        let block_last_version;
-        match self
+
+        let (block_start_version, block_last_version, _) = match self
             .context
             .db
             .get_block_info_by_height(self.current_block_height)
         {
-            Ok(block_info) => {
-                (block_start_version, block_last_version, _) = block_info;
-            }
+            Ok(block_info) => block_info,
             Err(err) => {
                 // TODO: If block has been pruned, panic
                 warn!(
@@ -130,7 +127,7 @@ impl SfStreamer {
                 sleep(Duration::from_millis(300)).await;
                 return vec![];
             }
-        }
+        };
 
         let ledger_info = self.context.get_latest_ledger_info().unwrap();
         let block_timestamp = self
@@ -146,78 +143,82 @@ impl SfStreamer {
         // 1. first (and only first) transaction is a block metadata or genesis 2. versions are monotonically increasing 3. start and end versions match block boundaries
         // Retry if the block is not valid. Panic if there's anything wrong with encoding a transaction.
         println!("FIRE BLOCK_START {}", self.current_block_height);
-        match self.context.get_transactions(
+
+        let transactions = match self.context.get_transactions(
             block_start_version,
             (block_last_version - block_start_version + 1)
                 .try_into()
                 .unwrap(),
             ledger_info.version(),
         ) {
-            Ok(transactions) => {
-                if transactions.is_empty() {
-                    debug!("[sf-stream] no transactions to send");
-                    sleep(Duration::from_millis(100)).await;
-                    return vec![];
-                }
-                debug!(
-                    "[sf-stream] got {} transactions from {} to {} [version on last actual transaction {}]",
-                    transactions.len(),
-                    block_start_version,
-                    block_last_version,
-                    transactions.last().map(|txn| txn.version).unwrap_or(0)
-                );
-                let mut curr_version = block_start_version;
-                for onchain_txn in transactions {
-                    let txn_version = onchain_txn.version;
-                    let txn = self
-                        .resolver
-                        .as_converter(self.context.db.clone())
-                        .try_into_onchain_transaction(block_timestamp, onchain_txn)
-                        .unwrap_or_else(|e| {
-                            panic!(
-                                "Could not convert onchain transaction version {} into transaction: {:?}",
-                                txn_version, e
-                            )
-                        });
-                    if !self.validate_transaction_type(curr_version == block_start_version, &txn) {
-                        error!(
-                            "Block {} failed validation: first transaction has to be block metadata or genesis",
-                            self.current_block_height
-                        );
-                        sleep(Duration::from_millis(500)).await;
-                        return vec![];
-                    }
-                    if curr_version != txn_version {
-                        error!(
-                            "Block {} failed validation: missing version {}",
-                            self.current_block_height, curr_version,
-                        );
-                        sleep(Duration::from_millis(500)).await;
-                        return vec![];
-                    }
-                    let txn_proto =
-                        convert_transaction(&txn, self.current_block_height, self.current_epoch);
-                    self.print_transaction(&txn_proto);
-                    result.push(txn_proto);
-                    curr_version += 1;
-                }
-                if curr_version - 1 != block_last_version {
-                    error!(
-                        "Block {} failed validation: last version supposed to be {} but getting {}",
-                        self.current_block_height,
-                        block_last_version,
-                        curr_version - 1,
-                    );
-                    sleep(Duration::from_millis(500)).await;
-                    return vec![];
-                }
-            }
+            Ok(transactions) => transactions,
             Err(err) => {
                 error!("[sf-stream] failed to get transactions: {}", err);
                 sleep(Duration::from_millis(100)).await;
                 return vec![];
             }
+        };
+
+        if transactions.is_empty() {
+            debug!("[sf-stream] no transactions to send");
+            sleep(Duration::from_millis(100)).await;
+            return vec![];
         }
+        debug!(
+            "[sf-stream] got {} transactions from {} to {} [version on last actual transaction {}]",
+            transactions.len(),
+            block_start_version,
+            block_last_version,
+            transactions.last().map(|txn| txn.version).unwrap_or(0)
+        );
+
+        let mut curr_version = block_start_version;
+        for onchain_txn in transactions {
+            let txn_version = onchain_txn.version;
+            let txn = self
+                .resolver
+                .as_converter(self.context.db.clone())
+                .try_into_onchain_transaction(block_timestamp, onchain_txn)
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "Could not convert onchain transaction version {} into transaction: {:?}",
+                        txn_version, e
+                    )
+                });
+            if !self.validate_transaction_type(curr_version == block_start_version, &txn) {
+                error!(
+                            "Block {} failed validation: first transaction has to be block metadata or genesis",
+                            self.current_block_height
+                        );
+                sleep(Duration::from_millis(500)).await;
+                return vec![];
+            }
+            if curr_version != txn_version {
+                error!(
+                    "Block {} failed validation: missing version {}",
+                    self.current_block_height, curr_version,
+                );
+                sleep(Duration::from_millis(500)).await;
+                return vec![];
+            }
+            let txn_proto =
+                convert_transaction(&txn, self.current_block_height, self.current_epoch);
+            self.print_transaction(&txn_proto);
+            result.push(txn_proto);
+            curr_version += 1;
+        }
+
+        if curr_version - 1 != block_last_version {
+            error!(
+                "Block {} failed validation: last version supposed to be {} but getting {}",
+                self.current_block_height,
+                block_last_version,
+                curr_version - 1,
+            );
+            sleep(Duration::from_millis(500)).await;
+            return vec![];
+        }
+
         println!("FIRE BLOCK_END {}", self.current_block_height);
         metrics::BLOCKS_SENT.inc();
         self.current_block_height += 1;
