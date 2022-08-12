@@ -79,7 +79,7 @@ pub(crate) fn start_shared_mempool<V>(
         config.mempool.system_transaction_gc_interval_ms,
     ));
 
-    if aptos_logger::enabled!(Level::Debug) {
+    if aptos_logger::enabled!(Level::Trace) {
         executor.spawn(snapshot_job(
             mempool,
             config.mempool.mempool_snapshot_interval_secs,
