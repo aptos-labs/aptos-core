@@ -325,7 +325,7 @@ pub struct PublishPackage {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     /// Whether to use the legacy publishing flow. This will be soon removed.
-    #[clap(long)]
+    #[clap(long, default_value_t = true)]
     pub(crate) legacy_flow: bool,
     /// The upgrade policy used for the published package. One of
     /// `arbitrary`, `compatible`, or `immutable`. Defaults to `compatible`.
