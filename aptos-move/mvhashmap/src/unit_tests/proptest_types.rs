@@ -142,7 +142,7 @@ where
                                     }
                                     break;
                                 }
-                                Ok(MVHashMapOutput::Value(_)) => unimplemented!(),
+                                Ok(MVHashMapOutput::ResolvedDelta(_)) => unimplemented!(),
                                 Err(MVHashMapError::EntryNotFound) => {
                                     assert_eq!(baseline, ExpectedOutput::NotInMap, "{:?}", idx);
                                     break;

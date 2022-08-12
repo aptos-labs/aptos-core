@@ -99,7 +99,7 @@ pub enum MVHashMapError<D> {
 #[derive(Debug, PartialEq, Eq)]
 pub enum MVHashMapOutput<V, D> {
     /// Value which is the result of delta application.
-    Value(D),
+    ResolvedDelta(D),
     /// Information from the last versioned-write.
     Versioned(Version, Arc<V>),
 }
@@ -187,7 +187,7 @@ impl<K: Hash + Clone + Eq, V> MVHashMap<K, V> {
                                         let read_value = write_as_delta
                                             .checked_add(value)
                                             .expect("erroneous delta aggregation is not supported");
-                                        return Ok(MVHashMapOutput::Value(read_value));
+                                        return Ok(MVHashMapOutput::ResolvedDelta(read_value));
                                     }
                                 }
                             }

@@ -8,7 +8,7 @@ use crate::{
     txn_last_input_output::{ReadDescriptor, TxnLastInputOutput},
 };
 use aptos_infallible::Mutex;
-use mvhashmap::MVHashMap;
+use mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use num_cpus;
 use once_cell::sync::Lazy;
 use std::{collections::HashSet, hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
@@ -35,6 +35,13 @@ pub struct MVHashMapView<'a, K, V> {
     captured_reads: Mutex<Vec<ReadDescriptor<K>>>,
 }
 
+pub enum ReadStatus<V> {
+    UnresolvedDelta(u128),
+    ResolvedDelta(u128), // todo: this is not strictly needed if we know how to convert to V.
+    Value(Arc<V>),
+    None,
+}
+
 impl<'a, K: ModulePath + PartialOrd + Send + Clone + Hash + Eq, V: Into<Vec<u8>> + Send + Sync>
     MVHashMapView<'a, K, V>
 {
@@ -45,10 +52,10 @@ impl<'a, K: ModulePath + PartialOrd + Send + Clone + Hash + Eq, V: Into<Vec<u8>>
     }
 
     /// Captures a read from the VM execution.
-    pub fn read(&self, key: &K) -> Option<Arc<V>> {
+    pub fn read(&self, key: &K) -> ReadStatus<V> {
         loop {
             match self.versioned_map.read(key, self.txn_idx) {
-                Ok((version, v)) => {
+                Ok(MVHashMapOutput::Versioned(version, v)) => {
                     let (txn_idx, incarnation) = version;
                     self.captured_reads
                         .lock()
@@ -57,15 +64,30 @@ impl<'a, K: ModulePath + PartialOrd + Send + Clone + Hash + Eq, V: Into<Vec<u8>>
                             txn_idx,
                             incarnation,
                         ));
-                    return Some(v);
+                    return ReadStatus::Value(v);
                 }
-                Err(None) => {
+                Ok(MVHashMapOutput::ResolvedDelta(value)) => {
+                    self.captured_reads
+                        .lock()
+                        .push(ReadDescriptor::from_resolved_delta(key.clone(), value));
+
+                    // TODO: materialize this here later.
+                    return ReadStatus::ResolvedDelta(value);
+                }
+                Err(MVHashMapError::UnresolvedDelta(delta)) => {
+                    self.captured_reads
+                        .lock()
+                        .push(ReadDescriptor::from_unresolved_delta(key.clone(), delta));
+
+                    return ReadStatus::UnresolvedDelta(delta);
+                }
+                Err(MVHashMapError::EntryNotFound) => {
                     self.captured_reads
                         .lock()
                         .push(ReadDescriptor::from_storage(key.clone()));
-                    return None;
+                    return ReadStatus::None;
                 }
-                Err(Some(dep_idx)) => {
+                Err(MVHashMapError::Dependency(dep_idx)) => {
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
                     match self.scheduler.wait_for_dependency(self.txn_idx, dep_idx) {
                         Some(dep_condition) => {
@@ -217,9 +239,11 @@ where
 
         let valid = read_set.iter().all(|r| {
             match versioned_data_cache.read(r.path(), idx_to_validate) {
-                Ok((version, _)) => r.validate_version(version),
-                Err(Some(_)) => false, // Dependency implies a validation failure.
-                Err(None) => r.validate_storage(),
+                Ok(MVHashMapOutput::Versioned(version, _)) => r.validate_version(version),
+                Ok(MVHashMapOutput::ResolvedDelta(value)) => r.validate_resolved_delta(value),
+                Err(MVHashMapError::Dependency(_)) => false, // Dependency implies a validation failure.
+                Err(MVHashMapError::EntryNotFound) => r.validate_storage(),
+                Err(MVHashMapError::UnresolvedDelta(delta)) => r.validate_unresolved_delta(delta),
             }
         });
 

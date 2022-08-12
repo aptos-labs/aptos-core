@@ -271,7 +271,8 @@ where
                 // Reads
                 let mut reads_result = vec![];
                 for k in reads[read_idx].iter() {
-                    reads_result.push(view.read(k).map(|v| (*v).clone()));
+                    //TODO:  Uncomment back later.
+                    // reads_result.push(view.read(k).map(|v| (*v).clone()));
                 }
                 ExecutionStatus::Success(Output(writes[write_idx].clone(), reads_result))
             }
