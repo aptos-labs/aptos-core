@@ -50,9 +50,10 @@ export function CredentialRow({
 
 function Account() {
   const { activeAccount } = useGlobalStateContext();
-  const { address, mnemonic } = activeAccount!;
+  const address = activeAccount?.address;
+  const mnemonic = activeAccount?.mnemonic;
 
-  const explorerAddress = `https://explorer.devnet.aptos.dev/account/${address}`;
+  const explorerAddress = address ? `https://explorer.devnet.aptos.dev/account/${address}` : 'https://explorer.devnet.aptos.dev';
 
   return (
     <AuthLayout routePath={PageRoutes.settings.path}>

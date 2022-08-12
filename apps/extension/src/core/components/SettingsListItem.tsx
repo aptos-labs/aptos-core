@@ -34,11 +34,13 @@ export default function SettingsListItem({
 }: SettingsListItemProps) {
   const navigate = useNavigate();
   const { colorMode } = useColorMode();
-  const { lockAccounts } = useGlobalStateContext();
+  const { activeAccount, removeAccount } = useGlobalStateContext();
 
   const gridOnClick = async () => {
-    if (title === 'Sign out' && lockAccounts) {
-      await lockAccounts();
+    if (title === 'Sign out' && removeAccount && activeAccount) {
+      // todo: add toasts for removing the account
+      // we should probably combine the toasts from the wallet drawer
+      await removeAccount(activeAccount.address);
     }
     navigate(path);
   };

@@ -5,6 +5,7 @@ import { BiNetworkChart } from '@react-icons/all-files/bi/BiNetworkChart';
 import { FaKey } from '@react-icons/all-files/fa/FaKey';
 import { FaKeyboard } from '@react-icons/all-files/fa/FaKeyboard';
 import { GoSignOut } from '@react-icons/all-files/go/GoSignOut';
+import Routes from 'core/routes';
 import { SettingsListItemProps } from './SettingsListItem';
 
 export const signOutSecondaryGridBgColor = {
@@ -48,7 +49,7 @@ function SettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
     bgColorDict: signOutSecondaryGridBgColor,
     hoverBgColorDict: signOutSecondaryGridHoverBgColor,
     icon: GoSignOut,
-    path: '/',
+    path: Routes.wallet.path,
     textColorDict: signOutSecondaryTextColor,
     title: 'Sign out',
   });
