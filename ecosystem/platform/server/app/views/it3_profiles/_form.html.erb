@@ -22,7 +22,7 @@
 
           <div class="mb-6">
             <%= f.label :owner_key, class: 'font-mono uppercase block mb-2' %>
-            <%= f.text_field :owner_key, autofocus: true, required: true, pattern: '0x[a-f0-9]{64}', spellcheck: false %>
+            <%= f.text_field :owner_key, required: true, pattern: '0x[a-f0-9]{64}', spellcheck: false %>
           </div>
           <div class="mb-6">
             <%= f.label :consensus_key, class: 'font-mono uppercase block mb-2' %>
