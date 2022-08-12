@@ -132,7 +132,7 @@ class RestClient:
         to_sign = bytes.fromhex(res.json()[2:])
         signature = sender.sign(to_sign)
         txn_request["signature"] = {
-            "type": "ed_25519_signature",
+            "type": "ed25519_signature",
             "public_key": f"{sender.public_key()}",
             "signature": f"{signature}",
         }
@@ -409,8 +409,8 @@ class RestClient:
             TransactionArgument(creators_address, Serializer.struct),
             TransactionArgument(collection_name, Serializer.str),
             TransactionArgument(token_name, Serializer.str),
-            TransactionArgument(amount, Serializer.u64),
             TransactionArgument(property_version, Serializer.u64),
+            TransactionArgument(amount, Serializer.u64),
         ]
 
         payload = ScriptFunction.natural(

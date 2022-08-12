@@ -56,13 +56,14 @@ impl ValidatorInfo {
         account_address: AccountAddress,
         consensus_public_key: bls12381::PublicKey,
         consensus_voting_power: u64,
+        validator_index: u64,
     ) -> Self {
         let addr = NetworkAddress::mock();
         let config = ValidatorConfig::new(
             consensus_public_key,
             bcs::to_bytes(&vec![addr.clone()]).unwrap(),
             bcs::to_bytes(&vec![addr]).unwrap(),
-            0,
+            validator_index,
         );
 
         Self {

@@ -62,7 +62,7 @@ async function registerCoin(coinReceiver: AptosAccount, coinTypeAddress: HexStri
   );
 
   const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural("0x1::coin", "register", [token], []),
+    TxnBuilderTypes.ScriptFunction.natural("0x1::coins", "register", [token], []),
   );
 
   const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([

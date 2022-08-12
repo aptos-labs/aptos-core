@@ -67,6 +67,7 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
             ledger_prune_window: 0,
             ledger_pruning_batch_size: 1,
             state_store_pruning_batch_size: 100,
+            user_pruning_window_offset: 0,
         },
     );
 

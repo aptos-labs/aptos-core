@@ -1,6 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-// @generated
+mod pb;
 
-pub mod extractor;
+pub use pb::aptos::*;

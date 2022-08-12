@@ -915,6 +915,7 @@ fn vote_resent_on_timeout() {
     });
 }
 
+#[test]
 fn sync_on_partial_newer_sync_info() {
     let mut runtime = consensus_runtime();
     let mut playground = NetworkPlayground::new(runtime.handle().clone());

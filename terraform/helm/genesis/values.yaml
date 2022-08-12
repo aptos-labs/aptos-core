@@ -4,10 +4,10 @@ chain:
   chain_id: 4
   root_key: '0x5243ca72b0766d9e9cbf2debf6153443b01a1e0e6d086c7ea206eaf6f8043956'
   allow_new_validators: false
-  epoch_duration_secs: 86400 # 1 day
+  epoch_duration_secs: 7200 # 2 hours
   min_price_per_gas_unit: 1
-  min_stake: 0
-  min_voting_threshold: 0
+  min_stake: 100000000000000
+  min_voting_threshold: 100000000000000 # 1M APTOS coins with 8 decimals
   max_stake: 100000000000000000 # 1B APTOS coins with 8 decimals
   recurring_lockup_duration_secs: 86400 # 1 day
   required_proposer_stake: 100000000000 # 1M APTOS coins with 8 decimals
@@ -31,6 +31,7 @@ genesis:
   validator:
     enable_onchain_discovery: false
     internal_host_suffix: validator-lb
+    stake_amount: "100000000000000"
   fullnode:
     enable_onchain_discovery: true
     internal_host_suffix: fullnode-lb

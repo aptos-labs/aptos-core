@@ -19,7 +19,7 @@ use rand::SeedableRng;
 use storage_interface::state_view::LatestDbStateCheckpointView;
 use storage_interface::DbReaderWriter;
 
-const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 262144;
+const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 
 struct TestValidator {
     vm_validator: VMValidator,

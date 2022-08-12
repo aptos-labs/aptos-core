@@ -364,8 +364,12 @@ impl Block {
                 )
                 .unwrap()
             }),
-            // A bitmap of voters
-            self.quorum_cert().ledger_info().get_voters_bitmap().clone(),
+            // A bitvec of voters
+            self.quorum_cert()
+                .ledger_info()
+                .get_voters_bitvec()
+                .clone()
+                .into(),
             // For nil block, we use 0x0 which is convention for nil address in move.
             self.block_data()
                 .failed_authors()

@@ -27,7 +27,7 @@ use move_deps::{
     move_ir_compiler::Compiler,
 };
 
-pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 262144;
+pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 
 #[test]
 fn verify_signature() {

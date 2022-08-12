@@ -907,11 +907,12 @@ impl VMExecutor for AptosVM {
 
         let concurrency_level = Self::get_concurrency_level();
         if concurrency_level > 1 {
-            let (result, _) = crate::parallel_executor::ParallelAptosVM::execute_block(
+            let (result, err) = crate::parallel_executor::ParallelAptosVM::execute_block(
                 transactions,
                 state_view,
                 concurrency_level,
             )?;
+            debug!("Parallel execution error {:?}", err);
             Ok(result)
         } else {
             let output = Self::execute_block_and_keep_vm_status(transactions, state_view)?;

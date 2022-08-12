@@ -187,7 +187,7 @@ impl TransactionGenerator {
             .with_transaction_expiration_time(300)
             .with_gas_unit_price(1)
             // TODO(Gas): double check if this is correct
-            .with_max_gas_amount(4_000_000)
+            .with_max_gas_amount(1_000)
     }
 
     // Write metadata

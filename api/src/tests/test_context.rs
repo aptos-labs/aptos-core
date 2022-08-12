@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::golden_output::GoldenOutputs;
-use super::pretty;
+use super::{golden_output::GoldenOutputs, pretty};
 use crate::{
     context::Context, index, poem_backend::attach_poem_to_runtime, runtime::get_routes_with_poem,
 };
@@ -440,12 +439,8 @@ impl TestContext {
             .private_key()
             .sign_arbitrary_message(signing_msg.inner());
 
-        let typ = match self.api_specific_config {
-            ApiSpecificConfig::V0 => "ed25519_signature",
-            ApiSpecificConfig::V1(_) => "ed_25519_signature",
-        };
         request["signature"] = json!({
-            "type": typ,
+            "type": "ed25519_signature",
             "public_key": HexEncodedBytes::from(account.public_key().to_bytes().to_vec()),
             "signature": HexEncodedBytes::from(sig.to_bytes().to_vec()),
         });
@@ -543,7 +538,7 @@ impl TestContext {
             round,
             self.validator_owner,
             Some(0),
-            vec![false],
+            vec![0],
             vec![],
             timestamp,
         )

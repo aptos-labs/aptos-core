@@ -35,7 +35,7 @@ class FirstCoin(RestClient):
 
         payload = {
             "type": "script_function_payload",
-            "function": "0x1::coin::register",
+            "function": "0x1::coins::register",
             "type_arguments": [f"0x{coin_type_address}::moon_coin::MoonCoin"],
             "arguments": []
         }

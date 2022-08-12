@@ -1,52 +1,45 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::account::{
+    create::{CreateAccount, DEFAULT_FUNDED_COINS},
+    fund::FundAccount,
+    list::{ListAccount, ListQuery},
+    transfer::{TransferCoins, TransferSummary},
+};
+use crate::common::init::InitTool;
 use crate::common::types::{
-    account_address_from_public_key, AccountAddressWrapper, CliError, FaucetOptions, GasOptions,
-    MoveManifestAccountWrapper, MovePackageDir, TransactionSummary,
+    account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
+    EncodingOptions, FaucetOptions, GasOptions, MoveManifestAccountWrapper, MovePackageDir,
+    PrivateKeyInputOptions, PromptOptions, RestOptions, RngArgs, TransactionOptions,
+    TransactionSummary,
 };
 use crate::common::utils::write_to_file;
 use crate::move_tool::{
     ArgWithType, CompilePackage, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
 };
 use crate::node::{
-    AddStake, IncreaseLockup, JoinValidatorSet, LeaveValidatorSet, OperatorArgs,
-    RegisterValidatorCandidate, ShowValidatorConfig, ShowValidatorSet, ShowValidatorStake,
-    UnlockStake, UpdateValidatorNetworkAddresses, ValidatorConfigArgs, WithdrawStake,
+    AddStake, AnalyzeMode, AnalyzeValidatorPerformance, IncreaseLockup, JoinValidatorSet,
+    LeaveValidatorSet, OperatorArgs, RegisterValidatorCandidate, ShowValidatorConfig,
+    ShowValidatorSet, ShowValidatorStake, UnlockStake, UpdateValidatorNetworkAddresses,
+    ValidatorConfigArgs, WithdrawStake,
 };
-use crate::{
-    account::{
-        create::{CreateAccount, DEFAULT_FUNDED_COINS},
-        fund::FundAccount,
-        list::{ListAccount, ListQuery},
-        transfer::{TransferCoins, TransferSummary},
-    },
-    common::{
-        init::InitTool,
-        types::{
-            CliTypedResult, EncodingOptions, PrivateKeyInputOptions, PromptOptions, RestOptions,
-            RngArgs, TransactionOptions,
-        },
-    },
-    CliCommand,
-};
-use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_crypto::{bls12381, x25519, PrivateKey};
+use crate::CliCommand;
+use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::warn;
-use aptos_rest_client::aptos_api_types::MoveType;
-use aptos_rest_client::Transaction;
+use aptos_rest_client::{aptos_api_types::MoveType, Transaction};
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_temppath::TempPath;
-use aptos_types::validator_info::ValidatorInfo;
-use aptos_types::{on_chain_config::ConsensusScheme, validator_config::ValidatorConfig};
+use aptos_types::{
+    on_chain_config::ConsensusScheme, validator_config::ValidatorConfig,
+    validator_info::ValidatorInfo,
+};
 use framework::natives::code::UpgradePolicy;
 use reqwest::Url;
 use serde_json::Value;
-use std::collections::BTreeMap;
-use std::path::PathBuf;
-use std::{str::FromStr, time::Duration};
+use std::{collections::BTreeMap, path::PathBuf, str::FromStr, time::Duration};
 use thiserror::private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
 
@@ -352,6 +345,22 @@ impl CliTestFramework {
                 full_node_host: None,
                 full_node_network_public_key: None,
             },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn analyze_validator_performance(
+        &self,
+        start_epoch: Option<u64>,
+        end_epoch: Option<u64>,
+    ) -> CliTypedResult<()> {
+        AnalyzeValidatorPerformance {
+            start_epoch,
+            end_epoch,
+            rest_options: self.rest_options(),
+            profile_options: Default::default(),
+            analyze_mode: AnalyzeMode::All,
         }
         .execute()
         .await
@@ -707,7 +716,7 @@ pub struct ValidatorSet {
 fn to_validator_set(value: &serde_json::Value) -> ValidatorSet {
     ValidatorSet {
         consensus_scheme: match value.get("consensus_scheme").unwrap().as_u64().unwrap() {
-            0u64 => ConsensusScheme::Ed25519,
+            0u64 => ConsensusScheme::BLS12381,
             _ => panic!(),
         },
         active_validators: to_validator_info_vec(value.get("active_validators").unwrap()),

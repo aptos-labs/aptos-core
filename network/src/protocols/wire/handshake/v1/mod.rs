@@ -202,7 +202,7 @@ impl ProtocolIdSet {
     pub fn iter(&self) -> impl Iterator<Item = ProtocolId> + '_ {
         self.0
             .iter_ones()
-            .filter_map(|idx| bcs::from_bytes(&[idx]).ok())
+            .filter_map(|idx| bcs::from_bytes(&[idx as u8]).ok())
     }
 
     /// Find the intersection between two sets of protocols.
@@ -217,12 +217,12 @@ impl ProtocolIdSet {
 
     /// Returns if the protocol is set.
     pub fn contains(&self, protocol: ProtocolId) -> bool {
-        self.0.is_set(protocol as u8)
+        self.0.is_set(protocol as u16)
     }
 
     /// Insert a new protocol into the set.
     pub fn insert(&mut self, protocol: ProtocolId) {
-        self.0.set(protocol as u8)
+        self.0.set(protocol as u16)
     }
 }
 

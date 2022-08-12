@@ -103,9 +103,10 @@ async fn test_network() {
     let request = NetworkRequest {
         network_identifier: NetworkIdentifier::from(chain_id),
     };
-    let status = rosetta_client.network_status(&request).await.unwrap();
-    assert!(status.current_block_identifier.index > 0);
-    assert!(status.current_block_timestamp > Y2K_MS);
+    let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+        .await
+        .unwrap();
+    assert!(status.current_block_timestamp >= Y2K_MS);
     assert_eq!(
         BlockIdentifier {
             index: 0,
@@ -382,6 +383,8 @@ async fn test_block() {
     assert!(newer_block.timestamp >= latest_block.timestamp);
 }
 
+// TODO: Unignore this when we have get_block_info for the v1 API.
+#[ignore]
 #[tokio::test]
 async fn test_block_transactions() {
     let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 2).await;
@@ -503,6 +506,8 @@ async fn test_block_transactions() {
     }
 }
 
+// TODO: Unignore this when we have get_block_info for the v1 API.
+#[ignore]
 #[tokio::test]
 async fn test_invalid_transaction_gas_charged() {
     let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 1).await;

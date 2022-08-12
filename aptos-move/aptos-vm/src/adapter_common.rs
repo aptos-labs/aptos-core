@@ -16,17 +16,13 @@ use crate::{
 };
 use aptos_logger::prelude::*;
 use aptos_types::{
-    access_path::AccessPath,
     block_metadata::BlockMetadata,
-    state_store::state_key::StateKey,
     transaction::{
-        Transaction, TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
-        WriteSetPayload,
+        Transaction, TransactionOutput, TransactionPayload, TransactionStatus, WriteSetPayload,
     },
     write_set::WriteSet,
 };
 use rayon::prelude::*;
-use std::collections::HashSet;
 
 /// This trait describes the VM adapter's interface.
 /// TODO: bring more of the execution logic in aptos_vm into this file.
@@ -130,35 +126,6 @@ pub(crate) fn validate_signature_checked_transaction<S: MoveResolverExt, A: VMAd
     }
 }
 
-fn preload_cache(signature_verified_block: &[PreprocessedTransaction], data_view: &impl StateView) {
-    // generate a collection of addresses
-    let mut addresses_to_preload = HashSet::new();
-    for txn in signature_verified_block {
-        if let PreprocessedTransaction::UserTransaction(txn) = txn {
-            if let TransactionPayload::Script(script) = txn.payload() {
-                addresses_to_preload.insert(txn.sender());
-
-                for arg in script.args() {
-                    if let TransactionArgument::Address(address) = arg {
-                        addresses_to_preload.insert(*address);
-                    }
-                }
-            }
-        }
-    }
-
-    // This will launch a number of threads to preload the account blobs in parallel. We may
-    // want to fine tune the number of threads launched here in the future.
-    addresses_to_preload
-        .into_par_iter()
-        .map(|addr| {
-            data_view
-                .get_state_value(&StateKey::AccessPath(AccessPath::new(addr, Vec::new())))
-                .ok()?
-        })
-        .collect::<Vec<Option<Vec<u8>>>>();
-}
-
 pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
     adapter: &A,
     transactions: Vec<Transaction>,
@@ -183,12 +150,6 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
             .map(preprocess_transaction::<A>)
             .collect();
     }
-
-    rayon::scope(|scope| {
-        scope.spawn(|_| {
-            preload_cache(&signature_verified_block, data_cache);
-        });
-    });
 
     for (idx, txn) in signature_verified_block.into_iter().enumerate() {
         let log_context = AdapterLogSchema::new(data_cache.id(), idx);

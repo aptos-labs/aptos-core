@@ -6,6 +6,7 @@ use aptos_config::{keys::ConfigKey, utils::get_available_port};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
+use aptos_logger::info;
 use aptos_types::{account_config::aptos_root_address, chain_id::ChainId};
 use forge::Node;
 use forge::{Factory, LocalFactory, LocalSwarm};
@@ -54,13 +55,16 @@ impl SwarmBuilder {
 
     // Gas is not enabled with this setup, it's enabled via forge instance.
     pub async fn build(self) -> LocalSwarm {
+        ::aptos_logger::Logger::new().init();
+        info!("Preparing to finish compiling");
         // TODO change to return Swarm trait
         // Add support for forge
         assert!(self.local);
         static FACTORY: Lazy<LocalFactory> = Lazy::new(|| LocalFactory::from_workspace().unwrap());
 
-        ::aptos_logger::Logger::new().init();
         let version = FACTORY.versions().max().unwrap();
+
+        info!("Node finished compiling");
 
         let init_genesis_config = self.init_genesis_config;
 

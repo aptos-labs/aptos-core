@@ -127,7 +127,7 @@ Note: `sender_can_set_message` is a `script` function in order to call the `scri
 
 ## Step 2) Publishing and Interacting with the Move Module
 
-Now we return to our application to deploy and interact with the module on the Atpos blockchain. As mentioned earlier, this tutorial builds upon the earlier tutorial and shares the common code. As a result, this tutorial only discusses new features for that library including the ability to publish, send the `set_message` transaction, and reading `MessageHolder::message`. The only difference from publishing a module and submitting a transaction is the payload type. See the following:
+Now we return to our application to deploy and interact with the module on the Aptos blockchain. As mentioned earlier, this tutorial builds upon the earlier tutorial and shares the common code. As a result, this tutorial only discusses new features for that library including the ability to publish, send the `set_message` transaction, and reading `MessageHolder::message`. The only difference from publishing a module and submitting a transaction is the payload type. See the following:
 
 ### Step 2.1) Publishing the Move Module
 
@@ -300,6 +300,6 @@ The data can be verified by visiting either a REST interface or the explorer:
 - Bob's account on the [explorer][bob_account_explorer]
 
 [account_basics]: /concepts/basics-accounts
-[alice_account_rest]: /rest-api/#tag/accounts/a52671f10dc3479b09d0a11ce47694c0/
+[alice_account_rest]: https://fullnode.devnet.aptoslabs.com/v1/accounts/a52671f10dc3479b09d0a11ce47694c0/
 [bob_account_explorer]: https://explorer.devnet.aptos.dev/account/ec6ec14e4abe10aaa6ad53b0b63a1806
-[rest_spec]: /rest-api
+[rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/
