@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::MVHashMap;
+use super::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -121,7 +121,7 @@ where
                         let mut retry_attempts = 0;
                         loop {
                             match map.read(key, idx) {
-                                Ok((_, v)) => {
+                                Ok(MVHashMapOutput::Versioned(_, v)) => {
                                     match &*v {
                                         Some(w) => {
                                             assert_eq!(
@@ -142,11 +142,13 @@ where
                                     }
                                     break;
                                 }
-                                Err(None) => {
+                                Ok(MVHashMapOutput::Value(_)) => unimplemented!(),
+                                Err(MVHashMapError::EntryNotFound) => {
                                     assert_eq!(baseline, ExpectedOutput::NotInMap, "{:?}", idx);
                                     break;
                                 }
-                                Err(Some(_i)) => (),
+                                Err(MVHashMapError::Dependency(_i)) => (),
+                                Err(MVHashMapError::UnresolvedDelta(_)) => unimplemented!(),
                             }
                             retry_attempts += 1;
                             if retry_attempts > DEFAULT_TIMEOUT {

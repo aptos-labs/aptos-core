@@ -5,7 +5,6 @@ use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
     collections::btree_map::BTreeMap,
-    convert::{TryFrom, TryInto},
     fmt::Debug,
     hash::Hash,
     sync::{
@@ -74,20 +73,6 @@ impl<V, D> Entry<V, D> {
     }
 }
 
-/// Trait to specify aggregatable types.
-pub trait Aggregatable: Clone + Copy {
-    /// Type of errors produced when data aggregation fails.
-    type Error: Debug;
-
-    /// Aggregates a value and returns an error if aggregation failed.
-    /// TODO: this may need to take `mut self`, but this clonable approach
-    /// is ok at the moment.
-    fn aggregate(&self, value: Self) -> Result<Self, Self::Error>;
-
-    /// Returns the base value that can be used as an accumulator during aggregation.
-    fn base() -> Self;
-}
-
 /// Main multi-version data-structure used by threads to read, write, or apply deltas
 /// during parallel execution. Maps each access path to an interal BTreeMap that
 /// contains the indices of transactions that write or update at the given access path
@@ -95,8 +80,8 @@ pub trait Aggregatable: Clone + Copy {
 /// Concurrency is managed by DashMap, i.e. when a method accesses a BTreeMap at a
 /// given key, it holds exclusive access and doesn't need to explicitly synchronize
 /// with other reader/writers.
-pub struct MVHashMap<K, V, D> {
-    data: DashMap<K, BTreeMap<TxnIndex, CachePadded<Entry<V, D>>>>,
+pub struct MVHashMap<K, V> {
+    data: DashMap<K, BTreeMap<TxnIndex, CachePadded<Entry<V, u128>>>>,
 }
 
 /// Error type returned when reading from the multi-version data-structure.
@@ -121,11 +106,8 @@ pub enum MVHashMapOutput<V, D> {
 
 pub type MVHashMapResult<V, D> = Result<MVHashMapOutput<V, D>, MVHashMapError<D>>;
 
-impl<K: Hash + Clone + Eq, V, D: Aggregatable> MVHashMap<K, V, D>
-where
-    D: for<'a> TryFrom<&'a V, Error = <D as Aggregatable>::Error>,
-{
-    pub fn new() -> MVHashMap<K, V, D> {
+impl<K: Hash + Clone + Eq, V> MVHashMap<K, V> {
+    pub fn new() -> MVHashMap<K, V> {
         MVHashMap {
             data: DashMap::new(),
         }
@@ -165,13 +147,13 @@ where
         map.remove(&txn_idx);
     }
 
-    /// read may return Ok((Arc<V>, txn_idx, incarnation)), Err(dep_txn_idx) for
-    /// a dependency of transaction dep_txn_idx or Err(None) when no prior entry is found.
-    pub fn read(&self, key: &K, txn_idx: TxnIndex) -> MVHashMapResult<V, D> {
+    /// If successful, returns a read value or its version. Otherwise an error
+    /// is returned.
+    pub fn read(&self, key: &K, txn_idx: TxnIndex) -> MVHashMapResult<V, u128> {
         match self.data.get(key) {
             Some(tree) => {
                 let mut iter = tree.range(0..txn_idx);
-                let mut aggregated: Option<D> = None;
+                let mut aggregated: Option<u128> = None;
 
                 // Since read can hit a delta, we need to keep reading until we
                 // hit a write.
@@ -199,13 +181,11 @@ where
                                     }
                                     // Read hits a write during data aggregation. Apply aggregated value.
                                     Some(value) => {
-                                        let write_as_delta: D = data
-                                            .clone()
-                                            .as_ref()
-                                            .try_into()
-                                            .expect("conversion into delta should not fail");
+                                        // TODO: let write_as_delta = data.clone().as_ref().convert();
+                                        let write_as_delta: u128 = 0;
+                                        // TODO: this needs to handle subtracts as well.
                                         let read_value = write_as_delta
-                                            .aggregate(value)
+                                            .checked_add(value)
                                             .expect("erroneous delta aggregation is not supported");
                                         return Ok(MVHashMapOutput::Value(read_value));
                                     }
@@ -216,14 +196,14 @@ where
                                     // Read hits a delta value during data aggregation.
                                     // Update the currently aggregated value.
                                     Some(value) => {
-                                        let new_value = value
-                                            .aggregate(*data)
+                                        let new_value = data
+                                            .checked_add(value)
                                             .expect("erroneous delta aggregation is not supported");
                                         aggregated = Some(new_value);
                                     }
                                     // Read hits a delta value and has to start data
                                     // aggregation. Initialize the aggregated value.
-                                    None => aggregated = Some(D::base()),
+                                    None => aggregated = Some(0),
                                 }
                             }
                         }
