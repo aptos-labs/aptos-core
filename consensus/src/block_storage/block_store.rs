@@ -22,7 +22,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::TransactionStatus};
 use consensus_types::{
     block::Block, common::Round, executed_block::ExecutedBlock, quorum_cert::QuorumCert,
-    sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate,
+    sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutWithSignatures,
 };
 use executor_types::{Error, StateComputeResult};
 use futures::executor::block_on;
@@ -155,7 +155,7 @@ impl BlockStore {
         root_metadata: RootMetadata,
         blocks: Vec<Block>,
         quorum_certs: Vec<QuorumCert>,
-        highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
+        highest_2chain_timeout_cert: Option<TwoChainTimeoutWithSignatures>,
         state_computer: Arc<dyn StateComputer>,
         storage: Arc<dyn PersistentLivenessStorage>,
         max_pruned_blocks_in_mem: usize,
@@ -426,7 +426,7 @@ impl BlockStore {
     /// In case a timeout certificate is updated, persist it to storage.
     pub fn insert_2chain_timeout_certificate(
         &self,
-        tc: Arc<TwoChainTimeoutCertificate>,
+        tc: Arc<TwoChainTimeoutWithSignatures>,
     ) -> anyhow::Result<()> {
         let cur_tc_round = self
             .highest_2chain_timeout_cert()
@@ -519,7 +519,7 @@ impl BlockReader for BlockStore {
         self.inner.read().highest_commit_cert()
     }
 
-    fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutCertificate>> {
+    fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutWithSignatures>> {
         self.inner.read().highest_2chain_timeout_cert()
     }
 

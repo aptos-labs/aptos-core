@@ -1949,7 +1949,7 @@ fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWith
         ),
         HashValue::zero(),
     );
-    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
+    LedgerInfoWithSignatures::new(ledger_info, AggregatedSignature::empty())
 }
 
 /// Creates a test transaction output
