@@ -67,7 +67,7 @@ jobs:
           command: docker run --mount=type=bind,source=/tmp,target=/specs --name=yaml-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json -o /specs/spec.json
 
       # Confirm that the specs we built here are the same as those checked in.
-      - run: echo "If this lint fails, run the following commands locally to fix it:"
+      - run: echo "If this step fails, run the following commands locally to fix it:"
       - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/v1/spec.yaml"
       - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/v1/spec.json"
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/spec.yaml api/doc/v1/spec.yaml
@@ -85,6 +85,8 @@ jobs:
 
       # Ensure any changes to the generated client were checked in.
       - run: cd ./ecosystem/typescript/sdk && yarn generate-client -o /tmp/generated_client
+      - run: echo "If this step fails, run the following command locally to fix it:"
+      - run: echo "cd ecosystem/typescript/sdk && yarn generate-client"
       - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ./ecosystem/typescript/sdk/src/generated/ /tmp/generated_client/
 
       # Run a local testnet built from the same commit.
