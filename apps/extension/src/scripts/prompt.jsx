@@ -17,7 +17,7 @@ import {
 } from '@chakra-ui/react';
 import { InfoIcon } from '@chakra-ui/icons';
 import { PermissionType, PromptMessage } from 'core/types/dappTypes';
-import { GlobalStateProvider, useGlobalStateContext } from "../core/hooks/useGlobalState";
+import { GlobalStateProvider, useGlobalStateContext } from "core/hooks/useGlobalState";
 import Password from 'pages/Password';
 
 const theme = extendTheme({

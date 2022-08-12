@@ -36,7 +36,7 @@ export function createRawTransaction(
     chainId, expSecFromNow, gasAmount, gasUnitPrice, sender, sequenceNumber,
   } = {
     expSecFromNow: Math.floor(Date.now() / 1000) + 10,
-    gasAmount: 1000,
+    gasAmount: 1000000,
     gasUnitPrice: 1,
     ...config,
   };

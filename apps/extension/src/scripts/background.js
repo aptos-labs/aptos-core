@@ -127,20 +127,25 @@ async function submitTransaction(client, publicAccount, signedTransaction, sendR
 }
 
 async function signTransactionAndSendResponse(publicAccount, signingMessage, sendResponse) {
-  const account = await checkAccount(sendResponse);
-  if (!checkConnected(publicAccount.address, sendResponse) || account === undefined) {
+  if (!checkConnected(publicAccount.address, sendResponse)) {
     return;
   }
 
   const permission = await Permissions.requestPermissions(
     PermissionType.SIGN_TRANSACTION,
     await getCurrentDomain(),
-    account.address().hex(),
+    publicAccount.address,
   );
   if (!permission) {
     rejectRequest(sendResponse);
     return;
   }
+
+  const account = await checkAccount(sendResponse);
+  if (!account) {
+    return;
+  }
+
   try {
     const signature = await signTransaction(account, signingMessage);
     sendResponse({ signature });
@@ -150,20 +155,26 @@ async function signTransactionAndSendResponse(publicAccount, signingMessage, sen
 }
 
 async function signMessage(publicAccount, message, sendResponse) {
-  const account = await checkAccount(sendResponse);
-  if (!checkConnected(publicAccount.address, sendResponse) || account === undefined) {
+  if (!checkConnected(publicAccount.address, sendResponse)) {
     return;
   }
 
   const permission = await Permissions.requestPermissions(
     PermissionType.SIGN_MESSAGE,
     await getCurrentDomain(),
-    account.address().hex(),
+    publicAccount.address,
   );
+
   if (!permission) {
     rejectRequest(sendResponse);
     return;
   }
+
+  const account = await checkAccount(sendResponse);
+  if (!account) {
+    return;
+  }
+
   try {
     const serializer = new BCS.Serializer();
     serializer.serializeStr(message);
