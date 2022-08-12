@@ -19,7 +19,7 @@ impl serde::Serialize for BlockMetadataTransactionOutput {
         if self.round != 0 {
             len += 1;
         }
-        if !self.previous_block_votes_bitmap.is_empty() {
+        if !self.previous_block_votes_bitvec.is_empty() {
             len += 1;
         }
         if !self.proposer.is_empty() {
@@ -46,10 +46,10 @@ impl serde::Serialize for BlockMetadataTransactionOutput {
         if self.round != 0 {
             struct_ser.serialize_field("round", ToString::to_string(&self.round).as_str())?;
         }
-        if !self.previous_block_votes_bitmap.is_empty() {
+        if !self.previous_block_votes_bitvec.is_empty() {
             struct_ser.serialize_field(
-                "previousBlockVotesBitmap",
-                &self.previous_block_votes_bitmap,
+                "previousBlockVotesBitvec",
+                pbjson::private::base64::encode(&self.previous_block_votes_bitvec).as_str(),
             )?;
         }
         if !self.proposer.is_empty() {
@@ -77,7 +77,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransactionOutput {
             "hash",
             "id",
             "round",
-            "previousBlockVotesBitmap",
+            "previousBlockVotesBitvec",
             "proposer",
             "failedProposerIndices",
             "timestamp",
@@ -89,7 +89,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransactionOutput {
             Hash,
             Id,
             Round,
-            PreviousBlockVotesBitmap,
+            PreviousBlockVotesBitvec,
             Proposer,
             FailedProposerIndices,
             Timestamp,
@@ -121,8 +121,8 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransactionOutput {
                             "hash" => Ok(GeneratedField::Hash),
                             "id" => Ok(GeneratedField::Id),
                             "round" => Ok(GeneratedField::Round),
-                            "previousBlockVotesBitmap" => {
-                                Ok(GeneratedField::PreviousBlockVotesBitmap)
+                            "previousBlockVotesBitvec" => {
+                                Ok(GeneratedField::PreviousBlockVotesBitvec)
                             }
                             "proposer" => Ok(GeneratedField::Proposer),
                             "failedProposerIndices" => Ok(GeneratedField::FailedProposerIndices),
@@ -153,7 +153,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransactionOutput {
                 let mut hash__ = None;
                 let mut id__ = None;
                 let mut round__ = None;
-                let mut previous_block_votes_bitmap__ = None;
+                let mut previous_block_votes_bitvec__ = None;
                 let mut proposer__ = None;
                 let mut failed_proposer_indices__ = None;
                 let mut timestamp__ = None;
@@ -184,13 +184,16 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransactionOutput {
                                     .0,
                             );
                         }
-                        GeneratedField::PreviousBlockVotesBitmap => {
-                            if previous_block_votes_bitmap__.is_some() {
+                        GeneratedField::PreviousBlockVotesBitvec => {
+                            if previous_block_votes_bitvec__.is_some() {
                                 return Err(serde::de::Error::duplicate_field(
-                                    "previousBlockVotesBitmap",
+                                    "previousBlockVotesBitvec",
                                 ));
                             }
-                            previous_block_votes_bitmap__ = Some(map.next_value()?);
+                            previous_block_votes_bitvec__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
+                                    .0,
+                            );
                         }
                         GeneratedField::Proposer => {
                             if proposer__.is_some() {
@@ -232,7 +235,7 @@ impl<'de> serde::Deserialize<'de> for BlockMetadataTransactionOutput {
                     hash: hash__.unwrap_or_default(),
                     id: id__.unwrap_or_default(),
                     round: round__.unwrap_or_default(),
-                    previous_block_votes_bitmap: previous_block_votes_bitmap__.unwrap_or_default(),
+                    previous_block_votes_bitvec: previous_block_votes_bitvec__.unwrap_or_default(),
                     proposer: proposer__.unwrap_or_default(),
                     failed_proposer_indices: failed_proposer_indices__.unwrap_or_default(),
                     timestamp: timestamp__,

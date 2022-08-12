@@ -49,7 +49,7 @@ pub fn get_block_metadata_output(
         hash: info.hash.clone(),
         id: bmt.id.clone(),
         round: bmt.round,
-        previous_block_votes_bitmap: bmt.previous_block_votes.clone(),
+        previous_block_votes_bitvec: bmt.previous_block_votes_bitvec.clone(),
         proposer: bmt.proposer.clone(),
         failed_proposer_indices: bmt.failed_proposer_indices.clone(),
         timestamp: info.timestamp.clone(),
@@ -118,7 +118,7 @@ pub fn get_events_output(
 
 pub fn get_write_set_changes_output(
     transaction_info: &TransactionInfo,
-) -> Result<Vec<WriteSetChangeOutput>> {
+) -> Vec<WriteSetChangeOutput> {
     let mut wsc_out = Vec::default();
     for (index, wsc) in transaction_info.changes.iter().enumerate() {
         if let Some(c) = &wsc.change {
@@ -132,7 +132,7 @@ pub fn get_write_set_changes_output(
             });
         }
     }
-    Ok(wsc_out)
+    wsc_out
 }
 
 pub fn get_transaction_type(t: TransactionType) -> String {

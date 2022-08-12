@@ -31,8 +31,7 @@ fn block_to_block_output(input_block: Block) -> Result<BlockOutput, Error> {
             Some(info) => {
                 transaction_info =
                     transaction_converter::get_transaction_info_output(&input_txn, info);
-                write_set_changes = transaction_converter::get_write_set_changes_output(info)
-                    .map_err(|e| Error::Unexpected(e.to_string()))?;
+                write_set_changes = transaction_converter::get_write_set_changes_output(info);
             }
         }
         let mut txn_data: Option<TxnDataOutput> = None;
