@@ -3,7 +3,7 @@
 
 use crate::{test_utils, test_utils::make_timeout_cert, Error, TSafetyRules};
 use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::multi_signature::AggregatedSignature;
 use aptos_types::{
     block_info::BlockInfo,
     epoch_state::EpochState,
@@ -15,7 +15,7 @@ use consensus_types::{
     block::block_test_utils::random_payload,
     common::{Payload, Round},
     quorum_cert::QuorumCert,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithSignatures},
     vote_proposal::VoteProposal,
 };
 
@@ -436,7 +436,7 @@ fn test_2chain_rules(constructor: &Callback) {
 
     safety_rules.initialize(&proof).unwrap();
 
-    let mut expect = |p, maybe_tc: Option<TwoChainTimeoutCertificate>, vote, commit| {
+    let mut expect = |p, maybe_tc: Option<TwoChainTimeoutWithSignatures>, vote, commit| {
         let result = safety_rules.construct_and_sign_vote_two_chain(p, maybe_tc.as_ref());
         let qc = p.block().quorum_cert();
         if vote {
@@ -633,7 +633,7 @@ fn test_sign_commit_vote(constructor: &Callback) {
                         ),
                         ledger_info_with_sigs.ledger_info().consensus_data_hash()
                     ),
-                    MultiSignature::empty(),
+                    AggregatedSignature::empty(),
                 ),
                 ledger_info_with_sigs.ledger_info().clone()
             )
@@ -647,7 +647,7 @@ fn test_sign_commit_vote(constructor: &Callback) {
             .sign_commit_vote(
                 LedgerInfoWithSignatures::new(
                     ledger_info_with_sigs.ledger_info().clone(),
-                    MultiSignature::empty(),
+                    AggregatedSignature::empty(),
                 ),
                 ledger_info_with_sigs.ledger_info().clone()
             )

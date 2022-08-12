@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use std::collections::HashMap;
-
 use anyhow::anyhow;
 use itertools::zip_eq;
 
@@ -80,7 +78,7 @@ fn aggregate_commit_proof(
     validator: &ValidatorVerifier,
 ) -> LedgerInfoWithSignatures {
     let aggregated_sig = validator
-        .aggregate_and_verify_multi_signature(verified_signatures, commit_ledger_info)
+        .generate_multi_signature(verified_signatures, commit_ledger_info)
         .expect("Failed to generate aggregated signature");
     LedgerInfoWithSignatures::new(commit_ledger_info.clone(), aggregated_sig)
 }
@@ -138,7 +136,7 @@ impl BufferItem {
         callback: StateComputerCommitCallBackType,
     ) -> Self {
         Self::Ordered(Box::new(OrderedItem {
-            unverified_signatures: PartialSignatures::new(HashMap::new()),
+            unverified_signatures: PartialSignatures::empty(),
             commit_proof: None,
             callback,
             ordered_blocks,

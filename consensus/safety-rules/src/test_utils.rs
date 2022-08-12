@@ -12,7 +12,7 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
-    multi_signature::{MultiSignature, PartialSignatures},
+    multi_signature::{AggregatedSignature, PartialSignatures},
     on_chain_config::ValidatorSet,
     proof::AccumulatorExtensionProof,
     validator_info::ValidatorInfo,
@@ -20,11 +20,12 @@ use aptos_types::{
     validator_verifier::generate_validator_verifier,
     waypoint::Waypoint,
 };
+use consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
 use consensus_types::{
     block::Block,
     common::{Payload, Round},
     quorum_cert::QuorumCert,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithSignatures},
     vote::Vote,
     vote_data::VoteData,
     vote_proposal::VoteProposal,
@@ -43,7 +44,7 @@ pub fn make_genesis(signer: &ValidatorSigner) -> (EpochChangeProof, QuorumCert) 
     let li = LedgerInfo::mock_genesis(Some(validator_set));
     let block = Block::make_genesis_block_from_ledger_info(&li);
     let qc = QuorumCert::certificate_for_genesis_from_ledger_info(&li, block.id());
-    let lis = LedgerInfoWithSignatures::new(li, MultiSignature::empty());
+    let lis = LedgerInfoWithSignatures::new(li, AggregatedSignature::empty());
     let proof = EpochChangeProof::new(vec![lis], false);
     (proof, qc)
 }
@@ -202,12 +203,14 @@ pub fn make_timeout_cert(
     round: Round,
     hqc: &QuorumCert,
     signer: &ValidatorSigner,
-) -> TwoChainTimeoutCertificate {
+) -> TwoChainTimeoutWithSignatures {
     let timeout = TwoChainTimeout::new(1, round, hqc.clone());
-    let mut tc = TwoChainTimeoutCertificate::new(timeout.clone());
+    let mut tc_partial = TwoChainTimeoutWithPartialSignatures::new(timeout.clone());
     let signature = timeout.sign(signer);
-    tc.add(signer.author(), timeout, signature);
-    tc
+    tc_partial.add(signer.author(), timeout, signature);
+    tc_partial
+        .aggregate_signatures(&generate_validator_verifier(&[signer.clone()]))
+        .unwrap()
 }
 
 pub fn validator_signers_to_ledger_info(signers: &[&ValidatorSigner]) -> LedgerInfo {
