@@ -68,6 +68,8 @@
     "production": [
       ">0.2%",
       "not dead",
+      "not ie <= 99",
+      "not android <= 4.4.4",
       "not op_mini all"
     ],
     "development": [
