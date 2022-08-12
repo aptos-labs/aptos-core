@@ -24,7 +24,7 @@ export default function WalletLayout({
 
   const templateRows = useMemo(() => {
     if (hasWalletFooter && hasWalletHeader) {
-      return '64px 1fr 40px';
+      return '64px 1fr 60px';
     }
     if (hasWalletFooter) {
       return '1fr 40px';
