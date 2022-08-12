@@ -10,14 +10,15 @@ use crate::{
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::multi_signature::AggregatedSignature;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::ValidatorSet,
 };
 use consensus_types::{
-    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
+    block::Block, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutWithSignatures,
+    vote::Vote,
 };
 use std::{collections::HashMap, sync::Arc};
 use storage_interface::DbReader;
@@ -30,7 +31,7 @@ pub struct MockSharedStorage {
     pub last_vote: Mutex<Option<Vote>>,
 
     // Liveness state
-    pub highest_2chain_timeout_certificate: Mutex<Option<TwoChainTimeoutCertificate>>,
+    pub highest_2chain_timeout_certificate: Mutex<Option<TwoChainTimeoutWithSignatures>>,
     pub validator_set: ValidatorSet,
 }
 
@@ -65,7 +66,7 @@ impl MockStorage {
             let validator_set = Some(shared_storage.validator_set.clone());
             LedgerInfo::mock_genesis(validator_set)
         };
-        let lis = LedgerInfoWithSignatures::new(li, MultiSignature::empty());
+        let lis = LedgerInfoWithSignatures::new(li, AggregatedSignature::empty());
         shared_storage
             .lis
             .lock()
@@ -95,7 +96,7 @@ impl MockStorage {
     pub fn get_ledger_recovery_data(&self) -> LedgerRecoveryData {
         LedgerRecoveryData::new(LedgerInfoWithSignatures::new(
             self.storage_ledger.lock().clone(),
-            MultiSignature::empty(),
+            AggregatedSignature::empty(),
         ))
     }
 
@@ -204,7 +205,7 @@ impl PersistentLivenessStorage for MockStorage {
 
     fn save_highest_2chain_timeout_cert(
         &self,
-        highest_timeout_certificate: &TwoChainTimeoutCertificate,
+        highest_timeout_certificate: &TwoChainTimeoutWithSignatures,
     ) -> Result<()> {
         self.shared_storage
             .highest_2chain_timeout_certificate
@@ -262,7 +263,7 @@ impl PersistentLivenessStorage for EmptyStorage {
     fn recover_from_ledger(&self) -> LedgerRecoveryData {
         LedgerRecoveryData::new(LedgerInfoWithSignatures::new(
             LedgerInfo::mock_genesis(None),
-            MultiSignature::empty(),
+            AggregatedSignature::empty(),
         ))
     }
 
@@ -283,7 +284,7 @@ impl PersistentLivenessStorage for EmptyStorage {
         }
     }
 
-    fn save_highest_2chain_timeout_cert(&self, _: &TwoChainTimeoutCertificate) -> Result<()> {
+    fn save_highest_2chain_timeout_cert(&self, _: &TwoChainTimeoutWithSignatures) -> Result<()> {
         Ok(())
     }
 
