@@ -101,7 +101,7 @@ impl SfStreamer {
     }
 
     pub async fn start(&mut self) {
-        println!("FIRE INIT aptos v1");
+        println!("FIRE INIT aptos-node {} aptos 0 0", env!("CARGO_PKG_VERSION"));
         loop {
             self.convert_next_block().await;
         }
@@ -205,7 +205,7 @@ impl SfStreamer {
     }
 
     /// We can consider a block height as valid if these conditions are met:
-    /// 1. first transaction is a block metadata or genesis 2. versions are monotonically increasing 3. start and end versions match block boundaries
+    /// 1. first (and only first) transaction is a block metadata or genesis 2. versions are monotonically increasing 3. start and end versions match block boundaries
     /// Return error if the block is not valid. Panic if there's anything wrong with encoding a transaction.
     fn print_block_with_validation(
         &self,
@@ -219,21 +219,27 @@ impl SfStreamer {
         println!("FIRE BLOCK_START {}", self.current_block_height);
         let mut curr_version = block_start_version;
         for (index, txn) in converted_txns.iter().enumerate() {
-            // First transaction has to be bmt or genesis
+            // First, and only first, transaction has to be bmt or genesis
+            let is_bm_or_genesis = match txn.r#type() {
+                TransactionType::BlockMetadata => true,
+                TransactionType::Genesis => true,
+                TransactionType::User => false,
+                TransactionType::StateCheckpoint => false,
+            };
             if index == 0 {
-                let success = match txn.r#type() {
-                    TransactionType::BlockMetadata => true,
-                    TransactionType::Genesis => true,
-                    TransactionType::User => false,
-                    TransactionType::StateCheckpoint => false,
-                };
-                if !success {
-                    bail!(
-                        "First transaction has to be block metadata for block {}, found {}",
-                        self.current_block_height,
-                        txn.r#type
-                    )
-                }
+                ensure!(
+                    is_bm_or_genesis,
+                    "First transaction has to be block metadata for block {}, found {}",
+                    self.current_block_height,
+                    txn.r#type
+                );
+            } else {
+                ensure!(
+                    !is_bm_or_genesis,
+                    "Multiple {} detected for block {}",
+                    txn.r#type,
+                    self.current_block_height
+                );
             }
             // Start version has to be first version and versions have to be monotonically increasing
             ensure!(
