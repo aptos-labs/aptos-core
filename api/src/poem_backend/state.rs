@@ -44,12 +44,38 @@ impl StateApi {
     /// The Aptos nodes prune account state history, via a configurable time window (link).
     /// If the requested data has been pruned, the server responds with a 404.
     #[oai(
-        path = "/accounts/:address/resource/:resource_type",
+        path = "/accounts/:address/resources/:resource_type",
         method = "get",
         operation_id = "get_account_resource",
         tag = "ApiTags::Accounts"
     )]
     async fn get_account_resource(
+        &self,
+        accept_type: AcceptType,
+        address: Path<Address>,
+        resource_type: Path<MoveStructTag>,
+        ledger_version: Query<Option<U64>>,
+    ) -> BasicResultWith404<MoveResource> {
+        fail_point_poem("endpoint_get_account_resource")?;
+        self.resource(&accept_type, address.0, resource_type.0, ledger_version.0)
+    }
+
+    /// Get specific account resource
+    ///
+    /// This endpoint returns the resource of a specific type residing at a given
+    /// account at a specified ledger version (AKA transaction version). If the
+    /// ledger version is not specified in the request, the latest ledger version
+    /// is used.
+    ///
+    /// The Aptos nodes prune account state history, via a configurable time window (link).
+    /// If the requested data has been pruned, the server responds with a 404.
+    #[oai(
+        path = "/accounts/:address/resource/:resource_type",
+        method = "get",
+        operation_id = "get_account_resource",
+        tag = "ApiTags::Accounts"
+    )]
+    async fn get_account_resource_deprecated(
         &self,
         accept_type: AcceptType,
         address: Path<Address>,
@@ -70,12 +96,38 @@ impl StateApi {
     /// The Aptos nodes prune account state history, via a configurable time window (link).
     /// If the requested data has been pruned, the server responds with a 404.
     #[oai(
-        path = "/accounts/:address/module/:module_name",
+        path = "/accounts/:address/modules/:module_name",
         method = "get",
         operation_id = "get_account_module",
         tag = "ApiTags::Accounts"
     )]
     async fn get_account_module(
+        &self,
+        accept_type: AcceptType,
+        address: Path<Address>,
+        module_name: Path<IdentifierWrapper>,
+        ledger_version: Query<Option<U64>>,
+    ) -> BasicResultWith404<MoveModuleBytecode> {
+        fail_point_poem("endpoint_get_account_module")?;
+        self.module(&accept_type, address.0, module_name.0, ledger_version.0)
+    }
+
+    /// Get specific account module
+    ///
+    /// This endpoint returns the module with a specific name residing at a given
+    /// account at a specified ledger version (AKA transaction version). If the
+    /// ledger version is not specified in the request, the latest ledger version
+    /// is used.
+    ///
+    /// The Aptos nodes prune account state history, via a configurable time window (link).
+    /// If the requested data has been pruned, the server responds with a 404.
+    #[oai(
+        path = "/accounts/:address/module/:module_name",
+        method = "get",
+        operation_id = "get_account_module",
+        tag = "ApiTags::Accounts"
+    )]
+    async fn get_account_module_deprecated(
         &self,
         accept_type: AcceptType,
         address: Path<Address>,
