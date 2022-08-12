@@ -15,7 +15,7 @@ All transactions executed on the Aptos Blockchain must be signed. This requireme
 ## Generating the signing message 
 
 The first step in signing a transaction is to generate the signing message from the transaction. To generate such a signing message, you can use:
-- The Aptos node's [REST API](/rest-api). The Aptos node will generate the signing message, the transaction signature and will submit the signed transaction to the Aptos Blockchain. However, this approach is not secure. See [Submitting transactions in BCS vs JSON](/sdks/transactions-with-ts-sdk#submitting-transactions-in-bcs-vs-json).
+- The Aptos node's [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/). The Aptos node will generate the signing message, the transaction signature and will submit the signed transaction to the Aptos Blockchain. However, this approach is not secure. See [Submitting transactions in BCS vs JSON](/sdks/transactions-with-ts-sdk#submitting-transactions-in-bcs-vs-json).
   - Also see the tutorial [Your First Transaction](../tutorials/first-transaction.md) that explains this approach.
 - However, you may prefer instead that your client application, for example, a hardware security module (HSM), be responsible for generating the signed transaction. In this approach, before submitting transactions, a client must:
   - Serialize the transactions into bytes, and
@@ -114,7 +114,7 @@ A signed transaction consists of:
 * A raw transaction, and
 * An authenticator. The authenticator contains a client's public key and the signature of the raw transaction.
 
-This signed transaction is further BCS-serialized (not shown in the diagram in [Overview](#overview) section), after which the signed transaction is ready for submission to the [Aptos REST interface](/rest-api).
+This signed transaction is further BCS-serialized (not shown in the diagram in [Overview](#overview) section), after which the signed transaction is ready for submission to the [Aptos REST interface](https://fullnode.devnet.aptoslabs.com/v1/spec#/).
 
 ### Multisignature transactions
 
@@ -314,7 +314,7 @@ curl -X POST -H "Content-Type: application/x.aptos.signed_transaction+bcs" --dat
 
 [first_transaction]: /tutorials/first-transaction
 [account]: /concepts/basics-accounts
-[rest_spec]: /rest-api
+[rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/
 [bcs]: https://docs.rs/bcs/latest/bcs/
 [sha3]: https://en.wikipedia.org/wiki/SHA-3
 [ed25519]: https://ed25519.cr.yp.to/

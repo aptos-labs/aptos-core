@@ -4,6 +4,7 @@
 use crate::{
     driver::{DriverConfiguration, StateSyncDriver},
     driver_client::{ClientNotificationListener, DriverClient, DriverNotification},
+    metadata_storage::MetadataStorageInterface,
     notification_handlers::{
         CommitNotificationListener, ConsensusNotificationHandler, ErrorNotificationListener,
         MempoolNotificationHandler,
@@ -37,6 +38,7 @@ impl DriverFactory {
     pub fn create_and_spawn_driver<
         ChunkExecutor: ChunkExecutorTrait + 'static,
         MempoolNotifier: MempoolNotificationSender + 'static,
+        MetadataStorage: MetadataStorageInterface + Clone + Send + Sync + 'static,
     >(
         create_runtime: bool,
         node_config: &NodeConfig,
@@ -44,6 +46,7 @@ impl DriverFactory {
         storage: DbReaderWriter,
         chunk_executor: Arc<ChunkExecutor>,
         mempool_notification_sender: MempoolNotifier,
+        metadata_storage: MetadataStorage,
         consensus_listener: ConsensusNotificationListener,
         mut event_subscription_service: EventSubscriptionService,
         aptos_data_client: AptosNetDataClient,
@@ -98,6 +101,7 @@ impl DriverFactory {
             error_notification_sender,
             event_subscription_service.clone(),
             mempool_notification_handler.clone(),
+            metadata_storage.clone(),
             storage.clone(),
             driver_runtime.as_ref(),
         );
@@ -118,6 +122,7 @@ impl DriverFactory {
             error_notification_listener,
             event_subscription_service,
             mempool_notification_handler,
+            metadata_storage,
             storage_synchronizer,
             aptos_data_client,
             streaming_service_client,

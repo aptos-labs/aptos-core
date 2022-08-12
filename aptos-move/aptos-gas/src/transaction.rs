@@ -1,5 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
+
+//! This module defines all the gas parameters for transactions, along with their initial values
+//! in the genesis and a mapping between the Rust representation and the on-chain gas schedule.
+
 use crate::gas_meter::{FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule};
 use std::collections::BTreeMap;
 
@@ -79,7 +83,7 @@ define_gas_parameters_for_transaction!(
     [
         max_transaction_size_in_bytes,
         "max_transaction_size_in_bytes",
-        8192
+        6 * 1024 * 1024
     ],
     [gas_unit_scaling_factor, "gas_unit_scaling_factor", 1000],
 );
@@ -94,7 +98,7 @@ impl TransactionGasParameters {
         }
     }
 
-    /// Calculate the intrinsic gas for the transaction based upon its size in bytes/words.
+    /// Calculate the intrinsic gas for the transaction based upon its size in bytes.
     pub fn calculate_intrinsic_gas(&self, transaction_size: u64) -> u64 {
         let min_transaction_fee = self.min_transaction_gas_units;
 

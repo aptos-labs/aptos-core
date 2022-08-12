@@ -160,7 +160,7 @@ The moon_coin module has alreayd been deployed. The next step is to initialize M
 
 In other networks, since tokens/coins are just balance numbers in a contract, anyone can "send" anyone else a random coin, even if the recipient doesn't want it. In Aptos, a user needs to explicitly register to receive a `Coin<RandomCoin>` before it can be sent to them.
 
-To register, the recipient just needs to call `0x1::coin::register<CoinType>`:
+To register, the recipient just needs to call `0x1::coins::register<CoinType>`:
 
 <Tabs>
   <TabItem value="typescript" label="Typescript" default>
@@ -246,6 +246,6 @@ The data can be verified by visiting either a REST interface or the explorer:
 - Bob's account on the [explorer][bob_account_explorer].
 
 [account_basics]: /concepts/basics-accounts
-[alice_account_rest]: /rest-api/#tag/accounts/a52671f10dc3479b09d0a11ce47694c0/
+[alice_account_rest]: https://fullnode.devnet.aptoslabs.com/v1/accounts/a52671f10dc3479b09d0a11ce47694c0/
 [bob_account_explorer]: https://explorer.devnet.aptos.dev/account/ec6ec14e4abe10aaa6ad53b0b63a1806
-[rest_spec]: /rest-api
+[rest_spec]: https://fullnode.devnet.aptoslabs.com/v1/spec#/

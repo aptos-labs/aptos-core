@@ -32,18 +32,27 @@ pub struct GenesisInfo {
     validators: Vec<Validator>,
     /// Compiled bytecode of framework modules
     modules: Vec<Vec<u8>>,
+    /// The genesis transaction, once it's been generated
+    genesis: Option<Transaction>,
+
     /// Whether to allow new validators to join the set after genesis
     pub allow_new_validators: bool,
+    /// Duration of an epoch
+    pub epoch_duration_secs: u64,
     /// Minimum stake to be in the validator set
     pub min_stake: u64,
+    /// Minimum number of votes to consider a proposal valid.
+    pub min_voting_threshold: u128,
     /// Maximum stake to be in the validator set
     pub max_stake: u64,
     /// Minimum number of seconds to lockup staked coins
     pub recurring_lockup_duration_secs: u64,
-    /// Duration of an epoch
-    pub epoch_duration_secs: u64,
-    /// The genesis transaction, once it's been generated
-    genesis: Option<Transaction>,
+    /// Required amount of stake to create proposals.
+    pub required_proposer_stake: u64,
+    /// Percentage of stake given out as rewards a year (0-100%).
+    pub rewards_apy_percentage: u64,
+    /// Voting duration for a proposal in seconds.
+    pub voting_duration_secs: u64,
 }
 
 impl GenesisInfo {
@@ -53,10 +62,14 @@ impl GenesisInfo {
         configs: Vec<ValidatorConfiguration>,
         modules: Vec<Vec<u8>>,
         allow_new_validators: bool,
+        epoch_duration_secs: u64,
         min_stake: u64,
+        min_voting_threshold: u128,
         max_stake: u64,
         recurring_lockup_duration_secs: u64,
-        epoch_duration_secs: u64,
+        required_proposer_stake: u64,
+        rewards_apy_percentage: u64,
+        voting_duration_secs: u64,
     ) -> anyhow::Result<GenesisInfo> {
         let mut validators = Vec::new();
 
@@ -69,12 +82,16 @@ impl GenesisInfo {
             root_key,
             validators,
             modules,
+            genesis: None,
             allow_new_validators,
+            epoch_duration_secs,
             min_stake,
+            min_voting_threshold,
             max_stake,
             recurring_lockup_duration_secs,
-            epoch_duration_secs,
-            genesis: None,
+            required_proposer_stake,
+            rewards_apy_percentage,
+            voting_duration_secs,
         })
     }
 
@@ -93,12 +110,16 @@ impl GenesisInfo {
             &self.validators,
             &self.modules,
             self.chain_id,
-            vm_genesis::GenesisConfigurations {
+            vm_genesis::GenesisConfiguration {
+                allow_new_validators: self.allow_new_validators,
                 epoch_duration_secs: self.epoch_duration_secs,
                 min_stake: self.min_stake,
+                min_voting_threshold: self.min_voting_threshold,
                 max_stake: self.max_stake,
                 recurring_lockup_duration_secs: self.recurring_lockup_duration_secs,
-                allow_new_validators: self.allow_new_validators,
+                required_proposer_stake: self.required_proposer_stake,
+                rewards_apy_percentage: self.rewards_apy_percentage,
+                voting_duration_secs: self.voting_duration_secs,
             },
         )
     }

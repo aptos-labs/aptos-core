@@ -11,6 +11,7 @@ RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
         -p aptos-node \
         -p aptos-node-checker \
         -p aptos-openapi-spec-generator \
+        -p aptos-telemetry-service \
         -p backup-cli \
         -p db-bootstrapper \
         -p forge-cli \
@@ -25,6 +26,7 @@ BINS=(
     aptos-node
     aptos-node-checker
     aptos-openapi-spec-generator
+    aptos-telemetry-service
     db-backup
     db-backup-verify
     db-bootstrapper

@@ -10,6 +10,7 @@ mod driver_client;
 pub mod driver_factory;
 mod error;
 mod logging;
+pub mod metadata_storage;
 pub mod metrics;
 mod notification_handlers;
 mod storage_synchronizer;

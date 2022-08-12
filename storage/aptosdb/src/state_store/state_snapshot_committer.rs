@@ -52,7 +52,11 @@ impl StateSnapshotCommitter {
     pub fn run(self) {
         while let Ok(msg) = self.state_snapshot_commit_receiver.recv() {
             match msg {
-                CommitMessage::Data(delta_to_commit) => {
+                CommitMessage::Data {
+                    data: delta_to_commit,
+                    prev_snapshot_ready_receiver,
+                    snapshot_ready_sender,
+                } => {
                     let node_hashes = delta_to_commit
                         .current
                         .clone()
@@ -60,6 +64,13 @@ impl StateSnapshotCommitter {
                         .new_node_hashes_since(&delta_to_commit.base.clone().freeze());
                     let version = delta_to_commit.current_version.expect("Cannot be empty");
                     let base_version = delta_to_commit.base_version;
+
+                    // Wait for the previous batch to commit before reading the snapshot from db.
+                    prev_snapshot_ready_receiver
+                        .expect("prev_snapshot_ready_receiver cannot be None")
+                        .recv()
+                        .unwrap();
+
                     let (batch, root_hash) = self
                         .state_merkle_db
                         .merklize_value_set(
@@ -70,11 +81,15 @@ impl StateSnapshotCommitter {
                         )
                         .expect("Error writing snapshot");
                     self.state_merkle_batch_commit_sender
-                        .send(CommitMessage::Data(StateMerkleBatch {
-                            batch,
-                            root_hash,
-                            state_delta: delta_to_commit,
-                        }))
+                        .send(CommitMessage::Data {
+                            data: StateMerkleBatch {
+                                batch,
+                                root_hash,
+                                state_delta: delta_to_commit,
+                            },
+                            prev_snapshot_ready_receiver: None,
+                            snapshot_ready_sender,
+                        })
                         .unwrap();
                 }
                 CommitMessage::Sync(finish_sender) => {

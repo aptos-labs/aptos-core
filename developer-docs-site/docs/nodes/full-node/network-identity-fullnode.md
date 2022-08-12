@@ -167,6 +167,11 @@ full_node_networks:
 
 ## Allowing other FullNodes to connect
 
+:::tip Ports and port settings
+
+See [Ports and port settings](/nodes/ait/node-requirements#networking-requirements) for an explanation of port settings and how they are used.
+:::
+
 Once you start your FullNode with a static identity you can allow others to connect to devnet through your node.
 
 :::note

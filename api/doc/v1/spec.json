@@ -3,7 +3,7 @@
   "info": {
     "title": "Aptos Node API",
     "description": "The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "contact": {
       "name": "Aptos Labs",
       "url": "https://github.com/aptos-labs/aptos-core"
@@ -13,11 +13,19 @@
       "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
     }
   },
-  "servers": [],
+  "servers": [
+    {
+      "url": "/v1"
+    }
+  ],
   "tags": [
     {
       "name": "Accounts",
       "description": "Access to account resources and modules"
+    },
+    {
+      "name": "Blocks",
+      "description": "Access to blocks"
     },
     {
       "name": "Events",
@@ -117,6 +125,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -249,6 +273,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -375,6 +415,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -418,7 +474,7 @@
           "General"
         ],
         "summary": "Show OpenAPI explorer",
-        "description": "Provides a UI that you can use to explore the API. You can also retrieve the API directly at `/spec.yaml` and `/spec.json`.",
+        "description": "Provides a UI that you can use to explore the API. You can also\nretrieve the API directly at `/spec.yaml` and `/spec.json`.",
         "responses": {
           "200": {
             "description": "",
@@ -432,6 +488,407 @@
           }
         },
         "operationId": "spec"
+      }
+    },
+    "/-/healthy": {
+      "get": {
+        "tags": [
+          "General"
+        ],
+        "summary": "Check basic node health",
+        "description": "By default this endpoint just checks that it can get the latest ledger\ninfo and then returns 200.\n\nIf the duration_secs param is provided, this endpoint will return a\n200 if the following condition is true:\n\n`server_latest_ledger_info_timestamp >= server_current_time_timestamp - duration_secs`",
+        "parameters": [
+          {
+            "name": "duration_secs",
+            "schema": {
+              "type": "integer",
+              "format": "uint32"
+            },
+            "in": "query",
+            "required": false,
+            "deprecated": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheckSuccess"
+                }
+              },
+              "application/x-bcs": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint16"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "healthy"
+      }
+    },
+    "/blocks/by_height/{block_height}": {
+      "get": {
+        "tags": [
+          "Blocks"
+        ],
+        "summary": "Get blocks by height",
+        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information.",
+        "parameters": [
+          {
+            "name": "block_height",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false
+          },
+          {
+            "name": "with_transactions",
+            "schema": {
+              "type": "boolean"
+            },
+            "in": "query",
+            "required": false,
+            "deprecated": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Block"
+                }
+              },
+              "application/x-bcs": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint16"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_block_by_height"
+      }
+    },
+    "/blocks/by_version/{version}": {
+      "get": {
+        "tags": [
+          "Blocks"
+        ],
+        "summary": "Get blocks by version",
+        "description": "This endpoint allows you to get the transactions in a block\nand the corresponding block information given a version in the block.",
+        "parameters": [
+          {
+            "name": "version",
+            "schema": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false
+          },
+          {
+            "name": "with_transactions",
+            "schema": {
+              "type": "boolean"
+            },
+            "in": "query",
+            "required": false,
+            "deprecated": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Block"
+                }
+              },
+              "application/x-bcs": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "uint8"
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-APTOS-CHAIN-ID": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint16"
+                }
+              },
+              "X-APTOS-LEDGER-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-OLDEST-VERSION": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-LEDGER-TIMESTAMPUSEC": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "get_block_by_version"
       }
     },
     "/events/{event_key}": {
@@ -527,6 +984,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -687,6 +1160,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -784,6 +1273,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -906,6 +1411,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1038,6 +1559,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1177,6 +1714,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1304,6 +1857,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1418,6 +1987,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1548,6 +2133,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1656,6 +2257,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -1798,6 +2415,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -1917,6 +2550,22 @@
                 }
               },
               "X-APTOS-EPOCH": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
                 "required": true,
                 "deprecated": false,
                 "schema": {
@@ -2046,6 +2695,22 @@
                   "type": "integer",
                   "format": "uint64"
                 }
+              },
+              "X-APTOS-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
+              },
+              "X-APTOS-OLDEST-BLOCK-HEIGHT": {
+                "required": true,
+                "deprecated": false,
+                "schema": {
+                  "type": "integer",
+                  "format": "uint64"
+                }
               }
             }
           },
@@ -2104,8 +2769,8 @@
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "ed_25519_signature": "#/components/schemas/AccountSignature_Ed25519Signature",
-            "multi_ed_25519_signature": "#/components/schemas/AccountSignature_MultiEd25519Signature"
+            "ed25519_signature": "#/components/schemas/AccountSignature_Ed25519Signature",
+            "multi_ed25519_signature": "#/components/schemas/AccountSignature_MultiEd25519Signature"
           }
         }
       },
@@ -2119,7 +2784,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "ed_25519_signature"
+                "example": "ed25519_signature"
               }
             }
           },
@@ -2138,7 +2803,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "multi_ed_25519_signature"
+                "example": "multi_ed25519_signature"
               }
             }
           },
@@ -2151,7 +2816,7 @@
         "type": "string",
         "format": "hex",
         "description": "Hex encoded 32 byte Aptos account address",
-        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 "
       },
       "AptosError": {
         "type": "object",
@@ -2182,6 +2847,39 @@
           "invalid_limit_param"
         ]
       },
+      "Block": {
+        "type": "object",
+        "required": [
+          "block_height",
+          "block_hash",
+          "block_timestamp",
+          "first_version",
+          "last_version"
+        ],
+        "properties": {
+          "block_height": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "block_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "block_timestamp": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "first_version": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "last_version": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            }
+          }
+        }
+      },
       "BlockMetadataTransaction": {
         "type": "object",
         "required": [
@@ -2198,7 +2896,7 @@
           "epoch",
           "round",
           "events",
-          "previous_block_votes",
+          "previous_block_votes_bitvec",
           "proposer",
           "failed_proposer_indices",
           "timestamp"
@@ -2249,10 +2947,11 @@
               "$ref": "#/components/schemas/Event"
             }
           },
-          "previous_block_votes": {
+          "previous_block_votes_bitvec": {
             "type": "array",
             "items": {
-              "type": "boolean"
+              "type": "integer",
+              "format": "uint8"
             }
           },
           "proposer": {
@@ -2460,7 +3159,7 @@
         "type": "string",
         "format": "hex",
         "description": "Event key is a global index for an event stream.\n\nIt is hex-encoded BCS bytes of `EventHandle` `guid` field value, which is\na combination of a `uint64` creation number and account address (without\ntrimming leading zeros).\n\nFor example, event key `0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1` is combined by the following 2 parts:\n  1. `0000000000000000`: `uint64` representation of `0`.\n  2. `88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1`: 32 bytes of account address.\n",
-        "example": "0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+        "example": "0x000000000000000088fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 "
       },
       "GenesisPayload": {
         "type": "object",
@@ -2555,11 +3254,22 @@
       "HashValue": {
         "type": "string"
       },
+      "HealthCheckSuccess": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "HexEncodedBytes": {
         "type": "string",
         "format": "hex",
         "description": "All bytes (Vec<u8>) data is represented as hex-encoded string prefixed with `0x` and fulfilled with\ntwo hex digits per byte.\n\nUnlike the `Address` type, HexEncodedBytes will not trim any zeros.\n",
-        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1"
+        "example": "0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1 "
       },
       "IdentifierWrapper": {
         "type": "string"
@@ -2572,6 +3282,8 @@
           "epoch",
           "ledger_version",
           "oldest_ledger_version",
+          "block_height",
+          "oldest_block_height",
           "ledger_timestamp",
           "node_role"
         ],
@@ -2587,6 +3299,12 @@
             "$ref": "#/components/schemas/U64"
           },
           "oldest_ledger_version": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "block_height": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "oldest_block_height": {
             "$ref": "#/components/schemas/U64"
           },
           "ledger_timestamp": {
@@ -3306,8 +4024,8 @@
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "ed_25519_signature": "#/components/schemas/TransactionSignature_Ed25519Signature",
-            "multi_ed_25519_signature": "#/components/schemas/TransactionSignature_MultiEd25519Signature",
+            "ed25519_signature": "#/components/schemas/TransactionSignature_Ed25519Signature",
+            "multi_ed25519_signature": "#/components/schemas/TransactionSignature_MultiEd25519Signature",
             "multi_agent_signature": "#/components/schemas/TransactionSignature_MultiAgentSignature"
           }
         }
@@ -3322,7 +4040,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "ed_25519_signature"
+                "example": "ed25519_signature"
               }
             }
           },
@@ -3360,7 +4078,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "multi_ed_25519_signature"
+                "example": "multi_ed25519_signature"
               }
             }
           },

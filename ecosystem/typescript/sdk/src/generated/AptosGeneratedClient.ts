@@ -6,6 +6,7 @@ import type { OpenAPIConfig } from './core/OpenAPI';
 import { AxiosHttpRequest } from './core/AxiosHttpRequest';
 
 import { AccountsService } from './services/AccountsService';
+import { BlocksService } from './services/BlocksService';
 import { EventsService } from './services/EventsService';
 import { GeneralService } from './services/GeneralService';
 import { TablesService } from './services/TablesService';
@@ -16,6 +17,7 @@ type HttpRequestConstructor = new (config: OpenAPIConfig) => BaseHttpRequest;
 export class AptosGeneratedClient {
 
     public readonly accounts: AccountsService;
+    public readonly blocks: BlocksService;
     public readonly events: EventsService;
     public readonly general: GeneralService;
     public readonly tables: TablesService;
@@ -25,8 +27,8 @@ export class AptosGeneratedClient {
 
     constructor(config?: Partial<OpenAPIConfig>, HttpRequest: HttpRequestConstructor = AxiosHttpRequest) {
         this.request = new HttpRequest({
-            BASE: config?.BASE ?? '',
-            VERSION: config?.VERSION ?? '1.0.0',
+            BASE: config?.BASE ?? '/v1',
+            VERSION: config?.VERSION ?? '1.0.1',
             WITH_CREDENTIALS: config?.WITH_CREDENTIALS ?? false,
             CREDENTIALS: config?.CREDENTIALS ?? 'include',
             TOKEN: config?.TOKEN,
@@ -37,6 +39,7 @@ export class AptosGeneratedClient {
         });
 
         this.accounts = new AccountsService(this.request);
+        this.blocks = new BlocksService(this.request);
         this.events = new EventsService(this.request);
         this.general = new GeneralService(this.request);
         this.tables = new TablesService(this.request);

@@ -133,11 +133,12 @@ impl Events {
     }
 
     pub fn list(self, page: Page, accept_type: AcceptType) -> Result<impl Reply, Error> {
+        let ledger_version = self.ledger_info.version();
         let events = self.context.get_events(
             &self.key,
-            page.start(0, u64::MAX)?,
+            page.start_option()?,
             page.limit()?,
-            self.ledger_info.version(),
+            ledger_version,
         )?;
 
         match accept_type {

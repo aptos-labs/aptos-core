@@ -4,6 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class ApplicationMailer < ActionMailer::Base
-  default from: 'from@example.com'
+  default from: 'community@aptoslabs.com'
   layout 'mailer'
 end

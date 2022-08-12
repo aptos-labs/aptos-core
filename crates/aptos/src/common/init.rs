@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::types::ConfigSearchMode;
 use crate::common::{
     types::{
         account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
@@ -15,7 +16,7 @@ use clap::Parser;
 use reqwest::Url;
 use std::collections::HashMap;
 
-pub const DEFAULT_REST_URL: &str = "https://fullnode.devnet.aptoslabs.com";
+pub const DEFAULT_REST_URL: &str = "https://fullnode.devnet.aptoslabs.com/v1";
 pub const DEFAULT_FAUCET_URL: &str = "https://faucet.devnet.aptoslabs.com";
 const NUM_DEFAULT_COINS: u64 = 10000;
 
@@ -52,8 +53,8 @@ impl CliCommand<()> for InitTool {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let mut config = if CliConfig::config_exists() {
-            CliConfig::load()?
+        let mut config = if CliConfig::config_exists(ConfigSearchMode::CurrentDir) {
+            CliConfig::load(ConfigSearchMode::CurrentDir)?
         } else {
             CliConfig::default()
         };

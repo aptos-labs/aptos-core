@@ -32,6 +32,7 @@ Rails.application.routes.draw do
 
   # CMS
   resources :articles, param: :slug, only: %i[index show]
+  resources :network_operations, only: %i[index show]
 
   # Settings
   get 'settings', to: redirect('/settings/profile')
@@ -57,7 +58,7 @@ Rails.application.routes.draw do
   get 'health', to: 'health#health'
 
   # IT3
-  resource :it3, only: %i[show]
+  resource :it3, only: %i[show update]
   resources :it3_profiles, except: %i[index destroy]
   resources :it3_surveys, except: %i[index destroy]
 

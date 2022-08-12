@@ -20,7 +20,7 @@ reqwest = { version = "0.11.10", features = ["json"] }
 serde_json = "1.0.81"
 tokio = { version = "1.18.2", features = ["full"] }
 
-aptos = { path = "../../crates/aptos" }
+aptos = { path = "../../crates/aptos", features = ["fuzzing"] }
 aptos-config = { path = "../../config" }
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-faucet = { path = "../../crates/aptos-faucet" }
@@ -40,6 +40,7 @@ consensus = { path = "../../consensus" }
 forge = { path = "../forge" }
 framework = { path = "../../aptos-move/framework" }
 move-deps = { path = "../../aptos-move/move-deps" }
+state-sync-driver = { path = "../../state-sync/state-sync-v2/state-sync-driver" }
 
 [dev-dependencies]
 base64 = "0.13.0"
@@ -61,11 +62,3 @@ aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-vault-client = { path = "../../secure/storage/vault", features = ["fuzzing"] }
 aptos-writeset-generator = { path = "../../aptos-move/writeset-transaction-generator" }
 backup-cli = { path = "../../storage/backup/backup-cli" }
-
-[[test]]
-name = "forge"
-harness = false
-
-[[test]]
-name = "forge-aptos"
-harness = false

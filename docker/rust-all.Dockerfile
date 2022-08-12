@@ -24,6 +24,13 @@ RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely ju
 
 COPY --link . /aptos/
 
+RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarch_64/g") \
+    && curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v21.5/protoc-21.5-linux-$ARCHITECTURE.zip" \
+    && unzip -o "protoc-21.5-linux-$ARCHITECTURE.zip" -d /usr/local bin/protoc \
+    && unzip -o "protoc-21.5-linux-$ARCHITECTURE.zip" -d /usr/local 'include/*' \
+    && chmod +x "/usr/local/bin/protoc" \
+    && rm "protoc-21.5-linux-$ARCHITECTURE.zip"
+
 RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOME/registry docker/build-rust-all.sh && rm -rf $CARGO_HOME/registry/index
 
 ### Validator Image ###
@@ -59,6 +66,8 @@ ENV RUST_BACKTRACE 1
 ENV RUST_LOG_FORMAT=json
 
 # add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
@@ -79,6 +88,8 @@ COPY --link --from=builder /aptos/dist/aptos-indexer /usr/local/bin/aptos-indexe
 ENV RUST_LOG_FORMAT=json
 
 # add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
@@ -99,6 +110,8 @@ COPY --link --from=builder /aptos/dist/aptos-node-checker /usr/local/bin/aptos-n
 ENV RUST_LOG_FORMAT=json
 
 # add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
@@ -143,6 +156,8 @@ RUN mv /aptos-framework/move/build/AptosFramework/bytecode_modules/dependencies/
 RUN rm -rf /aptos-framework/move/build
 
 # add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
@@ -169,6 +184,8 @@ EXPOSE 8000
 ENV RUST_LOG_FORMAT=json
 
 # add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
@@ -197,6 +214,8 @@ COPY --link --from=builder /aptos/dist/forge /usr/local/bin/forge
 ENV RUST_LOG_FORMAT=json
 
 # add build info
+ARG BUILD_DATE
+ENV BUILD_DATE ${BUILD_DATE}
 ARG GIT_TAG
 ENV GIT_TAG ${GIT_TAG}
 ARG GIT_BRANCH
@@ -205,3 +224,23 @@ ARG GIT_SHA
 ENV GIT_SHA ${GIT_SHA}
 
 ENTRYPOINT ["/tini", "--", "forge"]
+
+### Telemetry Service Image ###
+
+FROM debian-base AS telemetry-service
+
+RUN apt-get update && apt-get install -y libssl1.1 ca-certificates net-tools tcpdump iproute2 netcat libpq-dev \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
+COPY --link --from=builder /aptos/dist/aptos-telemetry-service /usr/local/bin/aptos-telemetry-service
+
+EXPOSE 8000
+ENV RUST_LOG_FORMAT=json
+
+# add build info
+ARG GIT_TAG
+ENV GIT_TAG ${GIT_TAG}
+ARG GIT_BRANCH
+ENV GIT_BRANCH ${GIT_BRANCH}
+ARG GIT_SHA
+ENV GIT_SHA ${GIT_SHA}
