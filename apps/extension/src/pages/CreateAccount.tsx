@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import AuthLayout from 'core/layouts/AuthLayout';
 import Routes, { Routes as PageRoutes } from 'core/routes';
 import CreateAccountBody from 'core/components/CreateAccountBody';
@@ -18,10 +18,12 @@ function CreateAccount() {
   const { addAccount } = useGlobalStateContext();
   const { fundAccount } = useFundAccount();
   const newMnemonic = useMemo(() => generateMnemonic(), []);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const onSubmit = async (data: CreateAccountFormValues, event?: React.BaseSyntheticEvent) => {
     const { mnemonicString, secretRecoveryPhrase } = data;
     event?.preventDefault();
+    setIsLoading(true);
 
     if (secretRecoveryPhrase) {
       try {
@@ -53,6 +55,7 @@ function CreateAccount() {
         console.error(err);
       }
     }
+    setIsLoading(false);
   };
 
   return (
@@ -67,7 +70,7 @@ function CreateAccount() {
         }}
         onSubmit={onSubmit}
       >
-        <CreateAccountBody />
+        <CreateAccountBody isLoading={isLoading} />
       </CreateAccountLayout>
     </AuthLayout>
   );

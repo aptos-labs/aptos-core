@@ -13,7 +13,11 @@ import SecretRecoveryPhraseBody from './SecretRecoveryPhraseBody';
 
 zxcvbnOptions.setOptions(passwordOptions);
 
-export default function CreateAccountBody() {
+interface Props {
+  isLoading: boolean
+}
+
+export default function CreateAccountBody({ isLoading }: Props) {
   const { watch } = useFormContext<CreateAccountFormValues>();
   const secretRecoveryPhrase = watch('secretRecoveryPhrase');
 
@@ -25,6 +29,7 @@ export default function CreateAccountBody() {
           colorScheme="teal"
           type="submit"
           isDisabled={!secretRecoveryPhrase}
+          isLoading={isLoading}
           px={8}
         >
           Submit
