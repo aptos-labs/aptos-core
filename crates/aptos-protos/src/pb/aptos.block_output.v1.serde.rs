@@ -756,9 +756,6 @@ impl serde::Serialize for MoveModuleOutput {
         if !self.address.is_empty() {
             len += 1;
         }
-        if !self.state_key_hash.is_empty() {
-            len += 1;
-        }
         if !self.bytecode.is_empty() {
             len += 1;
         }
@@ -774,6 +771,9 @@ impl serde::Serialize for MoveModuleOutput {
         if self.is_deleted {
             len += 1;
         }
+        if self.wsc_index != 0 {
+            len += 1;
+        }
         let mut struct_ser =
             serializer.serialize_struct("aptos.block_output.v1.MoveModuleOutput", len)?;
         if !self.name.is_empty() {
@@ -781,12 +781,6 @@ impl serde::Serialize for MoveModuleOutput {
         }
         if !self.address.is_empty() {
             struct_ser.serialize_field("address", &self.address)?;
-        }
-        if !self.state_key_hash.is_empty() {
-            struct_ser.serialize_field(
-                "stateKeyHash",
-                pbjson::private::base64::encode(&self.state_key_hash).as_str(),
-            )?;
         }
         if !self.bytecode.is_empty() {
             struct_ser.serialize_field(
@@ -806,6 +800,10 @@ impl serde::Serialize for MoveModuleOutput {
         if self.is_deleted {
             struct_ser.serialize_field("isDeleted", &self.is_deleted)?;
         }
+        if self.wsc_index != 0 {
+            struct_ser
+                .serialize_field("wscIndex", ToString::to_string(&self.wsc_index).as_str())?;
+        }
         struct_ser.end()
     }
 }
@@ -818,24 +816,24 @@ impl<'de> serde::Deserialize<'de> for MoveModuleOutput {
         const FIELDS: &[&str] = &[
             "name",
             "address",
-            "stateKeyHash",
             "bytecode",
             "friends",
             "exposedFunctions",
             "structs",
             "isDeleted",
+            "wscIndex",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Name,
             Address,
-            StateKeyHash,
             Bytecode,
             Friends,
             ExposedFunctions,
             Structs,
             IsDeleted,
+            WscIndex,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -862,12 +860,12 @@ impl<'de> serde::Deserialize<'de> for MoveModuleOutput {
                         match value {
                             "name" => Ok(GeneratedField::Name),
                             "address" => Ok(GeneratedField::Address),
-                            "stateKeyHash" => Ok(GeneratedField::StateKeyHash),
                             "bytecode" => Ok(GeneratedField::Bytecode),
                             "friends" => Ok(GeneratedField::Friends),
                             "exposedFunctions" => Ok(GeneratedField::ExposedFunctions),
                             "structs" => Ok(GeneratedField::Structs),
                             "isDeleted" => Ok(GeneratedField::IsDeleted),
+                            "wscIndex" => Ok(GeneratedField::WscIndex),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -889,12 +887,12 @@ impl<'de> serde::Deserialize<'de> for MoveModuleOutput {
             {
                 let mut name__ = None;
                 let mut address__ = None;
-                let mut state_key_hash__ = None;
                 let mut bytecode__ = None;
                 let mut friends__ = None;
                 let mut exposed_functions__ = None;
                 let mut structs__ = None;
                 let mut is_deleted__ = None;
+                let mut wsc_index__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Name => {
@@ -908,15 +906,6 @@ impl<'de> serde::Deserialize<'de> for MoveModuleOutput {
                                 return Err(serde::de::Error::duplicate_field("address"));
                             }
                             address__ = Some(map.next_value()?);
-                        }
-                        GeneratedField::StateKeyHash => {
-                            if state_key_hash__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("stateKeyHash"));
-                            }
-                            state_key_hash__ = Some(
-                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
-                                    .0,
-                            );
                         }
                         GeneratedField::Bytecode => {
                             if bytecode__.is_some() {
@@ -951,17 +940,26 @@ impl<'de> serde::Deserialize<'de> for MoveModuleOutput {
                             }
                             is_deleted__ = Some(map.next_value()?);
                         }
+                        GeneratedField::WscIndex => {
+                            if wsc_index__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("wscIndex"));
+                            }
+                            wsc_index__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?
+                                    .0,
+                            );
+                        }
                     }
                 }
                 Ok(MoveModuleOutput {
                     name: name__.unwrap_or_default(),
                     address: address__.unwrap_or_default(),
-                    state_key_hash: state_key_hash__.unwrap_or_default(),
                     bytecode: bytecode__.unwrap_or_default(),
                     friends: friends__.unwrap_or_default(),
                     exposed_functions: exposed_functions__.unwrap_or_default(),
                     structs: structs__.unwrap_or_default(),
                     is_deleted: is_deleted__.unwrap_or_default(),
+                    wsc_index: wsc_index__.unwrap_or_default(),
                 })
             }
         }
@@ -998,6 +996,9 @@ impl serde::Serialize for MoveResourceOutput {
         if self.is_deleted {
             len += 1;
         }
+        if self.wsc_index != 0 {
+            len += 1;
+        }
         let mut struct_ser =
             serializer.serialize_struct("aptos.block_output.v1.MoveResourceOutput", len)?;
         if !self.address.is_empty() {
@@ -1018,6 +1019,10 @@ impl serde::Serialize for MoveResourceOutput {
         if self.is_deleted {
             struct_ser.serialize_field("isDeleted", &self.is_deleted)?;
         }
+        if self.wsc_index != 0 {
+            struct_ser
+                .serialize_field("wscIndex", ToString::to_string(&self.wsc_index).as_str())?;
+        }
         struct_ser.end()
     }
 }
@@ -1034,6 +1039,7 @@ impl<'de> serde::Deserialize<'de> for MoveResourceOutput {
             "genericTypeParams",
             "data",
             "isDeleted",
+            "wscIndex",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -1044,6 +1050,7 @@ impl<'de> serde::Deserialize<'de> for MoveResourceOutput {
             GenericTypeParams,
             Data,
             IsDeleted,
+            WscIndex,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1074,6 +1081,7 @@ impl<'de> serde::Deserialize<'de> for MoveResourceOutput {
                             "genericTypeParams" => Ok(GeneratedField::GenericTypeParams),
                             "data" => Ok(GeneratedField::Data),
                             "isDeleted" => Ok(GeneratedField::IsDeleted),
+                            "wscIndex" => Ok(GeneratedField::WscIndex),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1099,6 +1107,7 @@ impl<'de> serde::Deserialize<'de> for MoveResourceOutput {
                 let mut generic_type_params__ = None;
                 let mut data__ = None;
                 let mut is_deleted__ = None;
+                let mut wsc_index__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::Address => {
@@ -1137,6 +1146,15 @@ impl<'de> serde::Deserialize<'de> for MoveResourceOutput {
                             }
                             is_deleted__ = Some(map.next_value()?);
                         }
+                        GeneratedField::WscIndex => {
+                            if wsc_index__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("wscIndex"));
+                            }
+                            wsc_index__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?
+                                    .0,
+                            );
+                        }
                     }
                 }
                 Ok(MoveResourceOutput {
@@ -1146,6 +1164,7 @@ impl<'de> serde::Deserialize<'de> for MoveResourceOutput {
                     generic_type_params: generic_type_params__.unwrap_or_default(),
                     data: data__.unwrap_or_default(),
                     is_deleted: is_deleted__.unwrap_or_default(),
+                    wsc_index: wsc_index__.unwrap_or_default(),
                 })
             }
         }
@@ -1449,9 +1468,6 @@ impl serde::Serialize for TableItemOutput {
     {
         use serde::ser::SerializeStruct;
         let mut len = 0;
-        if !self.state_key_hash.is_empty() {
-            len += 1;
-        }
         if !self.handle.is_empty() {
             len += 1;
         }
@@ -1473,14 +1489,11 @@ impl serde::Serialize for TableItemOutput {
         if self.is_deleted {
             len += 1;
         }
+        if self.wsc_index != 0 {
+            len += 1;
+        }
         let mut struct_ser =
             serializer.serialize_struct("aptos.block_output.v1.TableItemOutput", len)?;
-        if !self.state_key_hash.is_empty() {
-            struct_ser.serialize_field(
-                "stateKeyHash",
-                pbjson::private::base64::encode(&self.state_key_hash).as_str(),
-            )?;
-        }
         if !self.handle.is_empty() {
             struct_ser.serialize_field("handle", &self.handle)?;
         }
@@ -1502,6 +1515,10 @@ impl serde::Serialize for TableItemOutput {
         if self.is_deleted {
             struct_ser.serialize_field("isDeleted", &self.is_deleted)?;
         }
+        if self.wsc_index != 0 {
+            struct_ser
+                .serialize_field("wscIndex", ToString::to_string(&self.wsc_index).as_str())?;
+        }
         struct_ser.end()
     }
 }
@@ -1512,7 +1529,6 @@ impl<'de> serde::Deserialize<'de> for TableItemOutput {
         D: serde::Deserializer<'de>,
     {
         const FIELDS: &[&str] = &[
-            "stateKeyHash",
             "handle",
             "key",
             "decodedKey",
@@ -1520,11 +1536,11 @@ impl<'de> serde::Deserialize<'de> for TableItemOutput {
             "decodedValue",
             "valueType",
             "isDeleted",
+            "wscIndex",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
-            StateKeyHash,
             Handle,
             Key,
             DecodedKey,
@@ -1532,6 +1548,7 @@ impl<'de> serde::Deserialize<'de> for TableItemOutput {
             DecodedValue,
             ValueType,
             IsDeleted,
+            WscIndex,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -1556,7 +1573,6 @@ impl<'de> serde::Deserialize<'de> for TableItemOutput {
                         E: serde::de::Error,
                     {
                         match value {
-                            "stateKeyHash" => Ok(GeneratedField::StateKeyHash),
                             "handle" => Ok(GeneratedField::Handle),
                             "key" => Ok(GeneratedField::Key),
                             "decodedKey" => Ok(GeneratedField::DecodedKey),
@@ -1564,6 +1580,7 @@ impl<'de> serde::Deserialize<'de> for TableItemOutput {
                             "decodedValue" => Ok(GeneratedField::DecodedValue),
                             "valueType" => Ok(GeneratedField::ValueType),
                             "isDeleted" => Ok(GeneratedField::IsDeleted),
+                            "wscIndex" => Ok(GeneratedField::WscIndex),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -1583,7 +1600,6 @@ impl<'de> serde::Deserialize<'de> for TableItemOutput {
             where
                 V: serde::de::MapAccess<'de>,
             {
-                let mut state_key_hash__ = None;
                 let mut handle__ = None;
                 let mut key__ = None;
                 let mut decoded_key__ = None;
@@ -1591,17 +1607,9 @@ impl<'de> serde::Deserialize<'de> for TableItemOutput {
                 let mut decoded_value__ = None;
                 let mut value_type__ = None;
                 let mut is_deleted__ = None;
+                let mut wsc_index__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
-                        GeneratedField::StateKeyHash => {
-                            if state_key_hash__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("stateKeyHash"));
-                            }
-                            state_key_hash__ = Some(
-                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
-                                    .0,
-                            );
-                        }
                         GeneratedField::Handle => {
                             if handle__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("handle"));
@@ -1644,10 +1652,18 @@ impl<'de> serde::Deserialize<'de> for TableItemOutput {
                             }
                             is_deleted__ = Some(map.next_value()?);
                         }
+                        GeneratedField::WscIndex => {
+                            if wsc_index__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("wscIndex"));
+                            }
+                            wsc_index__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?
+                                    .0,
+                            );
+                        }
                     }
                 }
                 Ok(TableItemOutput {
-                    state_key_hash: state_key_hash__.unwrap_or_default(),
                     handle: handle__.unwrap_or_default(),
                     key: key__.unwrap_or_default(),
                     decoded_key: decoded_key__.unwrap_or_default(),
@@ -1655,6 +1671,7 @@ impl<'de> serde::Deserialize<'de> for TableItemOutput {
                     decoded_value: decoded_value__.unwrap_or_default(),
                     value_type: value_type__.unwrap_or_default(),
                     is_deleted: is_deleted__.unwrap_or_default(),
+                    wsc_index: wsc_index__.unwrap_or_default(),
                 })
             }
         }

@@ -106,13 +106,13 @@ message WriteSetChangeOutput {
 message MoveModuleOutput {
   string name = 1;
   string address = 2;
-  bytes state_key_hash = 3;
-  bytes bytecode = 4;
-  repeated string friends = 5;
+  bytes bytecode = 3;
+  repeated string friends = 4;
   // this can be better
-  repeated string exposed_functions = 6;
-  repeated string structs = 7;
-  bool is_deleted = 8;
+  repeated string exposed_functions = 5;
+  repeated string structs = 6;
+  bool is_deleted = 7;
+  uint64 wsc_index = 8;
 }
 
 message MoveResourceOutput {
@@ -122,15 +122,16 @@ message MoveResourceOutput {
   repeated string generic_type_params = 4;
   string data = 5;
   bool is_deleted = 6;
+  uint64 wsc_index = 8;
 }
 
 message TableItemOutput {
-  bytes state_key_hash = 1;
-  string handle = 2;
-  string key = 3;
-  string decoded_key = 4;
-  string key_type = 5;
-  string decoded_value = 6;
-  string value_type = 7;
-  bool is_deleted = 8;
+  string handle = 1;
+  string key = 2;
+  string decoded_key = 3;
+  string key_type = 4;
+  string decoded_value = 5;
+  string value_type = 6;
+  bool is_deleted = 7;
+  uint64 wsc_index = 8;
 }

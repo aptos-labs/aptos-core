@@ -3,16 +3,19 @@
 
 use aptos_protos::{
     block_output::v1::{
-        BlockMetadataTransactionOutput, EventKeyOutput, EventOutput, GenesisTransactionOutput,
-        SignatureOutput, TransactionInfoOutput, UserTransactionOutput, WriteSetChangeOutput,
+        write_set_change_output::Change as ChangeOutput, BlockMetadataTransactionOutput,
+        EventKeyOutput, EventOutput, GenesisTransactionOutput, MoveModuleOutput,
+        MoveResourceOutput, SignatureOutput, TableItemOutput, TransactionInfoOutput,
+        UserTransactionOutput, WriteSetChangeOutput,
     },
     extractor::v1::{
         account_signature::Signature as AccountSignature,
         signature::{Signature, Type as SignatureType},
         transaction::TransactionType,
-        BlockMetadataTransaction, Ed25519Signature, Event, GenesisTransaction, MultiAgentSignature,
-        MultiEd25519Signature, Transaction, TransactionInfo, UserTransaction,
-        UserTransactionRequest,
+        write_set_change::{Change as ChangeInput, Type as WriteSetChangeType},
+        BlockMetadataTransaction, Ed25519Signature, Event, GenesisTransaction, MoveResource,
+        MoveStructTag, MultiAgentSignature, MultiEd25519Signature, Transaction, TransactionInfo,
+        UserTransaction, UserTransactionRequest,
     },
 };
 
@@ -60,7 +63,7 @@ pub fn get_user_transaction_output(
 ) -> Result<UserTransactionOutput> {
     if let Some(user_request) = &user_txn.request {
         let mut signature_type = String::new();
-        let mut signatures = vec![];
+        let mut signatures = Vec::default();
         if let Some(signature) = &user_request.signature {
             signature_type = get_signature_type(signature.r#type());
             if let Some(signature) = &signature.signature {
@@ -113,8 +116,23 @@ pub fn get_events_output(
         .collect()
 }
 
-pub fn get_write_set_changes_output(_input_txn: &Transaction) -> Result<Vec<WriteSetChangeOutput>> {
-    Ok(vec![])
+pub fn get_write_set_changes_output(
+    transaction_info: &TransactionInfo,
+) -> Result<Vec<WriteSetChangeOutput>> {
+    let mut wsc_out = Vec::default();
+    for (index, wsc) in transaction_info.changes.iter().enumerate() {
+        if let Some(c) = &wsc.change {
+            let hash = get_state_key_hash(c);
+            let change = get_change_output(c, index as u64);
+            wsc_out.push(WriteSetChangeOutput {
+                transaction_hash: transaction_info.hash.clone(),
+                hash,
+                r#type: get_write_set_change_type(wsc.r#type()),
+                change: Some(change),
+            });
+        }
+    }
+    Ok(wsc_out)
 }
 
 pub fn get_transaction_type(t: TransactionType) -> String {
@@ -131,6 +149,17 @@ pub fn get_signature_type(t: SignatureType) -> String {
         SignatureType::Ed25519 => String::from("ed25519_signature"),
         SignatureType::MultiEd25519 => String::from("multi_ed25519_signature"),
         SignatureType::MultiAgent => String::from("multi_agent_signature"),
+    }
+}
+
+pub fn get_write_set_change_type(t: WriteSetChangeType) -> String {
+    match t {
+        WriteSetChangeType::DeleteModule => String::from("delete_module"),
+        WriteSetChangeType::DeleteResource => String::from("delete_resource"),
+        WriteSetChangeType::DeleteTableItem => String::from("delete_table_item"),
+        WriteSetChangeType::WriteModule => String::from("write_module"),
+        WriteSetChangeType::WriteResource => String::from("write_resource"),
+        WriteSetChangeType::WriteTableItem => String::from("write_table_item"),
     }
 }
 
@@ -167,7 +196,7 @@ fn parse_single_signature(
         public_key: s.public_key.clone(),
         signature: s.signature.clone(),
         threshold: 1,
-        bitmap: vec![],
+        bitmap: Vec::default(),
         multi_agent_index,
         multi_sig_index: 0,
     }
@@ -181,7 +210,7 @@ fn parse_multi_signature(
     multi_agent_index: u32,
     override_address: Option<&String>,
 ) -> Vec<SignatureOutput> {
-    let mut signatures = vec![];
+    let mut signatures = Vec::default();
     let mut signer = &request.sender;
     if let Some(addr) = override_address {
         signer = addr;
@@ -209,7 +238,7 @@ fn parse_multi_agent_signature(
     request: &UserTransactionRequest,
     info: &TransactionInfoOutput,
 ) -> Result<Vec<SignatureOutput>> {
-    let mut signatures = vec![];
+    let mut signatures = Vec::default();
     // process sender signature
     if let Some(signature) = &s.sender {
         match &signature.signature {
@@ -266,5 +295,131 @@ fn parse_multi_agent_signature_helper(
             multi_agent_index,
             override_address,
         ),
+    }
+}
+
+fn get_change_output(change: &ChangeInput, index: u64) -> ChangeOutput {
+    match change {
+        ChangeInput::DeleteModule(item) => ChangeOutput::MoveModule(MoveModuleOutput {
+            address: item.address.clone(),
+            name: item.module.clone().unwrap_or_default().name,
+            bytecode: Vec::default(),
+            friends: Vec::default(),
+            exposed_functions: Vec::default(),
+            structs: Vec::default(),
+            is_deleted: true,
+            wsc_index: index,
+        }),
+        ChangeInput::WriteModule(item) => {
+            let abi = item
+                .data
+                .clone()
+                .unwrap_or_default()
+                .abi
+                .unwrap_or_default();
+            let friends = match abi
+                .friends
+                .iter()
+                .map(|module_id| serde_json::to_string(module_id))
+                .collect()
+            {
+                Ok(res) => res,
+                _ => Vec::default(),
+            };
+            let exposed_functions = match abi
+                .exposed_functions
+                .iter()
+                .map(|module_id| serde_json::to_string(module_id))
+                .collect()
+            {
+                Ok(res) => res,
+                _ => Vec::default(),
+            };
+            let structs = match abi
+                .structs
+                .iter()
+                .map(|module_id| serde_json::to_string(module_id))
+                .collect()
+            {
+                Ok(res) => res,
+                _ => Vec::default(),
+            };
+            ChangeOutput::MoveModule(MoveModuleOutput {
+                address: item.address.clone(),
+                name: abi.name,
+                bytecode: item.data.clone().unwrap_or_default().bytecode,
+                friends,
+                exposed_functions,
+                structs,
+                is_deleted: false,
+                wsc_index: index,
+            })
+        }
+        ChangeInput::DeleteResource(item) => ChangeOutput::MoveResource(MoveResourceOutput {
+            address: item.address.clone(),
+            name: item.resource.clone().unwrap_or_default().name,
+            module: item.resource.clone().unwrap_or_default().module,
+            generic_type_params: Vec::default(),
+            data: String::default(),
+            is_deleted: true,
+            wsc_index: index,
+        }),
+        ChangeInput::WriteResource(item) => {
+            let data = item.data.clone().unwrap_or(MoveResource {
+                r#type: Some(MoveStructTag::default()),
+                data: String::default(),
+            });
+            let struct_tag = data.r#type.clone().unwrap_or_default();
+            ChangeOutput::MoveResource(MoveResourceOutput {
+                address: item.address.clone(),
+                name: struct_tag.name,
+                module: struct_tag.module,
+                generic_type_params: struct_tag
+                    .generic_type_params
+                    .iter()
+                    .map(|param| serde_json::to_string(param).unwrap_or_default())
+                    .collect(),
+                data: data.data.clone(),
+                is_deleted: false,
+                wsc_index: index,
+            })
+        }
+        ChangeInput::DeleteTableItem(item) => {
+            let data = item.data.clone().unwrap_or_default();
+            ChangeOutput::TableItem(TableItemOutput {
+                handle: item.handle.clone(),
+                key: item.key.clone(),
+                decoded_key: data.key,
+                key_type: data.key_type,
+                decoded_value: String::default(),
+                value_type: String::default(),
+                is_deleted: true,
+                wsc_index: index,
+            })
+        }
+        ChangeInput::WriteTableItem(item) => {
+            let data = item.data.clone().unwrap_or_default();
+            ChangeOutput::TableItem(TableItemOutput {
+                handle: item.handle.clone(),
+                key: item.key.clone(),
+                decoded_key: data.key,
+                key_type: data.key_type,
+                decoded_value: data.value,
+                value_type: data.value_type,
+                is_deleted: false,
+                wsc_index: index,
+            })
+        }
+    }
+}
+
+fn get_state_key_hash(change: &ChangeInput) -> Vec<u8> {
+    match change {
+        ChangeInput::DeleteModule(item) => item.state_key_hash.clone(),
+        ChangeInput::DeleteResource(item) => item.state_key_hash.clone(),
+        ChangeInput::DeleteTableItem(item) => item.state_key_hash.clone(),
+        ChangeInput::WriteModule(item) => item.state_key_hash.clone(),
+        ChangeInput::WriteResource(item) => item.state_key_hash.clone(),
+        ChangeInput::WriteTableItem(item) => item.state_key_hash.clone(),
     }
 }
