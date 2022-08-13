@@ -666,7 +666,9 @@ fn reject_invalid_failed_authors() {
             .process_proposal_msg(missing_failed_authors_proposal)
             .await
             .is_err());
+    });
 
+    timed_block_on(&mut runtime, async {
         assert!(node
             .round_manager
             .process_proposal_msg(wrong_failed_authors_proposal)
