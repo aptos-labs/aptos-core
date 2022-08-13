@@ -169,10 +169,14 @@ impl BufferManager {
             ordered_proof,
             callback,
         } = ordered_blocks;
-        debug!("Receive ordered block {}", ordered_proof.commit_info());
 
         let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
+        info!(
+            "Receive ordered block {}, the queue size is {}",
+            ordered_proof.commit_info(),
+            self.buffer.len()
+        );
     }
 
     /// Set the execution root to the first not executed item (Ordered) and send execution request
@@ -184,7 +188,7 @@ impl BufferManager {
             .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
                 item.is_ordered()
             });
-        debug!(
+        info!(
             "Advance execution root from {:?} to {:?}",
             cursor, self.execution_root
         );
@@ -212,7 +216,7 @@ impl BufferManager {
             .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
                 item.is_executed()
             });
-        debug!(
+        info!(
             "Advance signing root from {:?} to {:?}",
             cursor, self.signing_root
         );
@@ -280,7 +284,7 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
-                debug!("Advance head to {:?}", self.buffer.head_cursor());
+                info!("Advance head to {:?}", self.buffer.head_cursor());
                 return;
             }
         }
@@ -305,11 +309,12 @@ impl BufferManager {
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
     async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, stop } = request;
-        debug!("Receive reset");
+        info!("Receive reset");
 
         self.stop = stop;
         self.reset().await;
         tx.send(sync_ack_new()).unwrap();
+        info!("Reset finishes");
     }
 
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
@@ -328,7 +333,7 @@ impl BufferManager {
                 return;
             }
         };
-        debug!(
+        info!(
             "Receive executed response {}",
             executed_blocks.last().unwrap().block_info()
         );
@@ -355,7 +360,7 @@ impl BufferManager {
                 return;
             }
         };
-        debug!(
+        info!(
             "Receive signing response {}",
             commit_ledger_info.commit_info()
         );
@@ -409,7 +414,7 @@ impl BufferManager {
             }
             VerifiedEvent::CommitDecision(commit_proof) => {
                 let target_block_id = commit_proof.ledger_info().commit_info().id();
-                debug!(
+                info!(
                     "Receive commit decision {}",
                     commit_proof.ledger_info().commit_info()
                 );
