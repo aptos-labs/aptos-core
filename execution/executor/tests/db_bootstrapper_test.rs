@@ -236,6 +236,7 @@ fn test_new_genesis() {
                 WriteOp::Value(
                     bcs::to_bytes(&CoinStoreResource::new(
                         1_000_000,
+                        false,
                         EventHandle::random(0),
                         EventHandle::random(0),
                     ))
