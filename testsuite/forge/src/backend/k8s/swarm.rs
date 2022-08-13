@@ -61,7 +61,7 @@ impl K8sSwarm {
         let client = validators.values().next().unwrap().rest_client();
         let key = load_root_key(root_key);
         let account_key = AccountKey::from_private_key(key);
-        let address = aptos_sdk::types::account_config::aptos_root_address();
+        let address = aptos_sdk::types::account_config::aptos_test_root_address();
         let sequence_number = query_sequence_numbers(&client, &[address])
             .await
             .map_err(|e| {
