@@ -87,7 +87,7 @@ impl Display for TwoChainTimeout {
 
 /// Validators sign this structure that allows the TwoChainTimeoutCertificate to store a round number
 /// instead of a quorum cert per validator in the signatures field.
-#[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+#[derive(Serialize, Deserialize, Debug, CryptoHasher, BCSCryptoHash)]
 pub struct TimeoutSigningRepr {
     pub epoch: u64,
     pub round: Round,
@@ -252,9 +252,12 @@ impl TwoChainTimeoutWithPartialSignatures {
     pub fn aggregate_signatures(
         &self,
         verifier: &ValidatorVerifier,
+        verify: bool,
     ) -> Result<TwoChainTimeoutWithSignatures, VerifyError> {
-        let (partial_sign, rounds) = self.signatures.get_partial_sig_with_rounds();
-        let timeout_messages: Vec<_> = rounds
+        let (partial_sign, ordered_rounds) = self
+            .signatures
+            .get_partial_sig_with_rounds(verifier.address_to_validator_index());
+        let timeout_messages: Vec<_> = ordered_rounds
             .iter()
             .map(|round| TimeoutSigningRepr {
                 epoch: self.timeout.epoch(),
@@ -264,10 +267,13 @@ impl TwoChainTimeoutWithPartialSignatures {
             .collect();
         let timeout_messages_ref: Vec<_> = timeout_messages.iter().collect();
         let aggregated_sig =
-            verifier.generate_aggregated_signature(&partial_sign, &timeout_messages_ref)?;
+            verifier.generate_aggregated_signature(&partial_sign, &timeout_messages_ref, verify)?;
         Ok(TwoChainTimeoutWithSignatures {
             timeout: self.timeout.clone(),
-            signatures_with_rounds: AggregatedSignatureWithRounds::new(aggregated_sig, rounds),
+            signatures_with_rounds: AggregatedSignatureWithRounds::new(
+                aggregated_sig,
+                ordered_rounds,
+            ),
         })
     }
 }
@@ -314,22 +320,21 @@ fn test_2chain_timeout_certificate() {
     }
 
     let tc_with_sig = tc_with_partial_sig
-        .aggregate_signatures(&validators)
+        .aggregate_signatures(&validators, false)
         .unwrap();
-
     tc_with_sig.verify(&validators).unwrap();
 
     // timeout round < hqc round
-    let mut invalid_timeout_cert = tc_with_partial_sig.clone();
-    invalid_timeout_cert.timeout.round = 1;
+    let mut invalid_tc_with_partial_sig = tc_with_partial_sig.clone();
+    invalid_tc_with_partial_sig.timeout.round = 1;
 
-    let invalid_tc_with_sig = tc_with_partial_sig
-        .aggregate_signatures(&validators)
+    let invalid_tc_with_sig = invalid_tc_with_partial_sig
+        .aggregate_signatures(&validators, false)
         .unwrap();
     invalid_tc_with_sig.verify(&validators).unwrap_err();
 
     // invalid signature
-    let mut invalid_timeout_cert = tc_with_partial_sig.clone();
+    let mut invalid_timeout_cert = invalid_tc_with_partial_sig.clone();
     invalid_timeout_cert.signatures.replace_signature(
         signers[0].author(),
         0,
@@ -337,35 +342,35 @@ fn test_2chain_timeout_certificate() {
     );
 
     let invalid_tc_with_sig = invalid_timeout_cert
-        .aggregate_signatures(&validators)
+        .aggregate_signatures(&validators, false)
         .unwrap();
     invalid_tc_with_sig.verify(&validators).unwrap_err();
 
     // not enough signatures
-    let mut invalid_timeout_cert = tc_with_partial_sig.clone();
+    let mut invalid_timeout_cert = invalid_tc_with_partial_sig.clone();
     invalid_timeout_cert
         .signatures
         .remove_signature(&signers[0].author());
     let invalid_tc_with_sig = invalid_timeout_cert
-        .aggregate_signatures(&validators)
+        .aggregate_signatures(&validators, false)
         .unwrap();
 
     invalid_tc_with_sig.verify(&validators).unwrap_err();
 
     // hqc round does not match signed round
-    let mut invalid_timeout_cert = tc_with_partial_sig.clone();
+    let mut invalid_timeout_cert = invalid_tc_with_partial_sig.clone();
     invalid_timeout_cert.timeout.quorum_cert = generate_quorum(2, quorum_size);
 
     let invalid_tc_with_sig = invalid_timeout_cert
-        .aggregate_signatures(&validators)
+        .aggregate_signatures(&validators, false)
         .unwrap();
     invalid_tc_with_sig.verify(&validators).unwrap_err();
 
     // invalid quorum cert
-    let mut invalid_timeout_cert = tc_with_partial_sig;
+    let mut invalid_timeout_cert = invalid_tc_with_partial_sig;
     invalid_timeout_cert.timeout.quorum_cert = generate_quorum(3, quorum_size - 1);
     let invalid_tc_with_sig = invalid_timeout_cert
-        .aggregate_signatures(&validators)
+        .aggregate_signatures(&validators, false)
         .unwrap();
 
     invalid_tc_with_sig.verify(&validators).unwrap_err();
