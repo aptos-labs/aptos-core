@@ -6,7 +6,7 @@ module aptos_framework::managed_coin {
     use std::error;
     use std::signer;
 
-    use aptos_framework::coin::{Self, BurnCapability, MintCapability};
+    use aptos_framework::coin::{Self, BurnCapability, FreezeCapability, MintCapability};
     use aptos_framework::coins;
 
     //
@@ -23,8 +23,9 @@ module aptos_framework::managed_coin {
     /// Capabilities resource storing mint and burn capabilities.
     /// The resource is stored on the account that initialized coin `CoinType`.
     struct Capabilities<phantom CoinType> has key {
-        mint_cap: MintCapability<CoinType>,
         burn_cap: BurnCapability<CoinType>,
+        freeze_cap: FreezeCapability<CoinType>,
+        mint_cap: MintCapability<CoinType>,
     }
 
     //
@@ -58,7 +59,7 @@ module aptos_framework::managed_coin {
         decimals: u64,
         monitor_supply: bool,
     ) {
-        let (mint_cap, burn_cap) = coin::initialize<CoinType>(
+        let (burn_cap, freeze_cap, mint_cap) = coin::initialize<CoinType>(
             account,
             string::utf8(name),
             string::utf8(symbol),
@@ -67,8 +68,9 @@ module aptos_framework::managed_coin {
         );
 
         move_to(account, Capabilities<CoinType>{
-            mint_cap,
             burn_cap,
+            freeze_cap,
+            mint_cap,
         });
     }
 

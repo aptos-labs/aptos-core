@@ -487,7 +487,7 @@ module aptos_framework::account {
         let bob = create_address(x"0000000000000000000000000000000000000000000000000000000000000b0b");
         let carol = create_address(x"00000000000000000000000000000000000000000000000000000000000ca501");
 
-        let (mint_cap, burn_cap) = aptos_framework::aptos_coin::initialize_for_test(&core);
+        let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(&core);
         create_account(signer::address_of(&alice));
         coin::deposit(signer::address_of(&alice), coin::mint(10000, &mint_cap));
         transfer(&alice, bob, 500);
@@ -497,8 +497,8 @@ module aptos_framework::account {
         transfer(&alice, carol, 1500);
         assert!(coin::balance<AptosCoin>(carol) == 2000, 2);
 
-        coin::destroy_mint_cap(mint_cap);
         coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
         let _bob = bob;
     }
 }

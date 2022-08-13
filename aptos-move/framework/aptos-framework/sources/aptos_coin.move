@@ -34,10 +34,10 @@ module aptos_framework::aptos_coin {
     }
 
     /// Can only called during genesis to initialize the Aptos coin.
-    public(friend) fun initialize(aptos_framework: &signer): (MintCapability<AptosCoin>, BurnCapability<AptosCoin>) {
+    public(friend) fun initialize(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
-        let (mint_cap, burn_cap) = coin::initialize<AptosCoin>(
+        let (burn_cap, freeze_cap, mint_cap) = coin::initialize<AptosCoin>(
             aptos_framework,
             string::utf8(b"Aptos Coin"),
             string::utf8(b"APT"),
@@ -45,7 +45,8 @@ module aptos_framework::aptos_coin {
             false, /* monitor_supply */
         );
 
-        (mint_cap, burn_cap)
+        coin::destroy_freeze_cap(freeze_cap);
+        (burn_cap, mint_cap)
     }
 
     /// Can only be called during genesis for tests to grant mint capability to aptos framework and core resources
@@ -136,17 +137,7 @@ module aptos_framework::aptos_coin {
     }
 
     #[test_only]
-    public fun initialize_for_test(aptos_framework: &signer): (MintCapability<AptosCoin>, BurnCapability<AptosCoin>) {
-        system_addresses::assert_aptos_framework(aptos_framework);
-
-        let (mint_cap, burn_cap) = coin::initialize<AptosCoin>(
-            aptos_framework,
-            string::utf8(b"Aptos Coin"),
-            string::utf8(b"APT"),
-            8, /* decimals */
-            false, /* monitor_supply */
-        );
-
-        (mint_cap, burn_cap)
+    public fun initialize_for_test(aptos_framework: &signer): (BurnCapability<AptosCoin>, MintCapability<AptosCoin>) {
+        initialize(aptos_framework)
     }
 }

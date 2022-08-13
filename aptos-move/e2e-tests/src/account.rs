@@ -309,6 +309,7 @@ impl TransactionBuilder {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CoinStore {
     coin: u64,
+    frozen: bool,
     deposit_events: EventHandle,
     withdraw_events: EventHandle,
 }
@@ -318,6 +319,7 @@ impl CoinStore {
     pub fn new(coin: u64, deposit_events: EventHandle, withdraw_events: EventHandle) -> Self {
         Self {
             coin,
+            frozen: false,
             deposit_events,
             withdraw_events,
         }
@@ -332,6 +334,7 @@ impl CoinStore {
     pub fn to_value(&self) -> Value {
         Value::struct_(Struct::pack(vec![
             Value::u64(self.coin),
+            Value::bool(self.frozen),
             Value::struct_(Struct::pack(vec![
                 Value::u64(self.withdraw_events.count()),
                 Value::struct_(Struct::pack(vec![
@@ -353,6 +356,7 @@ impl CoinStore {
     pub fn layout() -> MoveStructLayout {
         MoveStructLayout::new(vec![
             MoveTypeLayout::U64,
+            MoveTypeLayout::Bool,
             MoveTypeLayout::Struct(MoveStructLayout::new(vec![
                 MoveTypeLayout::U64,
                 MoveTypeLayout::Struct(MoveStructLayout::new(vec![
