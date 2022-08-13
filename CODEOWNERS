@@ -4,8 +4,11 @@
 /crates/aptos-crypto/ @alinush
 # Owners for the `/crates/aptos-crypto-derive` directory and all its subdirectories.
 /crates/aptos-crypto-derive/ @alinush
-# Owners for the `/api` directory and all its subdirectories.
+# Owners for the `/api` directory and all its subdirectories. And other API related crates
 /api/ @banool @gregnazario
+/crates/aptos-rest-client @banool @gregnazario
+/crates/aptos-open-api @banool @gregnazario
+/crates/aptos-faucet @banool @gregnazario
 # Owners for the `/terraform` directory and all its subdirectories.
 /terraform/ @aptos-labs/prod-eng
 # Owners for the `/docker` directory and all its subdirectories.
@@ -16,3 +19,13 @@
 /consensus/ @zekun000
 # Owners for the `/storage` directory and all its subdirectories.
 /storage/ @msmouse
+# Owners for the `/aptos` directory and all its subdirectories. And other CLI related crates
+/crates/aptos @gregnazario
+/crates/aptos-genesis @gregnazario
+/crates/aptos-faucet-cli @gregnazario
+# Owners for the `/aptos-rosetta` directory and related crates.
+/crates/aptos-rosetta @gregnazario
+/crates/aptos-rosetta-cli @gregnazario
+# Owners for the `SDKs`
+/ecosystem/typescript/sdk @jjleng @gregnazario @banool
+/ecosystem/python/sdk @davidiw @gregnazario @banool
