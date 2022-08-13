@@ -11,6 +11,7 @@ import {
 import React from 'react';
 import useGlobalStateContext, { NetworkType } from 'core/hooks/useGlobalState';
 import { useQueryClient } from 'react-query';
+import { useTestnetStatus } from 'core/queries/network';
 import NetworkListItem from './NetworkListItem';
 
 export default function NetworkBody() {
@@ -20,6 +21,8 @@ export default function NetworkBody() {
     switchNetwork,
   } = useGlobalStateContext();
   const queryClient = useQueryClient();
+
+  const { data: isLocahostLive } = useTestnetStatus();
 
   const { getRadioProps, getRootProps } = useRadioGroup({
     defaultValue: activeNetworkType,
@@ -46,7 +49,7 @@ export default function NetworkBody() {
                 key={networkType}
                 network={network}
                 isLoading={false}
-                isDisabled={networkType === NetworkType.LocalHost
+                isDisabled={(networkType === NetworkType.LocalHost && !isLocahostLive)
                   || networkType === NetworkType.Testnet}
                 {...getRadioProps({ value: networkType })}
               />
