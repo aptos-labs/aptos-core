@@ -25,23 +25,27 @@ The below code example shows how to use the `signAndSubmitTransaction()` API to 
 import { BCS, TxnBuilderTypes } from 'aptos';
 const wallet = getAptosWallet(); // see "Connecting"
 
-// Transaction format
-https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html
+// Transaction format 
+// https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html
 const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 const transaction = new TxnBuilderTypes.TransactionPayloadScriptFunction(
     TxnBuilderTypes.ScriptFunction.natural(
-    "0x1::coin",
-    "transfer",
-    [token],
-    [BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex('0xabab')), BCS.bcsSerializeUint64(717)],
+        '0x1::coin',
+        'transfer',
+        [token],
+        [
+            BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(address)),
+            BCS.bcsSerializeUint64(717),
+        ],
     ),
 );
 
 
 try {
     const pendingTransaction = await (window as any).aptos.signAndSubmitTransaction(transaction)
-} catch (error)
+} catch (error) {
     // see "Errors"
+}
 ```
 
 
@@ -54,20 +58,24 @@ The below code example shows how to use the `signTransaction()` API to only sign
 import { BCS, TxnBuilderTypes } from 'aptos';
 const wallet = getAptosWallet(); // see "Connecting"
 
-// Transaction format
-https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html
+// Transaction format 
+// https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html
 const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 const transaction = new TxnBuilderTypes.TransactionPayloadScriptFunction(
     TxnBuilderTypes.ScriptFunction.natural(
-    "0x1::coin",
-    "transfer",
-    [token],
-    [BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex('0xabab')), BCS.bcsSerializeUint64(717)],
+        '0x1::coin',
+        'transfer',
+        [token],
+        [
+            BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(address)),
+            BCS.bcsSerializeUint64(717),
+        ],
     ),
 );
 
 try {
     const signTransaction = await (window as any).aptos.signTransaction(transaction)
-} catch (error)
+} catch (error) {
     // see "Errors"
+}
 ```
