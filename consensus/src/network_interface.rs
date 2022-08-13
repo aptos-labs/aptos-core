@@ -106,7 +106,7 @@ pub fn network_endpoint_config() -> AppConfig {
     AppConfig::p2p(
         protos,
         aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
-            .queue_style(QueueStyle::LIFO)
+            .queue_style(QueueStyle::FIFO)
             .counters(&counters::PENDING_CONSENSUS_NETWORK_EVENTS),
     )
 }
