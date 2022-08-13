@@ -18,6 +18,10 @@ pub fn coin_module_identifier() -> Identifier {
     ident_str!("coin").into()
 }
 
+pub fn stake_module_identifier() -> Identifier {
+    ident_str!("stake").into()
+}
+
 // Resource Identifiers
 pub fn account_resource_identifier() -> Identifier {
     ident_str!("Account").into()
@@ -35,6 +39,11 @@ pub fn aptos_coin_resource_identifier() -> Identifier {
     ident_str!("AptosCoin").into()
 }
 
+pub fn stake_pool_resource_identifier() -> Identifier {
+    ident_str!("StakePool").into()
+}
+
+// Function identifiers
 // Function identifiers
 pub fn create_account_function_identifier() -> Identifier {
     ident_str!("create_account").into()
@@ -42,6 +51,10 @@ pub fn create_account_function_identifier() -> Identifier {
 
 pub fn transfer_function_identifier() -> Identifier {
     ident_str!("transfer").into()
+}
+
+pub fn set_operator_function_identifier() -> Identifier {
+    ident_str!("set_operator").into()
 }
 
 // Field identifiers
@@ -55,6 +68,10 @@ pub fn deposit_events_field_identifier() -> Identifier {
 
 pub fn withdraw_events_field_identifier() -> Identifier {
     ident_str!("withdraw_events").into()
+}
+
+pub fn set_operator_events_field_identifier() -> Identifier {
+    ident_str!("set_operator_events").into()
 }
 
 pub fn sequence_number_field_identifier() -> Identifier {
