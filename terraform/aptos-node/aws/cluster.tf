@@ -59,11 +59,6 @@ resource "aws_launch_template" "nodes" {
   for_each      = local.pools
   name          = "aptos-${local.workspace_name}/${each.key}"
   instance_type = each.value.instance_type
-  user_data = base64encode(
-    templatefile("${path.module}/templates/eks_user_data.sh", {
-      taints = each.value.taint ? "aptos.org/nodepool=${each.key}:NoExecute" : ""
-    })
-  )
 
   block_device_mappings {
     device_name = "/dev/xvda"
@@ -103,6 +98,16 @@ resource "aws_eks_node_group" "nodes" {
     ]
   }
 
+  # if the NodeGroup should be tainted, then create the below dynamic block
+  dynamic "taint" {
+    for_each = each.value.taint ? [local.pools[each.key]] : []
+    content {
+      key    = "aptos.org/nodepool"
+      value  = each.key
+      effect = "NO_EXECUTE"
+    }
+  }
+
   launch_template {
     id      = aws_launch_template.nodes[each.key].id
     version = aws_launch_template.nodes[each.key].latest_version
@@ -134,4 +139,51 @@ resource "aws_iam_openid_connect_provider" "cluster" {
 
 locals {
   oidc_provider = replace(aws_iam_openid_connect_provider.cluster.url, "https://", "")
+}
+
+
+# EBS CSI ADDON
+
+data "aws_iam_policy_document" "aws-ebs-csi-driver-trust-policy" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type = "Federated"
+      identifiers = [
+        "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${local.oidc_provider}"
+      ]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_provider}:sub"
+      values   = ["system:serviceaccount:kube-system:ebs-csi-controller-sa"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "${local.oidc_provider}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "aws-ebs-csi-driver" {
+  name                 = "aptos-${local.workspace_name}-ebs-csi-controller"
+  path                 = var.iam_path
+  permissions_boundary = var.permissions_boundary_policy
+  assume_role_policy   = data.aws_iam_policy_document.aws-ebs-csi-driver-trust-policy.json
+}
+
+resource "aws_iam_role_policy_attachment" "caws-ebs-csi-driver" {
+  role = aws_iam_role.aws-ebs-csi-driver.name
+  # From this reference: https://docs.aws.amazon.com/eks/latest/userguide/csi-iam-role.html
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+}
+
+resource "aws_eks_addon" "aws-ebs-csi-driver" {
+  cluster_name             = aws_eks_cluster.aptos.name
+  addon_name               = "aws-ebs-csi-driver"
+  service_account_role_arn = aws_iam_role.aws-ebs-csi-driver.arn
 }

@@ -50,6 +50,7 @@ terraform/validator/*/*-kube.config
 terraform/validator/vault-init/backend.tf
 terraform/testnet/*-kubernetes.json
 terraform/testnet/*-vault.ca
+.terraform.lock.hcl
 
 # Move Build Output
 build/
