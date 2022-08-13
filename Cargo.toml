@@ -107,6 +107,7 @@ members = [
     "storage/backup/backup-service",
     "storage/indexer",
     "storage/jellyfish-merkle",
+    "storage/rocksdb-options",
     "storage/schemadb",
     "storage/scratchpad",
     "storage/state-view",
