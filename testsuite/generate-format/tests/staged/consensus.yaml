@@ -25,6 +25,19 @@ AccountAuthenticator:
               TYPENAME: MultiEd25519PublicKey
           - signature:
               TYPENAME: MultiEd25519Signature
+AggregatedSignature:
+  STRUCT:
+    - validator_bitmask:
+        TYPENAME: BitVec
+    - aggregated_sig:
+        OPTION:
+          TYPENAME: Signature
+AggregatedSignatureWithRounds:
+  STRUCT:
+    - aggregated_sig:
+        TYPENAME: AggregatedSignature
+    - rounds:
+        SEQ: U64
 BitVec:
   STRUCT:
     - inner: BYTES
@@ -238,7 +251,7 @@ LedgerInfoWithV0:
     - ledger_info:
         TYPENAME: LedgerInfo
     - signatures:
-        TYPENAME: MultiSignature
+        TYPENAME: AggregatedSignature
 Module:
   STRUCT:
     - code: BYTES
@@ -257,13 +270,6 @@ MultiEd25519PublicKey:
   NEWTYPESTRUCT: BYTES
 MultiEd25519Signature:
   NEWTYPESTRUCT: BYTES
-MultiSignature:
-  STRUCT:
-    - validator_bitmask:
-        TYPENAME: BitVec
-    - multi_sig:
-        OPTION:
-          TYPENAME: Signature
 Payload:
   ENUM:
     0:
@@ -370,7 +376,7 @@ SyncInfo:
         TYPENAME: QuorumCert
     - highest_2chain_timeout_cert:
         OPTION:
-          TYPENAME: TwoChainTimeoutCertificate
+          TYPENAME: TwoChainTimeoutWithSignatures
 TableHandle:
   NEWTYPESTRUCT: U128
 Transaction:
@@ -463,18 +469,12 @@ TwoChainTimeout:
     - round: U64
     - quorum_cert:
         TYPENAME: QuorumCert
-TwoChainTimeoutCertificate:
+TwoChainTimeoutWithSignatures:
   STRUCT:
     - timeout:
         TYPENAME: TwoChainTimeout
-    - signatures:
-        MAP:
-          KEY:
-            TYPENAME: AccountAddress
-          VALUE:
-            TUPLE:
-              - U64
-              - TYPENAME: Signature
+    - signatures_with_rounds:
+        TYPENAME: AggregatedSignatureWithRounds
 TypeTag:
   ENUM:
     0:
