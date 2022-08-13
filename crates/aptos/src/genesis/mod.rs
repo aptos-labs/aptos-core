@@ -60,6 +60,7 @@ pub struct GenerateGenesis {
     prompt_options: PromptOptions,
     #[clap(flatten)]
     git_options: GitOptions,
+    /// Output directory for Genesis file and waypoint
     #[clap(long, parse(from_os_str))]
     output_dir: Option<PathBuf>,
 }
