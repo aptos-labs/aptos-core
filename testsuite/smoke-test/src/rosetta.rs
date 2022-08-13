@@ -590,6 +590,21 @@ async fn parse_operations(
                     );
                 }
             }
+            OperationType::SetOperator => {
+                if actual_txn.success() {
+                    assert_eq!(
+                        OperationStatusType::Success,
+                        status,
+                        "Successful transaction should have successful set operator operation"
+                    );
+                } else {
+                    assert_eq!(
+                        OperationStatusType::Failure,
+                        status,
+                        "Failed transaction should have failed set operator operation"
+                    );
+                }
+            }
         }
     }
 }
