@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 /* eslint-disable max-len */
 import * as Nacl from "tweetnacl";
 import { bcsSerializeUint64, bcsToBytes, Bytes } from "./bcs";

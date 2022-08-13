@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 export type Nullable<T> = { [P in keyof T]: T[P] | null };
 
 export type AnyObject = { [key: string]: any };

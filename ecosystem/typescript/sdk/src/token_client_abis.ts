@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 /* eslint-disable max-len */
 
 export const TOKEN_ABIS = [
