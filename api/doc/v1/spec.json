@@ -2896,7 +2896,7 @@
           "epoch",
           "round",
           "events",
-          "previous_block_votes",
+          "previous_block_votes_bitvec",
           "proposer",
           "failed_proposer_indices",
           "timestamp"
@@ -2947,10 +2947,11 @@
               "$ref": "#/components/schemas/Event"
             }
           },
-          "previous_block_votes": {
+          "previous_block_votes_bitvec": {
             "type": "array",
             "items": {
-              "type": "boolean"
+              "type": "integer",
+              "format": "uint8"
             }
           },
           "proposer": {

@@ -1,9 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod analyze;
+
 use crate::common::types::{ConfigSearchMode, PromptOptions};
 use crate::common::utils::prompt_yes_with_override;
 use crate::config::GlobalConfig;
+use crate::node::analyze::analyze_validators::AnalyzeValidators;
+use crate::node::analyze::fetch_metadata::FetchMetadata;
 use crate::{
     common::{
         types::{
@@ -28,6 +32,7 @@ use hex::FromHex;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use reqwest::Url;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{path::PathBuf, thread, time::Duration};
@@ -49,6 +54,7 @@ pub enum NodeTool {
     ShowValidatorStake(ShowValidatorStake),
     RunLocalTestnet(RunLocalTestnet),
     UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
+    AnalyzeValidatorPerformance(AnalyzeValidatorPerformance),
 }
 
 impl NodeTool {
@@ -67,6 +73,7 @@ impl NodeTool {
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
             RunLocalTestnet(tool) => tool.execute_serialized_without_logger().await,
             UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
+            AnalyzeValidatorPerformance(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -705,5 +712,102 @@ impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
                 bcs::to_bytes(&full_node_network_addresses)?,
             ))
             .await
+    }
+}
+
+#[derive(Parser)]
+pub struct AnalyzeValidatorPerformance {
+    #[clap(long)]
+    pub start_epoch: Option<u64>,
+    #[clap(long)]
+    pub end_epoch: Option<u64>,
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+    #[clap(arg_enum, long)]
+    pub(crate) analyze_mode: AnalyzeMode,
+}
+
+#[derive(PartialEq, clap::ArgEnum, Clone)]
+pub enum AnalyzeMode {
+    /// Print all other modes simultaneously
+    All,
+    /// For each epoch, print a detailed table containing performance
+    /// of each of the validators.
+    DetailedEpochTable,
+    /// For each validator, summarize it's performance in an epoch into
+    /// one of the predefined reliability buckets,
+    /// and prints it's performance across epochs.
+    ValidatorHealthOverTime,
+    /// For each epoch summarize how many validators were in
+    /// each of the reliability buckets.
+    NetworkHealthOverTime,
+}
+
+#[async_trait]
+impl CliCommand<()> for AnalyzeValidatorPerformance {
+    fn command_name(&self) -> &'static str {
+        "AnalyzeValidatorPerformance"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<()> {
+        let client = self.rest_options.client(&self.profile_options.profile)?;
+
+        let epochs =
+            FetchMetadata::fetch_new_block_events(&client, self.start_epoch, self.end_epoch)
+                .await?;
+        let mut stats = HashMap::new();
+
+        let print_detailed = self.analyze_mode == AnalyzeMode::DetailedEpochTable
+            || self.analyze_mode == AnalyzeMode::All;
+        for epoch_info in epochs {
+            let epoch_stats = AnalyzeValidators::analyze(epoch_info.blocks, &epoch_info.validators);
+            if print_detailed {
+                println!("Detailed table for epoch {}:", epoch_info.epoch);
+                AnalyzeValidators::print_detailed_epoch_table(&epoch_stats, None, true);
+            }
+            stats.insert(epoch_info.epoch, epoch_stats);
+        }
+
+        if stats.is_empty() {
+            println!("No data found for given input");
+            return Ok(());
+        }
+        let total_stats = stats
+            .iter()
+            .map(|(_k, v)| v.clone())
+            .reduce(|a, b| a + b)
+            .unwrap();
+        if print_detailed {
+            println!(
+                "Detailed table for all epochs [{}, {}]:",
+                stats.keys().min().unwrap(),
+                stats.keys().max().unwrap()
+            );
+            AnalyzeValidators::print_detailed_epoch_table(&total_stats, None, true);
+        }
+        let all_validators: Vec<_> = total_stats.validator_stats.keys().cloned().collect();
+        if self.analyze_mode == AnalyzeMode::ValidatorHealthOverTime
+            || self.analyze_mode == AnalyzeMode::All
+        {
+            println!(
+                "Validator health over epochs [{}, {}]:",
+                stats.keys().min().unwrap(),
+                stats.keys().max().unwrap()
+            );
+            AnalyzeValidators::print_validator_health_over_time(&stats, &all_validators, None);
+        }
+        if self.analyze_mode == AnalyzeMode::NetworkHealthOverTime
+            || self.analyze_mode == AnalyzeMode::All
+        {
+            println!(
+                "Network health over epochs [{}, {}]:",
+                stats.keys().min().unwrap(),
+                stats.keys().max().unwrap()
+            );
+            AnalyzeValidators::print_network_health_over_time(&stats, &all_validators);
+        }
+        Ok(())
     }
 }

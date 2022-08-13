@@ -25,6 +25,19 @@ macro_rules! log {
     }};
 }
 
+#[macro_export]
+macro_rules! enabled {
+    ($level:expr) => {{
+        const METADATA: $crate::Metadata = $crate::Metadata::new(
+            $level,
+            env!("CARGO_CRATE_NAME"),
+            module_path!(),
+            concat!(file!(), ':', line!()),
+        );
+        METADATA.enabled()
+    }};
+}
+
 /// Log at the `trace` level
 #[macro_export]
 macro_rules! trace {

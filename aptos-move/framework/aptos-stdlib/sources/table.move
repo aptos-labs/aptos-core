@@ -53,6 +53,17 @@ module aptos_std::table {
         borrow_mut(table, key)
     }
 
+    /// Insert the pair (`key`, `value`) if there is no entry for `key`.
+    /// update the value of the entry for `key` to `value` otherwise
+    public fun upsert<K: copy + drop, V: drop>(table: &mut Table<K, V>, key: K, value: V) {
+        if (!contains(table, copy key)) {
+            add(table, copy key, value)
+        } else {
+            let ref = borrow_mut(table, key);
+            *ref = value;
+        };
+    }
+
     /// Remove from `table` and return the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun remove<K: copy + drop, V>(table: &mut Table<K, V>, key: K): V {
@@ -74,6 +85,25 @@ module aptos_std::table {
     public(friend) fun destroy<K: copy + drop, V>(table: Table<K, V>) {
         destroy_empty_box<K, V, Box<V>>(&table);
         drop_unchecked_box<K, V, Box<V>>(table)
+    }
+
+    #[test_only]
+    struct TableHolder<phantom K: copy + drop, phantom V: drop> has key{
+        t: Table<K, V>
+    }
+
+    #[test(account = @0x1)]
+    fun test_upsert(account: signer) {
+        let t = new<u64, u8>();
+        let key: u64 = 111;
+        let error_code: u64 = 1;
+        assert!(!contains(&t, key), error_code);
+        upsert(&mut t, key, 12);
+        assert!(*borrow(&t, key) == 12, error_code);
+        upsert(&mut t, key, 23);
+        assert!(*borrow(&t, key) == 23, error_code);
+
+        move_to(&account, TableHolder{ t });
     }
 
     // ======================================================================================================
