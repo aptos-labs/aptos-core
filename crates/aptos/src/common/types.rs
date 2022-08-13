@@ -319,14 +319,17 @@ impl FromStr for KeyType {
         match s.to_lowercase().as_str() {
             "ed25519" => Ok(KeyType::Ed25519),
             "x25519" => Ok(KeyType::X25519),
-            _ => Err("Invalid key type"),
+            _ => Err("Invalid key type: Must be one of [ed25519, x25519]"),
         }
     }
 }
 
 #[derive(Debug, Parser)]
 pub struct ProfileOptions {
-    /// Profile to use from config
+    /// Profile to use from the CLI config
+    ///
+    /// This will be used to override associated settings such as
+    /// the REST URL, the Faucet URL, and the private key arguments
     #[clap(long, default_value = "default")]
     pub profile: String,
 }
@@ -414,7 +417,11 @@ impl EncodingType {
 
 #[derive(Clone, Debug, Parser)]
 pub struct RngArgs {
-    /// The seed used for key generation, should be a 64 character hex string and mainly used for testing
+    /// The seed used for key generation, should be a 64 character hex string and only used for testing
+    ///
+    /// If a predictable random seed is used, the key that is produced will be insecure and easy
+    /// to reproduce.  Please do not use this unless sufficient randomness is put into the random
+    /// seed.
     #[clap(long)]
     random_seed: Option<String>,
 }
@@ -494,7 +501,7 @@ impl PromptOptions {
 /// An insertable option for use with encodings.
 #[derive(Debug, Default, Parser)]
 pub struct EncodingOptions {
-    /// Encoding of data as `base64`, `bcs`, or `hex`
+    /// Encoding of data as one of [base64, bcs, hex]
     #[clap(long, default_value_t = EncodingType::Hex)]
     pub encoding: EncodingType,
 }
@@ -613,7 +620,10 @@ pub trait ExtractPublicKey {
     ) -> CliTypedResult<x25519::PublicKey> {
         let key = self.extract_public_key(encoding, profile)?;
         x25519::PublicKey::from_ed25519_public_bytes(&key.to_bytes()).map_err(|err| {
-            CliError::UnexpectedError(format!("Failed to convert ed25519 to x25519 {:?}", err))
+            CliError::UnexpectedError(format!(
+                "Failed to convert ed25519 key to x25519 key {:?}",
+                err
+            ))
         })
     }
 }
@@ -764,8 +774,7 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
         Ok(account_address_from_public_key(&public_key))
     } else {
         Err(CliError::CommandArgumentError(
-            "'--account-address' or '--profile' after using aptos init must be provided"
-                .to_string(),
+            "'--account' or '--profile' after using aptos init must be provided".to_string(),
         ))
     }
 }
@@ -805,7 +814,7 @@ pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, Cl
         Ok(Some(account_address_from_public_key(&public_key)))
     } else {
         Err(CliError::CommandArgumentError(
-            "Invalid manifest account address".to_string(),
+            "Invalid Move manifest account address".to_string(),
         ))
     }
 }
@@ -942,7 +951,7 @@ pub struct ChangeSummary {
 
 #[derive(Debug, Default, Parser)]
 pub struct FaucetOptions {
-    /// URL for the faucet
+    /// URL for the faucet endpoint e.g. https://faucet.devnet.aptoslabs.com
     #[clap(long)]
     faucet_url: Option<reqwest::Url>,
 }
@@ -976,14 +985,24 @@ pub const DEFAULT_GAS_UNIT_PRICE: u64 = 1;
 /// Gas price options for manipulating how to prioritize transactions
 #[derive(Debug, Eq, Parser, PartialEq)]
 pub struct GasOptions {
-    /// Amount to increase gas bid by for a transaction
+    /// Gas multiplier per unit of gas
     ///
-    /// Defaults to 1 coin per gas unit
+    /// The amount of coins used for a transaction is equal
+    /// to (gas unit price * gas used).  The gas_unit_price can
+    /// be used as a multiplier for the amount of coins willing
+    /// to be paid for a transaction.  This will prioritize the
+    /// transaction with a higher gas unit price.
     #[clap(long, default_value_t = DEFAULT_GAS_UNIT_PRICE)]
     pub gas_unit_price: u64,
-    /// Maximum gas to be used to send a transaction
+    /// Maximum amount of gas units to be used to send this transaction
     ///
-    /// Defaults to 1000 gas units
+    /// The maximum amount of gas units willing to pay for the transaction.
+    /// This is the (max gas in coins / gas unit price).
+    ///
+    /// For example if I wanted to pay a maximum of 100 coins, I may have the
+    /// max gas set to 100 if the gas unit price is 1.  If I want it to have a
+    /// gas unit price of 2, the max gas would need to be 50 to still only have
+    /// a maximum price of 100 coins.
     #[clap(long, default_value_t = DEFAULT_MAX_GAS)]
     pub max_gas: u64,
 }
