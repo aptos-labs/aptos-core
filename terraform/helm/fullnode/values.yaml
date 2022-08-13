@@ -17,7 +17,7 @@ rust_log: info
 
 image:
   repo: aptoslabs/validator
-  tag: devnet_1a56a55c6c149ccc8d6a38903e42e9626fb10b06
+  tag: devnet
   pullPolicy: IfNotPresent
 
 resources:
