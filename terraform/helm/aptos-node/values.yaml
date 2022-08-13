@@ -87,6 +87,9 @@ fullnode:
   # -- Validator configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs
   config:
     max_inbound_connections: 100
+    shared_mempool_max_concurrent_inbound_syncs: 16
+    max_broadcasts_per_peer: 2
+    default_failovers: 0
 
 haproxy:
   # -- Enable HAProxy deployment in front of validator and fullnodes

@@ -15,13 +15,12 @@ use structopt::StructOpt;
 use testcases::network_bandwidth_test::NetworkBandwidthTest;
 use testcases::network_latency_test::NetworkLatencyTest;
 use testcases::network_loss_test::NetworkLossTest;
+use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use testcases::{
     compatibility_test::SimpleValidatorUpgrade, forge_setup_test::ForgeSetupTest, generate_traffic,
     network_partition_test::NetworkPartitionTest, performance_test::PerformanceBenchmark,
     reconfiguration_test::ReconfigurationTest, state_sync_performance::StateSyncPerformance,
 };
-
-use testcases::performance_with_fullnode_test::PerformanceBenchmarkWithFN;
 use tokio::runtime::Runtime;
 use url::Url;
 
@@ -436,9 +435,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
         "network_partition" => config.with_network_tests(&[&NetworkPartitionTest]),
         "network_latency" => config.with_network_tests(&[&NetworkLatencyTest]),
         "network_bandwidth" => config.with_network_tests(&[&NetworkBandwidthTest]),
-        "bench_with_fullnode" => config
-            .with_network_tests(&[&PerformanceBenchmarkWithFN])
-            .with_initial_fullnode_count(6),
         "setup_test" => config
             .with_initial_fullnode_count(1)
             .with_network_tests(&[&ForgeSetupTest]),
@@ -449,9 +445,9 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
 
 fn land_blocking_test_suite() -> ForgeConfig<'static> {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(30).unwrap())
-        .with_initial_fullnode_count(1)
-        .with_network_tests(&[&PerformanceBenchmark])
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(10)
+        .with_network_tests(&[&PerformanceBenchmarkWithFN])
 }
 
 fn pre_release_suite() -> ForgeConfig<'static> {
