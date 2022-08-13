@@ -433,7 +433,7 @@ impl Swarm for LocalSwarm {
             .map(|v| v as &mut dyn Validator)
     }
 
-    fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
+    async fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
         let version = self
             .versions
             .get(version)
