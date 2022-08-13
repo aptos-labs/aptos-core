@@ -48,20 +48,8 @@ impl TransactionOutputExt {
         &self.delta_change_set
     }
 
-    pub fn write_set(&self) -> &WriteSet {
-        self.output.write_set()
-    }
-
-    pub fn events(&self) -> &[ContractEvent] {
-        self.output.events()
-    }
-
-    pub fn gas_used(&self) -> u64 {
-        self.output.gas_used()
-    }
-
-    pub fn status(&self) -> &TransactionStatus {
-        self.output.status()
+    pub fn txn_output(&self) -> &TransactionOutput {
+        &self.output
     }
 
     pub fn into(self) -> (DeltaChangeSet, TransactionOutput) {
@@ -72,15 +60,17 @@ impl TransactionOutputExt {
     /// TODO: ideally, we may want to expose this function to VM instead. Since
     /// we do not care about rerunning the epilogue - it sufficies to have it
     /// here for now.
-    pub fn into_transaction_output_with_status(
+    pub fn into_transaction_output(
         self,
         state_view: &impl StateView,
-    ) -> (VMStatus, TransactionOutput) {
+    ) -> Result<TransactionOutput, VMStatus> {
         let (delta_change_set, txn_output) = self.into();
 
-        // No deltas - return immediately.
-        if delta_change_set.is_empty() {
-            return (VMStatus::Executed, txn_output);
+        // First, check if output of transaction should be discarded or delta
+        // change set is empty. In both cases, we do not need to apply any
+        // deltas and can return immediately.
+        if txn_output.status().is_discarded() || delta_change_set.is_empty() {
+            return Ok(txn_output);
         }
 
         match delta_change_set.try_into_write_set_mut(state_view) {
@@ -109,7 +99,7 @@ impl TransactionOutputExt {
                     status,
                 );
 
-                (VMStatus::Executed, output)
+                Ok(output)
             }
         }
     }

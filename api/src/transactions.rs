@@ -346,22 +346,16 @@ impl Transactions {
         let state_view = &*self.context.move_resolver()?;
         let (status, output_ext) = AptosVM::simulate_signed_transaction(&txn, state_view);
         let version = self.ledger_info.version();
-        let (output, exe_status) = match status.into() {
-            TransactionStatus::Keep(exec_status) => {
-                // Apply deltas.
-                // TODO: while `into_transaction_output_with_status()` should never fail
-                // to apply deltas, we should propagate errors properly. Fix this when
-                // VM error handling is fixed.
-                let (vm_status, output) =
-                    output_ext.into_transaction_output_with_status(state_view);
-                debug_assert!(vm_status == VMStatus::Executed);
 
-                (output, exec_status)
-            }
-            _ => {
-                let (_, output) = output_ext.into();
-                (output, ExecutionStatus::MiscellaneousError(None))
-            }
+        // Apply deltas.
+        // TODO: while `into_transaction_output_with_status()` should never fail
+        // to apply deltas, we should propagate errors properly. Fix this when
+        // VM error handling is fixed.
+        let output = output_ext.into_transaction_output(state_view)?;
+
+        let exe_status = match status.into() {
+            TransactionStatus::Keep(exec_status) => exec_status,
+            _ => ExecutionStatus::MiscellaneousError(None),
         };
 
         let zero_hash = HashValue::zero();
