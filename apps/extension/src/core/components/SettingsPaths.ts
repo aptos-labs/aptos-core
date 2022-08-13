@@ -4,7 +4,7 @@
 import { BiNetworkChart } from '@react-icons/all-files/bi/BiNetworkChart';
 import { FaKey } from '@react-icons/all-files/fa/FaKey';
 import { FaKeyboard } from '@react-icons/all-files/fa/FaKeyboard';
-import { GoSignOut } from '@react-icons/all-files/go/GoSignOut';
+import { FaLock } from '@react-icons/all-files/fa/FaLock';
 import Routes from 'core/routes';
 import { SettingsListItemProps } from './SettingsListItem';
 
@@ -48,10 +48,10 @@ function SettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
   items.push({
     bgColorDict: signOutSecondaryGridBgColor,
     hoverBgColorDict: signOutSecondaryGridHoverBgColor,
-    icon: GoSignOut,
+    icon: FaLock,
     path: Routes.wallet.path,
     textColorDict: signOutSecondaryTextColor,
-    title: 'Sign out',
+    title: 'Lock wallet',
   });
 
   return items;
