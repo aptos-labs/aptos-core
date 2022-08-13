@@ -5,7 +5,9 @@ coredns:
 autoscaler:
   enabled:
   clusterName:
-  scaleDownUnneededTime: 15m
+  # How long a node should be unneeded before it is eligible for scale down
+  scaleDownUnneededTime: 30m
+  # How long after scale up that scale down evaluation resumes
   scaleDownDelayAfterAdd: 5m
   image:
     repo: k8s.gcr.io/autoscaling/cluster-autoscaler
