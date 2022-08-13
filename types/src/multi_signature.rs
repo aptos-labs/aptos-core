@@ -158,7 +158,7 @@ impl PartialSignaturesWithRound {
                 .into_iter()
                 .for_each(|index| {
                     partial_sig.add_signature(*address, sig.clone());
-                    index_to_rounds.insert(index, round.clone());
+                    index_to_rounds.insert(index, *round);
                 });
         });
         (partial_sig, index_to_rounds.into_values().collect_vec())

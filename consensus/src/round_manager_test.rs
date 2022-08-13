@@ -576,7 +576,7 @@ fn new_round_on_timeout_certificate() {
     tc_partial.add(node.signer.author(), timeout, timeout_signature);
 
     let tc = tc_partial
-        .aggregate_signatures(&generate_validator_verifier(&[node.signer.clone()]))
+        .aggregate_signatures(&generate_validator_verifier(&[node.signer.clone()]), true)
         .unwrap();
     timed_block_on(&mut runtime, async {
         let skip_round_proposal = ProposalMsg::new(
@@ -618,7 +618,7 @@ fn reject_invalid_failed_authors() {
         tc_partial.add(node.signer.author(), timeout, timeout_signature);
 
         tc_partial
-            .aggregate_signatures(&generate_validator_verifier(&[node.signer.clone()]))
+            .aggregate_signatures(&generate_validator_verifier(&[node.signer.clone()]), true)
             .unwrap()
     };
 
@@ -823,7 +823,7 @@ fn recover_on_restart() {
         );
 
         let tc = tc_partial
-            .aggregate_signatures(&generate_validator_verifier(&[node.signer.clone()]))
+            .aggregate_signatures(&generate_validator_verifier(&[node.signer.clone()]), true)
             .unwrap();
 
         data.push((proposal, tc));
