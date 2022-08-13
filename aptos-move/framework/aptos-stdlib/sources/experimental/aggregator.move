@@ -60,7 +60,7 @@
 /// ====================
 /// Users are encouraged to use "cheap" operations (e.g. additions) to exploit the
 /// parallelism in execution.
-module aptos_framework::aggregator {
+module aptos_std::aggregator {
 
     /// When the value of aggregator (actual or accumulated) overflows (raised
     /// by native code).

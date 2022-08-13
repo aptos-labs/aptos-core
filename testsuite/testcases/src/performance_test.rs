@@ -40,7 +40,7 @@ impl NetworkTest for PerformanceBenchmark {
 
         let runtime = Runtime::new().unwrap();
 
-        runtime.block_on(ctx.swarm().ensure_no_fullnode_restart())?;
+        runtime.block_on(ctx.swarm().ensure_no_validator_restart())?;
         runtime.block_on(ctx.swarm().ensure_no_fullnode_restart())?;
 
         Ok(())

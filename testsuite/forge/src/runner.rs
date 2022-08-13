@@ -201,7 +201,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             network_tests: &[],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
             initial_fullnode_count: 0,
-            initial_version: InitialVersion::Newest,
+            initial_version: InitialVersion::Oldest,
             genesis_config: None,
         }
     }
