@@ -525,12 +525,25 @@ impl TransactionsApi {
         }
         let ledger_info = self.context.get_latest_ledger_info_poem()?;
         let move_resolver = self.context.move_resolver_poem()?;
-        let (status, output) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
+        let (status, output_ext) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
         let version = ledger_info.version();
+
+        // Apply deltas.
+        // TODO: while `into_transaction_output_with_status()` should never fail
+        // to apply deltas, we should propagate errors properly. Fix this when
+        // VM error handling is fixed.
+        let output = output_ext.into_transaction_output(&move_resolver);
+        debug_assert!(
+            matches!(output, Ok(_)),
+            "converting into transaction output failed"
+        );
+        let output = output.unwrap();
+
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,
             _ => ExecutionStatus::MiscellaneousError(None),
         };
+
         let zero_hash = aptos_crypto::HashValue::zero();
         let info = aptos_types::transaction::TransactionInfo::new(
             zero_hash,

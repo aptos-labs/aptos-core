@@ -160,13 +160,15 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
             debug!(log_context, "Retry after reconfiguration");
             continue;
         };
-        let (vm_status, output, sender) = adapter.execute_single_transaction(
+        let (vm_status, output_ext, sender) = adapter.execute_single_transaction(
             &txn,
             &data_cache.as_move_resolver(),
             &log_context,
         )?;
-        // TODO: apply deltas.
-        let (_, output) = output.into();
+
+        // Apply deltas.
+        let output = output_ext.into_transaction_output(&data_cache)?;
+
         if !output.status().is_discarded() {
             data_cache.push_write_set(output.write_set());
         } else {
