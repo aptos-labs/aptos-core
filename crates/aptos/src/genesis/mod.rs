@@ -30,8 +30,10 @@ use std::{path::PathBuf, str::FromStr};
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
 
-/// Tool for setting up and building the Genesis transaction
+/// Tool for setting up an Aptos chain Genesis transaction
 ///
+/// This tool sets up a space for multiple initial "validator"
+/// accounts to build a genesis transaction for a new chain.
 #[derive(Parser)]
 pub enum GenesisTool {
     GenerateGenesis(GenerateGenesis),

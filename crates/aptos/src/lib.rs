@@ -20,8 +20,7 @@ use async_trait::async_trait;
 use clap::Parser;
 use std::collections::BTreeMap;
 
-/// CLI tool for interacting with the Aptos blockchain and nodes
-///
+/// Command Line Interface (CLI) for developing and interacting with the Aptos blockchain
 #[derive(Parser)]
 #[clap(name = "aptos", author, version, propagate_version = true)]
 pub enum Tool {
@@ -61,7 +60,7 @@ impl Tool {
     }
 }
 
-/// Show information about the build of the CLI
+/// Show build information about the CLI
 ///
 /// This is useful for debugging as well as determining what versions are compatible with the CLI
 #[derive(Parser)]

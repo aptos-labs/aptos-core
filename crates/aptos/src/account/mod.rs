@@ -10,8 +10,10 @@ pub mod fund;
 pub mod list;
 pub mod transfer;
 
-/// CLI tool for interacting with accounts
+/// Tool for interacting with accounts
 ///
+/// This tool is used to create accounts, get information about the
+/// account's resources, and transfer resources between accounts.
 #[derive(Debug, Subcommand)]
 pub enum AccountTool {
     Create(create::CreateAccount),
