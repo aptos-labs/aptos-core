@@ -16,6 +16,7 @@ use crate::validator_signer::ValidatorSigner;
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
 use aptos_crypto::bls12381::PublicKey;
+use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 
@@ -192,7 +193,8 @@ impl ValidatorVerifier {
         &self,
         partial_signatures: &PartialSignatures,
     ) -> Result<(AggregatedSignature, PublicKey, Vec<&PublicKey>), VerifyError> {
-        let mut pub_keys = vec![];
+        // Need a Btree Map to ensure the public keys are ordered by the validator index.
+        let mut pub_keys = BTreeMap::new();
         let mut sigs = vec![];
         let mut masks = BitVec::with_num_bits(self.len() as u16);
         for (addr, sig) in partial_signatures.signatures() {
@@ -201,19 +203,21 @@ impl ValidatorVerifier {
                 .get(addr)
                 .ok_or(VerifyError::UnknownAuthor)?;
             masks.set(index as u16);
-            pub_keys.push(self.validator_infos[index].public_key());
+            pub_keys.insert(index, self.validator_infos[index].public_key());
             sigs.push(sig.clone());
         }
         // Perform an optimistic aggregation of the signatures without verification.
         let aggregated_sig = bls12381::Signature::aggregate(sigs)
             .map_err(|_| VerifyError::FailedToAggregateSignature)?;
 
-        let aggregated_key = PublicKey::aggregate(pub_keys.clone())
+        let ordered_pub_keys: Vec<_> = pub_keys.into_values().collect_vec();
+
+        let aggregated_key = PublicKey::aggregate(ordered_pub_keys.clone())
             .map_err(|_| VerifyError::FailedToAggregatePubKey)?;
         Ok((
             AggregatedSignature::new(masks, Some(aggregated_sig)),
             aggregated_key,
-            pub_keys,
+            ordered_pub_keys,
         ))
     }
 
@@ -237,16 +241,19 @@ impl ValidatorVerifier {
         &self,
         partial_signatures: &PartialSignatures,
         messages: &[&T],
+        verify: bool,
     ) -> Result<AggregatedSignature, VerifyError> {
         let (aggregated_sig, _aggregated_key, public_keys) =
             self.aggregate_signature(partial_signatures)?;
         // Verify the aggregated signature
-        aggregated_sig
-            .aggregated_sig()
-            .as_ref()
-            .expect("Failed to get aggregated signature")
-            .verify_aggregate(messages, &public_keys)
-            .map_err(|_| VerifyError::FailedToVerifyAggregatedSignature)?;
+        if verify {
+            aggregated_sig
+                .aggregated_sig()
+                .as_ref()
+                .expect("Failed to get aggregated signature")
+                .verify_aggregate(messages, &public_keys)
+                .map_err(|_| VerifyError::FailedToVerifyAggregatedSignature)?;
+        }
         Ok(aggregated_sig)
     }
 
@@ -406,6 +413,10 @@ impl ValidatorVerifier {
     /// Returns total voting power.
     pub fn total_voting_power(&self) -> u128 {
         self.total_voting_power
+    }
+
+    pub fn address_to_validator_index(&self) -> &HashMap<AccountAddress, usize> {
+        &self.address_to_validator_index
     }
 }
 

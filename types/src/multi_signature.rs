@@ -3,7 +3,8 @@
 
 use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use std::collections::BTreeMap;
+use itertools::Itertools;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::block_info::Round;
 use aptos_bitvec::BitVec;
@@ -144,15 +145,23 @@ impl PartialSignaturesWithRound {
             .or_insert((round, signature));
     }
 
-    /// Returns partial signature and a vector of rounds ordered by account address.
-    pub fn get_partial_sig_with_rounds(&self) -> (PartialSignatures, Vec<Round>) {
+    /// Returns partial signature and a vector of rounds ordered by validator index
+    pub fn get_partial_sig_with_rounds(
+        &self,
+        address_to_validator_index: &HashMap<AccountAddress, usize>,
+    ) -> (PartialSignatures, Vec<Round>) {
         let mut partial_sig = PartialSignatures::empty();
-        let mut rounds = vec![];
+        let mut index_to_rounds = BTreeMap::new();
         self.signatures.iter().for_each(|(address, (round, sig))| {
-            partial_sig.add_signature(*address, sig.clone());
-            rounds.push(*round);
+            address_to_validator_index
+                .get(address)
+                .into_iter()
+                .for_each(|index| {
+                    partial_sig.add_signature(*address, sig.clone());
+                    index_to_rounds.insert(index, round.clone());
+                });
         });
-        (partial_sig, rounds)
+        (partial_sig, index_to_rounds.into_values().collect_vec())
     }
 }
 
