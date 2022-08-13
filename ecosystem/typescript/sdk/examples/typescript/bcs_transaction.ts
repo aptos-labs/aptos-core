@@ -10,15 +10,7 @@ import assert from "assert";
 const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
 const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
 
-const {
-  AccountAddress,
-  TypeTagStruct,
-  ScriptFunction,
-  StructTag,
-  TransactionPayloadScriptFunction,
-  RawTransaction,
-  ChainId,
-} = TxnBuilderTypes;
+const { AccountAddress, TypeTagStruct, ScriptFunction, StructTag, TransactionPayloadScriptFunction } = TxnBuilderTypes;
 
 /**
  * This code example demonstrates the process of moving test coins from one account to another.
@@ -62,26 +54,7 @@ const {
     ),
   );
 
-  const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
-    client.getAccount(account1.address()),
-    client.getChainId(),
-  ]);
-
-  // See class definiton here
-  // https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.RawTransaction.html#constructor.
-  const rawTxn = new RawTransaction(
-    // Transaction sender account address
-    AccountAddress.fromHex(account1.address()),
-    BigInt(sequenceNumber),
-    scriptFunctionPayload,
-    // Max gas unit to spend
-    2000n,
-    // Gas price per unit
-    1n,
-    // Expiration timestamp. Transaction is discarded if it is not executed within 10 seconds from now.
-    BigInt(Math.floor(Date.now() / 1000) + 10),
-    new ChainId(chainId),
-  );
+  const rawTxn = await client.generateRawTransaction(account1.address(), scriptFunctionPayload);
 
   // Sign the raw transaction with account1's private key
   const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
