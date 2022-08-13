@@ -1,5 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
+use crate::rocks_db::RocksDbStorage;
 use crate::{
     CryptoStorage, Error, GetResponse, GitHubStorage, InMemoryStorage, KVStorage, Namespaced,
     OnDiskStorage, PublicKeyResponse, VaultStorage,
@@ -21,6 +22,7 @@ pub enum Storage {
     InMemoryStorage(InMemoryStorage),
     NamespacedStorage(Namespaced<Box<Storage>>),
     OnDiskStorage(OnDiskStorage),
+    RocksDbStorage(RocksDbStorage),
 }
 
 impl KVStorage for Box<Storage> {
