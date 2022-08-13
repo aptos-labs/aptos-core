@@ -724,7 +724,7 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
         .batch_update(vec![(key.hash(), Some(&value))], &ProofReader::new_empty())
         .unwrap();
     db.ledger_db
-        .put::<StateValueSchema>(&(key.clone(), version), &value)
+        .put::<StateValueSchema>(&(key.clone(), version), &Some(value.clone()))
         .unwrap();
     let mut in_memory_state = db
         .state_store

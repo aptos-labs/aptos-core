@@ -365,11 +365,11 @@ pub trait DbReader: Send + Sync {
     }
 
     /// Returns the proof of the given state key and version.
-    fn get_state_proof_by_version(
+    fn get_state_proof_by_version_ext(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<SparseMerkleProof> {
+    ) -> Result<SparseMerkleProofExt> {
         unimplemented!()
     }
 
@@ -686,8 +686,8 @@ pub fn jmt_updates(
         .collect()
 }
 
-pub fn jmt_update_refs(
-    jmt_updates: &[(HashValue, Option<(HashValue, StateKey)>)],
-) -> Vec<(HashValue, Option<&(HashValue, StateKey)>)> {
+pub fn jmt_update_refs<K>(
+    jmt_updates: &[(HashValue, Option<(HashValue, K)>)],
+) -> Vec<(HashValue, Option<&(HashValue, K)>)> {
     jmt_updates.iter().map(|(x, y)| (*x, y.as_ref())).collect()
 }

@@ -215,7 +215,7 @@ fn test_update_256_siblings_in_proof() {
             .collect();
     siblings.push(leaf2.into());
     siblings.reverse();
-    let proof_of_key1 = SparseMerkleProofExt::new(Some(leaf1.clone()), siblings.clone());
+    let proof_of_key1 = SparseMerkleProofExt::new(Some(leaf1), siblings.clone());
 
     let old_root_hash = siblings
         .iter()

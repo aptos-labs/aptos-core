@@ -75,7 +75,7 @@ fn test_insert_at_leaf_with_internal_created() {
     let key1 = HashValue::new([0x00u8; HashValue::LENGTH]);
     let value1 = gen_value();
 
-    let (_root0_hash, batch) = tree
+    let (root0_hash, batch) = tree
         .put_value_set_test(vec![(key1, Some(&value1))], 0 /* version */)
         .unwrap();
 
@@ -93,7 +93,7 @@ fn test_insert_at_leaf_with_internal_created() {
     let key2 = update_nibble(&key1, 0, 15);
     let value2 = gen_value();
 
-    let (root1_hash, batch) = tree
+    let (_root1_hash, batch) = tree
         .put_value_set_test(vec![(key2, Some(&value2))], 1 /* version */)
         .unwrap();
     assert_eq!(batch.num_stale_node(), 1);
@@ -134,7 +134,7 @@ fn test_insert_at_leaf_with_internal_created() {
     assert_eq!(db.get_node(&internal_node_key).unwrap(), internal);
 
     // Deletion
-    let (root1_hash_after_delete, batch) = tree
+    let (root2_hash, batch) = tree
         .put_value_set_test(vec![(key2, None)], 2 /* version */)
         .unwrap();
     assert_eq!(batch.num_stale_node(), 3);
@@ -144,7 +144,7 @@ fn test_insert_at_leaf_with_internal_created() {
     assert!(tree.get(key2, 0).unwrap().is_none());
     assert_eq!(tree.get(key2, 1).unwrap().unwrap(), value2.0);
     assert!(tree.get(key2, 2).unwrap().is_none());
-    assert_eq!(root1_hash_after_delete, root1_hash);
+    assert_eq!(root0_hash, root2_hash);
     // get # of nodes
     assert_eq!(db.num_nodes(), 5 /* 1 + 3 + 1 */);
 }
@@ -785,7 +785,7 @@ proptest! {
     }
 
     #[test]
-    fn proptest_get_leaf_count(keys in hash_set(any::<HashValue>(), 1..1000)) {
+    fn proptest_get_leaf_count(keys in hash_set(any::<HashValue>(), 3..2000)) {
         test_get_leaf_count(keys)
     }
 }

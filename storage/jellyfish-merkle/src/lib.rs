@@ -449,7 +449,7 @@ where
         hash_cache: &Option<&HashMap<NibblePath, HashValue>>,
         batch: &mut TreeUpdateBatch<K>,
     ) -> Result<Option<Node<K>>> {
-        let node = self.reader.get_node(&node_key)?;
+        let node = self.reader.get_node(node_key)?;
         batch.put_stale_node(node_key.clone(), version, &node);
 
         match node {
@@ -465,7 +465,7 @@ where
                             let mut sub_batch = TreeUpdateBatch::new();
                             Ok((
                                 self.insert_at_child(
-                                    &node_key,
+                                    node_key,
                                     &internal_node,
                                     version,
                                     kvs,
@@ -489,7 +489,7 @@ where
                     range_iter
                         .map(|(left, right)| {
                             self.insert_at_child(
-                                &node_key,
+                                node_key,
                                 &internal_node,
                                 version,
                                 kvs,
@@ -504,7 +504,7 @@ where
                 };
 
                 // Reuse the current `InternalNode` in memory to create a new internal node.
-                let mut old_children: Children = internal_node.clone().into();
+                let mut old_children: Children = internal_node.into();
                 let mut new_created_children = HashMap::new();
                 for (child_nibble, child_option) in new_children {
                     if let Some(child) = child_option {
@@ -522,10 +522,8 @@ where
                             if old_nibble == new_nibble && new_child.is_leaf() {
                                 return Ok(Some(new_child.clone()));
                             }
-                        } else {
-                            if new_child.is_leaf() {
-                                return Ok(Some(new_child.clone()));
-                            }
+                        } else if new_child.is_leaf() {
+                            return Ok(Some(new_child.clone()));
                         }
                     } else {
                         let (old_child_nibble, old_child) =
@@ -534,11 +532,7 @@ where
                             let old_child_node_key =
                                 node_key.gen_child_node_key(old_child.version, *old_child_nibble);
                             let old_child_node = self.reader.get_node(&old_child_node_key)?;
-                            batch.put_stale_node(
-                                old_child_node_key.clone(),
-                                version,
-                                &old_child_node,
-                            );
+                            batch.put_stale_node(old_child_node_key, version, &old_child_node);
                             return Ok(Some(old_child_node));
                         }
                     }
@@ -561,7 +555,7 @@ where
                 Ok(Some(new_internal_node.into()))
             }
             Node::Leaf(leaf_node) => self.batch_update_subtree_with_existing_leaf(
-                &node_key, version, leaf_node, kvs, depth, hash_cache, batch,
+                node_key, version, leaf_node, kvs, depth, hash_cache, batch,
             ),
         }
     }
