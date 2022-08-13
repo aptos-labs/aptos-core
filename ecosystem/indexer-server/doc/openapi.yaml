@@ -726,7 +726,7 @@ components:
         Note:
           1. Empty chars should be ignored when comparing 2 struct tag ids.
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-      example: "0x1::XUS::XUS"
+      example: "0x1::aptos_coin::AptosCoin"
     MoveTypeId:
       title: Move Type ID
       type: string
@@ -793,7 +793,7 @@ components:
         Note:
           1. Empty chars should be ignored when comparing 2 struct tag ids.
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-      example: "0x1::AptosAccount::Balance<0x1::XUS::XUS>"
+      example: "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
     MoveStructTagId:
       title: Move Struct Tag ID
       type: string
@@ -816,7 +816,7 @@ components:
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
 
         See [doc](https://diem.github.io/move/structs-and-resources.html) for more details.
-      example: "0x1::AptosAccount::Balance<0x1::XUS::XUS>"
+      example: "0x1::AptosAccount::Balance<0x1::aptos_coin::AptosCoin>"
     MoveModule:
       title: Move Module
       type: object
@@ -1003,7 +1003,6 @@ components:
         - sequence_number
         - max_gas_amount
         - gas_unit_price
-        - gas_currency_code
         - expiration_timestamp_secs
         - payload
       properties:
@@ -1015,9 +1014,6 @@ components:
           $ref: '#/components/schemas/Uint64'
         gas_unit_price:
           $ref: '#/components/schemas/Uint64'
-        gas_currency_code:
-          type: string
-          example: "XDX"
         expiration_timestamp_secs:
           $ref: '#/components/schemas/TimestampSec'
         payload:

@@ -26,7 +26,10 @@ pub const ESCRIPT_NOT_ALLOWED: u64 = 1008;
 pub const EMODULE_NOT_ALLOWED: u64 = 1009;
 pub const EINVALID_WRITESET_SENDER: u64 = 1010; // invalid sender (not aptos root) for write set
 pub const ESEQUENCE_NUMBER_TOO_BIG: u64 = 1011;
-pub const EBAD_TRANSACTION_FEE_CURRENCY: u64 = 1012;
+// This error code has been deprecated and just left here sp future error codes would not
+// accidentally reuse.
+#[allow(dead_code)]
+pub const RESERVED_UNUSED: u64 = 1012;
 pub const ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1013;
 pub const ESEQ_NONCE_NONCE_INVALID: u64 = 1014;
 
@@ -87,10 +90,6 @@ pub fn convert_prologue_error(
                 (INVALID_ARGUMENT, EINVALID_WRITESET_SENDER) => StatusCode::REJECTED_WRITE_SET,
                 // Sequence number will overflow
                 (LIMIT_EXCEEDED, ESEQUENCE_NUMBER_TOO_BIG) => StatusCode::SEQUENCE_NUMBER_TOO_BIG,
-                // The gas currency is not registered as a TransactionFee currency
-                (INVALID_ARGUMENT, EBAD_TRANSACTION_FEE_CURRENCY) => {
-                    StatusCode::BAD_TRANSACTION_FEE_CURRENCY
-                }
                 (INVALID_ARGUMENT, ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH) => {
                     StatusCode::SECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH
                 }
