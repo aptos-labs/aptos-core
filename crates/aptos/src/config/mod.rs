@@ -20,8 +20,10 @@ use std::fmt::Formatter;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-/// Tool for configuration of the CLI tool
+/// Tool for interacting with configuration of the Aptos CLI tool
 ///
+/// This tool handles the global configuration of the CLI tool for
+/// default configuration, and user specific settings.
 #[derive(Parser)]
 pub enum ConfigTool {
     Init(crate::common::init::InitTool),

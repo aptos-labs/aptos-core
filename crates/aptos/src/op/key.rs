@@ -23,7 +23,10 @@ use std::{
 
 pub const PUBLIC_KEY_EXTENSION: &str = "pub";
 
-/// CLI tool for generating, inspecting, and interacting with keys.
+/// Tool for generating, inspecting, and interacting with keys
+///
+/// This tool allows users to generate and extract related information
+/// with all key types used on the Aptos blockchain.
 #[derive(Debug, Subcommand)]
 pub enum KeyTool {
     Generate(GenerateKey),

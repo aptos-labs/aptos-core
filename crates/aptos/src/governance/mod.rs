@@ -18,6 +18,9 @@ use std::fmt::Formatter;
 
 /// Tool for on-chain governance
 ///
+/// This tool allows voters that have stake to vote the ability to
+/// propose changes to the chain, as well as vote and execute these
+/// proposals.
 #[derive(Parser)]
 pub enum GovernanceTool {
     Propose(SubmitProposal),
