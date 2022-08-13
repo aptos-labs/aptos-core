@@ -735,6 +735,110 @@
           "val": "1"
         },
         {
+          "key": "aptos_framework.bit_vector.little_endian_bitvector_from_byte_vector.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bit_vector.little_endian_bitvector_from_byte_vector.per_byte",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bit_vector.big_endian_bitvector_from_byte_vector.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bit_vector.big_endian_bitvector_from_byte_vector.per_byte",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.basepoint_double_mul",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.point_add",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.point_compress",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.point_decompress",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.point_equals",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.point_from_64_uniform_bytes",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.point_identity",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.point_mul",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.point_neg",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.point_sub",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.scalar_sha512_per_byte",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.scalar_sha512_per_hash",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.scalar_add",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.scalar_from_512_bits",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.scalar_from_u128",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.scalar_from_u64",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.scalar_invert",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.scalar_is_canonical",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.scalar_mul",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.scalar_neg",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.ristretto255.scalar_sub",
+          "val": "1"
+        },
+        {
           "key": "aptos_framework.signature.ed25519_validate_pubkey.base",
           "val": "1"
         },

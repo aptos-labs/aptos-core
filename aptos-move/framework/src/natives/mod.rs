@@ -29,6 +29,7 @@ pub struct GasParameters {
     pub account: account::GasParameters,
     pub signature: signature::GasParameters,
     pub bls12381: cryptography::bls12381::GasParameters,
+    pub ristretto255: cryptography::ristretto255::GasParameters,
     pub hash: hash::GasParameters,
     pub type_info: type_info::GasParameters,
     pub util: util::GasParameters,
@@ -61,6 +62,32 @@ impl GasParameters {
                 per_pairing_cost: 0.into(),
                 per_msg_hashing_cost: 0.into(),
                 per_byte_hashing_cost: 0.into(),
+            },
+            ristretto255: cryptography::ristretto255::GasParameters {
+                base_cost: 0.into(),
+                basepoint_mul_cost: 0.into(),
+                basepoint_double_mul_cost: 0.into(),
+                point_add_cost: 0.into(),
+                point_compress_cost: 0.into(),
+                point_decompress_cost: 0.into(),
+                point_equals_cost: 0.into(),
+                point_from_64_uniform_bytes_cost: 0.into(),
+                point_identity_cost: 0.into(),
+                point_mul_cost: 0.into(),
+                point_neg_cost: 0.into(),
+                point_sub_cost: 0.into(),
+                scalar_add_cost: 0.into(),
+                scalar_reduced_from_32_bytes_cost: 0.into(),
+                scalar_uniform_from_64_bytes_cost: 0.into(),
+                scalar_from_u128_cost: 0.into(),
+                scalar_from_u64_cost: 0.into(),
+                scalar_invert_cost: 0.into(),
+                scalar_is_canonical_cost: 0.into(),
+                scalar_mul_cost: 0.into(),
+                scalar_neg_cost: 0.into(),
+                sha512_per_byte_cost: 0.into(),
+                sha512_per_hash_cost: 0.into(),
+                scalar_sub_cost: 0.into(),
             },
             signature: signature::GasParameters {
                 // Ed25519
@@ -147,6 +174,10 @@ pub fn all_natives(
         cryptography::bls12381::make_all(gas_params.bls12381)
     );
     add_natives_from_module!("aptos_hash", hash::make_all(gas_params.hash));
+    add_natives_from_module!(
+        "ristretto255",
+        cryptography::ristretto255::make_all(gas_params.ristretto255)
+    );
     add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
     add_natives_from_module!("util", util::make_all(gas_params.util));
     add_natives_from_module!(
