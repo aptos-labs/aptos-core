@@ -304,7 +304,7 @@ impl CliCommand<&'static str> for ProvePackage {
 
         match result {
             Ok(_) => Ok("Success"),
-            Err(_) => Err(CliError::MoveProverError),
+            Err(err) => Err(CliError::MoveProverError(err.to_string())),
         }
     }
 }

@@ -128,7 +128,6 @@ fn signing_message_request() -> Value {
         "sequence_number": "0",
         "gas_unit_price": "0",
         "max_gas_amount": "1000000",
-        "gas_currency_code": "XUS",
         "expiration_timestamp_secs": "9991638487317",
         "payload": {
             "type": "script_function_payload",

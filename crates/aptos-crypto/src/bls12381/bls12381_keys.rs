@@ -58,13 +58,13 @@ impl PublicKey {
         self.pubkey.to_bytes()
     }
 
-    /// Group-checks the public key (i.e., verifies the public key is an element of the prime-order
+    /// Subgroup-checks the public key (i.e., verifies the public key is an element of the prime-order
     /// subgroup and it is not the identity element).
     ///
-    /// WARNING: Group-checking is done implicitly when verifying the proof-of-possession (PoP) for
+    /// WARNING: Subgroup-checking is done implicitly when verifying the proof-of-possession (PoP) for
     /// this public key  in `ProofOfPossession::verify`, so this function should not be called
     /// separately for most use-cases. We leave it here just in case.
-    pub fn group_check(&self) -> Result<()> {
+    pub fn subgroup_check(&self) -> Result<()> {
         self.pubkey.validate().map_err(|e| anyhow!("{:?}", e))
     }
 
@@ -76,7 +76,7 @@ impl PublicKey {
     pub fn aggregate(pubkeys: Vec<&Self>) -> Result<PublicKey> {
         let blst_pubkeys: Vec<_> = pubkeys.iter().map(|pk| &pk.pubkey).collect();
 
-        // CRYPTONOTE(Alin): We assume the PKs have had their PoPs verified and thus have also been group-checked
+        // CRYPTONOTE(Alin): We assume the PKs have had their PoPs verified and thus have also been subgroup-checked
         let aggpk = blst::min_pk::AggregatePublicKey::aggregate(&blst_pubkeys[..], false)
             .map_err(|e| anyhow!("{:?}", e))?;
 
@@ -222,9 +222,16 @@ impl TryFrom<&[u8]> for PublicKey {
 
     /// Deserializes a PublicKey from a sequence of bytes.
     ///
-    /// WARNING: Does NOT group-check the public key! Instead, the caller is responsible for
+    /// WARNING: Does NOT subgroup-check the public key! Instead, the caller is responsible for
     /// verifying the public key's proof-of-possession (PoP) via `ProofOfPossession::verify`,
-    /// which implicitly group checks the public key.
+    /// which implicitly subgroup-checks the public key.
+    ///
+    /// NOTE: This function will only check that the PK is a point on the curve:
+    ///  - `blst::min_pk::PublicKey::from_bytes(bytes)` calls `blst::min_pk::PublicKey::deserialize(bytes)`,
+    ///    which calls `$pk_deser` in https://github.com/supranational/blst/blob/711e1eec747772e8cae15d4a1885dd30a32048a4/bindings/rust/src/lib.rs#L734,
+    ///    which is mapped to `blst_p1_deserialize` in https://github.com/supranational/blst/blob/711e1eec747772e8cae15d4a1885dd30a32048a4/bindings/rust/src/lib.rs#L1652
+    ///  - `blst_p1_deserialize` eventually calls `POINTonE1_Deserialize_BE`, which checks
+    ///    the point is on the curve: https://github.com/supranational/blst/blob/711e1eec747772e8cae15d4a1885dd30a32048a4/src/e1.c#L296
     fn try_from(bytes: &[u8]) -> std::result::Result<Self, CryptoMaterialError> {
         Ok(Self {
             pubkey: blst::min_pk::PublicKey::from_bytes(bytes)

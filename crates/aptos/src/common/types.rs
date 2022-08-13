@@ -81,8 +81,8 @@ pub enum CliError {
     MoveCompilationError(String),
     #[error("Move unit tests failed")]
     MoveTestError,
-    #[error("Move Prover failed")]
-    MoveProverError,
+    #[error("Move Prover failed: {0}")]
+    MoveProverError(String),
     #[error("Unable to parse '{0}': error: {1}")]
     UnableToParse(&'static str, String),
     #[error("Unable to read file '{0}', error: {1}")]
@@ -103,7 +103,7 @@ impl CliError {
             CliError::IO(_, _) => "IO",
             CliError::MoveCompilationError(_) => "MoveCompilationError",
             CliError::MoveTestError => "MoveTestError",
-            CliError::MoveProverError => "MoveProverError",
+            CliError::MoveProverError(_) => "MoveProverError",
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
