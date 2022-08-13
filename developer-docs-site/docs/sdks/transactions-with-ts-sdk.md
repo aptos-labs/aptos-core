@@ -93,7 +93,7 @@ const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromSt
 const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
   TxnBuilderTypes.ScriptFunction.natural(
     // Fully qualified module name, `AccountAddress::ModuleName`
-    "0x1::Coin",
+    "0x1::coin",
     // Module function
     "transfer",
     // The coin type to transfer
@@ -117,30 +117,8 @@ All arguments in `ScriptFunction` payload must be BCS serialized. In above code,
 After assembling a transaction payload, we are ready to create a `RawTransaction` instance that wraps the payload we just created. The `RawTransaction` can then be signed and submitted.
 
 ```ts
-// Sequence number is a security measure to prevent re-play attack.
-const [{ sequence_number: sequnceNumber }, chainId] = await Promise.all([
-  client.getAccount(alice.address()),
-  client.getChainId(),
-]);
-
-// See class definiton here
-// https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.RawTransaction.html#constructor.
-const rawTxn = new TxnBuilderTypes.RawTransaction(
-  // Transaction sender account address (Alice's)
-  TxnBuilderTypes.AccountAddress.fromHex(alice.address()),
-  // Account sequnece number
-  BigInt(sequnceNumber),
-  // Payload we assembled from the previous step
-  scriptFunctionPayload,
-  // Max gas unit to spend
-  1000n,
-  // Gas price per unit
-  1n,
-  // Expiration timestamp. Transaction is discarded if it is not executed within 10 seconds from now.
-  BigInt(Math.floor(Date.now() / 1000) + 10),
-  // The chain id that this transaction is targeting
-  new TxnBuilderTypes.ChainId(chainId),
-);
+// Create a raw transaction out of the transaction payload
+const rawTxn = await client.generateRawTransaction(alice.address(), scriptFunctionPayload);
 
 // Sign the raw transaction with Alice's private key
 const bcsTxn = AptosClient.generateBCSTransaction(alice, rawTxn);
@@ -164,3 +142,31 @@ Alice coins: 5000. Should be 5000!
 Bob coins: 0. Should be 0!
 Bob coins: 717. Should be 717!
 ```
+
+## Build raw transactions with the ABI transaction builder
+
+To reduce the burden of serializing payload arguments manually, Typescript SDK also provides an ABI (Application Binary Interface) based transaction builder. The ABI includes the information about the Move function signatures. With the help of ABI, the Typescript SDK is able to serialize native JS/TS values. The ABI files are produced while compiling Move packages with the Aptos CLI. To build raw transactions with the ABI transaction builder, you first need to convert the ABI files into hex strings. On linux/Mac, you can do it with below command::
+
+```bash
+cat aptos-core/aptos-move/framework/aptos-token/build/AptosToken/abis/token_transfers/offer_script.abi | od -v -t x1 -A n | tr -d ' \n'
+```
+
+And then, you can build raw transactions with:
+
+```ts
+import { TransactionBuilderABI, HexString } from "aptos";
+
+// You can pass in multiple ABIs
+const transactionBuilder = new TransactionBuilderABI([
+  new HexString("ABI_HEX_STRING_1").toUint8Array(),
+  new HexString("ABI_HEX_STRING_2").toUint8Array(),
+]);
+
+const rawTransaction = transactionBuilder.build(
+  "0x3::token_transfers::offer_script",
+  [],
+  [receiver, creator, collectionName, name, property_version, amount],
+);
+```
+
+After building the raw transactions, you can follow the `Step 3` above to sign and submit the transaction.
