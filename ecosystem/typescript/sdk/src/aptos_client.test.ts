@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { AptosClient } from "./aptos_client";
 import * as Gen from "./generated/index";
 import { FAUCET_URL, NODE_URL } from "./util.test";
@@ -402,7 +405,7 @@ test(
     aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("0");
 
-    let bobBalance = await tokenClient.getTokenBalanceForAccount(bob.address().hex(), tokenId);
+    const bobBalance = await tokenClient.getTokenBalanceForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
   },
   30 * 1000,

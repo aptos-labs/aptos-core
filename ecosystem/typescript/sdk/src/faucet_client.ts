@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 /** Faucet creates and funds accounts. This is a thin wrapper around that. */
 import { AptosClient } from "./aptos_client";
 import { OpenAPIConfig } from "./generated";

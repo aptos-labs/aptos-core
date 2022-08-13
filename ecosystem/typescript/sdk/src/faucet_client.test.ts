@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { AptosClient } from "./aptos_client";
 import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";

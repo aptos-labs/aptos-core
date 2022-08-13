@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { Memoize } from "typescript-memoize";
 import { HexString, MaybeHexString } from "./hex_string";
 import { fixNodeUrl, sleep } from "./util";
