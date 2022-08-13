@@ -10,6 +10,7 @@ use std::time::Duration;
 use tokio::runtime::Runtime;
 use tokio_metrics::RuntimeMonitor;
 
+/// Instruments the provided tokio run time by spawning a periodic task on the runtime itself.
 pub fn instrument_tokio_runtime(runtime: &Runtime, name: &'static str) {
     let runtime_monitor = RuntimeMonitor::new(runtime.handle());
     runtime.spawn(async move {
