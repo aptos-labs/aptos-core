@@ -4,10 +4,12 @@
 use crate::{error::Error, Client, Result};
 use aptos_types::transaction::SignedTransaction;
 use move_deps::move_core_types::account_address::AccountAddress;
-use reqwest::Url;
+use reqwest::{Client as ReqwestClient, Url};
+use std::time::Duration;
 
 pub struct FaucetClient {
     faucet_url: Url,
+    inner: ReqwestClient,
     rest_client: Client,
 }
 
@@ -15,6 +17,10 @@ impl FaucetClient {
     pub fn new(faucet_url: Url, rest_url: Url) -> Self {
         Self {
             faucet_url,
+            inner: ReqwestClient::builder()
+                .timeout(Duration::from_secs(10))
+                .build()
+                .unwrap(),
             rest_client: Client::new(rest_url),
         }
     }
@@ -22,6 +28,10 @@ impl FaucetClient {
     pub fn new_for_testing(faucet_url: Url, rest_url: Url) -> Self {
         Self {
             faucet_url,
+            inner: ReqwestClient::builder()
+                .timeout(Duration::from_secs(10))
+                .build()
+                .unwrap(),
             rest_client: Client::new(rest_url)
                 // By default the path is prefixed with the version, e.g. `v1`.
                 // The fake API used in the faucet tests doesn't have a
@@ -31,16 +41,16 @@ impl FaucetClient {
         }
     }
 
-    pub fn create_account(&self, address: AccountAddress) -> Result<()> {
-        let client = reqwest::blocking::Client::new();
+    /// Create an account with zero balance.
+    pub async fn create_account(&self, address: AccountAddress) -> Result<()> {
         let mut url = self.faucet_url.clone();
         url.set_path("mint");
         let query = format!("auth_key={}&amount=0&return_txns=true", address);
         url.set_query(Some(&query));
 
-        let response = client.post(url).send().map_err(Error::request)?;
+        let response = self.inner.post(url).send().await.map_err(Error::request)?;
         let status_code = response.status();
-        let body = response.text().map_err(Error::decode)?;
+        let body = response.text().await.map_err(Error::decode)?;
         if !status_code.is_success() {
             return Err(anyhow::anyhow!("body: {}", body));
         }
@@ -48,16 +58,16 @@ impl FaucetClient {
         let bytes = hex::decode(body).map_err(Error::decode)?;
         let txns: Vec<SignedTransaction> = bcs::from_bytes(&bytes).map_err(Error::decode)?;
 
-        tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(self.rest_client.wait_for_signed_transaction(&txns[0]))
+        self.rest_client
+            .wait_for_signed_transaction(&txns[0])
+            .await
             .map_err(Error::unknown)?;
 
         Ok(())
     }
 
-    pub fn fund(&self, address: AccountAddress, amount: u64) -> Result<()> {
-        let client = reqwest::blocking::Client::new();
+    /// Fund an account with the given amount.
+    pub async fn fund(&self, address: AccountAddress, amount: u64) -> Result<()> {
         let mut url = self.faucet_url.clone();
         url.set_path("mint");
         let query = format!("auth_key={}&amount={}&return_txns=true", address, amount);
@@ -65,9 +75,9 @@ impl FaucetClient {
 
         // Faucet returns the transaction that creates the account and needs to be waited on before
         // returning.
-        let response = client.post(url).send().map_err(Error::request)?;
+        let response = self.inner.post(url).send().await.map_err(Error::request)?;
         let status_code = response.status();
-        let body = response.text().map_err(Error::decode)?;
+        let body = response.text().await.map_err(Error::decode)?;
         if !status_code.is_success() {
             return Err(Error::status(status_code.as_u16()).into());
         }
@@ -75,17 +85,18 @@ impl FaucetClient {
         let bytes = hex::decode(body).map_err(Error::decode)?;
         let txns: Vec<SignedTransaction> = bcs::from_bytes(&bytes).map_err(Error::decode)?;
 
-        tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(self.rest_client.wait_for_signed_transaction(&txns[0]))
+        self.rest_client
+            .wait_for_signed_transaction(&txns[0])
+            .await
             .map_err(Error::unknown)?;
 
         Ok(())
     }
 
-    pub fn mint(&self, address: AccountAddress, amount: u64) -> Result<()> {
-        self.create_account(address)?;
-        self.fund(address, amount)?;
+    // Create and fund an account.
+    pub async fn mint(&self, address: AccountAddress, amount: u64) -> Result<()> {
+        self.create_account(address).await?;
+        self.fund(address, amount).await?;
 
         Ok(())
     }
