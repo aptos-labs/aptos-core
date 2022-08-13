@@ -192,6 +192,36 @@ fn bls12381_aggsig_should_verify() {
     assert!(aggsig.verify_aggregate(&msgs_wrong_refs, &pubkeys).is_err());
 }
 
+/// Tests that an aggregate signature on 0 messages or PKs does NOT verify.
+#[test]
+fn bls12381_aggsig_zero_messages_or_pks_does_not_verify() {
+    let mut rng = OsRng;
+
+    let message = random_message_for_signing(&mut rng);
+
+    let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+
+    let aggsig = bls12381::Signature::aggregate(vec![key_pair.private_key.sign(&message)]).unwrap();
+
+    // aggsig should NOT verify on zero messages and zero PKs
+    let pubkeys: Vec<&PublicKey> = vec![];
+    let messages = vec![];
+    let msgs_refs = messages.iter().collect::<Vec<&TestAptosCrypto>>();
+    assert!(aggsig.verify_aggregate(&msgs_refs, &pubkeys).is_err());
+
+    // aggsig should NOT verify on zero PKs
+    let pubkeys: Vec<&PublicKey> = vec![];
+    let messages = vec![message];
+    let msgs_refs = messages.iter().collect::<Vec<&TestAptosCrypto>>();
+    assert!(aggsig.verify_aggregate(&msgs_refs, &pubkeys).is_err());
+
+    // aggsig should NOT verify on zero messages
+    let pubkeys: Vec<&PublicKey> = vec![&key_pair.public_key];
+    let messages = vec![];
+    let msgs_refs = messages.iter().collect::<Vec<&TestAptosCrypto>>();
+    assert!(aggsig.verify_aggregate(&msgs_refs, &pubkeys).is_err());
+}
+
 /// Tests that a multisignature incorrectly aggregated from signature shares on different messages does
 /// NOT verify.
 #[test]
