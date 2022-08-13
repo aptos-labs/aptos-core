@@ -19,13 +19,16 @@ use std::{fmt::Debug, io::Read, path::PathBuf, str::FromStr};
 
 pub const LAYOUT_NAME: &str = "layout";
 
-/// Setup a shared Github repository for Genesis
+/// Setup a shared Git repository for Genesis
 ///
+/// This will setup a folder or an online Github repository to be used
+/// for Genesis.  If it's the local, it will create the folders but not
+/// set up a Git repository.
 #[derive(Parser)]
 pub struct SetupGit {
     #[clap(flatten)]
     pub(crate) git_options: GitOptions,
-    /// Path to `Layout` which defines where all the files are
+    /// Path to the `Layout` file which defines where all the files are
     #[clap(long, parse(from_os_str))]
     pub(crate) layout_file: PathBuf,
 }
