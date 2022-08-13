@@ -170,13 +170,13 @@ impl BufferManager {
             callback,
         } = ordered_blocks;
 
-        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
-        self.buffer.push_back(item);
         info!(
             "Receive ordered block {}, the queue size is {}",
             ordered_proof.commit_info(),
-            self.buffer.len()
+            self.buffer.len() + 1,
         );
+        let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
+        self.buffer.push_back(item);
     }
 
     /// Set the execution root to the first not executed item (Ordered) and send execution request

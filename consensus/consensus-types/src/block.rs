@@ -335,7 +335,7 @@ impl Block {
         ))
         .chain(
             self.payload()
-                .unwrap_or(&Payload::new_empty())
+                .unwrap_or(&Payload::empty())
                 .clone()
                 .into_iter()
                 .map(Transaction::UserTransaction),
