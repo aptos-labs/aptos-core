@@ -28,7 +28,6 @@ use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::transaction::{
     ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction, TransactionStatus,
 };
-use aptos_types::vm_status::VMStatus;
 use aptos_vm::AptosVM;
 use poem_openapi::param::{Path, Query};
 use poem_openapi::payload::Json;
@@ -533,7 +532,12 @@ impl TransactionsApi {
         // TODO: while `into_transaction_output_with_status()` should never fail
         // to apply deltas, we should propagate errors properly. Fix this when
         // VM error handling is fixed.
-        let output = output_ext.into_transaction_output(&move_resolver)?;
+        let output = output_ext.into_transaction_output(&move_resolver);
+        debug_assert!(
+            matches!(output, Ok(_)),
+            "converting into transaction output failed"
+        );
+        let output = output.unwrap();
 
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,

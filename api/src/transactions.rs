@@ -20,7 +20,6 @@ use aptos_crypto::signing_message;
 use aptos_types::{
     mempool_status::MempoolStatusCode,
     transaction::{RawTransaction, RawTransactionWithData, SignedTransaction},
-    vm_status::VMStatus,
 };
 
 use aptos_crypto::HashValue;
@@ -351,7 +350,12 @@ impl Transactions {
         // TODO: while `into_transaction_output_with_status()` should never fail
         // to apply deltas, we should propagate errors properly. Fix this when
         // VM error handling is fixed.
-        let output = output_ext.into_transaction_output(state_view)?;
+        let output = output_ext.into_transaction_output(state_view);
+        debug_assert!(
+            matches!(output, Ok(_)),
+            "converting into transaction output failed"
+        );
+        let output = output.unwrap();
 
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,

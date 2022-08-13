@@ -4,10 +4,8 @@
 use crate::delta_ext::DeltaChangeSet;
 use aptos_state_view::StateView;
 use aptos_types::{
-    contract_event::ContractEvent,
-    transaction::{ChangeSet, TransactionOutput, TransactionStatus},
+    transaction::{ChangeSet, TransactionOutput},
     vm_status::VMStatus,
-    write_set::WriteSet,
 };
 
 /// Extension of `ChangeSet` that also holds deltas.
