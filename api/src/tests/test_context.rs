@@ -17,7 +17,7 @@ use aptos_mempool::mocks::MockSharedMempool;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{
-        account_config::aptos_root_address, transaction::SignedTransaction, AccountKey,
+        account_config::aptos_test_root_address, transaction::SignedTransaction, AccountKey,
         LocalAccount,
     },
 };
@@ -238,7 +238,7 @@ impl TestContext {
     }
 
     pub fn root_account(&self) -> LocalAccount {
-        LocalAccount::new(aptos_root_address(), self.root_key.private_key(), 0)
+        LocalAccount::new(aptos_test_root_address(), self.root_key.private_key(), 0)
     }
 
     pub fn latest_state_view(&self) -> DbStateView {

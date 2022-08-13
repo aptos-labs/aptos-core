@@ -194,7 +194,7 @@ impl LocalSwarm {
             .collect::<Result<HashMap<_, _>>>()?;
         let root_key = ConfigKey::new(root_key);
         let root_account = LocalAccount::new(
-            aptos_sdk::types::account_config::aptos_root_address(),
+            aptos_sdk::types::account_config::aptos_test_root_address(),
             AccountKey::from_private_key(root_key.private_key()),
             0,
         );

@@ -10,6 +10,8 @@ module aptos_framework::block {
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
 
+    friend aptos_framework::genesis;
+
     /// Should be in-sync with BlockResource rust struct in new_block.rs
     struct BlockResource has key {
         /// Height of the current block
@@ -33,16 +35,16 @@ module aptos_framework::block {
     }
 
     /// The `BlockResource` resource is in an invalid state
-    const EBLOCK_METADATA: u64 = 0;
+    const EBLOCK_METADATA: u64 = 1;
     /// An invalid signer was provided. Expected the signer to be the VM or a Validator.
-    const EVM_OR_VALIDATOR: u64 = 1;
+    const EVM_OR_VALIDATOR: u64 = 2;
+    const EINVALID_EPOCH_INTERVAL: u64 = 3;
 
     /// This can only be called during Genesis.
-    public fun initialize_block_metadata(account: &signer, epoch_interval: u64) {
-        timestamp::assert_genesis();
+    public(friend) fun initialize(account: &signer, epoch_interval: u64) {
         system_addresses::assert_aptos_framework(account);
+        assert!(epoch_interval > 0, error::invalid_argument(EINVALID_EPOCH_INTERVAL));
 
-        assert!(!is_initialized(), error::already_exists(EBLOCK_METADATA));
         move_to<BlockResource>(
             account,
             BlockResource {
@@ -60,13 +62,10 @@ module aptos_framework::block {
         new_epoch_interval: u64,
     ) acquires BlockResource {
         system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(new_epoch_interval > 0, error::invalid_argument(EINVALID_EPOCH_INTERVAL));
+
         let block_metadata = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata.epoch_interval = new_epoch_interval;
-    }
-
-    /// Helper function to determine whether this module has been initialized.
-    fun is_initialized(): bool {
-        exists<BlockResource>(@aptos_framework)
     }
 
     /// Set the metadata for the current block.
@@ -88,7 +87,7 @@ module aptos_framework::block {
         // Authorization
         assert!(
             proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
-        error::permission_denied(EVM_OR_VALIDATOR)
+            error::permission_denied(EVM_OR_VALIDATOR)
         );
 
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
@@ -116,7 +115,6 @@ module aptos_framework::block {
 
     /// Get the current block height
     public fun get_current_block_height(): u64 acquires BlockResource {
-        assert!(is_initialized(), error::not_found(EBLOCK_METADATA));
         borrow_global<BlockResource>(@aptos_framework).height
     }
 
@@ -149,7 +147,7 @@ module aptos_framework::block {
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockResource {
-        initialize_block_metadata(&aptos_framework, 1);
+        initialize(&aptos_framework, 1);
         assert!(borrow_global<BlockResource>(@aptos_framework).epoch_interval == 1, 0);
         update_epoch_interval(&aptos_framework, 2);
         assert!(borrow_global<BlockResource>(@aptos_framework).epoch_interval == 2, 1);
@@ -161,7 +159,7 @@ module aptos_framework::block {
         aptos_framework: signer,
         account: signer,
     ) acquires BlockResource {
-        initialize_block_metadata(&aptos_framework, 1);
+        initialize(&aptos_framework, 1);
         update_epoch_interval(&account, 2);
     }
 }

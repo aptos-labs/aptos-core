@@ -11,6 +11,7 @@ chain:
   allow_new_validators: false
   # -- Length of each epoch in seconds. Defaults to 2 hours
   epoch_duration_secs: 7200
+  is_test: true
   # -- Minimum price per gas unit
   min_price_per_gas_unit: 1
   # -- Minimum stake. Defaults to 1M APTOS coins with 8 decimals

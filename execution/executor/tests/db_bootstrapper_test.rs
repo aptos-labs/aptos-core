@@ -11,7 +11,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{
-        aptos_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
+        aptos_test_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
         CORE_CODE_ADDRESS,
     },
     account_view::AccountView,
@@ -125,7 +125,7 @@ fn get_aptos_coin_mint_transaction(
     amount: u64,
 ) -> Transaction {
     get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
@@ -140,7 +140,7 @@ fn get_account_transaction(
     _account_key: &Ed25519PrivateKey,
 ) -> Transaction {
     get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),

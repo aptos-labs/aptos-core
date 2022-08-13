@@ -94,7 +94,8 @@ module aptos_framework::aptos_governance {
         voting_duration_secs: u64,
     }
 
-    /// Stores the signer capability for 0x1.
+    /// Can be called during genesis or by the governance itself.
+    /// Stores the signer capability for a given address.
     public fun store_signer_cap(
         aptos_framework: &signer,
         signer_address: address,
@@ -297,21 +298,14 @@ module aptos_framework::aptos_governance {
         reconfiguration::reconfigure();
     }
 
-    #[test(core_resources = @core_resources, aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, yes_voter = @0x234, no_voter = @345)]
     public entry fun test_voting(
-        core_resources: signer,
         aptos_framework: signer,
         proposer: signer,
         yes_voter: signer,
         no_voter: signer,
     ) acquires GovernanceConfig, GovernanceEvents, VotingRecords {
-        setup_voting(
-            &core_resources,
-            &aptos_framework,
-            &proposer,
-            &yes_voter,
-            &no_voter,
-        );
+        setup_voting(&aptos_framework, &proposer, &yes_voter, &no_voter);
 
         create_proposal(
             &proposer,
@@ -330,22 +324,15 @@ module aptos_framework::aptos_governance {
         assert!(proposal_state == 1, proposal_state);
     }
 
-    #[test(core_resources = @core_resources, aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
     #[expected_failure(abort_code = 0x10004)]
     public entry fun test_cannot_double_vote(
-        core_resources: signer,
         aptos_framework: signer,
         proposer: signer,
         voter_1: signer,
         voter_2: signer,
     ) acquires GovernanceConfig, GovernanceEvents, VotingRecords {
-        setup_voting(
-            &core_resources,
-            &aptos_framework,
-            &proposer,
-            &voter_1,
-            &voter_2,
-        );
+        setup_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
 
         create_proposal(
             &proposer,
@@ -360,22 +347,15 @@ module aptos_framework::aptos_governance {
         vote(&voter_1, signer::address_of(&voter_1), 0, true);
     }
 
-    #[test(core_resources = @core_resources, aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
+    #[test(aptos_framework = @aptos_framework, proposer = @0x123, voter_1 = @0x234, voter_2 = @345)]
     #[expected_failure(abort_code = 0x10004)]
     public entry fun test_cannot_double_vote_with_different_voter_addresses(
-        core_resources: signer,
         aptos_framework: signer,
         proposer: signer,
         voter_1: signer,
         voter_2: signer,
     ) acquires GovernanceConfig, GovernanceEvents, VotingRecords {
-        setup_voting(
-            &core_resources,
-            &aptos_framework,
-            &proposer,
-            &voter_1,
-            &voter_2,
-        );
+        setup_voting(&aptos_framework, &proposer, &voter_1, &voter_2);
 
         create_proposal(
             &proposer,
@@ -392,13 +372,7 @@ module aptos_framework::aptos_governance {
     }
 
     #[test_only]
-    fun setup_voting(
-        core_resources: &signer,
-        aptos_framework: &signer,
-        proposer: &signer,
-        yes_voter: &signer,
-        no_voter: &signer,
-    ) {
+    public fun setup_voting(aptos_framework: &signer, proposer: &signer, yes_voter: &signer, no_voter: &signer) {
         use std::vector;
         use aptos_framework::coin;
         use aptos_framework::aptos_coin::{Self, AptosCoin};
@@ -415,7 +389,7 @@ module aptos_framework::aptos_governance {
         vector::push_back(&mut active_validators, signer::address_of(no_voter));
         stake::create_validator_set(aptos_framework, active_validators);
 
-        let (mint_cap, burn_cap) = aptos_coin::initialize(aptos_framework, core_resources);
+        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(aptos_framework);
         // Spread stake among active and pending_inactive because both need to be accounted for when computing voting
         // power.
         stake::create_stake_pool(proposer, coin::mint(50, &mint_cap), coin::mint(50, &mint_cap), 10000);

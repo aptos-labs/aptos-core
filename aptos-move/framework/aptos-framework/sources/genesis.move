@@ -1,6 +1,4 @@
 module aptos_framework::genesis {
-    use std::signer;
-    use std::error;
     use std::vector;
 
     use aptos_framework::account;
@@ -8,6 +6,7 @@ module aptos_framework::genesis {
     use aptos_framework::aptos_governance;
     use aptos_framework::block;
     use aptos_framework::chain_id;
+    use aptos_framework::coin::MintCapability;
     use aptos_framework::coins;
     use aptos_framework::consensus_config;
     use aptos_framework::gas_schedule;
@@ -21,9 +20,8 @@ module aptos_framework::genesis {
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;
 
+    /// Genesis step 1: Initialize aptos framework account and core modules on chain.
     fun initialize(
-        core_resource_account: &signer,
-        core_resource_account_auth_key: vector<u8>,
         gas_schedule: vector<u8>,
         chain_id: u8,
         initial_version: u64,
@@ -36,17 +34,10 @@ module aptos_framework::genesis {
         rewards_rate: u64,
         rewards_rate_denominator: u64,
     ) {
-        // This can fail genesis but is necessary so that any misconfigurations can be corrected before genesis succeeds
-        assert!(epoch_interval > 0, error::invalid_argument(EINVALID_EPOCH_DURATION));
-
-        // TODO: Only do create the core resources account in testnets
-        account::create_account_internal(signer::address_of(core_resource_account));
-        account::rotate_authentication_key_internal(core_resource_account, copy core_resource_account_auth_key);
-
         // Initialize the aptos framework account. This is the account where system resources and modules will be
         // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
         // to use this account.
-        let (aptos_framework_account, framework_signer_cap) = account::create_core_framework_account();
+        let (aptos_framework_account, framework_signer_cap) = account::create_aptos_framework_account();
 
         // Initialize account configs on aptos framework account.
         account::initialize(
@@ -64,8 +55,7 @@ module aptos_framework::genesis {
         // Give the decentralized on-chain governance control over the core framework account.
         aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, framework_signer_cap);
 
-        // Consensus config setup
-        consensus_config::initialize(&aptos_framework_account);
+        consensus_config::initialize(&aptos_framework_account, consensus_config);
         version::initialize(&aptos_framework_account, initial_version);
         stake::initialize(&aptos_framework_account);
         staking_config::initialize(
@@ -77,29 +67,37 @@ module aptos_framework::genesis {
             rewards_rate,
             rewards_rate_denominator,
         );
+        gas_schedule::initialize(&aptos_framework_account, gas_schedule);
 
-        gas_schedule::initialize(
-            &aptos_framework_account,
-            gas_schedule
-        );
-
-        consensus_config::set(&aptos_framework_account, consensus_config);
-
-        // This is testnet-specific configuration and can be skipped for mainnet.
-        // Mainnet can call Coin::initialize<MainnetCoin> directly and give mint capability to the Staking module.
-        let (mint_cap, burn_cap) = aptos_coin::initialize(&aptos_framework_account, core_resource_account);
-
-        // Give Stake module MintCapability<AptosCoin> so it can mint rewards.
-        stake::store_aptos_coin_mint_cap(&aptos_framework_account, mint_cap);
-
-        // Give TransactionFee BurnCapability<AptosCoin> so it can burn gas.
-        transaction_fee::store_aptos_coin_burn_cap(&aptos_framework_account, burn_cap);
-
-        // This needs to be called at the very end.
+        // This needs to be called at the very end because earlier initializations might rely on timestamp not being
+        // initialized yet.
         chain_id::initialize(&aptos_framework_account, chain_id);
         reconfiguration::initialize(&aptos_framework_account);
-        block::initialize_block_metadata(&aptos_framework_account, epoch_interval);
+        block::initialize(&aptos_framework_account, epoch_interval);
         timestamp::set_time_has_started(&aptos_framework_account);
+    }
+
+    /// Genesis step 2: Initialize Aptos coin.
+    fun initialize_aptos_coin(aptos_framework: &signer): MintCapability<AptosCoin> {
+        let (mint_cap, burn_cap) = aptos_coin::initialize(aptos_framework);
+        // Give stake module MintCapability<AptosCoin> so it can mint rewards.
+        stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
+
+        // Give transaction_fee module BurnCapability<AptosCoin> so it can burn gas.
+        transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
+
+        mint_cap
+    }
+
+    /// Only called for testnets and e2e tests.
+    fun initialize_core_resources_and_aptos_coin(
+        aptos_framework: &signer,
+        core_resources_auth_key: vector<u8>,
+    ) {
+        let core_resources = account::create_account_internal(@core_resources);
+        account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
+        let mint_cap = initialize_aptos_coin(aptos_framework);
+        aptos_coin::configure_accounts_for_test(aptos_framework, &core_resources, mint_cap);
     }
 
     /// Sets up the initial validator set for the network.
@@ -161,10 +159,8 @@ module aptos_framework::genesis {
     }
 
     #[test_only]
-    public fun setup(core_resource_account: &signer) {
+    public fun setup() {
         initialize(
-            core_resource_account,
-            x"0000000000000000000000000000000000000000000000000000000000000000",
             x"00", // empty gas schedule
             4u8, // TESTING chain ID
             0,
@@ -179,12 +175,11 @@ module aptos_framework::genesis {
         )
     }
 
-    #[test(account = @core_resources)]
-    fun test_setup(account: signer) {
+    #[test]
+    fun test_setup() {
         use aptos_framework::account;
 
-        setup(&account);
+        setup();
         assert!(account::exists_at(@aptos_framework), 0);
-        assert!(account::exists_at(@core_resources), 0);
     }
 }

@@ -86,7 +86,7 @@ module aptos_framework::account {
     native fun create_address(bytes: vector<u8>): address;
     native fun create_signer(addr: address): signer;
 
-    public fun initialize(account: &signer,
+    public(friend) fun initialize(account: &signer,
         module_addr: address,
         module_name: vector<u8>,
         script_prologue_name: vector<u8>,
@@ -380,7 +380,7 @@ module aptos_framework::account {
     }
 
     /// Create the account for @aptos_framework to help module upgrades on testnet.
-    public(friend) fun create_core_framework_account(): (signer, SignerCapability) {
+    public(friend) fun create_aptos_framework_account(): (signer, SignerCapability) {
         timestamp::assert_genesis();
         let signer = create_account_unchecked(@aptos_framework);
         let signer_cap = SignerCapability { account: @aptos_framework };
@@ -482,14 +482,14 @@ module aptos_framework::account {
     // Test account helpers
     ///////////////////////////////////////////////////////////////////////////
 
-    #[test(alice = @0xa11ce, mint = @0xA550C18, core = @0x1)]
-    public fun test_transfer(alice: signer, mint: signer, core: signer) acquires Account {
+    #[test(alice = @0xa11ce, core = @0x1)]
+    public fun test_transfer(alice: signer, core: signer) acquires Account {
         let bob = create_address(x"0000000000000000000000000000000000000000000000000000000000000b0b");
         let carol = create_address(x"00000000000000000000000000000000000000000000000000000000000ca501");
 
-        let (mint_cap, burn_cap) = aptos_framework::aptos_coin::initialize(&core, &mint);
+        let (mint_cap, burn_cap) = aptos_framework::aptos_coin::initialize_for_test(&core);
         create_account(signer::address_of(&alice));
-        aptos_framework::aptos_coin::mint(&mint, signer::address_of(&alice), 10000);
+        coin::deposit(signer::address_of(&alice), coin::mint(10000, &mint_cap));
         transfer(&alice, bob, 500);
         assert!(coin::balance<AptosCoin>(bob) == 500, 0);
         transfer(&alice, carol, 500);
