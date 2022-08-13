@@ -419,7 +419,6 @@ impl TestContext {
             "sequence_number": account.sequence_number().to_string(),
             "gas_unit_price": "0",
             "max_gas_amount": "1000000",
-            "gas_currency_code": "XUS",
             "expiration_timestamp_secs": "16373698888888",
             "payload": payload,
         });

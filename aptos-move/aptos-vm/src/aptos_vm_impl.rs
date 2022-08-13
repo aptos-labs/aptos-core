@@ -238,7 +238,6 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let chain_specific_info = self.chain_info();
-        let gas_currency = vec![];
         let txn_sequence_number = txn_data.sequence_number();
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -285,7 +284,8 @@ impl AptosVMImpl {
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 prologue_function_name,
-                gas_currency,
+                // TODO: Deprecate this once we remove gas currency on the Move side.
+                vec![],
                 serialize_values(&args),
                 &mut gas_meter,
             )
@@ -303,7 +303,7 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let chain_specific_info = self.chain_info();
-        let gas_currency = vec![];
+
         let txn_sequence_number = txn_data.sequence_number();
         let txn_public_key = txn_data.authentication_key_preimage().to_vec();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -315,7 +315,8 @@ impl AptosVMImpl {
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 &chain_specific_info.module_prologue_name,
-                gas_currency,
+                // TODO: Deprecate this once we remove gas currency on the Move side.
+                vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(txn_sequence_number),
@@ -347,7 +348,6 @@ impl AptosVMImpl {
             ))
         });
 
-        let gas_currency = vec![];
         let chain_specific_info = self.chain_info();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -356,7 +356,8 @@ impl AptosVMImpl {
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 &chain_specific_info.user_epilogue_name,
-                gas_currency,
+                // TODO: Deprecate this once we remove gas currency on the Move side.
+                vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(txn_sequence_number),
@@ -380,7 +381,6 @@ impl AptosVMImpl {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let gas_currency = vec![];
         let chain_specific_info = self.chain_info();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -389,7 +389,8 @@ impl AptosVMImpl {
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 &chain_specific_info.user_epilogue_name,
-                gas_currency,
+                // TODO: Deprecate this once we remove gas currency on the Move side.
+                vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(txn_sequence_number),

@@ -77,7 +77,6 @@ class RestClient:
             "sequence_number": str(seq_num),
             "max_gas_amount": "2000",
             "gas_unit_price": "1",
-            "gas_currency_code": "XUS",
             "expiration_timestamp_secs": str(int(time.time()) + 600),
             "payload": payload,
         }

@@ -1155,7 +1155,7 @@ components:
     AccountResource:
       description: Account resource is a Move struct value belongs to an account.
       example:
-        type: 0x1::AptosAccount::Balance<0x1::XDX::XDX>
+        type: 0x1::coin::CoinStore<0x1::XDX::XDX>
         data:
           coin:
             value: "8000000000"
@@ -1178,7 +1178,7 @@ components:
               2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
 
             See [doc](https://diem.github.io/move/structs-and-resources.html) for more details.
-          example: 0x1::AptosAccount::Balance<0x1::XUS::XUS>
+          example: 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
           format: move_type
           pattern: ^0x[0-9a-zA-Z:_<>]+$
           title: Move Struct Tag ID
@@ -1211,7 +1211,7 @@ components:
         Vector type value examples:
           * `vector<u8>`
           * `vector<vector<u64>>`
-          * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+          * `vector<0x1::coin::CoinStore<0x1::XDX::XDX>>`
 
         Struct type value examples:
           * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
@@ -1221,7 +1221,7 @@ components:
         Note:
           1. Empty chars should be ignored when comparing 2 struct tag ids.
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-      example: 0x1::XUS::XUS
+      example: 0x1::aptos_coin::AptosCoin
       pattern: ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+)$
       title: Move Type Tag ID
       type: string
@@ -1246,7 +1246,7 @@ components:
         Vector type value examples:
           * `vector<u8>`
           * `vector<vector<u64>>`
-          * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+          * `vector<0x1::coin::CoinStore<0x1::XDX::XDX>>`
 
         Struct type value examples:
           * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
@@ -1288,7 +1288,7 @@ components:
         Note:
           1. Empty chars should be ignored when comparing 2 struct tag ids.
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-      example: 0x1::AptosAccount::Balance<0x1::XUS::XUS>
+      example: 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
       pattern: ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+|^&(mut
         )?.+$|T\d+)$
       title: Move Type ID
@@ -1311,7 +1311,7 @@ components:
           2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
 
         See [doc](https://diem.github.io/move/structs-and-resources.html) for more details.
-      example: 0x1::AptosAccount::Balance<0x1::XUS::XUS>
+      example: 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
       format: move_type
       pattern: ^0x[0-9a-zA-Z:_<>]+$
       title: Move Struct Tag ID
@@ -1437,7 +1437,7 @@ components:
             Vector type value examples:
               * `vector<u8>`
               * `vector<vector<u64>>`
-              * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+              * `vector<0x1::coin::CoinStore<0x1::XDX::XDX>>`
 
             Struct type value examples:
               * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
@@ -1479,7 +1479,7 @@ components:
             Note:
               1. Empty chars should be ignored when comparing 2 struct tag ids.
               2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-          example: 0x1::AptosAccount::Balance<0x1::XUS::XUS>
+          example: 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
           pattern: ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+|^&(mut
             )?.+$|T\d+)$
           title: Move Type ID
@@ -1591,9 +1591,6 @@ components:
           format: uint64
           title: uint64
           type: string
-        gas_currency_code:
-          example: XDX
-          type: string
         expiration_timestamp_secs:
           description: |
             Timestamp in seconds, e.g. transaction expiration timestamp.
@@ -1605,7 +1602,6 @@ components:
           $ref: '#/components/schemas/TransactionPayload'
       required:
       - expiration_timestamp_secs
-      - gas_currency_code
       - gas_unit_price
       - max_gas_amount
       - payload
@@ -2012,7 +2008,7 @@ components:
               2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
 
             See [doc](https://diem.github.io/move/structs-and-resources.html) for more details.
-          example: 0x1::AptosAccount::Balance<0x1::XUS::XUS>
+          example: 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
           format: move_type
           pattern: ^0x[0-9a-zA-Z:_<>]+$
           title: Move Struct Tag ID
@@ -2277,7 +2273,7 @@ components:
             Vector type value examples:
               * `vector<u8>`
               * `vector<vector<u64>>`
-              * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+              * `vector<0x1::coin::CoinStore<0x1::XDX::XDX>>`
 
             Struct type value examples:
               * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
@@ -2287,7 +2283,7 @@ components:
             Note:
               1. Empty chars should be ignored when comparing 2 struct tag ids.
               2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-          example: 0x1::XUS::XUS
+          example: 0x1::aptos_coin::AptosCoin
           pattern: ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+)$
           title: Move Type Tag ID
           type: string
@@ -2472,7 +2468,7 @@ components:
             Vector type value examples:
               * `vector<u8>`
               * `vector<vector<u64>>`
-              * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+              * `vector<0x1::coin::CoinStore<0x1::XDX::XDX>>`
 
             Struct type value examples:
               * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
@@ -2514,7 +2510,7 @@ components:
             Note:
               1. Empty chars should be ignored when comparing 2 struct tag ids.
               2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-          example: 0x1::AptosAccount::Balance<0x1::XUS::XUS>
+          example: 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
           pattern: ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+|^&(mut
             )?.+$|T\d+)$
           title: Move Type ID
@@ -2540,7 +2536,7 @@ components:
             Vector type value examples:
               * `vector<u8>`
               * `vector<vector<u64>>`
-              * `vector<0x1::AptosAccount::Balance<0x1::XDX::XDX>>`
+              * `vector<0x1::coin::CoinStore<0x1::XDX::XDX>>`
 
             Struct type value examples:
               * `0x1::Aptos::Aptos<0x1::XDX::XDX>`
@@ -2582,7 +2578,7 @@ components:
             Note:
               1. Empty chars should be ignored when comparing 2 struct tag ids.
               2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-          example: 0x1::AptosAccount::Balance<0x1::XUS::XUS>
+          example: 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>
           pattern: ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+|^&(mut
             )?.+$|T\d+)$
           title: Move Type ID
