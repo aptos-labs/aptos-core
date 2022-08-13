@@ -36,6 +36,38 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.secp256k1.base, "secp256k1.base", 1],
     [.secp256k1.ecdsa_recover, "secp256k1.ecdsa_recover", 1],
 
+    [.ristretto255.basepoint_mul, "ristretto255.basepoint_mul", 1],
+    [.ristretto255.basepoint_double_mul, "ristretto255.basepoint_double_mul", 1],
+
+    [.ristretto255.point_add, "ristretto255.point_add", 1],
+    [.ristretto255.point_compress, "ristretto255.point_compress", 1],
+    [.ristretto255.point_decompress, "ristretto255.point_decompress", 1],
+    [.ristretto255.point_equals, "ristretto255.point_equals", 1],
+    [.ristretto255.point_from_64_uniform_bytes, "ristretto255.point_from_64_uniform_bytes", 1],
+    [.ristretto255.point_identity, "ristretto255.point_identity", 1],
+    [.ristretto255.point_mul, "ristretto255.point_mul", 1],
+    [.ristretto255.point_neg, "ristretto255.point_neg", 1],
+    [.ristretto255.point_sub, "ristretto255.point_sub", 1],
+    [.ristretto255.point_parse_arg, "ristretto255.point_parse_arg", 1],
+
+
+    // TODO(Alin): These SHA512 gas costs could be unified with the costs in our future SHA512 module
+    // (assuming same implementation complexity, which might not be the case
+    [.ristretto255.sha512_per_byte, "ristretto255.scalar_sha512_per_byte", 1],
+    [.ristretto255.sha512_per_hash, "ristretto255.scalar_sha512_per_hash", 1],
+
+    [.ristretto255.scalar_add, "ristretto255.scalar_add", 1],
+    [.ristretto255.scalar_reduced_from_32_bytes, "ristretto255.scalar_reduced_from_32_bytes", 1],
+    [.ristretto255.scalar_uniform_from_64_bytes, "ristretto255.scalar_uniform_from_64_bytes", 1],
+    [.ristretto255.scalar_from_u128, "ristretto255.scalar_from_u128", 1],
+    [.ristretto255.scalar_from_u64, "ristretto255.scalar_from_u64", 1],
+    [.ristretto255.scalar_invert, "ristretto255.scalar_invert", 1],
+    [.ristretto255.scalar_is_canonical, "ristretto255.scalar_is_canonical", 1],
+    [.ristretto255.scalar_mul, "ristretto255.scalar_mul", 1],
+    [.ristretto255.scalar_neg, "ristretto255.scalar_neg", 1],
+    [.ristretto255.scalar_sub, "ristretto255.scalar_sub", 1],
+    [.ristretto255.scalar_parse_arg, "ristretto255.scalar_parse_arg", 1],
+
     [.hash.sip_hash.base, "hash.sip_hash.base", 1],
     [.hash.sip_hash.per_byte, "hash.sip_hash.per_byte", 1],
 

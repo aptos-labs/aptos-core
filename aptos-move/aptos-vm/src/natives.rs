@@ -3,6 +3,7 @@
 
 use aptos_gas::NativeGasParameters;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
+use framework::natives::cryptography::ristretto255_point::NativeRistrettoPointContext;
 use framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
     transaction_context::NativeTransactionContext,
@@ -47,4 +48,5 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeCodeContext::default());
     exts.add(NativeTransactionContext::new(vec![1]));
     exts.add(NativeAggregatorContext::new(0, &*DUMMY_RESOLVER));
+    exts.add(NativeRistrettoPointContext::new());
 }

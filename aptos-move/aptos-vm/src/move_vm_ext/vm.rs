@@ -8,6 +8,7 @@ use crate::{
 use aptos_gas::NativeGasParameters;
 use framework::natives::{
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
+    cryptography::ristretto255_point::NativeRistrettoPointContext,
     state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
 };
 use move_deps::{
@@ -41,6 +42,7 @@ impl MoveVmExt {
     ) -> SessionExt<'r, '_, S> {
         let mut extensions = NativeContextExtensions::default();
         extensions.add(NativeTableContext::new(session_id.as_uuid(), remote));
+        extensions.add(NativeRistrettoPointContext::new());
         extensions.add(NativeAggregatorContext::new(session_id.as_uuid(), remote));
 
         let script_hash = match session_id {
