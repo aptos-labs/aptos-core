@@ -4,6 +4,7 @@
 use aptos_aggregator::aggregator_extension::{aggregator_natives, NativeAggregatorContext};
 use aptos_gas::NativeGasParameters;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
+use framework::natives::cryptography::ristretto255_point::NativeRistrettoPointContext;
 use framework::natives::{code::NativeCodeContext, transaction_context::NativeTransactionContext};
 use move_deps::move_unit_test;
 use move_deps::move_vm_runtime::native_extensions::NativeContextExtensions;
@@ -46,4 +47,5 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeCodeContext::default());
     exts.add(NativeTransactionContext::new(vec![1]));
     exts.add(NativeAggregatorContext::new(0, &*DUMMY_RESOLVER));
+    exts.add(NativeRistrettoPointContext::new());
 }
