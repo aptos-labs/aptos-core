@@ -43,30 +43,96 @@ impl GasParameters {
                 create_signer: account::CreateSignerGasParameters { base_cost: 0 },
             },
             signature: signature::GasParameters {
-                bls12381_validate_pubkey: signature::Bls12381ValidatePubkeyGasParameters {
-                    base_cost: 0,
-                },
-                ed25519_validate_pubkey: signature::Ed25519ValidatePubkeyGasParameters {
-                    base_cost: 0,
-                },
-                ed25519_verify: signature::Ed25519VerifyGasParameters {
-                    base_cost: 0,
-                    unit_cost: 0,
-                },
-                secp256k1_ecdsa_recover: signature::Secp256k1ECDSARecoverGasParameters {
-                    base_cost: 0,
-                },
-                bls12381_verify_signature: signature::Bls12381VerifySignatureGasParams {
-                    base_cost: 0,
-                    unit_cost: 0,
-                },
+                // BLS signatures over BLS12-381 curves
                 bls12381_aggregate_pop_verified_pubkeys:
                     signature::Bls12381AggregatePopVerifiedPubkeysGasParameters {
                         base_cost: 0,
-                        per_pubkey_cost: 0,
+                        per_pubkey_deserialize_cost: 0,
+                        per_pubkey_aggregate_cost: 0,
+                    },
+                bls12381_aggregate_signatures:
+                    signature::Bls12381AggregateSignaturesGasParameters {
+                        base_cost: 0,
+                        per_sig_deserialize_cost: 0,
+                        per_sig_aggregate_cost: 0,
+                    },
+                bls12381_signature_subgroup_check:
+                    signature::Bls12381SignatureSubgroupCheckGasParameters {
+                        base_cost: 0,
+                        per_sig_deserialize_cost: 0,
+                        per_sig_subgroup_check_cost: 0,
+                    },
+                bls12381_validate_pubkey: signature::Bls12381ValidatePubkeyGasParameters {
+                    base_cost: 0,
+                    per_pubkey_deserialize_cost: 0,
+                    per_pubkey_subgroup_check_cost: 0,
+                },
+                bls12381_verify_aggregate_signature:
+                    signature::Bls12381VerifyAggregateSignatureGasParameters {
+                        base_cost: 0,
+                        per_pubkey_deserialize_cost: 0,
+                        per_sig_deserialize_cost: 0,
+                        per_pairing_cost: 0,
+                        per_msg_hashing_base_cost: 0,
+                        per_msg_byte_hashing_cost: 0,
+                    },
+                bls12381_verify_multisignature:
+                    signature::Bls12381VerifyMultisignatureGasParameters {
+                        base_cost: 0,
+                        per_pubkey_deserialize_cost: 0,
+                        per_pubkey_subgroup_check_cost: 0,
+                        per_sig_deserialize_cost: 0,
+                        per_sig_verify_cost: 0,
+                        per_msg_hashing_base_cost: 0,
+                        per_msg_byte_hashing_cost: 0,
+                    },
+                bls12381_verify_normal_signature:
+                    signature::Bls12381VerifyNormalSignatureGasParameters {
+                        base_cost: 0,
+                        per_pubkey_deserialize_cost: 0,
+                        per_pubkey_subgroup_check_cost: 0,
+                        per_sig_deserialize_cost: 0,
+                        per_sig_verify_cost: 0,
+                        per_msg_hashing_base_cost: 0,
+                        per_msg_byte_hashing_cost: 0,
                     },
                 bls12381_verify_proof_of_possession:
-                    signature::Bls12381VerifyProofOfPosessionGasParameters { base_cost: 0 },
+                    signature::Bls12381VerifyProofOfPosessionGasParameters {
+                        base_cost: 0,
+                        per_pubkey_deserialize_cost: 0,
+                        per_sig_deserialize_cost: 0,
+                        per_pop_verify_cost: 0,
+                    },
+                bls12381_verify_signature_share:
+                    signature::Bls12381VerifySignatureShareGasParameters {
+                        base_cost: 0,
+                        per_pubkey_deserialize_cost: 0,
+                        per_pubkey_subgroup_check_cost: 0,
+                        per_sig_deserialize_cost: 0,
+                        per_sig_verify_cost: 0,
+                        per_msg_hashing_base_cost: 0,
+                        per_msg_byte_hashing_cost: 0,
+                    },
+
+                // Ed25519
+                ed25519_validate_pubkey: signature::Ed25519ValidatePubkeyGasParameters {
+                    base_cost: 0,
+                    per_pubkey_deserialize_cost: 0,
+                    per_pubkey_small_order_check_cost: 0,
+                },
+                ed25519_verify: signature::Ed25519VerifyGasParameters {
+                    base_cost: 0,
+                    per_pubkey_deserialize_cost: 0,
+                    per_sig_deserialize_cost: 0,
+                    per_sig_strict_verify_cost: 0,
+                    per_msg_hashing_base_cost: 0,
+                    per_msg_byte_hashing_cost: 0,
+                },
+
+                // secp256k1
+                secp256k1_ecdsa_recover: signature::Secp256k1ECDSARecoverGasParameters {
+                    base_cost: 0,
+                },
             },
             hash: hash::GasParameters {
                 sip_hash: hash::SipHashGasParameters {
