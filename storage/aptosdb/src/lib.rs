@@ -63,6 +63,7 @@ use aptos_config::config::{
 use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -94,7 +95,7 @@ use aptosdb_indexer::Indexer;
 use itertools::zip_eq;
 use move_deps::move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
-use schemadb::{db_options::gen_rocksdb_options, DB};
+use schemadb::DB;
 use std::{
     collections::HashMap,
     iter::Iterator,

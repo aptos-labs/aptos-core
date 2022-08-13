@@ -971,6 +971,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-rocksdb-options"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "rocksdb",
+]
+
+[[package]]
 name = "aptos-rosetta"
 version = "0.0.1"
 dependencies = [
@@ -1081,6 +1089,7 @@ dependencies = [
 name = "aptos-secure-storage"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-github-client",
@@ -1094,6 +1103,7 @@ dependencies = [
  "chrono",
  "enum_dispatch",
  "rand 0.7.3",
+ "schemadb",
  "serde 1.0.141",
  "serde_json",
  "thiserror",
@@ -1449,6 +1459,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
+ "aptos-rocksdb-options",
  "aptos-state-view",
  "aptos-temppath",
  "aptos-types",
@@ -1488,6 +1499,7 @@ dependencies = [
  "aptos-logger",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
+ "aptos-rocksdb-options",
  "aptos-state-view",
  "aptos-temppath",
  "aptos-types",
@@ -7946,7 +7958,6 @@ name = "schemadb"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aptos-config",
  "aptos-infallible",
  "aptos-logger",
  "aptos-metrics-core",

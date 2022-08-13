@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::Error;
-use aptos_config::config::{self, GitHubConfig, OnDiskStorageConfig, Token, VaultConfig};
+use aptos_config::config::{
+    self, GitHubConfig, OnDiskStorageConfig, RocksDbStorageConfig, Token, VaultConfig,
+};
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
@@ -15,6 +17,7 @@ pub const BACKEND: &str = "backend";
 pub const DISK: &str = "disk";
 pub const GITHUB: &str = "github";
 pub const MEMORY: &str = "memory";
+pub const ROCKSDB: &str = "rocksdb";
 pub const VAULT: &str = "vault";
 
 // Custom timeouts for vault backend operations when using the management tooling.
@@ -103,6 +106,17 @@ impl TryInto<config::SecureBackend> for SecureBackend {
                 })
             }
             MEMORY => config::SecureBackend::InMemoryStorage,
+            ROCKSDB => {
+                let mut config = RocksDbStorageConfig::default();
+                config.set_data_dir(PathBuf::from(""));
+                let path = self
+                    .parameters
+                    .remove("path")
+                    .ok_or_else(|| Error::BackendParsingError("missing path".into()))?;
+                config.path = PathBuf::from(path);
+                config.namespace = self.parameters.remove("namespace");
+                config::SecureBackend::RocksDbStorage(config)
+            }
             VAULT => {
                 let certificate = self.parameters.remove("ca_certificate").map(PathBuf::from);
                 let server = self
@@ -159,6 +173,7 @@ pair: "k0=v0;k1=v1;...".  The current supported formats are:
         an optional namespace: "namespace=NAMESPACE"
     InMemory: "backend=memory"
     OnDisk: "backend=disk;path=LOCAL_PATH"
+    RocksDb: "backend=rocksdb;path=LOCAL_PATH"
                 "#)
             )]
             pub $field_name: Option<SecureBackend>,
@@ -209,6 +224,17 @@ mod tests {
         storage(&disk).unwrap();
 
         let disk = "backend=disk";
+        assert!(storage(disk).is_err());
+    }
+
+    #[test]
+    fn test_rocksb() {
+        let path = aptos_temppath::TempPath::new();
+        path.create_as_file().unwrap();
+        let disk = format!("backend=rocksdb;path={}", path.path().to_str().unwrap());
+        storage(&disk).unwrap();
+
+        let disk = "backend=rocksdb";
         assert!(storage(disk).is_err());
     }
 

@@ -10,6 +10,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.57"
 base64 = "0.13.0"
 bcs = "0.1.3"
 chrono = "0.4.19"
@@ -26,12 +27,14 @@ aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-temppath = { path = "../../crates/aptos-temppath" }
 aptos-time-service = { path = "../../crates/aptos-time-service" }
 aptos-vault-client = { path = "vault" }
+schemadb = { path = "../../storage/schemadb" }
 
 [dev-dependencies]
 rand = "0.7.3"
 
 aptos-crypto = { path = "../../crates/aptos-crypto", features = ["fuzzing"] }
 aptos-crypto-derive = { path = "../../crates/aptos-crypto-derive" }
+schemadb = { path = "../../storage/schemadb", features = ["fuzzing"] }
 
 [features]
 fuzzing = ["aptos-crypto/fuzzing"]

@@ -128,6 +128,7 @@ impl Config {
             config::SecureBackend::InMemoryStorage => panic!("Unsupported namespace for InMemory"),
             config::SecureBackend::Vault(config) => config.namespace = Some(namespace),
             config::SecureBackend::OnDiskStorage(config) => config.namespace = Some(namespace),
+            config::SecureBackend::RocksDbStorage(config) => config.namespace = Some(namespace),
         };
         StorageWrapper {
             storage_name: "shared",
