@@ -371,10 +371,10 @@ async fn test_no_failures() {
     .await;
 }
 
-#[ignore]
+
 #[tokio::test]
 async fn test_no_failures_long() {
-    let num_validators = 5;
+    let num_validators = 10;
     run_fail_point_test(
         num_validators,
         40,   // cycles

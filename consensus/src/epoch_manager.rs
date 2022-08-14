@@ -977,7 +977,13 @@ impl EpochManager {
         self.await_reconfig_notification().await;
         loop {
             tokio::select! {
+                // TODO: combine consensus_messages and quorum_store_messages to a stream.
                 Some((peer, msg)) = network_receivers.consensus_messages.next() => {
+                    if let Err(e) = self.process_message(peer, msg).await {
+                        error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
+                    }
+                }
+                Some((peer, msg)) = network_receivers.quorum_store_messages.next() => {
                     if let Err(e) = self.process_message(peer, msg).await {
                         error!(epoch = self.epoch(), error = ?e, kind = error_kind(&e));
                     }

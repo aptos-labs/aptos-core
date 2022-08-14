@@ -7,8 +7,8 @@ module aptos_framework::block {
 
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
-    // use aptos_framework::reconfiguration;
-    // use aptos_framework::stake;
+    use aptos_framework::reconfiguration;
+    use aptos_framework::stake;
 
     friend aptos_framework::genesis;
 
@@ -106,11 +106,11 @@ module aptos_framework::block {
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
-        // stake::update_performance_statistics(proposer_index_optional, failed_proposer_indices);
+        stake::update_performance_statistics(proposer_index_optional, failed_proposer_indices);
 
-        // if (timestamp - reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_interval) {
-        //     reconfiguration::reconfigure();
-        // };
+        if (timestamp - reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_interval) {
+            reconfiguration::reconfigure();
+        };
     }
 
     /// Get the current block height
