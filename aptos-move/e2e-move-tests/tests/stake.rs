@@ -18,7 +18,7 @@ fn test_staking_end_to_end() {
     let operator_address = *operator.address();
 
     // Initialize and add stake.
-    let stake_amount = 100_000_000;
+    let stake_amount = 50_000_000;
     assert_success!(initialize_staking(
         &mut harness,
         &owner,
@@ -91,11 +91,11 @@ fn test_staking_rewards() {
     let validator_2_address = *validator_2.address();
 
     // Initialize the validators.
-    let rewards_per_epoch = 1141;
-    let mut stake_amount_2 = 100_000_000;
-    setup_staking(&mut harness, &validator_2, stake_amount_2);
-    let mut stake_amount_1 = 100_000_000;
-    setup_staking(&mut harness, &validator_1, stake_amount_1);
+    let rewards_per_epoch = 285;
+    let mut stake_amount_2 = 25_000_000;
+    assert_success!(setup_staking(&mut harness, &validator_2, stake_amount_2));
+    let mut stake_amount_1 = 25_000_000;
+    assert_success!(setup_staking(&mut harness, &validator_1, stake_amount_1));
     harness.new_epoch();
 
     let index_1 = get_validator_config(&harness, &validator_1_address).validator_index as u32;
@@ -172,7 +172,7 @@ fn test_staking_rewards_pending_inactive() {
     let validator_address = *validator.address();
 
     // Initialize the validator.
-    let stake_amount = 100_000_000;
+    let stake_amount = 50_000_000;
     setup_staking(&mut harness, &validator, stake_amount);
     harness.new_epoch();
 
@@ -191,6 +191,6 @@ fn test_staking_rewards_pending_inactive() {
     harness.new_epoch();
     assert_eq!(
         get_stake_pool(&harness, &validator_address).active,
-        stake_amount + 1141
+        stake_amount + 570
     );
 }

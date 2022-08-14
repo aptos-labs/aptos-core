@@ -1,4 +1,5 @@
 module aptos_framework::genesis {
+    use std::error;
     use std::vector;
 
     use aptos_framework::account;
@@ -19,6 +20,7 @@ module aptos_framework::genesis {
 
     /// Invalid epoch duration.
     const EINVALID_EPOCH_DURATION: u64 = 1;
+    const EINVALID_ADDRESSES: u64 = 2;
 
     /// Genesis step 1: Initialize aptos framework account and core modules on chain.
     fun initialize(
@@ -33,6 +35,7 @@ module aptos_framework::genesis {
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
+        voting_power_increase_limit: u64,
     ) {
         // Initialize the aptos framework account. This is the account where system resources and modules will be
         // deployed to. This will be entirely managed by on-chain governance and no entities have the key or privileges
@@ -66,6 +69,7 @@ module aptos_framework::genesis {
             allow_validator_set_change,
             rewards_rate,
             rewards_rate_denominator,
+            voting_power_increase_limit,
         );
         gas_schedule::initialize(&aptos_framework_account, gas_schedule);
 
@@ -122,9 +126,12 @@ module aptos_framework::genesis {
         let num_owners = vector::length(&owners);
         let num_validator_network_addresses = vector::length(&validator_network_addresses);
         let num_full_node_network_addresses = vector::length(&full_node_network_addresses);
-        assert!(num_validator_network_addresses == num_full_node_network_addresses, 0);
+        assert!(
+            num_validator_network_addresses == num_full_node_network_addresses,
+            error::invalid_argument(EINVALID_ADDRESSES),
+        );
         let num_staking = vector::length(&staking_distribution);
-        assert!(num_full_node_network_addresses == num_staking, 0);
+        assert!(num_full_node_network_addresses == num_staking, error::invalid_argument(EINVALID_ADDRESSES));
 
         let i = 0;
         while (i < num_owners) {
@@ -172,6 +179,7 @@ module aptos_framework::genesis {
             true,
             1,
             1,
+            30,
         )
     }
 

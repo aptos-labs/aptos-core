@@ -49,7 +49,9 @@
       ],
       "consensus_scheme": 0,
       "pending_active": [],
-      "pending_inactive": []
+      "pending_inactive": [],
+      "total_joining_power": "0",
+      "total_voting_power": "1"
     }
   },
   {
@@ -944,7 +946,8 @@
       "minimum_stake": "0",
       "recurring_lockup_duration_secs": "86400",
       "rewards_rate": "273972",
-      "rewards_rate_denominator": "1000000000"
+      "rewards_rate_denominator": "1000000000",
+      "voting_power_increase_limit": "50"
     }
   },
   {
