@@ -1458,6 +1458,7 @@ dependencies = [
  "arc-swap",
  "bcs",
  "byteorder",
+ "dashmap",
  "executor-types",
  "itertools",
  "move-deps",
