@@ -73,7 +73,7 @@ module aptos_framework::coin {
         /// Number of decimals used to get its user representation.
         /// For example, if `decimals` equals `2`, a balance of `505` coins should
         /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
-        decimals: u64,
+        decimals: u8,
         /// Amount of this coin type in existence.
         supply: Option<u128>,
     }
@@ -139,7 +139,7 @@ module aptos_framework::coin {
     /// Returns the number of decimals used to get its user representation.
     /// For example, if `decimals` equals `2`, a balance of `505` coins should
     /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
-    public fun decimals<CoinType>(): u64 acquires CoinInfo {
+    public fun decimals<CoinType>(): u8 acquires CoinInfo {
         let type_info = type_info::type_of<CoinType>();
         let coin_address = type_info::account_address(&type_info);
         borrow_global<CoinInfo<CoinType>>(coin_address).decimals
@@ -249,7 +249,7 @@ module aptos_framework::coin {
         account: &signer,
         name: string::String,
         symbol: string::String,
-        decimals: u64,
+        decimals: u8,
         monitor_supply: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         let account_addr = signer::address_of(account);
