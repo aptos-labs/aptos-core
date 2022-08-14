@@ -139,7 +139,7 @@ impl NetworkSender {
         let other_validators = self
             .validators
             .get_ordered_account_addresses_iter()
-            .filter(|author| author != &self_author);
+            .filter(|author| *author != self_author);
 
         // Broadcast message over direct-send to all other validators.
         if let Err(err) = self.network_sender.send_to_many(other_validators, msg) {

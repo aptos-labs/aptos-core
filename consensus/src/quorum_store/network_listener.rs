@@ -61,7 +61,7 @@ impl NetworkListener {
                 "QS: got end batch message from {:?} batch_id {}, fragment_id {}",
                 source,
                 fragment.fragment_info.batch_id(),
-                fragment.fragment_info.fragment_id()
+                fragment.fragment_info.fragment_id(),
             );
             if expiration.epoch() == self.epoch {
                 match entry.end_batch(
