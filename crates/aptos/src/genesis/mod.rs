@@ -39,6 +39,7 @@ const GENESIS_FILE: &str = "genesis.blob";
 pub enum GenesisTool {
     GenerateGenesis(GenerateGenesis),
     GenerateKeys(keys::GenerateKeys),
+    GenerateLayoutTemplate(keys::GenerateLayoutTemplate),
     SetupGit(git::SetupGit),
     SetValidatorConfiguration(keys::SetValidatorConfiguration),
 }
@@ -48,6 +49,7 @@ impl GenesisTool {
         match self {
             GenesisTool::GenerateGenesis(tool) => tool.execute_serialized().await,
             GenesisTool::GenerateKeys(tool) => tool.execute_serialized().await,
+            GenesisTool::GenerateLayoutTemplate(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetupGit(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetValidatorConfiguration(tool) => tool.execute_serialized_success().await,
         }
@@ -104,6 +106,14 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
     let client = git_options.get_client()?;
     let layout: Layout = client.get(Path::new(LAYOUT_FILE))?;
 
+    // TODO: Remove this requirement when root key isn't needed
+    if layout.root_key.is_none() {
+        return Err(CliError::UnexpectedError(
+            "Layout field root_key was not set.  Please provide a hex encoded Ed25519PublicKey."
+                .to_string(),
+        ));
+    }
+
     let mut validators = Vec::new();
     let mut errors = Vec::new();
     for user in &layout.users {
@@ -136,7 +146,7 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
 
     Ok(GenesisInfo::new(
         layout.chain_id,
-        layout.root_key,
+        layout.root_key.unwrap(),
         validators,
         modules,
         &GenesisConfiguration {
