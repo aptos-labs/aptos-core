@@ -889,7 +889,7 @@ dependencies = [
  "criterion",
  "crossbeam",
  "crossbeam-queue",
- "dashmap",
+ "dashmap 5.2.0",
  "mvhashmap",
  "num_cpus",
  "once_cell",
@@ -2237,6 +2237,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-infallible",
+ "aptos-logger",
  "aptos-metrics-core",
  "aptos-types",
  "futures",
@@ -2547,7 +2548,7 @@ dependencies = [
  "serde 1.0.141",
  "serde_json",
  "short-hex-str",
- "tokio",
+ "tokio 1.19.2",
 ]
 
 [[package]]
