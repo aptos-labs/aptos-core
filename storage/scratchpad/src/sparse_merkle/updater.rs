@@ -292,7 +292,7 @@ impl<'a, V: Send + Sync + Clone + CryptoHash> SubTreeUpdater<'a, V> {
 
     fn run(self, proof_reader: &impl ProofRead) -> Result<InMemSubTreeInfo<V>> {
         // Limit total tasks that are potentially sent to other threads.
-        const MAX_PARALLELIZABLE_DEPTH: usize = 8;
+        const MAX_PARALLELIZABLE_DEPTH: usize = 16;
         // No point to introduce Rayon overhead if work is small.
         const MIN_PARALLELIZABLE_SIZE: usize = 2;
 
