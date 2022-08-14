@@ -39,6 +39,7 @@ use move_deps::{
 };
 use once_cell::sync::Lazy;
 use rand::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
@@ -315,36 +316,15 @@ fn create_and_initialize_validators(
     session: &mut SessionExt<impl MoveResolver>,
     validators: &[Validator],
 ) {
-    let mut owners = vec![];
-    let mut consensus_pubkeys = vec![];
-    let mut proof_of_possession = vec![];
-    let mut validator_network_addresses = vec![];
-    let mut full_node_network_addresses = vec![];
-    let mut staking_distribution = vec![];
-
-    for v in validators {
-        owners.push(MoveValue::Address(v.address));
-        consensus_pubkeys.push(MoveValue::vector_u8(v.consensus_pubkey.clone()));
-        proof_of_possession.push(MoveValue::vector_u8(v.proof_of_possession.clone()));
-        validator_network_addresses.push(MoveValue::vector_u8(v.network_addresses.clone()));
-        full_node_network_addresses
-            .push(MoveValue::vector_u8(v.full_node_network_addresses.clone()));
-        staking_distribution.push(MoveValue::U64(v.stake_amount));
-    }
+    let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
+    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    serialized_values.push(validators_bytes);
     exec_function(
         session,
         GENESIS_MODULE_NAME,
         "create_initialize_validators",
         vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-            MoveValue::Vector(owners),
-            MoveValue::Vector(consensus_pubkeys),
-            MoveValue::Vector(proof_of_possession),
-            MoveValue::Vector(validator_network_addresses),
-            MoveValue::Vector(full_node_network_addresses),
-            MoveValue::Vector(staking_distribution),
-        ]),
+        serialized_values,
     );
 }
 
@@ -506,23 +486,25 @@ pub fn test_genesis_change_set_and_validators(
     generate_test_genesis(cached_framework_packages::module_blobs(), count)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Validator {
-    /// The Aptos account address of the validator
-    pub address: AccountAddress,
-    /// bls12381 public key used to sign consensus messages
-    pub consensus_pubkey: Vec<u8>,
-    /// Proof of Possession of the consensus pubkey
-    pub proof_of_possession: Vec<u8>,
+    /// The Aptos account address of the validator.
+    pub owner_address: AccountAddress,
     /// The Aptos account address of the validator's operator (same as `address` if the validator is
-    /// its own operator)
+    /// its own operator).
     pub operator_address: AccountAddress,
-    /// `NetworkAddress` for the validator
-    pub network_addresses: Vec<u8>,
-    /// `NetworkAddress` for the validator's full node
-    pub full_node_network_addresses: Vec<u8>,
-    /// Amount to stake for consensus
+    pub voter_address: AccountAddress,
+    /// Amount to stake for consensus. Also the intial amount minted to the owner account.
     pub stake_amount: u64,
+
+    /// bls12381 public key used to sign consensus messages.
+    pub consensus_pubkey: Vec<u8>,
+    /// Proof of Possession of the consensus pubkey.
+    pub proof_of_possession: Vec<u8>,
+    /// `NetworkAddress` for the validator.
+    pub network_addresses: Vec<u8>,
+    /// `NetworkAddress` for the validator's full node.
+    pub full_node_network_addresses: Vec<u8>,
 }
 
 pub struct TestValidator {
@@ -533,16 +515,16 @@ pub struct TestValidator {
 
 impl TestValidator {
     pub fn new_test_set(count: Option<usize>) -> Vec<TestValidator> {
-        let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_seed([1u8; 32]);
+        let mut rng = rand::SeedableRng::from_seed([1u8; 32]);
         (0..count.unwrap_or(10))
             .map(|_| TestValidator::gen(&mut rng))
             .collect()
     }
 
-    fn gen(rng: &mut rand::rngs::StdRng) -> TestValidator {
+    fn gen(rng: &mut StdRng) -> TestValidator {
         let key = Ed25519PrivateKey::generate(rng);
         let auth_key = AuthenticationKey::ed25519(&key.public_key());
-        let address = auth_key.derived_address();
+        let owner_address = auth_key.derived_address();
         let consensus_key = bls12381::PrivateKey::generate(rng);
         let consensus_pubkey = consensus_key.public_key().to_bytes().to_vec();
         let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)
@@ -552,10 +534,11 @@ impl TestValidator {
         let full_node_network_address = [0u8; 0].to_vec();
 
         let data = Validator {
-            address,
+            owner_address,
             consensus_pubkey,
             proof_of_possession,
-            operator_address: address,
+            operator_address: owner_address,
+            voter_address: owner_address,
             network_addresses: network_address,
             full_node_network_addresses: full_node_network_address,
             stake_amount: 100_000_000,
