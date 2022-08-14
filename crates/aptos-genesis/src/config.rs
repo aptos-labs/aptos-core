@@ -26,7 +26,7 @@ use vm_genesis::Validator;
 pub struct Layout {
     /// Root key for the blockchain
     /// TODO: In the future, we won't need a root key
-    pub root_key: Ed25519PublicKey,
+    pub root_key: Option<Ed25519PublicKey>,
     /// List of usernames or identifiers
     pub users: Vec<String>,
     /// ChainId for the target network
@@ -67,6 +67,27 @@ impl Layout {
         })?;
 
         Ok(serde_yaml::from_str(&contents)?)
+    }
+}
+
+impl Default for Layout {
+    fn default() -> Self {
+        Layout {
+            root_key: None,
+            users: vec![],
+            chain_id: ChainId::test(),
+            allow_new_validators: false,
+            epoch_duration_secs: 7_200,
+            is_test: true,
+            min_stake: 100_000_000_000_000,
+            min_voting_threshold: 100_000_000_000_000,
+            max_stake: 100_000_000_000_000_000,
+            recurring_lockup_duration_secs: 86_400,
+            required_proposer_stake: 100_000_000_000_000,
+            rewards_apy_percentage: 10,
+            voting_duration_secs: 43_200,
+            voting_power_increase_limit: 20,
+        }
     }
 }
 

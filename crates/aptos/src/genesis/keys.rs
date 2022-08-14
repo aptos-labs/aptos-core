@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
+use crate::genesis::git::LAYOUT_FILE;
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions, RngArgs},
@@ -11,6 +12,7 @@ use crate::{
     CliCommand,
 };
 use aptos_crypto::{bls12381, PrivateKey};
+use aptos_genesis::config::Layout;
 use aptos_genesis::{
     config::{HostAndPort, ValidatorConfiguration},
     keys::{generate_key_objects, PrivateIdentity},
@@ -136,5 +138,36 @@ impl CliCommand<()> for SetValidatorConfiguration {
         self.git_options
             .get_client()?
             .put(file.as_path(), &credentials)
+    }
+}
+
+/// Generate a Layout template file with empty values
+///
+/// This will generate a layout template file for genesis with some default values.  To start a
+/// new chain, these defaults should be carefully thought through and chosen.
+#[derive(Parser)]
+pub struct GenerateLayoutTemplate {
+    /// Path of the output layout template
+    #[clap(long, parse(from_os_str), default_value = LAYOUT_FILE)]
+    pub(crate) output_file: PathBuf,
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
+}
+
+#[async_trait]
+impl CliCommand<()> for GenerateLayoutTemplate {
+    fn command_name(&self) -> &'static str {
+        "GenerateLayoutTemplate"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        check_if_file_exists(self.output_file.as_path(), self.prompt_options)?;
+        let layout = Layout::default();
+
+        write_to_user_only_file(
+            self.output_file.as_path(),
+            &self.output_file.display().to_string(),
+            to_yaml(&layout)?.as_bytes(),
+        )
     }
 }
