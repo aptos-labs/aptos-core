@@ -118,6 +118,7 @@ jobs:
       - uses: ./.github/actions/docker-buildx-setup
 
       - name: Build and Push Rust images
+        uses: rui314/setup-mold@v1
         run: docker/docker-bake-rust-all.sh
         env:
           LAST_GREEN_COMMIT: ${{ needs.determine-last-green-commit.outputs.lastGreenCommit }}
