@@ -22,6 +22,7 @@ impl Test for ForgeSetupTest {
     }
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn wipe_fullnode(fullnode: &mut dyn FullNode) -> Result<()> {
     fullnode.stop().await?;
     info!("Clear its storage");

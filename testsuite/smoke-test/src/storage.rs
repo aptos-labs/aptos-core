@@ -24,6 +24,7 @@ use std::{
 };
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_db_restore() {
     // pre-build tools
     workspace_builder::get_bin("db-backup");

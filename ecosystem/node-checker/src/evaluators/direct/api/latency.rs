@@ -55,6 +55,7 @@ impl LatencyEvaluator {
         Self { args }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get_latency_datapoint(&self, target_node_address: &NodeAddress) -> Result<Duration> {
         let client = target_node_address.get_api_client(std::time::Duration::from_millis(
             self.args.max_api_latency_ms * 2,

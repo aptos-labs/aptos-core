@@ -19,6 +19,7 @@ use crate::{
 };
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_auth() {
     let context = new_test_context().await;
     let server_public_key = context.inner.noise_config().public_key();
@@ -107,6 +108,7 @@ async fn test_auth() {
 
 #[tokio::test]
 #[should_panic]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_auth_wrong_key() {
     let context = new_test_context().await;
     let server_public_key = context.inner.noise_config().public_key();

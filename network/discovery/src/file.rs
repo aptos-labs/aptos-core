@@ -93,6 +93,7 @@ mod tests {
     }
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_file_listener() {
         let path = TempPath::new();
         path.create_as_file().unwrap();
@@ -142,6 +143,7 @@ mod tests {
     }
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_no_file() {
         let path = TempPath::new();
         path.create_as_file().unwrap();

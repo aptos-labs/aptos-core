@@ -459,6 +459,7 @@ impl MempoolNetworkInterface {
     }
 
     /// Sends a batch to the given `Peer`
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send_batch(
         &self,
         peer: PeerNetworkId,

@@ -7,6 +7,7 @@ use aptos::common::types::{GasOptions, DEFAULT_GAS_UNIT_PRICE, DEFAULT_MAX_GAS};
 use aptos_keygen::KeyGen;
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_account_flow() {
     let (_swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()

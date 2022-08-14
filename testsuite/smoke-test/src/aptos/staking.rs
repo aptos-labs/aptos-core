@@ -9,6 +9,7 @@ use forge::{AptosPublicInfo, Swarm};
 // re-enable after delegation is enabled
 #[ignore]
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_staking() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
@@ -73,6 +74,7 @@ async fn test_staking() {
     assert_eq!(voting_power, accounts.len() as u64 * 100 + 1);
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn stake_pool_from_addr(
     info: &AptosPublicInfo<'_>,
     addr: AccountAddress,
@@ -86,6 +88,7 @@ async fn stake_pool_from_addr(
         .data
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn validator_set(info: &AptosPublicInfo<'_>) -> serde_json::Value {
     info.client()
         .get_account_resource(CORE_CODE_ADDRESS, "0x1::Stake::ValidatorSet")

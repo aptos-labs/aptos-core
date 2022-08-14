@@ -15,6 +15,7 @@ use forge::Swarm;
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_indexer() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
@@ -71,6 +72,7 @@ async fn test_indexer() {
     assert_eq!(balance.get(), 10);
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn wait_for_account(client: &RestClient, address: AccountAddress) -> Result<()> {
     const DEFAULT_WAIT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
     let start = std::time::Instant::now();

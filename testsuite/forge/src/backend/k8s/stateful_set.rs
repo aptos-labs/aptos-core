@@ -86,6 +86,7 @@ pub async fn wait_stateful_set(
 }
 
 /// Checks the status of a single K8s StatefulSet. Also inspects the pods to make sure they are all ready.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn check_stateful_set_status(
     stateful_set_api: Arc<dyn Get<StatefulSet>>,
     pod_api: Arc<dyn Get<Pod>>,
@@ -309,6 +310,7 @@ mod tests {
 
     #[async_trait]
     impl Get<StatefulSet> for MockStatefulSetApi {
+#[tracing::instrument(skip_all, level = "trace")]
         async fn get(&self, _name: &str) -> Result<StatefulSet, KubeError> {
             Ok(self.stateful_set.clone())
         }
@@ -326,12 +328,14 @@ mod tests {
 
     #[async_trait]
     impl Get<Pod> for MockPodApi {
+#[tracing::instrument(skip_all, level = "trace")]
         async fn get(&self, _name: &str) -> Result<Pod, KubeError> {
             Ok(self.pod.clone())
         }
     }
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_check_stateful_set_status() {
         // mock a StatefulSet with 0/1 replicas
         // this should then mean we check the underlying pod to see what's up

@@ -323,6 +323,7 @@ impl MempoolNode {
     }
 
     /// Send a broadcast and receive a response
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send_broadcast_and_receive_response(
         &mut self,
         expected_peer_network_id: PeerNetworkId,

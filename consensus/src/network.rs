@@ -127,6 +127,7 @@ impl NetworkSender {
     /// internal(to provide back pressure), it does not indicate the message is delivered or sent
     /// out. It does not give indication about when the message is delivered to the recipients,
     /// as well as there is no indication about the network failures.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn broadcast(&mut self, msg: ConsensusMsg) {
         // Directly send the message to ourself without going through network.
         let self_msg = Event::Message(self.author, msg.clone());
@@ -149,6 +150,7 @@ impl NetworkSender {
     }
 
     /// Tries to send msg to given recipients.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send(&self, msg: ConsensusMsg, recipients: Vec<Author>) {
         let network_sender = self.network_sender.clone();
         let mut self_sender = self.self_sender.clone();

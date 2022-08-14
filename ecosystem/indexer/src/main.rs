@@ -65,6 +65,7 @@ struct IndexerArgs {
 }
 
 #[tokio::main]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn main() -> std::io::Result<()> {
     aptos_logger::Logger::new().init();
     let args: IndexerArgs = IndexerArgs::parse();

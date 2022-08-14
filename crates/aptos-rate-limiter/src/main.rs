@@ -122,6 +122,7 @@ fn run_experiment<F: Future<Output = Vec<RunStats>> + 'static + Send>(
 }
 
 /// A helper to get stats of a read / write operation
+#[tracing::instrument(skip_all, level = "trace")]
 async fn stats<F: Future<Output = (usize, usize)>, Block: FnOnce() -> F>(
     label: &'static str,
     block: Block,
@@ -148,6 +149,7 @@ async fn stats<F: Future<Output = (usize, usize)>, Block: FnOnce() -> F>(
 
 /// A generalized test of the rate limiter, allowing for turning off rate limiting on either
 /// read or write sides.  `total_test_bytes` is the lower bound of send / receive bytes
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_rate_limiter<
     R: AsyncRead + Unpin + Send,
     W: AsyncWrite + Unpin + Send,
@@ -254,6 +256,7 @@ fn simple_shared_bucket(label: &'static str, size: usize) -> SharedBucket {
 }
 
 /// For comparison, no rate limiting
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_no_rate_limit(num_bytes: usize) -> Vec<RunStats> {
     test_rate_limiter(num_bytes, |reader| reader, |writer| writer).await
 }
@@ -261,6 +264,7 @@ async fn test_no_rate_limit(num_bytes: usize) -> Vec<RunStats> {
 /// Tests backpressure, where only the reader is limited.  Using a socket adds a buffer
 /// that causes the backpressure only to occur after a large amount of traffic first. (> 500k bytes)
 /// > 55 chunks could cause backpressure, for a proper test > 100 or > 200 give good results.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_rate_limit_read(num_bytes: usize, throughput: usize) -> Vec<RunStats> {
     let inbound_rate_limiter = simple_shared_bucket("read", throughput);
     test_rate_limiter(
@@ -272,6 +276,7 @@ async fn test_rate_limit_read(num_bytes: usize, throughput: usize) -> Vec<RunSta
 }
 
 /// Tests only if the writer is rate limited, which should provide a smoother read rate
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_rate_limit_write(num_bytes: usize, throughput: usize) -> Vec<RunStats> {
     let outbound_rate_limiter = simple_shared_bucket("write", throughput);
     test_rate_limiter(
@@ -284,6 +289,7 @@ async fn test_rate_limit_write(num_bytes: usize, throughput: usize) -> Vec<RunSt
 
 /// Tests if both are rate limited.  Results should be roughly the same in the long term as
 /// the other two
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_rate_limit_read_write(
     num_bytes: usize,
     read_throughput: usize,

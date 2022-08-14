@@ -53,6 +53,7 @@ impl BytesSender {
         Self { endpoint, inner }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send_data(&mut self, chunk: Bytes) -> Result<()> {
         let n_bytes = chunk.len();
         self.inner.send_data(chunk).await?;
@@ -97,6 +98,7 @@ where
         });
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn send_size_prefixed_bcs_bytes_impl<I, R>(
     iter_res: Result<I>,
     sender: &mut BytesSender,

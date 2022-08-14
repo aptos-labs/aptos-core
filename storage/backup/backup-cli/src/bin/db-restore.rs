@@ -55,6 +55,7 @@ enum RestoreType {
 }
 
 #[tokio::main]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn main() -> Result<()> {
     main_impl().await.map_err(|e| {
         error!("main_impl() failed: {}", e);
@@ -62,6 +63,7 @@ async fn main() -> Result<()> {
     })
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn main_impl() -> Result<()> {
     Logger::new().level(Level::Info).read_env().init();
     let _mp = MetricsPusher::start();

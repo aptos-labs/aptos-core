@@ -83,6 +83,7 @@ impl TelemetrySender {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn post_metrics(&self, telemetry_dump: &TelemetryDump) -> Result<(), anyhow::Error> {
         let token = self.get_token().await?;
 
@@ -112,6 +113,7 @@ impl TelemetrySender {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get_token(&self) -> Result<String, Error> {
         // Try to read the token holding a read lock
         let token = { self.auth_context.token.read().as_ref().cloned() };
@@ -125,6 +127,7 @@ impl TelemetrySender {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get_public_key_from_server(&self) -> Result<x25519::PublicKey, anyhow::Error> {
         let response = self.client.get(self.base_url.to_string()).send().await?;
 
@@ -137,6 +140,7 @@ impl TelemetrySender {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn server_public_key(&self) -> Result<x25519::PublicKey, anyhow::Error> {
         let server_public_key = { *self.auth_context.server_public_key.lock() };
         match server_public_key {
@@ -237,6 +241,7 @@ mod tests {
     use httpmock::MockServer;
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_server_public_key() {
         let mut rng = rand::thread_rng();
         let private_key = x25519::PrivateKey::generate(&mut rng);
@@ -271,6 +276,7 @@ mod tests {
     }
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_post_metrics() {
         let mut telemetry_event = TelemetryEvent {
             name: "sample-event".into(),
@@ -312,6 +318,7 @@ mod tests {
     }
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_send_metrics_retry() {
         let event_name = "sample-event";
         let mut telemetry_event = TelemetryEvent {

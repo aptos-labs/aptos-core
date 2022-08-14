@@ -397,6 +397,7 @@ impl<'t> TxnEmitter<'t> {
 }
 
 /// Waits for a single account to catch up to the expected sequence number
+#[tracing::instrument(skip_all, level = "trace")]
 async fn wait_for_single_account_sequence(
     client: &RestClient,
     account: &LocalAccount,
@@ -438,6 +439,7 @@ async fn wait_for_single_account_sequence(
 /// local sequence number could be much higher than the real sequence number ever
 /// will be, since not all of the submitted transactions were accepted.
 /// TODO, investigate whether this behaviour is desirable.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn wait_for_accounts_sequence(
     client: &RestClient,
     accounts: &mut [LocalAccount],

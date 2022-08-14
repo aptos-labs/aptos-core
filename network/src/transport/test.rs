@@ -180,6 +180,7 @@ where
     )
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn write_read_msg(socket: &mut impl TSocket, msg: &[u8]) -> Bytes {
     write_u16frame(socket, msg).await.unwrap();
     socket.flush().await.unwrap();

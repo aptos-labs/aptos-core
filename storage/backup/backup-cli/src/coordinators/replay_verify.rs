@@ -65,6 +65,7 @@ impl ReplayVerifyCoordinator {
         ret
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn run_impl(self) -> Result<()> {
         let metadata_view = metadata::cache::sync_and_load(
             &self.metadata_cache_opt,

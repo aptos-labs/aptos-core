@@ -18,6 +18,7 @@ use std::{
 };
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_full_node_basic_flow() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
@@ -113,6 +114,7 @@ async fn test_full_node_basic_flow() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_vfn_failover() {
     let mut swarm = new_local_swarm_with_aptos(4).await;
     let transaction_factory = swarm.chain_info().transaction_factory();
@@ -183,6 +185,7 @@ async fn test_vfn_failover() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_private_full_node() {
     let mut swarm = new_local_swarm_with_aptos(4).await;
     let transaction_factory = swarm.chain_info().transaction_factory();

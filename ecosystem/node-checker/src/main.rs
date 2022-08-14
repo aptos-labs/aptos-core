@@ -29,6 +29,7 @@ pub struct RootArgs {
 }
 
 #[tokio::main]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn main() -> Result<()> {
     let root_args = RootArgs::parse();
 

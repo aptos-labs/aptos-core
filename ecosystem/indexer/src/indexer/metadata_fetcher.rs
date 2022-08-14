@@ -36,6 +36,7 @@ impl MetaDataFetcher {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn read_http_uri(&self, uri: String) -> Result<serde_json::Value> {
         let resp = self
             .restclient

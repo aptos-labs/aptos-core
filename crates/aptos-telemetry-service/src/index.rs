@@ -20,6 +20,7 @@ fn index(context: Context) -> BoxedFilter<(impl Reply,)> {
         .boxed()
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn handle_index(context: Context) -> anyhow::Result<impl Reply, Rejection> {
     let resp = reply::json(&context.noise_config().public_key());
     Ok(resp)

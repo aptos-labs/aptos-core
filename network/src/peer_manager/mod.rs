@@ -429,6 +429,7 @@ where
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn handle_outbound_connection_request(&mut self, request: ConnectionRequest) {
         trace!(
             NetworkSchema::new(&self.network_context),
@@ -503,6 +504,7 @@ where
     }
 
     /// Sends an outbound request for `RPC` or `DirectSend` to the peer
+#[tracing::instrument(skip_all, level = "trace")]
     async fn handle_outbound_request(&mut self, request: PeerManagerRequest) {
         trace!(
             NetworkSchema::new(&self.network_context),

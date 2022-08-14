@@ -39,6 +39,7 @@ use storage_interface::DbReaderWriter;
 use tokio::task::JoinHandle;
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_apply_transaction_outputs() {
     // Create test data
     let transaction_to_commit = create_transaction();
@@ -91,6 +92,7 @@ async fn test_apply_transaction_outputs() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_apply_transaction_outputs_error() {
     // Setup the mock executor
     let mut chunk_executor = create_mock_executor();
@@ -120,6 +122,7 @@ async fn test_apply_transaction_outputs_error() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_commit_chunk_error() {
     // Setup the mock executor
     let mut chunk_executor = create_mock_executor();
@@ -152,6 +155,7 @@ async fn test_commit_chunk_error() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_execute_transactions() {
     // Create test data
     let transaction_to_commit = create_transaction();
@@ -204,6 +208,7 @@ async fn test_execute_transactions() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_execute_transactions_error() {
     // Setup the mock executor
     let mut chunk_executor = create_mock_executor();
@@ -234,6 +239,7 @@ async fn test_execute_transactions_error() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[should_panic]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_initialize_state_synchronizer_missing_info() {
     // Create test data that is missing transaction infos
     let mut output_list_with_proof = create_output_list_with_proof();
@@ -260,6 +266,7 @@ async fn test_initialize_state_synchronizer_missing_info() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[should_panic]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_initialize_state_synchronizer_receiver_error() {
     // Setup the mock db writer. The db writer should always fail.
     let mut db_writer = create_mock_db_writer();
@@ -287,6 +294,7 @@ async fn test_initialize_state_synchronizer_receiver_error() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_save_states_completion() {
     // Create test data
     let target_ledger_info = create_epoch_ending_ledger_info();
@@ -381,6 +389,7 @@ async fn test_save_states_completion() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[should_panic]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_save_states_dropped_error_listener() {
     // Setup the mock snapshot receiver
     let mut snapshot_receiver = create_mock_receiver();
@@ -422,6 +431,7 @@ async fn test_save_states_dropped_error_listener() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_save_states_invalid_chunk() {
     // Setup the mock snapshot receiver to always return errors
     let mut snapshot_receiver = create_mock_receiver();
@@ -534,6 +544,7 @@ fn create_storage_synchronizer(
 }
 
 /// Verifies that the expected snapshot commit notification is received by the listener
+#[tracing::instrument(skip_all, level = "trace")]
 async fn verify_snapshot_commit_notification(
     commit_listener: &mut CommitNotificationListener,
     expected_committed_transactions: CommittedTransactions,
@@ -547,6 +558,7 @@ async fn verify_snapshot_commit_notification(
 }
 
 /// Verifies that the expected error notification is received by the listener
+#[tracing::instrument(skip_all, level = "trace")]
 async fn verify_error_notification(
     error_listener: &mut ErrorNotificationListener,
     expected_notification_id: NotificationId,

@@ -66,6 +66,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn test_query_prometheus() {
         let client = get_prometheus_client().unwrap();
 

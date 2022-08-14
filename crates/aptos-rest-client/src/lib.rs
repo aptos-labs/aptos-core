@@ -245,6 +245,7 @@ impl Client {
             .await
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get_transaction_by_hash_inner(&self, hash: HashValue) -> Result<reqwest::Response> {
         let url = self.build_path(&format!("transactions/by_hash/{}", hash.to_hex_literal()))?;
         Ok(self.inner.get(url).send().await?)
@@ -255,6 +256,7 @@ impl Client {
             .await
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get_transaction_by_version_inner(&self, version: u64) -> Result<reqwest::Response> {
         let url = self.build_path(&format!("transactions/by_version/{}", version))?;
         Ok(self.inner.get(url).send().await?)
@@ -499,6 +501,7 @@ impl Client {
             .map_err(|e| anyhow::anyhow!("To text failed: {:?}", e))
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn check_response(
         &self,
         response: reqwest::Response,
@@ -512,6 +515,7 @@ impl Client {
         Ok((response, state))
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn json<T: serde::de::DeserializeOwned>(
         &self,
         response: reqwest::Response,
@@ -537,6 +541,7 @@ impl Client {
         Ok(())
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get<T: DeserializeOwned>(&self, url: Url) -> Result<Response<T>> {
         self.json(self.inner.get(url).send().await?).await
     }

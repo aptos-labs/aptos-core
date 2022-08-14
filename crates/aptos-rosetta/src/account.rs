@@ -53,6 +53,7 @@ pub fn routes(
 /// Account balance command
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/AccountApi.html#accountbalance)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn account_balance(
     request: AccountBalanceRequest,
     server_context: RosettaContext,
@@ -105,6 +106,7 @@ async fn account_balance(
 }
 
 /// Lookup currencies and convert them to Rosetta types
+#[tracing::instrument(skip_all, level = "trace")]
 async fn convert_balances_to_amounts(
     rest_client: &aptos_rest_client::Client,
     coin_cache: Arc<CoinCache>,
@@ -152,6 +154,7 @@ async fn convert_balances_to_amounts(
 }
 
 /// Retrieve the balances for an account
+#[tracing::instrument(skip_all, level = "trace")]
 async fn get_balances(
     rest_client: &aptos_rest_client::Client,
     address: AccountAddress,

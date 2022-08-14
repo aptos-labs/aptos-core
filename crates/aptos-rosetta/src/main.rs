@@ -23,6 +23,7 @@ const REST_API_WAIT_DURATION_MS: u64 = 100;
 const TOTAL_REST_API_WAIT_DURATION_S: u64 = 60;
 
 #[tokio::main]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn main() {
     let args: CommandArgs = CommandArgs::parse();
 

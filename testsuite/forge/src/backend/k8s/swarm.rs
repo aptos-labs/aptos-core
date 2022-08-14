@@ -307,6 +307,7 @@ pub fn k8s_wait_nodes_strategy() -> impl Iterator<Item = Duration> {
     ExponentWithLimitDelay::new(1000, 10 * 1000, 15 * 60 * 1000)
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn list_stateful_sets(client: K8sClient, kube_namespace: &str) -> Result<Vec<StatefulSet>> {
     let stateful_set_api: Api<StatefulSet> = Api::namespaced(client, kube_namespace);
     let lp = ListParams::default();

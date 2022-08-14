@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 /// Checks txn goes through consensus even if the local validator is not creating proposals.
 /// This behavior should be true with both mempool and quorum store.
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_txn_broadcast() {
     let mut swarm = SwarmBuilder::new_local(4)
         .with_aptos()

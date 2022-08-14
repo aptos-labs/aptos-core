@@ -126,6 +126,7 @@ pub async fn new_local_swarm_with_aptos(num_validators: usize) -> LocalSwarm {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_prevent_starting_nodes_twice() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;

@@ -34,6 +34,7 @@ impl PackageHooks for AptosPackageHooks {
     }
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn maybe_download_package(info: &CustomDepInfo) -> anyhow::Result<()> {
     if !info
         .download_to

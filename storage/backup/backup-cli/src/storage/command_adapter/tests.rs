@@ -72,6 +72,7 @@ fn dummy_store(cmd: &str) -> CommandAdapter {
     })
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn assert_commands_error(cmd: &str) {
     let name = ShellSafeName::from_str("name").unwrap();
 
@@ -115,6 +116,7 @@ async fn assert_commands_error(cmd: &str) {
     assert!(store.list_metadata_files().await.is_err());
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn assert_commands_okay(cmd: &str) {
     let handle = "handle";
     let name = ShellSafeName::from_str("name").unwrap();
