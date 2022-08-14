@@ -19,13 +19,9 @@ use aptos_types::{
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
-use move_deps::{
-    move_core_types::{
-        language_storage::{ResourceKey, StructTag},
-        move_resource::MoveStructType,
-        value::{MoveStructLayout, MoveTypeLayout},
-    },
-    move_vm_types::values::{Struct, Value},
+use move_deps::move_core_types::{
+    language_storage::{ResourceKey, StructTag},
+    move_resource::MoveStructType,
 };
 use vm_genesis::GENESIS_KEYPAIR;
 
@@ -331,47 +327,14 @@ impl CoinStore {
     }
 
     /// Returns the Move Value for the account's CoinStore
-    pub fn to_value(&self) -> Value {
-        Value::struct_(Struct::pack(vec![
-            Value::u64(self.coin),
-            Value::bool(self.frozen),
-            Value::struct_(Struct::pack(vec![
-                Value::u64(self.withdraw_events.count()),
-                Value::struct_(Struct::pack(vec![
-                    Value::u64(self.withdraw_events.key().get_creation_number()),
-                    Value::address(self.withdraw_events.key().get_creator_address()),
-                ])),
-            ])),
-            Value::struct_(Struct::pack(vec![
-                Value::u64(self.deposit_events.count()),
-                Value::struct_(Struct::pack(vec![
-                    Value::u64(self.deposit_events.key().get_creation_number()),
-                    Value::address(self.deposit_events.key().get_creator_address()),
-                ])),
-            ])),
-        ]))
-    }
-
-    /// Returns the value layout for the account's CoinStore
-    pub fn layout() -> MoveStructLayout {
-        MoveStructLayout::new(vec![
-            MoveTypeLayout::U64,
-            MoveTypeLayout::Bool,
-            MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                MoveTypeLayout::U64,
-                MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                    MoveTypeLayout::U64,
-                    MoveTypeLayout::Address,
-                ])),
-            ])),
-            MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                MoveTypeLayout::U64,
-                MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                    MoveTypeLayout::U64,
-                    MoveTypeLayout::Address,
-                ])),
-            ])),
-        ])
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let coin_store = CoinStoreResource::new(
+            self.coin,
+            self.frozen,
+            self.deposit_events.clone(),
+            self.withdraw_events.clone(),
+        );
+        bcs::to_bytes(&coin_store).unwrap()
     }
 }
 
@@ -451,35 +414,14 @@ impl AccountData {
         self.account.rotate_key(privkey, pubkey)
     }
 
-    /// Returns the (Move value) layout of the Account::Account struct
-    pub fn layout() -> MoveStructLayout {
-        MoveStructLayout::new(vec![
-            MoveTypeLayout::Vector(Box::new(MoveTypeLayout::U8)),
-            MoveTypeLayout::U64,
-            MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                MoveTypeLayout::U64,
-                MoveTypeLayout::Struct(MoveStructLayout::new(vec![
-                    MoveTypeLayout::U64,
-                    MoveTypeLayout::Address,
-                ])),
-            ])),
-        ])
-    }
-
     /// Creates and returns the top-level resources to be published under the account
-    pub fn to_value(&self) -> (Value, Value) {
-        let account = Value::struct_(Struct::pack(vec![
-            Value::vector_u8(AuthenticationKey::ed25519(&self.account.pubkey).to_vec()),
-            Value::u64(self.sequence_number),
-            Value::struct_(Struct::pack(vec![
-                Value::u64(self.coin_register_events.count()),
-                Value::struct_(Struct::pack(vec![
-                    Value::u64(self.coin_register_events.key().get_creation_number()),
-                    Value::address(self.coin_register_events.key().get_creator_address()),
-                ])),
-            ])),
-        ]));
-        (account, self.coin_store.to_value())
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let account = AccountResource::new(
+            self.sequence_number,
+            AuthenticationKey::ed25519(&self.account.pubkey).to_vec(),
+            self.coin_register_events.clone(),
+        );
+        bcs::to_bytes(&account).unwrap()
     }
 
     /// Returns the AccessPath that describes the Account resource instance.
@@ -499,27 +441,16 @@ impl AccountData {
     /// Creates a writeset that contains the account data and can be patched to the storage
     /// directly.
     pub fn to_writeset(&self) -> WriteSet {
-        let (account_blob, coinstore_blob) = self.to_value();
-        let mut write_set = Vec::new();
-        let account = account_blob
-            .value_as::<Struct>()
-            .unwrap()
-            .simple_serialize(&AccountData::layout())
-            .unwrap();
-        write_set.push((
-            StateKey::AccessPath(self.make_account_access_path()),
-            WriteOp::Value(account),
-        ));
-
-        let balance = coinstore_blob
-            .value_as::<Struct>()
-            .unwrap()
-            .simple_serialize(&CoinStore::layout())
-            .unwrap();
-        write_set.push((
-            StateKey::AccessPath(self.make_coin_store_access_path()),
-            WriteOp::Value(balance),
-        ));
+        let write_set = vec![
+            (
+                StateKey::AccessPath(self.make_account_access_path()),
+                WriteOp::Value(self.to_bytes()),
+            ),
+            (
+                StateKey::AccessPath(self.make_coin_store_access_path()),
+                WriteOp::Value(self.coin_store.to_bytes()),
+            ),
+        ];
 
         WriteSetMut::new(write_set).freeze().unwrap()
     }
