@@ -148,15 +148,13 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
         };
 
         if !self.module_read_write_intersection.load(Ordering::Relaxed) {
-            self.module_read_write_intersection.store(
-                Self::append_and_check(read_modules, &self.module_reads, &self.module_writes)
-                    || Self::append_and_check(
-                        written_modules,
-                        &self.module_writes,
-                        &self.module_reads,
-                    ),
-                Ordering::Release,
-            );
+            // Check if adding new read & write modules leads to intersections.
+            if Self::append_and_check(read_modules, &self.module_reads, &self.module_writes)
+                || Self::append_and_check(written_modules, &self.module_writes, &self.module_reads)
+            {
+                self.module_read_write_intersection
+                    .store(true, Ordering::Release);
+            }
         }
 
         self.inputs[txn_idx].store(Some(Arc::new(input)));
