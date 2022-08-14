@@ -15,9 +15,13 @@ use aptos_github_client::Client as GithubClient;
 use async_trait::async_trait;
 use clap::Parser;
 use serde::{de::DeserializeOwned, Serialize};
+use std::path::Path;
 use std::{fmt::Debug, io::Read, path::PathBuf, str::FromStr};
 
-pub const LAYOUT_NAME: &str = "layout";
+pub const LAYOUT_FILE: &str = "layout.yaml";
+pub const OPERATOR_FILE: &str = "operator.yaml";
+pub const OWNER_FILE: &str = "owner.yaml";
+pub const FRAMEWORK_DIR: &str = "framework";
 
 /// Setup a shared Git repository for Genesis
 ///
@@ -44,10 +48,10 @@ impl CliCommand<()> for SetupGit {
 
         // Upload layout file to ensure we can read later
         let client = self.git_options.get_client()?;
-        client.put(LAYOUT_NAME, &layout)?;
+        client.put(Path::new(LAYOUT_FILE), &layout)?;
 
         // Make a place for the modules to be uploaded
-        client.create_dir("framework")?;
+        client.create_dir(Path::new(FRAMEWORK_DIR))?;
 
         Ok(())
     }
@@ -141,10 +145,10 @@ impl Client {
     }
 
     /// Retrieves an object as a YAML encoded file from the appropriate storage
-    pub fn get<T: DeserializeOwned + Debug>(&self, name: &str) -> CliTypedResult<T> {
+    pub fn get<T: DeserializeOwned + Debug>(&self, path: &Path) -> CliTypedResult<T> {
         match self {
             Client::Local(local_repository_path) => {
-                let path = local_repository_path.join(format!("{}.yaml", name));
+                let path = local_repository_path.join(path);
                 let mut file = std::fs::File::open(path.as_path())
                     .map_err(|e| CliError::IO(path.display().to_string(), e))?;
 
@@ -154,18 +158,18 @@ impl Client {
                 from_yaml(&contents)
             }
             Client::Github(client) => {
-                from_base64_encoded_yaml(&client.get_file(&format!("{}.yaml", name))?)
+                from_base64_encoded_yaml(&client.get_file(&path.display().to_string())?)
             }
         }
     }
 
     /// Puts an object as a YAML encoded file to the appropriate storage
-    pub fn put<T: Serialize + ?Sized>(&self, name: &str, input: &T) -> CliTypedResult<()> {
+    pub fn put<T: Serialize + ?Sized>(&self, name: &Path, input: &T) -> CliTypedResult<()> {
         match self {
             Client::Local(local_repository_path) => {
-                self.create_dir(local_repository_path.to_str().unwrap())?;
+                self.create_dir(local_repository_path.as_path())?;
 
-                let path = local_repository_path.join(format!("{}.yaml", name));
+                let path = local_repository_path.join(name);
                 write_to_file(
                     path.as_path(),
                     &path.display().to_string(),
@@ -173,17 +177,17 @@ impl Client {
                 )?;
             }
             Client::Github(client) => {
-                client.put(&format!("{}.yaml", name), &to_base64_encoded_yaml(input)?)?;
+                client.put(&name.display().to_string(), &to_base64_encoded_yaml(input)?)?;
             }
         }
 
         Ok(())
     }
 
-    pub fn create_dir(&self, name: &str) -> CliTypedResult<()> {
+    pub fn create_dir(&self, dir: &Path) -> CliTypedResult<()> {
         match self {
             Client::Local(local_repository_path) => {
-                let path = local_repository_path.join(name);
+                let path = local_repository_path.join(dir);
                 create_dir_if_not_exist(path.as_path())?;
             }
             Client::Github(_) => {
