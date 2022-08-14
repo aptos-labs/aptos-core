@@ -104,7 +104,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "43",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -170,6 +170,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -333,7 +334,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "43",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -399,6 +400,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -562,7 +564,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "43",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -628,6 +630,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -791,7 +794,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "43",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -857,6 +860,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1020,7 +1024,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "43",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1086,6 +1090,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1249,7 +1254,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "43",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1315,6 +1320,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1478,7 +1484,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "43",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1544,6 +1550,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1707,7 +1714,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "43",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1773,6 +1780,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {

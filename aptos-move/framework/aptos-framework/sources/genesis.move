@@ -79,7 +79,7 @@ module aptos_framework::genesis {
 
     /// Genesis step 2: Initialize Aptos coin.
     fun initialize_aptos_coin(aptos_framework: &signer): MintCapability<AptosCoin> {
-        let (mint_cap, burn_cap) = aptos_coin::initialize(aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize(aptos_framework);
         // Give stake module MintCapability<AptosCoin> so it can mint rewards.
         stake::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
 

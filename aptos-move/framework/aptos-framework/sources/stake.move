@@ -1039,7 +1039,7 @@ module aptos_framework::stake {
         validator: signer,
     ) acquires OwnerCapability, StakePool, ValidatorConfig, ValidatorSet {
         test_setup(&aptos_framework);
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator, &mint_cap);
         let validator_address = signer::address_of(&validator);
         coin::deposit(validator_address, coin::mint(9901, &mint_cap));
@@ -1057,7 +1057,7 @@ module aptos_framework::stake {
         validator: signer,
     ) acquires OwnerCapability, StakePool, ValidatorConfig, ValidatorSet {
         test_setup(&aptos_framework);
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator, &mint_cap);
         let validator_address = signer::address_of(&validator);
         coin::deposit(validator_address, coin::mint(9901, &mint_cap));
@@ -1078,7 +1078,7 @@ module aptos_framework::stake {
         validator: signer,
     ) acquires AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         test_setup(&aptos_framework);
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator, &mint_cap);
         let validator_address = signer::address_of(&validator);
         coin::deposit(validator_address, coin::mint(9901, &mint_cap));
@@ -1100,7 +1100,7 @@ module aptos_framework::stake {
         validator: signer,
     ) acquires AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         test_setup(&aptos_framework);
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator, &mint_cap);
         let validator_address = signer::address_of(&validator);
         coin::deposit(validator_address, coin::mint(9901, &mint_cap));
@@ -1127,7 +1127,7 @@ module aptos_framework::stake {
         other_validator: signer,
     ) acquires AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         test_setup(&aptos_framework);
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator, &mint_cap);
         register_mint_stake(&other_validator, &mint_cap);
         let validator_address = signer::address_of(&validator);
@@ -1210,7 +1210,7 @@ module aptos_framework::stake {
     ) acquires OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         test_setup(&aptos_framework);
 
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator, &mint_cap);
         store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
@@ -1381,7 +1381,7 @@ module aptos_framework::stake {
         validator_2: signer,
     ) acquires OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         test_setup(&aptos_framework);
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator, &mint_cap);
         register_mint_stake(&validator_2, &mint_cap);
         store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
@@ -1430,7 +1430,7 @@ module aptos_framework::stake {
         validator_2: signer,
     ) acquires OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
         test_setup(&aptos_framework);
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator, &mint_cap);
         register_mint_stake(&validator_2, &mint_cap);
         store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
@@ -1474,7 +1474,7 @@ module aptos_framework::stake {
         initialize(&aptos_framework);
         staking_config::initialize_for_test(&aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100);
 
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator_1, &mint_cap);
         register_mint_stake(&validator_2, &mint_cap);
         register_mint_stake(&validator_3, &mint_cap);
@@ -1540,7 +1540,7 @@ module aptos_framework::stake {
         initialize(&aptos_framework);
         staking_config::initialize_for_test(&aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100);
 
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         let stake = coin::mint<AptosCoin>(100, &mint_cap);
         store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
 
@@ -1609,7 +1609,7 @@ module aptos_framework::stake {
         initialize(&aptos_framework);
         staking_config::initialize_for_test(&aptos_framework, 100, 10000, LOCKUP_CYCLE_SECONDS, false, 1, 100);
 
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator, &mint_cap);
         store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
@@ -1647,7 +1647,7 @@ module aptos_framework::stake {
 
         test_setup(&aptos_framework);
 
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator_1, &mint_cap);
         register_mint_stake(&validator_2, &mint_cap);
         register_mint_stake(&validator_3, &mint_cap);
@@ -1704,7 +1704,7 @@ module aptos_framework::stake {
 
         let validator_1_address = signer::address_of(&validator_1);
         let validator_2_address = signer::address_of(&validator_2);
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator_1, &mint_cap);
         register_mint_stake(&validator_2, &mint_cap);
         store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
@@ -1755,7 +1755,7 @@ module aptos_framework::stake {
         test_setup(&aptos_framework);
 
         let validator_address = signer::address_of(&validator);
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_mint_stake(&validator, &mint_cap);
         store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
@@ -1792,7 +1792,7 @@ module aptos_framework::stake {
         initialize(&aptos_framework);
         staking_config::initialize_for_test(&aptos_framework, 50, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100);
 
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_owner_only(&validator, &mint_cap);
         store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
@@ -1811,7 +1811,7 @@ module aptos_framework::stake {
         initialize(&aptos_framework);
         staking_config::initialize_for_test(&aptos_framework, 50, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 100);
 
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(&aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(&aptos_framework);
         register_owner_only(&validator, &mint_cap);
         store_aptos_coin_mint_cap(&aptos_framework, mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
@@ -1894,7 +1894,7 @@ module aptos_framework::stake {
         validator: &signer,
         change_epoch: bool,
     ) acquires AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet {
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
         register_mint_stake(validator, &mint_cap);
         store_aptos_coin_mint_cap(aptos_framework, mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
