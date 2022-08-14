@@ -183,6 +183,7 @@ dependencies = [
  "tokio 1.19.2",
  "tokio-util 0.7.3",
  "toml",
+ "tracing",
  "uuid",
  "vm-genesis",
  "walkdir",
@@ -396,6 +397,7 @@ dependencies = [
  "storage-service-types",
  "thiserror",
  "tokio 1.19.2",
+ "tracing",
 ]
 
 [[package]]
@@ -582,6 +584,7 @@ dependencies = [
  "serde 1.0.141",
  "serde_json",
  "tokio 1.19.2",
+ "tracing",
  "url",
 ]
 
@@ -650,8 +653,8 @@ dependencies = [
  "once_cell",
  "pretty_assertions",
  "prometheus",
- "serde 1.0.141",
  "rand 0.8.5",
+ "serde 1.0.141",
  "serde_json",
  "strum",
  "strum_macros",
@@ -722,6 +725,7 @@ dependencies = [
  "tokio 1.19.2",
  "tokio-metrics",
  "tokio-stream",
+ "tracing",
  "tracing-appender",
  "vm-validator",
 ]
@@ -786,8 +790,8 @@ dependencies = [
  "storage-interface",
  "storage-service-client",
  "storage-service-server",
- "tokio 1.19.2",
  "tikv-jemallocator",
+ "tokio 1.19.2",
  "tokio-stream",
 ]
 
@@ -818,6 +822,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "thiserror",
  "tokio 1.19.2",
+ "tracing",
  "transaction-emitter-lib",
  "url",
 ]
@@ -880,6 +885,7 @@ dependencies = [
  "tokio 1.19.2",
  "tokio-util 0.7.3",
  "toml",
+ "tracing",
  "url",
 ]
 
@@ -936,6 +942,7 @@ dependencies = [
  "pin-project",
  "tokio 1.19.2",
  "tokio-util 0.7.3",
+ "tracing",
 ]
 
 [[package]]
@@ -964,6 +971,7 @@ dependencies = [
  "serde 1.0.141",
  "serde_json",
  "tokio 1.19.2",
+ "tracing",
  "url",
 ]
 
@@ -1004,6 +1012,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio 1.19.2",
+ "tracing",
  "url",
  "warp",
 ]
@@ -1024,6 +1033,7 @@ dependencies = [
  "serde 1.0.141",
  "serde_json",
  "tokio 1.19.2",
+ "tracing",
  "url",
 ]
 
@@ -1146,6 +1156,7 @@ dependencies = [
  "serde_json",
  "storage-interface",
  "tokio 1.19.2",
+ "tracing",
  "vm-validator",
  "warp",
 ]
@@ -1196,6 +1207,7 @@ dependencies = [
  "tokio 1.19.2",
  "tokio-retry",
  "tokio-stream",
+ "tracing",
  "uuid",
 ]
 
@@ -1251,6 +1263,7 @@ dependencies = [
  "thiserror",
  "tokio 1.19.2",
  "tokio-test",
+ "tracing",
 ]
 
 [[package]]
@@ -1857,6 +1870,7 @@ dependencies = [
  "tokio-stream",
  "tokio-util 0.7.3",
  "toml",
+ "tracing",
  "warp",
 ]
 
@@ -1880,6 +1894,7 @@ dependencies = [
  "serde 1.0.141",
  "storage-interface",
  "tokio 1.19.2",
+ "tracing",
  "warp",
 ]
 
@@ -2087,6 +2102,7 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "tokio 1.19.2",
+ "tracing",
 ]
 
 [[package]]
@@ -2508,12 +2524,8 @@ dependencies = [
  "tempfile",
  "termion",
  "thiserror",
-<<<<<<< HEAD
  "tokio 1.19.2",
-=======
- "tokio",
  "tracing",
->>>>>>> 59695d6c51 (Adding Flame and std rolling)
  "vm-validator",
 ]
 
@@ -3086,6 +3098,7 @@ dependencies = [
  "thiserror",
  "tokio 1.19.2",
  "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
@@ -3704,6 +3717,7 @@ dependencies = [
  "termcolor",
  "thiserror",
  "tokio 1.19.2",
+ "tracing",
  "transaction-emitter-lib",
  "url",
 ]
@@ -4645,6 +4659,7 @@ dependencies = [
  "serde_json",
  "sysinfo",
  "tokio 1.19.2",
+ "tracing",
 ]
 
 [[package]]
@@ -6229,6 +6244,7 @@ dependencies = [
  "serde 1.0.141",
  "tokio 1.19.2",
  "tokio-util 0.7.3",
+ "tracing",
  "url",
 ]
 
@@ -6276,6 +6292,7 @@ dependencies = [
  "tokio 1.19.2",
  "tokio-retry",
  "tokio-util 0.7.3",
+ "tracing",
 ]
 
 [[package]]
@@ -6327,6 +6344,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "short-hex-str",
  "tokio 1.19.2",
+ "tracing",
 ]
 
 [[package]]
@@ -6826,6 +6844,7 @@ dependencies = [
  "serde 1.0.141",
  "thiserror",
  "tokio 1.19.2",
+ "tracing",
 ]
 
 [[package]]
@@ -8733,6 +8752,7 @@ dependencies = [
  "serde_yaml 0.8.26",
  "state-sync-driver",
  "tokio 1.19.2",
+ "tracing",
 ]
 
 [[package]]
@@ -8816,6 +8836,7 @@ dependencies = [
  "thiserror",
  "tokio 1.19.2",
  "tokio-stream",
+ "tracing",
  "vm-genesis",
 ]
 
@@ -8895,6 +8916,7 @@ dependencies = [
  "storage-service-types",
  "thiserror",
  "tokio 1.19.2",
+ "tracing",
 ]
 
 [[package]]
@@ -9186,6 +9208,7 @@ dependencies = [
  "forge",
  "rand 0.7.3",
  "tokio 1.19.2",
+ "tracing",
 ]
 
 [[package]]
@@ -9418,8 +9441,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bcb585a0069b53171684e22d5255984ec30d1c7304fd0a4a9a603ffd8c765cdd"
 dependencies = [
  "futures-util",
- "pin-project-lite",
- "tokio",
+ "pin-project-lite 0.2.9",
+ "tokio 1.19.2",
 ]
 
 [[package]]
@@ -9689,7 +9712,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09d48f71a791638519505cefafe162606f706c25592e4bde4d97600c0195312e"
 dependencies = [
  "crossbeam-channel",
- "time 0.3.9",
+ "time 0.3.12",
  "tracing-subscriber",
 ]
 
@@ -9755,7 +9778,7 @@ dependencies = [
  "ansi_term 0.12.1",
  "matchers",
  "once_cell",
- "parking_lot 0.12.0",
+ "parking_lot 0.12.1",
  "regex",
  "sharded-slab",
  "smallvec",
@@ -9805,6 +9828,7 @@ dependencies = [
  "serde 1.0.141",
  "termion",
  "tokio 1.19.2",
+ "tracing",
  "url",
 ]
 

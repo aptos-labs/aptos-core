@@ -71,6 +71,7 @@ pub(crate) fn start_shared_mempool<V>(
 
     let system_transaction_gc_interval_ms = config.mempool.system_transaction_gc_interval_ms;
     let mempool_snapshot_interval_secs = config.mempool.mempool_snapshot_interval_secs;
+    let mempool_clone = mempool.clone();
 
     if aptos_logger::enabled!(Level::Trace) {
         executor.spawn(snapshot_job(
@@ -78,6 +79,7 @@ pub(crate) fn start_shared_mempool<V>(
             config.mempool.mempool_snapshot_interval_secs,
         ));
     }
+
 
     executor.spawn(async move {
         let coordinator_monitor = tokio_metrics::TaskMonitor::new();
@@ -99,14 +101,14 @@ pub(crate) fn start_shared_mempool<V>(
         tokio::task::Builder::new()
             .name("[Mempool] GC Job")
             .spawn(gc_monitor.instrument(gc_coordinator(
-                mempool.clone(),
+                mempool_clone.clone(),
                 system_transaction_gc_interval_ms,
             )));
 
         tokio::task::Builder::new()
             .name("[Mempool] Snapshot Job")
             .spawn(
-                snapshot_monitor.instrument(snapshot_job(mempool, mempool_snapshot_interval_secs)),
+                snapshot_monitor.instrument(snapshot_job(mempool_clone, mempool_snapshot_interval_secs)),
             );
 
         let runtime_monitor = tokio_metrics::RuntimeMonitor::new(&handle_clone);
