@@ -26,7 +26,7 @@ use url::Url;
 
 #[derive(StructOpt, Debug)]
 struct Args {
-    #[structopt(long, default_value = "50000")]
+    #[structopt(long, default_value = "40000")]
     mempool_backlog: u64,
     #[structopt(long, default_value = "300")]
     duration_secs: usize,
@@ -41,7 +41,6 @@ struct Args {
         help = "Specify a test suite to run",
         default_value = "land_blocking"
     )]
-    
     suite: String,
     #[structopt(long, multiple = true)]
     changelog: Option<Vec<String>>,
