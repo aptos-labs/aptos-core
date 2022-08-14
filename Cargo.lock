@@ -829,6 +829,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-types",
  "arc-swap",
+ "claim",
  "criterion",
  "crossbeam",
  "crossbeam-queue",
