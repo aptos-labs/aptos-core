@@ -66,6 +66,7 @@ impl TransactionBackupController {
 }
 
 impl TransactionBackupController {
+#[tracing::instrument(skip_all, level = "trace")]
     async fn run_impl(self) -> Result<FileHandle> {
         let backup_handle = self
             .storage
@@ -141,6 +142,7 @@ impl TransactionBackupController {
             .unwrap()
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn write_chunk(
         &self,
         backup_handle: &BackupHandleRef,
@@ -180,6 +182,7 @@ impl TransactionBackupController {
         })
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn write_manifest(
         &self,
         backup_handle: &BackupHandleRef,

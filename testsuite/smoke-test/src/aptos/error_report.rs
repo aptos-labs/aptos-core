@@ -10,6 +10,7 @@ use forge::{AptosPublicInfo, Swarm};
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
     local_account: &LocalAccount,
     info: &mut AptosPublicInfo<'_>,
@@ -34,6 +35,7 @@ async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_error_report() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();

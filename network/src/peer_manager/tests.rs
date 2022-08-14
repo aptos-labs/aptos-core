@@ -125,6 +125,7 @@ fn build_test_peer_manager(
     )
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn ping_pong(connection: &mut MemorySocket) -> Result<(), PeerManagerError> {
     let (read_half, write_half) = tokio::io::split(connection.compat());
     let mut msg_tx =
@@ -146,6 +147,7 @@ async fn ping_pong(connection: &mut MemorySocket) -> Result<(), PeerManagerError
     Ok(())
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn assert_peer_disconnected_event(
     peer_id: PeerId,
     origin: ConnectionOrigin,
@@ -172,6 +174,7 @@ async fn assert_peer_disconnected_event(
 // This helper function is used to help identify that the expected connection was dropped due
 // to simultaneous dial tie-breaking.  It also checks the correct events were sent from the
 // Peer actors to PeerManager's internal_event_rx.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn check_correct_connection_is_live(
     mut live_connection: MemorySocket,
     mut dropped_connection: MemorySocket,

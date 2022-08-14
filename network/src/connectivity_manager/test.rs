@@ -110,6 +110,7 @@ impl TestHarness {
         (mock, conn_mgr)
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn trigger_connectivity_check(&self) {
         info!("Advance time to trigger connectivity check");
         self.mock_time
@@ -117,11 +118,13 @@ impl TestHarness {
             .await;
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn trigger_pending_dials(&self) {
         info!("Advance time to trigger dial");
         self.mock_time.advance_async(MAX_DELAY_WITH_JITTER).await;
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get_connected_size(&mut self) -> usize {
         info!("Sending ConnectivityRequest::GetConnectedSize");
         let (queue_size_tx, queue_size_rx) = oneshot::channel();
@@ -132,6 +135,7 @@ impl TestHarness {
         queue_size_rx.await.unwrap()
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get_dial_queue_size(&mut self) -> usize {
         info!("Sending ConnectivityRequest::GetDialQueueSize");
         let (queue_size_tx, queue_size_rx) = oneshot::channel();
@@ -142,6 +146,7 @@ impl TestHarness {
         queue_size_rx.await.unwrap()
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send_new_peer_await_delivery(
         &mut self,
         peer_id: PeerId,
@@ -162,6 +167,7 @@ impl TestHarness {
         self.send_notification_await_delivery(peer_id, notif).await;
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send_lost_peer_await_delivery(&mut self, peer_id: PeerId, address: NetworkAddress) {
         info!(
             "Sending LostPeer notification for peer: {}",
@@ -181,6 +187,7 @@ impl TestHarness {
         self.send_notification_await_delivery(peer_id, notif).await;
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send_notification_await_delivery(
         &mut self,
         peer_id: PeerId,
@@ -193,6 +200,7 @@ impl TestHarness {
         delivered_rx.await.unwrap();
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn expect_disconnect_inner(
         &mut self,
         peer_id: PeerId,
@@ -216,16 +224,19 @@ impl TestHarness {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn expect_disconnect_success(&mut self, peer_id: PeerId, address: NetworkAddress) {
         self.expect_disconnect_inner(peer_id, address, Ok(())).await;
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn expect_disconnect_fail(&mut self, peer_id: PeerId, address: NetworkAddress) {
         let error = PeerManagerError::NotConnected(peer_id);
         self.expect_disconnect_inner(peer_id, address, Err(error))
             .await;
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn wait_until_empty_dial_queue(&mut self) {
         // Wait for dial queue to be empty. Without this, it's impossible to guarantee that a completed
         // dial is removed from a dial queue. We need this guarantee to see the effects of future
@@ -234,6 +245,7 @@ impl TestHarness {
         while self.get_dial_queue_size().await > 0 {}
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn expect_one_dial_inner(
         &mut self,
         result: Result<(), PeerManagerError>,
@@ -257,6 +269,7 @@ impl TestHarness {
         (peer_id, address)
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn expect_one_dial(
         &mut self,
         expected_peer_id: PeerId,
@@ -271,6 +284,7 @@ impl TestHarness {
         self.wait_until_empty_dial_queue().await;
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn expect_one_dial_success(
         &mut self,
         expected_peer_id: PeerId,
@@ -280,6 +294,7 @@ impl TestHarness {
             .await;
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn expect_one_dial_fail(
         &mut self,
         expected_peer_id: PeerId,
@@ -290,6 +305,7 @@ impl TestHarness {
             .await;
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn expect_num_dials(&mut self, num_expected: usize) {
         for _ in 0..num_expected {
             let _ = self.expect_one_dial_inner(Ok(())).await;
@@ -297,6 +313,7 @@ impl TestHarness {
         self.wait_until_empty_dial_queue().await;
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send_update_discovered_peers(&mut self, src: DiscoverySource, peers: PeerSet) {
         info!("Sending UpdateDiscoveredPeers");
         self.conn_mgr_reqs_tx

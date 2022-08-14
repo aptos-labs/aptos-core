@@ -85,6 +85,7 @@ fn outbound_node_combinations() -> [(MempoolNode, (PeerNetworkId, ConnectionMeta
 
 /// Tests all possible inbound "downstream" peers
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn single_inbound_node_test() {
     for (mut node, (other_peer_network_id, other_metadata)) in inbound_node_combinations() {
         node.connect_self(other_peer_network_id.network_id(), other_metadata);
@@ -102,6 +103,7 @@ async fn single_inbound_node_test() {
 
 /// Tests all possible outbound "upstream" peers
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn single_outbound_node_test() {
     for (mut node, (other_peer_network_id, other_metadata)) in outbound_node_combinations() {
         // Add transactions
@@ -125,6 +127,7 @@ async fn single_outbound_node_test() {
 /// Tests if the node is a VFN, and it's getting forwarded messages from a PFN.  It should forward
 /// messages to the upstream VAL.  Upstream and downstream nodes are mocked.
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn vfn_middle_man_test() {
     let mut node = MempoolTestFrameworkBuilder::single_vfn();
     let (validator_peer_network_id, validator_metadata) =
@@ -149,6 +152,7 @@ async fn vfn_middle_man_test() {
 
 /// Tests when a node skips an ack
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_skip_ack_rebroadcast() {
     let mut node = MempoolTestFrameworkBuilder::single_validator();
     let (other_peer_network_id, other_metadata) =
@@ -170,6 +174,7 @@ async fn test_skip_ack_rebroadcast() {
 /// Tests when a node gets disconnected.  Node should pick up after the second sending
 /// TODO: also add an outbound test to ensure it'll broadcast all transactions again
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_interrupt_in_sync_inbound() {
     for (mut node, (other_peer_network_id, other_metadata)) in inbound_node_combinations() {
         // First txn is received
@@ -194,6 +199,7 @@ async fn test_interrupt_in_sync_inbound() {
 
 /// Tests that transactions will only be sent when they're ready (previous seq no have been sent)
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_ready_txns() {
     let mut node = MempoolTestFrameworkBuilder::single_validator();
     let (other_peer_network_id, other_metadata) =
@@ -222,6 +228,7 @@ async fn test_ready_txns() {
 
 /// Test that in the validator network, messages won't be sent back to the original sender
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_broadcast_self_txns() {
     let mut node = MempoolTestFrameworkBuilder::single_validator();
     let (other_peer_network_id, other_metadata) =
@@ -244,6 +251,7 @@ async fn test_broadcast_self_txns() {
 
 /// Test that gas price updates work and push onward to other nodes
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_update_gas_price() {
     let new_txn = TestTransaction::new(1, 0, 100);
     let new_txn = &[new_txn];
@@ -272,6 +280,7 @@ async fn test_update_gas_price() {
 
 /// In the event of a full mempool, retry and broadcast again
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_mempool_full_rebroadcast() {
     let mut node = MempoolTestFrameworkBuilder::single_validator();
     let (other_peer_network_id, other_metadata) =
@@ -296,6 +305,7 @@ async fn test_mempool_full_rebroadcast() {
 /// Tests if the node is a VFN, and it's getting forwarded messages from a PFN.  It should forward
 /// messages to the upstream VAL.  Upstream and downstream nodes also are running nodes.
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn fn_to_val_test() {
     for protocol_id in ALL_PROTOCOLS {
         let mut test_framework = MempoolTestFrameworkBuilder::new(1)

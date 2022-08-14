@@ -425,6 +425,7 @@ impl CliTestFramework {
         );
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn last_n_transactions_details(&self, count: u16) -> String {
         let result = aptos_rest_client::Client::new(self.endpoint.clone())
             .get_transactions(None, Some(count))

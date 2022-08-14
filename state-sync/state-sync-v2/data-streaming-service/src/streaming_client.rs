@@ -247,6 +247,7 @@ impl StreamingServiceClient {
         Self { request_sender }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send_stream_request(
         &self,
         client_request: StreamRequest,
@@ -262,6 +263,7 @@ impl StreamingServiceClient {
         Ok(response_receiver)
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send_request_and_await_response(
         &self,
         client_request: StreamRequest,

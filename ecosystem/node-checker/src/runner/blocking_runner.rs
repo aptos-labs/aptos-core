@@ -73,6 +73,7 @@ impl<M: MetricCollector> BlockingRunner<M> {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn collect_metrics<MC: MetricCollector>(
         metric_collector: &MC,
     ) -> Result<PrometheusScrape, RunnerError> {
@@ -82,12 +83,14 @@ impl<M: MetricCollector> BlockingRunner<M> {
             .map_err(RunnerError::ParseMetricsError)
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn collect_system_information<MC: MetricCollector>(
         metric_collector: &MC,
     ) -> Result<SystemInformation, RunnerError> {
         Ok(metric_collector.collect_system_information().await?)
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn run_metrics_evaluators<T: MetricCollector>(
         &self,
         target_metric_collector: &T,
@@ -129,6 +132,7 @@ impl<M: MetricCollector> BlockingRunner<M> {
         Ok(try_join_all(futures).await?.into_iter().flatten().collect())
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn run_system_information_evaluators<T: MetricCollector>(
         &self,
         target_metric_collector: &T,
@@ -161,6 +165,7 @@ impl<M: MetricCollector> BlockingRunner<M> {
         Ok(try_join_all(futures).await?.into_iter().flatten().collect())
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn run_direct_evaluators(
         &self,
         direct_evaluator_input: &DirectEvaluatorInput,

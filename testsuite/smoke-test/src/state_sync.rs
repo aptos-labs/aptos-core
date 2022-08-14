@@ -22,6 +22,7 @@ use std::{
 const MAX_CATCH_UP_SECS: u64 = 120; // The max time we'll wait for nodes to catch up
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_full_node_bootstrap_state_snapshot() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -51,6 +52,7 @@ async fn test_full_node_bootstrap_state_snapshot() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_full_node_bootstrap_outputs() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -73,6 +75,7 @@ async fn test_full_node_bootstrap_outputs() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_full_node_bootstrap_outputs_no_compression() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -95,6 +98,7 @@ async fn test_full_node_bootstrap_outputs_no_compression() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_full_node_bootstrap_transactions() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -117,6 +121,7 @@ async fn test_full_node_bootstrap_transactions() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_full_node_continuous_sync_outputs() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -136,6 +141,7 @@ async fn test_full_node_continuous_sync_outputs() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_full_node_continuous_sync_transactions() {
     // Create a validator swarm of 1 validator node
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -155,6 +161,7 @@ async fn test_full_node_continuous_sync_transactions() {
 }
 
 /// Creates a new full node using the given config and swarm
+#[tracing::instrument(skip_all, level = "trace")]
 async fn create_full_node(full_node_config: NodeConfig, swarm: &mut LocalSwarm) -> PeerId {
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
     let vfn_peer_id = swarm
@@ -175,6 +182,7 @@ async fn create_full_node(full_node_config: NodeConfig, swarm: &mut LocalSwarm) 
 
 /// A helper method that tests that a full node can sync from a validator after
 /// a failure and continue to stay up-to-date.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_full_node_sync(vfn_peer_id: PeerId, mut swarm: LocalSwarm, epoch_changes: bool) {
     // Stop the fullnode
     swarm.fullnode_mut(vfn_peer_id).unwrap().stop();
@@ -213,6 +221,7 @@ async fn test_full_node_sync(vfn_peer_id: PeerId, mut swarm: LocalSwarm, epoch_c
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_validator_bootstrap_outputs() {
     // Create a swarm of 4 validators with state sync v2 enabled (output syncing)
     let swarm = SwarmBuilder::new_local(4)
@@ -231,6 +240,7 @@ async fn test_validator_bootstrap_outputs() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_validator_bootstrap_transactions() {
     // Create a swarm of 4 validators with state sync v2 enabled (transaction syncing)
     let swarm = SwarmBuilder::new_local(4)
@@ -249,6 +259,7 @@ async fn test_validator_bootstrap_transactions() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_validator_bootstrap_transactions_no_compression() {
     // Create a swarm of 4 validators with state sync v2 enabled (transaction syncing, no compression)
     let swarm = SwarmBuilder::new_local(4)
@@ -269,6 +280,7 @@ async fn test_validator_bootstrap_transactions_no_compression() {
 
 /// A helper method that tests that a validator can sync after a failure and
 /// continue to stay up-to-date.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_validator_sync(mut swarm: LocalSwarm) {
     // Execute multiple transactions through validator 0
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
@@ -316,6 +328,7 @@ async fn test_validator_sync(mut swarm: LocalSwarm) {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_validator_failure_bootstrap_outputs() {
     // Create a swarm of 4 validators with state sync v2 enabled (snapshot
     // bootstrapping and transaction output application).
@@ -335,6 +348,7 @@ async fn test_validator_failure_bootstrap_outputs() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_validator_failure_bootstrap_execution() {
     // Create a swarm of 4 validators with state sync v2 enabled (snapshot
     // bootstrapping and transaction execution).
@@ -355,6 +369,7 @@ async fn test_validator_failure_bootstrap_execution() {
 
 /// A helper method that tests that all validators can sync after a failure and
 /// continue to stay up-to-date.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_all_validator_failures(mut swarm: LocalSwarm) {
     // Execute multiple transactions through validator 0
     let validator_peer_ids = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
@@ -411,6 +426,7 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 
 #[tokio::test]
 #[ignore]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_single_validator_failure() {
     // Create a swarm of 1 validator
     let mut swarm = new_local_swarm_with_aptos(1).await;
@@ -448,6 +464,7 @@ async fn test_single_validator_failure() {
 /// Executes transactions using the given transaction factory, client and
 /// accounts. If `force_epoch_changes` is true, also execute transactions to
 /// force reconfigurations.
+#[tracing::instrument(skip_all, level = "trace")]
 async fn execute_transactions(
     swarm: &mut LocalSwarm,
     client: &RestClient,
@@ -477,6 +494,7 @@ async fn execute_transactions(
 }
 
 /// Executes transactions and waits for all nodes to catch up
+#[tracing::instrument(skip_all, level = "trace")]
 async fn execute_transactions_and_wait(
     swarm: &mut LocalSwarm,
     client: &RestClient,
@@ -489,6 +507,7 @@ async fn execute_transactions_and_wait(
 }
 
 /// Waits for all nodes to catch up
+#[tracing::instrument(skip_all, level = "trace")]
 async fn wait_for_all_nodes(swarm: &mut LocalSwarm) {
     swarm
         .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_CATCH_UP_SECS))
@@ -497,6 +516,7 @@ async fn wait_for_all_nodes(swarm: &mut LocalSwarm) {
 }
 
 /// Creates and funds two test accounts
+#[tracing::instrument(skip_all, level = "trace")]
 async fn create_test_accounts(swarm: &mut LocalSwarm) -> (LocalAccount, LocalAccount) {
     let token_amount = 1000;
     let account_0 = create_and_fund_account(swarm, token_amount).await;

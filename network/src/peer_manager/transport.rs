@@ -219,6 +219,7 @@ where
     }
 
     /// Notifies `PeerManager` of a completed or failed outbound connection
+#[tracing::instrument(skip_all, level = "trace")]
     async fn handle_completed_outbound_upgrade(
         &mut self,
         upgrade: Result<Connection<TSocket>, TTransport::Error>,
@@ -290,6 +291,7 @@ where
     }
 
     /// Notifies `PeerManager` of a completed or failed inbound connection
+#[tracing::instrument(skip_all, level = "trace")]
     async fn handle_completed_inbound_upgrade(
         &mut self,
         upgrade: Result<Connection<TSocket>, TTransport::Error>,
@@ -328,6 +330,7 @@ where
     }
 
     /// Send a newly completed connection to `PeerManager`
+#[tracing::instrument(skip_all, level = "trace")]
     async fn send_connection_to_peer_manager(
         &mut self,
         connection: Connection<TSocket>,

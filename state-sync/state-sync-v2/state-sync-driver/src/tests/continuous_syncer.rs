@@ -31,6 +31,7 @@ use std::sync::Arc;
 use storage_service_types::Epoch;
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_critical_timeout() {
     // Create test data
     let current_synced_epoch = 54;
@@ -107,6 +108,7 @@ async fn test_critical_timeout() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_data_stream_transactions_with_target() {
     // Create test data
     let current_synced_epoch = 5;
@@ -189,6 +191,7 @@ async fn test_data_stream_transactions_with_target() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_data_stream_transaction_outputs() {
     // Create test data
     let current_synced_epoch = 100;

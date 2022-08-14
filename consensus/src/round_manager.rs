@@ -213,6 +213,7 @@ impl RoundManager {
     /// Replica:
     ///
     /// Do nothing
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_new_round_event(
         &mut self,
         new_round_event: NewRoundEvent,
@@ -251,6 +252,7 @@ impl RoundManager {
         Ok(())
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn generate_proposal(
         &mut self,
         new_round_event: NewRoundEvent,
@@ -317,6 +319,7 @@ impl RoundManager {
     }
 
     /// Sync to the sync info sending from peer if it has newer certificates.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn sync_up(&mut self, sync_info: &SyncInfo, author: Author) -> anyhow::Result<()> {
         let local_sync_info = self.block_store.sync_info();
         if sync_info.has_newer_certificates(&local_sync_info) {
@@ -481,6 +484,7 @@ impl RoundManager {
     }
 
     /// This function is called only after all the dependencies of the given QC have been retrieved.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_certificates(&mut self) -> anyhow::Result<()> {
         let sync_info = self.block_store.sync_info();
         if let Some(new_round_event) = self.round_state.process_certificates(sync_info) {
@@ -495,6 +499,7 @@ impl RoundManager {
     /// 3. Try to vote for it following the safety rules.
     /// 4. In case a validator chooses to vote, send the vote to the representatives at the next
     /// round.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_proposal(&mut self, proposal: Block) -> Result<()> {
         let author = proposal
             .author()
@@ -559,6 +564,7 @@ impl RoundManager {
     /// * then verify the voting rules
     /// * save the updated state to consensus DB
     /// * return a VoteMsg with the LedgerInfo to be committed in case the vote gathers QC.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn execute_and_vote(&mut self, proposed_block: Block) -> anyhow::Result<Vote> {
         let executed_block = self
             .block_store
@@ -631,6 +637,7 @@ impl RoundManager {
     /// If a new QC / TC is formed then
     /// 1) fetch missing dependencies if required, and then
     /// 2) call process_certificates(), which will start a new round in return.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
         let round = vote.vote_data().proposed().round();
 
@@ -689,6 +696,7 @@ impl RoundManager {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn new_qc_aggregated(
         &mut self,
         qc: Arc<QuorumCert>,
@@ -703,6 +711,7 @@ impl RoundManager {
         result
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn new_2chain_tc_aggregated(
         &mut self,
         tc: Arc<TwoChainTimeoutCertificate>,
@@ -818,6 +827,7 @@ impl RoundManager {
     ///
     /// It's only enabled with fault injection (failpoints feature).
     #[cfg(feature = "failpoints")]
+#[tracing::instrument(skip_all, level = "trace")]
     async fn attempt_to_inject_reconfiguration_error(
         &self,
         proposal_msg: &ProposalMsg,

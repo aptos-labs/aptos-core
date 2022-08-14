@@ -12,6 +12,7 @@ use forge::{NodeExt, Swarm};
 use std::time::{Duration, Instant};
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_create_mint_transfer_block_metadata() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
 
@@ -35,6 +36,7 @@ async fn test_create_mint_transfer_block_metadata() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_basic_fault_tolerance() {
     // A configuration with 4 validators should tolerate single node failure.
     let mut swarm = new_local_swarm_with_aptos(4).await;
@@ -43,6 +45,7 @@ async fn test_basic_fault_tolerance() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_basic_restartability() {
     let mut swarm = new_local_swarm_with_aptos(4).await;
     let client = swarm.validators().next().unwrap().rest_client();
@@ -85,6 +88,7 @@ async fn test_basic_restartability() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_concurrent_transfers_single_node() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let client = swarm.validators().next().unwrap().rest_client();
@@ -108,6 +112,7 @@ async fn test_concurrent_transfers_single_node() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_latest_events_and_transactions() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let client = swarm.validators().next().unwrap().rest_client();

@@ -23,6 +23,7 @@ use serde_json::{json, Value};
 use std::{collections::HashMap, convert::TryInto, path::PathBuf, sync::Arc, time::Duration};
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_genesis_works() {
     let test_context = new_test_context(current_function_name!(), 0);
 
@@ -44,6 +45,7 @@ async fn test_genesis_works() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_block_transactions_work() {
     let mut test_context = new_test_context(current_function_name!(), 0);
 
@@ -112,6 +114,7 @@ async fn test_block_transactions_work() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_block_height_and_ts_work() {
     let start_ts_usecs = 1000 * 1000000;
     let mut test_context = new_test_context(current_function_name!(), start_ts_usecs as u64);
@@ -171,6 +174,7 @@ async fn test_block_height_and_ts_work() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_table_item_parsing_works() {
     let mut test_context = new_test_context(current_function_name!(), 0);
     let ctx = &mut test_context;
@@ -222,6 +226,7 @@ async fn test_table_item_parsing_works() {
     // test_context.check_golden_output(&converted[1..]);
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
     let module = build_test_module(account.address()).await;
 
@@ -237,6 +242,7 @@ async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
     .await
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn build_test_module(account: AccountAddress) -> Vec<u8> {
     let package_dir = PathBuf::from(std::env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -263,6 +269,7 @@ async fn build_test_module(account: AccountAddress) -> Vec<u8> {
     out
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn fetch_all_stream(mut streamer: SfStreamer) -> Vec<TransactionPB> {
     // Overfetching should work
     let mut res = streamer.convert_next_block().await;

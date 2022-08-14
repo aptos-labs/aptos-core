@@ -154,6 +154,7 @@ prop_compose! {
     }
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn mock_backup_service_get_epoch_ending_lis(lis: Vec<LedgerInfoWithSignatures>) -> u16 {
     let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0);
     let route = warp::path!("epoch_ending_ledger_infos" / usize / usize).map(move |start, end| {
@@ -171,6 +172,7 @@ async fn mock_backup_service_get_epoch_ending_lis(lis: Vec<LedgerInfoWithSignatu
     addr.port()
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_trusted_waypoints_impl(
     lis: Vec<LedgerInfoWithSignatures>,
     trusted_waypoints: Vec<Waypoint>,

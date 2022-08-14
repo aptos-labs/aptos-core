@@ -21,6 +21,7 @@ use std::{
 };
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_connection_limiting() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let version = swarm.versions().max().unwrap();
@@ -129,6 +130,7 @@ async fn test_connection_limiting() {
 // Currently this test seems flaky: https://github.com/aptos-labs/aptos-core/issues/670
 #[ignore]
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_file_discovery() {
     let op_tool = OperationalTool::test();
     let (private_key, peer_set) = generate_private_key_and_peer(&op_tool).await;
@@ -190,6 +192,7 @@ fn create_discovery_file(peer_set: PeerSet) -> TempPath {
 }
 
 /// Generates `PrivateKey` and `Peer` information for a client / node
+#[tracing::instrument(skip_all, level = "trace")]
 async fn generate_private_key_and_peer(op_tool: &OperationalTool) -> (PrivateKey, PeerSet) {
     let key_file = TempPath::new();
     key_file.create_as_file().unwrap();
@@ -234,6 +237,7 @@ fn add_identity_to_config(
     config
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn check_endpoint(
     op_tool: &OperationalTool,
     network_id: NetworkId,

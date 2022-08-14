@@ -195,6 +195,7 @@ pub fn launch_buffer_manager() -> (
     )
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn loopback_commit_vote(
     self_loop_rx: &mut channel::Receiver<Event<ConsensusMsg>>,
     msg_tx: &aptos_channel::Sender<AccountAddress, VerifiedEvent>,
@@ -212,6 +213,7 @@ async fn loopback_commit_vote(
     };
 }
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn assert_results(batches: Vec<Vec<ExecutedBlock>>, result_rx: &mut Receiver<OrderedBlocks>) {
     for (i, batch) in enumerate(batches) {
         let OrderedBlocks { ordered_blocks, .. } = result_rx.next().await.unwrap();

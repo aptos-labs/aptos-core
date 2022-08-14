@@ -199,6 +199,7 @@ fn validate_address(address: &NetworkAddress) -> Result<(), Error> {
 }
 
 /// Wrapper for `check_endpoint_inner` to handle runtime
+#[tracing::instrument(skip_all, level = "trace")]
 async fn check_endpoint(
     upgrade_context: Arc<UpgradeContext>,
     address: NetworkAddress,
@@ -219,6 +220,7 @@ async fn check_endpoint(
 }
 
 /// Connects via Noise, and then drops the connection
+#[tracing::instrument(skip_all, level = "trace")]
 async fn check_endpoint_inner(
     upgrade_context: Arc<UpgradeContext>,
     address: NetworkAddress,
@@ -258,6 +260,7 @@ async fn check_endpoint_inner(
 
 const INVALID_NOISE_HEADER: &[u8; 152] = &[7; 152];
 
+#[tracing::instrument(skip_all, level = "trace")]
 async fn check_endpoint_inner_no_handshake(address: NetworkAddress) -> Result<String, Error> {
     let mut socket = resolve_and_connect(address.clone())
         .await

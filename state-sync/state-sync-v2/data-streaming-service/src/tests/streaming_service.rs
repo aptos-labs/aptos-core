@@ -27,6 +27,7 @@ macro_rules! unexpected_payload_type {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_state_values() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -70,6 +71,7 @@ async fn test_notifications_state_values() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_state_values_multiple_streams() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -116,6 +118,7 @@ async fn test_notifications_state_values_multiple_streams() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_continuous_outputs() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -167,6 +170,7 @@ async fn test_notifications_continuous_outputs() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_continuous_outputs_target() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -219,6 +223,7 @@ async fn test_notifications_continuous_outputs_target() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_continuous_outputs_multiple_streams() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -285,6 +290,7 @@ async fn test_notifications_continuous_outputs_multiple_streams() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_continuous_transactions() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -343,6 +349,7 @@ async fn test_notifications_continuous_transactions() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_continuous_transactions_target() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -400,6 +407,7 @@ async fn test_notifications_continuous_transactions_target() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_epoch_ending() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -433,6 +441,7 @@ async fn test_notifications_epoch_ending() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_epoch_ending_multiple_streams() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -476,6 +485,7 @@ async fn test_notifications_epoch_ending_multiple_streams() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_subscribe_outputs() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service_with_delay();
@@ -531,6 +541,7 @@ async fn test_notifications_subscribe_outputs() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_subscribe_transactions() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service_with_delay();
@@ -590,6 +601,7 @@ async fn test_notifications_subscribe_transactions() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_transaction_outputs() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -626,6 +638,7 @@ async fn test_notifications_transaction_outputs() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_transactions() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -666,6 +679,7 @@ async fn test_notifications_transactions() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_notifications_transactions_multiple_streams() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -722,6 +736,7 @@ async fn test_notifications_transactions_multiple_streams() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_states() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -746,6 +761,7 @@ async fn test_stream_states() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_continuous_outputs() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -782,6 +798,7 @@ async fn test_stream_continuous_outputs() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_continuous_outputs_target() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -818,6 +835,7 @@ async fn test_stream_continuous_outputs_target() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_continuous_transactions() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -857,6 +875,7 @@ async fn test_stream_continuous_transactions() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_continuous_transactions_target() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -895,6 +914,7 @@ async fn test_stream_continuous_transactions_target() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_epoch_ending() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -919,6 +939,7 @@ async fn test_stream_epoch_ending() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_transaction_outputs() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -955,6 +976,7 @@ async fn test_stream_transaction_outputs() {
 }
 
 #[tokio::test]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_stream_transactions() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -994,6 +1016,7 @@ async fn test_stream_transactions() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_terminate_complete_stream() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();
@@ -1030,6 +1053,7 @@ async fn test_terminate_complete_stream() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[should_panic(expected = "SelectNextSome polled after terminated")]
+#[tracing::instrument(skip_all, level = "trace")]
 async fn test_terminate_stream() {
     // Create a new streaming client and service
     let streaming_client = create_streaming_client_and_service();

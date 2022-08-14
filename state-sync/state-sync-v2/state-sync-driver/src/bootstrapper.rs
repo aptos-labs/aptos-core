@@ -429,6 +429,7 @@ impl<
     }
 
     /// Initializes an active data stream so that we can begin to process notifications
+#[tracing::instrument(skip_all, level = "trace")]
     async fn initialize_active_data_stream(
         &mut self,
         global_data_summary: &GlobalDataSummary,
@@ -474,6 +475,7 @@ impl<
     }
 
     /// Fetches all missing state snapshot data in order to bootstrap the node
+#[tracing::instrument(skip_all, level = "trace")]
     async fn fetch_missing_state_snapshot_data(
         &mut self,
         highest_synced_version: Version,
@@ -524,6 +526,7 @@ impl<
     }
 
     /// Attempts to fetch a data notification from the active stream
+#[tracing::instrument(skip_all, level = "trace")]
     async fn fetch_next_data_notification(&mut self) -> Result<DataNotification, Error> {
         let max_stream_wait_time_ms = self.driver_configuration.config.max_stream_wait_time_ms;
         let result =
@@ -538,6 +541,7 @@ impl<
     }
 
     /// Processes any notifications already pending on the active stream
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_active_stream_notifications(&mut self) -> Result<(), Error> {
         for _ in 0..self
             .driver_configuration
@@ -594,6 +598,7 @@ impl<
     }
 
     /// Fetches state values (as required to bootstrap the node)
+#[tracing::instrument(skip_all, level = "trace")]
     async fn fetch_missing_state_values(
         &mut self,
         target_ledger_info: LedgerInfoWithSignatures,
@@ -659,6 +664,7 @@ impl<
     }
 
     /// Fetches all missing transaction data in order to bootstrap the node
+#[tracing::instrument(skip_all, level = "trace")]
     async fn fetch_missing_transaction_data(
         &mut self,
         highest_synced_version: Version,
@@ -708,6 +714,7 @@ impl<
 
     /// Fetches all epoch ending ledger infos (from the current epoch to the
     /// maximum that can be found by the data streaming service).
+#[tracing::instrument(skip_all, level = "trace")]
     async fn fetch_epoch_ending_ledger_infos(
         &mut self,
         global_data_summary: &GlobalDataSummary,
@@ -814,6 +821,7 @@ impl<
     }
 
     /// Verifies the start and end indices in the given state value chunk
+#[tracing::instrument(skip_all, level = "trace")]
     async fn verify_states_values_indices(
         &mut self,
         notification_id: NotificationId,
@@ -869,6 +877,7 @@ impl<
     }
 
     /// Process a single state value chunk with proof payload
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_state_values_payload(
         &mut self,
         notification_id: NotificationId,
@@ -959,6 +968,7 @@ impl<
     }
 
     /// Process a single epoch ending payload
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_epoch_ending_payload(
         &mut self,
         notification_id: NotificationId,
@@ -1005,6 +1015,7 @@ impl<
     }
 
     /// Process a single transaction or transaction output data payload
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_transaction_or_output_payload(
         &mut self,
         notification_id: NotificationId,
@@ -1123,6 +1134,7 @@ impl<
 
     /// Verifies the payload contains the transaction info we require to
     /// download all state values.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn verify_transaction_info_to_sync(
         &mut self,
         notification_id: NotificationId,
@@ -1193,6 +1205,7 @@ impl<
     }
 
     /// Verifies the first payload version matches the version we wish to sync
+#[tracing::instrument(skip_all, level = "trace")]
     async fn verify_payload_start_version(
         &mut self,
         notification_id: NotificationId,
@@ -1225,6 +1238,7 @@ impl<
     /// Returns the end of epoch ledger info for the given payload. If
     /// calculation fails, the active stream is terminated. Assumes the
     /// `payload_start_version` exists.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn get_end_of_epoch_ledger_info(
         &mut self,
         notification_id: NotificationId,
@@ -1303,6 +1317,7 @@ impl<
 
     /// Handles the end of stream notification or an invalid payload by
     /// terminating the stream appropriately.
+#[tracing::instrument(skip_all, level = "trace")]
     async fn handle_end_of_stream_or_invalid_payload(
         &mut self,
         data_notification: DataNotification,

@@ -48,6 +48,7 @@ pub fn status_route(
 /// This should be able to run without a running full node connection
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/NetworkApi.html#networklist)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn network_list(
     _empty: MetadataRequest,
     server_context: RosettaContext,
@@ -71,6 +72,7 @@ async fn network_list(
 /// This should be able to run without a running full node connection
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/NetworkApi.html#networkoptions)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn network_options(
     request: NetworkRequest,
     server_context: RosettaContext,
@@ -127,6 +129,7 @@ async fn network_options(
 /// This should respond with the latest ledger version, timestamp, and genesis information
 ///
 /// [API Spec](https://www.rosetta-api.org/docs/NetworkApi.html#networkoptions)
+#[tracing::instrument(skip_all, level = "trace")]
 async fn network_status(
     request: NetworkRequest,
     server_context: RosettaContext,

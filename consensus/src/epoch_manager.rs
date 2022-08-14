@@ -315,6 +315,7 @@ impl EpochManager {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_epoch_retrieval(
         &mut self,
         request: EpochRetrievalRequest,
@@ -339,6 +340,7 @@ impl EpochManager {
         ))
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_different_epoch(
         &mut self,
         different_epoch: u64,
@@ -380,6 +382,7 @@ impl EpochManager {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn initiate_new_epoch(&mut self, proof: EpochChangeProof) -> anyhow::Result<()> {
         let ledger_info = proof
             .verify(self.epoch_state())
@@ -465,6 +468,7 @@ impl EpochManager {
         OrderingStateComputer::new(block_tx, self.commit_state_computer.clone(), reset_tx)
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn shutdown_current_processor(&mut self) {
         if self.round_manager_tx.is_some() {
             // Release the previous RoundManager, especially the SafetyRule client
@@ -493,6 +497,7 @@ impl EpochManager {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn start_round_manager(
         &mut self,
         recovery_data: RecoveryData,
@@ -604,6 +609,7 @@ impl EpochManager {
         tokio::spawn(round_manager.start(round_manager_rx));
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn start_new_epoch(&mut self, payload: OnChainConfigPayload) {
         let validator_set: ValidatorSet = payload
             .get()
@@ -632,6 +638,7 @@ impl EpochManager {
         .await;
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_message(
         &mut self,
         peer_id: AccountAddress,
@@ -662,6 +669,7 @@ impl EpochManager {
         Ok(())
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn check_epoch(
         &mut self,
         peer_id: AccountAddress,
@@ -749,6 +757,7 @@ impl EpochManager {
         }
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn process_block_retrieval(
         &self,
         request: IncomingBlockRetrievalRequest,
@@ -764,6 +773,7 @@ impl EpochManager {
         self.forward_to_round_manager(self.author, VerifiedEvent::LocalTimeout(round));
     }
 
+#[tracing::instrument(skip_all, level = "trace")]
     async fn await_reconfig_notification(&mut self) {
         let reconfig_notification = self
             .reconfig_events
