@@ -30,6 +30,46 @@ pub static VM_INIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static RAYON_PARALLEL_EXEC: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_rayon_parallel_exec",
+        "Execution time per user transaction"
+    )
+    .unwrap()
+});
+
+pub static VALIDATION_SECS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_validation_secs",
+        "Execution time per user transaction"
+    )
+    .unwrap()
+});
+
+pub static EXECUTION_LOCKS_SECS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_execution_locks",
+        "Execution time per user transaction"
+    )
+    .unwrap()
+});
+
+pub static EXECUTION_SECS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_execution_secs",
+        "Execution time per user transaction"
+    )
+    .unwrap()
+});
+
+pub static EXECUTION_TXNS_SECS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_execution_txns_secs",
+        "Execution time per user transaction"
+    )
+    .unwrap()
+});
+
 /// A struct that is always used by a single thread performing an execution task. The struct is
 /// passed to the VM and acts as a proxy to resolve reads first in the shared multi-version
 /// data-structure. It also allows the caller to track the read-set and any dependencies.
@@ -149,6 +189,7 @@ where
         scheduler: &'a Scheduler,
         executor: &E,
     ) -> SchedulerTask<'a> {
+        let _timer = EXECUTION_SECS.start_timer();
         let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute];
 
@@ -160,7 +201,9 @@ where
         };
 
         // VM execution.
+        let timer = EXECUTION_TXNS_SECS.start_timer();
         let execute_result = executor.execute_transaction(&state_view, txn);
+        drop(timer);
         let mut prev_write_set: HashSet<T::Key> = last_input_output.write_set(idx_to_execute);
 
         // For tracking whether the recent execution wrote outside of the previous write set.
@@ -217,6 +260,7 @@ where
         versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
         scheduler: &'a Scheduler,
     ) -> SchedulerTask<'a> {
+        let _timer = VALIDATION_SECS.start_timer();
         let (idx_to_validate, incarnation) = version_to_validate;
         let read_set = last_input_output
             .read_set(idx_to_validate)
@@ -282,6 +326,7 @@ where
                     &executor,
                 ),
                 SchedulerTask::ExecutionTask(_, Some(condvar), _guard) => {
+                    let _timer = EXECUTION_LOCKS_SECS.start_timer();
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
                     *lock.lock() = true;
@@ -312,6 +357,7 @@ where
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
 
+        let timer = RAYON_PARALLEL_EXEC.start_timer();
         RAYON_EXEC_POOL.scope(|s| {
             for _ in 0..self.concurrency_level {
                 s.spawn(|_| {
@@ -325,6 +371,7 @@ where
                 });
             }
         });
+        drop(timer);
 
         // TODO: for large block sizes and many cores, extract outputs in parallel.
         let num_txns = scheduler.num_txn_to_execute();
