@@ -131,20 +131,10 @@ fn create_layout_file(
     chain_id: ChainId,
 ) -> TempPath {
     let layout = Layout {
-        root_key: root_public_key,
+        root_key: Some(root_public_key),
         users,
         chain_id,
-        allow_new_validators: false,
-        epoch_duration_secs: 86400,
-        is_test: true,
-        min_stake: 0,
-        min_voting_threshold: 0,
-        max_stake: u64::MAX,
-        recurring_lockup_duration_secs: 86400,
-        required_proposer_stake: 0,
-        rewards_apy_percentage: 1,
-        voting_duration_secs: 1,
-        voting_power_increase_limit: 50,
+        ..Default::default()
     };
     let file = TempPath::new();
     file.create_as_file().unwrap();
