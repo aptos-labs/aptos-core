@@ -1240,6 +1240,7 @@ dependencies = [
  "thiserror",
  "tokio 1.19.2",
  "tokio_schedule",
+ "tracing",
  "url",
  "warp",
 ]
