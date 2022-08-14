@@ -86,7 +86,8 @@ module aptos_framework::account {
     native fun create_address(bytes: vector<u8>): address;
     native fun create_signer(addr: address): signer;
 
-    public(friend) fun initialize(account: &signer,
+    public(friend) fun initialize(
+        account: &signer,
         module_addr: address,
         module_name: vector<u8>,
         script_prologue_name: vector<u8>,
@@ -108,19 +109,6 @@ module aptos_framework::account {
             user_epilogue_name,
             writeset_epilogue_name,
         });
-    }
-
-    /// Construct an authentication key, aborting if the prefix is not valid.
-    fun create_authentication_key(account: &signer, auth_key_prefix: vector<u8>): vector<u8> {
-        let authentication_key = auth_key_prefix;
-        vector::append(
-            &mut authentication_key, bcs::to_bytes(signer::borrow_address(account))
-        );
-        assert!(
-            vector::length(&authentication_key) == 32,
-            error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
-        );
-        authentication_key
     }
 
     /// Publishes a new `Account` resource under `new_address`. A signer representing `new_address`
@@ -172,8 +160,8 @@ module aptos_framework::account {
         *&borrow_global<Account>(addr).authentication_key
     }
 
-    public entry fun rotate_authentication_key(account: signer, new_auth_key: vector<u8>) acquires Account {
-        rotate_authentication_key_internal(&account, new_auth_key);
+    public entry fun rotate_authentication_key(account: &signer, new_auth_key: vector<u8>) acquires Account {
+        rotate_authentication_key_internal(account, new_auth_key);
     }
 
     public fun rotate_authentication_key_internal(
