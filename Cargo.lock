@@ -2509,12 +2509,8 @@ dependencies = [
  "tempfile",
  "termion",
  "thiserror",
-<<<<<<< HEAD
  "tokio 1.19.2",
-=======
- "tokio",
  "tracing",
->>>>>>> 59695d6c51 (Adding Flame and std rolling)
  "vm-validator",
 ]
 
