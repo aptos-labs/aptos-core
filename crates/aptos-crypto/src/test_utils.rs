@@ -212,16 +212,16 @@ where
 
 /// This struct provides a means of testing signing and verification through
 /// BCS serialization and domain separation
-#[cfg(any(test, feature = "fuzzing"))]
+//#[cfg(any(test, feature = "fuzzing"))]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TestAptosCrypto(pub String);
 
 // the following block is macro expanded from derive(CryptoHasher, BCSCryptoHash)
 
 /// Cryptographic hasher for an BCS-serializable #item
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 pub struct TestAptosCryptoHasher(crate::hash::DefaultHasher);
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 impl ::core::clone::Clone for TestAptosCryptoHasher {
     #[inline]
     fn clone(&self) -> TestAptosCryptoHasher {
@@ -232,10 +232,10 @@ impl ::core::clone::Clone for TestAptosCryptoHasher {
         }
     }
 }
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 static TEST_CRYPTO_SEED: crate::_once_cell::sync::OnceCell<[u8; 32]> =
     crate::_once_cell::sync::OnceCell::new();
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 impl TestAptosCryptoHasher {
     fn new() -> Self {
         let name = crate::_serde_name::trace_name::<TestAptosCrypto>()
@@ -243,16 +243,16 @@ impl TestAptosCryptoHasher {
         TestAptosCryptoHasher(crate::hash::DefaultHasher::new(name.as_bytes()))
     }
 }
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 static TEST_CRYPTO_HASHER: crate::_once_cell::sync::Lazy<TestAptosCryptoHasher> =
     crate::_once_cell::sync::Lazy::new(TestAptosCryptoHasher::new);
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 impl std::default::Default for TestAptosCryptoHasher {
     fn default() -> Self {
         TEST_CRYPTO_HASHER.clone()
     }
 }
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 impl crate::hash::CryptoHasher for TestAptosCryptoHasher {
     fn seed() -> &'static [u8; 32] {
         TEST_CRYPTO_SEED.get_or_init(|| {
@@ -269,7 +269,7 @@ impl crate::hash::CryptoHasher for TestAptosCryptoHasher {
         self.0.finish()
     }
 }
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 impl std::io::Write for TestAptosCryptoHasher {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
         self.0.update(bytes);
@@ -279,7 +279,7 @@ impl std::io::Write for TestAptosCryptoHasher {
         Ok(())
     }
 }
-#[cfg(any(test, feature = "fuzzing"))]
+// #[cfg(any(test, feature = "fuzzing"))]
 impl crate::hash::CryptoHash for TestAptosCrypto {
     type Hasher = TestAptosCryptoHasher;
     fn hash(&self) -> crate::hash::HashValue {

@@ -146,7 +146,6 @@ impl RestClient {
             "sequence_number": seq_num.to_string(),
             "max_gas_amount": "1000",
             "gas_unit_price": "1",
-            "gas_currency_code": "XUS",
             "expiration_timestamp_secs": expiration_time_secs.to_string(),
             "payload": payload,
         })

@@ -22,7 +22,7 @@ export type BlockMetadataTransaction = {
     epoch: U64;
     round: U64;
     events: Array<Event>;
-    previous_block_votes: Array<boolean>;
+    previous_block_votes_bitvec: Array<number>;
     proposer: Address;
     failed_proposer_indices: Array<number>;
     timestamp: U64;

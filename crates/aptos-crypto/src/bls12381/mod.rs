@@ -1,14 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module provides APIs for Boneh-Lynn-Shacham (BLS) aggregate signatures (including
-//! individual signatures and multisignatures) on top of Barreto-Lynn-Scott BLS12-381 elliptic
-//! curves. This module wraps the [blst](https://github.com/supranational/blst) library.
+//! This module provides APIs for Boneh-Lynn-Shacham (BLS) aggregate signatures, including
+//! normal (non-aggregated) signatures and multisignatures, on top of Barreto-Lynn-Scott BLS12-381
+//! elliptic curves. This module wraps the [blst](https://github.com/supranational/blst) library.
 //!
 //! Our multisignature and aggregate signature implementations are described in [^BLS04], [^Bold03],
 //! except we use the proof-of-possession (PoP) scheme from [^RY07] to prevent rogue-key attacks
 //! [^MOR01] where malicious signers adversarially pick their public keys in order to forge a
 //! multisignature or forge an aggregate signature.
+//!
+//! Our normal (non-aggregated) signatures implementation requires CAREFUL use by developers to
+//! prevent small-subgroup attacks. Specifically, developers must always wrap `bls12381::PublicKey`
+//! objects as `Validatable::<bls12381::PublicKey>` and access the public key via
+//! `Validatable::<bls12381::PublicKey>::valid()`. We give an example below.
 //!
 //! We implement the `Minimal-pubkey-size` variant from the BLS IETF draft standard [^bls-ietf-draft],
 //! which puts the signatures in the group $\mathbb{G}_2$ and the public keys in $\mathbb{G}_1$. The
@@ -76,12 +81,17 @@
 //!
 //! # A note on subgroup checks
 //!
-//! This library was written so that users who know nothing about _small subgroup attacks_ need not
-//! worry about them [^LL97], [^BCM+15e], **as long as library users always verify a public key's
-//! proof-of-possession (PoP)** before aggregating it with other PKs or before verifying signatures
-//! with it.
+//! This library was written so that users who know nothing about _small subgroup attacks_  [^LL97], [^BCM+15e]
+//! need not worry about them, **as long as library users either**:
 //!
-//! Nonetheless, we still provide `group_check` methods for the `PublicKey` and `Signature` structs,
+//!  1. For normal (non-aggregated) signature verification, wrap `PublicKey` objects using
+//!     `Validatable<PublicKey>`
+//!
+//!  2. For multisignature, aggregate signature and signature share verification, library users
+//!     always verify a public key's proof-of-possession (PoP)** before aggregating it with other PKs
+//!     and before verifying signature shares with it.
+//!
+//! Nonetheless, we still provide `subgroup_check` methods for the `PublicKey` and `Signature` structs,
 //! in case manual verification of subgroup membership is ever needed.
 //!
 //! # A note on domain separation tags (DSTs)
@@ -98,6 +108,115 @@
 //! signatures used during PoP creation.
 //!
 //! This way, we can clearly separate the message spaces of these two use cases of the secret key `sk`.
+//!
+//! # How to use this module to create and verify normal (non-aggregated) signatures on a single message
+//!
+//! A typical use of the normal (non-aggregated) signature library would look as follows.
+//!
+//! For signers:
+//!
+//! ```
+//! use std::iter::zip;
+//! use aptos_crypto::test_utils::{KeyPair, TestAptosCrypto};
+//! use aptos_crypto::{bls12381, Signature, SigningKey, Uniform};
+//! use aptos_crypto::bls12381::bls12381_keys::{PrivateKey, PublicKey};
+//! use aptos_crypto::bls12381::ProofOfPossession;
+//! use aptos_crypto_derive::{CryptoHasher, BCSCryptoHash};
+//! use rand_core::OsRng;
+//! use serde::{Serialize, Deserialize};
+//!
+//! let mut rng = OsRng;
+//!
+//! // A signer locally generated their own BLS key-pair via:
+//! let kp = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+//!
+//! // Any arbitrary struct can be signed as long as it is properly "derived" via:
+//! //
+//! //   #[derive(CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
+//! //   struct Message(String);
+//! //
+//! // Here, we'll sign an existing testing struct from `crates/aptos-crypto/src/test_utils.rs`:
+//! //
+//! //   #[derive(Debug, Serialize, Deserialize)]
+//! //   pub struct TestAptosCrypto(pub String);
+//!
+//!
+//! // The signer computes a normal signature on a message.
+//! let message = TestAptosCrypto("test".to_owned());
+//! let sig = kp.private_key.sign(&message);
+//! ```
+//!
+//! For verifiers:
+//!
+//! ```
+//! use std::convert::TryFrom;
+//! use std::iter::zip;
+//! use aptos_crypto::test_utils::{KeyPair, TestAptosCrypto};
+//! use aptos_crypto::{bls12381, Signature, SigningKey, Uniform};
+//! use aptos_crypto::bls12381::bls12381_keys::{PrivateKey, PublicKey};
+//! use aptos_crypto::bls12381::{ProofOfPossession, UnvalidatedPublicKey};
+//! use aptos_crypto_derive::{CryptoHasher, BCSCryptoHash};
+//! use rand_core::OsRng;
+//! use serde::{Serialize, Deserialize};
+//! use aptos_crypto::validatable::Validatable;
+//!
+//! // NOTE: These were generated by running `cargo test -- doc_test --ignored --nocapture` in `crates/aptos-crypto/`
+//! let sk_bytes = hex::decode("65e0c364e0cc27ae4e90cb28059677c36fd11b47cbbab48a9cca3c34e92eefbb").unwrap();
+//! let pk_bytes = hex::decode("99ad6adb0a8b9a8c44dbf643a3ad6d11ff1fe90138db857382a8fc202334e6f8842e04055a729e4a4ba5b08161e7abd6").unwrap();
+//! // signature on TestAptosCrypto("test".to_owned())
+//! let sig_bytes = hex::decode("b266e156091c1d621304861654bae748cb3534bef86eb6ca1d482148ba7b1e3530eca47790a98971f421fe2d55f9d9af047807b5698cf559441b81288a022812d58669fee2d30b4c7bd86706c6a2128fd5b0c44c4bc171ca6e9d4c89196cac85").unwrap();
+//!
+//! // A verifier typically obtains the public key of the signer (somehow) and deserializes it
+//!
+//! ///////////////////////////////////////////////////////////////////////////////////////////////
+//! // WARNING: Before relying on any public key to verify a signature, a verifier MUST first    //
+//! // validate it using the `Validatable::<PublicKey>` wrapper as follows:                      //
+//! ///////////////////////////////////////////////////////////////////////////////////////////////
+//!
+//! // First, construct an UnvalidatedPublicKey struct
+//! let pk_unvalidated = UnvalidatedPublicKey::try_from(pk_bytes.as_slice());
+//! if pk_unvalidated.is_err() {
+//!     println!("ERROR: Could NOT deserialize unvalidated PK");
+//!     return;
+//! }
+//!
+//! // Second, construct a Validatable::<PublicKey> struct out of this UnvalidatedPublicKey struct
+//! let pk_validatable = Validatable::<PublicKey>::from_unvalidated(pk_unvalidated.unwrap());
+//!
+//! // Third, call validate() on it to get a subgroup-checked PK back.
+//! //
+//! // IMPORTANT NOTE: The result of this validation will be cached in a OnceCell so subsequent calls
+//! // to this function will return very fast.
+//! //
+//! let pk = pk_validatable.validate();
+//!
+//! if pk.is_err() {
+//!     println!("ERROR: Public key was either accidentally-corrupted or maliciously-generated.");
+//!     println!("Specifically, the public key is NOT a prime-order point.");
+//!     println!("As a result, this public key CANNOT be relied upon to verify any signatures!");
+//!     return;
+//! }
+//!
+//! let pk = pk.unwrap();
+//! let message = TestAptosCrypto("test".to_owned());
+//!
+//! // deserialize the signature on `message` and verify it
+//! let sig = bls12381::Signature::try_from(sig_bytes.as_slice());
+//! if sig.is_err() {
+//!     println!("ERROR: Could NOT deserialize signature");
+//!     return;
+//! }
+//!
+//! // Any verifier who has the signer's public key can verify the `(message, sig)` pair as:
+//! let sig = sig.unwrap();
+//! if sig.verify(&message, &pk).is_ok() {
+//!     println!("Signature verified successfully!");
+//! } else {
+//!     println!("Signature did NOT verify!");
+//! }
+//!
+//! // If the verification passed, then the verifier is certain that the signer signed `message`
+//! ```
 //!
 //! # How to use this module to aggregate and verify multisignatures
 //!
@@ -148,8 +267,8 @@
 //! // proof-of-possession (PoP)!
 //!
 //! ///////////////////////////////////////////////////////////////////////////////////////////////
-//! // WARNING: Before relying on a public key to verify an individual signature share or a      //
-//! // multisignature, one must MUST first verify that public key's PoP.                         //
+//! // WARNING: Before relying on a public key to verify a multisignature or a signature share   //
+//! // one must MUST first verify that public key's PoP                                          //
 //! //                                                                                           //
 //! //                  The importance of this step cannot be overstated!                        //
 //! //                                                                                           //
@@ -303,7 +422,9 @@ const DST_BLS_SIG_IN_G2_WITH_POP: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_
 pub mod bls12381_keys;
 pub mod bls12381_pop;
 pub mod bls12381_sigs;
+pub mod bls12381_validatable;
 
 pub use bls12381_keys::{PrivateKey, PublicKey};
 pub use bls12381_pop::ProofOfPossession;
 pub use bls12381_sigs::Signature;
+pub use bls12381_validatable::UnvalidatedPublicKey;

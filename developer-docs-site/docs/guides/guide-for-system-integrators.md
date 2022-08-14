@@ -25,49 +25,42 @@ This guide will overview the following topics for integrating with Aptos:
 
 ## Getting Started
 
-To get started, you will need:
+There are two well-supported approaches for integrating with the Aptos blockchain:
 
-1. The Aptos CLI tool.
-2. A local testnet with a validator node that has the faucet service turned on, and
-3. The Aptos SDK. You can use either the Typescript SDK or the Python SDK. For Typescript SDK, the version of the SDK is important to ensure that the TS SDK code builds the clients that talk to the local testnet, and not to the Aptos devnet. 
+1. Local development using our standalone testnet
+2. Devnet -- a shared resource for the community
 
-Follow the below steps to set up the above three:
+### Local Testnet
 
-1. Follow the instructions for Aptos CLI in [Install with cargo](/cli-tools/aptos-cli-tool/install-aptos-cli#install-with-cargo) and install the CLI tool. 
+There are two options to run a local testnet:
+1. Directly run a local testnet is to follow [this guide](/nodes/local-testnet/run-a-local-testnet/).
+2. Use the CLI by 1) [installing with the CLI](/cli-tools/aptos-cli-tool/install-aptos-cli) and 2) start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet)
 
-   :::caution
-   Make sure that when you execute Step 2, you use `--branch main` to target the `main` branch, and not the `--branch devnet`. The `main` branch should be used for your local development, i.e., on the local node with the faucet, and the `devnet` branch is for development on the Aptos devnet.
-2. Start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet): `aptos node run-local-testnet --with-faucet`. See the [Starting a local testnet with a faucet, using CLI](https://aptos.dev/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet) for more.
-3. Install the SDK. 
-   - **Typescript SDK**: Install the Typescript SDK from the `aptos-core`. Follow the steps described in [Use the SDK from aptos-core](/guides/local-testnet-dev-flow#typescript-use-the-sdk-from-aptos-core).
-   - **Python SDK**: Install the Python SDK as described in this [Python SDK](/sdks/python-sdk).
+This will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet service at `http://127.0.1:8000` for option 1 or `http://127.0.0.1:8081` for option 2. The applications will output the location of the services.
 
-This will start a local testnet with a faucet and cause SDKs to automatically point toward this node as the default endpoint, if one is not specified.
+### Access Devnet
 
-There are a plethora of ways to build on top of the Aptos blockchain. This guide takes an opinionated approach to help onboard the developer. However, the approach described here is not the only methodology or a definitive route. The specific goals for this approach are to drive a level of ownership, understanding, and stability.
+Faucet service: https://faucet.devnet.aptoslabs.com
+REST API service: https://fullnode.devnet.aptoslabs.com/v1
 
-:::caution Source of truth for local testnet development
+### SDKs
 
-When in doubt, consider the document [Local testnet development flow](/guides/local-testnet-dev-flow) as the source of truth.
-:::
+Aptos currently has two SDKs:
+1. [Python](/sdks/python-sdk)
+2. [Typescript](/sdks/transactions-with-ts-sdk)
 
-Other areas worth being familiar with:
+
+### Other Areas
 
 * [Using the CLI](../cli-tools/aptos-cli-tool/use-aptos-cli) which includes creating accounts, transferring coins, and publishing modules
 * [Typescript SDK](../transactions-with-ts-sdk)
 * [Python SDK](../sdks/python-sdk)
-* [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
-
-Useful guides:
-* [Local testnet development flow](./local-testnet-dev-flow)
-
-:::tip
-Not all SDKs and tools respect those environment flags though they will in due time.
-:::
+* [REST API spec](https://fullnode.devnet.aptoslabs.com/v1/spec#/)
+* [Local testnet development flow](/guides/local-testnet-dev-flow)
 
 ## Accounts on Aptos
 
-An [account](https://aptos.dev/concepts/basics-accounts) represents a resource on the Aptos blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources. On Aptos, accounts must be created on-chain prior to any blockchain operations involving that account. The Aptos framework supports implicitly creating accounts when transferring Aptos coin via `account::transfer` or explicitly via `account::create_account`.
+An [account](/concepts/basics-accounts) represents a resource on the Aptos blockchain that can send transactions. Each account is identified by a particular 32-byte account address and is a container for Move modules and Move resources. On Aptos, accounts must be created on-chain prior to any blockchain operations involving that account. The Aptos framework supports implicitly creating accounts when transferring Aptos coin via [`account::transfer`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L398) or explicitly via [`account::create_account`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L370).
 
 At creation, an [Aptos account](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L20) contains:
 * A [resource containing Aptos Coin](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/coin.move#L50) and deposit and withdrawal of coins from that resource.
@@ -89,10 +82,10 @@ This is covered in depth in the [Accounts](https://aptos.dev/concepts/basics-acc
 
 ### Rotating the keys
 
-An Account on Aptos has the ability to rotate keys so that potentially compromised keys cannot be used to access the accounts.
+An Account on Aptos has the ability to rotate keys so that potentially compromised keys cannot be used to access the accounts. Keys can be rotated via [`account::rotate_authentication_key`](https://github.com/aptos-labs/aptos-core/blob/60751b5ed44984178c7163933da3d1b18ad80388/aptos-move/framework/aptos-framework/sources/account.move#L183) function.
 
 :::tip Read more
-See more in [Account address](http://aptos.dev/concepts/basics-accounts#account-address).
+See more in [Account address](/concepts/basics-accounts#account-address).
 :::
 
 Refreshing the keys is generally regarded as good hygiene in the security field. However, this presents a challenge for system integrators who are used to using a mnemonic to represent both a private key and its associated account. To simplify this for the system integrators, Aptos will provide an on-chain mapping, before the launch of the mainnet. The on-chain data maps an effective account address as defined by the current mnemonic to the actual account address.
@@ -102,12 +95,12 @@ Refreshing the keys is generally regarded as good hygiene in the security field.
 When the Aptos blockchain processes the transaction, it looks at the sequence number in the transaction and compares it with the sequence number in the sender’s account (as stored on the blockchain at the current ledger version). The transaction is executed only if the sequence number in the transaction is the same as the sequence number for the sender account, and rejects if they do not match. In this way past transactions, which necessarily contain older sequence numbers, cannot be replayed, hence preventing replay attacks.
 
 :::tip Read more
-See more on [Account sequence number here](http://aptos.dev/concepts/basics-accounts#account-sequence-number).
+See more on [Account sequence number here](/concepts/basics-accounts#account-sequence-number).
 :::
 
 ## Transactions
 
-Aptos [transactions](http://aptos.dev/concepts/basics-txns-states) are encoded in [BCS](https://github.com/diem/bcs) (Binary Canonical Serialization). Transactions contain  information such as the sender’s account address, authentication from the sender, the desired operation to be performed on the Aptos blockchain, and the amount of gas the sender is willing to pay to execute the transaction.
+Aptos [transactions](/concepts/basics-txns-states) are encoded in [BCS](https://github.com/diem/bcs) (Binary Canonical Serialization). Transactions contain  information such as the sender’s account address, authentication from the sender, the desired operation to be performed on the Aptos blockchain, and the amount of gas the sender is willing to pay to execute the transaction.
 
 ### Transaction states
 
@@ -129,7 +122,7 @@ The submitter can try to increase the gas cost by a trivial amount to help make 
 On the Aptos devnet, the time between submission and confirmation is within seconds.
 
 :::tip Read more
-See [here for a comprehensive description of the transaction lifecycle](https://aptos.dev/guides/basics-life-of-txn).
+See [here for a comprehensive description of the transaction lifecycle](/guides/basics-life-of-txn).
 :::
 
 ### Constructing a transaction
@@ -143,15 +136,15 @@ Aptos supports two methods for constructing transactions:
 
 JSON-encoded transactions can be generated via the [REST API](https://fullnode.devnet.aptoslabs.com/v1/spec#/), following these steps:
 
-- First construct an appropriate JSON payload for the `/transactions/signing_message` endpoint as demonstrated in the [Python SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L111).
+- First construct an appropriate JSON payload for the `/transactions/encode_submission` endpoint as demonstrated in the [Python SDK](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L128).
 - The output of the above contains an object containing a `message` and this must be signed with the sender’s private key locally.
-- Finally, the original JSON payload is extended with the signature information and posted to the `/transactions` [endpoint](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L127). This will return back a transaction submission result that, if successful, contains a transaction hash in the `hash` [field](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L138).
+- Finally, the original JSON payload is extended with the signature information and posted to the `/transactions` [endpoint](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L142). This will return back a transaction submission result that, if successful, contains a transaction hash in the `hash` [field](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L145).
 
-JSON-encoded transactions allow for rapid development and support seamless ABI conversions of transaction arguments to native types. However, most system integrators prefer to generate transactions within their own tech stack. Both the [TypeScript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L259) and [Python SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L202) support generating BCS transactions.
+JSON-encoded transactions allow for rapid development and support seamless ABI conversions of transaction arguments to native types. However, most system integrators prefer to generate transactions within their own tech stack. Both the [TypeScript SDK](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/typescript/sdk/src/aptos_client.ts#L259) and [Python SDK](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L100) support generating BCS transactions.
 
 #### BCS-encoded transactions
 
-BCS encoded transactions can be submitted to the `/transactions` endpoint but must specify `Content-Type: application/x.aptos.signed_transaction+bcs` in the HTTP headers. This will return back a transaction submission result that, if successful, contains a transaction hash in the `[hash` [field](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L138).
+BCS encoded transactions can be submitted to the `/transactions` endpoint but must specify `Content-Type: application/x.aptos.signed_transaction+bcs` in the HTTP headers. This will return back a transaction submission result that, if successful, contains a transaction hash in the `hash` [field](https://github.com/aptos-labs/aptos-core/blob/9b85d41ed8ef4a61a9cd64f9de511654fcc02024/ecosystem/python/sdk/aptos_sdk/client.py#L138).
 
 ### Types of Transactions
 
@@ -160,19 +153,13 @@ Within a given transaction, the target of execution can be one of two types:
 - An entry point (formerly known as script function), and/or
 - A script (payload). 
 
-Currently the SDKs: [Python](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/python/sdk/aptos_sdk/client.py#L248) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) only support the generation of transactions that target entry points. This guide points out many of those entry points, such as `coin::transfer` and `account::create_account`. 
+Currently the SDKs: [Python](https://github.com/aptos-labs/aptos-core/blob/b0fe7ea6687e9c180ebdbac8d8eb984d11d7e4d4/ecosystem/python/sdk/aptos_sdk/client.py#L249) and [Typescript](https://github.com/aptos-labs/aptos-core/blob/76b654b54dcfc152de951a728cc1e3f9559d2729/ecosystem/typescript/sdk/src/aptos_client.test.ts#L98) only support the generation of transactions that target entry points. This guide points out many of those entry points, such as `coin::transfer` and `account::create_account`. 
 
 All operations on the Aptos blockchain should be available via entry point calls. While one could submit multiple transactions calling entry points in series, many such operations may benefit from being called atomically from a single transaction. A script payload transaction can call any entry point or public function defined within any module. 
 
 :::tip Move book
 Currently there are no tutorials in this guide on script payloads, but the [Move book](https://move-language.github.io/move/modules-and-scripts.html?highlight=script#scripts) does go in some depth.
 :::
-
-### Status of a transaction
-
-Transaction status can be obtained by querying the API `/transactions/{hash}` with the hash returned during the submission of the transaction.
-
-A reasonable strategy for submitting transactions is to limit their lifetime to 30 to 60 seconds, and polling that API at regular intervals until success or a several seconds after that time has elapsed. If there is no commitment on-chain, the transaction was likely discarded.
 
 :::tip Read more
 
@@ -186,7 +173,13 @@ See the following documentation for generating valid transactions:
 
 :::
 
-### Evaluating transactions
+### Status of a transaction
+
+Transaction status can be obtained by querying the API [`/transactions/by_hash/{hash}`](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_hash) with the hash returned during the submission of the transaction.
+
+A reasonable strategy for submitting transactions is to limit their lifetime to 30 to 60 seconds, and polling that API at regular intervals until success or a several seconds after that time has elapsed. If there is no commitment on-chain, the transaction was likely discarded.
+
+### Testing transactions or transaction pre-execution
 
 To facilitate evaluation of transactions, Aptos supports a simulation API that does not require and should not contain valid signatures on transactions.
 
@@ -207,11 +200,11 @@ Most integrations into the Aptos blockchain benefit from a holistic and comprehe
 The storage service on a node employs two forms of pruning that erase data from nodes: 
 
 1. state, and 
-2. events, transactions, and everything else. 
+2. events, transactions, and everything else.
 
 While either of these may be disabled, storing the state versions is not particularly sustainable. 
 
-Events and transactions pruning can be disabled via setting the [`ledger_prune_window`](https://github.com/aptos-labs/aptos-core/blob/b718154c93b3556658c8c06341be0cf47957188c/config/src/config/storage_config.rs#L106) to `None`. In the near future, Aptos will provide indexers that mitigate the need to directly query from a node. 
+Events and transactions pruning can be disabled via setting the [`enable_ledger_pruner`](https://github.com/aptos-labs/aptos-core/blob/cf0bc2e4031a843cdc0c04e70b3f7cd92666afcf/config/src/config/storage_config.rs#L141)) to `false`. This will be default behavior in Mainnet. In the near future, Aptos will provide indexers that mitigate the need to directly query from a node.
 
 The REST API contains the following useful APIs for querying transactions and events:
 

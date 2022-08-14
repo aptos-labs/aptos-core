@@ -1,10 +1,23 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{anyhow, Result};
+pub mod aptos;
+pub mod error;
+pub mod faucet;
+pub use faucet::FaucetClient;
+pub mod response;
+pub use response::Response;
+pub mod state;
+pub mod types;
+
 pub use aptos_api_types::{
     self, Event, IndexResponse, MoveModuleBytecode, PendingTransaction, Transaction,
 };
+pub use state::State;
+pub use types::{Account, Resource};
+
+use crate::aptos::{AptosVersion, Balance};
+use anyhow::{anyhow, Result};
 use aptos_api_types::{
     mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, BlockInfo,
     HexEncodedBytes, VersionedEvent,
@@ -18,21 +31,9 @@ use aptos_types::{
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
-pub use state::State;
 use std::time::Duration;
-use url::Url;
-
-pub mod error;
-pub mod faucet;
-pub use faucet::FaucetClient;
-pub mod response;
-pub use response::Response;
-pub mod state;
-pub mod types;
-use crate::aptos::{AptosVersion, Balance};
-pub use types::{Account, Resource};
-pub mod aptos;
 use types::{deserialize_from_prefixed_hex_string, deserialize_from_string};
+use url::Url;
 
 pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 pub const DEFAULT_VERSION_PATH_BASE: &str = "v1/";

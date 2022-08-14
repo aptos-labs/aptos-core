@@ -1,8 +1,8 @@
 #[test_only]
-module aptos_framework::aggregator_tests {
+module aptos_std::aggregator_tests {
 
-    use aptos_framework::aggregator;
-    use aptos_framework::aggregator_factory;
+    use aptos_std::aggregator;
+    use aptos_std::aggregator_factory;
 
     #[test(account = @aptos_framework)]
     fun test_can_add_and_sub_and_read(account: signer) {

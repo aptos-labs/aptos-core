@@ -44,7 +44,7 @@ impl FromStr for ListQuery {
     }
 }
 
-/// Command to list items owned by an address
+/// Command to list resources, modules, or other items owned by an address
 ///
 #[derive(Debug, Parser)]
 pub struct ListAccount {
@@ -54,12 +54,11 @@ pub struct ListAccount {
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
 
-    /// Address of account you want to list resources/modules for
+    /// Address of the account you want to list resources/modules for
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: Option<AccountAddress>,
 
-    /// Type of items to list: resources, modules. (Defaults to 'resources').
-    /// TODO: add options like --tokens --nfts etc
+    /// Type of items to list: [balance, resources, modules]
     #[clap(long, default_value_t = ListQuery::Resources)]
     pub(crate) query: ListQuery,
 }

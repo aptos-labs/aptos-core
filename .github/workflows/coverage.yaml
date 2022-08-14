@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   rust-unit:
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') 
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')
     runs-on: high-perf-docker
     steps:
       - uses: actions/checkout@v3
@@ -37,6 +37,7 @@ jobs:
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
       - name: Upload coverage to Codecov
+        if: "!cancelled()"
         uses: codecov/codecov-action@v3
         with:
           files: lcov.info
@@ -68,6 +69,7 @@ jobs:
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
       - name: Upload coverage to Codecov
+        if: "!cancelled()"
         uses: codecov/codecov-action@v3
         with:
           files: lcov.info

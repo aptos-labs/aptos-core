@@ -4,7 +4,10 @@
 use crate::{unit_tests::TestInterface, AptosDebugger};
 use anyhow::bail;
 use aptos_types::{account_address::AccountAddress, account_config::AccountResource};
-use move_deps::move_core_types::{effects::ChangeSet, move_resource::MoveStructType};
+use move_deps::move_core_types::{
+    effects::{ChangeSet, Op},
+    move_resource::MoveStructType,
+};
 use std::path::PathBuf;
 
 #[test]
@@ -41,10 +44,10 @@ fn test_changeset_override() {
     let event = aptos_types::event::EventHandle::random(0);
     let mut override_changeset = ChangeSet::new();
     override_changeset
-        .publish_resource(
+        .add_resource_op(
             address,
             AccountResource::struct_tag(),
-            bcs::to_bytes(&AccountResource::new(0, vec![], event)).unwrap(),
+            Op::New(bcs::to_bytes(&AccountResource::new(0, vec![], event)).unwrap()),
         )
         .unwrap();
 

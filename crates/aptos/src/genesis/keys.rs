@@ -30,7 +30,7 @@ pub struct GenerateKeys {
     pub(crate) prompt_options: PromptOptions,
     #[clap(flatten)]
     pub rng_args: RngArgs,
-    /// Output path for the three keys
+    /// Output directory for the key files
     #[clap(long, parse(from_os_str))]
     pub(crate) output_dir: Option<PathBuf>,
 }
@@ -73,21 +73,21 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
     }
 }
 
-/// Set ValidatorConfiguration for a single validator in the git repository
+/// Set validator configuration for a single validator in the git repository
 #[derive(Parser)]
 pub struct SetValidatorConfiguration {
-    /// Username
+    /// Name of validator
     #[clap(long)]
     pub(crate) username: String,
     #[clap(flatten)]
     pub(crate) git_options: GitOptions,
-    /// Path to folder with account.key, consensus.key, and network.key
+    /// Path to directory used in GenerateKeys
     #[clap(long, parse(from_os_str))]
     pub(crate) keys_dir: Option<PathBuf>,
-    /// Host and port pair for the validator e.g. 127.0.0.1:6180
+    /// Host and port pair for the validator e.g. 127.0.0.1:6180 or aptoslabs.com:6180
     #[clap(long)]
     pub(crate) validator_host: HostAndPort,
-    /// Host and port pair for the fullnode e.g. 127.0.0.1:6180
+    /// Host and port pair for the fullnode e.g. 127.0.0.1:6180 or aptoslabs.com:6180
     #[clap(long)]
     pub(crate) full_node_host: Option<HostAndPort>,
     /// Stake amount for stake distribution

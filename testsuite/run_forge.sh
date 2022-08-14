@@ -164,6 +164,9 @@ HUMIO_LOGS_LINK="https://cloud.us.humio.com/k8s/search?query=%24forgeLogs%28vali
 
 # set the image tag in IMAGE_TAG
 set_image_tag
+if [ -z "$UPGRADE_IMAGE_TAG" ]; then
+    UPGRADE_IMAGE_TAG=$IMAGE_TAG
+fi
 
 # set the o11y resource locations in
 # ES_DEFAULT_INDEX, ES_BASE_URL, GRAFANA_BASE_URL
@@ -198,6 +201,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
         --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD --duration-secs $FORGE_RUNNER_DURATION_SECS \
         test k8s-swarm \
         --image-tag $IMAGE_TAG \
+        --upgrade-image-tag $UPGRADE_IMAGE_TAG \
         --namespace $FORGE_NAMESPACE \
         --port-forward $REUSE_ARGS $KEEP_ARGS $ENABLE_HAPROXY_ARGS | tee $FORGE_OUTPUT
 
@@ -227,6 +231,7 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
         -e "s/{FORGE_RUNNER_DURATION_SECS}/${FORGE_RUNNER_DURATION_SECS}/g" \
         -e "s/{FORGE_RUNNER_TPS_THRESHOLD}/${FORGE_RUNNER_TPS_THRESHOLD}/g" \
         -e "s/{IMAGE_TAG}/${IMAGE_TAG}/g" \
+        -e "s/{UPGRADE_IMAGE_TAG}/${UPGRADE_IMAGE_TAG}/g" \
         -e "s/{AWS_ACCOUNT_NUM}/${AWS_ACCOUNT_NUM}/g" \
         -e "s/{AWS_REGION}/${AWS_REGION}/g" \
         -e "s/{FORGE_NAMESPACE}/${FORGE_NAMESPACE}/g" \
