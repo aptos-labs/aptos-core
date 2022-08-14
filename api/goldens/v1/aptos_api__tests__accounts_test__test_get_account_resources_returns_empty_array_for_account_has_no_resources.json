@@ -168,14 +168,6 @@
     }
   },
   {
-    "type": "0x1::aptos_coin::Capabilities",
-    "data": {
-      "mint_cap": {
-        "dummy_field": false
-      }
-    }
-  },
-  {
     "type": "0x1::gas_schedule::GasSchedule",
     "data": {
       "entries": [
