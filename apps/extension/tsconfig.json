@@ -22,6 +22,7 @@
     "paths": {
       "core/*": ["./core/*"],
       "pages/*": ["./pages/*"],
+      "shared/*": ["./shared/*"],
     },
   },
   "exclude": [

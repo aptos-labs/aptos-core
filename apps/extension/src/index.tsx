@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { StrictMode, useMemo } from 'react';
+import React, { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   QueryClientProvider,
@@ -12,18 +12,13 @@ import {
   useRoutes,
 } from 'react-router-dom';
 import { ChakraProvider, extendTheme, type ThemeConfig } from '@chakra-ui/react';
-import { WalletStateProvider } from 'core/hooks/useWalletState';
-import { GlobalStateProvider, useGlobalStateContext } from 'core/hooks/useGlobalState';
+import { AppStateProvider, useAppState } from 'core/hooks/useAppState';
+import { AccountsProvider } from 'core/hooks/useAccounts';
+import { NetworksProvider } from 'core/hooks/useNetworks';
 import { createStandaloneToast } from '@chakra-ui/toast';
 import SimulatedExtensionContainer from 'core/layouts/SimulatedExtensionContainer';
 import { StepsStyleConfig as Steps } from 'chakra-ui-steps';
-
-import {
-  lockedWalletRoutes,
-  mainRoutes,
-  noAccountsRoutes,
-  uninitializedRoutes,
-} from 'core/routes';
+import { routes } from 'core/routes';
 
 const { ToastContainer } = createStandaloneToast();
 
@@ -62,61 +57,35 @@ const queryClient = new QueryClient({
   },
 });
 
-function useAppRoutes() {
-  const {
-    activeAccountAddress,
-    areAccountsInitialized,
-    areAccountsReady,
-    areAccountsUnlocked,
-  } = useGlobalStateContext();
-  const hasActiveAccount = activeAccountAddress !== undefined;
-
-  return useMemo(() => {
-    if (!areAccountsReady) {
-      return [
-        { element: null, path: '*' },
-      ];
-    }
-
-    if (areAccountsUnlocked) {
-      return hasActiveAccount
-        ? mainRoutes
-        : noAccountsRoutes;
-    }
-
-    return areAccountsInitialized
-      ? lockedWalletRoutes
-      : uninitializedRoutes;
-  }, [
-    areAccountsReady,
-    areAccountsInitialized,
-    areAccountsUnlocked,
-    hasActiveAccount,
-  ]);
-}
-
 function App() {
-  const appRoutes = useAppRoutes();
-  return useRoutes([...appRoutes]);
+  const appRoutes = useRoutes(routes);
+  const { isAppStateReady } = useAppState();
+
+  // Pause rendering until state is ready
+  return isAppStateReady ? (
+    <AccountsProvider>
+      <NetworksProvider>
+        { appRoutes }
+      </NetworksProvider>
+    </AccountsProvider>
+  ) : null;
 }
 
 const root = createRoot(document.getElementById('root') as Element);
 
 root.render(
   <StrictMode>
-    <GlobalStateProvider>
+    <AppStateProvider>
       <QueryClientProvider client={queryClient}>
         <ChakraProvider theme={theme}>
-          <WalletStateProvider>
-            <SimulatedExtensionContainer>
-              <MemoryRouter>
-                <App />
-              </MemoryRouter>
-            </SimulatedExtensionContainer>
-          </WalletStateProvider>
+          <SimulatedExtensionContainer>
+            <MemoryRouter>
+              <App />
+            </MemoryRouter>
+          </SimulatedExtensionContainer>
         </ChakraProvider>
       </QueryClientProvider>
-    </GlobalStateProvider>
+    </AppStateProvider>
     <ToastContainer />
   </StrictMode>,
 );

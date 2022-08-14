@@ -1,3 +1,4 @@
+/* eslint-disable sort-keys-fix/sort-keys-fix,sort-keys */
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
@@ -24,6 +25,12 @@ import CreateAccount from 'pages/CreateAccount';
 import AddNetwork from 'pages/AddNetwork';
 import RenameAccount from 'pages/RenameAccount';
 import CreateWalletViaImportAccount from 'pages/CreateWalletViaImportAccount';
+import {
+  ActiveAccountGuard,
+  InitializedAccountsGuard,
+  LockedAccountsGuard,
+  UnlockedAccountsGuard,
+} from './guards';
 
 // TODO: have a single representation for routes
 
@@ -118,56 +125,59 @@ export const Routes = Object.freeze({
   },
 } as const);
 
-export type RoutePaths = typeof Routes[keyof typeof Routes]['path'];
-
 export default Routes;
 
-export const mainRoutes = Object.freeze([
-  Routes.wallet,
-  Routes.gallery,
-  Routes.token,
-  Routes.activity,
-  Routes.transaction,
-  Routes.account,
-  Routes.settings,
-  Routes.rename_account,
-  Routes.credentials,
-  Routes.network,
-  Routes.recovery_phrase,
-  Routes.createAccount,
-  Routes.addAccount,
-  Routes.addNetwork,
-  Routes.importWalletMnemonic,
-  Routes.importWalletPrivateKey,
-  Routes.help,
-  // this needs to be here to prevent force redirect on last screen of wallet creation
-  Routes.createWallet,
-  { element: <Navigate to={Routes.wallet.path} replace />, path: '*' },
-]);
-
-export const noAccountsRoutes = Object.freeze([
-  Routes.addAccount,
-  Routes.createAccount,
+/**
+ * Routes definition for the extension app.
+ * At routing time, the router will go through the routes and stop at the first match.
+ * Once a match is found, the full tree of components will be rendered.
+ *
+ * The guard+provider pattern ensures that a specific condition is verified
+ * before rendering its children. When the condition is verified,
+ * the resolved state is provided to the children which can use it freely without unwrapping,
+ * otherwise an appropriate redirect is triggered
+ */
+export const routes = [
   {
-    element: <Navigate to={Routes.addAccount.path} replace />,
-    path: '*',
+    element: <InitializedAccountsGuard />,
+    children: [
+      {
+        element: <UnlockedAccountsGuard />,
+        children: [
+          {
+            element: <ActiveAccountGuard />,
+            children: [
+              Routes.wallet,
+              Routes.gallery,
+              Routes.token,
+              Routes.activity,
+              Routes.transaction,
+              Routes.account,
+              Routes.settings,
+              Routes.rename_account,
+              Routes.credentials,
+              Routes.network,
+              Routes.addNetwork,
+              Routes.recovery_phrase,
+              Routes.help,
+              { path: '/', element: <Navigate to={Routes.wallet.path} replace /> },
+            ],
+          },
+          Routes.addAccount,
+          Routes.createAccount,
+          Routes.importWalletMnemonic,
+          Routes.importWalletPrivateKey,
+        ],
+      },
+      {
+        element: <LockedAccountsGuard />,
+        children: [
+          Routes.password,
+        ],
+      },
+    ],
   },
-]);
-
-export const lockedWalletRoutes = Object.freeze([
-  Routes.password,
-  {
-    element: <Navigate to={Routes.password.path} replace />,
-    path: '*',
-  },
-]);
-
-export const uninitializedRoutes = Object.freeze([
   Routes.noWallet,
-  Routes.createWalletViaImportAccount,
   Routes.createWallet,
-  {
-    element: <Navigate to={Routes.noWallet.path} replace />,
-    path: '*',
-  },
-]);
+  Routes.createWalletViaImportAccount,
+];
