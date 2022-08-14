@@ -51,6 +51,8 @@ pub struct Layout {
     pub rewards_apy_percentage: u64,
     /// Voting duration for a proposal in seconds.
     pub voting_duration_secs: u64,
+    /// % of current epoch's total voting power that can be added in this epoch.
+    pub voting_power_increase_limit: u64,
 }
 
 impl Layout {
