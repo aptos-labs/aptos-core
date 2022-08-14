@@ -8838,6 +8838,7 @@ name = "storage-service-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-bitvec",
  "aptos-config",
  "aptos-crypto",
  "aptos-infallible",
@@ -8856,6 +8857,7 @@ dependencies = [
  "move-deps",
  "network",
  "once_cell",
+ "rand 0.7.3",
  "serde 1.0.141",
  "storage-interface",
  "storage-service-types",
