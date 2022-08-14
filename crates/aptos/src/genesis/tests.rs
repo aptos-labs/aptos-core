@@ -1,6 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::utils::read_from_file;
+use crate::genesis::git::from_yaml;
+use crate::genesis::keys::GenerateLayoutTemplate;
 use crate::{
     common::{
         types::{PromptOptions, RngArgs},
@@ -87,11 +90,14 @@ async fn setup_git_dir(
     chain_id: ChainId,
 ) -> GitOptions {
     let git_options = git_options();
-    let layout_file = create_layout_file(root_private_key.public_key(), users, chain_id);
-    let layout_file = PathBuf::from(layout_file.path());
+    let layout_file = TempPath::new();
+    layout_file.create_as_file().unwrap();
+    let layout_file = layout_file.path();
+
+    create_layout_file(layout_file, root_private_key.public_key(), users, chain_id).await;
     let setup_command = SetupGit {
         git_options: git_options.clone(),
-        layout_file,
+        layout_file: PathBuf::from(layout_file),
     };
 
     setup_command
@@ -125,37 +131,34 @@ fn git_options() -> GitOptions {
 }
 
 /// Create a layout file for the repo
-fn create_layout_file(
+async fn create_layout_file(
+    file: &Path,
     root_public_key: Ed25519PublicKey,
     users: Vec<String>,
     chain_id: ChainId,
-) -> TempPath {
-    let layout = Layout {
-        root_key: root_public_key,
-        users,
-        chain_id,
-        allow_new_validators: false,
-        epoch_duration_secs: 86400,
-        is_test: true,
-        min_stake: 0,
-        min_voting_threshold: 0,
-        max_stake: u64::MAX,
-        recurring_lockup_duration_secs: 86400,
-        required_proposer_stake: 0,
-        rewards_apy_percentage: 1,
-        voting_duration_secs: 1,
-        voting_power_increase_limit: 50,
-    };
-    let file = TempPath::new();
-    file.create_as_file().unwrap();
+) {
+    GenerateLayoutTemplate {
+        output_file: PathBuf::from(file),
+        prompt_options: PromptOptions::yes(),
+    }
+    .execute()
+    .await
+    .expect("Expected to create layout template");
+
+    // Update layout file
+    let mut layout: Layout =
+        from_yaml(&String::from_utf8(read_from_file(file).unwrap()).unwrap()).unwrap();
+    layout.root_key = Some(root_public_key);
+    layout.users = users;
+    layout.chain_id = chain_id;
+    layout.is_test = true;
 
     write_to_file(
-        file.path(),
+        file,
         "Layout file",
         serde_yaml::to_string(&layout).unwrap().as_bytes(),
     )
     .unwrap();
-    file
 }
 
 /// Generate keys for a "user"
@@ -179,7 +182,7 @@ async fn add_public_keys(username: String, git_options: GitOptions, keys_dir: &P
         keys_dir: Some(PathBuf::from(keys_dir)),
         validator_host: HostAndPort::from_str("localhost:6180").unwrap(),
         full_node_host: None,
-        stake_amount: 1,
+        stake_amount: 100_000_000_000_000,
     };
 
     command.execute().await.unwrap()
