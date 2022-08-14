@@ -325,7 +325,7 @@ impl HealthChecker {
             Ok(())
         });
 
-        let _ = res_tx.send(Ok(message.into()));
+        //let _ = res_tx.send(Ok(message.into()));
     }
 
     async fn handle_ping_response(
