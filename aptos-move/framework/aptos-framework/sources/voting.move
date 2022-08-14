@@ -111,7 +111,7 @@ module aptos_framework::voting {
 
     struct VoteEvent has drop, store {
         proposal_id: u64,
-        num_votes: u64,
+        num_votes: u128,
     }
 
     struct ResolveProposal has drop, store {
@@ -209,7 +209,7 @@ module aptos_framework::voting {
         _proof: &ProposalType,
         voting_forum_address: address,
         proposal_id: u64,
-        num_votes: u64,
+        num_votes: u128,
         should_pass: bool,
     ) acquires VotingForum {
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);

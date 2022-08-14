@@ -215,7 +215,7 @@ module aptos_framework::account {
             txn_sequence_number == sender_account.sequence_number,
             error::invalid_argument(PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW)
         );
-        let max_transaction_fee = txn_gas_price * txn_max_gas_units;
+        let max_transaction_fee = (txn_gas_price as u128) * (txn_max_gas_units as u128);
         assert!(
             coin::is_account_registered<AptosCoin>(transaction_sender),
             error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
@@ -317,11 +317,8 @@ module aptos_framework::account {
         assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EGAS));
         let gas_used = txn_max_gas_units - gas_units_remaining;
 
-        assert!(
-            (txn_gas_price as u128) * (gas_used as u128) <= MAX_U64,
-            error::out_of_range(EGAS)
-        );
-        let transaction_fee_amount = txn_gas_price * gas_used;
+        let transaction_fee_amount = (txn_gas_price as u128) * (gas_used as u128);
+        assert!(transaction_fee_amount <= MAX_U64, error::out_of_range(EGAS));
         let addr = signer::address_of(&account);
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
@@ -375,7 +372,7 @@ module aptos_framework::account {
         (signer, signer_cap)
     }
 
-    public entry fun transfer(source: &signer, to: address, amount: u64) acquires Account {
+    public entry fun transfer(source: &signer, to: address, amount: u128) acquires Account {
         if(!exists<Account>(to)) {
             create_account(to)
         };

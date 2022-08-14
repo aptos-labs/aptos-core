@@ -18,11 +18,11 @@ module aptos_framework::staking_config {
         // A validator needs to stake at least this amount to be able to join the validator set.
         // If after joining the validator set and at the start of any epoch, a validator's stake drops below this amount
         // they will be removed from the set.
-        minimum_stake: u64,
+        minimum_stake: u128,
         // A validator can only stake at most this amount. Any larger stake will be rejected.
         // If after joining the validator set and at the start of any epoch, a validator's stake exceeds this amount,
         // their voting power and rewards would only be issued for the max stake amount.
-        maximum_stake: u64,
+        maximum_stake: u128,
         recurring_lockup_duration_secs: u64,
         // Whether validators are allow to join/leave post genesis.
         allow_validator_set_change: bool,
@@ -35,8 +35,8 @@ module aptos_framework::staking_config {
     /// Only called during genesis.
     public(friend) fun initialize(
         aptos_framework: &signer,
-        minimum_stake: u64,
-        maximum_stake: u64,
+        minimum_stake: u128,
+        maximum_stake: u128,
         recurring_lockup_duration_secs: u64,
         allow_validator_set_change: bool,
         rewards_rate: u64,
@@ -72,7 +72,7 @@ module aptos_framework::staking_config {
     }
 
     /// Return the required min/max stake.
-    public fun get_required_stake(config: &StakingConfig): (u64, u64) {
+    public fun get_required_stake(config: &StakingConfig): (u128, u128) {
         (config.minimum_stake, config.maximum_stake)
     }
 
@@ -91,8 +91,8 @@ module aptos_framework::staking_config {
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
     public fun update_required_stake(
         aptos_framework: &signer,
-        minimum_stake: u64,
-        maximum_stake: u64,
+        minimum_stake: u128,
+        maximum_stake: u128,
     ) acquires StakingConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
         validate_required_stake(minimum_stake, maximum_stake);
@@ -133,7 +133,7 @@ module aptos_framework::staking_config {
         staking_config.rewards_rate_denominator = new_rewards_rate_denominator;
     }
 
-    fun validate_required_stake(minimum_stake: u64, maximum_stake: u64) {
+    fun validate_required_stake(minimum_stake: u128, maximum_stake: u128) {
         assert!(minimum_stake <= maximum_stake && maximum_stake > 0, error::invalid_argument(EINVALID_STAKE_RANGE));
     }
 
@@ -197,8 +197,8 @@ module aptos_framework::staking_config {
 
     public fun initialize_for_test(
         aptos_framework: &signer,
-        minimum_stake: u64,
-        maximum_stake: u64,
+        minimum_stake: u128,
+        maximum_stake: u128,
         recurring_lockup_duration_secs: u64,
         allow_validator_set_change: bool,
         rewards_rate: u64,

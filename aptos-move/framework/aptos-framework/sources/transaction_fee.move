@@ -11,7 +11,7 @@ module aptos_framework::transaction_fee {
     }
 
     /// Burn transaction fees in epilogue.
-    public(friend) fun burn_fee(account: address, fee: u64) acquires AptosCoinCapabilities {
+    public(friend) fun burn_fee(account: address, fee: u128) acquires AptosCoinCapabilities {
         coin::burn_from<AptosCoin>(
             account,
             fee,

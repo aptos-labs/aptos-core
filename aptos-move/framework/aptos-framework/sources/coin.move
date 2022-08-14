@@ -52,7 +52,7 @@ module aptos_framework::coin {
     /// Main structure representing a coin/token in an account's custody.
     struct Coin<phantom CoinType> has store {
         /// Amount of coin this address has.
-        value: u64,
+        value: u128,
     }
 
     /// A holder of a specific coin types and associated event handles.
@@ -73,19 +73,19 @@ module aptos_framework::coin {
         /// Number of decimals used to get its user representation.
         /// For example, if `decimals` equals `2`, a balance of `505` coins should
         /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
-        decimals: u64,
+        decimals: u8,
         /// Amount of this coin type in existence.
         supply: Option<u128>,
     }
 
     /// Event emitted when some amount of a coin is deposited into an account.
     struct DepositEvent has drop, store {
-        amount: u64,
+        amount: u128,
     }
 
     /// Event emitted when some amount of a coin is withdrawn from an account.
     struct WithdrawEvent has drop, store {
-        amount: u64,
+        amount: u128,
     }
 
     /// Capability required to mint coins.
@@ -102,7 +102,7 @@ module aptos_framework::coin {
     //
 
     /// Returns the balance of `owner` for provided `CoinType`.
-    public fun balance<CoinType>(owner: address): u64 acquires CoinStore {
+    public fun balance<CoinType>(owner: address): u128 acquires CoinStore {
         assert!(
             is_account_registered<CoinType>(owner),
             error::not_found(ECOIN_STORE_NOT_PUBLISHED),
@@ -139,7 +139,7 @@ module aptos_framework::coin {
     /// Returns the number of decimals used to get its user representation.
     /// For example, if `decimals` equals `2`, a balance of `505` coins should
     /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
-    public fun decimals<CoinType>(): u64 acquires CoinInfo {
+    public fun decimals<CoinType>(): u8 acquires CoinInfo {
         let type_info = type_info::type_of<CoinType>();
         let coin_address = type_info::account_address(&type_info);
         borrow_global<CoinInfo<CoinType>>(coin_address).decimals
@@ -177,7 +177,7 @@ module aptos_framework::coin {
     /// Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be burned.
     public fun burn_from<CoinType>(
         account_addr: address,
-        amount: u64,
+        amount: u128,
         burn_cap: &BurnCapability<CoinType>,
     ) acquires CoinInfo, CoinStore {
         // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
@@ -220,7 +220,7 @@ module aptos_framework::coin {
     }
 
     /// Extracts `amount` from the passed-in `coin`, where the original token is modified in place.
-    public fun extract<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
+    public fun extract<CoinType>(coin: &mut Coin<CoinType>, amount: u128): Coin<CoinType> {
         assert!(coin.value >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
         coin.value = coin.value - amount;
         Coin { value: amount }
@@ -249,7 +249,7 @@ module aptos_framework::coin {
         account: &signer,
         name: string::String,
         symbol: string::String,
-        decimals: u64,
+        decimals: u8,
         monitor_supply: bool,
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         let account_addr = signer::address_of(account);
@@ -287,7 +287,7 @@ module aptos_framework::coin {
     /// The capability `_cap` should be passed as reference to `MintCapability<CoinType>`.
     /// Returns minted `Coin`.
     public fun mint<CoinType>(
-        amount: u64,
+        amount: u128,
         _cap: &MintCapability<CoinType>,
     ): Coin<CoinType> acquires CoinInfo {
         if (amount == 0) {
@@ -331,21 +331,21 @@ module aptos_framework::coin {
     public entry fun transfer<CoinType>(
         from: &signer,
         to: address,
-        amount: u64,
+        amount: u128,
     ) acquires CoinStore {
         let coin = withdraw<CoinType>(from, amount);
         deposit(to, coin);
     }
 
     /// Returns the `value` passed in `coin`.
-    public fun value<CoinType>(coin: &Coin<CoinType>): u64 {
+    public fun value<CoinType>(coin: &Coin<CoinType>): u128 {
         coin.value
     }
 
     /// Withdraw specifed `amount` of coin `CoinType` from the signing account.
     public fun withdraw<CoinType>(
         account: &signer,
-        amount: u64,
+        amount: u128,
     ): Coin<CoinType> acquires CoinStore {
         let account_addr = signer::address_of(account);
         assert!(
@@ -397,7 +397,7 @@ module aptos_framework::coin {
     public entry fun create_fake_money(
         source: &signer,
         destination: &signer,
-        amount: u64
+        amount: u128
     ) acquires CoinInfo, CoinStore {
         let name = string::utf8(b"Fake money");
         let symbol = string::utf8(b"FMD");
@@ -553,7 +553,7 @@ module aptos_framework::coin {
         });
     }
 
-    #[test(source = @0x1, destination = @0x2)]
+    #[test(source = @0x1)]
     public entry fun test_burn_from_with_capability(
         source: signer,
     ) acquires CoinInfo, CoinStore {

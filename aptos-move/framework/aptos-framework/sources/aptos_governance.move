@@ -47,7 +47,7 @@ module aptos_framework::aptos_governance {
     /// by this AptosGovernance module.
     struct GovernanceConfig has key {
         min_voting_threshold: u128,
-        required_proposer_stake: u64,
+        required_proposer_stake: u128,
         voting_duration_secs: u64,
     }
 
@@ -83,14 +83,14 @@ module aptos_framework::aptos_governance {
         proposal_id: u64,
         voter: address,
         stake_pool: address,
-        num_votes: u64,
+        num_votes: u128,
         should_pass: bool,
     }
 
     /// Event emitted when the governance configs are updated.
     struct UpdateConfigEvent has drop, store {
         min_voting_threshold: u128,
-        required_proposer_stake: u64,
+        required_proposer_stake: u128,
         voting_duration_secs: u64,
     }
 
@@ -117,7 +117,7 @@ module aptos_framework::aptos_governance {
     fun initialize(
         aptos_framework: &signer,
         min_voting_threshold: u128,
-        required_proposer_stake: u64,
+        required_proposer_stake: u128,
         voting_duration_secs: u64,
     ) {
         system_addresses::assert_aptos_framework(aptos_framework);
@@ -143,7 +143,7 @@ module aptos_framework::aptos_governance {
     public fun update_governance_config(
         _proposal: GovernanceProposal,
         min_voting_threshold: u128,
-        required_proposer_stake: u64,
+        required_proposer_stake: u128,
         voting_duration_secs: u64,
     ) acquires GovernanceConfig, GovernanceEvents {
         let governance_config = borrow_global_mut<GovernanceConfig>(@aptos_framework);

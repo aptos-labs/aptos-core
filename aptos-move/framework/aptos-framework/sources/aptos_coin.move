@@ -78,7 +78,7 @@ module aptos_framework::aptos_coin {
     public entry fun mint(
         account: &signer,
         dst_addr: address,
-        amount: u64,
+        amount: u128,
     ) acquires Capabilities {
         let account_addr = signer::address_of(account);
 

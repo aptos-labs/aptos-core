@@ -27,8 +27,8 @@ module aptos_framework::genesis {
         initial_version: u64,
         consensus_config: vector<u8>,
         epoch_interval: u64,
-        minimum_stake: u64,
-        maximum_stake: u64,
+        minimum_stake: u128,
+        maximum_stake: u128,
         recurring_lockup_duration_secs: u64,
         allow_validator_set_change: bool,
         rewards_rate: u64,
@@ -117,7 +117,7 @@ module aptos_framework::genesis {
         proof_of_possession: vector<vector<u8>>,
         validator_network_addresses: vector<vector<u8>>,
         full_node_network_addresses: vector<vector<u8>>,
-        staking_distribution: vector<u64>,
+        staking_distribution: vector<u128>,
     ) {
         let num_owners = vector::length(&owners);
         let num_validator_network_addresses = vector::length(&validator_network_addresses);

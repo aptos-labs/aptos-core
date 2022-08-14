@@ -35,7 +35,7 @@ module aptos_framework::managed_coin {
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
     public entry fun burn<CoinType>(
         account: &signer,
-        amount: u64,
+        amount: u128,
     ) acquires Capabilities {
         let account_addr = signer::address_of(account);
 
@@ -56,7 +56,7 @@ module aptos_framework::managed_coin {
         account: &signer,
         name: vector<u8>,
         symbol: vector<u8>,
-        decimals: u64,
+        decimals: u8,
         monitor_supply: bool,
     ) {
         let (burn_cap, freeze_cap, mint_cap) = coin::initialize<CoinType>(
@@ -78,7 +78,7 @@ module aptos_framework::managed_coin {
     public entry fun mint<CoinType>(
         account: &signer,
         dst_addr: address,
-        amount: u64,
+        amount: u128,
     ) acquires Capabilities {
         let account_addr = signer::address_of(account);
 

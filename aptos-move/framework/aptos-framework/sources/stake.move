@@ -144,7 +144,7 @@ module aptos_framework::stake {
     /// Consensus information per validator, stored in ValidatorSet.
     struct ValidatorInfo has copy, store, drop {
         addr: address,
-        voting_power: u64,
+        voting_power: u128,
         config: ValidatorConfig,
     }
 
@@ -190,7 +190,7 @@ module aptos_framework::stake {
 
     struct AddStakeEvent has drop, store {
         pool_address: address,
-        amount_added: u64,
+        amount_added: u128,
     }
 
     struct RotateConsensusKeyEvent has drop, store {
@@ -219,17 +219,17 @@ module aptos_framework::stake {
 
     struct DistributeRewardsEvent has drop, store {
         pool_address: address,
-        rewards_amount: u64,
+        rewards_amount: u128,
     }
 
     struct UnlockStakeEvent has drop, store {
         pool_address: address,
-        amount_unlocked: u64,
+        amount_unlocked: u128,
     }
 
     struct WithdrawStakeEvent has drop, store {
         pool_address: address,
-        amount_withdrawn: u64,
+        amount_withdrawn: u128,
     }
 
     struct LeaveValidatorSetEvent has drop, store {
@@ -255,7 +255,7 @@ module aptos_framework::stake {
 
     /// Return the different stake amounts for `pool_address` (whether the validator is active or not).
     /// The returned amounts are for (active, inactive, pending_active, pending_inactive) stake respectively.
-    public fun get_stake(pool_address: address): (u64, u64, u64, u64) acquires StakePool {
+    public fun get_stake(pool_address: address): (u128, u128, u128, u128) acquires StakePool {
         let stake_pool = borrow_global<StakePool>(pool_address);
         (
             coin::value<AptosCoin>(&stake_pool.active),
@@ -281,7 +281,7 @@ module aptos_framework::stake {
 
     /// Return the voting power of the validator in the current epoch.
     /// This is the same as the validator's total active and pending_inactive stake.
-    public fun get_current_epoch_voting_power(pool_address: address): u64 acquires StakePool, ValidatorSet {
+    public fun get_current_epoch_voting_power(pool_address: address): u128 acquires StakePool, ValidatorSet {
         let validator_state = get_validator_state(pool_address);
         // Both active and pending inactive validators can still vote in the current epoch.
         if (validator_state == VALIDATOR_STATUS_ACTIVE || validator_state == VALIDATOR_STATUS_PENDING_INACTIVE) {
@@ -355,7 +355,7 @@ module aptos_framework::stake {
     /// to set later.
     public entry fun initialize_owner_only(
         owner: &signer,
-        initial_stake_amount: u64,
+        initial_stake_amount: u128,
         operator: address,
         voter: address,
     ) acquires OwnerCapability, StakePool, ValidatorSet {
@@ -482,7 +482,7 @@ module aptos_framework::stake {
     /// Add `amount` of coins from the `account` owning the StakePool.
     public entry fun add_stake(
         account: &signer,
-        amount: u64,
+        amount: u128,
     ) acquires OwnerCapability, StakePool, ValidatorSet {
         let account_addr = signer::address_of(account);
         let ownership_cap = borrow_global<OwnerCapability>(account_addr);
@@ -657,14 +657,14 @@ module aptos_framework::stake {
     }
 
     /// Similar to unlock_with_cap but will use ownership capability from the signing account.
-    public entry fun unlock(account: &signer, amount: u64) acquires OwnerCapability, StakePool {
+    public entry fun unlock(account: &signer, amount: u128) acquires OwnerCapability, StakePool {
         let account_addr = signer::address_of(account);
         let ownership_cap = borrow_global<OwnerCapability>(account_addr);
         unlock_with_cap(amount, ownership_cap);
     }
 
     /// Unlock `amount` from the active stake. Only possible if the lockup has expired.
-    public fun unlock_with_cap(amount: u64, owner_cap: &OwnerCapability) acquires StakePool {
+    public fun unlock_with_cap(amount: u128, owner_cap: &OwnerCapability) acquires StakePool {
         // Short-circuit if amount to unlock is 0 so we don't emit events.
         if (amount == 0) {
             return
@@ -688,7 +688,7 @@ module aptos_framework::stake {
 
     /// Withdraw from `account`'s inactive stake.
     public entry fun withdraw(
-        account: &signer, withdraw_amount: u64) acquires OwnerCapability, StakePool, ValidatorSet {
+        account: &signer, withdraw_amount: u128) acquires OwnerCapability, StakePool, ValidatorSet {
         let account_addr = signer::address_of(account);
         let ownership_cap = borrow_global<OwnerCapability>(account_addr);
         let coins = withdraw_with_cap(ownership_cap, withdraw_amount);
@@ -697,7 +697,7 @@ module aptos_framework::stake {
 
     /// Withdraw from `pool_address`'s inactive stake with the corresponding `owner_cap`.
     public fun withdraw_with_cap(
-        owner_cap: &OwnerCapability, withdraw_amount: u64): Coin<AptosCoin> acquires StakePool, ValidatorSet {
+        owner_cap: &OwnerCapability, withdraw_amount: u128): Coin<AptosCoin> acquires StakePool, ValidatorSet {
         let pool_address = owner_cap.pool_address;
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
         // There's an edge case where a validator unlocks their stake and leaves the validator set before
@@ -937,18 +937,18 @@ module aptos_framework::stake {
 
     /// Calculate the rewards amount.
     fun calculate_rewards_amount(
-        stake_amount: u64,
+        stake_amount: u128,
         num_successful_proposals: u64,
         num_total_proposals: u64,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
-    ): u64 {
+    ): u128 {
         // The rewards amount is equal to (stake amount * rewards rate * performance multiplier).
         // We do multiplication in u128 before division to avoid the overflow and minimize the rounding error.
         let rewards_numerator = (stake_amount as u128) * (rewards_rate as u128) * (num_successful_proposals as u128);
         let rewards_denominator = (rewards_rate_denominator as u128) * (num_total_proposals as u128);
         if (rewards_denominator > 0) {
-            ((rewards_numerator / rewards_denominator) as u64)
+            ((rewards_numerator / rewards_denominator) as u128)
         } else {
             0
         }
@@ -961,7 +961,7 @@ module aptos_framework::stake {
         num_total_proposals: u64,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
-    ): u64 acquires AptosCoinCapabilities {
+    ): u128 acquires AptosCoinCapabilities {
         let stake_amount = coin::value<AptosCoin>(stake);
         let rewards_amount = if (stake_amount > 0) {
             calculate_rewards_amount(stake_amount, num_successful_proposals, num_total_proposals, rewards_rate, rewards_rate_denominator)
