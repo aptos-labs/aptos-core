@@ -62,6 +62,7 @@ pub struct GenesisConfiguration {
     pub required_proposer_stake: u64,
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
+    pub voting_power_increase_limit: u64,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -179,6 +180,11 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
         genesis_config.voting_duration_secs < genesis_config.recurring_lockup_duration_secs,
         "Voting duration must be strictly smaller than recurring lockup"
     );
+    assert!(
+        genesis_config.voting_power_increase_limit > 0
+            && genesis_config.voting_power_increase_limit <= 50,
+        "voting_power_increase_limit must be > 0 and <= 50"
+    );
 }
 
 fn exec_function(
@@ -251,6 +257,7 @@ fn initialize(
             MoveValue::Bool(genesis_config.allow_new_validators),
             MoveValue::U64(rewards_rate_numerator),
             MoveValue::U64(rewards_rate_denominator),
+            MoveValue::U64(genesis_config.voting_power_increase_limit),
         ]),
     );
 }
@@ -551,7 +558,7 @@ impl TestValidator {
             operator_address: address,
             network_addresses: network_address,
             full_node_network_addresses: full_node_network_address,
-            stake_amount: 1,
+            stake_amount: 100_000_000,
         };
         Self {
             key,
@@ -587,6 +594,7 @@ pub fn generate_test_genesis(
             required_proposer_stake: 0,
             rewards_apy_percentage: 10,
             voting_duration_secs: 3600,
+            voting_power_increase_limit: 50,
         },
     );
     (genesis, test_validators)

@@ -28,6 +28,8 @@ chain:
   rewards_apy_percentage: 10
   # -- Voting duration in seconds. Defaults to 12 hours
   voting_duration_secs: 43200
+  # -- Limit on how much voting power can join every epoch. Defaults to 50%.
+  voting_power_increase_limit: 50
 
 # -- Default image tag to use for all tools images
 imageTag: testnet

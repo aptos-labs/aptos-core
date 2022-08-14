@@ -27,6 +27,8 @@ pub struct ValidatorSet {
     pub active_validators: Vec<ValidatorInfo>,
     pub pending_inactive: Vec<ValidatorInfo>,
     pub pending_active: Vec<ValidatorInfo>,
+    pub total_voting_power: u128,
+    pub total_joining_power: u128,
 }
 
 impl fmt::Display for ValidatorSet {
@@ -47,6 +49,8 @@ impl ValidatorSet {
             active_validators: payload,
             pending_inactive: vec![],
             pending_active: vec![],
+            total_voting_power: 0,
+            total_joining_power: 0,
         }
     }
 
