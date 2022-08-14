@@ -14,7 +14,7 @@ use aptos_protos::extractor::v1::{
     Transaction as TransactionPB,
 };
 
-use aptos_sdk::types::{account_config::aptos_root_address, LocalAccount};
+use aptos_sdk::types::{account_config::aptos_test_root_address, LocalAccount};
 use move_deps::{
     move_core_types::{account_address::AccountAddress, value::MoveValue},
     move_package::BuildConfig,
@@ -38,7 +38,7 @@ async fn test_genesis_works() {
     if let TxnData::Genesis(txn) = txn.txn_data.unwrap() {
         assert_eq!(
             txn.events[0].key.clone().unwrap().account_address,
-            aptos_root_address().to_string()
+            aptos_test_root_address().to_string()
         );
     }
 }

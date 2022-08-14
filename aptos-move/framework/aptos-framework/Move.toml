@@ -10,6 +10,5 @@ core_resources = "0xA550C18"
 vm_reserved = "0x0"
 
 [dependencies]
-AptosExperimental = { local = "../aptos-experimental" }
 AptosStdlib = { local = "../aptos-stdlib" }
 MoveStdlib = { local = "../move-stdlib" }

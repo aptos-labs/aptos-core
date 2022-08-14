@@ -10,7 +10,7 @@ use aptos_sdk::{
 use aptos_state_view::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
-    account_config::aptos_root_address,
+    account_config::aptos_test_root_address,
     account_view::AccountView,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -38,7 +38,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
 
     let mut genesis_account: LocalAccount = LocalAccount::new(
-        aptos_root_address(),
+        aptos_test_root_address(),
         AccountKey::from_private_key(vm_genesis::GENESIS_KEYPAIR.0.clone()),
         0,
     );

@@ -26,15 +26,19 @@
 /// When something whants to use an aggregator, the factory is queried and an
 /// aggregator instance is created. Once aggregator is no longer in use, it
 /// should be destroyed by the user.
-module aptos_framework::aggregator_factory {
+module aptos_std::aggregator_factory {
     use std::error;
     use std::signer;
 
-    use aptos_framework::aggregator::Aggregator;
-    use aptos_framework::table::{Self, Table};
+    use aptos_std::aggregator::Aggregator;
+    use aptos_std::table::{Self, Table};
 
     #[test_only]
-    friend aptos_framework::aggregator_tests;
+    friend aptos_std::aggregator_tests;
+
+    // TODO: only certain modules are allowed to create a aggregator.
+    friend aptos_std::optional_aggregator;
+    friend aptos_std::table_with_aggregator_length;
 
     /// When aggregator factory has already been published.
     const EAGGREGATOR_FACTORY_EXISTS: u64 = 1;

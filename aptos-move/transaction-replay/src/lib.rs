@@ -8,7 +8,7 @@ use aptos_types::{
     access_path,
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::aptos_root_address,
+    account_config::aptos_test_root_address,
     account_state::AccountState,
     account_view::AccountView,
     contract_event::{ContractEvent, EventWithVersion},
@@ -139,7 +139,7 @@ impl AptosDebugger {
         let cache = aptos_vm::data_cache::StateViewCache::new(&state_view);
         let sequence_number = match self
             .debugger
-            .get_account_state_by_version(aptos_root_address(), base_version)?
+            .get_account_state_by_version(aptos_test_root_address(), base_version)?
         {
             Some(account) => account
                 .get_account_resource()?
@@ -149,11 +149,11 @@ impl AptosDebugger {
         };
         let txn_data = aptos_vm::transaction_metadata::TransactionMetadata {
             sequence_number,
-            sender: aptos_root_address(),
+            sender: aptos_test_root_address(),
             ..Default::default()
         };
 
-        let (_, output) = vm
+        let (_, output_ext) = vm
             .execute_writeset_transaction(
                 &cache.as_move_resolver(),
                 payload,
@@ -163,7 +163,7 @@ impl AptosDebugger {
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
         // Since we execute write sets, deltas cannot be produced.
-        let (_, output) = output.into();
+        let (_, output) = output_ext.into();
 
         if save_write_set {
             self.save_write_sets(&output)?;
@@ -370,7 +370,7 @@ impl AptosDebugger {
                 session.execute_script(
                     predicate.clone(),
                     vec![],
-                    vec![aptos_root_address().to_vec(), sender.to_vec()],
+                    vec![aptos_test_root_address().to_vec(), sender.to_vec()],
                     &mut UnmeteredGasMeter,
                 )
             })

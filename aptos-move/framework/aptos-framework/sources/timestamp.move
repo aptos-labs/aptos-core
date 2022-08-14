@@ -24,11 +24,11 @@ module aptos_framework::timestamp {
     const MICRO_CONVERSION_FACTOR: u64 = 1000000;
 
     /// The blockchain is not in the genesis state anymore
-    const ENOT_GENESIS: u64 = 0;
+    const ENOT_GENESIS: u64 = 1;
     /// The blockchain is not in an operating state yet
-    const ENOT_OPERATING: u64 = 1;
+    const ENOT_OPERATING: u64 = 2;
     /// An invalid timestamp was provided
-    const ETIMESTAMP: u64 = 2;
+    const ETIMESTAMP: u64 = 3;
 
     /// Marks that time has started and genesis has finished. This can only be called from genesis and with the root
     /// account.

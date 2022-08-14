@@ -1072,9 +1072,6 @@ components:
           $ref: '#/components/schemas/Uint64'
         gas_unit_price:
           $ref: '#/components/schemas/Uint64'
-        gas_currency_code:
-          type: string
-          example: "XDX"
         expiration_timestamp_secs:
           $ref: '#/components/schemas/TimestampSec'
         payload:

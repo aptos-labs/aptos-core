@@ -83,6 +83,10 @@ impl WriteSetMut {
         self.write_set.push(item);
     }
 
+    pub fn append(&mut self, other: &mut Self) {
+        self.write_set.append(&mut other.write_set);
+    }
+
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.write_set.is_empty()

@@ -3,6 +3,7 @@
 
 use crate::{batch_update, generate_traffic};
 use anyhow::bail;
+use aptos_logger::info;
 use forge::{NetworkContext, NetworkTest, Result, SwarmExt, Test};
 use tokio::{runtime::Runtime, time::Duration};
 
@@ -33,7 +34,7 @@ impl NetworkTest for SimpleValidatorUpgrade {
             "Compatibility test results for {} ==> {} (PR)",
             old_version, new_version
         );
-        println!("{}", msg);
+        info!("{}", msg);
         ctx.report.report_text(msg);
 
         // Split the swarm into 2 parts
@@ -51,54 +52,72 @@ impl NetworkTest for SimpleValidatorUpgrade {
         let duration = Duration::from_secs(5);
 
         let msg = format!(
-            "1. Downgrade all validators to older version: {}",
+            "1. Check liveness of validators at old version: {}",
             old_version
         );
-        println!("{}", msg);
+        info!("{}", msg);
         ctx.report.report_text(msg);
-        // Ensure that all validators are running the older version of the software
-        let validators_to_downgrade = ctx
-            .swarm()
-            .validators()
-            .filter(|v| v.version() != old_version)
-            .map(|v| v.peer_id())
-            .collect::<Vec<_>>();
-        runtime.block_on(batch_update(ctx, &validators_to_downgrade, &old_version))?;
 
         // Generate some traffic
-        generate_traffic(ctx, &all_validators, duration, 1)?;
+        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1)?;
+        ctx.report.report_txn_stats(
+            format!("{}::liveness-check", self.name()),
+            &txn_stat,
+            duration,
+        );
 
         // Update the first Validator
         let msg = format!(
             "2. Upgrading first Validator to new version: {}",
             new_version
         );
-        println!("{}", msg);
+        info!("{}", msg);
         ctx.report.report_text(msg);
         runtime.block_on(batch_update(ctx, &[first_node], &new_version))?;
-        generate_traffic(ctx, &[first_node], duration, 1)?;
+
+        // Generate some traffic
+        let txn_stat = generate_traffic(ctx, &[first_node], duration, 1)?;
+        ctx.report.report_txn_stats(
+            format!("{}::single-validator-upgrade", self.name()),
+            &txn_stat,
+            duration,
+        );
 
         // Update the rest of the first batch
         let msg = format!(
             "3. Upgrading rest of first batch to new version: {}",
             new_version
         );
-        println!("{}", msg);
+        info!("{}", msg);
         ctx.report.report_text(msg);
         runtime.block_on(batch_update(ctx, &first_batch, &new_version))?;
-        generate_traffic(ctx, &first_batch, duration, 1)?;
+
+        // Generate some traffic
+        let txn_stat = generate_traffic(ctx, &first_batch, duration, 1)?;
+        ctx.report.report_txn_stats(
+            format!("{}::half-validator-upgrade", self.name()),
+            &txn_stat,
+            duration,
+        );
 
         ctx.swarm().fork_check()?;
 
         // Update the second batch
         let msg = format!("4. upgrading second batch to new version: {}", new_version);
-        println!("{}", msg);
+        info!("{}", msg);
         ctx.report.report_text(msg);
         runtime.block_on(batch_update(ctx, &second_batch, &new_version))?;
-        generate_traffic(ctx, &second_batch, duration, 1)?;
+
+        // Generate some traffic
+        let txn_stat = generate_traffic(ctx, &second_batch, duration, 1)?;
+        ctx.report.report_txn_stats(
+            format!("{}::rest-validator-upgrade", self.name()),
+            &txn_stat,
+            duration,
+        );
 
         let msg = "5. check swarm health".to_string();
-        println!("{}", msg);
+        info!("{}", msg);
         ctx.report.report_text(msg);
         ctx.swarm().fork_check()?;
         ctx.report.report_text(format!(

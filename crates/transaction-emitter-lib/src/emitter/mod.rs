@@ -45,7 +45,7 @@ use stats::{StatsAccumulator, TxnStats};
 
 /// Max transactions per account in mempool
 const MAX_TXN_BATCH_SIZE: usize = 100;
-const TRANSACTIONS_PER_ACCOUNT: usize = 3;
+const TRANSACTIONS_PER_ACCOUNT: usize = 5;
 const MAX_TXNS: u64 = 1_000_000;
 const SEND_AMOUNT: u64 = 1;
 const TXN_EXPIRATION_SECONDS: u64 = 180;

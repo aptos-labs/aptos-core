@@ -190,7 +190,6 @@ export class AptosClient {
    *     sequence_number: account.sequence_number,
    *     max_gas_amount: "1000",
    *     gas_unit_price: "1",
-   *     gas_currency_code: "XUS",
    *     // Unix timestamp, in seconds + 10 seconds
    *     expiration_timestamp_secs: (Math.floor(Date.now() / 1000) + 10).toString(),
    *   }

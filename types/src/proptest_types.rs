@@ -718,7 +718,12 @@ pub struct CoinStoreResourceGen {
 
 impl CoinStoreResourceGen {
     pub fn materialize(self) -> CoinStoreResource {
-        CoinStoreResource::new(self.coin, EventHandle::random(0), EventHandle::random(0))
+        CoinStoreResource::new(
+            self.coin,
+            false,
+            EventHandle::random(0),
+            EventHandle::random(0),
+        )
     }
 }
 

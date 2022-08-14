@@ -361,6 +361,7 @@ const ONE_DAY: u64 = 86400;
 pub struct GenesisConfiguration {
     pub allow_new_validators: bool,
     pub epoch_duration_secs: u64,
+    pub is_test: bool,
     pub min_stake: u64,
     pub max_stake: u64,
     pub min_voting_threshold: u128,
@@ -549,6 +550,7 @@ impl Builder {
         let mut genesis_config = GenesisConfiguration {
             allow_new_validators: false,
             epoch_duration_secs: ONE_DAY,
+            is_test: true,
             min_stake: 0,
             min_voting_threshold: 0,
             max_stake: u64::MAX,
@@ -567,15 +569,7 @@ impl Builder {
             root_key,
             configs,
             self.move_modules.clone(),
-            genesis_config.allow_new_validators,
-            genesis_config.epoch_duration_secs,
-            genesis_config.min_stake,
-            genesis_config.min_voting_threshold,
-            genesis_config.max_stake,
-            genesis_config.recurring_lockup_duration_secs,
-            genesis_config.required_proposer_stake,
-            genesis_config.rewards_apy_percentage,
-            genesis_config.voting_duration_secs,
+            &genesis_config,
         )?;
         let waypoint = genesis_info.generate_waypoint()?;
         let genesis = genesis_info.get_genesis();

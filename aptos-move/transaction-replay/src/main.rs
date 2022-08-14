@@ -8,7 +8,7 @@ use aptos_types::{
     transaction::{TransactionPayload, Version},
 };
 use difference::Changeset;
-use move_deps::move_core_types::effects::ChangeSet;
+use move_deps::move_core_types::effects::{ChangeSet, Op};
 use std::{fs, path::PathBuf};
 use structopt::StructOpt;
 
@@ -218,7 +218,7 @@ fn main() -> Result<()> {
                     for module in framework::aptos::modules() {
                         let mut bytes = vec![];
                         module.serialize(&mut bytes)?;
-                        change_set.publish_module(module.self_id(), bytes)?;
+                        change_set.add_module_op(module.self_id(), Op::New(bytes))?;
                     }
                     Some(change_set)
                 } else {

@@ -23,7 +23,10 @@ use std::{
 
 pub const PUBLIC_KEY_EXTENSION: &str = "pub";
 
-/// CLI tool for generating, inspecting, and interacting with keys.
+/// Tool for generating, inspecting, and interacting with keys
+///
+/// This tool allows users to generate and extract related information
+/// with all key types used on the Aptos blockchain.
 #[derive(Debug, Subcommand)]
 pub enum KeyTool {
     Generate(GenerateKey),
@@ -99,7 +102,7 @@ impl CliCommand<HashMap<AccountAddress, Peer>> for ExtractPeer {
 /// key encoded with the `encoding`.
 #[derive(Debug, Parser)]
 pub struct GenerateKey {
-    /// Key type: `x25519` or `ed25519`
+    /// Key type to generate. Must be one of [x25519, ed25519]
     #[clap(long, default_value_t = KeyType::Ed25519)]
     key_type: KeyType,
     #[clap(flatten)]
