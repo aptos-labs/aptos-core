@@ -31,7 +31,10 @@ RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarc
     && chmod +x "/usr/local/bin/protoc" \
     && rm "protoc-21.5-linux-$ARCHITECTURE.zip"
 
-RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOME/registry docker/build-rust-all.sh && rm -rf $CARGO_HOME/registry/index
+ARG BUILD_PROFILE
+ENV BUILD_PROFILE ${BUILD_PROFILE}
+
+RUN --mount=type=cache,target=/aptos/target --mount=type=cache,target=$CARGO_HOME/registry BUILD_PROFILE=$BUILD_PROFILE docker/build-rust-all.sh && rm -rf $CARGO_HOME/registry/index
 
 ### Validator Image ###
 FROM debian-base AS validator
