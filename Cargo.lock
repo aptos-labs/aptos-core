@@ -884,6 +884,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-infallible",
+ "aptos-metrics-core",
  "aptos-types",
  "arc-swap",
  "criterion",

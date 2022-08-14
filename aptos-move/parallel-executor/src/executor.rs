@@ -8,6 +8,7 @@ use crate::{
     txn_last_input_output::{ReadDescriptor, TxnLastInputOutput},
 };
 use aptos_infallible::Mutex;
+use aptos_metrics_core::{register_histogram, Histogram};
 use mvhashmap::MVHashMap;
 use num_cpus;
 use once_cell::sync::Lazy;
@@ -19,6 +20,14 @@ static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
         .thread_name(|index| format!("parallel_executor_{}", index))
         .build()
         .unwrap()
+});
+
+pub static VM_INIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_vm_init_total_seconds",
+        "Execution time per user transaction"
+    )
+    .unwrap()
 });
 
 /// A struct that is always used by a single thread performing an execution task. The struct is
@@ -248,7 +257,10 @@ where
         scheduler: &Scheduler,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
+
+        let timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
+        drop(timer);
 
         let mut scheduler_task = SchedulerTask::NoTask;
         loop {
