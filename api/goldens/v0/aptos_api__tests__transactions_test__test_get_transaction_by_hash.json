@@ -16,7 +16,17 @@
             }
           }
         },
-        "sequence_number": "1"
+        "rotation_capability_offer": {
+          "for": {
+            "vec": []
+          }
+        },
+        "sequence_number": "1",
+        "signer_capability_offer": {
+          "for": {
+            "vec": []
+          }
+        }
       }
     }
   },

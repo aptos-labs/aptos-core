@@ -2,6 +2,7 @@ module aptos_framework::account {
     use std::bcs;
     use std::error;
     use std::hash;
+    use std::option::{Self, Option};
     use std::signer;
     use std::vector;
     use aptos_std::event::{Self, EventHandle};
@@ -21,6 +22,8 @@ module aptos_framework::account {
         authentication_key: vector<u8>,
         sequence_number: u64,
         coin_register_events: EventHandle<CoinRegisterEvent>,
+        rotation_capability_offer: CapabilityOffer<RotationCapability>,
+        signer_capability_offer: CapabilityOffer<SignerCapability>,
     }
 
     struct CoinRegisterEvent has drop, store {
@@ -40,6 +43,8 @@ module aptos_framework::account {
         writeset_epilogue_name: vector<u8>,
     }
 
+    struct CapabilityOffer<phantom T> has store { for: Option<address> }
+    struct RotationCapability has drop, store { account: address }
     struct SignerCapability has drop, store { account: address }
 
     const MAX_U64: u128 = 18446744073709551615;
@@ -142,6 +147,8 @@ module aptos_framework::account {
                 authentication_key,
                 sequence_number: 0,
                 coin_register_events: event::new_event_handle<CoinRegisterEvent>(&new_account),
+                rotation_capability_offer: CapabilityOffer { for: option::none() },
+                signer_capability_offer: CapabilityOffer { for: option::none() },
             }
         );
 
