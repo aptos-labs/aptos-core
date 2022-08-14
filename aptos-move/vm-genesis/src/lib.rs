@@ -488,6 +488,16 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
     generate_test_genesis(&modules, Some(1)).0
 }
 
+/// Generate a genesis `ChangeSet` for mainnet
+pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
+    let modules = match genesis_options {
+        GenesisOptions::Compiled => cached_framework_packages::module_blobs().to_vec(),
+        GenesisOptions::Fresh => framework::aptos::module_blobs(),
+    };
+
+    generate_mainnet_genesis(&modules, Some(1)).0
+}
+
 pub fn test_genesis_transaction() -> Transaction {
     let changeset = test_genesis_change_set_and_validators(None).0;
     Transaction::GenesisTransaction(WriteSetPayload::Direct(changeset))
@@ -525,14 +535,14 @@ pub struct TestValidator {
 }
 
 impl TestValidator {
-    pub fn new_test_set(count: Option<usize>) -> Vec<TestValidator> {
-        let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_seed([1u8; 32]);
+    pub fn new_test_set(count: Option<usize>, initial_stake: Option<u64>) -> Vec<TestValidator> {
+        let mut rng = rand::SeedableRng::from_seed([1u8; 32]);
         (0..count.unwrap_or(10))
-            .map(|_| TestValidator::gen(&mut rng))
+            .map(|_| TestValidator::gen(&mut rng, initial_stake))
             .collect()
     }
 
-    fn gen(rng: &mut rand::rngs::StdRng) -> TestValidator {
+    fn gen(rng: &mut StdRng, initial_stake: Option<u64>) -> TestValidator {
         let key = Ed25519PrivateKey::generate(rng);
         let auth_key = AuthenticationKey::ed25519(&key.public_key());
         let address = auth_key.derived_address();
@@ -544,6 +554,11 @@ impl TestValidator {
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
+        let stake_amount = if let Some(amount) = initial_stake {
+            amount
+        } else {
+            1
+        };
         let data = Validator {
             address,
             consensus_pubkey,
@@ -551,7 +566,7 @@ impl TestValidator {
             operator_address: address,
             network_addresses: network_address,
             full_node_network_addresses: full_node_network_address,
-            stake_amount: 1,
+            stake_amount,
         };
         Self {
             key,
@@ -565,7 +580,7 @@ pub fn generate_test_genesis(
     stdlib_modules: &[Vec<u8>],
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    let test_validators = TestValidator::new_test_set(count);
+    let test_validators = TestValidator::new_test_set(count, None);
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
     let validators = &validators_;
 
@@ -587,6 +602,37 @@ pub fn generate_test_genesis(
             required_proposer_stake: 0,
             rewards_apy_percentage: 10,
             voting_duration_secs: 3600,
+        },
+    );
+    (genesis, test_validators)
+}
+
+pub fn generate_mainnet_genesis(
+    stdlib_modules: &[Vec<u8>],
+    count: Option<usize>,
+) -> (ChangeSet, Vec<TestValidator>) {
+    // TODO: Update to have custom validators/accounts with initial balances at genesis.
+    let test_validators = TestValidator::new_test_set(count, Some(1_000_000_00000000));
+    let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
+    let validators = &validators_;
+
+    let genesis = encode_genesis_change_set(
+        &GENESIS_KEYPAIR.1,
+        validators,
+        stdlib_modules,
+        OnChainConsensusConfig::default(),
+        ChainId::test(),
+        &GenesisConfiguration {
+            allow_new_validators: true,
+            epoch_duration_secs: 2 * 3600, // 2 hours
+            is_test: false,
+            min_stake: 1_000_000_00000000, // 1M Aptos coins
+            min_voting_threshold: 400_000_000_00000000, // 400M Aptos coins
+            max_stake: 50_000_000_00000000, // 50M APTOS coins (with 8 decimals).
+            recurring_lockup_duration_secs: 30 * 24 * 3600, // 1 month
+            required_proposer_stake: 1_000_000_00000000, // 1M Aptos coins
+            rewards_apy_percentage: 10,
+            voting_duration_secs: 7 * 24 * 3600, // 7 days
         },
     );
     (genesis, test_validators)

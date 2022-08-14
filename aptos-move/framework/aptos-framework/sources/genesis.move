@@ -111,7 +111,7 @@ module aptos_framework::genesis {
     /// Network address fields are a vector per account, where each entry is a vector of addresses
     /// encoded in a single BCS byte array.
     fun create_initialize_validators(
-        aptos_framework_account: signer,
+        aptos_framework: &signer,
         owners: vector<address>,
         consensus_pubkeys: vector<vector<u8>>,
         proof_of_possession: vector<vector<u8>>,
@@ -149,12 +149,17 @@ module aptos_framework::genesis {
             // Transfer coins from the root account to the validator, so they can stake and have non-zero voting power
             // and can complete consensus on the genesis block.
             coins::register<AptosCoin>(&owner_account);
-            aptos_coin::mint(&aptos_framework_account, *owner, amount);
+            aptos_coin::mint(aptos_framework, *owner, amount);
             stake::add_stake(&owner_account, amount);
             stake::join_validator_set_internal(&owner_account, *owner);
 
             i = i + 1;
         };
+
+        // Destroy the aptos framework account's ability to mint coins now that we're done with setting up the initial
+        // validators.
+        aptos_coin::destroy_mint_cap(aptos_framework);
+
         stake::on_new_epoch();
     }
 
