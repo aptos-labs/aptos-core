@@ -3,20 +3,37 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
+CMD="--release"
+BUILD_FLAGS="--cfg tokio_unstable"
+
+echo "1. profile = <$BUILD_PROFILE>, cmd == $CMD"
+
+[ -n "$BUILD_PROFILE" ] && CMD="--profile $BUILD_PROFILE"
+
+echo "2. profile = <$BUILD_PROFILE>, cmd == $CMD"
+
+[ -z "$BUILD_PROFILE" ] && BUILD_PROFILE="release"
+
+echo "3. profile = <$BUILD_PROFILE>, cmd == $CMD"
+
 # Build all the rust release binaries
-RUSTFLAGS="--cfg tokio_unstable" cargo build --release \
-        -p aptos \
-        -p aptos-faucet \
-        -p aptos-indexer \
-        -p aptos-node \
-        -p aptos-node-checker \
-        -p aptos-openapi-spec-generator \
-        -p aptos-telemetry-service \
-        -p backup-cli \
-        -p db-bootstrapper \
-        -p forge-cli \
-        -p transaction-emitter \
-        "$@"
+echo "RUSTFLAGS=$BUILD_FLAGS cargo build $CMD -p aptos-node [--profile performance]"
+
+RUSTFLAGS=$BUILD_FLAGS cargo build --profile performance \
+	-p aptos 	\
+	-p aptos-faucet \
+	-p aptos-indexer \
+	-p aptos-node	\
+	-p aptos-node-checker \
+	-p aptos-openapi-spec-generator \
+	-p aptos-telemetry-service \
+	-p backup-cli \
+	-p db-bootstrapper \
+	-p forge-cli \
+	-p transaction-emitter \
+	"$@"
+
+BUILD_PROFILE="performance"
 
 # After building, copy the binaries we need to `dist` since the `target` directory is used as docker cache mount and only available during the RUN step
 BINS=(
@@ -39,7 +56,7 @@ mkdir dist
 
 for BIN in "${BINS[@]}"
 do
-    cp target/release/$BIN dist/$BIN
+	cp target/$BUILD_PROFILE/$BIN dist/$BIN
 done
 
 # Build the Aptos Move framework
