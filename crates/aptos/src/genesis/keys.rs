@@ -132,8 +132,9 @@ impl CliCommand<()> for SetValidatorConfiguration {
             stake_amount: self.stake_amount,
         };
 
+        let file = PathBuf::from(format!("{}.yaml", self.username));
         self.git_options
             .get_client()?
-            .put(&self.username, &credentials)
+            .put(file.as_path(), &credentials)
     }
 }
