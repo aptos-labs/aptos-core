@@ -24,14 +24,14 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 /// The package registry at the given address.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PackageRegistry {
     /// Packages installed at this address.
     pub packages: Vec<PackageMetadata>,
 }
 
 /// The PackageMetadata type.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PackageMetadata {
     /// Name of this package.
     pub name: String,

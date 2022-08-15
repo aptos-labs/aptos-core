@@ -30,6 +30,11 @@ where
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(relative.into())
 }
 
+pub(crate) fn path_relative_to_crate(path: PathBuf) -> PathBuf {
+    let crate_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.strip_prefix(crate_path).unwrap_or(&path).to_path_buf()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{ReleaseBundle, ReleaseTarget};
@@ -40,13 +45,13 @@ mod tests {
         let actual_name = tempdir
             .path()
             .to_path_buf()
-            .join(ReleaseTarget::Current.file_name());
-        ReleaseTarget::Current
+            .join(ReleaseTarget::Head.file_name());
+        ReleaseTarget::Head
             .create_release(Some(actual_name.clone()))
             .unwrap();
         let actual = ReleaseBundle::read(actual_name).unwrap();
         assert!(
-            crate::current_release_bundle() == &actual,
+            crate::head_release_bundle() == &actual,
             "Generated framework artifacts out-of-date. Please `cargo run -p framework -- release`"
         );
     }

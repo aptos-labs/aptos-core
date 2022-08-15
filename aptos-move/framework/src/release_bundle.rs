@@ -3,6 +3,7 @@
 
 use crate::built_package::BuiltPackage;
 use crate::natives::code::{PackageMetadata, UpgradePolicy};
+use crate::path_in_crate;
 use aptos_types::transaction::ScriptABI;
 use move_deps::move_binary_format::access::ModuleAccess;
 use move_deps::move_binary_format::errors::PartialVMError;
@@ -10,7 +11,6 @@ use move_deps::move_binary_format::CompiledModule;
 use move_deps::move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_EXTENSION,
 };
-use move_deps::move_compiler::shared::NumericalAddress;
 use move_deps::move_core_types::errmap::ErrorMapping;
 use move_deps::move_core_types::language_storage::ModuleId;
 use serde::{Deserialize, Serialize};
@@ -124,14 +124,11 @@ impl ReleaseBundle {
         );
         let mut result = vec![];
         for path in &self.source_dirs {
-            let mut files = find_filenames(&[path], |p| extension_equals(p, MOVE_EXTENSION))?;
+            let path = path_in_crate(path);
+            let mut files = find_filenames(&[&path], |p| extension_equals(p, MOVE_EXTENSION))?;
             result.append(&mut files);
         }
         Ok(result)
-    }
-
-    pub fn named_addresses(&self) -> BTreeMap<String, NumericalAddress> {
-        BTreeMap::new()
     }
 }
 

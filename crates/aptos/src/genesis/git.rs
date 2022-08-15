@@ -51,9 +51,6 @@ impl CliCommand<()> for SetupGit {
         let client = self.git_options.get_client()?;
         client.put(Path::new(LAYOUT_FILE), &layout)?;
 
-        // Make a place for the modules to be uploaded
-        client.create_dir(Path::new(FRAMEWORK_DIR))?;
-
         Ok(())
     }
 }
