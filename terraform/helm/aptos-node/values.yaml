@@ -51,12 +51,12 @@ validator:
     concurrency_level: 8
     round_initial_timeout_ms:
     quorum_store_poll_count: 1
-    enable_state_store_pruner: true
+    enable_state_merkle_pruner: true
     enable_ledger_pruner: true
     ledger_prune_window: 10000000
-    state_store_prune_window: 1000000
+    state_prune_window: 1000000
     ledger_pruning_batch_size: 10000
-    state_store_pruning_batch_size: 10000
+    state_pruning_batch_size: 10000
   # -- Lock down network ingress and egress with Kubernetes NetworkPolicy
   enableNetworkPolicy: true
 
