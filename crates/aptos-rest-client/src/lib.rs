@@ -149,13 +149,13 @@ impl Client {
 
     pub async fn get_ledger_information(&self) -> Result<Response<State>> {
         let response = self.get_index().await?.map(|r| State {
-            chain_id: r.ledger_info.chain_id,
-            epoch: r.ledger_info.epoch.into(),
-            version: r.ledger_info.ledger_version.into(),
-            timestamp_usecs: r.ledger_info.ledger_timestamp.into(),
-            oldest_ledger_version: r.ledger_info.oldest_ledger_version.into(),
-            oldest_block_height: r.ledger_info.oldest_block_height.into(),
-            block_height: r.ledger_info.block_height.into(),
+            chain_id: r.chain_id,
+            epoch: r.epoch.into(),
+            version: r.ledger_version.into(),
+            timestamp_usecs: r.ledger_timestamp.into(),
+            oldest_ledger_version: r.oldest_ledger_version.into(),
+            oldest_block_height: r.oldest_block_height.into(),
+            block_height: r.block_height.into(),
         });
 
         Ok(response)
