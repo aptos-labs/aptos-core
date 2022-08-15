@@ -8,6 +8,11 @@
   }
 }
 
+html {
+  /* So the sticky header doesn't cover things that are scrolled into view. */
+  scroll-padding-top: 120px;
+}
+
 .font-mono {
   font-variant-ligatures: none;
 }
