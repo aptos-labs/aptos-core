@@ -3,7 +3,7 @@
   "name": "Petra",
   "version": "0.1.4",
   "manifest_version": 3,
-  "description": "A crypto wallet on Aptos, built by Aptos Labs. Petra is a free extension that allows users to securely store coins and tokens, collect NFTs, and interface with Aptos.",
+  "description": "A crypto wallet on Aptos, built by Aptos Labs",
   "action": {
     "default_popup": "index.html"
   },
