@@ -866,6 +866,8 @@ module aptos_framework::stake {
         let len = vector::length(&validator_set.active_validators);
         let next_epoch_validators = vector::empty();
         validator_perf.validators = vector::empty();
+        validator_set.total_voting_power = 0;
+        validator_set.total_joining_power = 0;
         while (i < len) {
             let old_validator_info = vector::borrow_mut(&mut validator_set.active_validators, i);
             let pool_address = old_validator_info.addr;
@@ -884,7 +886,6 @@ module aptos_framework::stake {
             validator_index = validator_index + 1;
             validator_set.total_voting_power =
                 validator_set.total_voting_power + (new_validator_info.voting_power as u128);
-            validator_set.total_joining_power = 0;
             vector::push_back(&mut next_epoch_validators, new_validator_info);
             vector::push_back(&mut validator_perf.validators, IndividualValidatorPerformance {
                 successful_proposals: 0,
@@ -1353,6 +1354,27 @@ module aptos_framework::stake {
         join_validator_set(&validator_2, signer::address_of(&validator_2));
         // Add more stake, which now exceeds the 100% limit. This should fail.
         add_stake(&validator_2, 1);
+    }
+
+    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[expected_failure(abort_code = 0x10013)]
+    public entry fun test_active_validator_cannot_add_more_stake_than_limit_in_multiple_epochs(
+        aptos_framework: signer,
+        validator: signer,
+    ) acquires OwnerCapability, StakePool, AptosCoinCapabilities, ValidatorConfig, ValidatorPerformance, ValidatorSet {
+        timestamp::set_time_has_started_for_testing(&aptos_framework);
+        initialize(&aptos_framework);
+        // Only 50% voting power increase is allowed in each epoch.
+        staking_config::initialize_for_test(&aptos_framework, 50, 10000, LOCKUP_CYCLE_SECONDS, true, 1, 10, 50);
+        let validator_address = signer::address_of(&validator);
+        join_test_staking(&aptos_framework, &validator, true);
+        assert_validator_state(validator_address, 100, 0, 0, 0, 0);
+        end_epoch();
+        assert_validator_state(validator_address, 110, 0, 0, 0, 0);
+        end_epoch();
+        assert_validator_state(validator_address, 121, 0, 0, 0, 0);
+        // Add more than 50% limit. The following line should fail.
+        add_stake(&validator, 99);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]

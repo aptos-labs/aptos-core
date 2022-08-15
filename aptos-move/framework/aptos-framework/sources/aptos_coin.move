@@ -122,7 +122,7 @@ module aptos_framework::aptos_coin {
         assert!(option::is_some(&maybe_index), EDELEGATION_NOT_FOUND);
         let idx = *option::borrow(&maybe_index);
         let delegations = &mut borrow_global_mut<Delegations>(@core_resources).inner;
-        let DelegatedMintCapability { to: _} = vector::swap_remove(delegations, idx);
+        let DelegatedMintCapability { to: _ } = vector::swap_remove(delegations, idx);
 
         // Make a copy of mint cap and give it to the specified account.
         let mint_cap = borrow_global<Capabilities>(@core_resources).mint_cap;
