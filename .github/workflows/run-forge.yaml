@@ -78,21 +78,18 @@ jobs:
 
           source testsuite/run_forge.sh
 
-          # export env vars for next step
-          echo "FORGE_PRE_COMMENT=$FORGE_PRE_COMMENT" >> $GITHUB_ENV
-
           # append some GHA-specific content to the comment
           cat << EOF >> $FORGE_PRE_COMMENT
           * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           * Pending test run ${{ github.run_attempt }} ${{ env.FORGE_BLOCKING == 'true' && 'is land-blocking' || 'is not land-blocking' }}
+          * Triggered by ${{ github.event_name || github.event.pull_request.auto_merge != null && 'automerge' }}
           EOF
 
       - name: Post pre-Forge comment
         if: env.FORGE_ENABLED == 'true' && github.event.number != null
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          recreate: true
-          header: forge-comment-${{ github.run_attempt }}
+          append: true
           path: ${{ env.FORGE_PRE_COMMENT }}
 
       - name: Run Forge
@@ -112,6 +109,7 @@ jobs:
           cat << EOF >> $FORGE_COMMENT
           * [Test runner output](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
           * Test run ${{ github.run_attempt }} ${{ env.FORGE_BLOCKING == 'true' && 'is land-blocking' || 'is not land-blocking' }}
+          * Triggered by ${{ github.event_name || github.event.pull_request.auto_merge != null && 'automerge' }}
           EOF
 
           # add github step summary as described here https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary
@@ -125,6 +123,5 @@ jobs:
         if: env.FORGE_ENABLED == 'true' && github.event.number != null && !cancelled()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
-          recreate: true
+          append: true
           path: ${{ env.FORGE_COMMENT }}
-          header: forge-comment-${{ github.run_attempt }}
