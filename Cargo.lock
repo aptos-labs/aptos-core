@@ -1188,6 +1188,7 @@ dependencies = [
  "aptosdb",
  "consensus",
  "const_format",
+ "flate2",
  "futures",
  "httpmock",
  "network",
