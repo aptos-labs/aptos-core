@@ -383,8 +383,6 @@ async fn test_block() {
     assert!(newer_block.timestamp >= latest_block.timestamp);
 }
 
-// TODO: Unignore this when we have get_block_info for the v1 API.
-#[ignore]
 #[tokio::test]
 async fn test_block_transactions() {
     let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 2).await;
@@ -506,8 +504,6 @@ async fn test_block_transactions() {
     }
 }
 
-// TODO: Unignore this when we have get_block_info for the v1 API.
-#[ignore]
 #[tokio::test]
 async fn test_invalid_transaction_gas_charged() {
     let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 1).await;

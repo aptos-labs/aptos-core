@@ -102,8 +102,8 @@ impl Client {
         .await
     }
 
-    pub async fn get_block_info(&self, version: u64) -> Result<Response<BlockInfo>> {
-        self.get(self.build_path(&format!("blocks/{}", version))?)
+    pub async fn get_block_info(&self, version: u64) -> Result<Response<Block>> {
+        self.get(self.build_path(&format!("blocks/by_version/{}", version))?)
             .await
     }
 
