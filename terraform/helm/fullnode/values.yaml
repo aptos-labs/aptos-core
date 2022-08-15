@@ -66,7 +66,8 @@ ingress:
   enabled: false
   hostName: #aptos-fullnode.example.com
   #leaving class empty will result in an ingress that implicity uses the default ingress class
-  class: #nginx
+  ingressClassName: #nginx
+  annotations: {}
 
 
 serviceAccount:
