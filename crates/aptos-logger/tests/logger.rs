@@ -3,6 +3,7 @@
 
 use aptos_infallible::RwLock;
 use aptos_logger::{aptos_logger::AptosData, info, Writer};
+use std::io::Write;
 use std::sync::Arc;
 
 #[derive(Default)]
@@ -13,6 +14,10 @@ struct VecWriter {
 impl Writer for VecWriter {
     fn write(&self, log: String) {
         self.logs.write().push(log)
+    }
+
+    fn write_buferred(&self, _writer: &mut dyn Write, log: String) {
+        self.write(log);
     }
 }
 
