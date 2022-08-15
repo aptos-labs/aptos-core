@@ -19,8 +19,8 @@ pub use types::{Account, Resource};
 use crate::aptos::{AptosVersion, Balance};
 use anyhow::{anyhow, Result};
 use aptos_api_types::{
-    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, BlockInfo,
-    HexEncodedBytes, VersionedEvent,
+    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, HexEncodedBytes,
+    VersionedEvent,
 };
 use aptos_crypto::HashValue;
 use aptos_types::{
@@ -110,6 +110,27 @@ impl Client {
     pub async fn get_account_balance(&self, address: AccountAddress) -> Result<Response<Balance>> {
         let resp = self
             .get_account_resource(address, "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>")
+            .await?;
+        resp.and_then(|resource| {
+            if let Some(res) = resource {
+                Ok(serde_json::from_value::<Balance>(res.data)?)
+            } else {
+                Err(anyhow!("No data returned"))
+            }
+        })
+    }
+
+    pub async fn get_account_balance_at_version(
+        &self,
+        address: AccountAddress,
+        version: u64,
+    ) -> Result<Response<Balance>> {
+        let resp = self
+            .get_account_resource_at_version(
+                address,
+                "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
+                version,
+            )
             .await?;
         resp.and_then(|resource| {
             if let Some(res) = resource {
@@ -299,7 +320,7 @@ impl Client {
         version: u64,
     ) -> Result<Response<Vec<Resource>>> {
         let url = self.build_path(&format!(
-            "accounts/{}/resources?version={}",
+            "accounts/{}/resources?ledger_version={}",
             address, version
         ))?;
 
