@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use anyhow::anyhow;
-use aptos_api::runtime::bootstrap as bootstrap_api;
+use aptos_api::bootstrap as bootstrap_api;
 use aptos_config::{
     config::{
         AptosDataClientConfig, BaseConfig, DataStreamingServiceConfig, NetworkConfig, NodeConfig,
