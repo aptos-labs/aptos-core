@@ -16,6 +16,9 @@ use serde::{Deserialize, Serialize};
 
 // This struct includes TypeInfo (account_address, module_name, and struct_name)
 // and RotationProof-specific information (sequence_number, originator, current_auth_key, and new_public_key)
+// Since the struct RotationProof is defined in "0x1::account::RotationProof",
+// we will be passing in "0x1" to `account_address`, "account" to `module_name`, and "RotationProof" to `struct_name`
+// Originator refers to the user's address
 #[derive(Serialize, Deserialize)]
 struct RotationProof {
     account_address: AccountAddress,
@@ -53,13 +56,18 @@ fn rotate_auth_key() {
     let rotation_msg = bcs::to_bytes(&rotation_proof);
 
     // sign the struct using both the current private key and the next private key
-    let rotation_proof_signed_by_current_private_key = account1.privkey.sign_arbitrary_message(&rotation_msg.clone().unwrap());
-    let rotation_proof_signed_by_new_private_key = new_private_key.sign_arbitrary_message(&rotation_msg.unwrap());
+    let rotation_proof_signed_by_current_private_key = account1
+        .privkey
+        .sign_arbitrary_message(&rotation_msg.clone().unwrap());
+    let rotation_proof_signed_by_new_private_key =
+        new_private_key.sign_arbitrary_message(&rotation_msg.unwrap());
 
     assert_success!(harness.run_transaction_payload(
         &account1,
         aptos_stdlib::account_rotate_authentication_key_ed25519(
-            rotation_proof_signed_by_current_private_key.to_bytes().to_vec(),
+            rotation_proof_signed_by_current_private_key
+                .to_bytes()
+                .to_vec(),
             rotation_proof_signed_by_new_private_key.to_bytes().to_vec(),
             account1.pubkey.to_bytes().to_vec(),
             new_public_key.to_bytes().to_vec(),
