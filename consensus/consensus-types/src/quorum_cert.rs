@@ -5,7 +5,7 @@ use crate::vote_data::VoteData;
 use anyhow::{ensure, Context};
 use aptos_bitvec::BitVec;
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::multi_signature::AggregatedSignature;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},

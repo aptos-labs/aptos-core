@@ -16,7 +16,7 @@ use crate::{
 };
 use aptos_config::utils::get_available_port;
 use aptos_temppath::TempPath;
-use aptos_types::multi_signature::AggregatedSignature;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     proptest_types::{AccountInfoUniverse, LedgerInfoWithSignaturesGen},

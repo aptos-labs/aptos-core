@@ -3,7 +3,7 @@
 
 use aptos_crypto::hash::HashValue;
 use aptos_logger::prelude::*;
-use aptos_types::multi_signature::AggregatedSignature;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},

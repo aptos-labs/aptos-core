@@ -17,7 +17,7 @@ use crate::{
     util::{mock_time_service::SimulatedTimeService, time_service::TimeService},
 };
 use aptos_infallible::Mutex;
-use aptos_types::multi_signature::AggregatedSignature;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,

@@ -5,7 +5,9 @@ use crate::{common::Author, quorum_cert::QuorumCert};
 use anyhow::ensure;
 use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::multi_signature::{AggregatedSignatureWithRounds, PartialSignaturesWithRound};
+use aptos_types::aggregated_signature::{
+    AggregatedSignatureWithRounds, PartialSignaturesWithRound,
+};
 use aptos_types::validator_verifier::VerifyError;
 use aptos_types::{
     block_info::Round, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier,
@@ -187,9 +189,8 @@ impl TwoChainTimeoutWithSignatures {
     }
 }
 
-/// TimeoutCertificate is a proof that 2f+1 participants in epoch i
-/// have voted in round r and we can now move to round r+1. AptosBFT v4 requires signature to sign on
-/// the TimeoutSigningRepr and carry the TimeoutWithHighestQC with highest quorum cert among 2f+1.
+/// Contains two chain timout with partial signatures from the validators. This is only used during
+/// signature aggregation and does not go through the wire.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TwoChainTimeoutWithPartialSignatures {
     timeout: TwoChainTimeout,
@@ -197,7 +198,6 @@ pub struct TwoChainTimeoutWithPartialSignatures {
 }
 
 impl TwoChainTimeoutWithPartialSignatures {
-    /// Creates new TimeoutCertificate
     pub fn new(timeout: TwoChainTimeout) -> Self {
         Self {
             timeout,
@@ -249,6 +249,8 @@ impl TwoChainTimeoutWithPartialSignatures {
         self.signatures.add_signature(author, hqc_round, signature);
     }
 
+    /// Aggregates the partial signature into `TwoChainTimeoutWithSignatures`. This is done when we
+    /// have quorum voting power in the partial signature.
     pub fn aggregate_signatures(
         &self,
         verifier: &ValidatorVerifier,
@@ -278,100 +280,109 @@ impl TwoChainTimeoutWithPartialSignatures {
     }
 }
 
-#[test]
-fn test_2chain_timeout_certificate() {
-    use crate::vote_data::VoteData;
-    use aptos_crypto::hash::CryptoHash;
-    use aptos_types::{
-        block_info::BlockInfo,
-        ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
-        multi_signature::PartialSignatures,
-        validator_verifier::random_validator_verifier,
-    };
+#[cfg(test)]
+mod tests {
+    use crate::quorum_cert::QuorumCert;
+    use crate::timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithPartialSignatures};
+    use aptos_crypto::bls12381;
 
-    let num_nodes = 4;
-    let (signers, validators) = random_validator_verifier(num_nodes, None, false);
-    let quorum_size = validators.quorum_voting_power() as usize;
-    let generate_quorum = |round, num_of_signature| {
-        let vote_data = VoteData::new(BlockInfo::random(round), BlockInfo::random(0));
-        let mut ledger_info = LedgerInfoWithPartialSignatures::new(
-            LedgerInfo::new(BlockInfo::empty(), vote_data.hash()),
-            PartialSignatures::empty(),
-        );
-        for signer in &signers[0..num_of_signature] {
-            let signature = signer.sign(ledger_info.ledger_info());
-            ledger_info.add_signature(signer.author(), signature);
+    #[test]
+    fn test_2chain_timeout_certificate() {
+        use crate::vote_data::VoteData;
+        use aptos_crypto::hash::CryptoHash;
+        use aptos_types::{
+            aggregated_signature::PartialSignatures,
+            block_info::BlockInfo,
+            ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
+            validator_verifier::random_validator_verifier,
+        };
+
+        let num_nodes = 4;
+        let (signers, validators) = random_validator_verifier(num_nodes, None, false);
+        let quorum_size = validators.quorum_voting_power() as usize;
+        let generate_quorum = |round, num_of_signature| {
+            let vote_data = VoteData::new(BlockInfo::random(round), BlockInfo::random(0));
+            let mut ledger_info = LedgerInfoWithPartialSignatures::new(
+                LedgerInfo::new(BlockInfo::empty(), vote_data.hash()),
+                PartialSignatures::empty(),
+            );
+            for signer in &signers[0..num_of_signature] {
+                let signature = signer.sign(ledger_info.ledger_info());
+                ledger_info.add_signature(signer.author(), signature);
+            }
+            QuorumCert::new(
+                vote_data,
+                ledger_info.aggregate_signatures(&validators).unwrap(),
+            )
+        };
+        let generate_timeout = |round, qc_round| {
+            TwoChainTimeout::new(1, round, generate_quorum(qc_round, quorum_size))
+        };
+
+        let timeouts: Vec<_> = (1..=3)
+            .map(|qc_round| generate_timeout(4, qc_round))
+            .collect();
+        // timeout cert with (round, hqc round) = (4, 1), (4, 2), (4, 3)
+        let mut tc_with_partial_sig =
+            TwoChainTimeoutWithPartialSignatures::new(timeouts[0].clone());
+        for (timeout, signer) in timeouts.iter().zip(&signers) {
+            tc_with_partial_sig.add(signer.author(), timeout.clone(), timeout.sign(signer));
         }
-        QuorumCert::new(
-            vote_data,
-            ledger_info.aggregate_signatures(&validators).unwrap(),
-        )
-    };
-    let generate_timeout =
-        |round, qc_round| TwoChainTimeout::new(1, round, generate_quorum(qc_round, quorum_size));
 
-    let timeouts: Vec<_> = (1..=3)
-        .map(|qc_round| generate_timeout(4, qc_round))
-        .collect();
-    // timeout cert with (round, hqc round) = (4, 1), (4, 2), (4, 3)
-    let mut tc_with_partial_sig = TwoChainTimeoutWithPartialSignatures::new(timeouts[0].clone());
-    for (timeout, signer) in timeouts.iter().zip(&signers) {
-        tc_with_partial_sig.add(signer.author(), timeout.clone(), timeout.sign(signer));
+        let tc_with_sig = tc_with_partial_sig
+            .aggregate_signatures(&validators, false)
+            .unwrap();
+        tc_with_sig.verify(&validators).unwrap();
+
+        // timeout round < hqc round
+        let mut invalid_tc_with_partial_sig = tc_with_partial_sig.clone();
+        invalid_tc_with_partial_sig.timeout.round = 1;
+
+        let invalid_tc_with_sig = invalid_tc_with_partial_sig
+            .aggregate_signatures(&validators, false)
+            .unwrap();
+        invalid_tc_with_sig.verify(&validators).unwrap_err();
+
+        // invalid signature
+        let mut invalid_timeout_cert = invalid_tc_with_partial_sig.clone();
+        invalid_timeout_cert.signatures.replace_signature(
+            signers[0].author(),
+            0,
+            bls12381::Signature::dummy_signature(),
+        );
+
+        let invalid_tc_with_sig = invalid_timeout_cert
+            .aggregate_signatures(&validators, false)
+            .unwrap();
+        invalid_tc_with_sig.verify(&validators).unwrap_err();
+
+        // not enough signatures
+        let mut invalid_timeout_cert = invalid_tc_with_partial_sig.clone();
+        invalid_timeout_cert
+            .signatures
+            .remove_signature(&signers[0].author());
+        let invalid_tc_with_sig = invalid_timeout_cert
+            .aggregate_signatures(&validators, false)
+            .unwrap();
+
+        invalid_tc_with_sig.verify(&validators).unwrap_err();
+
+        // hqc round does not match signed round
+        let mut invalid_timeout_cert = invalid_tc_with_partial_sig.clone();
+        invalid_timeout_cert.timeout.quorum_cert = generate_quorum(2, quorum_size);
+
+        let invalid_tc_with_sig = invalid_timeout_cert
+            .aggregate_signatures(&validators, false)
+            .unwrap();
+        invalid_tc_with_sig.verify(&validators).unwrap_err();
+
+        // invalid quorum cert
+        let mut invalid_timeout_cert = invalid_tc_with_partial_sig;
+        invalid_timeout_cert.timeout.quorum_cert = generate_quorum(3, quorum_size - 1);
+        let invalid_tc_with_sig = invalid_timeout_cert
+            .aggregate_signatures(&validators, false)
+            .unwrap();
+
+        invalid_tc_with_sig.verify(&validators).unwrap_err();
     }
-
-    let tc_with_sig = tc_with_partial_sig
-        .aggregate_signatures(&validators, false)
-        .unwrap();
-    tc_with_sig.verify(&validators).unwrap();
-
-    // timeout round < hqc round
-    let mut invalid_tc_with_partial_sig = tc_with_partial_sig.clone();
-    invalid_tc_with_partial_sig.timeout.round = 1;
-
-    let invalid_tc_with_sig = invalid_tc_with_partial_sig
-        .aggregate_signatures(&validators, false)
-        .unwrap();
-    invalid_tc_with_sig.verify(&validators).unwrap_err();
-
-    // invalid signature
-    let mut invalid_timeout_cert = invalid_tc_with_partial_sig.clone();
-    invalid_timeout_cert.signatures.replace_signature(
-        signers[0].author(),
-        0,
-        bls12381::Signature::dummy_signature(),
-    );
-
-    let invalid_tc_with_sig = invalid_timeout_cert
-        .aggregate_signatures(&validators, false)
-        .unwrap();
-    invalid_tc_with_sig.verify(&validators).unwrap_err();
-
-    // not enough signatures
-    let mut invalid_timeout_cert = invalid_tc_with_partial_sig.clone();
-    invalid_timeout_cert
-        .signatures
-        .remove_signature(&signers[0].author());
-    let invalid_tc_with_sig = invalid_timeout_cert
-        .aggregate_signatures(&validators, false)
-        .unwrap();
-
-    invalid_tc_with_sig.verify(&validators).unwrap_err();
-
-    // hqc round does not match signed round
-    let mut invalid_timeout_cert = invalid_tc_with_partial_sig.clone();
-    invalid_timeout_cert.timeout.quorum_cert = generate_quorum(2, quorum_size);
-
-    let invalid_tc_with_sig = invalid_timeout_cert
-        .aggregate_signatures(&validators, false)
-        .unwrap();
-    invalid_tc_with_sig.verify(&validators).unwrap_err();
-
-    // invalid quorum cert
-    let mut invalid_timeout_cert = invalid_tc_with_partial_sig;
-    invalid_timeout_cert.timeout.quorum_cert = generate_quorum(3, quorum_size - 1);
-    let invalid_tc_with_sig = invalid_timeout_cert
-        .aggregate_signatures(&validators, false)
-        .unwrap();
-
-    invalid_tc_with_sig.verify(&validators).unwrap_err();
 }
