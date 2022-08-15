@@ -17,13 +17,13 @@ dialog::backdrop {
 }
 
 input:-webkit-autofill {
-  -webkit-box-shadow:0 0 0 50px #171717 inset;
-  -webkit-text-fill-color: #fff;
+  -webkit-box-shadow:0 0 0 50px #262626 inset;
+  -webkit-text-fill-color: #f5f5f5;
 }
 
 input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 50px #171717 inset;
-  -webkit-text-fill-color: #fff;
+  -webkit-box-shadow: 0 0 0 50px #262626 inset;
+  -webkit-text-fill-color: #f5f5f5;
 }
 
 .grecaptcha-badge { visibility: hidden; }
