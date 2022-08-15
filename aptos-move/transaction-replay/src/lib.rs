@@ -13,12 +13,13 @@ use aptos_types::{
     account_view::AccountView,
     contract_event::{ContractEvent, EventWithVersion},
     event::EventKey,
-    transaction::{ChangeSet, Transaction, TransactionOutput, Version, WriteSetPayload},
+    transaction::{Transaction, TransactionOutput, Version, WriteSetPayload},
     write_set::WriteOp,
 };
 use aptos_validator_interface::{AptosValidatorInterface, DBDebuggerInterface, DebuggerStateView};
 use aptos_vm::{
     data_cache::{AsMoveResolver, RemoteStorage},
+    delta_ext::ChangeSetExt,
     logging::AdapterLogSchema,
     move_vm_ext::{MoveVmExt, SessionId},
     AptosVM, VMExecutor,
@@ -332,7 +333,7 @@ impl AptosDebugger {
         version: Version,
         override_changeset: Option<MoveChanges>,
         f: F,
-    ) -> Result<ChangeSet>
+    ) -> Result<ChangeSetExt>
     where
         F: FnOnce(
             &mut Session<DeltaStorage<RemoteStorage<DebuggerStateView>>>,

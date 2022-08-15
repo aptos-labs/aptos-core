@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_ext::TransactionOutputExt;
+use crate::delta_ext::{ChangeSetExt, DeltaChangeSet, TransactionOutputExt};
 use crate::{
     adapter_common,
     adapter_common::{
@@ -543,11 +543,13 @@ impl AptosVM {
         writeset_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
-    ) -> Result<ChangeSet, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
+    ) -> Result<ChangeSetExt, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
         let mut gas_meter = UnmeteredGasMeter;
 
         Ok(match writeset_payload {
-            WriteSetPayload::Direct(change_set) => change_set.clone(),
+            WriteSetPayload::Direct(change_set) => {
+                ChangeSetExt::new(DeltaChangeSet::empty(), change_set.clone())
+            }
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(storage, session_id);
                 let senders = match txn_sender {
@@ -632,27 +634,27 @@ impl AptosVM {
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
-        let change_set = match self.execute_writeset(
+        let change_set_ext = match self.execute_writeset(
             storage,
             &writeset_payload,
             None,
             SessionId::genesis(genesis_id),
         ) {
-            Ok(cs) => cs,
+            Ok(change_set_ext) => change_set_ext,
             Err(e) => return e,
         };
+
+        let (delta_change_set, change_set) = change_set_ext.into_inner();
         Self::validate_waypoint_change_set(&change_set, log_context)?;
         let (write_set, events) = change_set.into_inner();
         self.read_writeset(storage, &write_set)?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
+
+        let txn_output = TransactionOutput::new(write_set, events, 0, VMStatus::Executed.into());
+
         Ok((
             VMStatus::Executed,
-            TransactionOutputExt::from(TransactionOutput::new(
-                write_set,
-                events,
-                0,
-                VMStatus::Executed.into(),
-            )),
+            TransactionOutputExt::new(delta_change_set, txn_output),
         ))
     }
 
@@ -747,14 +749,20 @@ impl AptosVM {
         txn_data: TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
-        let change_set = match self.execute_writeset(
+        let change_set_ext = match self.execute_writeset(
             storage,
             writeset_payload,
             Some(txn_data.sender()),
             SessionId::txn_meta(&txn_data),
         ) {
-            Ok(change_set) => change_set,
+            Ok(change_set_ext) => change_set_ext,
             Err(e) => return e,
+        };
+
+        let (delta_change_set, change_set) = change_set_ext.into_inner();
+        if let Err(e) = self.read_writeset(storage, change_set.write_set()) {
+            // Any error at this point would be an invalid writeset
+            return Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET)));
         };
 
         // Run the epilogue function.
@@ -766,14 +774,16 @@ impl AptosVM {
             log_context,
         )?;
 
-        if let Err(e) = self.read_writeset(storage, change_set.write_set()) {
-            // Any error at this point would be an invalid writeset
-            return Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET)));
-        };
-
         let session_out = session.finish().map_err(|e| e.into_vm_status())?;
-        let (epilogue_writeset, epilogue_events) =
+        let (epilogue_delta_change_set, epilogue_change_set) =
             session_out.into_change_set(&mut ())?.into_inner();
+        let (epilogue_writeset, epilogue_events) = epilogue_change_set.into_inner();
+
+        // Writeset epilogue does not produce delta changes.
+        if !epilogue_delta_change_set.is_empty() {
+            let vm_status = VMStatus::Error(StatusCode::INVALID_WRITE_SET);
+            return Ok(discard_error_vm_status(vm_status));
+        }
 
         // Make sure epilogue WriteSet doesn't intersect with the writeset in TransactionPayload.
         if !epilogue_writeset
@@ -824,14 +834,16 @@ impl AptosVM {
             .collect();
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
+        let txn_output = TransactionOutput::new(
+            write_set,
+            events,
+            0,
+            TransactionStatus::Keep(ExecutionStatus::Success),
+        );
+
         Ok((
             VMStatus::Executed,
-            TransactionOutputExt::from(TransactionOutput::new(
-                write_set,
-                events,
-                0,
-                TransactionStatus::Keep(ExecutionStatus::Success),
-            )),
+            TransactionOutputExt::new(delta_change_set, txn_output),
         ))
     }
 
