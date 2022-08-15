@@ -27,6 +27,8 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
     types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
   push:
     branches:
+      - auto
+      - canary
       - devnet
       - testnet
 
