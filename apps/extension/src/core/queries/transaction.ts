@@ -5,7 +5,7 @@ import { AptosClient } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
 import { ScriptFunctionPayload, UserTransaction } from 'aptos/dist/generated';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
-import { coinNamespace } from 'core/constants';
+import { accountNamespace, coinNamespace } from 'core/constants';
 
 export const transactionQueryKeys = Object.freeze({
   getAccountLatestTransactionTimestamp: 'getAccountLatestTransactionTimestamp',
@@ -29,12 +29,13 @@ export async function getUserTransactions(aptosClient: AptosClient, address: str
 export async function getScriptFunctionTransactions(
   aptosClient: AptosClient,
   address: string,
-  functionName: string,
+  functionName: string | string[],
 ) {
   const transactions = await getUserTransactions(aptosClient, address);
+  const functionNames = Array.isArray(functionName) ? functionName : [functionName];
   return transactions
     .filter((t) => t.payload.type === 'script_function_payload'
-      && (t.payload as ScriptFunctionPayload).function === functionName);
+      && functionNames.indexOf((t.payload as ScriptFunctionPayload).function) >= 0);
 }
 
 // region Use transactions
@@ -66,7 +67,7 @@ export function useCoinTransferTransactions(
     async () => getScriptFunctionTransactions(
       aptosClient!,
       address!,
-      `${coinNamespace}::transfer`,
+      [`${coinNamespace}::transfer`, `${accountNamespace}::transfer`],
     ),
     {
       ...options,
