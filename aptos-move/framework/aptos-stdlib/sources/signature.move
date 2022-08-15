@@ -18,14 +18,6 @@ module aptos_std::signature {
         inner: ProofType,
     }
 
-    public fun ed25519_verify_t<T: drop> (signature: vector<u8>, public_key: vector<u8>, data: T): bool {
-        let encoded = Proof {
-            type_info: type_info::type_of<T>(),
-            inner: data,
-        };
-        ed25519_verify(signature, public_key, bcs::to_bytes(&encoded))
-    }
-
     /// CRYPTOGRAPHY WARNING: This function assumes that the caller verified all public keys have a valid
     /// proof-of-possesion (PoP) using `bls12381_verify_proof_of_possession`.
     ///
@@ -191,6 +183,15 @@ module aptos_std::signature {
         recovery_id: u8,
         signature: vector<u8>
     ): (vector<u8>, bool);
+
+    public fun ed25519_verify_t<T: drop> (signature: vector<u8>, public_key: vector<u8>, data: T): bool {
+        let encoded = Proof {
+            type_info: type_info::type_of<T>(),
+            inner: data,
+        };
+        ed25519_verify(signature, public_key, bcs::to_bytes(&encoded))
+    }
+
 
     #[test_only]
     use std::vector;
