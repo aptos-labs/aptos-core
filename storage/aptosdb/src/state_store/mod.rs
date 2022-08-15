@@ -59,7 +59,7 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
 pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
-    pub persisted_state_value_cache: DashMap<StateKey, StateValue>,
+    pub persisted_state_value_cache: DashMap<StateKey, (Version, StateValue)>,
 }
 
 #[derive(Debug)]
@@ -105,18 +105,36 @@ impl DbReader for StateDb {
         version: Version,
     ) -> Result<Option<StateValue>> {
         let latest_persisted_state_value = self.persisted_state_value_cache.get(state_key);
-        if let Some(state_value) = latest_persisted_state_value {
-            return Ok(Some(state_value.value().clone()));
+        if let Some(state_value) = latest_persisted_state_value.as_ref() {
+            let (cached_version, value) = state_value.value();
+            if *cached_version <= version {
+                return Ok(Some(value.clone()));
+            }
         }
+
         let mut read_opts = ReadOptions::default();
         // We want `None` if the state_key changes in iteration.
         read_opts.set_prefix_same_as_start(true);
         let mut iter = self.ledger_db.iter::<StateValueSchema>(read_opts)?;
         iter.seek(&(state_key.clone(), version))?;
-        iter.next()
-            .transpose()?
-            .map(|(_, state_value)| Ok(state_value))
-            .transpose()
+        let ret = iter.next().transpose()?;
+
+        if let Some(ret_value) = &ret {
+            if let Some(state_value) = latest_persisted_state_value.as_ref() {
+                let (cached_version, _value) = state_value.clone().value();
+                if *cached_version < ret_value.0 .1 {
+                    drop(latest_persisted_state_value);
+                    self.persisted_state_value_cache
+                        .insert(state_key.clone(), (ret_value.0 .1, ret_value.1.clone()));
+                }
+            } else {
+                drop(latest_persisted_state_value);
+                self.persisted_state_value_cache
+                    .insert(state_key.clone(), (ret_value.0 .1, ret_value.1.clone()));
+            }
+        }
+
+        Ok(ret.map(|x| x.1))
     }
 
     /// Returns the proof of the given state key and version.
@@ -425,10 +443,32 @@ impl StateStore {
                     .map(move |(k, v)| ((k.clone(), first_version + i as Version), v.clone()))
             })
             .collect::<HashMap<_, _>>();
-        add_kv_batch(&mut cs.batch, &kv_batch)?;
-        kv_batch.into_iter().for_each(|((key, _), v)| {
-            self.persisted_state_value_cache.insert(key, v);
+        self.add_kv_batch(&mut cs.batch, kv_batch)?;
+
+        Ok(())
+    }
+
+    fn add_kv_batch(&self, batch: &mut SchemaBatch, kv_batch: StateValueBatch) -> Result<()> {
+        kv_batch
+            .iter()
+            .map(|(k, v)| batch.put::<StateValueSchema>(k, v))
+            .collect::<Result<Vec<_>>>()?;
+
+        kv_batch.into_iter().for_each(|((key, version), v)| {
+            let existing = self.persisted_state_value_cache.get(&key);
+            if let Some(v1) = existing.as_ref() {
+                let (v_cached, _) = v1.clone().value();
+                if *v_cached < version {
+                    drop(existing);
+                    self.persisted_state_value_cache.insert(key, (version, v));
+                }
+            } else {
+                drop(existing);
+                self.persisted_state_value_cache.insert(key, (version, v));
+            }
         });
+
+        // Add kv_batch
         Ok(())
     }
 
@@ -537,21 +577,7 @@ impl StateStore {
 impl StateValueWriter<StateKey, StateValue> for StateStore {
     fn write_kv_batch(&self, node_batch: &StateValueBatch) -> Result<()> {
         let mut batch = SchemaBatch::new();
-        add_kv_batch(&mut batch, node_batch)?;
-        node_batch.iter().for_each(|((key, _), v)| {
-            self.persisted_state_value_cache
-                .insert(key.clone(), v.clone());
-        });
+        self.add_kv_batch(&mut batch, node_batch.clone())?;
         self.ledger_db.write_schemas(batch)
     }
-}
-
-fn add_kv_batch(batch: &mut SchemaBatch, kv_batch: &StateValueBatch) -> Result<()> {
-    kv_batch
-        .iter()
-        .map(|(k, v)| batch.put::<StateValueSchema>(k, v))
-        .collect::<Result<Vec<_>>>()?;
-
-    // Add kv_batch
-    Ok(())
 }

@@ -46,6 +46,7 @@ impl ApplyChunkOutput {
         // Calculate TransactionData and TransactionInfo, i.e. the ledger history diff.
         let (to_commit, transaction_info_hashes) =
             Self::assemble_ledger_diff(to_keep, state_updates_vec, state_checkpoint_hashes);
+
         let result_view = ExecutedTrees::new(
             result_state,
             Arc::new(base_view.txn_accumulator().append(&transaction_info_hashes)),
@@ -108,6 +109,7 @@ impl ApplyChunkOutput {
                 });
 
         // Sanity check transactions with the Discard status:
+
         let to_discard = to_discard
             .into_iter()
             .map(|(t, o)| {

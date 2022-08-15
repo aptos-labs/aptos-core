@@ -10,7 +10,7 @@ use aptos_types::{
 use std::ops::Deref;
 
 pub struct ParsedTransactionOutput {
-    output: TransactionOutput,
+    pub output: TransactionOutput,
     reconfig_events: Vec<ContractEvent>,
 }
 
