@@ -32,10 +32,12 @@ pub async fn new_test_context() -> TestContext {
             dataset_id: String::from("2"),
             table_id: String::from("3"),
         },
+        victoria_metrics_base_url: "".into(),
+        victoria_metrics_token: "".into(),
     };
     let cache = ValidatorSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
 
-    TestContext::new(Context::new(config, cache, None))
+    TestContext::new(Context::new(config, cache, None, None))
 }
 
 #[derive(Clone)]
