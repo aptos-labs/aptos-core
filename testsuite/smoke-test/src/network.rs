@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder};
+use crate::smoke_test_environment::SwarmBuilder;
 use aptos::common::types::EncodingType;
 use aptos::test::CliTestFramework;
 use aptos_config::config::Peer;
@@ -24,7 +24,9 @@ use std::{
 #[ignore]
 #[tokio::test]
 async fn test_connection_limiting() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
     let version = swarm.versions().max().unwrap();
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
 
@@ -137,8 +139,7 @@ async fn test_file_discovery() {
     let (_, peer_set) = generate_private_key_and_peer(&cli, [0u8; 32]).await;
     let discovery_file = Arc::new(create_discovery_file(peer_set));
     let discovery_file_for_closure = discovery_file.clone();
-    let swarm = SwarmBuilder::new_local(1)
-        .with_aptos()
+    let swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
         .with_init_config(Arc::new(move |_, config, _| {
             let discovery_file_for_closure2 = discovery_file_for_closure.clone();
             modify_network_config(config, &NetworkId::Validator, move |network| {

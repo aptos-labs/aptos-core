@@ -103,7 +103,7 @@ pub static NEW_BLOCK_EVENT_PATH: Lazy<Vec<u8>> = Lazy::new(|| {
 });
 
 /// Should be kept in-sync with BlockResource move struct in block.move.
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct BlockResource {
     height: u64,
     epoch_interval: u64,
@@ -111,12 +111,24 @@ pub struct BlockResource {
 }
 
 impl BlockResource {
+    pub fn new(height: u64, epoch_interval: u64, count: u64) -> Self {
+        Self {
+            height,
+            epoch_interval,
+            new_block_events: EventHandle::new(new_block_event_key(), count),
+        }
+    }
+
     pub fn new_block_events(&self) -> &EventHandle {
         &self.new_block_events
     }
 
     pub fn height(&self) -> u64 {
         self.height
+    }
+
+    pub fn epoch_interval(&self) -> u64 {
+        self.epoch_interval
     }
 }
 

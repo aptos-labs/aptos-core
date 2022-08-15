@@ -1,16 +1,19 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use forge::{AptosPublicInfo, Swarm};
+
+use crate::smoke_test_environment::SwarmBuilder;
 
 // re-enable after delegation is enabled
 #[ignore]
 #[tokio::test]
 async fn test_staking() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
     let mut info = swarm.aptos_public_info();
 
     // created by root account

@@ -1,13 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use crate::smoke_test_environment::SwarmBuilder;
 use aptos_transaction_builder::aptos_stdlib;
 use forge::Swarm;
 
 #[tokio::test]
 async fn test_mint_transfer() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
     let mut info = swarm.aptos_public_info();
 
     let mut account1 = info.random_account();

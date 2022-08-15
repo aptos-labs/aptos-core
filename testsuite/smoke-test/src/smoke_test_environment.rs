@@ -8,11 +8,11 @@ use aptos_faucet::FaucetArgs;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use aptos_logger::info;
 use aptos_types::{account_config::aptos_test_root_address, chain_id::ChainId};
-use forge::Node;
-use forge::{Factory, LocalFactory, LocalSwarm};
+use forge::{Factory, Node};
+use forge::{LocalFactory, LocalSwarm};
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
-use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
+use std::{num::NonZeroUsize, path::PathBuf};
 use tokio::task::JoinHandle;
 
 pub struct SwarmBuilder {
@@ -21,26 +21,31 @@ pub struct SwarmBuilder {
     genesis_modules: Option<Vec<Vec<u8>>>,
     init_config: Option<InitConfigFn>,
     init_genesis_config: Option<InitGenesisConfigFn>,
+    optimize_without_validator_performance_and_rewards: bool,
 }
 
 impl SwarmBuilder {
-    pub fn new(local: bool, num_validators: usize) -> Self {
+    fn new(
+        local: bool,
+        num_validators: usize,
+        optimize_without_validator_performance_and_rewards: bool,
+    ) -> Self {
         Self {
             local,
             num_validators: NonZeroUsize::new(num_validators).unwrap(),
             genesis_modules: None,
             init_config: None,
             init_genesis_config: None,
+            optimize_without_validator_performance_and_rewards,
         }
     }
 
-    pub fn new_local(num_validators: usize) -> Self {
-        Self::new(true, num_validators)
+    pub fn new_local_optimized_without_rewards(num_validators: usize) -> Self {
+        Self::new(true, num_validators, true)
     }
 
-    pub fn with_aptos(mut self) -> Self {
-        self.genesis_modules = Some(cached_framework_packages::module_blobs().to_vec());
-        self
+    pub fn new_local_with_rewards(num_validators: usize) -> Self {
+        Self::new(true, num_validators, false)
     }
 
     pub fn with_init_config(mut self, init_config: InitConfigFn) -> Self {
@@ -75,11 +80,8 @@ impl SwarmBuilder {
                 &version,
                 self.genesis_modules,
                 self.init_config,
-                Some(Arc::new(move |genesis_config| {
-                    if let Some(init_genesis_config) = &init_genesis_config {
-                        (init_genesis_config)(genesis_config);
-                    }
-                })),
+                init_genesis_config,
+                self.optimize_without_validator_performance_and_rewards,
             )
             .await
             .unwrap()
@@ -117,18 +119,12 @@ impl SwarmBuilder {
     }
 }
 
-// Gas is not enabled with this setup, it's enabled via forge instance.
-pub async fn new_local_swarm_with_aptos(num_validators: usize) -> LocalSwarm {
-    SwarmBuilder::new_local(num_validators)
-        .with_aptos()
-        .build()
-        .await
-}
-
 #[tokio::test]
 async fn test_prevent_starting_nodes_twice() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
 
     assert!(swarm.launch().await.is_err());
     let validator = swarm.validators_mut().next().unwrap();

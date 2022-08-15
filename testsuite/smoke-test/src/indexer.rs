@@ -14,7 +14,7 @@ use diesel::connection::Connection;
 use forge::{AptosPublicInfo, Result, Swarm};
 use std::sync::Arc;
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use crate::smoke_test_environment::SwarmBuilder;
 
 pub fn wipe_database(conn: &PgPoolConnection) {
     for table in [
@@ -114,7 +114,9 @@ pub async fn execute_nft_txns<'t>(
 
 #[tokio::test]
 async fn test_indexer() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
     let mut info = swarm.aptos_public_info();
 
     if aptos_indexer::should_skip_pg_tests() {

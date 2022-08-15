@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::new_local_swarm_with_aptos,
+    smoke_test_environment::SwarmBuilder,
     test_utils::{
         assert_balance, check_create_mint_transfer, create_and_fund_account, transfer_coins,
     },
@@ -13,7 +13,9 @@ use std::time::{Duration, Instant};
 
 #[tokio::test]
 async fn test_create_mint_transfer_block_metadata() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
 
     // This script does 4 transactions
     check_create_mint_transfer(&mut swarm).await;
@@ -37,14 +39,18 @@ async fn test_create_mint_transfer_block_metadata() {
 #[tokio::test]
 async fn test_basic_fault_tolerance() {
     // A configuration with 4 validators should tolerate single node failure.
-    let mut swarm = new_local_swarm_with_aptos(4).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(4)
+        .build()
+        .await;
     swarm.validators_mut().nth(3).unwrap().stop();
     check_create_mint_transfer(&mut swarm).await;
 }
 
 #[tokio::test]
 async fn test_basic_restartability() {
-    let mut swarm = new_local_swarm_with_aptos(4).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(4)
+        .build()
+        .await;
     let client = swarm.validators().next().unwrap().rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
 
@@ -86,7 +92,9 @@ async fn test_basic_restartability() {
 
 #[tokio::test]
 async fn test_concurrent_transfers_single_node() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
     let client = swarm.validators().next().unwrap().rest_client();
     let transaction_factory = swarm.chain_info().transaction_factory();
 
@@ -109,7 +117,9 @@ async fn test_concurrent_transfers_single_node() {
 
 #[tokio::test]
 async fn test_latest_events_and_transactions() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
     let client = swarm.validators().next().unwrap().rest_client();
     let start_events = client
         .get_new_block_events(None, Some(2))

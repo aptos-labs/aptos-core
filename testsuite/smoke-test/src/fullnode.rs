@@ -12,11 +12,13 @@ use forge::NodeExt;
 use forge::Result;
 use forge::Swarm;
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use crate::smoke_test_environment::SwarmBuilder;
 
 #[tokio::test]
 async fn test_indexer() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
 
     let version = swarm.versions().max().unwrap();
     let fullnode_peer_id = swarm

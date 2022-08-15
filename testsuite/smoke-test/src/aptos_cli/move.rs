@@ -77,8 +77,7 @@ async fn test_move_compile_flow() {
 
 #[tokio::test]
 async fn test_move_publish_flow() {
-    let (_swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+    let (_swarm, mut cli, _faucet) = SwarmBuilder::new_local_optimized_without_rewards(1)
         .build_with_cli(2)
         .await;
 

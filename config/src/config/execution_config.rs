@@ -21,6 +21,7 @@ pub struct ExecutionConfig {
     pub network_timeout_ms: u64,
     pub concurrency_level: u16,
     pub num_proof_reading_threads: u16,
+    pub use_native_block_prologue_without_stake_performance: bool,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -49,6 +50,7 @@ impl Default for ExecutionConfig {
             // Sequential execution by default.
             concurrency_level: 1,
             num_proof_reading_threads: 32,
+            use_native_block_prologue_without_stake_performance: false,
         }
     }
 }

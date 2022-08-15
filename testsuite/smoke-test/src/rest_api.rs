@@ -5,11 +5,13 @@ use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
 use forge::Swarm;
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use crate::smoke_test_environment::SwarmBuilder;
 
 #[tokio::test]
 async fn test_get_index() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
     let info = swarm.aptos_public_info();
 
     let resp = reqwest::get(info.url().to_owned()).await.unwrap();
@@ -18,7 +20,9 @@ async fn test_get_index() {
 
 #[tokio::test]
 async fn test_basic_client() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
     let mut info = swarm.aptos_public_info();
 
     info.client().get_ledger_information().await.unwrap();

@@ -1,14 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::aptos::move_test_helpers;
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use crate::{aptos::move_test_helpers, smoke_test_environment::SwarmBuilder};
 use forge::Swarm;
 use framework::natives::code::UpgradePolicy;
 
 #[tokio::test]
 async fn test_package_publish() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
     let mut info = swarm.aptos_public_info();
 
     let base_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));

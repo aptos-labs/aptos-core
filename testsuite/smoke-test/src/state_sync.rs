@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
+    smoke_test_environment::SwarmBuilder,
     test_utils::{create_and_fund_account, transfer_and_reconfig, transfer_coins},
 };
 use aptos_config::config::{BootstrappingMode, ContinuousSyncingMode, NodeConfig};
@@ -24,7 +24,9 @@ const MAX_CATCH_UP_SECS: u64 = 120; // The max time we'll wait for nodes to catc
 #[tokio::test]
 async fn test_full_node_bootstrap_state_snapshot() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
 
     // Create a fullnode config that uses snapshot syncing
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -58,7 +60,9 @@ async fn test_full_node_bootstrap_state_snapshot() {
 #[tokio::test]
 async fn test_full_node_bootstrap_outputs() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
 
     // Create a fullnode config that uses transaction outputs to sync
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -80,7 +84,9 @@ async fn test_full_node_bootstrap_outputs() {
 #[tokio::test]
 async fn test_full_node_bootstrap_outputs_no_compression() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
 
     // Create a fullnode config that uses transaction outputs to sync (without compression)
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -102,7 +108,9 @@ async fn test_full_node_bootstrap_outputs_no_compression() {
 #[tokio::test]
 async fn test_full_node_bootstrap_transactions() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
 
     // Create a fullnode config that uses transactions to sync
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -124,7 +132,9 @@ async fn test_full_node_bootstrap_transactions() {
 #[tokio::test]
 async fn test_full_node_continuous_sync_outputs() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
 
     // Create a fullnode config that uses transaction outputs to sync
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -143,7 +153,9 @@ async fn test_full_node_continuous_sync_outputs() {
 #[tokio::test]
 async fn test_full_node_continuous_sync_transactions() {
     // Create a validator swarm of 1 validator node
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
 
     // Create a fullnode config that uses transactions to sync
     let mut vfn_config = NodeConfig::default_for_validator_full_node();
@@ -220,8 +232,7 @@ async fn test_full_node_sync(vfn_peer_id: PeerId, swarm: &mut LocalSwarm, epoch_
 #[tokio::test]
 async fn test_validator_bootstrap_outputs() {
     // Create a swarm of 4 validators with state sync v2 enabled (output syncing)
-    let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(4)
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::ApplyTransactionOutputsFromGenesis;
@@ -238,8 +249,7 @@ async fn test_validator_bootstrap_outputs() {
 #[tokio::test]
 async fn test_validator_bootstrap_state_snapshot() {
     // Create a swarm of 4 validators with state sync v2 enabled (snapshot syncing, chunk size = 1)
-    let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(4)
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
@@ -262,8 +272,7 @@ async fn test_validator_bootstrap_state_snapshot() {
 #[tokio::test]
 async fn test_validator_bootstrap_transactions() {
     // Create a swarm of 4 validators with state sync v2 enabled (transaction syncing)
-    let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(4)
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::ExecuteTransactionsFromGenesis;
@@ -280,8 +289,7 @@ async fn test_validator_bootstrap_transactions() {
 #[tokio::test]
 async fn test_validator_bootstrap_transactions_no_compression() {
     // Create a swarm of 4 validators with state sync v2 enabled (transaction syncing, no compression)
-    let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(4)
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::ExecuteTransactionsFromGenesis;
@@ -329,8 +337,7 @@ async fn test_validator_sync(swarm: &mut LocalSwarm, validator_index_to_test: us
 async fn test_validator_failure_bootstrap_outputs() {
     // Create a swarm of 4 validators with state sync v2 enabled (snapshot
     // bootstrapping and transaction output application).
-    let swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+    let swarm = SwarmBuilder::new_local_optimized_without_rewards(4)
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
@@ -348,8 +355,7 @@ async fn test_validator_failure_bootstrap_outputs() {
 async fn test_validator_failure_bootstrap_execution() {
     // Create a swarm of 4 validators with state sync v2 enabled (snapshot
     // bootstrapping and transaction execution).
-    let swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+    let swarm = SwarmBuilder::new_local_optimized_without_rewards(4)
         .with_init_config(Arc::new(|_, config, _| {
             config.state_sync.state_sync_driver.bootstrapping_mode =
                 BootstrappingMode::DownloadLatestStates;
@@ -423,7 +429,9 @@ async fn test_all_validator_failures(mut swarm: LocalSwarm) {
 #[ignore]
 async fn test_single_validator_failure() {
     // Create a swarm of 1 validator
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
 
     // Execute multiple transactions
     let validator = swarm.validators_mut().next().unwrap();

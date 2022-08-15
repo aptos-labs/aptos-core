@@ -89,6 +89,7 @@ pub struct LocalSwarm {
     root_account: LocalAccount,
     chain_id: ChainId,
     root_key: ConfigKey<Ed25519PrivateKey>,
+    optimize_without_validator_performance_and_rewards: bool,
 
     launched: bool,
 }
@@ -103,6 +104,7 @@ impl LocalSwarm {
         init_genesis_config: Option<InitGenesisConfigFn>,
         dir: Option<PathBuf>,
         genesis_modules: Option<Vec<Vec<u8>>>,
+        optimize_without_validator_performance_and_rewards: bool,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
@@ -127,11 +129,25 @@ impl LocalSwarm {
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(
                 move |index, config, genesis_stake_amount| {
+                    config
+                        .execution
+                        .use_native_block_prologue_without_stake_performance =
+                        optimize_without_validator_performance_and_rewards;
+
                     // Single node orders blocks too fast which would trigger backpressure and stall for 1 sec
                     // which cause flakiness in tests.
+                    // this delays empty block by (quorum_store_poll_count-1) * 30ms
+                    if number_of_validators.get() == 1
+                        && !optimize_without_validator_performance_and_rewards
+                    {
+                        // without optimized empty-block execution we need longer delay.
+                        config.consensus.quorum_store_poll_count = 20;
+                    } else {
+                        config.consensus.quorum_store_poll_count = 4;
+                    }
+
+                    // Reduce amount of time being waited on sync after startup when there are no other nodes.
                     if number_of_validators.get() == 1 {
-                        // this delays empty block by (30-1) * 30ms
-                        config.consensus.quorum_store_poll_count = 30;
                         config
                             .state_sync
                             .state_sync_driver
@@ -211,6 +227,7 @@ impl LocalSwarm {
             root_account,
             chain_id: ChainId::test(),
             root_key,
+            optimize_without_validator_performance_and_rewards,
             launched: false,
         })
     }
@@ -288,9 +305,14 @@ impl LocalSwarm {
     pub fn add_validator_fullnode(
         &mut self,
         version: &Version,
-        template: NodeConfig,
+        mut template: NodeConfig,
         validator_peer_id: PeerId,
     ) -> Result<PeerId> {
+        if self.optimize_without_validator_performance_and_rewards {
+            template
+                .execution
+                .use_native_block_prologue_without_stake_performance = true;
+        }
         let validator = self
             .validators
             .get(&validator_peer_id)
@@ -333,7 +355,13 @@ impl LocalSwarm {
         Ok(peer_id)
     }
 
-    fn add_fullnode(&mut self, version: &Version, template: NodeConfig) -> Result<PeerId> {
+    fn add_fullnode(&mut self, version: &Version, mut template: NodeConfig) -> Result<PeerId> {
+        if self.optimize_without_validator_performance_and_rewards {
+            template
+                .execution
+                .use_native_block_prologue_without_stake_performance = true;
+        }
+
         let name = self.node_name_counter.to_string();
         self.node_name_counter += 1;
         let fullnode_config = FullnodeNodeConfig::public_fullnode(

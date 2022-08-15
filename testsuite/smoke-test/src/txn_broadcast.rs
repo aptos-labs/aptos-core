@@ -12,8 +12,7 @@ use std::time::{Duration, Instant};
 /// This behavior should be true with both mempool and quorum store.
 #[tokio::test]
 async fn test_txn_broadcast() {
-    let mut swarm = SwarmBuilder::new_local(4)
-        .with_aptos()
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(4)
         .with_init_config(Arc::new(|_, conf, _| {
             conf.api.failpoints_enabled = true;
         }))

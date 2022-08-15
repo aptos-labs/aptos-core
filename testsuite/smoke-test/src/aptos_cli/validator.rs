@@ -17,8 +17,7 @@ use std::time::Duration;
 
 #[tokio::test]
 async fn test_analyze_validators() {
-    let (mut swarm, cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+    let (mut swarm, cli, _faucet) = SwarmBuilder::new_local_optimized_without_rewards(1)
         .with_init_config(Arc::new(|_i, _conf, genesis_stake_amount| {
             *genesis_stake_amount = 100000;
         }))
@@ -50,8 +49,7 @@ async fn test_analyze_validators() {
 
 #[tokio::test]
 async fn test_show_validator_set() {
-    let (swarm, cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+    let (swarm, cli, _faucet) = SwarmBuilder::new_local_optimized_without_rewards(1)
         .build_with_cli(1)
         .await;
     let validator_set = cli.show_validator_set().await.unwrap();
@@ -71,8 +69,7 @@ async fn test_show_validator_set() {
 
 #[tokio::test]
 async fn test_register_and_update_validator() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local_optimized_without_rewards(1)
         .build_with_cli(0)
         .await;
     let transaction_factory = swarm.chain_info().transaction_factory();
@@ -163,8 +160,7 @@ async fn test_register_and_update_validator() {
 
 #[tokio::test]
 async fn test_join_and_leave_validator() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local_optimized_without_rewards(1)
         .with_init_config(Arc::new(|_i, conf, genesis_stake_amount| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;
@@ -321,8 +317,7 @@ async fn test_join_and_leave_validator() {
 
 #[tokio::test]
 async fn test_owner_create_and_delegate_flow() {
-    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local_optimized_without_rewards(1)
         .with_init_config(Arc::new(|_i, conf, genesis_stake_amount| {
             // reduce timeout, as we will have dead node during rounds
             conf.consensus.round_initial_timeout_ms = 200;

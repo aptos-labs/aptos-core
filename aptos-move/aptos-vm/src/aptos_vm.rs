@@ -25,7 +25,13 @@ use aptos_gas::AptosGasMeter;
 use aptos_logger::prelude::*;
 use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_state_view::StateView;
-use aptos_types::account_config::new_block_event_key;
+use aptos_types::access_path::{AccessPath, Path};
+use aptos_types::account_config::NewBlockEvent;
+use aptos_types::account_config::{new_block_event_key, BlockResource, CORE_CODE_ADDRESS};
+use aptos_types::contract_event::ContractEvent;
+use aptos_types::on_chain_config::ConfigurationResource;
+use aptos_types::state_store::state_key::StateKey;
+use aptos_types::write_set::WriteOp;
 use aptos_types::{
     account_config,
     block_metadata::BlockMetadata,
@@ -40,6 +46,9 @@ use aptos_types::{
 };
 use fail::fail_point;
 use framework::natives::code::PublishRequest;
+use move_deps::move_core_types::identifier::Identifier;
+use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
+use move_deps::move_core_types::move_resource::MoveStructType;
 use move_deps::{
     move_binary_format::{
         access::ModuleAccess,
@@ -66,6 +75,7 @@ use std::{
 };
 
 static EXECUTION_CONCURRENCY_LEVEL: OnceCell<usize> = OnceCell::new();
+static USE_NATIVE_BLOCK_PROLOGUE_WITHOUT_STAKE_PERFORMANCE: OnceCell<bool> = OnceCell::new();
 static NUM_PROOF_READING_THREADS: OnceCell<usize> = OnceCell::new();
 
 #[derive(Clone)]
@@ -105,6 +115,22 @@ impl AptosVM {
             Some(concurrency_level) => *concurrency_level,
             None => 1,
         }
+    }
+
+    pub fn set_use_native_block_prologue_without_stake_performance(
+        use_native_block_prologue: bool,
+    ) {
+        // Only the first call succeeds, due to OnceCell semantics.
+        USE_NATIVE_BLOCK_PROLOGUE_WITHOUT_STAKE_PERFORMANCE
+            .set(use_native_block_prologue)
+            .ok();
+    }
+
+    pub fn use_native_block_prologue_without_stake_performance() -> bool {
+        USE_NATIVE_BLOCK_PROLOGUE_WITHOUT_STAKE_PERFORMANCE
+            .get()
+            .cloned()
+            .unwrap()
     }
 
     /// Sets the # of async proof reading threads.
@@ -692,7 +718,6 @@ impl AptosVM {
                 expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
             })?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
-
         let output =
             get_transaction_output(&mut (), session, 0, &txn_data, ExecutionStatus::Success)?;
         Ok((VMStatus::Executed, output))
@@ -886,6 +911,115 @@ impl AptosVM {
             }
         }
     }
+
+    // Functions for block prologue execution for testing
+    // Since we don't use them in prod, we can unwrap() failures in a more relaxed way,
+    // to surface issues inline.
+
+    fn check_should_use_native_block_prologue_without_stake_performance<
+        S: MoveResolverExt + StateView,
+    >(
+        block_metadata: &BlockMetadata,
+        data_cache: &S,
+    ) -> Result<(bool, Option<BlockResource>), VMStatus> {
+        if Self::use_native_block_prologue_without_stake_performance() {
+            let configuration: ConfigurationResource = bcs::from_bytes(
+                &data_cache
+                    .get_resource(&CORE_CODE_ADDRESS, &ConfigurationResource::struct_tag())
+                    .unwrap()
+                    .unwrap(),
+            )
+            .unwrap();
+            let block_resource: BlockResource = bcs::from_bytes(
+                &data_cache
+                    .get_resource(&CORE_CODE_ADDRESS, &BlockResource::struct_tag())
+                    .unwrap()
+                    .unwrap(),
+            )
+            .unwrap();
+            if block_metadata.timestamp_usecs() - configuration.last_reconfiguration_time()
+                > block_resource.epoch_interval()
+            {
+                // we need to use VM when epoch needs to be changed.
+                Ok((true, Some(block_resource)))
+            } else {
+                Ok((false, Some(block_resource)))
+            }
+        } else {
+            Ok((true, None))
+        }
+    }
+
+    fn execute_native_block_prologue<S: MoveResolverExt + StateView>(
+        block_resource: BlockResource,
+        block_metadata: &BlockMetadata,
+        data_cache: &S,
+    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
+        let cur_timestamp_struct_tag = StructTag {
+            address: CORE_CODE_ADDRESS,
+            module: Identifier::new("timestamp").unwrap(),
+            name: Identifier::new("CurrentTimeMicroseconds").unwrap(),
+            type_params: vec![],
+        };
+        // read for corresponding write.
+        data_cache
+            .get_resource(&CORE_CODE_ADDRESS, &cur_timestamp_struct_tag)
+            .unwrap()
+            .unwrap();
+        let new_output = TransactionOutput::new(
+            WriteSetMut::new(vec![
+                (
+                    StateKey::AccessPath(AccessPath::new(
+                        CORE_CODE_ADDRESS,
+                        bcs::to_bytes(&Path::Resource(BlockResource::struct_tag())).unwrap(),
+                    )),
+                    WriteOp::Value(
+                        bcs::to_bytes(&BlockResource::new(
+                            block_resource.new_block_events().count(),
+                            block_resource.epoch_interval(),
+                            block_resource.new_block_events().count() + 1,
+                        ))
+                        .unwrap(),
+                    ),
+                ),
+                (
+                    StateKey::AccessPath(AccessPath::new(
+                        CORE_CODE_ADDRESS,
+                        bcs::to_bytes(&Path::Resource(cur_timestamp_struct_tag)).unwrap(),
+                    )),
+                    WriteOp::Value(bcs::to_bytes(&block_metadata.timestamp_usecs()).unwrap()),
+                ),
+            ])
+            .freeze()
+            .unwrap(),
+            vec![ContractEvent::new(
+                new_block_event_key(),
+                block_resource.new_block_events().count(),
+                TypeTag::Struct(NewBlockEvent::struct_tag()),
+                bcs::to_bytes(&NewBlockEvent::new(
+                    block_metadata.epoch(),
+                    block_metadata.round(),
+                    block_resource.new_block_events().count(),
+                    block_metadata
+                        .previous_block_votes_bitvec()
+                        .clone()
+                        .into_iter()
+                        .collect::<Vec<u8>>(),
+                    block_metadata.proposer(),
+                    block_metadata
+                        .failed_proposer_indices()
+                        .iter()
+                        .map(|v| *v as u64)
+                        .collect(),
+                    block_metadata.timestamp_usecs(),
+                ))
+                .unwrap(),
+            )],
+            0,
+            TransactionStatus::Keep(ExecutionStatus::Success),
+        );
+        Ok((VMStatus::Executed, TransactionOutputExt::from(new_output)))
+    }
 }
 
 // Executor external API
@@ -994,8 +1128,18 @@ impl VMAdapter for AptosVM {
     ) -> Result<(VMStatus, TransactionOutputExt, Option<String>), VMStatus> {
         Ok(match txn {
             PreprocessedTransaction::BlockMetadata(block_metadata) => {
-                let (vm_status, output) =
-                    self.process_block_prologue(data_cache, block_metadata.clone(), log_context)?;
+                let (use_vm, block_resource_opt) =
+                    Self::check_should_use_native_block_prologue_without_stake_performance(
+                        block_metadata,
+                        data_cache,
+                    )?;
+
+                let (vm_status, output) = if use_vm {
+                    self.process_block_prologue(data_cache, block_metadata.clone(), log_context)?
+                } else {
+                    let block_resource = block_resource_opt.unwrap();
+                    Self::execute_native_block_prologue(block_resource, block_metadata, data_cache)?
+                };
                 (vm_status, output, Some("block_prologue".to_string()))
             }
             PreprocessedTransaction::WaypointWriteSet(write_set_payload) => {

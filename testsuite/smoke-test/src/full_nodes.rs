@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::new_local_swarm_with_aptos,
+    smoke_test_environment::SwarmBuilder,
     test_utils::{assert_balance, create_and_fund_account, transfer_coins},
 };
 use aptos_config::{
@@ -19,7 +19,9 @@ use std::{
 
 #[tokio::test]
 async fn test_full_node_basic_flow() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
 
     let version = swarm.versions().max().unwrap();
     let validator_peer_id = swarm.validators().next().unwrap().peer_id();
@@ -114,7 +116,9 @@ async fn test_full_node_basic_flow() {
 
 #[tokio::test]
 async fn test_vfn_failover() {
-    let mut swarm = new_local_swarm_with_aptos(4).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(4)
+        .build()
+        .await;
     let transaction_factory = swarm.chain_info().transaction_factory();
 
     let mut vfns = Vec::new();
@@ -184,7 +188,9 @@ async fn test_vfn_failover() {
 
 #[tokio::test]
 async fn test_private_full_node() {
-    let mut swarm = new_local_swarm_with_aptos(4).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(4)
+        .build()
+        .await;
     let transaction_factory = swarm.chain_info().transaction_factory();
     let version = swarm.versions().max().unwrap();
 

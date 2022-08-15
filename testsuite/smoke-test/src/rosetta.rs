@@ -40,8 +40,7 @@ pub async fn setup_test(
     num_nodes: usize,
     num_accounts: usize,
 ) -> (LocalSwarm, CliTestFramework, JoinHandle<()>, RosettaClient) {
-    let (swarm, cli, faucet) = SwarmBuilder::new_local(num_nodes)
-        .with_aptos()
+    let (swarm, cli, faucet) = SwarmBuilder::new_local_optimized_without_rewards(num_nodes)
         .build_with_cli(num_accounts)
         .await;
     let validator = swarm.validators().next().unwrap();

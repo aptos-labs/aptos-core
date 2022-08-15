@@ -105,19 +105,6 @@ impl LocalFactory {
         Self::with_revision_and_workspace(&merge_base)
     }
 
-    pub async fn new_swarm<R>(
-        &self,
-        rng: R,
-        number_of_validators: NonZeroUsize,
-    ) -> Result<LocalSwarm>
-    where
-        R: ::rand::RngCore + ::rand::CryptoRng,
-    {
-        let version = self.versions.keys().max().unwrap();
-        self.new_swarm_with_version(rng, number_of_validators, version, None, None, None)
-            .await
-    }
-
     pub async fn new_swarm_with_version<R>(
         &self,
         rng: R,
@@ -126,6 +113,7 @@ impl LocalFactory {
         genesis_modules: Option<Vec<Vec<u8>>>,
         init_config: Option<InitConfigFn>,
         init_genesis_config: Option<InitGenesisConfigFn>,
+        optimize_without_validator_performance_and_rewards: bool,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
@@ -140,6 +128,7 @@ impl LocalFactory {
             init_genesis_config,
             None,
             genesis_modules,
+            optimize_without_validator_performance_and_rewards,
         )?;
 
         swarm
@@ -178,7 +167,15 @@ impl Factory for LocalFactory {
             None => None,
         };
         let swarm = self
-            .new_swarm_with_version(rng, num_validators, version, genesis_modules, None, None)
+            .new_swarm_with_version(
+                rng,
+                num_validators,
+                version,
+                genesis_modules,
+                None,
+                None,
+                false,
+            )
             .await?;
 
         Ok(Box::new(swarm))

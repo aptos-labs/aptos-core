@@ -8,8 +8,7 @@ use aptos_keygen::KeyGen;
 
 #[tokio::test]
 async fn test_account_flow() {
-    let (_swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
-        .with_aptos()
+    let (_swarm, mut cli, _faucet) = SwarmBuilder::new_local_optimized_without_rewards(1)
         .build_with_cli(2)
         .await;
 

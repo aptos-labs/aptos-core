@@ -8,7 +8,7 @@ use aptos_types::{
 };
 use forge::{AptosPublicInfo, Swarm};
 
-use crate::smoke_test_environment::new_local_swarm_with_aptos;
+use crate::smoke_test_environment::SwarmBuilder;
 
 async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
     local_account: &LocalAccount,
@@ -35,7 +35,9 @@ async fn submit_and_check_err<F: Fn(TransactionBuilder) -> TransactionBuilder>(
 
 #[tokio::test]
 async fn test_error_report() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut swarm = SwarmBuilder::new_local_optimized_without_rewards(1)
+        .build()
+        .await;
     let mut info = swarm.aptos_public_info();
 
     let local_account = info.random_account();
