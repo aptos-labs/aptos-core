@@ -376,7 +376,6 @@ module aptos_framework::account {
 
     /// Create the account for @aptos_framework to help module upgrades on testnet.
     public(friend) fun create_aptos_framework_account(): (signer, SignerCapability) {
-        timestamp::assert_genesis();
         let signer = create_account_unchecked(@aptos_framework);
         let signer_cap = SignerCapability { account: @aptos_framework };
         (signer, signer_cap)

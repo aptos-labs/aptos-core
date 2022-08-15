@@ -11,11 +11,10 @@ module aptos_framework::reconfiguration {
 
     friend aptos_framework::aptos_governance;
     friend aptos_framework::block;
-    // TODO: migrate all to callback in block prologue
     friend aptos_framework::consensus_config;
+    friend aptos_framework::gas_schedule;
     friend aptos_framework::genesis;
     friend aptos_framework::version;
-    friend aptos_framework::gas_schedule;
 
     /// Event that signals consensus to start a new epoch,
     /// with new configuration information. This is also called a
@@ -53,7 +52,6 @@ module aptos_framework::reconfiguration {
     public(friend) fun initialize(
         account: &signer,
     ) {
-        timestamp::assert_genesis();
         system_addresses::assert_aptos_framework(account);
 
         // assert it matches `new_epoch_event_key()`, otherwise the event can't be recognized
@@ -89,25 +87,8 @@ module aptos_framework::reconfiguration {
         !exists<DisableReconfiguration>(@aptos_framework)
     }
 
-    /// Force an epoch change.
-    public entry fun force_reconfigure(account: &signer) acquires Configuration {
-        system_addresses::assert_aptos_framework(account);
-        reconfigure();
-    }
-
     /// Signal validators to start using new configuration. Must be called from friend config modules.
     public(friend) fun reconfigure() acquires Configuration {
-        stake::on_new_epoch();
-        reconfigure_();
-    }
-
-    public fun last_reconfiguration_time(): u64 acquires Configuration {
-        borrow_global<Configuration>(@aptos_framework).last_reconfiguration_time
-    }
-
-    /// Private function to do reconfiguration. Updates reconfiguration status resource
-    /// `Configuration` and emits a `NewEpochEvent`
-    fun reconfigure_() acquires Configuration {
         // Do not do anything if genesis has not finished.
         if (timestamp::is_genesis() || timestamp::now_microseconds() == 0 || !reconfiguration_enabled()) {
             return
@@ -132,6 +113,9 @@ module aptos_framework::reconfiguration {
             return
         };
 
+        // Call stake to compute the new validator set and distribute rewards.
+        stake::on_new_epoch();
+
         assert!(current_time > config_ref.last_reconfiguration_time, error::invalid_state(EINVALID_BLOCK_TIME));
         config_ref.last_reconfiguration_time = current_time;
         config_ref.epoch = config_ref.epoch + 1;
@@ -142,6 +126,10 @@ module aptos_framework::reconfiguration {
                 epoch: config_ref.epoch,
             },
         );
+    }
+
+    public fun last_reconfiguration_time(): u64 acquires Configuration {
+        borrow_global<Configuration>(@aptos_framework).last_reconfiguration_time
     }
 
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first

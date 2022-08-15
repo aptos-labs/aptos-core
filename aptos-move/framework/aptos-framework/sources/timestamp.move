@@ -23,17 +23,14 @@ module aptos_framework::timestamp {
     /// Conversion factor between seconds and microseconds
     const MICRO_CONVERSION_FACTOR: u64 = 1000000;
 
-    /// The blockchain is not in the genesis state anymore
-    const ENOT_GENESIS: u64 = 1;
     /// The blockchain is not in an operating state yet
-    const ENOT_OPERATING: u64 = 2;
+    const ENOT_OPERATING: u64 = 1;
     /// An invalid timestamp was provided
-    const ETIMESTAMP: u64 = 3;
+    const ETIMESTAMP: u64 = 2;
 
-    /// Marks that time has started and genesis has finished. This can only be called from genesis and with the root
-    /// account.
+    /// Marks that time has started and genesis has finished. This can only be called from genesis and with the
+    /// aptos framework account.
     public(friend) fun set_time_has_started(account: &signer) {
-        assert_genesis();
         system_addresses::assert_aptos_framework(account);
         let timer = CurrentTimeMicroseconds { microseconds: 0 };
         move_to(account, timer);
@@ -80,11 +77,6 @@ module aptos_framework::timestamp {
     /// Helper function to determine if Aptos is in genesis state.
     public fun is_genesis(): bool {
         !exists<CurrentTimeMicroseconds>(@aptos_framework)
-    }
-
-    /// Helper function to assert genesis state.
-    public fun assert_genesis() {
-        assert!(is_genesis(), error::invalid_state(ENOT_GENESIS));
     }
 
     /// Helper function to determine if Aptos is operating. This is the same as `!is_genesis()` and is provided

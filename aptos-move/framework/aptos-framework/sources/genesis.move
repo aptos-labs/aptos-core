@@ -182,7 +182,7 @@ module aptos_framework::genesis {
             x"00", // empty gas schedule
             4u8, // TESTING chain ID
             0,
-            x"",
+            x"12",
             1,
             0,
             1,

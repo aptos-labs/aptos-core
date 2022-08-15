@@ -190,25 +190,25 @@ module aptos_framework::staking_config {
     }
 
     #[test(account = @0x123)]
-    #[expected_failure(abort_code = 0x50002)]
+    #[expected_failure(abort_code = 0x50003)]
     public entry fun test_update_required_stake_unauthorized_should_fail(account: signer) acquires StakingConfig {
         update_required_stake(&account, 1, 2);
     }
 
     #[test(account = @0x123)]
-    #[expected_failure(abort_code = 0x50002)]
+    #[expected_failure(abort_code = 0x50003)]
     public entry fun test_update_required_lockup_unauthorized_should_fail(account: signer) acquires StakingConfig {
         update_recurring_lockup_duration_secs(&account, 1);
     }
 
     #[test(account = @0x123)]
-    #[expected_failure(abort_code = 0x50002)]
+    #[expected_failure(abort_code = 0x50003)]
     public entry fun test_update_rewards_unauthorized_should_fail(account: signer) acquires StakingConfig {
         update_rewards_rate(&account, 1, 10);
     }
 
     #[test(account = @0x123)]
-    #[expected_failure(abort_code = 0x50002)]
+    #[expected_failure(abort_code = 0x50003)]
     public entry fun test_update_voting_power_increase_limit_unauthorized_should_fail(account: signer) acquires StakingConfig {
         update_voting_power_increase_limit(&account, 10);
     }
