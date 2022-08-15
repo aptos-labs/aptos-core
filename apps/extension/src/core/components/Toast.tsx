@@ -96,4 +96,15 @@ export const removeAccountErrorToast = () => {
   });
 };
 
+export const switchNetworkToast = (networkName: string, isSwitching: boolean) => {
+  const description = isSwitching
+    ? `Switching to network ${networkName}`
+    : `Staying on network ${networkName}`;
+  toast({
+    description,
+    status: 'success',
+    title: 'Removed network',
+  });
+};
+
 export default toast;

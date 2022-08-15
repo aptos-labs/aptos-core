@@ -4,13 +4,13 @@
 import { usePersistentStorageState } from 'core/hooks/useStorageState';
 import { useMemo } from 'react';
 import { AptosClient, FaucetClient } from 'aptos';
-import { WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY } from 'core/constants';
+import { WALLET_STATE_CUSTOM_NETWORKS_STORAGE_KEY, WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY } from 'core/constants';
 import { ProviderEvent, sendProviderEvent } from 'core/utils/providerEvents';
 
-export enum NetworkType {
-  Devnet = 'devnet',
-  LocalHost = 'localhost',
-  Testnet = 'testnet',
+export enum DefaultNetworks {
+  Devnet = 'Devnet',
+  LocalHost = 'Localhost',
+  Testnet = 'Testnet',
 }
 
 export interface Network {
@@ -19,37 +19,53 @@ export interface Network {
   nodeUrl: string;
 }
 
-export const defaultNetworks = Object.freeze({
-  [NetworkType.Devnet]: {
+export type Networks = Record<string, Network>;
+
+export const defaultNetworks: Networks = Object.freeze({
+  [DefaultNetworks.Devnet]: {
     faucetUrl: 'https://faucet.devnet.aptoslabs.com',
     name: 'Devnet',
     nodeUrl: 'https://fullnode.devnet.aptoslabs.com',
   },
-  [NetworkType.LocalHost]: {
+  [DefaultNetworks.LocalHost]: {
     faucetUrl: 'http://0.0.0.0:8000',
     name: 'Localhost',
     nodeUrl: 'http://0.0.0.0:8080',
   },
-  [NetworkType.Testnet]: {
+  [DefaultNetworks.Testnet]: {
     faucetUrl: undefined,
     name: 'Testnet',
     nodeUrl: 'https://ait3.aptosdev.com/',
   },
 } as const);
 
-export const defaultNetworkType = NetworkType.Devnet;
+export const defaultNetworkName = DefaultNetworks.Devnet;
 
 export default function useNetworks() {
   const [
-    activeNetworkType,
-    setActiveNetworkType,
-    isNetworkTypeReady,
-  ] = usePersistentStorageState<NetworkType>(
+    activeNetworkName,
+    setActiveNetworkName,
+    isActiveNetworkNameReady,
+  ] = usePersistentStorageState<string>(
     WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY,
-    defaultNetworkType,
+    defaultNetworkName,
+  );
+  const [
+    customNetworks,
+    setCustomNetworks,
+    areCustomNetworksReady,
+  ] = usePersistentStorageState<Networks>(
+    WALLET_STATE_CUSTOM_NETWORKS_STORAGE_KEY,
+    { },
   );
 
-  const activeNetwork = activeNetworkType ? defaultNetworks[activeNetworkType] : undefined;
+  const networks = customNetworks
+    ? { ...defaultNetworks, ...customNetworks }
+    : undefined;
+
+  const activeNetwork = (activeNetworkName && networks)
+    ? networks[activeNetworkName]
+    : undefined;
 
   const aptosClient = useMemo(
     () => (activeNetwork ? new AptosClient(activeNetwork.nodeUrl) : undefined),
@@ -63,18 +79,39 @@ export default function useNetworks() {
     [activeNetwork],
   );
 
-  const switchNetwork = async (network: NetworkType) => {
-    await setActiveNetworkType(network);
+  const addNetwork = async (network: Network) => {
+    const newCustomNetworks = { ...customNetworks, [network.name]: network };
+    await setCustomNetworks(newCustomNetworks);
+    await setActiveNetworkName(network.name);
+    await sendProviderEvent(ProviderEvent.NETWORK_CHANGED);
+  };
+
+  const removeNetwork = async (networkName: string) => {
+    const newCustomNetworks = { ...customNetworks };
+    delete newCustomNetworks[networkName];
+    await setCustomNetworks(newCustomNetworks);
+
+    if (networkName === activeNetworkName) {
+      const firstAvailableNetworkName = Object.keys(newCustomNetworks)[0];
+      await setActiveNetworkName(firstAvailableNetworkName);
+      await sendProviderEvent(ProviderEvent.NETWORK_CHANGED);
+    }
+  };
+
+  const switchNetwork = async (networkName: string) => {
+    await setActiveNetworkName(networkName);
     await sendProviderEvent(ProviderEvent.NETWORK_CHANGED);
   };
 
   return {
     activeNetwork,
-    activeNetworkType,
+    activeNetworkName,
+    addNetwork,
     aptosClient,
-    areNetworksReady: isNetworkTypeReady,
+    areNetworksReady: areCustomNetworksReady && isActiveNetworkNameReady,
     faucetClient,
-    networks: defaultNetworks,
+    networks,
+    removeNetwork,
     switchNetwork,
   };
 }

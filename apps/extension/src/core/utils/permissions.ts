@@ -117,14 +117,10 @@ export default class Permissions {
   }
 
   static async getAllDomains(): Promise<{ [address: string]: string[] }> {
-    return new Promise((resolve) => {
-      Browser.persistentStorage()?.get([PERMISSIONS_STORAGE_KEY], (result) => {
-        if (result && result[PERMISSIONS_STORAGE_KEY]) {
-          resolve(result[PERMISSIONS_STORAGE_KEY]);
-        }
-        resolve({});
-      });
-    });
+    const result = await Browser.persistentStorage()?.get([PERMISSIONS_STORAGE_KEY]);
+    return (result && result[PERMISSIONS_STORAGE_KEY])
+      ? result[PERMISSIONS_STORAGE_KEY]
+      : {};
   }
 
   public static async getDomains(address: string): Promise<Set<string>> {

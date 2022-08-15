@@ -26,7 +26,7 @@ import Browser from 'core/utils/browser';
 import bs58 from 'bs58';
 import { HDKey } from '@scure/bip32';
 import {
-  defaultNetworkType, defaultNetworks, NetworkType, Network,
+  defaultNetworkName, defaultNetworks,
 } from 'core/hooks/useNetworks';
 import { Accounts } from 'core/hooks/useEncryptedStorageState';
 
@@ -277,16 +277,13 @@ export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
   });
 }
 
-export function getBackgroundNetwork(): Promise<Network> {
-  return new Promise((resolve) => {
-    Browser.persistentStorage()?.get([WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY], (result: any) => {
-      const serializedNetworkType = result[WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY];
-      const networkType = serializedNetworkType
-        ? JSON.parse(serializedNetworkType) as NetworkType
-        : undefined;
-      resolve(defaultNetworks[networkType ?? defaultNetworkType]);
-    });
-  });
+export async function getBackgroundNetwork() {
+  const result = await Browser.persistentStorage()?.get([WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY]);
+  const serializedNetworkId = result && result[WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY];
+  const networkName = serializedNetworkId
+    ? JSON.parse(serializedNetworkId)
+    : undefined;
+  return defaultNetworks[networkName ?? defaultNetworkName];
 }
 
 export async function loadBackgroundState(): Promise<boolean> {

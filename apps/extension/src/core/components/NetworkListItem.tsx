@@ -4,27 +4,74 @@
 import React from 'react';
 import {
   Box,
+  Button,
   Center,
+  HStack,
+  Modal,
+  ModalCloseButton,
+  ModalContent,
+  ModalFooter,
+  ModalHeader,
+  ModalOverlay,
+  ModalProps,
   Spinner,
   Text,
-  useColorMode,
+  useColorMode, useDisclosure,
   useRadio,
   UseRadioProps,
+  VStack,
 } from '@chakra-ui/react';
 import { secondaryHoverBgColor, secondaryButtonColor } from 'core/colors';
-import { Network, NetworkType } from 'core/hooks/useGlobalState';
+import {
+  Network, DefaultNetworks, defaultNetworks,
+} from 'core/hooks/useGlobalState';
+import { DeleteIcon } from '@chakra-ui/icons';
+
+type ConfirmationModalProps = Omit<ModalProps, 'children'> & {
+  name: string,
+  onConfirm: () => void,
+};
+
+function ConfirmationModal(props: ConfirmationModalProps) {
+  const { name, onClose, onConfirm } = props;
+
+  return (
+    <Modal {...props}>
+      <ModalOverlay />
+      <ModalContent>
+        <ModalHeader>
+          {`Are you sure you want to delete network '${name}'?`}
+        </ModalHeader>
+        <ModalCloseButton />
+        <ModalFooter>
+          <Button colorScheme="red" mr={3} onClick={onConfirm}>
+            Yes
+          </Button>
+          <Button onClick={onClose}>
+            Close
+          </Button>
+        </ModalFooter>
+      </ModalContent>
+    </Modal>
+  );
+}
 
 type NetworkListItemProps = UseRadioProps & {
   isLoading: boolean,
   network: Network,
+  onRemove: (networkName: string) => void,
 };
 
 export default function NetworkListItem(props: NetworkListItemProps) {
   const { getCheckboxProps, getInputProps } = useRadio(props);
+  const { isOpen, onClose, onOpen } = useDisclosure();
   const { colorMode } = useColorMode();
   const {
-    isChecked, isDisabled, isLoading, network, value,
+    isChecked, isDisabled, isLoading, network, onRemove, value,
   } = props;
+
+  const isCustomNetwork = !(network.name in defaultNetworks);
+
   return (
     <Box as="label">
       <input disabled={isDisabled} {...getInputProps()} />
@@ -48,19 +95,36 @@ export default function NetworkListItem(props: NetworkListItemProps) {
       >
         {
           !isLoading ? (
-            <>
-              <Text fontSize="md" fontWeight={600}>
-                { network.name }
-              </Text>
+            <VStack alignItems="flex-start">
+              <HStack w="100%" justifyContent="space-between">
+                <Text fontSize="md" fontWeight={600}>
+                  {network.name}
+                </Text>
+                {
+                  isCustomNetwork ? (
+                    <DeleteIcon
+                      fontSize="lg"
+                      cursor="pointer"
+                      _hover={{
+                        color: 'red.400',
+                      }}
+                      onClick={(e: React.MouseEvent) => {
+                        e.preventDefault();
+                        onOpen();
+                      }}
+                    />
+                  ) : null
+                }
+              </HStack>
               <Text fontSize="md" fontWeight={400}>
-                { network.nodeUrl }
+                {network.nodeUrl}
               </Text>
               {
-                (isDisabled && value === NetworkType.LocalHost) ? (
+                (isDisabled && value === DefaultNetworks.LocalHost) ? (
                   <Text fontSize="sm">(Please start testnet and testnet faucet on localhost to switch)</Text>
                 ) : undefined
               }
-            </>
+            </VStack>
           ) : (
             <Center>
               <Spinner />
@@ -68,6 +132,12 @@ export default function NetworkListItem(props: NetworkListItemProps) {
           )
         }
       </Box>
+      <ConfirmationModal
+        isOpen={isOpen}
+        onClose={onClose}
+        onConfirm={() => onRemove(network.name)}
+        name={network.name}
+      />
     </Box>
   );
 }

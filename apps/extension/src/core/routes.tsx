@@ -22,6 +22,7 @@ import AddAccount from 'pages/AddAccount';
 import ImportAccountMnemonic from 'pages/ImportAccountMnemonic';
 import ImportAccountPrivateKey from 'pages/ImportAccountPrivateKey';
 import CreateAccount from 'pages/CreateAccount';
+import AddNetwork from 'pages/AddNetwork';
 import RenameAccount from 'pages/RenameAccount';
 
 // TODO: have a single representation for routes
@@ -38,6 +39,10 @@ export const Routes = Object.freeze({
   addAccount: {
     element: <AddAccount />,
     path: '/add-account',
+  },
+  addNetwork: {
+    element: <AddNetwork />,
+    path: '/settings/add-network',
   },
   createAccount: {
     element: <CreateAccount />,
@@ -127,6 +132,7 @@ export const mainRoutes = Object.freeze([
   Routes.recovery_phrase,
   Routes.createAccount,
   Routes.addAccount,
+  Routes.addNetwork,
   Routes.importWalletMnemonic,
   Routes.importWalletPrivateKey,
   Routes.help,

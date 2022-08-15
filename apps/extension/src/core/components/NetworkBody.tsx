@@ -3,58 +3,76 @@
 
 import {
   VStack,
-  Flex,
-  SimpleGrid,
   Heading,
+  HStack,
   useRadioGroup,
+  Button,
 } from '@chakra-ui/react';
 import React from 'react';
-import useGlobalStateContext, { NetworkType } from 'core/hooks/useGlobalState';
+import useGlobalStateContext from 'core/hooks/useGlobalState';
 import { useQueryClient } from 'react-query';
-import { useTestnetStatus } from 'core/queries/network';
+import Routes from 'core/routes';
+import { AddIcon } from '@chakra-ui/icons';
+import ChakraLink from 'core/components/ChakraLink';
+import { switchNetworkToast } from 'core/components/Toast';
 import NetworkListItem from './NetworkListItem';
 
 export default function NetworkBody() {
   const {
-    activeNetworkType,
+    activeNetworkName,
     networks,
+    removeNetwork,
     switchNetwork,
   } = useGlobalStateContext();
   const queryClient = useQueryClient();
 
-  const { data: isLocahostLive } = useTestnetStatus();
+  const onSwitchNetwork = async (networkName: string) => {
+    await switchNetwork(networkName);
+    // Invalidate all queries to clear cached data from previous network
+    await queryClient.invalidateQueries();
+  };
 
-  const { getRadioProps, getRootProps } = useRadioGroup({
-    defaultValue: activeNetworkType,
-    onChange: async (networkType: NetworkType) => {
-      await switchNetwork(networkType);
-      // Invalidate all queries to clear cached data from previous network
-      await queryClient.invalidateQueries();
-    },
+  const { getRadioProps, getRootProps, setValue } = useRadioGroup({
+    defaultValue: activeNetworkName,
+    onChange: onSwitchNetwork,
   });
+
+  const onRemoveNetwork = async (networkName: string) => {
+    await removeNetwork(networkName);
+
+    if (networkName === activeNetworkName) {
+      const firstAvailableNetworkName = Object.keys(networks!).filter((n) => n !== networkName)[0];
+      switchNetworkToast(firstAvailableNetworkName, true);
+      setValue(firstAvailableNetworkName);
+    } else if (activeNetworkName) {
+      switchNetworkToast(activeNetworkName!, false);
+    }
+  };
 
   return (
     <>
-      <SimpleGrid columns={2} width="100%" pb={4}>
-        <Flex>
-          <Heading fontSize="xl">Network</Heading>
-        </Flex>
-      </SimpleGrid>
+      <HStack w="100%" pb={4} justifyContent="space-between">
+        <Heading fontSize="xl">Network</Heading>
+        <ChakraLink to={Routes.addNetwork.path}>
+          <Button
+            colorScheme="teal"
+            size="sm"
+            leftIcon={<AddIcon />}
+          >
+            Add network
+          </Button>
+        </ChakraLink>
+      </HStack>
       <VStack mt={2} spacing={2} alignItems="left" {...getRootProps()}>
         {
-          Object.keys(networks).map((networkType) => {
-            const network = networks[networkType as NetworkType];
-            return (
-              <NetworkListItem
-                key={networkType}
-                network={network}
-                isLoading={false}
-                isDisabled={(networkType === NetworkType.LocalHost && !isLocahostLive)
-                  || networkType === NetworkType.Testnet}
-                {...getRadioProps({ value: networkType })}
-              />
-            );
-          })
+          networks ? Object.keys(networks).map((networkName) => (
+            <NetworkListItem
+              key={networkName}
+              network={networks[networkName]}
+              {...getRadioProps({ value: networkName })}
+              onRemove={onRemoveNetwork}
+            />
+          )) : null
         }
       </VStack>
     </>

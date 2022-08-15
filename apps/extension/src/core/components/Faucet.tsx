@@ -10,7 +10,7 @@ import { faFaucet } from '@fortawesome/free-solid-svg-icons/faFaucet';
 import { aptosCoinStructTag } from 'core/constants';
 import Analytics from 'core/utils/analytics/analytics';
 import { faucetEvents } from 'core/utils/analytics/events';
-import useGlobalStateContext, { NetworkType } from 'core/hooks/useGlobalState';
+import useGlobalStateContext, { DefaultNetworks } from 'core/hooks/useGlobalState';
 import useFundAccount from 'core/mutations/faucet';
 import { NodeUrl } from 'core/utils/network';
 import { toast } from './Toast';
@@ -21,7 +21,7 @@ export default function Faucet() {
   const {
     activeAccountAddress,
     activeNetwork,
-    activeNetworkType,
+    activeNetworkName,
   } = useGlobalStateContext();
   const { fundAccount, isFunding } = useFundAccount();
 
@@ -38,7 +38,7 @@ export default function Faucet() {
         },
       });
     } catch (err) {
-      const localhostMessage = (activeNetworkType === NetworkType.LocalHost)
+      const localhostMessage = (activeNetworkName === DefaultNetworks.LocalHost)
         ? 'If you are on localhost, please ensure that the faucet is running.'
         : undefined;
       toast({
