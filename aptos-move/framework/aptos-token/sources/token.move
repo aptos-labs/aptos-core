@@ -382,20 +382,17 @@ module aptos_token::token {
     }
 
     /// Deposit the token balance into the recipients account and emit an event.
-    fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
-        let token_store = borrow_global_mut<TokenStore>(account_addr);
-
-        event::emit_event<DepositEvent>(
-            &mut token_store.deposit_events,
-            DepositEvent { id: token.id, amount: token.amount },
-        );
-
+    public fun direct_deposit(account_addr: address, token: Token) acquires TokenStore {
         assert!(
             exists<TokenStore>(account_addr),
             error::not_found(ETOKEN_STORE_NOT_PUBLISHED),
         );
         let token_store = borrow_global_mut<TokenStore>(account_addr);
 
+        event::emit_event<DepositEvent>(
+            &mut token_store.deposit_events,
+            DepositEvent { id: token.id, amount: token.amount },
+        );
 
         if (!table::contains(&token_store.tokens, token.id)) {
             table::add(&mut token_store.tokens, token.id, token);
@@ -859,6 +856,34 @@ module aptos_token::token {
         let token = withdraw_token(&creator, token_id, 1);
         deposit_token(&owner, token);
     }
+
+    #[test(creator = @0x1, owner = @0x2)]
+    #[expected_failure]
+    public fun create_withdraw_direct_deposit_token_fail(
+        creator: signer,
+        owner: signer
+    ) acquires Collections, TokenStore {
+        let token_id = create_collection_and_token(&creator, 1, 1, 1);
+
+        let token = withdraw_token(&creator, token_id, 1);
+        let owner_account = signer::address_of(&owner);
+        direct_deposit(owner_account, token);
+    }
+
+    #[test(creator = @0x1, owner = @0x2)]
+    public fun create_withdraw_direct_deposit_token(
+        creator: signer,
+        owner: signer
+    ) acquires Collections, TokenStore {
+        let token_id = create_collection_and_token(&creator, 1, 1, 1);
+
+        let token = withdraw_token(&creator, token_id, 1);
+        initialize_token_store(&owner);
+        let owner_account = signer::address_of(&owner);
+        initialize_token(&owner, token.id);
+        direct_deposit(owner_account, token);
+    }
+
 
     #[test(creator = @0xCC, owner = @0xCB)]
     public fun create_withdraw_deposit(
