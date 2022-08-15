@@ -479,6 +479,7 @@ struct LoggerService {
 impl LoggerService {
     pub fn run(mut self) {
         let mut writer = self.address.take().map(TcpWriter::new);
+        let mut buffer = std::io::BufWriter::new(std::io::stdout());
 
         for event in self.receiver {
             match event {
@@ -494,7 +495,7 @@ impl LoggerService {
                             .enabled(&entry.metadata)
                         {
                             let s = (self.facade.formatter)(&entry).expect("Unable to format");
-                            printer.write(s)
+                            printer.write_buferred(&mut buffer, s);
                         }
                     }
 
@@ -555,10 +556,13 @@ impl LoggerService {
     }
 }
 
-/// An trait encapsulating the operations required for writing logs.
+/// A trait encapsulating the operations required for writing logs.
 pub trait Writer: Send + Sync {
     /// Write the log.
     fn write(&self, log: String);
+
+    /// Write the log in an async task.
+    fn write_buferred(&self, writer: &mut dyn Write, log: String);
 }
 
 /// A struct for writing logs to stdout
@@ -568,6 +572,11 @@ impl Writer for StdoutWriter {
     /// Write log to stdout
     fn write(&self, log: String) {
         println!("{}", log);
+    }
+    fn write_buferred(&self, writer: &mut dyn Write, log: String) {
+        writer
+            .write_fmt(format_args!("{}", log))
+            .unwrap_or_default();
     }
 }
 
@@ -595,6 +604,9 @@ impl Writer for FileWriter {
         if let Err(err) = writeln!(self.log_file.write(), "{}", log) {
             eprintln!("Unable to write to log file: {}", err);
         }
+    }
+    fn write_buferred(&self, _writer: &mut dyn Write, log: String) {
+        self.write(log);
     }
 }
 
