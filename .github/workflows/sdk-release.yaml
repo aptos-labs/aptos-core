@@ -58,13 +58,13 @@ jobs:
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: docker run --mount=type=bind,source=/tmp,target=/specs --name=yaml-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
+          command: docker run --mount=type=bind,source=/tmp,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
       - uses: nick-fields/retry@v2
         name: generate-json-spec
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: docker run --mount=type=bind,source=/tmp,target=/specs --name=json-spec ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json -o /specs/spec.json
+          command: docker run --mount=type=bind,source=/tmp,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f json -o /specs/spec.json
 
       # Confirm that the specs we built here are the same as those checked in.
       - run: echo "If this step fails, run the following commands locally to fix it:"
@@ -134,14 +134,6 @@ jobs:
         if: github.event_name == 'push' && github.ref_name == 'devnet'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_JS_AUTH_TOKEN }}
-
-      - name: Print spec generation logs on failure (YAML)
-        if: ${{ failure() }}
-        run: docker logs yaml-spec
-
-      - name: Print spec generation logs on failure (JSON)
-        if: ${{ failure() }}
-        run: docker logs json-spec
 
       - name: Print docker-compose testnet logs on failure
         if: ${{ failure() }}
