@@ -11,6 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::data_store::GENESIS_CHANGE_SET_MAINNET;
 use crate::{
     account::{Account, AccountData},
     data_store::{FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_FRESH},
@@ -116,6 +117,11 @@ impl FakeExecutor {
     /// Creates an executor using the standard genesis.
     pub fn from_fresh_genesis() -> Self {
         Self::from_genesis(GENESIS_CHANGE_SET_FRESH.clone().write_set())
+    }
+
+    /// Creates an executor using the mainnet genesis.
+    pub fn from_mainnet_genesis() -> Self {
+        Self::from_genesis(GENESIS_CHANGE_SET_MAINNET.clone().write_set())
     }
 
     /// Creates an executor in which no genesis state has been applied yet.

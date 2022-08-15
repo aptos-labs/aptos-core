@@ -168,6 +168,11 @@ module aptos_framework::genesis {
 
             i = i + 1;
         };
+
+        // Destroy the aptos framework account's ability to mint coins now that we're done with setting up the initial
+        // validators.
+        aptos_coin::destroy_mint_cap(aptos_framework);
+
         stake::on_new_epoch();
     }
 

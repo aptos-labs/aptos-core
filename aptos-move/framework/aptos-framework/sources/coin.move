@@ -379,9 +379,13 @@ module aptos_framework::coin {
         let FreezeCapability<CoinType> { } = freeze_cap;
     }
 
-    //
-    // Tests
-    //
+    public fun destroy_mint_cap<CoinType>(mint_cap: MintCapability<CoinType>) {
+        let MintCapability<CoinType> { } = mint_cap;
+    }
+
+    public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
+        let BurnCapability<CoinType> { } = burn_cap;
+    }
 
     #[test_only]
     struct FakeMoney { }
@@ -741,15 +745,5 @@ module aptos_framework::coin {
             freeze_cap,
             mint_cap,
         });
-    }
-
-    #[test_only]
-    public fun destroy_mint_cap<CoinType>(mint_cap: MintCapability<CoinType>) {
-        let MintCapability<CoinType> { } = mint_cap;
-    }
-
-    #[test_only]
-    public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
-        let BurnCapability<CoinType> { } = burn_cap;
     }
 }
