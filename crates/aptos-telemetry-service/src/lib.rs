@@ -23,6 +23,7 @@ use crate::{
 mod auth;
 mod context;
 mod custom_event;
+mod prometheus;
 mod error;
 mod index;
 mod jwt_auth;
