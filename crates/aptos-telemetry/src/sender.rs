@@ -68,7 +68,7 @@ impl TelemetrySender {
             prometheus::TextEncoder::new().encode_to_string(&aptos_metrics_core::gather())?;
 
         let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
-        gzip_encoder.write_all(scraped_metrics.as_bytes()).unwrap();
+        gzip_encoder.write_all(scraped_metrics.as_bytes())?;
         let compressed_bytes = gzip_encoder.finish()?;
 
         let response = self
