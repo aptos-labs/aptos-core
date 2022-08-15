@@ -52,6 +52,8 @@ jobs:
           node-version-file: .node-version
           registry-url: 'https://registry.npmjs.org'
 
+      - run: mkdir -p /tmp
+
       # Build the API specs.
       - uses: nick-fields/retry@v2
         name: generate-yaml-spec
