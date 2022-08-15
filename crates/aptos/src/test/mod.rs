@@ -10,9 +10,9 @@ use crate::account::{
 use crate::common::init::InitTool;
 use crate::common::types::{
     account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
-    EncodingOptions, FaucetOptions, GasOptions, MoveManifestAccountWrapper, MovePackageDir,
-    PrivateKeyInputOptions, PromptOptions, RestOptions, RngArgs, TransactionOptions,
-    TransactionSummary,
+    EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
+    MovePackageDir, PrivateKeyInputOptions, PromptOptions, RestOptions, RngArgs, SaveFile,
+    TransactionOptions, TransactionSummary,
 };
 use crate::common::utils::write_to_file;
 use crate::move_tool::{
@@ -24,7 +24,9 @@ use crate::node::{
     ShowValidatorSet, ShowValidatorStake, UnlockStake, UpdateValidatorNetworkAddresses,
     ValidatorConfigArgs, WithdrawStake,
 };
+use crate::op::key::{ExtractPeer, GenerateKey, SaveKey};
 use crate::CliCommand;
+use aptos_config::config::Peer;
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
@@ -39,6 +41,7 @@ use aptos_types::{
 use framework::natives::code::UpgradePolicy;
 use reqwest::Url;
 use serde_json::Value;
+use std::collections::HashMap;
 use std::{collections::BTreeMap, path::PathBuf, str::FromStr, time::Duration};
 use thiserror::private::PathAsDisplay;
 use tokio::time::{sleep, Instant};
@@ -456,6 +459,44 @@ impl CliTestFramework {
             })
             .collect::<Vec<_>>();
         format!("\n{}\n", lines.join("\n"))
+    }
+
+    pub async fn generate_x25519_key(
+        &self,
+        output_file: PathBuf,
+        seed: [u8; 32],
+    ) -> CliTypedResult<HashMap<&'static str, PathBuf>> {
+        GenerateKey {
+            key_type: KeyType::X25519,
+            rng_args: RngArgs::from_seed(seed),
+            save_params: SaveKey {
+                file_options: SaveFile {
+                    output_file,
+                    prompt_options: PromptOptions::yes(),
+                },
+                encoding_options: Default::default(),
+            },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn extract_peer(
+        &self,
+        private_key_file: PathBuf,
+        output_file: PathBuf,
+    ) -> CliTypedResult<HashMap<AccountAddress, Peer>> {
+        ExtractPeer {
+            private_key_input_options: PrivateKeyInputOptions::from_file(private_key_file),
+            output_file_options: SaveFile {
+                output_file,
+                prompt_options: PromptOptions::yes(),
+            },
+            encoding_options: Default::default(),
+            profile_options: Default::default(),
+        }
+        .execute()
+        .await
     }
 
     pub fn init_move_dir(&mut self) {

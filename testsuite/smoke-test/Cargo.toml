@@ -54,8 +54,6 @@ aptos-genesis = { path = "../../crates/aptos-genesis", features = ["testing"] }
 aptos-global-constants = { path = "../../config/global-constants" }
 aptos-infallible = { path = "../../crates/aptos-infallible" }
 aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-management = { path = "../../config/management", features = ["testing"] }
-aptos-operational-tool = { path = "../../config/management/operational", features = ["testing"] }
 aptos-secure-storage = { path = "../../secure/storage", features = ["testing"] }
 aptos-time-service = { path = "../../crates/aptos-time-service", features = ["testing"] }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
