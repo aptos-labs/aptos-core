@@ -12,7 +12,8 @@ use crate::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
+    multi_signature::PartialSignatures,
     on_chain_config::ValidatorSet,
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -24,6 +25,7 @@ use crate::{
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
+    validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -205,7 +207,11 @@ impl AccountInfoUniverse {
             })
             .collect();
         accounts.sort_by(|a, b| a.address.cmp(&b.address));
-        let validator_set_by_epoch = vec![(0, Vec::new())].into_iter().collect();
+        let validator_signer = ValidatorSigner::new(
+            accounts[0].address,
+            accounts[0].consensus_private_key.clone(),
+        );
+        let validator_set_by_epoch = vec![(0, vec![validator_signer])].into_iter().collect();
 
         Self {
             accounts,
@@ -613,31 +619,46 @@ impl Arbitrary for Module {
 }
 
 prop_compose! {
-    fn arb_validator_signature_for_ledger_info(ledger_info: LedgerInfo)(
+    fn arb_validator_for_ledger_info(ledger_info: LedgerInfo)(
         ledger_info in Just(ledger_info),
         account_keypair in ed25519::keypair_strategy(),
         consensus_keypair in bls12381_keys::keypair_strategy(),
-    ) -> (AccountAddress, bls12381::Signature) {
+    ) -> (AccountAddress, ValidatorConsensusInfo,  bls12381::Signature) {
         let signature = consensus_keypair.private_key.sign(&ledger_info);
-        (account_address::from_public_key(&account_keypair.public_key), signature)
+        let address = account_address::from_public_key(&account_keypair.public_key);
+        (address, ValidatorConsensusInfo::new(address, consensus_keypair.public_key, 1), signature)
     }
 }
 
 impl Arbitrary for LedgerInfoWithSignatures {
-    type Parameters = SizeRange;
-    fn arbitrary_with(num_validators_range: Self::Parameters) -> Self::Strategy {
-        (any::<LedgerInfo>(), Just(num_validators_range))
+    type Parameters = ();
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        (any::<LedgerInfo>(), (1usize..100))
             .prop_flat_map(|(ledger_info, num_validators_range)| {
                 (
                     Just(ledger_info.clone()),
-                    prop::collection::vec(
-                        arb_validator_signature_for_ledger_info(ledger_info),
+                    vec(
+                        arb_validator_for_ledger_info(ledger_info),
                         num_validators_range,
                     ),
                 )
             })
-            .prop_map(|(ledger_info, signatures)| {
-                LedgerInfoWithSignatures::new(ledger_info, signatures.into_iter().collect())
+            .prop_map(|(ledger_info, validator_infos)| {
+                let validator_verifier = ValidatorVerifier::new_with_quorum_voting_power(
+                    validator_infos.iter().map(|x| x.1.clone()).collect(),
+                    validator_infos.len() as u128 / 2,
+                )
+                .unwrap();
+                let partial_sig = PartialSignatures::new(
+                    validator_infos.iter().map(|x| (x.0, x.2.clone())).collect(),
+                );
+                LedgerInfoWithSignatures::new(
+                    ledger_info,
+                    validator_verifier
+                        .aggregate_multi_signature(&partial_sig)
+                        .unwrap()
+                        .0,
+                )
             })
             .boxed()
     }
@@ -685,7 +706,6 @@ impl AccountResourceGen {
         AccountResource::new(
             account_info.sequence_number,
             account_info.public_key.to_bytes().to_vec(),
-            account_info.address,
             EventHandle::random(0),
         )
     }
@@ -698,7 +718,12 @@ pub struct CoinStoreResourceGen {
 
 impl CoinStoreResourceGen {
     pub fn materialize(self) -> CoinStoreResource {
-        CoinStoreResource::new(self.coin, EventHandle::random(0), EventHandle::random(0))
+        CoinStoreResource::new(
+            self.coin,
+            false,
+            EventHandle::random(0),
+            EventHandle::random(0),
+        )
     }
 }
 
@@ -710,11 +735,12 @@ pub struct AccountStateGen {
 
 impl AccountStateGen {
     pub fn materialize(self, account_index: Index, universe: &AccountInfoUniverse) -> AccountState {
+        let address = universe.get_account_info(account_index).address;
         let account_resource = self
             .account_resource_gen
             .materialize(account_index, universe);
         let balance_resource = self.balance_resource_gen.materialize();
-        AccountState::try_from((&account_resource, &balance_resource)).unwrap()
+        AccountState::try_from((address, &account_resource, &balance_resource)).unwrap()
     }
 }
 
@@ -948,8 +974,9 @@ impl Arbitrary for BlockMetadata {
             any::<HashValue>(),
             any::<u64>(),
             any::<u64>(),
-            prop::collection::vec(any::<bool>(), num_validators_range.clone()),
             any::<AccountAddress>(),
+            any::<u32>(),
+            prop::collection::vec(any::<u8>(), num_validators_range.clone()),
             prop::collection::vec(any::<u32>(), num_validators_range),
             any::<u64>(),
         )
@@ -958,8 +985,9 @@ impl Arbitrary for BlockMetadata {
                     id,
                     epoch,
                     round,
-                    previous_block_votes,
                     proposer,
+                    proposer_index,
+                    previous_block_votes,
                     failed_proposer_indices,
                     timestamp,
                 )| {
@@ -967,8 +995,9 @@ impl Arbitrary for BlockMetadata {
                         id,
                         epoch,
                         round,
-                        previous_block_votes,
                         proposer,
+                        Some(proposer_index),
+                        previous_block_votes,
                         failed_proposer_indices,
                         timestamp,
                     )
@@ -999,13 +1028,13 @@ impl ValidatorSetGen {
 
 impl Arbitrary for ValidatorSetGen {
     type Parameters = ();
-    type Strategy = BoxedStrategy<Self>;
-
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        vec(any::<Index>(), 3)
+        vec(any::<Index>(), 1..3)
             .prop_map(|validators| Self { validators })
             .boxed()
     }
+
+    type Strategy = BoxedStrategy<Self>;
 }
 
 #[derive(Debug)]
@@ -1027,11 +1056,13 @@ impl BlockInfoGen {
             let next_validator_set = self.validator_set_gen.materialize(universe);
             let next_validator_infos = next_validator_set
                 .iter()
-                .map(|signer| {
+                .enumerate()
+                .map(|(index, signer)| {
                     ValidatorInfo::new_with_test_network_keys(
                         signer.author(),
                         signer.public_key(),
                         1, /* consensus_voting_power */
+                        index as u64,
                     )
                 })
                 .collect();
@@ -1181,13 +1212,7 @@ impl LedgerInfoWithSignaturesGen {
         block_size: usize,
     ) -> LedgerInfoWithSignatures {
         let ledger_info = self.ledger_info_gen.materialize(universe, block_size);
-        let signatures = universe
-            .get_validator_set(ledger_info.epoch())
-            .iter()
-            .map(|signer| (signer.author(), signer.sign(&ledger_info)))
-            .collect();
-
-        LedgerInfoWithSignatures::new(ledger_info, signatures)
+        generate_ledger_info_with_sig(universe.get_validator_set(ledger_info.epoch()), ledger_info)
     }
 }
 
@@ -1212,4 +1237,16 @@ pub fn arb_json_value() -> impl Strategy<Value = Value> {
             ]
         },
     )
+}
+
+impl Arbitrary for ValidatorVerifier {
+    type Parameters = ();
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        vec(any::<ValidatorConsensusInfo>(), 1..1000)
+            .prop_map(ValidatorVerifier::new)
+            .boxed()
+    }
+
+    type Strategy = BoxedStrategy<Self>;
 }

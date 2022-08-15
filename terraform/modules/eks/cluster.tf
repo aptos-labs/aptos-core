@@ -30,10 +30,6 @@ resource "aws_eks_cluster" "aptos" {
     aws_iam_role_policy_attachment.cluster-service,
     aws_cloudwatch_log_group.eks,
   ]
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 data "aws_eks_cluster_auth" "aptos" {
@@ -59,11 +55,21 @@ resource "aws_launch_template" "nodes" {
   for_each      = local.pools
   name          = "aptos-${local.workspace_name}/${each.key}"
   instance_type = each.value.instance_type
-  user_data     = base64encode(
+  user_data = base64encode(
     templatefile("${path.module}/templates/eks_user_data.sh", {
       taints = each.value.taint ? "aptos/nodepool=${each.key}:NoExecute" : ""
     })
   )
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+
+    ebs {
+      delete_on_termination = true
+      volume_size           = 100
+      volume_type           = "gp3"
+    }
+  }
 
   tag_specifications {
     resource_type = "instance"

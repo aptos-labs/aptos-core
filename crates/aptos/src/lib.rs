@@ -11,17 +11,16 @@ pub mod governance;
 pub mod move_tool;
 pub mod node;
 pub mod op;
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
 
 use crate::common::types::{CliCommand, CliResult, CliTypedResult};
+use aptos_telemetry::collect_build_information;
 use async_trait::async_trait;
 use clap::Parser;
 use std::collections::BTreeMap;
 
-shadow_rs::shadow!(build);
-
-/// CLI tool for interacting with the Aptos blockchain and nodes
-///
+/// Command Line Interface (CLI) for developing and interacting with the Aptos blockchain
 #[derive(Parser)]
 #[clap(name = "aptos", author, version, propagate_version = true)]
 pub enum Tool {
@@ -61,7 +60,7 @@ impl Tool {
     }
 }
 
-/// Show information about the build of the CLI
+/// Show build information about the CLI
 ///
 /// This is useful for debugging as well as determining what versions are compatible with the CLI
 #[derive(Parser)]
@@ -74,39 +73,8 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
     }
 
     async fn execute(self) -> CliTypedResult<BTreeMap<String, String>> {
-        let mut build_information: std::collections::BTreeMap<String, String> = BTreeMap::new();
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_BRANCH.into(),
-            build::BRANCH.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_CARGO_VERSION.into(),
-            build::CARGO_VERSION.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_COMMIT_HASH.into(),
-            build::COMMIT_HASH.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_OS.into(),
-            build::BUILD_OS.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_PKG_VERSION.into(),
-            build::PKG_VERSION.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_RUST_CHANNEL.into(),
-            build::RUST_CHANNEL.into(),
-        );
-        build_information.insert(
-            aptos_telemetry::build_information::BUILD_RUST_VERSION.into(),
-            build::RUST_VERSION.into(),
-        );
+        let build_information = collect_build_information!();
+
         Ok(build_information)
     }
-}
-
-pub fn build_commit_hash() -> String {
-    build::COMMIT_HASH.to_string()
 }

@@ -3,6 +3,7 @@
 
 //! This file defines transaction store APIs that are related to committed signed transactions.
 
+use crate::transaction_accumulator::TransactionAccumulatorSchema;
 use crate::{
     change_set::ChangeSet,
     errors::AptosDbError,
@@ -16,7 +17,6 @@ use anyhow::{ensure, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     account_address::AccountAddress,
-    block_metadata::BlockMetadata,
     proof::position::Position,
     transaction::{Transaction, Version},
     write_set::WriteSet,
@@ -116,38 +116,6 @@ impl TransactionStore {
                 .checked_add(num_transactions as u64)
                 .ok_or_else(|| format_err!("too many transactions requested"))?,
         })
-    }
-
-    /// Get the first version that txn starts existent.
-    pub fn get_first_txn_version(&self) -> Result<Option<Version>> {
-        let mut iter = self.db.iter::<TransactionSchema>(Default::default())?;
-        iter.seek_to_first();
-        iter.next().map(|res| res.map(|(v, _)| v)).transpose()
-    }
-
-    /// Returns the block metadata carried on the block metadata transaction at or preceding
-    /// `version`, together with the version of the block metadata transaction.
-    /// Returns None if there's no such transaction at or preceding `version` (it's likely the genesis
-    /// version 0).
-    pub fn get_block_metadata(&self, version: Version) -> Result<Option<(Version, BlockMetadata)>> {
-        // Must be larger than a block size, otherwise a NotFound error will be raised wrongly.
-        const MAX_VERSIONS_TO_SEARCH: usize = 1000 * 100;
-
-        // Linear search via `DB::rev_iter()` here, NOT expecting performance hit, due to the fact
-        // that the iterator caches data block and that there are limited number of transactions in
-        // each block.
-        let mut iter = self.db.rev_iter::<TransactionSchema>(Default::default())?;
-        iter.seek(&version)?;
-        for res in iter.take(MAX_VERSIONS_TO_SEARCH) {
-            let (v, txn) = res?;
-            if let Transaction::BlockMetadata(block_meta) = txn {
-                return Ok(Some((v, block_meta)));
-            } else if v == 0 {
-                return Ok(None);
-            }
-        }
-
-        Err(AptosDbError::NotFound(format!("BlockMetadata preceding version {}", version)).into())
     }
 
     /// Searches around the version to find the block's transactions
@@ -286,13 +254,6 @@ impl TransactionStore {
         Ok(ret)
     }
 
-    /// Get the first version that write set starts existent.
-    pub fn get_first_write_set_version(&self) -> Result<Option<Version>> {
-        let mut iter = self.db.iter::<WriteSetSchema>(Default::default())?;
-        iter.seek_to_first();
-        iter.next().map(|res| res.map(|(v, _)| v)).transpose()
-    }
-
     /// Save executed transaction vm output given `version`
     pub fn put_write_set(
         &self,
@@ -356,6 +317,65 @@ impl TransactionStore {
         Ok(())
     }
 
+    /// Prune the transaction accumulator between a range of version in [begin, end).
+    ///
+    /// To avoid always pruning a full left subtree, we uses the following algorithm.
+    /// For each leaf with an odd leaf index.
+    /// 1. From the bottom upwards, find the first ancestor that's a left child of its parent.
+    /// (the position of which can be got by popping "1"s from the right of the leaf address).
+    /// Note that this node DOES NOT become non-useful.
+    /// 2. From the node found from the previous step, delete both its children non-useful, and go
+    /// to the right child to repeat the process until we reach a leaf node.
+    /// More details are in this issue https://github.com/aptos-labs/aptos-core/issues/1288.
+    pub fn prune_transaction_accumulator(
+        &self,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> anyhow::Result<()> {
+        for version_to_delete in begin..end {
+            // The even version will be pruned in the iteration of version + 1.
+            if version_to_delete % 2 == 0 {
+                continue;
+            }
+
+            let first_ancestor_that_is_a_left_child =
+                self.find_first_ancestor_that_is_a_left_child(version_to_delete);
+
+            // This assertion is true because we skip the leaf nodes with address which is a
+            // a multiple of 2.
+            assert!(!first_ancestor_that_is_a_left_child.is_leaf());
+
+            let mut current = first_ancestor_that_is_a_left_child;
+            while !current.is_leaf() {
+                db_batch.delete::<TransactionAccumulatorSchema>(&current.left_child())?;
+                db_batch.delete::<TransactionAccumulatorSchema>(&current.right_child())?;
+                current = current.right_child();
+            }
+        }
+        Ok(())
+    }
+
+    /// Finds the first ancestor that is a child of its parent.
+    fn find_first_ancestor_that_is_a_left_child(&self, version: Version) -> Position {
+        // We can get the first ancestor's position based on the two observations:
+        // - floor(level position of a node / 2) = level position of its parent.
+        // - if a node is a left child of its parent, its level position should be a multiple of 2.
+        // - level position means the position counted from 0 of a single tree level. For example,
+        //                a (level position = 0)
+        //         /                                \
+        //    b (level position = 0)      c(level position = 1)
+        //
+        // To find the first ancestor which is a left child of its parent, we can keep diving the
+        // version by 2 (to find the ancestor) until we get a number which is a multiple of 2
+        // (to make sure the ancestor is a left child of its parent). The number of time we
+        // divide the version is the level of the ancestor. The remainder is the level position
+        // of the ancestor.
+        let first_ancestor_that_is_a_left_child_level = version.trailing_ones();
+        let index_in_level = version >> first_ancestor_that_is_a_left_child_level;
+        Position::from_level_and_pos(first_ancestor_that_is_a_left_child_level, index_in_level)
+    }
+
     /// Prune the transaction schema store between a range of version in [begin, end)
     pub fn prune_write_set(
         &self,
@@ -367,17 +387,6 @@ impl TransactionStore {
             db_batch.delete::<WriteSetSchema>(&version)?;
         }
         Ok(())
-    }
-
-    /// Returns the minimum position node needed to be included in the proof of the leaf index. This
-    /// will be the left child of the root if the leaf index is non zero and zero otherwise.
-    pub fn get_min_proof_node(&self, leaf_index: u64) -> Position {
-        if leaf_index > 0 {
-            Position::root_from_leaf_index(leaf_index).left_child()
-        } else {
-            // Handle this as a special case when min_readable_version is 0
-            Position::root_from_leaf_index(0)
-        }
     }
 }
 

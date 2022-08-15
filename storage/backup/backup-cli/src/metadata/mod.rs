@@ -35,8 +35,12 @@ impl Metadata {
         })
     }
 
-    pub fn new_state_snapshot_backup(version: Version, manifest: FileHandle) -> Self {
-        Self::StateSnapshotBackup(StateSnapshotBackupMeta { version, manifest })
+    pub fn new_state_snapshot_backup(epoch: u64, version: Version, manifest: FileHandle) -> Self {
+        Self::StateSnapshotBackup(StateSnapshotBackupMeta {
+            epoch,
+            version,
+            manifest,
+        })
     }
 
     pub fn new_transaction_backup(
@@ -81,6 +85,7 @@ pub struct EpochEndingBackupMeta {
 
 #[derive(Clone, Deserialize, Serialize, Eq, PartialEq, Ord, PartialOrd)]
 pub struct StateSnapshotBackupMeta {
+    pub epoch: u64,
     pub version: Version,
     pub manifest: FileHandle,
 }

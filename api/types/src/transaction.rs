@@ -14,7 +14,7 @@ use aptos_crypto::{
 use aptos_types::{
     account_address::AccountAddress,
     block_metadata::BlockMetadata,
-    contract_event::ContractEvent,
+    contract_event::{ContractEvent, EventWithVersion},
     transaction::{
         authenticator::{AccountAuthenticator, TransactionAuthenticator},
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
@@ -265,7 +265,7 @@ impl From<(&BlockMetadata, TransactionInfo, Vec<Event>)> for Transaction {
             epoch: txn.epoch().into(),
             round: txn.round().into(),
             events,
-            previous_block_votes: txn.previous_block_votes().clone(),
+            previous_block_votes_bitvec: txn.previous_block_votes_bitvec().clone(),
             proposer: txn.proposer().into(),
             failed_proposer_indices: txn.failed_proposer_indices().clone(),
             timestamp: txn.timestamp_usecs().into(),
@@ -406,7 +406,7 @@ pub struct BlockMetadataTransaction {
     pub epoch: U64,
     pub round: U64,
     pub events: Vec<Event>,
-    pub previous_block_votes: Vec<bool>,
+    pub previous_block_votes_bitvec: Vec<u8>,
     pub proposer: Address,
     pub failed_proposer_indices: Vec<u32>,
     pub timestamp: U64,
@@ -427,6 +427,32 @@ impl From<(&ContractEvent, serde_json::Value)> for Event {
     fn from((event, data): (&ContractEvent, serde_json::Value)) -> Self {
         match event {
             ContractEvent::V0(v0) => Self {
+                key: (*v0.key()).into(),
+                sequence_number: v0.sequence_number().into(),
+                typ: v0.type_tag().clone().into(),
+                data,
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
+pub struct VersionedEvent {
+    pub version: U64,
+    pub key: EventKey,
+    pub sequence_number: U64,
+    #[serde(rename = "type")]
+    #[oai(rename = "type")]
+    pub typ: MoveType,
+    // TODO: Use the real data here, not a JSON representation.
+    pub data: serde_json::Value,
+}
+
+impl From<(&EventWithVersion, serde_json::Value)> for VersionedEvent {
+    fn from((event, data): (&EventWithVersion, serde_json::Value)) -> Self {
+        match &event.event {
+            ContractEvent::V0(v0) => Self {
+                version: event.transaction_version.into(),
                 key: (*v0.key()).into(),
                 sequence_number: v0.sequence_number().into(),
                 typ: v0.type_tag().clone().into(),
@@ -627,8 +653,8 @@ impl TryFrom<TransactionSignature> for TransactionAuthenticator {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct Ed25519Signature {
-    public_key: HexEncodedBytes,
-    signature: HexEncodedBytes,
+    pub public_key: HexEncodedBytes,
+    pub signature: HexEncodedBytes,
 }
 
 impl TryFrom<Ed25519Signature> for TransactionAuthenticator {
@@ -675,10 +701,10 @@ impl TryFrom<Ed25519Signature> for AccountAuthenticator {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MultiEd25519Signature {
-    public_keys: Vec<HexEncodedBytes>,
-    signatures: Vec<HexEncodedBytes>,
-    threshold: u8,
-    bitmap: HexEncodedBytes,
+    pub public_keys: Vec<HexEncodedBytes>,
+    pub signatures: Vec<HexEncodedBytes>,
+    pub threshold: u8,
+    pub bitmap: HexEncodedBytes,
 }
 
 impl TryFrom<MultiEd25519Signature> for TransactionAuthenticator {
@@ -762,9 +788,9 @@ impl TryFrom<AccountSignature> for AccountAuthenticator {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
 pub struct MultiAgentSignature {
-    sender: AccountSignature,
-    secondary_signer_addresses: Vec<Address>,
-    secondary_signers: Vec<AccountSignature>,
+    pub sender: AccountSignature,
+    pub secondary_signer_addresses: Vec<Address>,
+    pub secondary_signers: Vec<AccountSignature>,
 }
 
 impl TryFrom<MultiAgentSignature> for TransactionAuthenticator {

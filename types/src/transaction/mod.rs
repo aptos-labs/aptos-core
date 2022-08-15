@@ -6,7 +6,6 @@ use crate::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
-    delta_change_set::DeltaChangeSet,
     ledger_info::LedgerInfo,
     proof::{
         accumulator::InMemoryAccumulator, TransactionInfoListWithProof, TransactionInfoWithProof,
@@ -41,7 +40,7 @@ mod module;
 mod script;
 mod transaction_argument;
 
-pub use change_set::{ChangeSet, ChangeSetExt};
+pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use script::{
     ArgumentABI, Script, ScriptABI, ScriptFunction, ScriptFunctionABI, TransactionScriptABI,
@@ -50,6 +49,7 @@ pub use script::{
 
 use crate::state_store::{state_key::StateKey, state_value::StateValue};
 use move_deps::move_core_types::vm_status::AbortLocation;
+use once_cell::sync::OnceCell;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
@@ -472,18 +472,21 @@ impl WriteSetPayload {
 /// **IMPORTANT:** The signature of a `SignedTransaction` is not guaranteed to be verified. For a
 /// transaction whose signature is statically guaranteed to be verified, see
 /// [`SignatureCheckedTransaction`].
-#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SignedTransaction {
     /// The raw transaction
     raw_txn: RawTransaction,
 
     /// Public key and signature to authenticate
     authenticator: TransactionAuthenticator,
+
+    #[serde(skip)]
+    bytes: OnceCell<Vec<u8>>,
 }
 
 /// A transaction for which the signature has been verified. Created by
 /// [`SignedTransaction::check_signature`] and [`RawTransaction::sign`].
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignatureCheckedTransaction(SignedTransaction);
 
 impl SignatureCheckedTransaction {
@@ -530,6 +533,7 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
+            bytes: OnceCell::new(),
         }
     }
 
@@ -542,6 +546,7 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
+            bytes: OnceCell::new(),
         }
     }
 
@@ -558,6 +563,7 @@ impl SignedTransaction {
                 secondary_signer_addresses,
                 secondary_signers,
             ),
+            bytes: OnceCell::new(),
         }
     }
 
@@ -568,6 +574,7 @@ impl SignedTransaction {
         Self {
             raw_txn,
             authenticator,
+            bytes: OnceCell::new(),
         }
     }
 
@@ -608,8 +615,10 @@ impl SignedTransaction {
     }
 
     pub fn raw_txn_bytes_len(&self) -> usize {
-        bcs::to_bytes(&self.raw_txn)
-            .expect("Unable to serialize RawTransaction")
+        self.bytes
+            .get_or_init(|| {
+                bcs::to_bytes(&self.raw_txn).expect("Unable to serialize RawTransaction")
+            })
             .len()
     }
 
@@ -949,55 +958,6 @@ impl TransactionOutput {
             status,
         } = self;
         (write_set, events, gas_used, status)
-    }
-}
-
-/// Extension of `TransactionOutput` that also holds `DeltaChangeSet`
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TransactionOutputExt {
-    delta_change_set: DeltaChangeSet,
-    output: TransactionOutput,
-}
-
-impl TransactionOutputExt {
-    pub fn new(delta_change_set: DeltaChangeSet, output: TransactionOutput) -> Self {
-        TransactionOutputExt {
-            delta_change_set,
-            output,
-        }
-    }
-
-    pub fn delta_change_set(&self) -> &DeltaChangeSet {
-        &self.delta_change_set
-    }
-
-    pub fn write_set(&self) -> &WriteSet {
-        &self.output.write_set
-    }
-
-    pub fn events(&self) -> &[ContractEvent] {
-        &self.output.events
-    }
-
-    pub fn gas_used(&self) -> u64 {
-        self.output.gas_used
-    }
-
-    pub fn status(&self) -> &TransactionStatus {
-        &self.output.status
-    }
-
-    pub fn into(self) -> (DeltaChangeSet, TransactionOutput) {
-        (self.delta_change_set, self.output)
-    }
-}
-
-impl From<TransactionOutput> for TransactionOutputExt {
-    fn from(output: TransactionOutput) -> Self {
-        TransactionOutputExt {
-            delta_change_set: DeltaChangeSet::empty(),
-            output,
-        }
     }
 }
 
@@ -1388,6 +1348,16 @@ impl TransactionOutputListWithProof {
         .map(|((txn, txn_output), txn_info)| {
             // Check the events against the expected events root hash
             verify_events_against_root_hash(&txn_output.events, txn_info)?;
+
+            // Verify the write set matches for both the transaction info and output
+            let write_set_hash = CryptoHash::hash(&txn_output.write_set);
+            ensure!(
+                txn_info.state_change_hash == write_set_hash,
+                "The write set in transaction output does not match the transaction info \
+                     in proof. Hash of write set in transaction output: {}. Write set hash in txn_info: {}.",
+                write_set_hash,
+                txn_info.state_change_hash,
+            );
 
             // Verify the gas matches for both the transaction info and output
             ensure!(

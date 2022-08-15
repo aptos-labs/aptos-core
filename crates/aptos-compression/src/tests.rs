@@ -1,12 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::CompressionClient;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::hash::HashValue;
 use aptos_crypto::{PrivateKey, SigningKey, Uniform};
 use aptos_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::transaction::{
     ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
     TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
@@ -16,7 +18,6 @@ use aptos_types::write_set::WriteSet;
 use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::collections::BTreeMap;
 use std::fmt::Debug;
 
 #[test]
@@ -38,8 +39,10 @@ fn test_basic_compression() {
 /// when BCS encoded.
 fn test_compress_and_decompress<T: Debug + DeserializeOwned + PartialEq + Serialize>(object: T) {
     let bcs_encoded_bytes = bcs::to_bytes(&object).unwrap();
-    let compressed_bytes = crate::compress(bcs_encoded_bytes).unwrap();
-    let decompressed_bytes = crate::decompress(&compressed_bytes).unwrap();
+    let compressed_bytes =
+        crate::compress(bcs_encoded_bytes, CompressionClient::StateSync).unwrap();
+    let decompressed_bytes =
+        crate::decompress(&compressed_bytes, CompressionClient::StateSync).unwrap();
     let decoded_object = bcs::from_bytes::<T>(&decompressed_bytes).unwrap();
 
     assert_eq!(object, decoded_object);
@@ -93,7 +96,7 @@ fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWith
         ),
         HashValue::zero(),
     );
-    LedgerInfoWithSignatures::new(ledger_info, BTreeMap::new())
+    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
 }
 
 /// Creates a test transaction output

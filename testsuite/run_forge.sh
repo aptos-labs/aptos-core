@@ -13,7 +13,6 @@
 pwd | grep -qE 'aptos-core$' || (echo "Please run from aptos-core root directory" && exit 1)
 
 # for calculating regression in local mode
-LOCAL_TPS_THRESHOLD=400
 LOCAL_P99_LATENCY_MS_THRESHOLD=60000
 
 # output files
@@ -21,10 +20,6 @@ FORGE_OUTPUT=${FORGE_OUTPUT:-$(mktemp)}
 FORGE_REPORT=${FORGE_REPORT:-$(mktemp)}
 FORGE_PRE_COMMENT=${FORGE_PRE_COMMENT:-$(mktemp)}
 FORGE_COMMENT=${FORGE_COMMENT:-$(mktemp)}
-echo "FORGE_OUTPUT: ${FORGE_OUTPUT}"
-echo "FORGE_REPORT: ${FORGE_REPORT}"
-echo "FORGE_PRE_COMMENT: ${FORGE_PRE_COMMENT}"
-echo "FORGE_COMMENT: ${FORGE_COMMENT}"
 
 # cluster auth
 AWS_ACCOUNT_NUM=${AWS_ACCOUNT_NUM:-$(aws sts get-caller-identity | jq -r .Account)}
@@ -44,10 +39,19 @@ FORGE_NAMESPACE_KEEP=${FORGE_NAMESPACE_KEEP:-false}
 FORGE_NAMESPACE_REUSE=${FORGE_NAMESPACE_REUSE:-false}
 FORGE_ENABLE_HAPROXY=${FORGE_ENABLE_HAPROXY:-false}
 FORGE_TEST_SUITE=${FORGE_TEST_SUITE:-land_blocking}
+FORGE_RUNNER_DURATION_SECS=${FORGE_RUNNER_DURATION_SECS:-300}
+FORGE_RUNNER_TPS_THRESHOLD=${FORGE_RUNNER_TPS_THRESHOLD:-400}
 
 [ "$FORGE_NAMESPACE_REUSE" = "true" ] && REUSE_ARGS="--reuse"
 [ "$FORGE_NAMESPACE_KEEP" = "true" ] && KEEP_ARGS="--keep"
 [ "$FORGE_ENABLE_HAPROXY" = "true" ] && ENABLE_HAPROXY_ARGS="--enable-haproxy"
+
+print_output_files() {
+    echo "FORGE_OUTPUT: ${FORGE_OUTPUT}"
+    echo "FORGE_REPORT: ${FORGE_REPORT}"
+    echo "FORGE_PRE_COMMENT: ${FORGE_PRE_COMMENT}"
+    echo "FORGE_COMMENT: ${FORGE_COMMENT}"
+}
 
 # Set variables for o11y resource locations depending on the type of cluster that is running Forge
 set_o11y_resources() {
@@ -84,8 +88,8 @@ set_image_tag() {
         for i in $(seq 0 $commit_threshold); do
             IMAGE_TAG_DEFAULT=$(git rev-parse HEAD~$i)
             echo "Trying tag: ${IMAGE_TAG_DEFAULT}"
-            git log --format=%B -n 1 $IMAGE_TAG_DEFAULT
-            img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG_DEFAULT)
+            git --no-pager log --format=%B -n 1 $IMAGE_TAG_DEFAULT
+            img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG_DEFAULT 2>/dev/null)
             if [ "$?" -eq 0 ]; then
                 echo "Image tag exists. Using tag: ${IMAGE_TAG_DEFAULT}"
                 IMAGE_TAG=$IMAGE_TAG_DEFAULT
@@ -93,12 +97,12 @@ set_image_tag() {
             fi
         done
         # if IMAGE_TAG still not set after checking HEAD,
-        if [ -z "$IMAGE_TAG"]; then
+        if [ -z "$IMAGE_TAG" ]; then
             echo "None of the last ${commit_threshold} commits have been built and pushed"
             exit 1
         fi
     else
-        img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG)
+        img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG 2>/dev/null)
         if [ "$?" -ne 0 ]; then
             echo "IMAGE_TAG does not exist in ECR: ${IMAGE_TAG}. Make sure your commit has been pushed to GitHub previously."
             echo "If you're trying to run the code from your PR, apply the label 'CICD:build-images' and wait for the builds to finish."
@@ -144,6 +148,8 @@ get_dashboard_link() {
     FORGE_DASHBOARD_LINK="${GRAFANA_BASE_URL}&var-namespace=${FORGE_NAMESPACE}&var-chain_name=${FORGE_CHAIN_NAME}${GRAFANA_TIME_FILTER}"
 }
 
+print_output_files
+
 # determine cluster name from kubectl context and set o11y resources
 FORGE_CLUSTER_NAME=$(kubectl config current-context | grep -oE 'aptos.*')
 echo "Using cluster ${FORGE_CLUSTER_NAME} from current kubectl context"
@@ -158,6 +164,9 @@ HUMIO_LOGS_LINK="https://cloud.us.humio.com/k8s/search?query=%24forgeLogs%28vali
 
 # set the image tag in IMAGE_TAG
 set_image_tag
+if [ -z "$UPGRADE_IMAGE_TAG" ]; then
+    UPGRADE_IMAGE_TAG=$IMAGE_TAG
+fi
 
 # set the o11y resource locations in
 # ES_DEFAULT_INDEX, ES_BASE_URL, GRAFANA_BASE_URL
@@ -184,10 +193,15 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # more file descriptors for heavy txn generation
     ulimit -n 1048576
 
-    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --workers-per-ac 10 --avg-tps $LOCAL_TPS_THRESHOLD \
-        --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD \
+    # port-forward prometheus
+    kubectl port-forward -n default svc/aptos-node-mon-aptos-monitoring-prometheus 9090:9090 >/dev/null 2>&1 &
+    prometheus_port_forward_pid=$!
+
+    cargo run -p forge-cli -- --suite $FORGE_TEST_SUITE --mempool-backlog 5000 --avg-tps $FORGE_RUNNER_TPS_THRESHOLD \
+        --max-latency-ms $LOCAL_P99_LATENCY_MS_THRESHOLD --duration-secs $FORGE_RUNNER_DURATION_SECS \
         test k8s-swarm \
         --image-tag $IMAGE_TAG \
+        --upgrade-image-tag $UPGRADE_IMAGE_TAG \
         --namespace $FORGE_NAMESPACE \
         --port-forward $REUSE_ARGS $KEEP_ARGS $ENABLE_HAPROXY_ARGS | tee $FORGE_OUTPUT
 
@@ -196,6 +210,7 @@ if [ "$FORGE_RUNNER_MODE" = "local" ]; then
     # try to kill orphaned port-forwards
     if [ -z "$KEEP_ARGS" ]; then
         ps -A | grep "kubectl port-forward -n $FORGE_NAMESPACE" | awk '{ print $1 }' | xargs -I{} kill -9 {}
+        kill -9 $prometheus_port_forward_pid
     fi
 
 elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
@@ -213,7 +228,10 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
 
     sed -e "s/{FORGE_POD_NAME}/${FORGE_POD_NAME}/g" \
         -e "s/{FORGE_TEST_SUITE}/${FORGE_TEST_SUITE}/g" \
+        -e "s/{FORGE_RUNNER_DURATION_SECS}/${FORGE_RUNNER_DURATION_SECS}/g" \
+        -e "s/{FORGE_RUNNER_TPS_THRESHOLD}/${FORGE_RUNNER_TPS_THRESHOLD}/g" \
         -e "s/{IMAGE_TAG}/${IMAGE_TAG}/g" \
+        -e "s/{UPGRADE_IMAGE_TAG}/${UPGRADE_IMAGE_TAG}/g" \
         -e "s/{AWS_ACCOUNT_NUM}/${AWS_ACCOUNT_NUM}/g" \
         -e "s/{AWS_REGION}/${AWS_REGION}/g" \
         -e "s/{FORGE_NAMESPACE}/${FORGE_NAMESPACE}/g" \
@@ -229,7 +247,13 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
     kubectl wait -n default --timeout=5m --for=condition=Ready "pod/${FORGE_POD_NAME}"
 
     # tail the logs and tee them for further parsing
+    echo "=====START FORGE LOGS====="
     kubectl logs -n default -f $FORGE_POD_NAME | tee $FORGE_OUTPUT
+    echo "=====END FORGE COMMENT====="
+
+    # wait for the pod status to change potentially
+    sleep 10
+    while [[ $(kubectl get pods $FORGE_POD_NAME -o 'jsonpath={..status.conditions[?(@.type=="Ready")].status}') == "True" ]]; do echo "waiting for pod to complete: $FORGE_POD_NAME" && sleep 1; done
 
     # parse the pod status: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-phase
     forge_pod_status=$(kubectl get pod -n default $FORGE_POD_NAME -o jsonpath="{.status.phase}" 2>&1)
@@ -237,7 +261,7 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
 
     if [ "$forge_pod_status" = "Succeeded" ]; then # the current pod succeeded
         FORGE_EXIT_CODE=0
-    elif echo $forge_pod_status | grep -E "(not found)|(not found)"; then # the current test in this namespace was likely preempted and deleted
+    elif echo $forge_pod_status | grep -E "(not found)|(NotFound)|(No such)"; then # the current test in this namespace was likely preempted and deleted
         FORGE_EXIT_CODE=10
     else # it did not succeed
         FORGE_EXIT_CODE=1
@@ -292,11 +316,9 @@ get_validator_logs_link
 if [ "$FORGE_EXIT_CODE" = "0" ]; then
     FORGE_COMMENT_HEADER="### :white_check_mark: Forge test success on \`${IMAGE_TAG}\`"
 elif [ "$FORGE_EXIT_CODE" = "2" ]; then
-    FORGE_COMMENT_HEADER"### :x: Forge test perf regression on \`${IMAGE_TAG}\`"
+    FORGE_COMMENT_HEADER="### :x: Forge test perf regression on \`${IMAGE_TAG}\`"
 elif [ "$FORGE_EXIT_CODE" = "10" ]; then
-    FORGE_COMMENT_HEADER"### :thought_balloon: Forge test preempted on \`${IMAGE_TAG}\`"
-    # don't actually fail if tests pre-empted
-    FORGE_EXIT_CODE=0
+    FORGE_COMMENT_HEADER="### :thought_balloon: Forge test preempted on \`${IMAGE_TAG}\`"
 else
     FORGE_COMMENT_HEADER="### :x: Forge test failure on \`${IMAGE_TAG}\`"
 fi
@@ -315,6 +337,8 @@ cat $FORGE_COMMENT
 echo "=====END FORGE COMMENT====="
 
 echo "Forge exit with: $FORGE_EXIT_CODE"
+
+print_output_files
 
 # report metrics to pushgateway
 echo "forge_job_status {FORGE_EXIT_CODE=\"$FORGE_EXIT_CODE\",FORGE_CLUSTER_NAME=\"$FORGE_CLUSTER_NAME\",FORGE_NAMESPACE=\"$FORGE_NAMESPACE\"} $GITHUB_RUN_ID" | curl -u "$PUSH_GATEWAY_USER:$PUSH_GATEWAY_PASSWORD" --data-binary @- ${PUSH_GATEWAY}/metrics/job/forge

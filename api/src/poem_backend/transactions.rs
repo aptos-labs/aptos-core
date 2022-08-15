@@ -13,14 +13,14 @@ use super::{
     ApiTags, AptosErrorResponse, BasicError, BasicErrorWith404, BasicResponse, BasicResponseStatus,
     BasicResult, BasicResultWith404, InternalError, NotFoundError,
 };
-use super::{AptosErrorCode, BadRequestError, InsufficientStorageError};
+use super::{BadRequestError, InsufficientStorageError};
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use crate::{generate_error_response, generate_success_response};
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    Address, AsConverter, EncodeSubmissionRequest, HashValue, HexEncodedBytes, LedgerInfo,
-    PendingTransaction, SubmitTransactionRequest, Transaction, TransactionData,
+    Address, AptosErrorCode, AsConverter, EncodeSubmissionRequest, HashValue, HexEncodedBytes,
+    LedgerInfo, PendingTransaction, SubmitTransactionRequest, Transaction, TransactionData,
     TransactionOnChainData, UserTransaction, U64,
 };
 use aptos_crypto::signing_message;
@@ -263,15 +263,10 @@ impl TransactionsApi {
     fn list(&self, accept_type: &AcceptType, page: Page) -> BasicResultWith404<Vec<Transaction>> {
         let latest_ledger_info = self.context.get_latest_ledger_info_poem()?;
         let ledger_version = latest_ledger_info.version();
+
         let limit = page.limit()?;
         // TODO: https://github.com/aptos-labs/aptos-core/issues/2286
-        let last_page_start = if ledger_version > (limit as u64) {
-            ledger_version - (limit as u64)
-        } else {
-            0
-        };
-        let start_version = page.start(last_page_start, ledger_version)?;
-
+        let start_version = page.compute_start(limit, ledger_version)?;
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)
@@ -530,12 +525,25 @@ impl TransactionsApi {
         }
         let ledger_info = self.context.get_latest_ledger_info_poem()?;
         let move_resolver = self.context.move_resolver_poem()?;
-        let (status, output) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
+        let (status, output_ext) = AptosVM::simulate_signed_transaction(&txn, &move_resolver);
         let version = ledger_info.version();
+
+        // Apply deltas.
+        // TODO: while `into_transaction_output_with_status()` should never fail
+        // to apply deltas, we should propagate errors properly. Fix this when
+        // VM error handling is fixed.
+        let output = output_ext.into_transaction_output(&move_resolver);
+        debug_assert!(
+            matches!(output, Ok(_)),
+            "converting into transaction output failed"
+        );
+        let output = output.unwrap();
+
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,
             _ => ExecutionStatus::MiscellaneousError(None),
         };
+
         let zero_hash = aptos_crypto::HashValue::zero();
         let info = aptos_types::transaction::TransactionInfo::new(
             zero_hash,

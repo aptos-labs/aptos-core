@@ -8,6 +8,7 @@ runs:
       shell: bash
       run: docker context create builders
     - name: setup docker buildx
-      uses: docker/setup-buildx-action@v1
+      uses: docker/setup-buildx-action@v2
       with:
         endpoint: builders
+        version: v0.8.2

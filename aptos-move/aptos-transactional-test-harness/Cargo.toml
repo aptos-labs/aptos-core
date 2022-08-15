@@ -24,6 +24,7 @@ move-deps = { path = "../move-deps", features = ["address32"] }
 
 # Aptos Move dependencies
 aptos-api-types = { path = "../../api/types" }
+aptos-gas = { path = "../aptos-gas" }
 aptos-vm =  { path = "../aptos-vm" }
 cached-framework-packages =  { path = "../framework/cached-packages" }
 framework =  { path = "../framework" }

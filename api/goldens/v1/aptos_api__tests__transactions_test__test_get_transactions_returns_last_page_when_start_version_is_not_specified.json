@@ -1,165 +1,5 @@
 [
   {
-    "version": "35",
-    "hash": "",
-    "state_root_hash": "",
-    "event_root_hash": "",
-    "gas_used": "133",
-    "success": true,
-    "vm_status": "Executed successfully",
-    "accumulator_root_hash": "",
-    "changes": [
-      {
-        "address": "0xa550c18",
-        "state_key_hash": "",
-        "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
-          "data": {
-            "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
-            "coin_register_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0xa550c18",
-                  "creation_num": "0"
-                }
-              }
-            },
-            "self_address": "0xa550c18",
-            "sequence_number": "12"
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "state_key_hash": "",
-        "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
-          "data": {
-            "authentication_key": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-            "coin_register_events": {
-              "counter": "1",
-              "guid": {
-                "id": {
-                  "addr": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-                  "creation_num": "0"
-                }
-              }
-            },
-            "self_address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-            "sequence_number": "0"
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "state_key_hash": "",
-        "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
-          "data": {
-            "coin": {
-              "value": "0"
-            },
-            "deposit_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-                  "creation_num": "1"
-                }
-              }
-            },
-            "withdraw_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-                  "creation_num": "2"
-                }
-              }
-            }
-          }
-        },
-        "type": "write_resource"
-      },
-      {
-        "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "state_key_hash": "",
-        "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
-          "data": {
-            "counter": "3"
-          }
-        },
-        "type": "write_resource"
-      }
-    ],
-    "sender": "0xa550c18",
-    "sequence_number": "11",
-    "max_gas_amount": "2000",
-    "gas_unit_price": "0",
-    "expiration_timestamp_secs": "18446744073709551615",
-    "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
-      "type_arguments": [],
-      "arguments": [
-        "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b"
-      ],
-      "type": "script_function_payload"
-    },
-    "signature": {
-      "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x6f333ef75f5a05432fa6b44af7281dbd9ded45384011a6ba928664b8bedf66e92cff87d5ce00e96e2f637539326719431b1f33882bb92901b090bfcd37f5ac06",
-      "type": "ed_25519_signature"
-    },
-    "events": [
-      {
-        "key": "0x00000000000000007ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "sequence_number": "0",
-        "type": "0x1::account::CoinRegisterEvent",
-        "data": {
-          "type_info": {
-            "account_address": "0x1",
-            "module_name": "0x6170746f735f636f696e",
-            "struct_name": "0x4170746f73436f696e"
-          }
-        }
-      }
-    ],
-    "timestamp": "12",
-    "type": "user_transaction"
-  },
-  {
     "version": "36",
     "hash": "",
     "state_root_hash": "",
@@ -186,12 +26,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockMetadata",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "13",
@@ -212,17 +47,14 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "13"
-            ],
-            "num_blocks": "13"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "13"
+              }
+            ]
           }
         },
         "type": "write_resource"
@@ -231,12 +63,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "13"
           }
@@ -256,17 +83,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "13",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "13"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -278,7 +103,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -287,12 +112,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -304,8 +124,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "13"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "13",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -314,12 +143,7 @@
         "address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
             "coin_register_events": {
@@ -331,8 +155,17 @@
                 }
               }
             },
-            "self_address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -341,14 +174,7 @@
         "address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -362,6 +188,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -379,12 +206,7 @@
         "address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -398,13 +220,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9"
@@ -414,7 +230,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0x8d300035e9a7f3978472d6567ebba01f52f604ec139216fabc97991c376967bec5be82095fc269eaf6a1c947a9bad8d2abf77173cb67fb6c96b472e0bbfc6c08",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -460,12 +276,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockMetadata",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "14",
@@ -486,17 +297,14 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "14"
-            ],
-            "num_blocks": "14"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "14"
+              }
+            ]
           }
         },
         "type": "write_resource"
@@ -505,12 +313,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "14"
           }
@@ -530,17 +333,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "14",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "14"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -552,7 +353,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -561,12 +362,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -578,8 +374,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "14"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "14",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -588,12 +393,7 @@
         "address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x095f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
             "coin_register_events": {
@@ -605,8 +405,17 @@
                 }
               }
             },
-            "self_address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -615,14 +424,7 @@
         "address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -636,6 +438,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -653,12 +456,7 @@
         "address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -672,13 +470,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681"
@@ -688,7 +480,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0xa58db3bce60a42cfacc578168d5796d9dfef32ecb024642f9babd23dc96e8258cdbdaf63fed7e7400eb351727d392d743606ba8380981f0fe16af06ef49aac00",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -734,12 +526,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockMetadata",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "15",
@@ -760,17 +547,14 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "15"
-            ],
-            "num_blocks": "15"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "15"
+              }
+            ]
           }
         },
         "type": "write_resource"
@@ -779,12 +563,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "15"
           }
@@ -804,17 +583,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "15",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "15"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -826,7 +603,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -835,12 +612,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -852,8 +624,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "15"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "15",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -862,12 +643,7 @@
         "address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
             "coin_register_events": {
@@ -879,8 +655,17 @@
                 }
               }
             },
-            "self_address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -889,14 +674,7 @@
         "address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -910,6 +688,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -927,12 +706,7 @@
         "address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -946,13 +720,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22"
@@ -962,7 +730,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0x11151ed3ebe76d03b638a68fd56260843bc872c05e5fa312b24b61eb61986a494a17e3ac1078d81a208fa565e9b9fe8877b2d5cf5651b17fe5b275cd7386dd0b",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -1008,12 +776,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockMetadata",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "16",
@@ -1034,17 +797,14 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "16"
-            ],
-            "num_blocks": "16"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "16"
+              }
+            ]
           }
         },
         "type": "write_resource"
@@ -1053,12 +813,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "16"
           }
@@ -1078,17 +833,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "16",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "16"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -1100,7 +853,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1109,12 +862,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -1126,8 +874,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "16"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "16",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -1136,12 +893,7 @@
         "address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
             "coin_register_events": {
@@ -1153,8 +905,17 @@
                 }
               }
             },
-            "self_address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -1163,14 +924,7 @@
         "address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1184,6 +938,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1201,12 +956,7 @@
         "address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -1220,13 +970,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e"
@@ -1236,7 +980,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0x86f1402e5182f1bafbfaff5ac8bb56140e6d3ffd659675792f0b43580010e0eb33f8d5307f142bf596ea044e01beea92b34cbe164045169f9a6d80fdf0b8d20d",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -1282,12 +1026,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockMetadata",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "17",
@@ -1308,17 +1047,14 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "17"
-            ],
-            "num_blocks": "17"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "17"
+              }
+            ]
           }
         },
         "type": "write_resource"
@@ -1327,12 +1063,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "17"
           }
@@ -1352,17 +1083,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "17",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "17"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -1374,7 +1103,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1383,12 +1112,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -1400,8 +1124,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "17"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "17",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -1410,12 +1143,7 @@
         "address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
             "coin_register_events": {
@@ -1427,8 +1155,17 @@
                 }
               }
             },
-            "self_address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -1437,14 +1174,7 @@
         "address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1458,6 +1188,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1475,12 +1206,7 @@
         "address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -1494,13 +1220,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06"
@@ -1510,7 +1230,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0x561d1eef2cd09aaa1d5776f42a91aab0b1b520d56c94246b50886181bdbcd4eb50179c897ad544ea486d83133b7106029b3ef15bcf5500a448d113de6bd5e80c",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -1556,12 +1276,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockMetadata",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "18",
@@ -1582,17 +1297,14 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "18"
-            ],
-            "num_blocks": "18"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "18"
+              }
+            ]
           }
         },
         "type": "write_resource"
@@ -1601,12 +1313,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "18"
           }
@@ -1626,17 +1333,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "18",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "18"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -1648,7 +1353,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1657,12 +1362,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -1674,8 +1374,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "18"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "18",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -1684,12 +1393,7 @@
         "address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x099acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
             "coin_register_events": {
@@ -1701,8 +1405,17 @@
                 }
               }
             },
-            "self_address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -1711,14 +1424,7 @@
         "address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -1732,6 +1438,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1749,12 +1456,7 @@
         "address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -1768,13 +1470,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26"
@@ -1784,7 +1480,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0xcb1512869c14c14aa015f88577331e15d89d864f196a144c5b9f2a3d174f0a9ec5ecc3dede3d077a65e7440176876a78290b54582adc5b4126b28e788687f005",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -1830,12 +1526,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockMetadata",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "19",
@@ -1856,17 +1547,14 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "19"
-            ],
-            "num_blocks": "19"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "19"
+              }
+            ]
           }
         },
         "type": "write_resource"
@@ -1875,12 +1563,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "19"
           }
@@ -1900,17 +1583,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "19",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "19"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -1922,7 +1603,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1931,12 +1612,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -1948,8 +1624,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "19"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "19",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -1958,12 +1643,7 @@
         "address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
             "coin_register_events": {
@@ -1975,8 +1655,17 @@
                 }
               }
             },
-            "self_address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -1985,14 +1674,7 @@
         "address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -2006,6 +1688,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -2023,12 +1706,7 @@
         "address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -2042,13 +1720,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd"
@@ -2058,7 +1730,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0x1cc4688a0309f1e0ad31caa9f787df2e0f8e7cef8d663bd75bf1806a17f9ae370a8f7e10e22e6870c53ed4babbde6f52572575870e8a7cc10de2e31ad923cf0b",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -2104,12 +1776,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "block",
-            "name": "BlockMetadata",
-            "generic_type_params": []
-          },
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "20",
@@ -2130,17 +1797,14 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "stake",
-            "name": "ValidatorPerformance",
-            "generic_type_params": []
-          },
+          "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "20"
-            ],
-            "num_blocks": "20"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "20"
+              }
+            ]
           }
         },
         "type": "write_resource"
@@ -2149,12 +1813,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "timestamp",
-            "name": "CurrentTimeMicroseconds",
-            "generic_type_params": []
-          },
+          "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "20"
           }
@@ -2174,17 +1833,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "20",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "20"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -2196,7 +1853,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -2205,12 +1862,7 @@
         "address": "0xa550c18",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
             "coin_register_events": {
@@ -2222,8 +1874,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "20"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "20",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -2232,12 +1893,7 @@
         "address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "account",
-            "name": "Account",
-            "generic_type_params": []
-          },
+          "type": "0x1::account::Account",
           "data": {
             "authentication_key": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
             "coin_register_events": {
@@ -2249,8 +1905,17 @@
                 }
               }
             },
-            "self_address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         },
         "type": "write_resource"
@@ -2259,14 +1924,7 @@
         "address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "coin",
-            "name": "CoinStore",
-            "generic_type_params": [
-              "0x1::aptos_coin::AptosCoin"
-            ]
-          },
+          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
           "data": {
             "coin": {
               "value": "0"
@@ -2280,6 +1938,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -2297,12 +1956,7 @@
         "address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
         "state_key_hash": "",
         "data": {
-          "type": {
-            "address": "0x1",
-            "module": "guid",
-            "name": "Generator",
-            "generic_type_params": []
-          },
+          "type": "0x1::guid::Generator",
           "data": {
             "counter": "3"
           }
@@ -2316,13 +1970,7 @@
     "gas_unit_price": "0",
     "expiration_timestamp_secs": "18446744073709551615",
     "payload": {
-      "function": {
-        "module": {
-          "address": "0x1",
-          "name": "account"
-        },
-        "name": "create_account"
-      },
+      "function": "0x1::account::create_account",
       "type_arguments": [],
       "arguments": [
         "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300"
@@ -2332,7 +1980,7 @@
     "signature": {
       "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
       "signature": "0xaedde14838018ee8c56d30f4d5ffa21bfb26f9512a6ab94614d1f8b0d9d83b9a76220b33918cbd57cc736e3e4ae150b32b0bcf8bf05e514adc194a8f99055a0f",
-      "type": "ed_25519_signature"
+      "type": "ed25519_signature"
     },
     "events": [
       {
@@ -2350,5 +1998,18 @@
     ],
     "timestamp": "20",
     "type": "user_transaction"
+  },
+  {
+    "version": "60",
+    "hash": "",
+    "state_root_hash": "",
+    "event_root_hash": "",
+    "gas_used": "0",
+    "success": true,
+    "vm_status": "Executed successfully",
+    "accumulator_root_hash": "",
+    "changes": [],
+    "timestamp": "20",
+    "type": "state_checkpoint_transaction"
   }
 ]

@@ -34,20 +34,25 @@ pub struct Layout {
     /// Whether to allow new validators to join the set after genesis
     #[serde(default)]
     pub allow_new_validators: bool,
+    /// Duration of an epoch
+    pub epoch_duration_secs: u64,
+    pub is_test: bool,
     /// Minimum stake to be in the validator set
     pub min_stake: u64,
+    /// Minimum number of votes to consider a proposal valid.
+    pub min_voting_threshold: u128,
     /// Maximum stake to be in the validator set
     pub max_stake: u64,
     /// Minimum number of seconds to lockup staked coins
-    pub min_lockup_duration_secs: u64,
-    /// Maximum number of seconds to lockup staked coins
-    pub max_lockup_duration_secs: u64,
-    /// Duration of an epoch
-    pub epoch_duration_secs: u64,
-    /// Initial timestamp for genesis validators to be locked up
-    pub initial_lockup_timestamp: u64,
-    /// Min price per gas unit
-    pub min_price_per_gas_unit: u64,
+    pub recurring_lockup_duration_secs: u64,
+    /// Required amount of stake to create proposals.
+    pub required_proposer_stake: u64,
+    /// Percentage of stake given out as rewards a year (0-100%).
+    pub rewards_apy_percentage: u64,
+    /// Voting duration for a proposal in seconds.
+    pub voting_duration_secs: u64,
+    /// % of current epoch's total voting power that can be added in this epoch.
+    pub voting_power_increase_limit: u64,
 }
 
 impl Layout {
@@ -145,10 +150,12 @@ impl TryFrom<ValidatorConfiguration> for Validator {
             )));
         }
         Ok(Validator {
-            address: derived_address,
+            owner_address: derived_address,
+            // TODO: Set operator and voter according to genesis config file.
+            operator_address: derived_address,
+            voter_address: derived_address,
             consensus_pubkey: config.consensus_public_key.to_bytes().to_vec(),
             proof_of_possession: config.proof_of_possession.to_bytes().to_vec(),
-            operator_address: auth_key.derived_address(),
             network_addresses: bcs::to_bytes(&validator_addresses).unwrap(),
             full_node_network_addresses: bcs::to_bytes(&full_node_addresses).unwrap(),
             stake_amount: config.stake_amount,

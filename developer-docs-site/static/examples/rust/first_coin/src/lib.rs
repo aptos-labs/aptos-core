@@ -39,7 +39,7 @@ impl FirstCoinClient {
     pub fn register_coin(&self, account_receiver: &mut Account, coin_type_address: &str) -> String {
         let payload = serde_json::json!({
             "type": "script_function_payload",
-            "function": "0x1::coin::register",
+            "function": "0x1::coins::register",
             "type_arguments": [format!("0x{}::moon_coin::MoonCoin", coin_type_address)],
             "arguments": []
         });

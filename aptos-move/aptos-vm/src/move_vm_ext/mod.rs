@@ -3,17 +3,14 @@
 
 ///! MoveVM and Session wrapped, to make sure Aptos natives and extensions are always installed and
 ///! taken care of after session finish.
-///
-mod code_context;
+mod aggregator_extension;
 mod resolver;
 mod session;
-mod transaction_context;
 mod vm;
 
 pub use crate::move_vm_ext::{
-    code_context::*,
+    aggregator_extension::{aggregator_natives, NativeAggregatorContext},
     resolver::MoveResolverExt,
     session::{SessionExt, SessionId, SessionOutput},
-    transaction_context::{transaction_context_natives, NativeTransactionContext},
     vm::MoveVmExt,
 };

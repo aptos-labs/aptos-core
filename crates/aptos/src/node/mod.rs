@@ -1,9 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::PromptOptions;
+pub mod analyze;
+
+use crate::common::types::{ConfigSearchMode, PromptOptions};
 use crate::common::utils::prompt_yes_with_override;
 use crate::config::GlobalConfig;
+use crate::node::analyze::analyze_validators::AnalyzeValidators;
+use crate::node::analyze::fetch_metadata::FetchMetadata;
 use crate::{
     common::{
         types::{
@@ -19,6 +23,7 @@ use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::config::{HostAndPort, ValidatorConfiguration};
 use aptos_rest_client::Transaction;
+use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::chain_id::ChainId;
 use aptos_types::{account_address::AccountAddress, account_config::CORE_CODE_ADDRESS};
 use async_trait::async_trait;
@@ -27,17 +32,16 @@ use hex::FromHex;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use reqwest::Url;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::{
-    path::PathBuf,
-    thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{path::PathBuf, thread, time::Duration};
 use tokio::time::Instant;
 
-/// Tool for manipulating nodes
+/// Tool for operations related to nodes
 ///
+/// This tool allows you to run a local test node for testing,
+/// identify issues with nodes, and show related information.
 #[derive(Parser)]
 pub enum NodeTool {
     AddStake(AddStake),
@@ -52,6 +56,7 @@ pub enum NodeTool {
     ShowValidatorStake(ShowValidatorStake),
     RunLocalTestnet(RunLocalTestnet),
     UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
+    AnalyzeValidatorPerformance(AnalyzeValidatorPerformance),
 }
 
 impl NodeTool {
@@ -70,6 +75,7 @@ impl NodeTool {
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
             RunLocalTestnet(tool) => tool.execute_serialized_without_logger().await,
             UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
+            AnalyzeValidatorPerformance(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -92,13 +98,7 @@ impl CliCommand<Transaction> for AddStake {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "add_stake",
-                vec![],
-                vec![bcs::to_bytes(&self.amount)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_add_stake(self.amount))
             .await
     }
 }
@@ -123,13 +123,7 @@ impl CliCommand<Transaction> for UnlockStake {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "unlock",
-                vec![],
-                vec![bcs::to_bytes(&self.amount)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_unlock(self.amount))
             .await
     }
 }
@@ -154,13 +148,7 @@ impl CliCommand<Transaction> for WithdrawStake {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         self.node_op_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "withdraw",
-                vec![],
-                vec![bcs::to_bytes(&self.amount)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_withdraw(self.amount))
             .await
     }
 }
@@ -170,11 +158,6 @@ impl CliCommand<Transaction> for WithdrawStake {
 pub struct IncreaseLockup {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    /// Number of seconds to increase the lockup period by
-    ///
-    /// Examples: '1d', '5 days', '1 month'
-    #[clap(long, parse(try_from_str=parse_duration::parse))]
-    pub(crate) lockup_duration: Duration,
 }
 
 #[async_trait]
@@ -184,26 +167,8 @@ impl CliCommand<Transaction> for IncreaseLockup {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
-        if self.lockup_duration.is_zero() {
-            return Err(CliError::CommandArgumentError(
-                "Must provide a non-zero lockup duration".to_string(),
-            ));
-        }
-
-        let lockup_timestamp_secs = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            .saturating_add(self.lockup_duration.as_secs());
-
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "increase_lockup",
-                vec![],
-                vec![bcs::to_bytes(&lockup_timestamp_secs)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_increase_lockup())
             .await
     }
 }
@@ -382,19 +347,13 @@ impl CliCommand<Transaction> for RegisterValidatorCandidate {
             };
 
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "register_validator_candidate",
-                vec![],
-                vec![
-                    bcs::to_bytes(&consensus_public_key)?,
-                    bcs::to_bytes(&consensus_proof_of_possession)?,
-                    // Double BCS encode, so that we can hide the original type
-                    bcs::to_bytes(&bcs::to_bytes(&validator_network_addresses)?)?,
-                    bcs::to_bytes(&bcs::to_bytes(&full_node_network_addresses)?)?,
-                ],
-            )
+            .submit_transaction(aptos_stdlib::stake_initialize_validator(
+                consensus_public_key.to_bytes().to_vec(),
+                consensus_proof_of_possession.to_bytes().to_vec(),
+                // BCS encode, so that we can hide the original type
+                bcs::to_bytes(&validator_network_addresses)?,
+                bcs::to_bytes(&full_node_network_addresses)?,
+            ))
             .await
     }
 }
@@ -438,13 +397,7 @@ impl CliCommand<Transaction> for JoinValidatorSet {
             .address(&self.txn_options.profile_options)?;
 
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "join_validator_set",
-                vec![],
-                vec![bcs::to_bytes(&address)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_join_validator_set(address))
             .await
     }
 }
@@ -470,13 +423,7 @@ impl CliCommand<Transaction> for LeaveValidatorSet {
             .address(&self.txn_options.profile_options)?;
 
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "leave_validator_set",
-                vec![],
-                vec![bcs::to_bytes(&address)?],
-            )
+            .submit_transaction(aptos_stdlib::stake_leave_validator_set(address))
             .await
     }
 }
@@ -604,7 +551,9 @@ impl CliCommand<()> for RunLocalTestnet {
             .unwrap_or_else(StdRng::from_entropy);
 
         let global_config = GlobalConfig::load()?;
-        let test_dir = global_config.get_config_location()?.join(TESTNET_FOLDER);
+        let test_dir = global_config
+            .get_config_location(ConfigSearchMode::CurrentDirAndParents)?
+            .join(TESTNET_FOLDER);
 
         // Remove the current test directory and start with a new node
         if self.force_restart && test_dir.exists() {
@@ -758,18 +707,109 @@ impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
             };
 
         self.txn_options
-            .submit_script_function(
-                AccountAddress::ONE,
-                "stake",
-                "update_network_and_fullnode_addresses",
-                vec![],
-                vec![
-                    bcs::to_bytes(&address)?,
-                    // Double BCS encode, so that we can hide the original type
-                    bcs::to_bytes(&bcs::to_bytes(&validator_network_addresses)?)?,
-                    bcs::to_bytes(&bcs::to_bytes(&full_node_network_addresses)?)?,
-                ],
-            )
+            .submit_transaction(aptos_stdlib::stake_update_network_and_fullnode_addresses(
+                address,
+                // BCS encode, so that we can hide the original type
+                bcs::to_bytes(&validator_network_addresses)?,
+                bcs::to_bytes(&full_node_network_addresses)?,
+            ))
             .await
+    }
+}
+
+#[derive(Parser)]
+pub struct AnalyzeValidatorPerformance {
+    #[clap(long)]
+    pub start_epoch: Option<u64>,
+    #[clap(long)]
+    pub end_epoch: Option<u64>,
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+    #[clap(arg_enum, long)]
+    pub(crate) analyze_mode: AnalyzeMode,
+}
+
+#[derive(PartialEq, clap::ArgEnum, Clone)]
+pub enum AnalyzeMode {
+    /// Print all other modes simultaneously
+    All,
+    /// For each epoch, print a detailed table containing performance
+    /// of each of the validators.
+    DetailedEpochTable,
+    /// For each validator, summarize it's performance in an epoch into
+    /// one of the predefined reliability buckets,
+    /// and prints it's performance across epochs.
+    ValidatorHealthOverTime,
+    /// For each epoch summarize how many validators were in
+    /// each of the reliability buckets.
+    NetworkHealthOverTime,
+}
+
+#[async_trait]
+impl CliCommand<()> for AnalyzeValidatorPerformance {
+    fn command_name(&self) -> &'static str {
+        "AnalyzeValidatorPerformance"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<()> {
+        let client = self.rest_options.client(&self.profile_options.profile)?;
+
+        let epochs =
+            FetchMetadata::fetch_new_block_events(&client, self.start_epoch, self.end_epoch)
+                .await?;
+        let mut stats = HashMap::new();
+
+        let print_detailed = self.analyze_mode == AnalyzeMode::DetailedEpochTable
+            || self.analyze_mode == AnalyzeMode::All;
+        for epoch_info in epochs {
+            let epoch_stats = AnalyzeValidators::analyze(epoch_info.blocks, &epoch_info.validators);
+            if print_detailed {
+                println!("Detailed table for epoch {}:", epoch_info.epoch);
+                AnalyzeValidators::print_detailed_epoch_table(&epoch_stats, None, true);
+            }
+            stats.insert(epoch_info.epoch, epoch_stats);
+        }
+
+        if stats.is_empty() {
+            println!("No data found for given input");
+            return Ok(());
+        }
+        let total_stats = stats
+            .iter()
+            .map(|(_k, v)| v.clone())
+            .reduce(|a, b| a + b)
+            .unwrap();
+        if print_detailed {
+            println!(
+                "Detailed table for all epochs [{}, {}]:",
+                stats.keys().min().unwrap(),
+                stats.keys().max().unwrap()
+            );
+            AnalyzeValidators::print_detailed_epoch_table(&total_stats, None, true);
+        }
+        let all_validators: Vec<_> = total_stats.validator_stats.keys().cloned().collect();
+        if self.analyze_mode == AnalyzeMode::ValidatorHealthOverTime
+            || self.analyze_mode == AnalyzeMode::All
+        {
+            println!(
+                "Validator health over epochs [{}, {}]:",
+                stats.keys().min().unwrap(),
+                stats.keys().max().unwrap()
+            );
+            AnalyzeValidators::print_validator_health_over_time(&stats, &all_validators, None);
+        }
+        if self.analyze_mode == AnalyzeMode::NetworkHealthOverTime
+            || self.analyze_mode == AnalyzeMode::All
+        {
+            println!(
+                "Network health over epochs [{}, {}]:",
+                stats.keys().min().unwrap(),
+                stats.keys().max().unwrap()
+            );
+            AnalyzeValidators::print_network_health_over_time(&stats, &all_validators);
+        }
+        Ok(())
     }
 }

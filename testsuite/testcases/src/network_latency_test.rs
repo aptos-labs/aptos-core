@@ -7,8 +7,8 @@ use forge::{NetworkContext, NetworkTest, Result, SwarmChaos, SwarmNetworkDelay, 
 pub struct NetworkLatencyTest;
 
 // Delay
-pub const LATENCY_MS: u64 = 80;
-pub const JITTER_MS: u64 = 20;
+pub const LATENCY_MS: u64 = 200;
+pub const JITTER_MS: u64 = 100;
 pub const CORRELATION_PERCENTAGE: u64 = 10;
 
 impl Test for NetworkLatencyTest {
@@ -40,7 +40,7 @@ impl NetworkTest for NetworkLatencyTest {
         );
         println!("{}", msg);
         ctx.report.report_text(msg);
-        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1, None)?;
+        let txn_stat = generate_traffic(ctx, &all_validators, duration, 1)?;
         ctx.report
             .report_txn_stats(format!("{}:delay", self.name()), &txn_stat, duration);
         ctx.swarm().remove_chaos(delay)?;

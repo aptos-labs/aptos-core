@@ -1,8 +1,8 @@
 import { Buffer } from "buffer/"; // the trailing slash is important!
-import { Types } from "./types";
+import { HexEncodedBytes } from "./generated";
 
 // eslint-disable-next-line no-use-before-define
-export type MaybeHexString = HexString | string | Types.HexEncodedBytes;
+export type MaybeHexString = HexString | string | HexEncodedBytes;
 
 /**
  * A util class for working with hex strings.
@@ -59,7 +59,7 @@ export class HexString {
    *  new HexString(string); // "0xstring"
    * ```
    */
-  constructor(hexString: string | Types.HexEncodedBytes) {
+  constructor(hexString: string | HexEncodedBytes) {
     if (hexString.startsWith("0x")) {
       this.hexString = hexString;
     } else {

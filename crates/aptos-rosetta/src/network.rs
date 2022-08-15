@@ -2,18 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::{check_network, get_timestamp, handle_request, with_context, with_empty_request},
+    common::{check_network, handle_request, with_context, with_empty_request},
     error::ApiError,
     types::{
-        Allow, BlockIdentifier, MetadataRequest, NetworkListResponse, NetworkOptionsResponse,
-        NetworkRequest, NetworkStatusResponse, OperationStatusType, OperationType, Version,
+        Allow, MetadataRequest, NetworkListResponse, NetworkOptionsResponse, NetworkRequest,
+        NetworkStatusResponse, OperationStatusType, OperationType, Version,
     },
     RosettaContext, NODE_VERSION, ROSETTA_VERSION,
 };
 use aptos_logger::{debug, trace};
 use warp::Filter;
-
-shadow_rs::shadow!(build);
 
 pub fn list_route(
     server_context: RosettaContext,
@@ -90,7 +88,7 @@ async fn network_options(
         rosetta_version: ROSETTA_VERSION.to_string(),
         // TODO: Get from node via REST API
         node_version: NODE_VERSION.to_string(),
-        middleware_version: build::PKG_VERSION.to_string(),
+        middleware_version: "0.1.0".to_string(),
     };
 
     let operation_statuses = OperationStatusType::all()
@@ -143,33 +141,27 @@ async fn network_status(
     check_network(request.network_identifier, &server_context)?;
     let rest_client = server_context.rest_client()?;
     let block_cache = server_context.block_cache()?;
-    let genesis_block_info = block_cache.get_block_info(0).await?;
-    let genesis_block_identifier = BlockIdentifier::from_block_info(genesis_block_info);
+    let genesis_block_identifier = block_cache.get_block_info_by_height(0).await?.block_id;
     let response = rest_client.get_ledger_information().await?;
     let state = response.state();
 
     // Get the oldest block
-    let oldest_block_identifier = if let Some(version) = state.oldest_ledger_version {
-        let block_info = block_cache.get_block_info_by_version(version).await?;
-        Some(BlockIdentifier::from_block_info(block_info))
-    } else {
-        None
-    };
+    let oldest_block_identifier = block_cache
+        .get_block_info_by_height(state.oldest_block_height)
+        .await?
+        .block_id;
 
     // Get the latest block
-    let latest_version = state.version;
-    // Get the latest block
-    let block_info = block_cache
-        .get_block_info_by_version(latest_version)
+    let current_block = block_cache
+        .get_block_info_by_height(state.block_height)
         .await?;
-    let current_block_identifier = BlockIdentifier::from_block_info(block_info);
-    let current_block_timestamp = get_timestamp(block_info);
+    let current_block_identifier = current_block.block_id;
 
     let response = NetworkStatusResponse {
         current_block_identifier,
-        current_block_timestamp,
+        current_block_timestamp: current_block.timestamp,
         genesis_block_identifier,
-        oldest_block_identifier,
+        oldest_block_identifier: Some(oldest_block_identifier),
         sync_status: None,
         peers: vec![],
     };

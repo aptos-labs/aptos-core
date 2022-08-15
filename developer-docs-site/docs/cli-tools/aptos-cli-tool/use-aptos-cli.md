@@ -680,11 +680,11 @@ SUCCESS proving 1 modules from package `hello_prover` in 1.649s
 
 ### Debug and Print Stacktrace
 
-In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example)
+In this example, we will use `DebugDemo` in [debug-move-example](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example).
 
-First, you need to include Move nursery in your Move.toml file [toml file](debug-move-example/Move.toml)
+First, you need to include Move nursery in your Move [toml file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/Move.toml).
 
-Now, you can use `Debug::print` and `Debug::print_stack_trace` in your [move file](debug-move-example/sources/DebugDemo.move)
+Now, you can use `Debug::print` and `Debug::print_stack_trace` in your [DebugDemo Move file](https://github.com/aptos-labs/aptos-core/tree/main/crates/aptos/debug-move-example/sources/DebugDemo.move).
 
 You can run the following command:
 ```bash
@@ -738,7 +738,7 @@ Arguments must be given a type with a colon to separate it.  In this example, we
 parsed as a string, so we put `string:Hello!`.
 
 ```bash
-$ aptos move run --function-id 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb::Message::set_message --args string:hello!
+$ aptos move run --function-id 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3f90d9de91ed9fb8cb::message::set_message --args string:hello!
 {
   "Result": {
     "changes": [
@@ -816,7 +816,7 @@ $ aptos move run --function-id 0xb9bd2cfa58ca29bce1d7add25fce5c62220604cd0236fe3
 
 Additionally, profiles can replace addresses in the function id.
 ```bash
-$ aptos move run --function-id default::Message::set_message --args string:hello!
+$ aptos move run --function-id default::message::set_message --args string:hello!
 {
   "Result": {
     "changes": [

@@ -50,10 +50,10 @@ impl AptosTest for NFTTransaction {
                     creator.address(),
                     0,
                     0,
-                    vec![false, false, false, false, false],
-                    vec![Vec::new()],
-                    vec![Vec::new()],
-                    vec![Vec::new()],
+                    vec![false, false, false, false, true],
+                    vec!["age".as_bytes().to_vec()],
+                    vec!["3".as_bytes().to_vec()],
+                    vec!["int".as_bytes().to_vec()],
                 ));
 
         let token_txn = creator.sign_with_transaction_builder(token_builder);
@@ -66,8 +66,8 @@ impl AptosTest for NFTTransaction {
                     creator.address(),
                     collection_name.clone(),
                     token_name.clone(),
-                    1,
                     0,
+                    1,
                 ));
         let offer_txn = creator.sign_with_transaction_builder(offer_builder);
         client.submit_and_wait(&offer_txn).await?;
@@ -91,12 +91,28 @@ impl AptosTest for NFTTransaction {
                     creator.address(),
                     collection_name.clone(),
                     token_name.clone(),
-                    1,
                     0,
+                    1,
                 ));
         let transfer_txn =
             owner.sign_multi_agent_with_transaction_builder(vec![&creator], transfer_builder);
         client.submit_and_wait(&transfer_txn).await?;
+
+        let token_mutator =
+            ctx.transaction_factory()
+                .payload(aptos_token_stdlib::token_mutate_token_properties(
+                    creator.address(),
+                    creator.address(),
+                    collection_name.clone(),
+                    token_name.clone(),
+                    0,
+                    2,
+                    vec!["age".as_bytes().to_vec()],
+                    vec!["2".as_bytes().to_vec()],
+                    vec!["int".as_bytes().to_vec()],
+                ));
+        let mutate_txn = creator.sign_with_transaction_builder(token_mutator);
+        client.submit_and_wait(&mutate_txn).await?;
 
         Ok(())
     }

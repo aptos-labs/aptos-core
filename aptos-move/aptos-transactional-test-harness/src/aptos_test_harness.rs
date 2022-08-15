@@ -8,10 +8,11 @@ use aptos_crypto::{
     hash::HashValue,
     ValidCryptoMaterialStringExt,
 };
+use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{aptos_root_address, AccountResource, CoinStoreResource},
+    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -36,7 +37,6 @@ use move_deps::{
     move_compiler::{self, shared::PackagePaths, FullyCompiledProgram},
     move_core_types::{
         account_address::AccountAddress,
-        gas_schedule::{GasAlgebra, GasConstants},
         identifier::{IdentStr, Identifier},
         language_storage::{ModuleId, ResourceKey, TypeTag},
         move_resource::MoveStructType,
@@ -439,19 +439,17 @@ impl<'a> AptosTestAdapter<'a> {
         let account_resource = self.fetch_account_resource(signer_addr)?;
 
         let sequence_number = sequence_number.unwrap_or_else(|| account_resource.sequence_number());
-        let max_number_of_gas_units = GasConstants::default().maximum_number_of_gas_units;
+        let max_number_of_gas_units =
+            TransactionGasParameters::initial().maximum_number_of_gas_units;
         let gas_unit_price = gas_unit_price.unwrap_or(1);
         let max_gas_amount = match max_gas_amount {
             Some(max_gas_amount) => max_gas_amount,
             None => {
                 if gas_unit_price == 0 {
-                    max_number_of_gas_units.get()
+                    max_number_of_gas_units
                 } else {
                     let account_balance = self.fetch_account_balance(signer_addr).unwrap();
-                    std::cmp::min(
-                        max_number_of_gas_units.get(),
-                        account_balance / gas_unit_price,
-                    )
+                    std::cmp::min(max_number_of_gas_units, account_balance / gas_unit_price)
                 }
             }
         };
@@ -494,11 +492,11 @@ impl<'a> AptosTestAdapter<'a> {
 
     fn create_and_fund_account(&mut self, account_addr: AccountAddress, amount: u64) {
         let parameters = self
-            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
+            .fetch_transaction_parameters(&aptos_test_root_address(), None, None, None, None)
             .unwrap();
 
         let txn = RawTransaction::new(
-            aptos_root_address(),
+            aptos_test_root_address(),
             parameters.sequence_number,
             aptos_transaction_builder::aptos_stdlib::account_create_account(account_addr),
             parameters.max_gas_amount,
@@ -514,7 +512,7 @@ impl<'a> AptosTestAdapter<'a> {
             .expect("Failed to create an account. This should not happen.");
 
         let txn = RawTransaction::new(
-            aptos_root_address(),
+            aptos_test_root_address(),
             parameters.sequence_number + 1,
             aptos_transaction_builder::aptos_stdlib::aptos_coin_mint(account_addr, amount),
             parameters.max_gas_amount,
@@ -870,8 +868,9 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     HashValue::zero(),
                     0,
                     block_cmd.time,
-                    vec![],
                     proposer,
+                    Some(0),
+                    vec![],
                     vec![],
                     block_cmd.time,
                 );

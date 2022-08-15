@@ -8,7 +8,7 @@ use aptos_types::{
     access_path,
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::aptos_root_address,
+    account_config::aptos_test_root_address,
     account_state::AccountState,
     account_view::AccountView,
     contract_event::{ContractEvent, EventWithVersion},
@@ -33,7 +33,7 @@ use move_deps::{
     move_core_types::{effects::ChangeSet as MoveChanges, language_storage::TypeTag},
     move_vm_runtime::session::{SerializedReturnValues, Session},
     move_vm_test_utils::DeltaStorage,
-    move_vm_types::gas_schedule::GasStatus,
+    move_vm_types::gas::UnmeteredGasMeter,
 };
 use std::{
     convert::TryFrom,
@@ -139,7 +139,7 @@ impl AptosDebugger {
         let cache = aptos_vm::data_cache::StateViewCache::new(&state_view);
         let sequence_number = match self
             .debugger
-            .get_account_state_by_version(aptos_root_address(), base_version)?
+            .get_account_state_by_version(aptos_test_root_address(), base_version)?
         {
             Some(account) => account
                 .get_account_resource()?
@@ -149,11 +149,11 @@ impl AptosDebugger {
         };
         let txn_data = aptos_vm::transaction_metadata::TransactionMetadata {
             sequence_number,
-            sender: aptos_root_address(),
+            sender: aptos_test_root_address(),
             ..Default::default()
         };
 
-        let (_, output) = vm
+        let (_, output_ext) = vm
             .execute_writeset_transaction(
                 &cache.as_move_resolver(),
                 payload,
@@ -163,7 +163,7 @@ impl AptosDebugger {
             .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
         // Since we execute write sets, deltas cannot be produced.
-        let (_, output) = output.into();
+        let (_, output) = output_ext.into();
 
         if save_write_set {
             self.save_write_sets(&output)?;
@@ -240,7 +240,9 @@ impl AptosDebugger {
         start_seq: u64,
         limit: u64,
     ) -> Result<()> {
-        let events = self.debugger.get_events(event_key, start_seq, limit)?;
+        let events =
+            self.debugger
+                .get_events(event_key, start_seq, limit, self.get_latest_version()?)?;
         let events_data = self.annotate_events(events.as_slice())?;
         for (event, event_data) in events.iter().zip(events_data.iter()) {
             println!("Transaction Version: {}", event.transaction_version);
@@ -336,7 +338,8 @@ impl AptosDebugger {
             &mut Session<DeltaStorage<RemoteStorage<DebuggerStateView>>>,
         ) -> VMResult<SerializedReturnValues>,
     {
-        let move_vm = MoveVmExt::new().unwrap();
+        // TODO(Gas): we should probably fetch the gas schedule from that version, right?
+        let move_vm = MoveVmExt::new(aptos_gas::NativeGasParameters::zeros()).unwrap();
         let state_view = DebuggerStateView::new(&*self.debugger, version.checked_sub(1));
         let state_view_storage = RemoteStorage::new(&state_view);
         let move_changes = override_changeset.unwrap_or_else(MoveChanges::new);
@@ -364,12 +367,11 @@ impl AptosDebugger {
         let predicate = compile_move_script(code_path)?;
         let is_version_ok = |version| {
             self.run_session_at_version(version, override_changeset.clone(), |session| {
-                let mut gas_status = GasStatus::new_unmetered();
                 session.execute_script(
                     predicate.clone(),
                     vec![],
-                    vec![aptos_root_address().to_vec(), sender.to_vec()],
-                    &mut gas_status,
+                    vec![aptos_test_root_address().to_vec(), sender.to_vec()],
+                    &mut UnmeteredGasMeter,
                 )
             })
             .map(|_| ())

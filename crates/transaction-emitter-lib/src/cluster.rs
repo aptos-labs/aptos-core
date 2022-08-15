@@ -12,7 +12,7 @@ use aptos_logger::{info, warn};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
-    types::{account_config::aptos_root_address, chain_id::ChainId, AccountKey, LocalAccount},
+    types::{account_config::aptos_test_root_address, chain_id::ChainId, AccountKey, LocalAccount},
 };
 use rand::seq::SliceRandom;
 use std::convert::TryFrom;
@@ -37,7 +37,7 @@ impl Cluster {
         peers: Vec<Url>,
         mint_key: Ed25519PrivateKey,
         chain_id: ChainId,
-        vasp: bool,
+        reuse_accounts: bool,
     ) -> Result<Self> {
         let num_peers = peers.len();
 
@@ -79,7 +79,7 @@ impl Cluster {
             num_peers
         );
 
-        let mint_key_pair = if vasp {
+        let mint_key_pair = if reuse_accounts {
             dummy_key_pair()
         } else {
             KeyPair::from(mint_key)
@@ -108,7 +108,7 @@ impl Cluster {
 
         let mint_key = args.mint_args.get_mint_key()?;
 
-        let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.vasp)
+        let cluster = Cluster::from_host_port(urls, mint_key, args.chain_id, args.reuse_accounts)
             .await
             .map_err(|e| format_err!("failed to create a cluster from host and port: {}", e))?;
 
@@ -142,12 +142,12 @@ impl Cluster {
     }
 
     pub async fn load_aptos_root_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        self.load_account_with_mint_key(client, aptos_root_address())
+        self.load_account_with_mint_key(client, aptos_test_root_address())
             .await
     }
 
     pub async fn load_faucet_account(&self, client: &RestClient) -> Result<LocalAccount> {
-        self.load_account_with_mint_key(client, aptos_root_address())
+        self.load_account_with_mint_key(client, aptos_test_root_address())
             .await
     }
 

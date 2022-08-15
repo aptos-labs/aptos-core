@@ -96,7 +96,7 @@ impl Evaluator for TpsEvaluator {
 
         let cluster_args = ClusterArgs {
             targets: vec![target_url; self.args.repeat_target_count],
-            vasp: false,
+            reuse_accounts: false,
             mint_args: self.args.mint_args.clone(),
             chain_id: input.baseline_node_information.chain_id,
         };

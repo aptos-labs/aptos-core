@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{
-    CliCommand, CliConfig, CliError, CliTypedResult, ProfileOptions, RestOptions,
+    CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, ProfileOptions, RestOptions,
 };
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
@@ -44,7 +44,7 @@ impl FromStr for ListQuery {
     }
 }
 
-/// Command to list items owned by an address
+/// Command to list resources, modules, or other items owned by an address
 ///
 #[derive(Debug, Parser)]
 pub struct ListAccount {
@@ -54,12 +54,11 @@ pub struct ListAccount {
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
 
-    /// Address of account you want to list resources/modules for
+    /// Address of the account you want to list resources/modules for
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: Option<AccountAddress>,
 
-    /// Type of items to list: resources, modules. (Defaults to 'resources').
-    /// TODO: add options like --tokens --nfts etc
+    /// Type of items to list: [balance, resources, modules]
     #[clap(long, default_value_t = ListQuery::Resources)]
     pub(crate) query: ListQuery,
 }
@@ -74,8 +73,11 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
     async fn execute(self) -> CliTypedResult<Vec<serde_json::Value>> {
         let account = if let Some(account) = self.account {
             account
-        } else if let Some(Some(account)) =
-            CliConfig::load_profile(&self.profile_options.profile)?.map(|p| p.account)
+        } else if let Some(Some(account)) = CliConfig::load_profile(
+            &self.profile_options.profile,
+            ConfigSearchMode::CurrentDirAndParents,
+        )?
+        .map(|p| p.account)
         {
             account
         } else {

@@ -171,13 +171,13 @@ As our wallet account is on devnet, we will set up the `AptosClient` to interact
 import { Types, AptosClient } from 'aptos';
 
 // Create an AptosClient to interact with devnet.
-const client = new AptosClient('https://fullnode.devnet.aptoslabs.com');
+const client = new AptosClient('https://fullnode.devnet.aptoslabs.com/v1');
 
 function App() {
   // ...
 
   // Use the AptosClient to retrieve details about the account.
-  const [account, setAccount] = React.useState<Types.Account | null>(null);
+  const [account, setAccount] = React.useState<Types.AccountData | null>(null);
   React.useEffect(() => {
     if (!address) return;
     client.getAccount(address).then(setAccount);

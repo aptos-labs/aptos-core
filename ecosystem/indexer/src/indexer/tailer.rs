@@ -317,7 +317,9 @@ mod test {
                 epoch: 0,
                 version: 0,
                 timestamp_usecs: 0,
-                oldest_ledger_version: None,
+                oldest_ledger_version: 0,
+                oldest_block_height: 0,
+                block_height: 0,
             }
         }
 
@@ -333,10 +335,11 @@ mod test {
     pub fn wipe_database(conn: &PgPoolConnection) {
         for table in [
             "metadatas",
-            "ownerships",
             "token_activities",
-            "tokens",
+            "token_datas",
+            "token_propertys",
             "collections",
+            "ownerships",
             "write_set_changes",
             "events",
             "user_transactions",
@@ -365,7 +368,7 @@ mod test {
         tailer.run_migrations();
 
         let pg_transaction_processor = DefaultTransactionProcessor::new(conn_pool.clone());
-        let token_transaction_processor = TokenTransactionProcessor::new(conn_pool.clone());
+        let token_transaction_processor = TokenTransactionProcessor::new(conn_pool.clone(), false);
         tailer.add_processor(Arc::new(pg_transaction_processor));
         tailer.add_processor(Arc::new(token_transaction_processor));
         Ok((conn_pool, tailer))
@@ -398,7 +401,6 @@ mod test {
                         "type":"0x1::account::Account",
                         "data":{
                            "authentication_key":"0x1e4dcad3d5d94307f30d51ff66d2ce784e0c2822d3138766907179bcb61f9edc",
-                           "self_address":"0x1",
                            "sequence_number":"0"
                         }
                      }
@@ -479,7 +481,6 @@ mod test {
                               "type":"0x1::account::Account",
                               "data":{
                                  "authentication_key":"0x1e4dcad3d5d94307f30d51ff66d2ce784e0c2822d3138766907179bcb61f9edc",
-                                 "self_address":"0x1",
                                  "sequence_number":"0"
                               }
                            }
@@ -591,15 +592,9 @@ mod test {
               "accumulator_root_hash": "0xb0ad602f805eb20c398f0f29a3504a9ef38bcc52c9c451deb9ec4a2d18807b49",
               "id": "0xeef99391a3fc681f16963a6c03415bc0b1b12b56c00429308fa8bf46ac9eddf0",
               "round": "57600",
-              "previous_block_votes": [],
               "failed_proposer_indices": [],
               "epoch": "1",
-              "previous_block_votes_bitmap": [
-                true,
-                true,
-                false,
-                true
-              ],
+              "previous_block_votes_bitvec": [],
               "proposer": "0x68f04222bd9f8846cda028ea5ba3846a806b04a47e1f1a4f0939f350d713b2eb",
               "timestamp": "1649395495746947",
               "events": [
@@ -610,7 +605,7 @@ mod test {
                     "data": {
                       "epoch": "1",
                       "failed_proposer_indices": [],
-                      "previous_block_votes": [false],
+                      "previous_block_votes_bitvec": [],
                       "proposer": "0xf7c109be515785bba951fc8c51063515d474f78cad150457d6ebd08c4faf2f3b",
                       "round": "1",
                       "time_microseconds": "1656565270489235"
@@ -623,7 +618,7 @@ mod test {
                   "address": "0xa550c18",
                   "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
                   "data": {
-                    "type": "0x1::block::BlockMetadata",
+                    "type": "0x1::block::BlockResource",
                     "data": {
                       "height": "1",
                       "new_block_events": {
@@ -735,7 +730,7 @@ mod test {
                   "address": "0xa550c18",
                   "state_key_hash": "0x220a03e13099533097731c551fe037bbf404dcf765fe4df8743022a298650e6e",
                   "data": {
-                    "type": "0x1::block::BlockMetadata",
+                    "type": "0x1::block::BlockResource",
                     "data": {
                       "height": "1",
                       "new_block_events": {

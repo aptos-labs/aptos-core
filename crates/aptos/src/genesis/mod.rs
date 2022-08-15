@@ -16,6 +16,7 @@ use crate::{
     CliCommand, CliResult,
 };
 use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
+use aptos_genesis::builder::GenesisConfiguration;
 use aptos_genesis::{
     config::{HostAndPort, Layout, ValidatorConfiguration},
     GenesisInfo,
@@ -29,8 +30,10 @@ use std::{path::PathBuf, str::FromStr};
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
 
-/// Tool for setting up and building the Genesis transaction
+/// Tool for setting up an Aptos chain Genesis transaction
 ///
+/// This tool sets up a space for multiple initial "validator"
+/// accounts to build a genesis transaction for a new chain.
 #[derive(Parser)]
 pub enum GenesisTool {
     GenerateGenesis(GenerateGenesis),
@@ -57,6 +60,7 @@ pub struct GenerateGenesis {
     prompt_options: PromptOptions,
     #[clap(flatten)]
     git_options: GitOptions,
+    /// Output directory for Genesis file and waypoint
     #[clap(long, parse(from_os_str))]
     output_dir: Option<PathBuf>,
 }
@@ -134,14 +138,19 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         layout.root_key,
         validators,
         modules,
-        layout.min_price_per_gas_unit,
-        layout.allow_new_validators,
-        layout.min_stake,
-        layout.max_stake,
-        layout.min_lockup_duration_secs,
-        layout.max_lockup_duration_secs,
-        layout.epoch_duration_secs,
-        layout.initial_lockup_timestamp,
+        &GenesisConfiguration {
+            allow_new_validators: layout.allow_new_validators,
+            epoch_duration_secs: layout.epoch_duration_secs,
+            is_test: layout.is_test,
+            min_stake: layout.min_stake,
+            min_voting_threshold: layout.min_voting_threshold,
+            max_stake: layout.max_stake,
+            recurring_lockup_duration_secs: layout.recurring_lockup_duration_secs,
+            required_proposer_stake: layout.required_proposer_stake,
+            rewards_apy_percentage: layout.rewards_apy_percentage,
+            voting_duration_secs: layout.voting_duration_secs,
+            voting_power_increase_limit: layout.voting_power_increase_limit,
+        },
     )?)
 }
 

@@ -130,8 +130,8 @@ async function offerToken(
         BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(creator.hex())),
         BCS.bcsSerializeStr(collection_name),
         BCS.bcsSerializeStr(token_name),
-        BCS.bcsSerializeUint64(amount),
         BCS.bcsSerializeUint64(0),
+        BCS.bcsSerializeUint64(amount),
       ],
     ),
   );
@@ -276,7 +276,7 @@ async function getTokenBalance(
     token_id,
   );
 
-  return token.data.amount;
+  return token.amount;
 }
 
 async function getTokenData(creator: HexString, collection_name: string, token_name: string): Promise<any> {
@@ -294,7 +294,7 @@ async function getTokenData(creator: HexString, collection_name: string, token_n
     "0x3::token::TokenData",
     token_data_id,
   );
-  return token.data;
+  return token;
 }
 //<:!:section_3
 
@@ -303,8 +303,8 @@ async function main() {
 
   const alice = new AptosAccount();
   const bob = new AptosAccount();
-  const collection_name = "Alice's";
-  const token_name = "Alice's first token";
+  const collection_name = "Alice's cat collection";
+  const token_name = "Alice's tabby";
 
   console.log("\n=== Addresses ===");
   console.log(
@@ -322,7 +322,14 @@ async function main() {
   console.log("\n=== Creating Collection and Token ===");
 
   await createCollection(alice, collection_name, "Alice's simple collection", "https://aptos.dev");
-  await createToken(alice, collection_name, token_name, "Alice's simple token", 1, "https://aptos.dev/img/nyan.jpeg");
+  await createToken(
+    alice,
+    collection_name,
+    token_name,
+    "Alice's tabby",
+    1,
+    "https://aptos.dev/img/nyan.jpeg", //TODO: replace with uri link matching ERC1155 off-chain standard
+  );
 
   let token_balance = await getTokenBalance(alice.address(), alice.address(), collection_name, token_name);
   console.log(`Alice's token balance: ${token_balance}`);

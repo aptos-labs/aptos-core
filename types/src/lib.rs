@@ -11,7 +11,6 @@ pub mod block_info;
 pub mod block_metadata;
 pub mod chain_id;
 pub mod contract_event;
-pub mod delta_change_set;
 pub mod epoch_change;
 pub mod epoch_state;
 pub mod event;
@@ -25,6 +24,7 @@ pub mod proof;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
 pub mod serde_helper;
+pub mod stake_pool;
 pub mod state_proof;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test_helpers;
@@ -44,6 +44,7 @@ pub use account_address::AccountAddress as PeerId;
 pub use utility_coin::*;
 
 pub mod account_view;
+pub mod multi_signature;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;

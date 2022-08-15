@@ -10,6 +10,7 @@ pub mod keys;
 #[cfg(any(test, feature = "testing"))]
 pub mod test_utils;
 
+use crate::builder::GenesisConfiguration;
 use crate::config::ValidatorConfiguration;
 use aptos_config::config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE};
 use aptos_crypto::ed25519::Ed25519PublicKey;
@@ -32,23 +33,30 @@ pub struct GenesisInfo {
     validators: Vec<Validator>,
     /// Compiled bytecode of framework modules
     modules: Vec<Vec<u8>>,
-    min_price_per_gas_unit: u64,
+    /// The genesis transaction, once it's been generated
+    genesis: Option<Transaction>,
+
     /// Whether to allow new validators to join the set after genesis
     pub allow_new_validators: bool,
+    /// Duration of an epoch
+    pub epoch_duration_secs: u64,
+    pub is_test: bool,
     /// Minimum stake to be in the validator set
     pub min_stake: u64,
+    /// Minimum number of votes to consider a proposal valid.
+    pub min_voting_threshold: u128,
     /// Maximum stake to be in the validator set
     pub max_stake: u64,
     /// Minimum number of seconds to lockup staked coins
-    pub min_lockup_duration_secs: u64,
-    /// Maximum number of seconds to lockup staked coins
-    pub max_lockup_duration_secs: u64,
-    /// Duration of an epoch
-    pub epoch_duration_secs: u64,
-    /// Initial timestamp for genesis validators to be locked up
-    pub initial_lockup_timestamp: u64,
-    /// The genesis transaction, once it's been generated
-    genesis: Option<Transaction>,
+    pub recurring_lockup_duration_secs: u64,
+    /// Required amount of stake to create proposals.
+    pub required_proposer_stake: u64,
+    /// Percentage of stake given out as rewards a year (0-100%).
+    pub rewards_apy_percentage: u64,
+    /// Voting duration for a proposal in seconds.
+    pub voting_duration_secs: u64,
+    /// Percent of current epoch's total voting power that can be added in this epoch.
+    pub voting_power_increase_limit: u64,
 }
 
 impl GenesisInfo {
@@ -57,14 +65,7 @@ impl GenesisInfo {
         root_key: Ed25519PublicKey,
         configs: Vec<ValidatorConfiguration>,
         modules: Vec<Vec<u8>>,
-        min_price_per_gas_unit: u64,
-        allow_new_validators: bool,
-        min_stake: u64,
-        max_stake: u64,
-        min_lockup_duration_secs: u64,
-        max_lockup_duration_secs: u64,
-        epoch_duration_secs: u64,
-        initial_lockup_timestamp: u64,
+        genesis_config: &GenesisConfiguration,
     ) -> anyhow::Result<GenesisInfo> {
         let mut validators = Vec::new();
 
@@ -77,15 +78,18 @@ impl GenesisInfo {
             root_key,
             validators,
             modules,
-            min_price_per_gas_unit,
-            allow_new_validators,
-            min_stake,
-            max_stake,
-            min_lockup_duration_secs,
-            max_lockup_duration_secs,
-            epoch_duration_secs,
-            initial_lockup_timestamp,
             genesis: None,
+            allow_new_validators: genesis_config.allow_new_validators,
+            epoch_duration_secs: genesis_config.epoch_duration_secs,
+            is_test: genesis_config.is_test,
+            min_stake: genesis_config.min_stake,
+            min_voting_threshold: genesis_config.min_voting_threshold,
+            max_stake: genesis_config.max_stake,
+            recurring_lockup_duration_secs: genesis_config.recurring_lockup_duration_secs,
+            required_proposer_stake: genesis_config.required_proposer_stake,
+            rewards_apy_percentage: genesis_config.rewards_apy_percentage,
+            voting_duration_secs: genesis_config.voting_duration_secs,
+            voting_power_increase_limit: genesis_config.voting_power_increase_limit,
         })
     }
 
@@ -104,15 +108,18 @@ impl GenesisInfo {
             &self.validators,
             &self.modules,
             self.chain_id,
-            vm_genesis::GenesisConfigurations {
-                min_price_per_gas_unit: self.min_price_per_gas_unit,
-                epoch_duration_secs: self.epoch_duration_secs,
-                min_stake: self.min_stake,
-                max_stake: self.max_stake,
-                min_lockup_duration_secs: self.min_lockup_duration_secs,
-                max_lockup_duration_secs: self.max_lockup_duration_secs,
+            vm_genesis::GenesisConfiguration {
                 allow_new_validators: self.allow_new_validators,
-                initial_lockup_timestamp: self.initial_lockup_timestamp,
+                epoch_duration_secs: self.epoch_duration_secs,
+                is_test: true,
+                min_stake: self.min_stake,
+                min_voting_threshold: self.min_voting_threshold,
+                max_stake: self.max_stake,
+                recurring_lockup_duration_secs: self.recurring_lockup_duration_secs,
+                required_proposer_stake: self.required_proposer_stake,
+                rewards_apy_percentage: self.rewards_apy_percentage,
+                voting_duration_secs: self.voting_duration_secs,
+                voting_power_increase_limit: self.voting_power_increase_limit,
             },
         )
     }

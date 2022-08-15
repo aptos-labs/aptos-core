@@ -48,8 +48,8 @@ spec:
         - "--backup-service-address"
         - "http://{{ include "backup.backupService" . }}"
         {{- with .Values.backup }}
-        - "--state-snapshot-interval"
-        - "{{ int .config.state_snapshot_interval }}"
+        - "--state-snapshot-interval-epochs"
+        - "{{ int .config.state_snapshot_interval_epochs }}"
         - "--transaction-batch-size"
         - "{{ int .config.transaction_batch_size }}"
         - "command-adapter"

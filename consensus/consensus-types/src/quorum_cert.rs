@@ -3,17 +3,16 @@
 
 use crate::vote_data::VoteData;
 use anyhow::{ensure, Context};
+use aptos_bitvec::BitVec;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    multi_signature::MultiSignature,
     validator_verifier::ValidatorVerifier,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    fmt::{Display, Formatter},
-};
+use std::fmt::{Display, Formatter};
 
 #[derive(Deserialize, Serialize, Clone, Debug, Eq, PartialEq)]
 pub struct QuorumCert {
@@ -87,12 +86,22 @@ impl QuorumCert {
             ledger_info.timestamp_usecs(),
             None,
         );
+
         let vote_data = VoteData::new(ancestor.clone(), ancestor.clone());
         let li = LedgerInfo::new(ancestor, vote_data.hash());
 
+        let validator_set_size = ledger_info
+            .next_epoch_state()
+            .expect("Next epoch state not found in ledger info")
+            .verifier
+            .len();
+
         QuorumCert::new(
             vote_data,
-            LedgerInfoWithSignatures::new(li, BTreeMap::new()),
+            LedgerInfoWithSignatures::new(
+                li,
+                MultiSignature::new(BitVec::with_num_bits(validator_set_size as u16), None),
+            ),
         )
     }
 
@@ -115,7 +124,7 @@ impl QuorumCert {
                 "Genesis QC has inconsistent commit block with certified block"
             );
             ensure!(
-                self.ledger_info().signatures().is_empty(),
+                self.ledger_info().get_num_voters() == 0,
                 "Genesis QC should not carry signatures"
             );
             return Ok(());

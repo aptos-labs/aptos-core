@@ -34,6 +34,8 @@ mod secure_backend_config;
 pub use secure_backend_config::*;
 mod state_sync_config;
 pub use state_sync_config::*;
+mod sf_streamer_config;
+pub use sf_streamer_config::*;
 mod storage_config;
 pub use storage_config::*;
 mod safety_rules_config;
@@ -79,6 +81,8 @@ pub struct NodeConfig {
     pub api: ApiConfig,
     #[serde(default)]
     pub state_sync: StateSyncConfig,
+    #[serde(default)]
+    pub sf_stream: SfStreamerConfig,
     #[serde(default)]
     pub storage: StorageConfig,
     #[serde(default)]
@@ -192,6 +196,7 @@ impl IdentityBlob {
 
 #[derive(Clone, Copy, Deserialize, Eq, PartialEq, PoemEnum, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[oai(rename_all = "snake_case")]
 pub enum RoleType {
     Validator,
     FullNode,
@@ -271,6 +276,20 @@ impl NodeConfig {
                 .iter()
                 .find(|config| config.network_id == NetworkId::Public)
                 .map(NetworkConfig::peer_id),
+        }
+    }
+
+    pub fn identity_key(&self) -> Option<x25519::PrivateKey> {
+        match self.base.role {
+            RoleType::Validator => self
+                .validator_network
+                .as_ref()
+                .map(NetworkConfig::identity_key),
+            RoleType::FullNode => self
+                .full_node_networks
+                .iter()
+                .find(|config| config.network_id == NetworkId::Public)
+                .map(NetworkConfig::identity_key),
         }
     }
 
@@ -488,11 +507,6 @@ mod test {
         NodeConfig::default_for_public_full_node();
         NodeConfig::default_for_validator();
         NodeConfig::default_for_validator_full_node();
-
-        let docker_public_full_node =
-            std::include_str!("../../../docker/compose/public_full_node/public_full_node.yaml");
-        // Only verify it is in the correct format as the values cannot be loaded for this config
-        NodeConfig::parse(docker_public_full_node).unwrap();
 
         let contents = std::include_str!("test_data/safety_rules.yaml");
         SafetyRulesConfig::parse(contents)

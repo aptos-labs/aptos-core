@@ -3,11 +3,11 @@
 
 use crate::common::types::{CliError, MovePackageDir};
 use crate::CliTypedResult;
-use aptos_vm::move_vm_ext::{ModuleMetadata, PackageMetadata, UpgradePolicy};
+use framework::natives::code::{ModuleMetadata, PackageMetadata, UpgradePolicy};
 use move_deps::move_package::compilation::compiled_package::CompiledPackage;
 use move_deps::move_package::BuildConfig;
 
-/// Represents a built package from which information can be extracted.
+/// Represents a built package on disk from which information can be extracted.
 pub struct BuiltPackage {
     package_dir: MovePackageDir,
     package: CompiledPackage,
@@ -54,10 +54,11 @@ impl BuiltPackage {
     /// Extracts metadata, as needed for publishing a package, from the built package.
     pub fn extract_metadata(
         &self,
-        name: String,
-        upgrade_policy: UpgradePolicy,
+        upgrade_policy: UpgradePolicy, // TODO: put this into Move.toml
     ) -> CliTypedResult<PackageMetadata> {
         let package_path = self.package_dir.get_package_path()?;
+
+        let build_info = serde_yaml::to_string(&self.package.compiled_package_info)?;
 
         let manifest_file = package_path.join("Move.toml");
         let manifest = std::fs::read_to_string(&manifest_file)
@@ -65,9 +66,8 @@ impl BuiltPackage {
         let mut modules = vec![];
         for u in &self.package.root_compiled_units {
             let name = u.unit.name().to_string();
-            let source_path = package_path.join(&u.source_path);
-            let source = std::fs::read_to_string(&source_path)
-                .map_err(|err| CliError::IO(source_path.to_string_lossy().to_string(), err))?;
+            let source = std::fs::read_to_string(&u.source_path)
+                .map_err(|err| CliError::IO(u.source_path.display().to_string(), err))?;
             let source_map = u.unit.serialize_source_map();
             let abi = if let Some(abis) = &self.package.compiled_abis {
                 abis.iter()
@@ -84,12 +84,16 @@ impl BuiltPackage {
                 abi,
             })
         }
+        // TODO: need to build this on publish
+        let error_map = vec![];
 
         Ok(PackageMetadata {
-            name,
+            name: self.name().to_string(),
             upgrade_policy,
+            build_info,
             manifest,
             modules,
+            error_map,
         })
     }
 }

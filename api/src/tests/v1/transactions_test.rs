@@ -519,13 +519,7 @@ async fn test_signing_message_with_script_function_payload() {
     let txn = context.create_user_account(&account);
     let payload = json!({
         "type": "script_function_payload",
-        "function": {
-            "module": {
-                "address": "0x1",
-                "name": "account",
-            },
-            "name": "create_account",
-        },
+        "function": "0x1::account::create_account",
         "type_arguments": [],
         "arguments": [
             account.address().to_hex_literal(), // new_account_address
@@ -680,7 +674,7 @@ async fn test_signing_message_with_payload(
 
     // assert transaction can be submitted into mempool and execute.
     body["signature"] = json!({
-        "type": "ed_25519_signature",
+        "type": "ed25519_signature",
         "public_key": format!("0x{}", hex::encode(sender.public_key().to_bytes())),
         "signature": format!("0x{}", hex::encode(sig.to_bytes())),
     });

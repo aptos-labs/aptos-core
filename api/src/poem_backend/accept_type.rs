@@ -1,7 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use poem::{http::StatusCode, web::Accept, Error, FromRequest, Request, RequestBody, Result};
+use crate::poem_backend::bcs_payload;
+use poem::{web::Accept, FromRequest, Request, RequestBody, Result};
 
 #[derive(PartialEq)]
 pub enum AcceptType {
@@ -19,20 +20,12 @@ impl<'a> FromRequest<'a> for AcceptType {
     }
 }
 
-// Check that the accept type is one of the allowed variants. If there is no
-// accept type and nothing explicitly not allowed, default to JSON.
+/// Check that the accept type is one of the allowed variants. If there is no
+/// overriding explicit accept type, default to JSON.
 fn parse_accept(accept: &Accept) -> Result<AcceptType> {
     for mime in &accept.0 {
-        match mime.as_ref() {
-            "application/json" => return Ok(AcceptType::Json),
-            "application/x-bcs" => return Ok(AcceptType::Bcs),
-            "*/*" => {}
-            wildcard => {
-                return Err(Error::from_string(
-                    &format!("Unsupported Accept type: {:?}", wildcard),
-                    StatusCode::NOT_ACCEPTABLE,
-                ));
-            }
+        if bcs_payload::CONTENT_TYPE == mime.as_ref() {
+            return Ok(AcceptType::Bcs);
         }
     }
 

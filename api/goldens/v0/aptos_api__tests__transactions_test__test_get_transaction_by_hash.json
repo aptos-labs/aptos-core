@@ -16,8 +16,17 @@
             }
           }
         },
-        "self_address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",
-        "sequence_number": "1"
+        "rotation_capability_offer": {
+          "for": {
+            "vec": []
+          }
+        },
+        "sequence_number": "1",
+        "signer_capability_offer": {
+          "for": {
+            "vec": []
+          }
+        }
       }
     }
   },
@@ -40,8 +49,7 @@
       "type": "0x3::token::Collections",
       "data": {
         "collection_data": {
-          "handle": "289233980808638807779268266229635965202",
-          "length": "1"
+          "handle": "289233980808638807779268266229635965202"
         },
         "create_collection_events": {
           "counter": "1",
@@ -71,8 +79,7 @@
           }
         },
         "token_data": {
-          "handle": "47387505257877758666710590976362900572",
-          "length": "0"
+          "handle": "47387505257877758666710590976362900572"
         }
       }
     }
@@ -87,7 +94,6 @@
       "key": "my name",
       "key_type": "0x1::string::String",
       "value": {
-        "count": "0",
         "description": "awesome collection",
         "maximum": "18446744073709551615",
         "mutability_config": {
@@ -96,6 +102,7 @@
           "uri": false
         },
         "name": "my name",
+        "supply": "0",
         "uri": "http://aptoslabs.com/ifonly.json"
       },
       "value_type": "0x3::token::CollectionData"

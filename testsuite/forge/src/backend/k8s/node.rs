@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    scale_stateful_set_replicas, FullNode, HealthCheckError, Node, NodeExt, Result, Validator,
-    Version, KUBECTL_BIN,
+    get_free_port, scale_stateful_set_replicas, FullNode, HealthCheckError, Node, NodeExt, Result,
+    Validator, Version, KUBECTL_BIN, LOCALHOST, NODE_METRIC_PORT, REST_API_HAPROXY_SERVICE_PORT,
+    REST_API_SERVICE_PORT,
 };
-use anyhow::{anyhow, format_err, Context};
+use anyhow::{anyhow, format_err};
 use aptos_config::config::NodeConfig;
 use aptos_logger::info;
 use aptos_rest_client::Client as RestClient;
@@ -20,74 +21,55 @@ use std::{
     time::{Duration, Instant},
 };
 
-const NODE_METRIC_PORT: u64 = 9101;
-
-// this is the port on the validator service itself, as opposed to 80 on the validator haproxy service
-pub const REST_API_SERVICE_PORT: u32 = 8080;
-pub const REST_API_HAPROXY_SERVICE_PORT: u32 = 80;
-
 pub struct K8sNode {
     pub(crate) name: String,
-    pub(crate) sts_name: String,
+    pub(crate) stateful_set_name: String,
     pub(crate) peer_id: PeerId,
-    pub(crate) node_id: usize,
-    pub(crate) dns: String,
-    pub(crate) ip: String,
-    pub(crate) port: u32,
+    pub(crate) index: usize,
+    pub(crate) service_name: String,
     pub(crate) rest_api_port: u32,
     pub version: Version,
     pub namespace: String,
-    // this controls whether the connection routes to HAProxy first
-    pub enable_haproxy: bool,
+    // whether this node has HAProxy in front of it
+    pub haproxy_enabled: bool,
+    // whether we should try using port-forward on the Service to reach this node
+    pub port_forward_enabled: bool,
 }
 
 impl K8sNode {
-    fn port(&self) -> u32 {
-        self.port
-    }
-
     fn rest_api_port(&self) -> u32 {
         self.rest_api_port
     }
 
-    #[allow(dead_code)]
-    fn dns(&self) -> String {
-        self.dns.clone()
-    }
-
-    fn ip(&self) -> String {
-        self.ip.clone()
+    fn service_name(&self) -> String {
+        self.service_name.clone()
     }
 
     #[allow(dead_code)]
-    fn node_id(&self) -> usize {
-        self.node_id
+    fn index(&self) -> usize {
+        self.index
     }
 
     pub(crate) fn rest_client(&self) -> RestClient {
         RestClient::new(self.rest_api_endpoint())
     }
 
-    pub fn sts_name(&self) -> &str {
-        &self.sts_name
+    pub fn stateful_set_name(&self) -> &str {
+        &self.stateful_set_name
     }
 
     fn namespace(&self) -> &str {
         &self.namespace
     }
 
-    pub fn spawn_port_forward(&self) -> Result<()> {
-        let remote_rest_api_port = if self.enable_haproxy {
-            REST_API_HAPROXY_SERVICE_PORT
-        } else {
-            REST_API_SERVICE_PORT
-        };
+    /// Start a port-forward to the node's Service
+    fn port_forward(&self, port: u32, remote_port: u32) -> Result<()> {
         let port_forward_args = [
             "port-forward",
             "-n",
             self.namespace(),
-            &format!("svc/{}", self.dns()),
-            &format!("{}:{}", self.rest_api_port(), remote_rest_api_port),
+            &format!("svc/{}", self.service_name()),
+            &format!("{}:{}", port, remote_port),
         ];
         // spawn a port-forward child process
         let cmd = Command::new(KUBECTL_BIN)
@@ -106,7 +88,10 @@ impl K8sNode {
                         Ok(())
                     }
                     Ok(None) => {
-                        info!("Port-forward started for {:?}", self);
+                        info!(
+                            "Port-forward started for {:?} from {} --> {}",
+                            self, port, remote_port
+                        );
                         Ok(())
                     }
                     Err(err) => Err(anyhow!(
@@ -123,16 +108,42 @@ impl K8sNode {
             )),
         }
     }
+
+    pub fn port_forward_rest_api(&self) -> Result<()> {
+        let remote_rest_api_port = if self.haproxy_enabled {
+            REST_API_HAPROXY_SERVICE_PORT
+        } else {
+            REST_API_SERVICE_PORT
+        };
+        self.port_forward(self.rest_api_port(), remote_rest_api_port)
+    }
 }
 
 #[async_trait::async_trait]
 impl Node for K8sNode {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
     fn peer_id(&self) -> PeerId {
         self.peer_id
     }
 
-    fn name(&self) -> &str {
-        &self.name
+    async fn start(&mut self) -> Result<()> {
+        scale_stateful_set_replicas(self.stateful_set_name(), self.namespace(), 1).await?;
+        // need to port-forward again since the node is coming back
+        // note that we will get a new port
+        if self.port_forward_enabled {
+            self.rest_api_port = get_free_port();
+            self.port_forward_rest_api()?;
+        }
+        self.wait_until_healthy(Instant::now() + Duration::from_secs(60))
+            .await
+    }
+
+    async fn stop(&mut self) -> Result<()> {
+        info!("going to stop node {}", self.stateful_set_name());
+        scale_stateful_set_replicas(self.stateful_set_name(), self.namespace(), 0).await
     }
 
     fn version(&self) -> Version {
@@ -140,33 +151,17 @@ impl Node for K8sNode {
     }
 
     fn rest_api_endpoint(&self) -> Url {
-        Url::from_str(&format!("http://{}:{}", self.ip(), self.rest_api_port()))
+        let host = if self.port_forward_enabled {
+            LOCALHOST
+        } else {
+            &self.service_name
+        };
+        Url::from_str(&format!("http://{}:{}/v1", host, self.rest_api_port()))
             .expect("Invalid URL.")
     }
 
-    fn inspection_service_endpoint(&self) -> Url {
-        Url::parse(&format!("http://{}:{}", self.ip(), self.port())).unwrap()
-    }
-
-    fn config(&self) -> &NodeConfig {
-        todo!()
-    }
-
-    async fn start(&mut self) -> Result<()> {
-        scale_stateful_set_replicas(self.sts_name(), 1)?;
-        self.wait_until_healthy(Instant::now() + Duration::from_secs(60))
-            .await?;
-
-        Ok(())
-    }
-
-    fn stop(&mut self) -> Result<()> {
-        info!("going to stop node {}", self.sts_name());
-        scale_stateful_set_replicas(self.sts_name(), 0)
-    }
-
     fn clear_storage(&mut self) -> Result<()> {
-        let sts_name = self.sts_name.clone();
+        let sts_name = self.stateful_set_name.clone();
         let pvc_name = if sts_name.contains("fullnode") {
             format!("fn-{}-0", sts_name)
         } else {
@@ -174,11 +169,11 @@ impl Node for K8sNode {
         };
         let delete_pvc_args = ["delete", "pvc", &pvc_name];
         info!("{:?}", delete_pvc_args);
-        let cleanup_output = Command::new("kubectl")
+        let cleanup_output = Command::new(KUBECTL_BIN)
             .stdout(Stdio::inherit())
             .args(&delete_pvc_args)
             .output()
-            .expect("failed to scale sts replicas");
+            .expect("failed to clear node storage");
         assert!(
             cleanup_output.status.success(),
             "{}",
@@ -188,19 +183,14 @@ impl Node for K8sNode {
         Ok(())
     }
 
-    async fn health_check(&mut self) -> Result<(), HealthCheckError> {
-        self.rest_client()
-            .get_ledger_information()
-            .await
-            .map(|_| ())
-            .map_err(|e| {
-                HealthCheckError::Failure(format_err!("K8s node health_check failed: {}", e))
-            })
+    fn config(&self) -> &NodeConfig {
+        todo!()
     }
 
+    // TODO: replace this with prometheus query?
     fn counter(&self, counter: &str, port: u64) -> Result<f64> {
         let response: Value =
-            reqwest::blocking::get(format!("http://localhost:{}/counters", port))?.json()?;
+            reqwest::blocking::get(format!("http://{}:{}/counters", LOCALHOST, port))?.json()?;
         if let Value::Number(ref response) = response[counter] {
             if let Some(response) = response.as_f64() {
                 Ok(response)
@@ -220,26 +210,32 @@ impl Node for K8sNode {
         }
     }
 
+    // TODO: verify this still works
     fn expose_metric(&self) -> Result<u64> {
-        let pod_name = format!("{}-0", self.sts_name);
-        let mut port = NODE_METRIC_PORT + 2 * self.node_id as u64;
-        if pod_name.contains("fullnode") {
-            port += 1;
-        }
-        let port_forward_args = [
-            "port-forward",
-            &format!("pod/{}", pod_name),
-            &format!("{}:{}", port, NODE_METRIC_PORT),
-        ];
-        info!("{:?}", port_forward_args);
-        let _ = Command::new("kubectl")
-            .stdout(Stdio::null())
-            .args(&port_forward_args)
-            .spawn()
-            .with_context(|| format!("Error port forwarding for node {}", pod_name))?;
-        thread::sleep(Duration::from_secs(5));
+        let port = get_free_port();
+        self.port_forward(port, NODE_METRIC_PORT)?;
 
-        Ok(port)
+        Ok(port as u64)
+    }
+
+    async fn health_check(&mut self) -> Result<(), HealthCheckError> {
+        self.rest_client()
+            .get_ledger_information()
+            .await
+            .map(|_| ())
+            .map_err(|e| {
+                HealthCheckError::Failure(format_err!("K8s node health_check failed: {}", e))
+            })
+    }
+
+    // TODO: verify this still works
+    fn inspection_service_endpoint(&self) -> Url {
+        Url::parse(&format!(
+            "http://{}:{}",
+            &self.service_name(),
+            self.rest_api_port()
+        ))
+        .unwrap()
     }
 }
 
@@ -249,6 +245,11 @@ impl FullNode for K8sNode {}
 
 impl Debug for K8sNode {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{} @ {}:{}", self.name, self.ip, self.rest_api_port)
+        let host = if self.port_forward_enabled {
+            LOCALHOST
+        } else {
+            &self.service_name
+        };
+        write!(f, "{} @ {}", self.name, host)
     }
 }

@@ -343,15 +343,24 @@ impl Transactions {
             ));
         }
         let state_view = &*self.context.move_resolver()?;
-        let (status, output) = AptosVM::simulate_signed_transaction(&txn, state_view);
+        let (status, output_ext) = AptosVM::simulate_signed_transaction(&txn, state_view);
         let version = self.ledger_info.version();
+
+        // Apply deltas.
+        // TODO: while `into_transaction_output_with_status()` should never fail
+        // to apply deltas, we should propagate errors properly. Fix this when
+        // VM error handling is fixed.
+        let output = output_ext.into_transaction_output(state_view);
+        debug_assert!(
+            matches!(output, Ok(_)),
+            "converting into transaction output failed"
+        );
+        let output = output.unwrap();
+
         let exe_status = match status.into() {
             TransactionStatus::Keep(exec_status) => exec_status,
             _ => ExecutionStatus::MiscellaneousError(None),
         };
-
-        // TODO: Here we need to materialize deltas.
-        let (_, output) = output.into();
 
         let zero_hash = HashValue::zero();
         let info = TransactionInfo::new(
@@ -377,13 +386,7 @@ impl Transactions {
     pub fn list(self, page: Page, accept_type: AcceptType) -> Result<impl Reply, Error> {
         let ledger_version = self.ledger_info.version();
         let limit = page.limit()?;
-        let last_page_start = if ledger_version > (limit as u64) {
-            ledger_version - (limit as u64)
-        } else {
-            0
-        };
-        let start_version = page.start(last_page_start, ledger_version)?;
-
+        let start_version = page.compute_start(limit, ledger_version)?;
         let data = self
             .context
             .get_transactions(start_version, limit, ledger_version)?;

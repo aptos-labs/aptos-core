@@ -74,7 +74,7 @@ spec:
         image: {{ $.Values.validator.image.repo }}:{{ $.Values.validator.image.tag | default $.Values.imageTag }}
       {{- with $.Values.validator }}
         imagePullPolicy: {{ .image.pullPolicy }}
-        command: ["/opt/aptos/bin/aptos-node", "-f", "/opt/aptos/etc/validator.yaml"]
+        command: ["/usr/local/bin/aptos-node", "-f", "/opt/aptos/etc/validator.yaml"]
         resources:
           {{- toYaml .resources | nindent 10 }}
         env:

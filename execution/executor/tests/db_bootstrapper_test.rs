@@ -10,9 +10,11 @@ use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
-    account_config::{aptos_root_address, CoinStoreResource, NewBlockEvent, CORE_CODE_ADDRESS},
+    account_config::{
+        aptos_test_root_address, new_block_event_key, CoinStoreResource, NewBlockEvent,
+        CORE_CODE_ADDRESS,
+    },
     account_view::AccountView,
-    block_metadata::new_block_event_key,
     contract_event::ContractEvent,
     event::EventHandle,
     on_chain_config::{access_path_for_config, ConfigurationResource, OnChainConfig, ValidatorSet},
@@ -48,19 +50,18 @@ fn test_empty_db() {
     let tmp_dir = TempPath::new();
     let db_rw = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
 
-    // BlockExecutor won't be able to boot on empty db due to lack of StartupInfo.
-    assert!(db_rw.reader.get_startup_info().unwrap().is_none());
+    assert!(db_rw
+        .reader
+        .get_latest_ledger_info_option()
+        .unwrap()
+        .is_none());
 
     // Bootstrap empty DB.
     let waypoint = generate_waypoint::<AptosVM>(&db_rw, &genesis_txn).expect("Should not fail.");
     maybe_bootstrap::<AptosVM>(&db_rw, &genesis_txn, waypoint).unwrap();
-    let startup_info = db_rw
-        .reader
-        .get_startup_info()
-        .expect("Should not fail.")
-        .expect("Should not be None.");
+    let ledger_info = db_rw.reader.get_latest_ledger_info().unwrap();
     assert_eq!(
-        Waypoint::new_epoch_boundary(startup_info.latest_ledger_info.ledger_info()).unwrap(),
+        Waypoint::new_epoch_boundary(ledger_info.ledger_info()).unwrap(),
         waypoint
     );
 
@@ -87,7 +88,8 @@ fn execute_and_commit(txns: Vec<Transaction>, db: &DbReaderWriter, signer: &Vali
         .execute_block((block_id, txns), executor.committed_block_id())
         .unwrap();
     assert_eq!(output.num_leaves(), target_version + 1);
-    let ledger_info_with_sigs = gen_ledger_info_with_sigs(epoch, &output, block_id, vec![signer]);
+    let ledger_info_with_sigs =
+        gen_ledger_info_with_sigs(epoch, &output, block_id, &[signer.clone()]);
     executor
         .commit_blocks(vec![block_id], ledger_info_with_sigs)
         .unwrap();
@@ -123,7 +125,7 @@ fn get_aptos_coin_mint_transaction(
     amount: u64,
 ) -> Transaction {
     get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
@@ -138,7 +140,7 @@ fn get_account_transaction(
     _account_key: &Ed25519PrivateKey,
 ) -> Transaction {
     get_test_signed_transaction(
-        aptos_root_address(),
+        aptos_test_root_address(),
         /* sequence_number = */ aptos_root_seq_num,
         aptos_root_key.clone(),
         aptos_root_key.public_key(),
@@ -192,7 +194,7 @@ fn test_new_genesis() {
     let db = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
     let waypoint = bootstrap_genesis::<AptosVM>(&db, &genesis_txn).unwrap();
     let signer = ValidatorSigner::new(
-        genesis.1[0].data.address,
+        genesis.1[0].data.owner_address,
         genesis.1[0].consensus_key.clone(),
     );
 
@@ -234,6 +236,7 @@ fn test_new_genesis() {
                 WriteOp::Value(
                     bcs::to_bytes(&CoinStoreResource::new(
                         1_000_000,
+                        false,
                         EventHandle::random(0),
                         EventHandle::random(0),
                     ))

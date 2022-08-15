@@ -10,8 +10,6 @@
 //! just strings, using the FromStr impl to parse the path param. They can
 //! then be unpacked to the real type beneath.
 
-use crate::MoveStructTag;
-
 use move_deps::move_core_types::identifier::{IdentStr, Identifier};
 
 use serde::{Deserialize, Serialize};
@@ -63,34 +61,5 @@ impl Deref for IdentifierWrapper {
 impl fmt::Display for IdentifierWrapper {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Identifier::fmt(&self.0, f)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct MoveStructTagParam(pub MoveStructTag);
-
-impl FromStr for MoveStructTagParam {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> anyhow::Result<Self, anyhow::Error> {
-        Ok(MoveStructTagParam(MoveStructTag::from_str(s)?))
-    }
-}
-
-impl From<MoveStructTagParam> for MoveStructTag {
-    fn from(value: MoveStructTagParam) -> MoveStructTag {
-        value.0
-    }
-}
-
-impl From<MoveStructTag> for MoveStructTagParam {
-    fn from(value: MoveStructTag) -> MoveStructTagParam {
-        Self(value)
-    }
-}
-
-impl fmt::Display for MoveStructTagParam {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        MoveStructTag::fmt(&self.0, f)
     }
 }

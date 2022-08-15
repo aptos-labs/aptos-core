@@ -1,137 +1,5 @@
 [
   {
-    "type": "user_transaction",
-    "version": "35",
-    "hash": "",
-    "state_root_hash": "",
-    "event_root_hash": "",
-    "gas_used": "133",
-    "success": true,
-    "vm_status": "Executed successfully",
-    "accumulator_root_hash": "",
-    "changes": [
-      {
-        "type": "write_resource",
-        "address": "0xa550c18",
-        "state_key_hash": "",
-        "data": {
-          "type": "0x1::account::Account",
-          "data": {
-            "authentication_key": "0xcef8ffd1ab9017e96132df8a56b22de39a8155e1c3fc32affbbf93eb624b532a",
-            "coin_register_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0xa550c18",
-                  "creation_num": "0"
-                }
-              }
-            },
-            "self_address": "0xa550c18",
-            "sequence_number": "12"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "state_key_hash": "",
-        "data": {
-          "type": "0x1::account::Account",
-          "data": {
-            "authentication_key": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-            "coin_register_events": {
-              "counter": "1",
-              "guid": {
-                "id": {
-                  "addr": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-                  "creation_num": "0"
-                }
-              }
-            },
-            "self_address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-            "sequence_number": "0"
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "state_key_hash": "",
-        "data": {
-          "type": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
-          "data": {
-            "coin": {
-              "value": "0"
-            },
-            "deposit_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-                  "creation_num": "1"
-                }
-              }
-            },
-            "withdraw_events": {
-              "counter": "0",
-              "guid": {
-                "id": {
-                  "addr": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-                  "creation_num": "2"
-                }
-              }
-            }
-          }
-        }
-      },
-      {
-        "type": "write_resource",
-        "address": "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "state_key_hash": "",
-        "data": {
-          "type": "0x1::guid::Generator",
-          "data": {
-            "counter": "3"
-          }
-        }
-      }
-    ],
-    "sender": "0xa550c18",
-    "sequence_number": "11",
-    "max_gas_amount": "2000",
-    "gas_unit_price": "0",
-    "expiration_timestamp_secs": "18446744073709551615",
-    "payload": {
-      "type": "script_function_payload",
-      "function": "0x1::account::create_account",
-      "type_arguments": [],
-      "arguments": [
-        "0x7ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b"
-      ]
-    },
-    "signature": {
-      "type": "ed25519_signature",
-      "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-      "signature": "0x6f333ef75f5a05432fa6b44af7281dbd9ded45384011a6ba928664b8bedf66e92cff87d5ce00e96e2f637539326719431b1f33882bb92901b090bfcd37f5ac06"
-    },
-    "events": [
-      {
-        "key": "0x00000000000000007ed92b4f434df6f2615a6b56ae402c6011b628fbe3a7bb6a028bf1f757f4385b",
-        "sequence_number": "0",
-        "type": "0x1::account::CoinRegisterEvent",
-        "data": {
-          "type_info": {
-            "account_address": "0x1",
-            "module_name": "0x6170746f735f636f696e",
-            "struct_name": "0x4170746f73436f696e"
-          }
-        }
-      }
-    ],
-    "timestamp": "12"
-  },
-  {
     "type": "state_checkpoint_transaction",
     "version": "36",
     "hash": "",
@@ -160,7 +28,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "13",
@@ -183,10 +51,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "13"
-            ],
-            "num_blocks": "13"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "13"
+              }
+            ]
           }
         }
       },
@@ -214,17 +84,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "13",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "13"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -236,7 +104,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -258,8 +126,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "13"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "13",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -280,8 +157,17 @@
                 }
               }
             },
-            "self_address": "0x48a951fe0ed12b29517867e00a3a09da55fcf859497b3f04bbed911cb75669c9",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -304,6 +190,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -391,7 +278,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "14",
@@ -414,10 +301,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "14"
-            ],
-            "num_blocks": "14"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "14"
+              }
+            ]
           }
         }
       },
@@ -445,17 +334,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "14",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "14"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -467,7 +354,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -489,8 +376,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "14"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "14",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -511,8 +407,17 @@
                 }
               }
             },
-            "self_address": "0x95f70f0272707f73ce63f9b09497324a7b2c9118d5d5fb22cb373efd916a681",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -535,6 +440,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -622,7 +528,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "15",
@@ -645,10 +551,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "15"
-            ],
-            "num_blocks": "15"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "15"
+              }
+            ]
           }
         }
       },
@@ -676,17 +584,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "15",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "15"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -698,7 +604,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -720,8 +626,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "15"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "15",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -742,8 +657,17 @@
                 }
               }
             },
-            "self_address": "0x4c989e245d6ce3f3735edb8ef9f84c34d5e6f0991bea502b05cd1ea74d327a22",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -766,6 +690,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -853,7 +778,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "16",
@@ -876,10 +801,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "16"
-            ],
-            "num_blocks": "16"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "16"
+              }
+            ]
           }
         }
       },
@@ -907,17 +834,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "16",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "16"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -929,7 +854,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -951,8 +876,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "16"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "16",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -973,8 +907,17 @@
                 }
               }
             },
-            "self_address": "0x46925daed0a8767bb9437ccccfdf31a1d349a05659710ca0ebe6205d0e5d737e",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -997,6 +940,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1084,7 +1028,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "17",
@@ -1107,10 +1051,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "17"
-            ],
-            "num_blocks": "17"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "17"
+              }
+            ]
           }
         }
       },
@@ -1138,17 +1084,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "17",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "17"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -1160,7 +1104,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1182,8 +1126,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "17"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "17",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1204,8 +1157,17 @@
                 }
               }
             },
-            "self_address": "0xfcad780f86d4ee8a3a200bb9289f77eb824bf1d6c155c8d007fc128bfbc33e06",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1228,6 +1190,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1315,7 +1278,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "18",
@@ -1338,10 +1301,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "18"
-            ],
-            "num_blocks": "18"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "18"
+              }
+            ]
           }
         }
       },
@@ -1369,17 +1334,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "18",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "18"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -1391,7 +1354,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1413,8 +1376,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "18"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "18",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1435,8 +1407,17 @@
                 }
               }
             },
-            "self_address": "0x99acce340661e0c847ca95ff58ced5f474bc30ca7972106e6a90055c1bdeb26",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1459,6 +1440,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1546,7 +1528,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "19",
@@ -1569,10 +1551,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "19"
-            ],
-            "num_blocks": "19"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "19"
+              }
+            ]
           }
         }
       },
@@ -1600,17 +1584,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "19",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "19"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -1622,7 +1604,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1644,8 +1626,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "19"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "19",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1666,8 +1657,17 @@
                 }
               }
             },
-            "self_address": "0xe9be740413c5f028e58ca77e0540355874c210b49bcd8a75db8880a7ac3273cd",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1690,6 +1690,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1777,7 +1778,7 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
-          "type": "0x1::block::BlockMetadata",
+          "type": "0x1::block::BlockResource",
           "data": {
             "epoch_interval": "86400000000",
             "height": "20",
@@ -1800,10 +1801,12 @@
         "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
-            "missed_votes": [
-              "20"
-            ],
-            "num_blocks": "20"
+            "validators": [
+              {
+                "failed_proposals": "0",
+                "successful_proposals": "20"
+              }
+            ]
           }
         }
       },
@@ -1831,17 +1834,15 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "20",
-          "previous_block_votes": [
-            false
-          ],
+          "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
           "time_microseconds": "20"
         }
       }
     ],
-    "previous_block_votes": [
-      false
+    "previous_block_votes_bitvec": [
+      0
     ],
     "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
     "failed_proposer_indices": [],
@@ -1853,7 +1854,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "133",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1875,8 +1876,17 @@
                 }
               }
             },
-            "self_address": "0xa550c18",
-            "sequence_number": "20"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "20",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1897,8 +1907,17 @@
                 }
               }
             },
-            "self_address": "0x626d590a97d6b59c93711a3cdc7aea92eca7fc5c3615084f43394791f1d6d300",
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1921,6 +1940,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1977,6 +1997,19 @@
         }
       }
     ],
+    "timestamp": "20"
+  },
+  {
+    "type": "state_checkpoint_transaction",
+    "version": "60",
+    "hash": "",
+    "state_root_hash": "",
+    "event_root_hash": "",
+    "gas_used": "0",
+    "success": true,
+    "vm_status": "Executed successfully",
+    "accumulator_root_hash": "",
+    "changes": [],
     "timestamp": "20"
   }
 ]

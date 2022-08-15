@@ -21,29 +21,34 @@ mod wrappers;
 
 pub use account::AccountData;
 pub use address::Address;
+pub use block::Block;
 pub use block::BlockInfo;
 pub use bytecode::Bytecode;
 pub use convert::{new_vm_utf8_string, AsConverter, MoveConverter};
-pub use error::Error;
+pub use error::{AptosError, AptosErrorCode, Error};
 pub use event_key::EventKey;
 pub use hash::HashValue;
 pub use index::IndexResponse;
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
-    HexEncodedBytes, MoveFunction, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, ScriptFunctionId, U128, U64,
+    HexEncodedBytes, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
+    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
+    MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MoveValue,
+    ScriptFunctionId, U128, U64,
 };
 pub use response::{
-    Response, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
+    Response, X_APTOS_BLOCK_HEIGHT, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_OLDEST_VERSION,
+    X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION, X_APTOS_OLDEST_BLOCK_HEIGHT,
 };
 pub use table::TableItemRequest;
 pub use transaction::{
-    BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem, DirectWriteSet,
-    EncodeSubmissionRequest, Event, GenesisTransaction, PendingTransaction, ScriptFunctionPayload,
+    AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem,
+    DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest, Event, GenesisPayload,
+    GenesisTransaction, MultiEd25519Signature, PendingTransaction, ScriptFunctionPayload,
     ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction, TransactionData,
     TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
-    TransactionSigningMessage, UserCreateSigningMessageRequest, UserTransaction,
-    UserTransactionRequest, WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload,
-    WriteTableItem,
+    TransactionSignature, TransactionSigningMessage, UserCreateSigningMessageRequest,
+    UserTransaction, UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet,
+    WriteSetChange, WriteSetPayload, WriteTableItem,
 };
-pub use wrappers::{IdentifierWrapper, MoveStructTagParam};
+pub use wrappers::IdentifierWrapper;

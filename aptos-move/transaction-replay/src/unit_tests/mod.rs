@@ -101,6 +101,7 @@ impl AptosValidatorInterface for TestInterface {
         _key: &EventKey,
         _start_seq: u64,
         _limit: u64,
+        _ledger_version: Version,
     ) -> Result<Vec<EventWithVersion>> {
         unimplemented!()
     }

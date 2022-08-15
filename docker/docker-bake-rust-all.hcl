@@ -20,6 +20,8 @@ variable "GIT_BRANCH" {}
 
 variable "GIT_TAG" {}
 
+variable "BUILT_VIA_BUILDKIT" {}
+
 variable "LAST_GREEN_COMMIT" {}
 
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
@@ -47,9 +49,10 @@ target "builder" {
   cache-to   = generate_cache_to("builder")
   tags       = generate_tags("builder")
   args       = {
-    GIT_SHA = "${GIT_SHA}"
+    GIT_SHA         = "${GIT_SHA}"
     GIT_BRANCH      = "${GIT_BRANCH}"
     GIT_TAG         = "${GIT_TAG}"
+    BUILT_VIA_BUILDKIT = "true"
   }
 }
 
@@ -60,7 +63,8 @@ group "all" {
     "node-checker",
     "tools",
     "faucet",
-    "forge"
+    "forge",
+    "telemetry-service"
   ]
 }
 
@@ -76,11 +80,19 @@ target "_common" {
     generate_cache_from("tools"),
     generate_cache_from("faucet"),
     generate_cache_from("forge"),
+    generate_cache_from("telemetry-service"),
   ])
   labels = {
     "org.label-schema.schema-version" = "1.0",
     "org.label-schema.build-date"     = "${BUILD_DATE}"
     "org.label-schema.git-sha"        = "${GIT_SHA}"
+  }
+  args = {
+    GIT_SHA         = "${GIT_SHA}"
+    GIT_BRANCH      = "${GIT_BRANCH}"
+    GIT_TAG         = "${GIT_TAG}"
+    BUILD_DATE      = "${BUILD_DATE}"
+    BUILT_VIA_BUILDKIT = "true"
   }
 }
 
@@ -124,6 +136,13 @@ target "forge" {
   target   = "forge"
   cache-to = generate_cache_to("forge")
   tags     = generate_tags("forge")
+}
+
+target "telemetry-service" {
+  inherits = ["_common"]
+  target = "telemetry-service"
+  cache-to = generate_cache_to("telemetry-service")
+  tags     = generate_tags("telemetry-service")
 }
 
 function "generate_cache_from" {

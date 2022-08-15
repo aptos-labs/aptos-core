@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_types::{
     block_metadata::BlockMetadata,
@@ -132,8 +133,9 @@ impl TransactionBenchState {
             HashValue::zero(),
             0,
             0,
-            validator_set.payload().map(|_| false).collect(),
             *validator_set.payload().next().unwrap().account_address(),
+            Some(0),
+            BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             vec![],
             1,
         );

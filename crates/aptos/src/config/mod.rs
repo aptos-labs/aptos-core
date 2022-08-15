@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliCommand, CliError, CliResult, CliTypedResult, CONFIG_FOLDER};
+use crate::common::types::{
+    CliCommand, CliError, CliResult, CliTypedResult, ConfigSearchMode, CONFIG_FOLDER,
+};
 use crate::common::utils::{
     create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file,
 };
@@ -18,8 +20,10 @@ use std::fmt::Formatter;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-/// Tool for configuration of the CLI tool
+/// Tool for interacting with configuration of the Aptos CLI tool
 ///
+/// This tool handles the global configuration of the CLI tool for
+/// default configuration, and user specific settings.
 #[derive(Parser)]
 pub enum ConfigTool {
     Init(crate::common::init::InitTool),
@@ -33,7 +37,7 @@ impl ConfigTool {
         match self {
             ConfigTool::Init(tool) => tool.execute_serialized_success().await,
             ConfigTool::GenerateShellCompletions(tool) => tool.execute_serialized_success().await,
-            ConfigTool::SetGlobalConfig(tool) => tool.execute_serialized_success().await,
+            ConfigTool::SetGlobalConfig(tool) => tool.execute_serialized().await,
             ConfigTool::ShowGlobalConfig(tool) => tool.execute_serialized().await,
         }
     }
@@ -82,21 +86,22 @@ pub struct SetGlobalConfig {
 }
 
 #[async_trait]
-impl CliCommand<()> for SetGlobalConfig {
+impl CliCommand<GlobalConfig> for SetGlobalConfig {
     fn command_name(&self) -> &'static str {
         "SetGlobalConfig"
     }
 
-    async fn execute(self) -> CliTypedResult<()> {
+    async fn execute(self) -> CliTypedResult<GlobalConfig> {
         // Load the global config
         let mut config = GlobalConfig::load()?;
 
         // Enable all features that are actually listed
         if let Some(config_type) = self.config_type {
-            config.config_type = config_type;
+            config.config_type = Some(config_type);
         }
 
-        config.save()
+        config.save()?;
+        config.display()
     }
 }
 
@@ -112,7 +117,9 @@ impl CliCommand<GlobalConfig> for ShowGlobalConfig {
 
     async fn execute(self) -> CliTypedResult<GlobalConfig> {
         // Load the global config
-        GlobalConfig::load()
+        let config = GlobalConfig::load()?;
+
+        config.display()
     }
 }
 
@@ -122,10 +129,20 @@ const GLOBAL_CONFIG_FILE: &str = "global_config.yaml";
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct GlobalConfig {
     /// Whether to be using Global or Workspace mode
-    pub config_type: ConfigType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config_type: Option<ConfigType>,
 }
 
 impl GlobalConfig {
+    /// Fill in defaults for display via the CLI
+    pub fn display(mut self) -> CliTypedResult<Self> {
+        if self.config_type.is_none() {
+            self.config_type = Some(ConfigType::default());
+        }
+
+        Ok(self)
+    }
+
     pub fn load() -> CliTypedResult<Self> {
         let path = global_folder()?.join(GLOBAL_CONFIG_FILE);
         if path.exists() {
@@ -137,10 +154,10 @@ impl GlobalConfig {
     }
 
     /// Get the config location based on the type
-    pub fn get_config_location(&self) -> CliTypedResult<PathBuf> {
-        match self.config_type {
+    pub fn get_config_location(&self, mode: ConfigSearchMode) -> CliTypedResult<PathBuf> {
+        match self.config_type.unwrap_or_default() {
             ConfigType::Global => global_folder(),
-            ConfigType::Workspace => Ok(current_dir()?.join(CONFIG_FOLDER)),
+            ConfigType::Workspace => find_workspace_config(current_dir()?, mode),
         }
     }
 
@@ -163,6 +180,27 @@ fn global_folder() -> CliTypedResult<PathBuf> {
         Err(CliError::UnexpectedError(
             "Unable to retrieve home directory".to_string(),
         ))
+    }
+}
+
+fn find_workspace_config(
+    starting_path: PathBuf,
+    mode: ConfigSearchMode,
+) -> CliTypedResult<PathBuf> {
+    match mode {
+        ConfigSearchMode::CurrentDir => Ok(starting_path.join(CONFIG_FOLDER)),
+        ConfigSearchMode::CurrentDirAndParents => {
+            let mut current_path = starting_path.clone();
+            loop {
+                let cand = current_path.join(CONFIG_FOLDER);
+                if cand.is_dir() {
+                    break Ok(cand);
+                } else if !current_path.pop() {
+                    // If we aren't able to find the folder, we'll create a new one right here
+                    break Ok(starting_path.join(CONFIG_FOLDER));
+                }
+            }
+        }
     }
 }
 

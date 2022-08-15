@@ -6,7 +6,8 @@ use aptos_config::{keys::ConfigKey, utils::get_available_port};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet::FaucetArgs;
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
-use aptos_types::{account_config::aptos_root_address, chain_id::ChainId};
+use aptos_logger::info;
+use aptos_types::{account_config::aptos_test_root_address, chain_id::ChainId};
 use forge::Node;
 use forge::{Factory, LocalFactory, LocalSwarm};
 use once_cell::sync::Lazy;
@@ -54,13 +55,16 @@ impl SwarmBuilder {
 
     // Gas is not enabled with this setup, it's enabled via forge instance.
     pub async fn build(self) -> LocalSwarm {
+        ::aptos_logger::Logger::new().init();
+        info!("Preparing to finish compiling");
         // TODO change to return Swarm trait
         // Add support for forge
         assert!(self.local);
         static FACTORY: Lazy<LocalFactory> = Lazy::new(|| LocalFactory::from_workspace().unwrap());
 
-        ::aptos_logger::Logger::new().init();
         let version = FACTORY.versions().max().unwrap();
+
+        info!("Node finished compiling");
 
         let init_genesis_config = self.init_genesis_config;
 
@@ -72,9 +76,6 @@ impl SwarmBuilder {
                 self.genesis_modules,
                 self.init_config,
                 Some(Arc::new(move |genesis_config| {
-                    // TODO: migrate to > 0
-                    genesis_config.min_price_per_gas_unit = 0;
-
                     if let Some(init_genesis_config) = &init_genesis_config {
                         (init_genesis_config)(genesis_config);
                     }
@@ -108,7 +109,10 @@ impl SwarmBuilder {
             num_cli_accounts,
         )
         .await;
-
+        println!(
+            "Created CLI with {} accounts for LocalSwarm",
+            num_cli_accounts
+        );
         (swarm, tool, faucet)
     }
 }
@@ -146,7 +150,7 @@ pub fn launch_faucet(
         server_url: endpoint,
         mint_key_file_path: PathBuf::new(),
         mint_key: Some(ConfigKey::new(mint_key)),
-        mint_account_address: Some(aptos_root_address()),
+        mint_account_address: Some(aptos_test_root_address()),
         chain_id,
         maximum_amount: None,
         do_not_delegate: true,

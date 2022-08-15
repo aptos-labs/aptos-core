@@ -4,6 +4,7 @@ use crate::{pruner::db_sub_pruner::DBSubPruner, EventStore};
 use schemadb::SchemaBatch;
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub struct EventStorePruner {
     event_store: Arc<EventStore>,
 }

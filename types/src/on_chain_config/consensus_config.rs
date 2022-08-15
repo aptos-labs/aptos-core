@@ -111,6 +111,8 @@ impl Default for ConsensusConfigV1 {
                     // to have enough useful statistics.
                     proposer_window_num_validators_multiplier: 10,
                     voter_window_num_validators_multiplier: 1,
+                    weight_by_voting_power: true,
+                    use_history_from_previous_epoch_max_count: 5,
                 }),
             ),
         }
@@ -137,18 +139,9 @@ pub enum ProposerElectionType {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LeaderReputationType {
-    // Proposer election based on whether nodes were active
-    ActiveInactive(ActiveInactiveConfig),
     // Proposer election based on whether nodes succeeded or failed
     // their proposer election rounds, and whether they voted.
     ProposerAndVoter(ProposerAndVoterConfig),
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct ActiveInactiveConfig {
-    pub active_weight: u64,
-    pub inactive_weight: u64,
-    pub window_num_validators_multiplier: usize,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -168,6 +161,12 @@ pub struct ProposerAndVoterConfig {
     // Window into history considered for votre statistics, multiplier
     // on top of number of validators
     pub voter_window_num_validators_multiplier: usize,
+    // Flag whether to use voting power as multiplier to the weights
+    pub weight_by_voting_power: bool,
+    // Flag whether to use history from previous epoch (0 if not),
+    // representing a number of historical epochs (beyond the current one)
+    // to consider.
+    pub use_history_from_previous_epoch_max_count: u32,
 }
 
 #[cfg(test)]

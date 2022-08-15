@@ -9,6 +9,7 @@ use crate::{
 };
 
 use aptos_crypto::HashValue;
+use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -21,7 +22,7 @@ use consensus_types::{
     vote_data::VoteData,
 };
 use futures::StreamExt;
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 #[test]
 fn test_round_time_interval() {
@@ -122,7 +123,7 @@ fn generate_sync_info(
     );
     let ledger_info = LedgerInfoWithSignatures::new(
         LedgerInfo::new(commit_block, HashValue::zero()),
-        BTreeMap::new(),
+        MultiSignature::empty(),
     );
     let quorum_cert = QuorumCert::new(
         VoteData::new(
