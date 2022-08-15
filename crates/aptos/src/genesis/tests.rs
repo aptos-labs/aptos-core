@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::types::OptionalPoolAddressArgs;
 use crate::common::utils::read_from_file;
 use crate::genesis::git::from_yaml;
 use crate::genesis::keys::GenerateLayoutTemplate;
@@ -165,6 +166,7 @@ async fn create_layout_file(
 async fn generate_keys(dir: &Path, index: u8) -> PathBuf {
     let output_dir = dir.join(index.to_string());
     let command = GenerateKeys {
+        pool_address_args: OptionalPoolAddressArgs { pool_address: None },
         rng_args: RngArgs::from_seed([index; 32]),
         prompt_options: PromptOptions::yes(),
         output_dir: Some(output_dir.clone()),
