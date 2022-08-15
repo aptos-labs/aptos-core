@@ -51,6 +51,7 @@ export default function useAccounts() {
       address: account.address,
       publicKey: account.publicKey,
     });
+    await sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED);
   };
 
   const removeAccount = async (address: string) => {
@@ -65,6 +66,7 @@ export default function useAccounts() {
         address: firstAvailableAccount.address,
         publicKey: firstAvailableAccount.publicKey,
       } : undefined);
+      await sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED);
     }
   };
 
