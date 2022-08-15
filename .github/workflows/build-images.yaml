@@ -141,7 +141,7 @@ jobs:
     needs: rust-images
     if: |
       !contains(github.event.pull_request.labels.*.name, 'CICD:skip-forge-e2e-test') && (
-        (github.event_name == 'push' && github.ref_name != "main") ||
+        (github.event_name == 'push' && github.ref_name != 'main') ||
         github.event_name == 'workflow_dispatch' ||
         contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
         github.event.pull_request.auto_merge != null ||
