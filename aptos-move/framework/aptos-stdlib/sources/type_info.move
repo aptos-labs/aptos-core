@@ -19,6 +19,11 @@ module aptos_std::type_info {
         type_info.struct_name
     }
 
+    public fun type_address<T>(): address {
+        let type_info = type_of<T>();
+        account_address(&type_info)
+    }
+
     public native fun type_of<T>(): TypeInfo;
     public native fun type_name<T>(): string::String;
 
@@ -32,6 +37,7 @@ module aptos_std::type_info {
         assert!(account_address(&type_info) == @aptos_std, 0);
         assert!(module_name(&type_info) == b"type_info", 1);
         assert!(struct_name(&type_info) == b"TypeInfo", 2);
+        assert!(type_address<TypeInfo>() == account_address(&type_info), 3);
     }
 
     #[test]
