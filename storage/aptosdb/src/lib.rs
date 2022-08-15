@@ -789,9 +789,11 @@ impl AptosDB {
         Ok(())
     }
 
-    fn wake_pruner(&self, latest_version: Version) {
-        self.state_pruner.maybe_wake_pruner(latest_version);
-        self.ledger_pruner.maybe_wake_pruner(latest_version);
+    fn set_pruner_target_version(&self, latest_version: Version) {
+        self.state_pruner
+            .maybe_set_pruner_target_db_version(latest_version);
+        self.ledger_pruner
+            .maybe_set_pruner_target_db_version(latest_version);
     }
 
     fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
@@ -1506,7 +1508,7 @@ impl DbWriter for AptosDB {
                     .expect("Counters should be bumped with transactions being saved.")
                     .bump_op_counters();
 
-                self.wake_pruner(last_version);
+                self.set_pruner_target_version(last_version);
             }
 
             // Once everything is successfully persisted, update the latest in-memory ledger info.
