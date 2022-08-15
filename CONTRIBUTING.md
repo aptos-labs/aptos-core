@@ -17,7 +17,7 @@ git clone https://github.com/aptos-labs/aptos-core.git
 cd aptos-core
 ./scripts/dev_setup.sh
 cargo build
-cargo xtest
+cargo test
 ```
 
 ## Our Development Process
