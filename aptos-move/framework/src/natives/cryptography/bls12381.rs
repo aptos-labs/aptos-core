@@ -158,20 +158,6 @@ fn signature_verify_with_gas<S: traits::Signature>(
     sig.verify_arbitrary_msg(&msg[..], pk).is_ok()
 }
 
-/// This trait defines gas costs for verifying:
-///  * normal (non-aggregated) signatures,
-///  * signature shares (in the multisignature scheme & the aggregate signature scheme)
-///  * multisignatures
-pub trait Bls12381VerifySignatureGasParametersTrait {
-    fn base_cost(&self) -> u64;
-    fn per_pubkey_deserialize_cost(&self) -> u64;
-    fn per_pubkey_subgroup_check_cost(&self) -> u64;
-    fn per_sig_deserialize_cost(&self) -> u64;
-    fn per_sig_verify_cost(&self) -> u64;
-    fn per_msg_hashing_base_cost(&self) -> u64;
-    fn per_msg_byte_hashing_cost(&self) -> u64; // signature verification involves signing |msg| bytes
-}
-
 /// This is a helper function called by our `bls12381_verify_*` functions for:
 ///  * normal (non-aggregated) signatures,
 ///  * signature shares (in the multisignature scheme & the aggregate signature scheme)
@@ -180,13 +166,13 @@ pub trait Bls12381VerifySignatureGasParametersTrait {
 /// Gas cost: base_cost + per_pubkey_deserialize_cost
 ///                     +? ( per_pubkey_subgroup_check_cost * check_pk_subgroup
 ///                          +? ( per_sig_deserialize_cost
-///                              +? ( per_sig_verify_cost + per_msg_hashing_base_cost
-///                                   + per_msg_byte_hashing_cost * |msg| ) ) )
+///                              +? ( per_sig_verify_cost + per_msg_hashing_cost
+///                                   + per_byte_hashing_cost * |msg| ) ) )
 ///
 /// where +? indicates that the expression stops evaluating there if the previous gas-charging step
 /// failed.
-pub fn bls12381_verify_signature_helper<T: Bls12381VerifySignatureGasParametersTrait>(
-    gas_params: &T,
+pub fn bls12381_verify_signature_helper(
+    gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -195,7 +181,7 @@ pub fn bls12381_verify_signature_helper<T: Bls12381VerifySignatureGasParametersT
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 3);
 
-    let mut cost = gas_params.base_cost();
+    let mut cost = gas_params.base_cost;
     let msg_bytes = pop_arg!(arguments, Vec<u8>);
     let aggpk_bytes = pop_arg!(arguments, Vec<u8>);
     let multisig_bytes = pop_arg!(arguments, Vec<u8>);
@@ -203,7 +189,7 @@ pub fn bls12381_verify_signature_helper<T: Bls12381VerifySignatureGasParametersT
     let pk = match bls12381_deserialize_pk_with_gas(
         aggpk_bytes,
         &mut cost,
-        gas_params.per_pubkey_deserialize_cost(),
+        gas_params.per_pubkey_deserialize_cost,
     ) {
         Some(pk) => pk,
         None => {
@@ -215,7 +201,7 @@ pub fn bls12381_verify_signature_helper<T: Bls12381VerifySignatureGasParametersT
         && !bls12381_pk_subgroub_check_with_gas(
             &pk,
             &mut cost,
-            gas_params.per_pubkey_subgroup_check_cost(),
+            gas_params.per_pubkey_subgroup_check_cost,
         )
     {
         return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
@@ -224,7 +210,7 @@ pub fn bls12381_verify_signature_helper<T: Bls12381VerifySignatureGasParametersT
     let sig = match bls12381_deserialize_sig_with_gas(
         multisig_bytes,
         &mut cost,
-        gas_params.per_sig_deserialize_cost(),
+        gas_params.per_sig_deserialize_cost,
     ) {
         Some(sig) => sig,
         None => {
@@ -238,9 +224,9 @@ pub fn bls12381_verify_signature_helper<T: Bls12381VerifySignatureGasParametersT
         &pk,
         msg_bytes,
         &mut cost,
-        gas_params.per_sig_verify_cost(),
-        gas_params.per_msg_hashing_base_cost(),
-        gas_params.per_msg_byte_hashing_cost(),
+        gas_params.per_sig_verify_cost,
+        gas_params.per_msg_hashing_cost,
+        gas_params.per_byte_hashing_cost,
     );
 
     Ok(NativeResult::ok(
@@ -267,15 +253,8 @@ pub fn bls12381_verify_signature_helper<T: Bls12381VerifySignatureGasParametersT
  * Otherwise, if only num_validatable_pubkeys deserialize correctly, an extra per_pubkey_deserialize_cost
  * must be charged for the failed deserialization.
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct Bls12381AggregatePopVerifiedPubkeysGasParameters {
-    pub base_cost: u64,
-    pub per_pubkey_deserialize_cost: u64,
-    pub per_pubkey_aggregate_cost: u64,
-}
-
 fn native_bls12381_aggregate_pop_verified_pubkeys(
-    gas_params: &Bls12381AggregatePopVerifiedPubkeysGasParameters,
+    gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -334,15 +313,8 @@ fn native_bls12381_aggregate_pop_verified_pubkeys(
  * the signature might not verify under the desired (message, public key) pair, or the signature
  * could lie in a small-order subgroup.
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct Bls12381AggregateSignaturesGasParameters {
-    pub base_cost: u64,
-    pub per_sig_deserialize_cost: u64,
-    pub per_sig_aggregate_cost: u64,
-}
-
 pub fn native_bls12381_aggregate_signatures(
-    gas_params: &Bls12381AggregateSignaturesGasParameters,
+    gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -393,15 +365,8 @@ pub fn native_bls12381_aggregate_signatures(
  * where +? indicates that the expression stops evaluating there if the previous gas-charging step
  * failed
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct Bls12381SignatureSubgroupCheckGasParameters {
-    pub base_cost: u64,
-    pub per_sig_deserialize_cost: u64,
-    pub per_sig_subgroup_check_cost: u64,
-}
-
 pub fn native_bls12381_signature_subgroup_check(
-    gas_params: &Bls12381SignatureSubgroupCheckGasParameters,
+    gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -439,15 +404,8 @@ pub fn native_bls12381_signature_subgroup_check(
  * where +? indicates that the expression stops evaluating there if the previous gas-charging step
  * failed
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct Bls12381ValidatePubkeyGasParameters {
-    pub base_cost: u64,
-    pub per_pubkey_deserialize_cost: u64,
-    pub per_pubkey_subgroup_check_cost: u64,
-}
-
 fn native_bls12381_validate_pubkey(
-    gas_params: &Bls12381ValidatePubkeyGasParameters,
+    gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -481,8 +439,8 @@ fn native_bls12381_validate_pubkey(
 *
 *   gas cost: base_cost + per_pubkey_deserialize_cost * min(num_validatable_pubkeys + 1, num_pubkeys)
 *                       +? ( per_sig_deserialize_cost * min(num_viable_sigs + 1, num_sigs)
-*                            +? ( per_pairing_cost + per_msg_hashing_base_cost ) * num_msgs
-*                                 + per_msg_byte_hashing_cost * total_msg_bytes )
+*                            +? ( per_pairing_cost + per_msg_hashing_cost ) * num_msgs
+*                                 + per_byte_hashing_cost * total_msg_bytes )
 *
 * where:
 *    +? indicates the expression stops evaluating there if the previous gas-charging step failed,
@@ -505,17 +463,8 @@ fn native_bls12381_validate_pubkey(
 * Otherwise, if only num_validatable_pubkeys deserialize correctly, an extra per_pubkey_deserialize_cost
 * must be charged for the failed deserialization. We proceed similarly for per_sig_deserialize_cost.
 **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct Bls12381VerifyAggregateSignatureGasParameters {
-    pub base_cost: u64,
-    pub per_pubkey_deserialize_cost: u64,
-    pub per_sig_deserialize_cost: u64,
-    pub per_pairing_cost: u64, // a size-n BLS aggregate signature requires n+1 pairings
-    pub per_msg_hashing_base_cost: u64,
-    pub per_msg_byte_hashing_cost: u64,
-}
 pub fn native_bls12381_verify_aggregate_signature(
-    gas_params: &Bls12381VerifyAggregateSignatureGasParameters,
+    gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -569,7 +518,7 @@ pub fn native_bls12381_verify_aggregate_signature(
     // The cost of verifying a size-n aggregate signatures involves n+1 parings and hashing all
     // the messages to elliptic curve points (proportional to sum of all message lengths).
     cost += gas_params.per_pairing_cost * (messages.len() + 1) as u64
-        + gas_params.per_msg_hashing_base_cost * messages.len() as u64
+        + gas_params.per_msg_hashing_cost * messages.len() as u64
         + messages.iter().fold(0, |sum, msg| sum + msg.len() as u64);
 
     let verify_result = aggsig
@@ -587,55 +536,14 @@ pub fn native_bls12381_verify_aggregate_signature(
  *
  *   gas cost: base_cost + per_pubkey_deserialize_cost
  *                       +? ( per_sig_deserialize_cost
- *                            +? ( per_sig_verify_cost + per_msg_hashing_base_cost
- *                                 + per_msg_byte_hashing_cost * |msg| ) )
+ *                            +? ( per_sig_verify_cost + per_msg_hashing_cost
+ *                                 + per_byte_hashing_cost * |msg| ) )
  *
  * where +? indicates that the expression stops evaluating there if the previous gas-charging step
  * failed
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct Bls12381VerifyMultisignatureGasParameters {
-    pub base_cost: u64,
-    pub per_pubkey_deserialize_cost: u64,
-    pub per_pubkey_subgroup_check_cost: u64,
-    pub per_sig_deserialize_cost: u64,
-    pub per_sig_verify_cost: u64,
-    pub per_msg_hashing_base_cost: u64,
-    pub per_msg_byte_hashing_cost: u64, // signature verification involves signing |msg| bytes
-}
-
-impl Bls12381VerifySignatureGasParametersTrait for Bls12381VerifyMultisignatureGasParameters {
-    fn base_cost(&self) -> u64 {
-        self.base_cost
-    }
-
-    fn per_pubkey_deserialize_cost(&self) -> u64 {
-        self.per_pubkey_deserialize_cost
-    }
-
-    fn per_pubkey_subgroup_check_cost(&self) -> u64 {
-        self.per_pubkey_subgroup_check_cost
-    }
-
-    fn per_sig_deserialize_cost(&self) -> u64 {
-        self.per_sig_deserialize_cost
-    }
-
-    fn per_sig_verify_cost(&self) -> u64 {
-        self.per_sig_verify_cost
-    }
-
-    fn per_msg_hashing_base_cost(&self) -> u64 {
-        self.per_msg_hashing_base_cost
-    }
-
-    fn per_msg_byte_hashing_cost(&self) -> u64 {
-        self.per_msg_byte_hashing_cost
-    }
-}
-
 pub fn native_bls12381_verify_multisignature(
-    gas_params: &Bls12381VerifyMultisignatureGasParameters,
+    gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     arguments: VecDeque<Value>,
@@ -650,55 +558,14 @@ pub fn native_bls12381_verify_multisignature(
  *   gas cost: base_cost + per_pubkey_deserialize_cost
  *                       +? ( per_sig_deserialize_cost
  *                            +? ( per_pubkey_subgroup_check_cost
- *                                 +? ( per_sig_verify_cost + per_msg_hashing_base_cost
- *                                     + per_msg_byte_hashing_cost * |msg| ) ) )
+ *                                 +? ( per_sig_verify_cost + per_msg_hashing_cost
+ *                                     + per_byte_hashing_cost * |msg| ) ) )
  *
  * where +? indicates that the expression stops evaluating there if the previous gas-charging step
  * failed
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct Bls12381VerifyNormalSignatureGasParameters {
-    pub base_cost: u64,
-    pub per_pubkey_deserialize_cost: u64,
-    pub per_pubkey_subgroup_check_cost: u64,
-    pub per_sig_deserialize_cost: u64,
-    pub per_sig_verify_cost: u64,
-    pub per_msg_hashing_base_cost: u64,
-    pub per_msg_byte_hashing_cost: u64, // signature verification involves signing |msg| bytes
-}
-
-impl Bls12381VerifySignatureGasParametersTrait for Bls12381VerifyNormalSignatureGasParameters {
-    fn base_cost(&self) -> u64 {
-        self.base_cost
-    }
-
-    fn per_pubkey_deserialize_cost(&self) -> u64 {
-        self.per_pubkey_deserialize_cost
-    }
-
-    fn per_pubkey_subgroup_check_cost(&self) -> u64 {
-        self.per_pubkey_subgroup_check_cost
-    }
-
-    fn per_sig_deserialize_cost(&self) -> u64 {
-        self.per_sig_deserialize_cost
-    }
-
-    fn per_sig_verify_cost(&self) -> u64 {
-        self.per_sig_verify_cost
-    }
-
-    fn per_msg_hashing_base_cost(&self) -> u64 {
-        self.per_msg_hashing_base_cost
-    }
-
-    fn per_msg_byte_hashing_cost(&self) -> u64 {
-        self.per_msg_byte_hashing_cost
-    }
-}
-
 pub fn native_bls12381_verify_normal_signature(
-    gas_params: &Bls12381VerifyNormalSignatureGasParameters,
+    gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     arguments: VecDeque<Value>,
@@ -720,16 +587,8 @@ pub fn native_bls12381_verify_normal_signature(
  * where +? indicates that the expression stops evaluating there if the previous gas-charging step
  * failed
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct Bls12381VerifyProofOfPosessionGasParameters {
-    pub base_cost: u64,
-    pub per_pubkey_deserialize_cost: u64,
-    pub per_sig_deserialize_cost: u64,
-    pub per_pop_verify_cost: u64,
-}
-
 fn native_bls12381_verify_proof_of_possession(
-    gas_params: &Bls12381VerifyProofOfPosessionGasParameters,
+    gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     mut arguments: VecDeque<Value>,
@@ -771,55 +630,14 @@ fn native_bls12381_verify_proof_of_possession(
  *
  *   gas cost: base_cost + per_pubkey_deserialize_cost
  *                       +? ( per_sig_deserialize_cost
- *                            +? ( per_sig_verify_cost + per_msg_hashing_base_cost
- *                                 + per_msg_byte_hashing_cost * |msg| ) )
+ *                            +? ( per_sig_verify_cost + per_msg_hashing_cost
+ *                                 + per_byte_hashing_cost * |msg| ) )
  *
  * where +? indicates that the expression stops evaluating there if the previous gas-charging step
  * failed
  **************************************************************************************************/
-#[derive(Debug, Clone)]
-pub struct Bls12381VerifySignatureShareGasParameters {
-    pub base_cost: u64,
-    pub per_pubkey_deserialize_cost: u64,
-    pub per_pubkey_subgroup_check_cost: u64,
-    pub per_sig_deserialize_cost: u64,
-    pub per_sig_verify_cost: u64,
-    pub per_msg_hashing_base_cost: u64,
-    pub per_msg_byte_hashing_cost: u64, // signature verification involves signing |msg| bytes
-}
-
-impl Bls12381VerifySignatureGasParametersTrait for Bls12381VerifySignatureShareGasParameters {
-    fn base_cost(&self) -> u64 {
-        self.base_cost
-    }
-
-    fn per_pubkey_deserialize_cost(&self) -> u64 {
-        self.per_pubkey_deserialize_cost
-    }
-
-    fn per_pubkey_subgroup_check_cost(&self) -> u64 {
-        self.per_pubkey_subgroup_check_cost
-    }
-
-    fn per_sig_deserialize_cost(&self) -> u64 {
-        self.per_sig_deserialize_cost
-    }
-
-    fn per_sig_verify_cost(&self) -> u64 {
-        self.per_sig_verify_cost
-    }
-
-    fn per_msg_hashing_base_cost(&self) -> u64 {
-        self.per_msg_hashing_base_cost
-    }
-
-    fn per_msg_byte_hashing_cost(&self) -> u64 {
-        self.per_msg_byte_hashing_cost
-    }
-}
-
 pub fn native_bls12381_verify_signature_share(
-    gas_params: &Bls12381VerifySignatureShareGasParameters,
+    gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
     arguments: VecDeque<Value>,
@@ -836,16 +654,23 @@ pub fn native_bls12381_verify_signature_share(
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct GasParameters {
-    // BLS signatures based on BLS12-381 elliptic curves
-    pub bls12381_aggregate_pop_verified_pubkeys: Bls12381AggregatePopVerifiedPubkeysGasParameters,
-    pub bls12381_aggregate_signatures: Bls12381AggregateSignaturesGasParameters,
-    pub bls12381_signature_subgroup_check: Bls12381SignatureSubgroupCheckGasParameters,
-    pub bls12381_validate_pubkey: Bls12381ValidatePubkeyGasParameters,
-    pub bls12381_verify_aggregate_signature: Bls12381VerifyAggregateSignatureGasParameters,
-    pub bls12381_verify_multisignature: Bls12381VerifyMultisignatureGasParameters,
-    pub bls12381_verify_normal_signature: Bls12381VerifyNormalSignatureGasParameters,
-    pub bls12381_verify_proof_of_possession: Bls12381VerifyProofOfPosessionGasParameters,
-    pub bls12381_verify_signature_share: Bls12381VerifySignatureShareGasParameters,
+    pub base_cost: u64,
+
+    pub per_pubkey_deserialize_cost: u64,
+    pub per_pubkey_aggregate_cost: u64,
+    pub per_pubkey_subgroup_check_cost: u64,
+
+    pub per_sig_deserialize_cost: u64,
+    pub per_sig_aggregate_cost: u64,
+    pub per_sig_subgroup_check_cost: u64,
+
+    pub per_sig_verify_cost: u64,
+    pub per_pop_verify_cost: u64,
+
+    pub per_pairing_cost: u64, // a size-n BLS aggregate signature requires n+1 pairings
+
+    pub per_msg_hashing_cost: u64,
+    pub per_byte_hashing_cost: u64, // signature verification involves signing |msg| bytes
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {
@@ -854,63 +679,63 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         (
             "aggregate_pop_verified_pubkeys",
             make_native_from_func(
-                gas_params.bls12381_aggregate_pop_verified_pubkeys,
+                gas_params.clone(),
                 native_bls12381_aggregate_pop_verified_pubkeys,
             ),
         ),
         (
             "aggregate_signatures",
             make_native_from_func(
-                gas_params.bls12381_aggregate_signatures,
+                gas_params.clone(),
                 native_bls12381_aggregate_signatures,
             ),
         ),
         (
             "signature_subgroup_check",
             make_native_from_func(
-                gas_params.bls12381_signature_subgroup_check,
+                gas_params.clone(),
                 native_bls12381_signature_subgroup_check,
             ),
         ),
         (
             "validate_pubkey",
             make_native_from_func(
-                gas_params.bls12381_validate_pubkey,
+                gas_params.clone(),
                 native_bls12381_validate_pubkey,
             ),
         ),
         (
             "verify_aggregate_signature",
             make_native_from_func(
-                gas_params.bls12381_verify_aggregate_signature,
+                gas_params.clone(),
                 native_bls12381_verify_aggregate_signature,
             ),
         ),
         (
             "verify_multisignature",
             make_native_from_func(
-                gas_params.bls12381_verify_multisignature,
+                gas_params.clone(),
                 native_bls12381_verify_multisignature,
             ),
         ),
         (
             "verify_normal_signature",
             make_native_from_func(
-                gas_params.bls12381_verify_normal_signature,
+                gas_params.clone(),
                 native_bls12381_verify_normal_signature,
             ),
         ),
         (
             "verify_proof_of_possession",
             make_native_from_func(
-                gas_params.bls12381_verify_proof_of_possession,
+                gas_params.clone(),
                 native_bls12381_verify_proof_of_possession,
             ),
         ),
         (
             "verify_signature_share",
             make_native_from_func(
-                gas_params.bls12381_verify_signature_share,
+                gas_params.clone(),
                 native_bls12381_verify_signature_share,
             ),
         ),
