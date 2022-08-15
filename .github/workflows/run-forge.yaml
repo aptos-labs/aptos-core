@@ -32,7 +32,11 @@ on:
         type: string
         default: land_blocking
         description: Test suite to run
-
+      POST_TO_SLACK:
+        required: false
+        type: boolean
+        default: false
+        description: Whether to post the test results comment to Slack
 env:
   AWS_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -51,6 +55,7 @@ env:
   FORGE_RUNNER_TPS_THRESHOLD: ${{ inputs.FORGE_RUNNER_TPS_THRESHOLD }}
   FORGE_NAMESPACE: ${{ inputs.FORGE_NAMESPACE }}
   FORGE_TEST_SUITE: ${{ inputs.FORGE_TEST_SUITE }}
+  POST_TO_SLACK: ${{ inputs.POST_TO_SLACK }}
 
 jobs:
   forge:
@@ -115,13 +120,30 @@ jobs:
           # add github step summary as described here https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary
           cat $FORGE_COMMENT >> $GITHUB_STEP_SUMMARY
 
+          # get the Forge comment into text
+          echo "FORGE_COMMENT_TEXT=$(cat $FORGE_COMMENT | jq -Rsa)" >> $GITHUB_ENV
+
           if [ "$FORGE_BLOCKING" = "true" ]; then
             exit $FORGE_EXIT_CODE
           fi
 
       - name: Post forge result comment
+        # Post a Github comment if the run has not been cancelled and if we're running on a PR
         if: env.FORGE_ENABLED == 'true' && github.event.number != null && !cancelled()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           append: true
           path: ${{ env.FORGE_COMMENT }}
+      - name: Post to a Slack channel
+        # Post a Slack comment if the run has not been cancelled and the envs are set
+        if: env.FORGE_ENABLED == 'true' && env.POST_TO_SLACK == 'true' && !cancelled()
+        id: slack
+        uses: slackapi/slack-github-action@v1.21.0
+        with:
+          # For posting a rich message using Block Kit
+          payload: |
+            {
+              "text": "${{ github.job }}(${{ inputs.FORGE_TEST_SUITE }}) ${{ job.status }}: ${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}
