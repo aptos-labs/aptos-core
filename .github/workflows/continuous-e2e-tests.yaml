@@ -29,6 +29,7 @@ jobs:
       FORGE_RUNNER_TPS_THRESHOLD: 5000
       # Land blocking is performance test
       FORGE_TEST_SUITE: land_blocking
+      POST_TO_SLACK: true
   # Test under sub optimal circumstances (network delay / loss)
   run-forge-chaos:
     uses: ./.github/workflows/run-forge.yaml
@@ -42,6 +43,7 @@ jobs:
       FORGE_RUNNER_TPS_THRESHOLD: 100
       # Pre release has chaos applied
       FORGE_TEST_SUITE: chaos
+      POST_TO_SLACK: true
   # Run a faster chaos forge to quickly surface correctness failures
   run-forge-fast-chaos:
     uses: ./.github/workflows/run-forge.yaml
@@ -55,6 +57,7 @@ jobs:
       FORGE_RUNNER_TPS_THRESHOLD: 100
       # Pre release has chaos applied
       FORGE_TEST_SUITE: chaos
+      POST_TO_SLACK: true
   # Example new forge nightly test, simply add this block below to schedule your own forge job
   # run-forge-example:
   #   uses: ./.github/workflows/run-forge.yaml
