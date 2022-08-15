@@ -948,6 +948,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-push-metrics"
+version = "0.1.0"
+dependencies = [
+ "aptos-logger",
+ "aptos-metrics-core",
+ "ureq",
+]
+
+[[package]]
 name = "aptos-rate-limiter"
 version = "0.1.0"
 dependencies = [
@@ -1109,19 +1118,10 @@ version = "0.1.0"
 dependencies = [
  "aptos-config",
  "aptos-logger",
- "aptos-secure-push-metrics",
+ "aptos-metrics-core",
  "once_cell",
  "serde 1.0.141",
  "thiserror",
-]
-
-[[package]]
-name = "aptos-secure-push-metrics"
-version = "0.1.0"
-dependencies = [
- "aptos-logger",
- "aptos-metrics-core",
- "ureq",
 ]
 
 [[package]]
@@ -1867,7 +1867,7 @@ dependencies = [
  "aptos-jellyfish-merkle",
  "aptos-logger",
  "aptos-proptest-helpers",
- "aptos-secure-push-metrics",
+ "aptos-push-metrics",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
@@ -3551,8 +3551,8 @@ dependencies = [
  "aptos-infallible",
  "aptos-jellyfish-merkle",
  "aptos-logger",
+ "aptos-push-metrics",
  "aptos-sdk",
- "aptos-secure-push-metrics",
  "aptos-state-view",
  "aptos-temppath",
  "aptos-transaction-builder",
@@ -8207,9 +8207,9 @@ dependencies = [
  "aptos-global-constants",
  "aptos-infallible",
  "aptos-logger",
+ "aptos-metrics-core",
  "aptos-proptest-helpers",
  "aptos-secure-net",
- "aptos-secure-push-metrics",
  "aptos-secure-storage",
  "aptos-temppath",
  "aptos-types",
