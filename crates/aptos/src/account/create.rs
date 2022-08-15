@@ -19,15 +19,15 @@ pub const DEFAULT_FUNDED_COINS: u64 = 10_000;
 pub struct CreateAccount {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    /// Address to create account for
+    /// Address of the new account
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
-    /// Flag for using faucet to create the account
+    /// If set, the faucet will be used to create the new account
     #[clap(long)]
     pub(crate) use_faucet: bool,
     #[clap(flatten)]
     pub(crate) faucet_options: FaucetOptions,
-    /// Initial coins to fund when using the faucet
+    /// Number of initial coins to fund when using the faucet
     #[clap(long, default_value_t = DEFAULT_FUNDED_COINS)]
     pub(crate) initial_coins: u64,
 }

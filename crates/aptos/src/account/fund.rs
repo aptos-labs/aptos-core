@@ -20,7 +20,7 @@ use clap::Parser;
 pub struct FundAccount {
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
-    /// Address to create account for
+    /// Address to fund
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
     #[clap(flatten)]
@@ -28,7 +28,6 @@ pub struct FundAccount {
     /// Coins to fund when using the faucet
     #[clap(long, default_value_t = DEFAULT_FUNDED_COINS)]
     pub(crate) num_coins: u64,
-    /// if passed, rest endpoint to wait for transaction to complete
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
 }

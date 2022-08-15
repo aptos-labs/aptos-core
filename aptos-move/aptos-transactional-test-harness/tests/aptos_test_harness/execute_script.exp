@@ -9,6 +9,7 @@ key 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin> {
     coin: store 0x1::coin::Coin<0x1::aptos_coin::AptosCoin> {
         value: 10100
     }
+    frozen: false
     deposit_events: store 0x1::event::EventHandle<0x1::coin::DepositEvent> {
         counter: 2
         guid: drop store 0x1::guid::GUID {

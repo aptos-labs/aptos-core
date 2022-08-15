@@ -194,7 +194,7 @@ fn test_new_genesis() {
     let db = DbReaderWriter::new(AptosDB::new_for_test(&tmp_dir));
     let waypoint = bootstrap_genesis::<AptosVM>(&db, &genesis_txn).unwrap();
     let signer = ValidatorSigner::new(
-        genesis.1[0].data.address,
+        genesis.1[0].data.owner_address,
         genesis.1[0].consensus_key.clone(),
     );
 
@@ -236,6 +236,7 @@ fn test_new_genesis() {
                 WriteOp::Value(
                     bcs::to_bytes(&CoinStoreResource::new(
                         1_000_000,
+                        false,
                         EventHandle::random(0),
                         EventHandle::random(0),
                     ))

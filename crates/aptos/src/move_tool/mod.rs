@@ -60,8 +60,11 @@ use std::{
 use tokio::task;
 use transactional_tests_runner::TransactionalTestOpts;
 
-/// CLI tool for performing Move tasks
+/// Tool for Move related operations
 ///
+/// This tool lets you compile, test, and publish Move code, in addition
+/// to run any other tools that help run, verify, or provide information
+/// about this code.
 #[derive(Subcommand)]
 pub enum MoveTool {
     Compile(CompilePackage),
@@ -304,7 +307,7 @@ impl CliCommand<&'static str> for ProvePackage {
 
         match result {
             Ok(_) => Ok("Success"),
-            Err(_) => Err(CliError::MoveProverError),
+            Err(err) => Err(CliError::MoveProverError(err.to_string())),
         }
     }
 }

@@ -42,6 +42,9 @@ module aptos_framework::coin {
 
     const EINVALID_COIN_AMOUNT: u64 = 8;
 
+    /// Coins cannot be deposited or withdrawn from this CoinStore.
+    const EFROZEN: u64 = 9;
+
     const MAX_U128: u128 = 340282366920938463463374607431768211455;
 
     /// Core data structures
@@ -56,6 +59,7 @@ module aptos_framework::coin {
     /// These are kept in a single resource to ensure locality of data.
     struct CoinStore<phantom CoinType> has key {
         coin: Coin<CoinType>,
+        frozen: bool,
         deposit_events: EventHandle<DepositEvent>,
         withdraw_events: EventHandle<WithdrawEvent>,
     }
@@ -69,7 +73,7 @@ module aptos_framework::coin {
         /// Number of decimals used to get its user representation.
         /// For example, if `decimals` equals `2`, a balance of `505` coins should
         /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
-        decimals: u64,
+        decimals: u8,
         /// Amount of this coin type in existence.
         supply: Option<u128>,
     }
@@ -86,6 +90,9 @@ module aptos_framework::coin {
 
     /// Capability required to mint coins.
     struct MintCapability<phantom CoinType> has copy, key, store { }
+
+    /// Capability required to freeze a coin store.
+    struct FreezeCapability<phantom CoinType> has copy, key, store { }
 
     /// Capability required to burn coins.
     struct BurnCapability<phantom CoinType> has copy, key, store { }
@@ -132,7 +139,7 @@ module aptos_framework::coin {
     /// Returns the number of decimals used to get its user representation.
     /// For example, if `decimals` equals `2`, a balance of `505` coins should
     /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
-    public fun decimals<CoinType>(): u64 acquires CoinInfo {
+    public fun decimals<CoinType>(): u8 acquires CoinInfo {
         let type_info = type_info::type_of<CoinType>();
         let coin_address = type_info::account_address(&type_info);
         borrow_global<CoinInfo<CoinType>>(coin_address).decimals
@@ -166,6 +173,8 @@ module aptos_framework::coin {
     /// Burn `coin` from the specified `account` with capability.
     /// The capability `burn_cap` should be passed as a reference to `BurnCapability<CoinType>`.
     /// This function shouldn't fail as it's called as part of transaction fee burning.
+    ///
+    /// Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be burned.
     public fun burn_from<CoinType>(
         account_addr: address,
         amount: u64,
@@ -189,6 +198,11 @@ module aptos_framework::coin {
         );
 
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+        assert!(
+            !coin_store.frozen,
+            error::permission_denied(EFROZEN),
+        );
+
         event::emit_event<DepositEvent>(
             &mut coin_store.deposit_events,
             DepositEvent { amount: coin.value },
@@ -219,6 +233,15 @@ module aptos_framework::coin {
         Coin { value: total_value }
     }
 
+    /// Freeze a CoinStore to prevent transfers
+    public entry fun freeze_coin_store<CoinType>(
+        account_addr: address,
+        _freeze_cap: &FreezeCapability<CoinType>,
+    ) acquires CoinStore {
+        let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+        coin_store.frozen = true
+    }
+
     /// Creates a new Coin with given `CoinType` and returns minting/burning capabilities.
     /// The given signer also becomes the account hosting the information
     /// about the coin (name, supply, etc.).
@@ -226,9 +249,9 @@ module aptos_framework::coin {
         account: &signer,
         name: string::String,
         symbol: string::String,
-        decimals: u64,
+        decimals: u8,
         monitor_supply: bool,
-    ): (MintCapability<CoinType>, BurnCapability<CoinType>) {
+    ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         let account_addr = signer::address_of(account);
 
         let type_info = type_info::type_of<CoinType>();
@@ -250,7 +273,7 @@ module aptos_framework::coin {
         };
         move_to(account, coin_info);
 
-        (MintCapability<CoinType> { }, BurnCapability<CoinType> { })
+        (BurnCapability<CoinType>{ }, FreezeCapability<CoinType>{ }, MintCapability<CoinType>{ })
     }
 
     /// "Merges" the two given coins.  The coin passed in as `dst_coin` will have a value equal
@@ -297,6 +320,7 @@ module aptos_framework::coin {
 
         let coin_store = CoinStore<CoinType> {
             coin: Coin { value: 0 },
+            frozen: false,
             deposit_events: event::new_event_handle<DepositEvent>(account),
             withdraw_events: event::new_event_handle<WithdrawEvent>(account),
         };
@@ -328,7 +352,12 @@ module aptos_framework::coin {
             is_account_registered<CoinType>(account_addr),
             error::not_found(ECOIN_STORE_NOT_PUBLISHED),
         );
+
         let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+        assert!(
+            !coin_store.frozen,
+            error::permission_denied(EFROZEN),
+        );
 
         event::emit_event<WithdrawEvent>(
             &mut coin_store.withdraw_events,
@@ -345,17 +374,27 @@ module aptos_framework::coin {
         }
     }
 
-    //
-    // Tests
-    //
+    /// Freeze capability is dangerous and therefore should be destroyed if not used.
+    public fun destroy_freeze_cap<CoinType>(freeze_cap: FreezeCapability<CoinType>) {
+        let FreezeCapability<CoinType> { } = freeze_cap;
+    }
+
+    public fun destroy_mint_cap<CoinType>(mint_cap: MintCapability<CoinType>) {
+        let MintCapability<CoinType> { } = mint_cap;
+    }
+
+    public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
+        let BurnCapability<CoinType> { } = burn_cap;
+    }
 
     #[test_only]
     struct FakeMoney { }
 
     #[test_only]
     struct FakeMoneyCapabilities has key {
-        mint_cap: MintCapability<FakeMoney>,
         burn_cap: BurnCapability<FakeMoney>,
+        freeze_cap: FreezeCapability<FakeMoney>,
+        mint_cap: MintCapability<FakeMoney>,
     }
 
     #[test_only]
@@ -367,7 +406,7 @@ module aptos_framework::coin {
         let name = string::utf8(b"Fake money");
         let symbol = string::utf8(b"FMD");
 
-        let (mint_cap, burn_cap) = initialize<FakeMoney>(
+        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             source,
             name,
             symbol,
@@ -379,8 +418,9 @@ module aptos_framework::coin {
         let coins_minted = mint<FakeMoney>(amount, &mint_cap);
         deposit(signer::address_of(source), coins_minted);
         move_to(source, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
             mint_cap,
-            burn_cap
         });
     }
 
@@ -395,7 +435,7 @@ module aptos_framework::coin {
         let name = string::utf8(b"Fake money");
         let symbol = string::utf8(b"FMD");
 
-        let (mint_cap, burn_cap) = initialize<FakeMoney>(
+        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             &source,
             name,
             symbol,
@@ -424,8 +464,9 @@ module aptos_framework::coin {
         assert!(*option::borrow(&supply<FakeMoney>()) == 90, 8);
 
         move_to(&source, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
             mint_cap,
-            burn_cap
         });
     }
 
@@ -437,7 +478,7 @@ module aptos_framework::coin {
         let source_addr = signer::address_of(&source);
         let destination_addr = signer::address_of(&destination);
 
-        let (mint_cap, burn_cap) = initialize<FakeMoney>(
+        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             &source,
             string::utf8(b"Fake money"),
             string::utf8(b"FMD"),
@@ -462,15 +503,16 @@ module aptos_framework::coin {
         assert!(option::is_none(&supply<FakeMoney>()), 4);
 
         move_to(&source, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
             mint_cap,
-            burn_cap
         });
     }
 
     #[test(source = @0x2)]
     #[expected_failure(abort_code = 0x10000)]
     public fun fail_initialize(source: signer) {
-        let (mint_cap, burn_cap) = initialize<FakeMoney>(
+        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             &source,
             string::utf8(b"Fake money"),
             string::utf8(b"FMD"),
@@ -479,8 +521,9 @@ module aptos_framework::coin {
         );
 
         move_to(&source, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
             mint_cap,
-            burn_cap
         });
     }
 
@@ -493,7 +536,7 @@ module aptos_framework::coin {
         let source_addr = signer::address_of(&source);
         let destination_addr = signer::address_of(&destination);
 
-        let (mint_cap, burn_cap) = initialize<FakeMoney>(
+        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             &source,
             string::utf8(b"Fake money"),
             string::utf8(b"FMD"),
@@ -508,8 +551,9 @@ module aptos_framework::coin {
         transfer<FakeMoney>(&source, destination_addr, 50);
 
         move_to(&source, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
             mint_cap,
-            burn_cap
         });
     }
 
@@ -519,7 +563,7 @@ module aptos_framework::coin {
     ) acquires CoinInfo, CoinStore {
         let source_addr = signer::address_of(&source);
 
-        let (mint_cap, burn_cap) = initialize<FakeMoney>(
+        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             &source,
             string::utf8(b"Fake money"),
             string::utf8(b"FMD"),
@@ -538,8 +582,9 @@ module aptos_framework::coin {
         assert!(*option::borrow(&supply<FakeMoney>()) == 90, 3);
 
         move_to(&source, FakeMoneyCapabilities{
-            mint_cap,
             burn_cap,
+            freeze_cap,
+            mint_cap,
         });
     }
 
@@ -548,7 +593,7 @@ module aptos_framework::coin {
     public fun test_destroy_non_zero(
         source: signer,
     ) acquires CoinInfo {
-        let (mint_cap, burn_cap) = initialize<FakeMoney>(
+        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             &source,
             string::utf8(b"Fake money"),
             string::utf8(b"FMD"),
@@ -560,8 +605,9 @@ module aptos_framework::coin {
         destroy_zero(coins_minted);
 
         move_to(&source, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
             mint_cap,
-            burn_cap
         });
     }
 
@@ -571,7 +617,7 @@ module aptos_framework::coin {
     ) acquires CoinInfo, CoinStore {
         let source_addr = signer::address_of(&source);
 
-        let (mint_cap, burn_cap) = initialize<FakeMoney>(
+        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             &source,
             string::utf8(b"Fake money"),
             string::utf8(b"FMD"),
@@ -593,15 +639,16 @@ module aptos_framework::coin {
         assert!(balance<FakeMoney>(source_addr) == 100, 2);
 
         move_to(&source, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
             mint_cap,
-            burn_cap
         });
     }
 
     #[test(source = @0x1)]
     public fun test_is_coin_initialized(source: signer) {
         assert!(!is_coin_initialized<FakeMoney>(), 0);
-        let (mint_cap, burn_cap) = initialize<FakeMoney>(
+        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             &source,
             string::utf8(b"Fake money"),
             string::utf8(b"FMD"),
@@ -611,8 +658,9 @@ module aptos_framework::coin {
         assert!(is_coin_initialized<FakeMoney>(), 1);
 
         move_to(&source, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
             mint_cap,
-            burn_cap
         });
     }
 
@@ -623,13 +671,79 @@ module aptos_framework::coin {
         destroy_zero(zero);
     }
 
-    #[test_only]
-    public fun destroy_mint_cap<CoinType>(mint_cap: MintCapability<CoinType>) {
-        let MintCapability<CoinType> { } = mint_cap;
+    #[test(account = @0x1)]
+    public entry fun burn_frozen(account: signer) acquires CoinInfo, CoinStore {
+        let account_addr = signer::address_of(&account);
+
+        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
+            &account,
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
+            18,
+            true
+        );
+        register<FakeMoney>(&account);
+
+        let coins_minted = mint<FakeMoney>(100, &mint_cap);
+        deposit(account_addr, coins_minted);
+
+        freeze_coin_store(account_addr, &freeze_cap);
+        burn_from(account_addr, 100, &burn_cap);
+
+        move_to(&account, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
     }
 
-    #[test_only]
-    public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
-        let BurnCapability<CoinType> { } = burn_cap;
+    #[test(account = @0x1)]
+    #[expected_failure(abort_code = 0x50009)]
+    public entry fun withdraw_frozen(account: signer) acquires CoinStore {
+        let account_addr = signer::address_of(&account);
+
+        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
+            &account,
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
+            18,
+            true
+        );
+        register<FakeMoney>(&account);
+
+        freeze_coin_store(account_addr, &freeze_cap);
+        let coin = withdraw<FakeMoney>(&account, 10);
+        deposit(account_addr, coin);
+
+        move_to(&account, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
+    }
+
+    #[test(account = @0x1)]
+    #[expected_failure(abort_code = 0x50009)]
+    public entry fun deposit_frozen(account: signer) acquires CoinInfo, CoinStore {
+        let account_addr = signer::address_of(&account);
+
+        let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
+            &account,
+            string::utf8(b"Fake money"),
+            string::utf8(b"FMD"),
+            18,
+            true
+        );
+        register<FakeMoney>(&account);
+
+        let coins_minted = mint<FakeMoney>(100, &mint_cap);
+        freeze_coin_store(account_addr, &freeze_cap);
+        deposit(account_addr, coins_minted);
+
+        move_to(&account, FakeMoneyCapabilities {
+            burn_cap,
+            freeze_cap,
+            mint_cap,
+        });
     }
 }

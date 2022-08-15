@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { AccountAddress } from "./account_address";
 
 const ADDRESS_LONG = "000000000000000000000000000000000000000000000000000000000a550c18";

@@ -24,6 +24,7 @@ data:
     required_proposer_stake: {{ .Values.chain.required_proposer_stake | int }}
     rewards_apy_percentage: {{ .Values.chain.rewards_apy_percentage | int }}
     voting_duration_secs: {{ .Values.chain.voting_duration_secs | int }}
+    voting_power_increase_limit: {{ .Values.chain.voting_power_increase_limit | int }}
 
 ---
 

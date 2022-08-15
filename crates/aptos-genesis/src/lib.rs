@@ -55,6 +55,8 @@ pub struct GenesisInfo {
     pub rewards_apy_percentage: u64,
     /// Voting duration for a proposal in seconds.
     pub voting_duration_secs: u64,
+    /// Percent of current epoch's total voting power that can be added in this epoch.
+    pub voting_power_increase_limit: u64,
 }
 
 impl GenesisInfo {
@@ -87,6 +89,7 @@ impl GenesisInfo {
             required_proposer_stake: genesis_config.required_proposer_stake,
             rewards_apy_percentage: genesis_config.rewards_apy_percentage,
             voting_duration_secs: genesis_config.voting_duration_secs,
+            voting_power_increase_limit: genesis_config.voting_power_increase_limit,
         })
     }
 
@@ -116,6 +119,7 @@ impl GenesisInfo {
                 required_proposer_stake: self.required_proposer_stake,
                 rewards_apy_percentage: self.rewards_apy_percentage,
                 voting_duration_secs: self.voting_duration_secs,
+                voting_power_increase_limit: self.voting_power_increase_limit,
             },
         )
     }

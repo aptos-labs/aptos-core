@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Do fuzzing tests with test vectors. The test vectors are produced by the same code
  * used by the Aptos Blockchain. The test vectors are arrays of JSON objects.

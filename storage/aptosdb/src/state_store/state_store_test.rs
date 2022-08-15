@@ -49,7 +49,12 @@ fn prune_stale_indices(
     limit: usize,
 ) -> Version {
     state_pruner
-        .prune_state_store(min_readable_version, target_min_readable_version, limit)
+        .prune_state_store(
+            min_readable_version,
+            target_min_readable_version,
+            limit,
+            None,
+        )
         .unwrap()
 }
 

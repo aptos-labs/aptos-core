@@ -389,7 +389,7 @@ module aptos_framework::aptos_governance {
         vector::push_back(&mut active_validators, signer::address_of(no_voter));
         stake::create_validator_set(aptos_framework, active_validators);
 
-        let (mint_cap, burn_cap) = aptos_coin::initialize_for_test(aptos_framework);
+        let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(aptos_framework);
         // Spread stake among active and pending_inactive because both need to be accounted for when computing voting
         // power.
         stake::create_stake_pool(proposer, coin::mint(50, &mint_cap), coin::mint(50, &mint_cap), 10000);

@@ -6,6 +6,8 @@ All notable changes to the Aptos Node API will be captured in this file. This ch
 
 ## 1.0.1 (2022-08-10)
 - Changed snake casing by updating Poem version. For example, `ed_25519_signature` will now be `ed25519_signature`. This behavior matches serde.
+- Switched back to the string representation of structs like `ScriptFunctionId`, `MoveStructTag`, and `MoveModuleId`. They are now represented how they were in "before" in the changelog notes of 1.0.0, e.g. `0x1::payment_scripts::peer_to_peer_with_metadata`.
+- Added `/blocks` endpoints.
 
 ## 1.0.0 (2022-08-04)
 

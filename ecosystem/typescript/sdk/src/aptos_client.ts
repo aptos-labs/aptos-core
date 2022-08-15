@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { Memoize } from "typescript-memoize";
 import { HexString, MaybeHexString } from "./hex_string";
 import { fixNodeUrl, sleep } from "./util";
@@ -23,6 +26,9 @@ export class AptosClient {
    * @param config Additional configuration options for the generated Axios client.
    */
   constructor(nodeUrl: string, config?: Partial<Gen.OpenAPIConfig>, doNotFixNodeUrl: boolean = false) {
+    if (!nodeUrl) {
+      throw new Error("Node URL cannot be empty.");
+    }
     const conf = config === undefined || config === null ? {} : { ...config };
     if (doNotFixNodeUrl) {
       conf.BASE = nodeUrl;
@@ -190,7 +196,6 @@ export class AptosClient {
    *     sequence_number: account.sequence_number,
    *     max_gas_amount: "1000",
    *     gas_unit_price: "1",
-   *     gas_currency_code: "XUS",
    *     // Unix timestamp, in seconds + 10 seconds
    *     expiration_timestamp_secs: (Math.floor(Date.now() / 1000) + 10).toString(),
    *   }

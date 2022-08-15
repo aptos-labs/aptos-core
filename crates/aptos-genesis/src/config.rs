@@ -51,6 +51,8 @@ pub struct Layout {
     pub rewards_apy_percentage: u64,
     /// Voting duration for a proposal in seconds.
     pub voting_duration_secs: u64,
+    /// % of current epoch's total voting power that can be added in this epoch.
+    pub voting_power_increase_limit: u64,
 }
 
 impl Layout {
@@ -148,10 +150,12 @@ impl TryFrom<ValidatorConfiguration> for Validator {
             )));
         }
         Ok(Validator {
-            address: derived_address,
+            owner_address: derived_address,
+            // TODO: Set operator and voter according to genesis config file.
+            operator_address: derived_address,
+            voter_address: derived_address,
             consensus_pubkey: config.consensus_public_key.to_bytes().to_vec(),
             proof_of_possession: config.proof_of_possession.to_bytes().to_vec(),
-            operator_address: auth_key.derived_address(),
             network_addresses: bcs::to_bytes(&validator_addresses).unwrap(),
             full_node_network_addresses: bcs::to_bytes(&full_node_addresses).unwrap(),
             stake_amount: config.stake_amount,

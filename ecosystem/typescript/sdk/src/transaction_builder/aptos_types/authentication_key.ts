@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import * as SHA3 from "js-sha3";
 import { HexString } from "../../hex_string";
 import { Bytes } from "../bcs";

@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { AptosClient } from "./aptos_client";
 import * as Gen from "./generated/index";
 import { FAUCET_URL, NODE_URL } from "./util.test";
@@ -11,6 +14,13 @@ const account = "0x1::account::Account";
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
 
 const coinTransferFunction = "0x1::coin::transfer";
+
+test("node url empty", () => {
+  expect(() => {
+    const client = new AptosClient("");
+    client.getAccount("0x1");
+  }).toThrow("Node URL cannot be empty.");
+});
 
 test("gets genesis account", async () => {
   const client = new AptosClient(NODE_URL);
@@ -285,7 +295,7 @@ test(
   30 * 1000,
 );
 
-test.skip(
+test(
   "submits multiagent transaction",
   async () => {
     const client = new AptosClient(NODE_URL);
@@ -331,13 +341,14 @@ test.skip(
       ),
     );
 
+    const propertyVersion = 0;
     const tokenId = {
       token_data_id: {
         creator: alice.address().hex(),
         collection: collectionName,
         name: tokenName,
       },
-      property_version: "0",
+      property_version: `${propertyVersion}`,
     };
 
     // Transfer Token from Alice's Account to Bob's Account
@@ -354,8 +365,8 @@ test.skip(
           BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(alice.address())),
           BCS.bcsSerializeStr(collectionName),
           BCS.bcsSerializeStr(tokenName),
+          BCS.bcsSerializeUint64(propertyVersion),
           BCS.bcsSerializeUint64(1),
-          BCS.bcsSerializeUint64(0),
         ],
       ),
     );
@@ -401,7 +412,7 @@ test.skip(
     aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("0");
 
-    let bobBalance = await tokenClient.getTokenBalanceForAccount(bob.address().hex(), tokenId);
+    const bobBalance = await tokenClient.getTokenBalanceForAccount(bob.address().hex(), tokenId);
     expect(bobBalance.amount).toBe("1");
   },
   30 * 1000,

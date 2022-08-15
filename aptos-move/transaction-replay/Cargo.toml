@@ -28,4 +28,5 @@ framework =  { path = "../framework" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "table-extension"] }
 
 [dev-dependencies]
+aptos-types = { path = "../../types", features = ["fuzzing"] }
 vm-genesis = { path = "../vm-genesis" }

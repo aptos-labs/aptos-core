@@ -46,6 +46,9 @@ dApps can make requests to the wallet from their website:
 ### Usage
 
 ```typescript
+// import transaction build from aptos sdk: https://github.com/aptos-labs/aptos-core/tree/main/ecosystem/typescript/sdk
+import { BCS, TxnBuilderTypes } from 'aptos';
+
 // Establish connection to the wallet
 const result = await (window as any).aptos.connect()
 
@@ -56,12 +59,16 @@ const status = await (window as any).aptos.isConnected()
 const accountAddress = await (window as any).aptos.account()
 
 // Create a transaction
-const transaction = {
-    type: 'script_function_payload',
-    function: '0x1::coin::transfer',
-    type_arguments: ['0x1::aptos_coin::AptosCoin'],
-    arguments: [receiverAddress, amount]
-}
+// https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html
+const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
+const transaction = new TxnBuilderTypes.TransactionPayloadScriptFunction(
+    TxnBuilderTypes.ScriptFunction.natural(
+        "0x1::coin",
+        "transfer",
+        [token],
+        [BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex('0xabab')), BCS.bcsSerializeUint64(717)],
+    ),
+);
 
 // Send transaction to the extension to be signed and submitted to chain
 const response = await (window as any).aptos.signAndSubmitTransaction(transaction)

@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 export type Seq<T> = T[];
 
 export type Uint8 = number;

@@ -30,8 +30,10 @@ use std::{path::PathBuf, str::FromStr};
 const WAYPOINT_FILE: &str = "waypoint.txt";
 const GENESIS_FILE: &str = "genesis.blob";
 
-/// Tool for setting up and building the Genesis transaction
+/// Tool for setting up an Aptos chain Genesis transaction
 ///
+/// This tool sets up a space for multiple initial "validator"
+/// accounts to build a genesis transaction for a new chain.
 #[derive(Parser)]
 pub enum GenesisTool {
     GenerateGenesis(GenerateGenesis),
@@ -58,6 +60,7 @@ pub struct GenerateGenesis {
     prompt_options: PromptOptions,
     #[clap(flatten)]
     git_options: GitOptions,
+    /// Output directory for Genesis file and waypoint
     #[clap(long, parse(from_os_str))]
     output_dir: Option<PathBuf>,
 }
@@ -146,6 +149,7 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             required_proposer_stake: layout.required_proposer_stake,
             rewards_apy_percentage: layout.rewards_apy_percentage,
             voting_duration_secs: layout.voting_duration_secs,
+            voting_power_increase_limit: layout.voting_power_increase_limit,
         },
     )?)
 }

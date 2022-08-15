@@ -104,7 +104,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -126,7 +126,17 @@
                 }
               }
             },
-            "sequence_number": "13"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "13",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -147,7 +157,17 @@
                 }
               }
             },
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -170,6 +190,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -333,7 +354,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -355,7 +376,17 @@
                 }
               }
             },
-            "sequence_number": "14"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "14",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -376,7 +407,17 @@
                 }
               }
             },
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -399,6 +440,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -562,7 +604,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -584,7 +626,17 @@
                 }
               }
             },
-            "sequence_number": "15"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "15",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -605,7 +657,17 @@
                 }
               }
             },
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -628,6 +690,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -791,7 +854,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -813,7 +876,17 @@
                 }
               }
             },
-            "sequence_number": "16"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "16",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -834,7 +907,17 @@
                 }
               }
             },
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -857,6 +940,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1020,7 +1104,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1042,7 +1126,17 @@
                 }
               }
             },
-            "sequence_number": "17"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "17",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1063,7 +1157,17 @@
                 }
               }
             },
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1086,6 +1190,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1249,7 +1354,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1271,7 +1376,17 @@
                 }
               }
             },
-            "sequence_number": "18"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "18",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1292,7 +1407,17 @@
                 }
               }
             },
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1315,6 +1440,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1478,7 +1604,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1500,7 +1626,17 @@
                 }
               }
             },
-            "sequence_number": "19"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "19",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1521,7 +1657,17 @@
                 }
               }
             },
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1544,6 +1690,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {
@@ -1707,7 +1854,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "42",
+    "gas_used": "44",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1729,7 +1876,17 @@
                 }
               }
             },
-            "sequence_number": "20"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "20",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1750,7 +1907,17 @@
                 }
               }
             },
-            "sequence_number": "0"
+            "rotation_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            },
+            "sequence_number": "0",
+            "signer_capability_offer": {
+              "for": {
+                "vec": []
+              }
+            }
           }
         }
       },
@@ -1773,6 +1940,7 @@
                 }
               }
             },
+            "frozen": false,
             "withdraw_events": {
               "counter": "0",
               "guid": {

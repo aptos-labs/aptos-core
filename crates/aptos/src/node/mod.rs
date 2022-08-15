@@ -38,8 +38,10 @@ use std::sync::Arc;
 use std::{path::PathBuf, thread, time::Duration};
 use tokio::time::Instant;
 
-/// Tool for manipulating nodes
+/// Tool for operations related to nodes
 ///
+/// This tool allows you to run a local test node for testing,
+/// identify issues with nodes, and show related information.
 #[derive(Parser)]
 pub enum NodeTool {
     AddStake(AddStake),
