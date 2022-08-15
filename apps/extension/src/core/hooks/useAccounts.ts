@@ -42,6 +42,7 @@ export default function useAccounts() {
       publicKey: firstAccount.publicKey,
     });
     await initEncryptedState(password, { [firstAccount.address]: firstAccount });
+    await sendProviderEvent(ProviderEvent.ACCOUNT_CHANGED);
   };
 
   const addAccount = async (account: Account) => {
