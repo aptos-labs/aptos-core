@@ -380,7 +380,7 @@ impl AuthenticationKey {
     pub const LENGTH: usize = 32;
 
     /// Create an authentication key from a preimage by taking its sha3 hash
-    pub fn from_pre image(preimage: &AuthenticationKeyPreimage) -> AuthenticationKey {
+    pub fn from_preimage(preimage: &AuthenticationKeyPreimage) -> AuthenticationKey {
         AuthenticationKey::new(*HashValue::sha3_256_of(&preimage.0).as_ref())
     }
 

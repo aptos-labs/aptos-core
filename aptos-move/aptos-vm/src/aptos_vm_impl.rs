@@ -1,19 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::ed25519;
 use crate::{
     access_path_cache::AccessPathCache,
     counters::*,
     data_cache::RemoteStorage,
     delta_ext::TransactionOutputExt,
-    ed25519::Ed25519PublicKey,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
     transaction_metadata::TransactionMetadata,
 };
-use aptos_crypto::HashValue;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule, NativeGasParameters};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
@@ -21,7 +18,6 @@ use aptos_types::{
     account_config::{ChainSpecificAccountInfo, APTOS_CHAIN_INFO, CORE_CODE_ADDRESS},
     on_chain_config::{GasSchedule, OnChainConfig, Version, APTOS_VERSION_3},
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
-    transaction::authenticator::{AuthenticationKey, AuthenticationKeyPreimage},
     vm_status::{StatusCode, VMStatus},
 };
 use fail::fail_point;
@@ -38,8 +34,6 @@ use move_deps::{
     move_vm_types::gas::UnmeteredGasMeter,
 };
 use std::sync::Arc;
-use aptos_crypto::ed25519::{Ed25519PublicKey, PublicKey};
-use aptos_types::transaction::authenticator::Scheme;
 
 #[derive(Clone)]
 /// A wrapper to make VMRuntime standalone and thread safe.
@@ -251,7 +245,7 @@ impl AptosVMImpl {
         let chain_id = txn_data.chain_id();
         let mut gas_meter = UnmeteredGasMeter;
         let secondary_auth_keys: Vec<MoveValue> = txn_data
-            .secondary_authentication_keys()
+            .secondary_authentication_keys
             .iter()
             .map(|auth_key| MoveValue::vector_u8(auth_key.to_vec()))
             .collect();
@@ -271,7 +265,7 @@ impl AptosVMImpl {
             vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(txn_sequence_number),
-                MoveValue::vector_u8(txn_public_key),
+                MoveValue::vector_u8(txn_authentication_key),
                 MoveValue::U64(txn_gas_price),
                 MoveValue::U64(txn_max_gas_units),
                 MoveValue::U64(txn_expiration_timestamp_secs),

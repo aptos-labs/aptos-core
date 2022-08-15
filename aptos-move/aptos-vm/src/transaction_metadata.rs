@@ -2,16 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey};
+use aptos_types::transaction::authenticator::AuthenticationKey;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
-    transaction::{
-        authenticator::AuthenticationKeyPreimage, SignedTransaction, TransactionPayload,
-    },
+    transaction::{SignedTransaction, TransactionPayload},
 };
 use move_deps::move_core_types::gas_schedule::{GasAlgebra, GasCarrier, GasPrice};
 use std::convert::TryFrom;
-use aptos_types::transaction::authenticator::AuthenticationKey;
 
 pub struct TransactionMetadata {
     pub sender: AccountAddress,
@@ -31,17 +29,13 @@ impl TransactionMetadata {
     pub fn new(txn: &SignedTransaction) -> Self {
         Self {
             sender: txn.sender(),
-            authentication_key: txn
-                .authenticator()
-                .sender()
-                .authentication_key()
-                .into_vec(),
+            authentication_key: txn.authenticator().sender().authentication_key().to_vec(),
             secondary_signers: txn.authenticator().secondary_signer_addreses(),
             secondary_authentication_keys: txn
                 .authenticator()
                 .secondary_signers()
                 .iter()
-                .map(|account_auth| account_auth.authentication_key().into_vec())
+                .map(|account_auth| account_auth.authentication_key().to_vec())
                 .collect(),
             sequence_number: txn.sequence_number(),
             max_gas_amount: txn.max_gas_amount(),
@@ -106,7 +100,7 @@ impl Default for TransactionMetadata {
         let public_key = Ed25519PrivateKey::try_from(&buf[..]).unwrap().public_key();
         TransactionMetadata {
             sender: AccountAddress::ZERO,
-            authentication_key: AuthenticationKey::ed25519(&public_key).into_vec(),
+            authentication_key: AuthenticationKey::ed25519(&public_key).to_vec(),
             secondary_signers: vec![],
             secondary_authentication_keys: vec![],
             sequence_number: 0,
