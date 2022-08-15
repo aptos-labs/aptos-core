@@ -43,5 +43,4 @@ do
 done
 
 # Build the Aptos Move framework
-cargo run --package framework -- --package aptos-framework --output current
-cargo run --package framework -- --package aptos-token --output current
+cargo run --package framework -- release

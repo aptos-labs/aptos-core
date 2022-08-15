@@ -10,7 +10,6 @@ use move_deps::move_binary_format::CompiledModule;
 use move_deps::move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_EXTENSION,
 };
-use move_deps::move_compiler::shared::NumericalAddress;
 use move_deps::move_core_types::errmap::ErrorMapping;
 use move_deps::move_core_types::language_storage::ModuleId;
 use serde::{Deserialize, Serialize};
@@ -128,10 +127,6 @@ impl ReleaseBundle {
             result.append(&mut files);
         }
         Ok(result)
-    }
-
-    pub fn named_addresses(&self) -> BTreeMap<String, NumericalAddress> {
-        BTreeMap::new()
     }
 }
 

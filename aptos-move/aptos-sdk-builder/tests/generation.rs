@@ -85,7 +85,7 @@ test = false
 #[ignore]
 fn test_that_rust_script_fun_code_compiles() {
     test_rust(
-        &framework::current_release_bundle().abis(),
+        &framework::head_release_bundle().abis(),
         "examples/rust/script_fun_demo.rs",
         EXPECTED_SCRIPT_FUN_OUTPUT,
     );

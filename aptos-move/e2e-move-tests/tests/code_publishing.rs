@@ -170,6 +170,8 @@ fn code_publishing_upgrade_fail_overlapping_module() {
 /// active until the MoveVM terminates. In order to workaround this until there is a better
 /// fix, we flush the cache in `MoveVmExt::new_session`. One can verify the fix by commenting
 /// the flush operation out, then this test fails.
+///
+/// TODO: for some reason this test did not capture a serious bug in `code::check_coexistence`.
 #[test]
 fn code_publishing_upgrade_loader_cache_consistency() {
     let mut h = MoveHarness::new_no_parallel();
@@ -208,7 +210,7 @@ fn code_publishing_upgrade_loader_cache_consistency() {
 fn code_publishing_framework_upgrade() {
     let mut h = MoveHarness::new_no_parallel();
     enable_golden!(h);
-    let acc = h.aptos_root_account();
+    let acc = h.aptos_framework_account();
 
     // We should be able to upgrade move-stdlib, as our local package has only
     // compatible changes. (We added a new function to string.move.)
@@ -223,7 +225,7 @@ fn code_publishing_framework_upgrade() {
 fn code_publishing_framework_upgrade_fail() {
     let mut h = MoveHarness::new_no_parallel();
     enable_golden!(h);
-    let acc = h.aptos_root_account();
+    let acc = h.aptos_framework_account();
 
     // We should not be able to upgrade move-stdlib because we removed a function
     // from the string module.

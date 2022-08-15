@@ -131,7 +131,6 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         ));
     }
 
-    // Should the target be configurable?
     let framework = client.get_framework()?;
 
     Ok(GenesisInfo::new(

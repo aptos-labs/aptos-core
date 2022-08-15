@@ -39,7 +39,6 @@ use move_deps::{
 use once_cell::sync::Lazy;
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
 const GENESIS_SEED: [u8; 32] = [42; 32];
@@ -209,7 +208,7 @@ fn exec_function(
                 "Error calling {}.{}: {}",
                 module_name,
                 function_name,
-                e // .into_vm_status()
+                e.into_vm_status()
             )
         });
 }
@@ -412,7 +411,7 @@ pub enum GenesisOptions {
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
     let framework = match genesis_options {
-        GenesisOptions::Compiled => framework::current_release_bundle(),
+        GenesisOptions::Compiled => framework::head_release_bundle(),
         GenesisOptions::Fresh => framework::devnet_release_bundle(),
     };
 
@@ -421,12 +420,12 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
 
 /// Generate a genesis `ChangeSet` for mainnet
 pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
-    let modules = match genesis_options {
-        GenesisOptions::Compiled => cached_framework_packages::module_blobs().to_vec(),
-        GenesisOptions::Fresh => framework::aptos::module_blobs(),
+    let framework = match genesis_options {
+        GenesisOptions::Compiled => framework::head_release_bundle(),
+        GenesisOptions::Fresh => framework::devnet_release_bundle(),
     };
 
-    generate_mainnet_genesis(&modules, Some(1)).0
+    generate_mainnet_genesis(framework, Some(1)).0
 }
 
 pub fn test_genesis_transaction() -> Transaction {
@@ -437,7 +436,7 @@ pub fn test_genesis_transaction() -> Transaction {
 pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    generate_test_genesis(framework::current_release_bundle(), count)
+    generate_test_genesis(framework::head_release_bundle(), count)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -543,7 +542,7 @@ pub fn generate_test_genesis(
 }
 
 pub fn generate_mainnet_genesis(
-    stdlib_modules: &[Vec<u8>],
+    framework: &ReleaseBundle,
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
     // TODO: Update to have custom validators/accounts with initial balances at genesis.
@@ -554,7 +553,7 @@ pub fn generate_mainnet_genesis(
     let genesis = encode_genesis_change_set(
         &GENESIS_KEYPAIR.1,
         validators,
-        stdlib_modules,
+        framework,
         OnChainConsensusConfig::default(),
         ChainId::test(),
         // TODO: Update once mainnet numbers are decided. These numbers are just placeholders.
@@ -580,7 +579,7 @@ pub fn generate_mainnet_genesis(
 pub fn test_genesis_module_publishing() {
     // create a state view for move_vm
     let mut state_view = GenesisStateView::new();
-    for (module_bytes, module) in framework::current_release_bundle().code_and_compiled_modules() {
+    for (module_bytes, module) in framework::head_release_bundle().code_and_compiled_modules() {
         state_view.add_module(&module.self_id(), module_bytes);
     }
     let data_cache = StateViewCache::new(&state_view).into_move_resolver();
@@ -588,5 +587,5 @@ pub fn test_genesis_module_publishing() {
     let move_vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
-    publish_framework(&mut session, framework::current_release_bundle());
+    publish_framework(&mut session, framework::head_release_bundle());
 }
