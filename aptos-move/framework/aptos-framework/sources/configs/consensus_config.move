@@ -1,8 +1,10 @@
 /// Maintains the consensus config for the blockchain. The config is stored in a
 /// Reconfiguration, and may be updated by root.
 module aptos_framework::consensus_config {
+    use std::error;
+    use std::vector;
+
     use aptos_framework::reconfiguration;
-    use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
 
     friend aptos_framework::genesis;
@@ -11,19 +13,25 @@ module aptos_framework::consensus_config {
         config: vector<u8>,
     }
 
+    /// On chain config specified is invalid.
+    const EINVALID_CONFIG: u64 = 1;
+
     /// Publishes the ConsensusConfig config.
     public(friend) fun initialize(account: &signer, config: vector<u8>) {
-        timestamp::assert_genesis();
         system_addresses::assert_aptos_framework(account);
-
+        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
         move_to(account, ConsensusConfig { config });
     }
 
-    /// Update the config.
+    /// This can be called by on-chain governance to update on-chain consensus configs.
     public fun set(account: &signer, config: vector<u8>) acquires ConsensusConfig {
         system_addresses::assert_aptos_framework(account);
+        assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
+
         let config_ref = &mut borrow_global_mut<ConsensusConfig>(@aptos_framework).config;
         *config_ref = config;
+
+        // Need to trigger reconfiguration so validator nodes can sync on the updated configs.
         reconfiguration::reconfigure();
     }
 }
