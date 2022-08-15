@@ -106,7 +106,7 @@ export default function AccountDrawer({ isOpen, onClose }: AccountDrawerProps) {
               Object.keys(accounts).map((address) => (
                 <AccountDrawerItem
                   key={address}
-                  address={address}
+                  account={accounts[address]}
                   onRemove={onRemoveAccount}
                   {...getRadioProps({ value: address })}
                 />

@@ -79,6 +79,14 @@ export default function useAccounts() {
     }
   };
 
+  const renameAccount = async (address: string, newName: string) => {
+    if (address in accounts!) {
+      const newAccounts = { ...accounts! };
+      newAccounts[address] = { ...newAccounts[address], name: newName };
+      await update(newAccounts);
+    }
+  };
+
   const aptosAccount = activeAccount ? new AptosAccount(
     HexString.ensure(activeAccount.privateKey).toUint8Array(),
     activeAccount.address,
@@ -96,6 +104,7 @@ export default function useAccounts() {
     initAccounts,
     lockAccounts,
     removeAccount,
+    renameAccount,
     switchAccount,
     unlockAccounts,
   };

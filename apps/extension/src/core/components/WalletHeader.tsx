@@ -36,7 +36,7 @@ interface WalletHeaderProps {
 export default function WalletHeader({
   showBackButton,
 }: WalletHeaderProps) {
-  const { activeAccountAddress } = useGlobalStateContext();
+  const { activeAccount, activeAccountAddress } = useGlobalStateContext();
   const { isOpen, onClose, onOpen } = useDisclosure();
   const { colorMode } = useColorMode();
   const { hasCopied, onCopy } = useClipboard(activeAccountAddress || '');
@@ -79,7 +79,7 @@ export default function WalletHeader({
               <Input
                 size="sm"
                 readOnly
-                value={activeAccountAddress}
+                value={`${activeAccount?.name} (${activeAccountAddress})`}
                 onClick={onCopy}
                 borderColor={secondaryBorderColor[colorMode]}
                 bgColor={secondaryHeaderInputBgColor[colorMode]}

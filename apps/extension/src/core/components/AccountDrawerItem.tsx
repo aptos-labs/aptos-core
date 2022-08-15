@@ -29,6 +29,7 @@ import {
 import { useAccountLatestTransactionTimestamp } from 'core/queries/transaction';
 import numeral from 'numeral';
 import React, { useMemo } from 'react';
+import { Account } from 'core/types/stateTypes';
 
 const secondaryHoverBgColor = {
   dark: 'teal.600',
@@ -73,7 +74,7 @@ function ConfirmationModal(props: ConfirmationModalProps) {
 }
 
 interface AccountDrawerItemProps {
-  address: string;
+  account: Account;
   onRemove: (address: string) => void;
 }
 
@@ -81,7 +82,7 @@ function AccountDrawerItem(
   props: UseRadioProps & AccountDrawerItemProps,
 ) {
   const { getCheckboxProps, getInputProps } = useRadio(props);
-  const { address, isChecked, onRemove } = props;
+  const { account: { address, name }, isChecked, onRemove } = props;
   const { colorMode } = useColorMode();
   const { isOpen, onClose, onOpen } = useDisclosure();
 
@@ -95,7 +96,7 @@ function AccountDrawerItem(
     ? `~${numeral(coinBalance).format('0.0a')}`
     : numeral(coinBalance).format('0,0');
 
-  const walletAddressFormatted = `Wallet: ${address.substring(0, 15)}...`;
+  const walletAddressFormatted = `${name}: ${address.substring(0, 15)}...`;
 
   return useMemo(() => (
     <Box as="label" width="100%">
@@ -152,11 +153,7 @@ function AccountDrawerItem(
             divider={<span>&nbsp;&nbsp;&bull;&nbsp;&nbsp;</span>}
           >
             <Text noOfLines={1} fontSize="sm">
-              Balance:
-              {' '}
-              {coinBalanceString}
-              &nbsp;
-              APT
+              {`Balance: ${coinBalanceString} APT`}
             </Text>
             <Text noOfLines={1} fontSize="sm">
               {
@@ -170,8 +167,7 @@ function AccountDrawerItem(
       </Box>
     </Box>
   ), [getInputProps, getCheckboxProps, colorMode, isChecked, walletAddressFormatted,
-    onOpen, isOpen, onClose, address, coinBalanceString,
-    latestTransactionTimestamp, onRemove]);
+    onOpen, isOpen, onClose, address, coinBalanceString, latestTransactionTimestamp, onRemove]);
 }
 
 export default AccountDrawerItem;

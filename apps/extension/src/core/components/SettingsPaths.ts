@@ -6,6 +6,7 @@ import { FaKey } from '@react-icons/all-files/fa/FaKey';
 import { FaKeyboard } from '@react-icons/all-files/fa/FaKeyboard';
 import { FaLock } from '@react-icons/all-files/fa/FaLock';
 import Routes from 'core/routes';
+import { FaEdit } from '@react-icons/all-files/fa/FaEdit';
 import { SettingsListItemProps } from './SettingsListItem';
 
 export const signOutSecondaryGridBgColor = {
@@ -26,13 +27,18 @@ export const signOutSecondaryTextColor = {
 function SettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
   const items: SettingsListItemProps[] = [
     {
+      icon: FaEdit,
+      path: Routes.rename_account.path,
+      title: 'Change account name',
+    },
+    {
       icon: FaKey,
-      path: '/settings/credentials',
+      path: Routes.credentials.path,
       title: 'Credentials',
     },
     {
       icon: BiNetworkChart,
-      path: '/settings/network',
+      path: Routes.network.path,
       title: 'Network',
     },
   ];
@@ -40,7 +46,7 @@ function SettingsPaths(hasMnemonic: boolean): SettingsListItemProps[] {
   if (hasMnemonic) {
     items.push({
       icon: FaKeyboard,
-      path: '/settings/recovery_phrase',
+      path: Routes.recovery_phrase.path,
       title: 'Show Recovery Phrase',
     });
   }
