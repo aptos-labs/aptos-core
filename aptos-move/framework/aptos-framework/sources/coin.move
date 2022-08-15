@@ -89,17 +89,23 @@ module aptos_framework::coin {
     }
 
     /// Capability required to mint coins.
-    struct MintCapability<phantom CoinType> has copy, key, store { }
+    struct MintCapability<phantom CoinType> has copy, store { }
 
     /// Capability required to freeze a coin store.
-    struct FreezeCapability<phantom CoinType> has copy, key, store { }
+    struct FreezeCapability<phantom CoinType> has copy, store { }
 
     /// Capability required to burn coins.
-    struct BurnCapability<phantom CoinType> has copy, key, store { }
+    struct BurnCapability<phantom CoinType> has copy, store { }
 
     //
     // Getter functions
     //
+
+    /// A helper function that returns the address of CoinType.
+    fun coin_address<CoinType>(): address {
+        let type_info = type_info::type_of<CoinType>();
+        type_info::account_address(&type_info)
+    }
 
     /// Returns the balance of `owner` for provided `CoinType`.
     public fun balance<CoinType>(owner: address): u64 acquires CoinStore {
@@ -112,9 +118,7 @@ module aptos_framework::coin {
 
     /// Returns `true` if the type `CoinType` is an initialized coin.
     public fun is_coin_initialized<CoinType>(): bool {
-        let type_info = type_info::type_of<CoinType>();
-        let coin_address = type_info::account_address(&type_info);
-        exists<CoinInfo<CoinType>>(coin_address)
+        exists<CoinInfo<CoinType>>(coin_address<CoinType>())
     }
 
     /// Returns `true` if `account_addr` is registered to receive `CoinType`.
@@ -124,32 +128,24 @@ module aptos_framework::coin {
 
     /// Returns the name of the coin.
     public fun name<CoinType>(): string::String acquires CoinInfo {
-        let type_info = type_info::type_of<CoinType>();
-        let coin_address = type_info::account_address(&type_info);
-        borrow_global<CoinInfo<CoinType>>(coin_address).name
+        borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).name
     }
 
     /// Returns the symbol of the coin, usually a shorter version of the name.
     public fun symbol<CoinType>(): string::String acquires CoinInfo {
-        let type_info = type_info::type_of<CoinType>();
-        let coin_address = type_info::account_address(&type_info);
-        borrow_global<CoinInfo<CoinType>>(coin_address).symbol
+        borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).symbol
     }
 
     /// Returns the number of decimals used to get its user representation.
     /// For example, if `decimals` equals `2`, a balance of `505` coins should
     /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
     public fun decimals<CoinType>(): u8 acquires CoinInfo {
-        let type_info = type_info::type_of<CoinType>();
-        let coin_address = type_info::account_address(&type_info);
-        borrow_global<CoinInfo<CoinType>>(coin_address).decimals
+        borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).decimals
     }
 
     /// Returns the amount of coin in existence.
     public fun supply<CoinType>(): Option<u128> acquires CoinInfo {
-        let type_info = type_info::type_of<CoinType>();
-        let coin_address = type_info::account_address(&type_info);
-        borrow_global<CoinInfo<CoinType>>(coin_address).supply
+        borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).supply
     }
 
     // Public functions
@@ -162,8 +158,7 @@ module aptos_framework::coin {
         let Coin { value: amount } = coin;
         assert!(amount > 0, error::invalid_argument(EINVALID_COIN_AMOUNT));
 
-        let coin_addr = type_info::account_address(&type_info::type_of<CoinType>());
-        let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).supply;
+        let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
         if (option::is_some(supply)) {
             let supply = option::borrow_mut(supply);
             *supply = *supply - (amount as u128);
@@ -254,9 +249,8 @@ module aptos_framework::coin {
     ): (BurnCapability<CoinType>, FreezeCapability<CoinType>, MintCapability<CoinType>) {
         let account_addr = signer::address_of(account);
 
-        let type_info = type_info::type_of<CoinType>();
         assert!(
-            type_info::account_address(&type_info) == account_addr,
+            coin_address<CoinType>() == account_addr,
             error::invalid_argument(ECOIN_INFO_ADDRESS_MISMATCH),
         );
 
@@ -294,8 +288,7 @@ module aptos_framework::coin {
             return zero<CoinType>()
         };
 
-        let coin_addr = type_info::account_address(&type_info::type_of<CoinType>());
-        let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_addr).supply;
+        let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
         if (option::is_some(supply)) {
             let supply = option::borrow_mut(supply);
             let amount_u128 = (amount as u128);
@@ -374,15 +367,17 @@ module aptos_framework::coin {
         }
     }
 
-    /// Freeze capability is dangerous and therefore should be destroyed if not used.
+    /// Destroy a freeze capability. Freeze capability is dangerous and therefore should be destroyed if not used.
     public fun destroy_freeze_cap<CoinType>(freeze_cap: FreezeCapability<CoinType>) {
         let FreezeCapability<CoinType> { } = freeze_cap;
     }
 
+    /// Destroy a mint capability.
     public fun destroy_mint_cap<CoinType>(mint_cap: MintCapability<CoinType>) {
         let MintCapability<CoinType> { } = mint_cap;
     }
 
+    /// Destroy a burn capability.
     public fun destroy_burn_cap<CoinType>(burn_cap: BurnCapability<CoinType>) {
         let BurnCapability<CoinType> { } = burn_cap;
     }
