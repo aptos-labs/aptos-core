@@ -130,6 +130,10 @@ impl ReleaseBundle {
         Ok(result)
     }
 
+    /// Returns the named addresses.
+    /// TODO: this is currently a dummy as we aren't sure how important that is. Once we
+    /// have ported all Move compiles in the stack to use `BuiltPackage` we should not need
+    /// it any longer.
     pub fn named_addresses(&self) -> BTreeMap<String, NumericalAddress> {
         BTreeMap::new()
     }

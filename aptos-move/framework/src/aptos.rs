@@ -19,7 +19,7 @@ use std::str::FromStr;
 /// which is ensured by tests.
 #[derive(ArgEnum, Clone, Copy, Debug)]
 pub enum ReleaseTarget {
-    Current,
+    Head,
     Devnet,
     Testnet,
     Mainnet,
@@ -28,7 +28,7 @@ pub enum ReleaseTarget {
 impl Display for ReleaseTarget {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let str = match self {
-            ReleaseTarget::Current => "current",
+            ReleaseTarget::Head => "head",
             ReleaseTarget::Devnet => "devnet",
             ReleaseTarget::Testnet => "testnet",
             ReleaseTarget::Mainnet => "mainnet",
@@ -42,11 +42,11 @@ impl FromStr for ReleaseTarget {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "current" => Ok(ReleaseTarget::Current),
+            "head" => Ok(ReleaseTarget::Head),
             "devnet" => Ok(ReleaseTarget::Devnet),
             "testnet" => Ok(ReleaseTarget::Testnet),
             "mainnet" => Ok(ReleaseTarget::Mainnet),
-            _ => Err("Invalid target. Valid values are: current, devnet, testnet, mainnet"),
+            _ => Err("Invalid target. Valid values are: head, devnet, testnet, mainnet"),
         }
     }
 }
@@ -73,7 +73,7 @@ impl ReleaseTarget {
     }
 
     /// Returns the file name under which this particular target's release buundle is stored.
-    /// For example, for `Current` the file name will be `current.mrb`.
+    /// For example, for `Head` the file name will be `head.mrb`.
     pub fn file_name(self) -> String {
         format!("{}.{}", self, RELEASE_BUNDLE_EXTENSION)
     }
@@ -125,18 +125,18 @@ impl ReleaseTarget {
 // ===============================================================================================
 // Inlined Package Artifacts
 
-static CURRENT_RELEASE_BUNDLE: Lazy<ReleaseBundle> =
-    Lazy::new(|| ReleaseTarget::Current.load_bundle().unwrap());
+static HEAD_RELEASE_BUNDLE: Lazy<ReleaseBundle> =
+    Lazy::new(|| ReleaseTarget::Head.load_bundle().unwrap());
 
 /// Returns the release bundle for the current code.
-pub fn current_release_bundle() -> &'static ReleaseBundle {
-    &CURRENT_RELEASE_BUNDLE
+pub fn head_release_bundle() -> &'static ReleaseBundle {
+    &HEAD_RELEASE_BUNDLE
 }
 
 /// Placeholder for returning the release bundle for the last devnet release(?).
 /// TODO: this is currently only used to differentiate between GenesisOptions::Fresh
 /// and GenesisOptions::Compiled. It is not clear what the difference should be.
-/// For now, we return the same as with current_release_bundel.
+/// For now, we return the same as with head_release_bundle.
 pub fn devnet_release_bundle() -> &'static ReleaseBundle {
-    &CURRENT_RELEASE_BUNDLE
+    &HEAD_RELEASE_BUNDLE
 }

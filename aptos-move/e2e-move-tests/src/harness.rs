@@ -71,8 +71,8 @@ impl MoveHarness {
         data.account().clone()
     }
 
-    /// Gets the account for aptos root.
-    pub fn aptos_root_account(&mut self) -> Account {
+    /// Gets the account where the Aptos framework is installed (0x1).
+    pub fn aptos_framework_account(&mut self) -> Account {
         self.new_account_at(AccountAddress::ONE)
     }
 
