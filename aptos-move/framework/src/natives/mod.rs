@@ -45,77 +45,18 @@ impl GasParameters {
                 create_signer: account::CreateSignerGasParameters { base_cost: 0 },
             },
             bls12381: cryptography::bls12381::GasParameters {
-                // BLS signatures over BLS12-381 curves
-                bls12381_aggregate_pop_verified_pubkeys:
-                    cryptography::bls12381::Bls12381AggregatePopVerifiedPubkeysGasParameters {
-                        base_cost: 0,
-                        per_pubkey_deserialize_cost: 0,
-                        per_pubkey_aggregate_cost: 0,
-                    },
-                bls12381_aggregate_signatures:
-                    cryptography::bls12381::Bls12381AggregateSignaturesGasParameters {
-                        base_cost: 0,
-                        per_sig_deserialize_cost: 0,
-                        per_sig_aggregate_cost: 0,
-                    },
-                bls12381_signature_subgroup_check:
-                    cryptography::bls12381::Bls12381SignatureSubgroupCheckGasParameters {
-                        base_cost: 0,
-                        per_sig_deserialize_cost: 0,
-                        per_sig_subgroup_check_cost: 0,
-                    },
-                bls12381_validate_pubkey:
-                    cryptography::bls12381::Bls12381ValidatePubkeyGasParameters {
-                        base_cost: 0,
-                        per_pubkey_deserialize_cost: 0,
-                        per_pubkey_subgroup_check_cost: 0,
-                    },
-                bls12381_verify_aggregate_signature:
-                    cryptography::bls12381::Bls12381VerifyAggregateSignatureGasParameters {
-                        base_cost: 0,
-                        per_pubkey_deserialize_cost: 0,
-                        per_sig_deserialize_cost: 0,
-                        per_pairing_cost: 0,
-                        per_msg_hashing_base_cost: 0,
-                        per_msg_byte_hashing_cost: 0,
-                    },
-                bls12381_verify_multisignature:
-                    cryptography::bls12381::Bls12381VerifyMultisignatureGasParameters {
-                        base_cost: 0,
-                        per_pubkey_deserialize_cost: 0,
-                        per_pubkey_subgroup_check_cost: 0,
-                        per_sig_deserialize_cost: 0,
-                        per_sig_verify_cost: 0,
-                        per_msg_hashing_base_cost: 0,
-                        per_msg_byte_hashing_cost: 0,
-                    },
-                bls12381_verify_normal_signature:
-                    cryptography::bls12381::Bls12381VerifyNormalSignatureGasParameters {
-                        base_cost: 0,
-                        per_pubkey_deserialize_cost: 0,
-                        per_pubkey_subgroup_check_cost: 0,
-                        per_sig_deserialize_cost: 0,
-                        per_sig_verify_cost: 0,
-                        per_msg_hashing_base_cost: 0,
-                        per_msg_byte_hashing_cost: 0,
-                    },
-                bls12381_verify_proof_of_possession:
-                    cryptography::bls12381::Bls12381VerifyProofOfPosessionGasParameters {
-                        base_cost: 0,
-                        per_pubkey_deserialize_cost: 0,
-                        per_sig_deserialize_cost: 0,
-                        per_pop_verify_cost: 0,
-                    },
-                bls12381_verify_signature_share:
-                    cryptography::bls12381::Bls12381VerifySignatureShareGasParameters {
-                        base_cost: 0,
-                        per_pubkey_deserialize_cost: 0,
-                        per_pubkey_subgroup_check_cost: 0,
-                        per_sig_deserialize_cost: 0,
-                        per_sig_verify_cost: 0,
-                        per_msg_hashing_base_cost: 0,
-                        per_msg_byte_hashing_cost: 0,
-                    },
+                base_cost: 0,
+                per_pubkey_deserialize_cost: 0,
+                per_pubkey_aggregate_cost: 0,
+                per_pubkey_subgroup_check_cost: 0,
+                per_sig_deserialize_cost: 0,
+                per_sig_aggregate_cost: 0,
+                per_sig_subgroup_check_cost: 0,
+                per_sig_verify_cost: 0,
+                per_pop_verify_cost: 0,
+                per_pairing_cost: 0,
+                per_msg_hashing_cost: 0,
+                per_byte_hashing_cost: 0
             },
             signature: signature::GasParameters {
                 // Ed25519
