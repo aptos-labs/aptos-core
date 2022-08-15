@@ -5,7 +5,7 @@
 
 FactoryBot.define do
   factory :user, class: User do
-    username { Faker::Internet.username(separators: %w[- _]) }
+    username { Faker::Internet.username(specifier: 3..20, separators: %w[- _]) }
     password { Faker::Internet.password }
     email { Faker::Internet.email }
     confirmed_at { Date.new }

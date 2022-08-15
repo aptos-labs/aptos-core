@@ -22,13 +22,13 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test 'create new project' do
-    category = Category.create(title: Faker::Company.buzzword)
+    category = FactoryBot.create(:category)
 
     assert_difference('Project.count') do
       post projects_path, params: { project: {
         title: Faker::Company.name,
         short_description: Faker::Company.catch_phrase,
-        full_description: Faker::Lorem.paragraphs(number: 3).join("\n\n"),
+        full_description: Faker::Lorem.paragraphs(number: 3).map { |p| "<p>#{p}</p>" }.join,
         website_url: Faker::Internet.url,
         github_url: Faker::Internet.url(host: 'github.com'),
         discord_url: Faker::Internet.url(host: 'discord.com'),
@@ -44,12 +44,31 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
           { user_id: @user.id, role: 'admin', public: true }
         ],
         project_screenshots_attributes: [
-          { url: Faker::LoremPixel.image(size: '1920x1080') }
+          { url: Faker::LoremFlickr.image(size: '1920x1080') }
         ],
         public: true
       } }
     end
 
     assert_redirected_to project_path(Project.last)
+  end
+
+  test 'update existing project' do
+    project = FactoryBot.create(:project)
+    assert_equal true, project.public
+
+    patch project_path(project), params: { project: {
+      public: false
+    } }
+    assert_redirected_to project_path(project)
+
+    project = Project.find(project.id)
+    assert_equal false, project.public
+  end
+
+  test 'view project' do
+    project = FactoryBot.create(:project)
+    get project_path(project)
+    assert_response :success
   end
 end

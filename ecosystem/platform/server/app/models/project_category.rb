@@ -8,5 +8,5 @@ class ProjectCategory < ApplicationRecord
   belongs_to :category
 
   validates :project, presence: true
-  validates :category, presence: true
+  validates :category, presence: true, uniqueness: { scope: :project }
 end
