@@ -2,7 +2,7 @@
   {
     "type": "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>",
     "data": {
-      "decimals": "8",
+      "decimals": 8,
       "name": "Aptos Coin",
       "supply": {
         "vec": []
