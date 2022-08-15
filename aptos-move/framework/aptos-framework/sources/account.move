@@ -14,6 +14,7 @@ module aptos_framework::account {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_std::table::{Self, Table};
+    use aptos_std::signature;
 
     friend aptos_framework::coins;
     friend aptos_framework::genesis;
@@ -55,11 +56,6 @@ module aptos_framework::account {
     struct RotationProof has drop {
         originator: address, // originating address
         current_auth_key: address, // current auth key
-    }
-
-    struct Proof<RotationProof> has drop {
-        type_info: TypeInfo,
-        inner: RotationProof,
     }
 
     const MAX_U64: u128 = 18446744073709551615;
@@ -134,6 +130,28 @@ module aptos_framework::account {
         });
     }
 
+    // This should only be called during genesis.
+    public(friend) fun create_address_map(aptos_framework_account: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework_account);
+
+        move_to(aptos_framework_account, OriginatingAddress {
+            address_map: table::new(),
+        });
+    }
+
+    /// Construct an authentication key, aborting if the prefix is not valid.
+    fun create_authentication_key(account: &signer, auth_key_prefix: vector<u8>): vector<u8> {
+        let authentication_key = auth_key_prefix;
+        vector::append(
+            &mut authentication_key, bcs::to_bytes(signer::borrow_address(account))
+        );
+        assert!(
+            vector::length(&authentication_key) == 32,
+            error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
+        );
+        authentication_key
+    }
+
     /// Publishes a new `Account` resource under `new_address`. A signer representing `new_address`
     /// is returned. This way, the caller of this function can publish additional resources under
     /// `new_address`.
@@ -203,7 +221,7 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    public entry fun rotate_authentication_key_ed25519(account: &signer, new_public_key: vector<u8>, signature: vector<u8>) acquires Account, OriginatingAddress {
+    public entry fun rotate_authentication_key_ed25519(account: &signer, signature: vector<u8>, new_public_key: vector<u8>) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT));
         assert!(
@@ -215,30 +233,21 @@ module aptos_framework::account {
             error::invalid_argument(EMALFORMED_PROOF_OF_KNOWLEDGE)
         );
 
-        let proof= RotationProof {
+        let account_resource = borrow_global_mut<Account>(addr);
+        let current_auth_key = create_address(account_resource.authentication_key);
+
+        let proof = RotationProof {
             originator: addr,
-            current_auth_key: current_auth_key,
+            current_auth_key,
         };
 
-        assert!(ed25519_verify_t(signature, new_public_key, proof), EINVALID_PROOF_OF_KNOWLEDGE);
+        assert!(signature::ed25519_verify_t(signature, new_public_key, proof), EINVALID_PROOF_OF_KNOWLEDGE);
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
         if (table::contains(address_map, current_auth_key)) {
             table::remove(address_map, current_auth_key);
-
-        let account_resource = borrow_global_mut<Account>(addr);
-        let current_auth_key = account_resource.authentication_key;
-        let current_addr = create_address(current_auth_key);
-
-        let proof= RotationProof {
-            originator: addr,
-            current_auth_key: copy current_auth_key,
         };
 
-        assert!(ed25519_verify_t(signature, new_public_key, proof), EINVALID_PROOF_OF_KNOWLEDGE);
-        let address_map = &mut borrow_global_mut<OriginatingAddress>(@core_resources).address_map;
-        if (table::contains(address_map, current_addr)) {
-            table::remove(address_map, current_addr);
-        };
+        vector::push_back(&mut new_public_key, 0);
 
         let new_auth_key = hash::sha3_256(new_public_key);
         let new_address = create_address(new_auth_key);
@@ -534,6 +543,41 @@ module aptos_framework::account {
         assert!(borrow_global<Account>(addr).sequence_number == 10, 2);
     }
 
+    #[test(alice = @0xa11ce)]
+    #[expected_failure(abort_code = 65548)]
+    public entry fun test_invalid_public_key(alice: signer) acquires Account, OriginatingAddress {
+        create_account(signer::address_of(&alice));
+        let test_public_key = vector::empty<u8>();
+        let test_signature = vector::empty<u8>();
+        let scheme = vector::empty<u8>();
+        vector::push_back(&mut scheme, 0);
+        rotate_authentication_key_ed25519(&alice, test_public_key, test_signature, scheme);
+    }
+
+    #[test(alice = @0xa11ce)]
+    #[expected_failure(abort_code = 65549)]
+    public entry fun test_invalid_signature(alice: signer) acquires Account, OriginatingAddress {
+        create_account(signer::address_of(&alice));
+        let account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
+        let test_signature = vector::empty<u8>();
+        let scheme = vector::empty<u8>();
+        vector::push_back(&mut scheme, 0);
+        rotate_authentication_key_ed25519(&alice, account_resource.authentication_key, test_signature, scheme);
+    }
+
+    #[test(alice = @0xa11ce)]
+    #[expected_failure(abort_code = 65551)]
+    public entry fun test_invalid_scheme(alice: signer) acquires Account, OriginatingAddress {
+        create_account(signer::address_of(&alice));
+        let account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
+        let auth_key = account_resource.authentication_key;
+        let test_signature = account_resource.authentication_key;
+        vector::append(&mut test_signature, copy auth_key);
+        let scheme = vector::empty<u8>();
+        vector::push_back(&mut scheme, 2);
+        rotate_authentication_key_ed25519(&alice, account_resource.authentication_key, test_signature, scheme);
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     // Test account helpers
     ///////////////////////////////////////////////////////////////////////////
@@ -556,5 +600,23 @@ module aptos_framework::account {
         coin::destroy_burn_cap(burn_cap);
         coin::destroy_mint_cap(mint_cap);
         let _bob = bob;
+    }
+
+    #[test(alice = @0xa11ce)]
+    #[expected_failure(abort_code = 65548)]
+    public entry fun test_invalid_public_key(alice: signer) acquires Account, OriginatingAddress {
+        create_account(signer::address_of(&alice));
+        let test_public_key = vector::empty<u8>();
+        let test_signature = vector::empty<u8>();
+        rotate_authentication_key_ed25519(&alice, test_public_key, test_signature);
+    }
+
+    #[test(alice = @0xa11ce)]
+    #[expected_failure(abort_code = 65549)]
+    public entry fun test_invalid_signature(alice: signer) acquires Account, OriginatingAddress {
+        create_account(signer::address_of(&alice));
+        let account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
+        let test_signature = vector::empty<u8>();
+        rotate_authentication_key_ed25519(&alice, account_resource.authentication_key, test_signature);
     }
 }

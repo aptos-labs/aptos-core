@@ -30,8 +30,6 @@ fn key_rotation() {
     let new_private_key = Ed25519PrivateKey::generate_for_testing();
     let new_public_key = new_private_key.public_key();
     let new_auth_key = AuthenticationKey::ed25519(&new_public_key);
-    let mut scheme: Vec<u8> = Vec::new();
-    scheme.push(0);
 
     let rotation_proof = Proof {
         account_address: CORE_CODE_ADDRESS,
@@ -47,9 +45,8 @@ fn key_rotation() {
     assert_success!(harness.run_transaction_payload(
         &account1,
         aptos_stdlib::account_rotate_authentication_key_ed25519(
-            new_public_key.to_bytes().to_vec(),
             signature.to_bytes().to_vec(),
-            scheme,
+            new_public_key.to_bytes().to_vec(),
         )
     ));
 
