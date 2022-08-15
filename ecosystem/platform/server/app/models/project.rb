@@ -18,7 +18,11 @@ class Project < ApplicationRecord
   has_many :project_categories, dependent: :destroy
   has_many :categories, through: :project_categories
   has_many :project_members, dependent: :destroy
-  has_many :members, through: :project_members, source: :user
+  has_many :members, through: :project_members, source: :user do
+    def public
+      where('project_members.public = ?', true)
+    end
+  end
   has_many :project_screenshots, dependent: :destroy
   accepts_nested_attributes_for :project_categories, :project_members, :project_screenshots
 

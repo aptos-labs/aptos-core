@@ -72,9 +72,9 @@ class ProjectsController < ApplicationController
     params.require(:project).permit(:title, :short_description, :full_description, :website_url, :github_url,
                                     :discord_url, :twitter_url, :telegram_url, :linkedin_url, :thumbnail_url,
                                     :youtube_url, :public,
-                                    project_categories_attributes: [:category_id],
-                                    project_members_attributes: %i[user_id role public],
-                                    project_screenshots_attributes: [:url])
+                                    project_categories_attributes: %i[id category_id],
+                                    project_members_attributes: %i[id user_id role public],
+                                    project_screenshots_attributes: %i[id url])
   end
 
   def check_recaptcha

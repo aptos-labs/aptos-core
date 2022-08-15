@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 require 'test_helper'
-require 'mocha/setup'
+require 'mocha/minitest'
 
 class It3ProfilesControllerTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
