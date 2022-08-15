@@ -41,6 +41,7 @@ goldenfile = "1.1.0"
 rand = "0.7.3"
 regex = "1.5.5"
 
+aptos-api-test-context  = { path = "../api/test-context" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-genesis = { path = "../crates/aptos-genesis", features = ["testing"] }
 aptos-global-constants = { path = "../config/global-constants" }
