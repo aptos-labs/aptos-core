@@ -3,7 +3,7 @@
 
 use crate::{test_utils, test_utils::make_timeout_cert, Error, TSafetyRules};
 use aptos_crypto::hash::{HashValue, ACCUMULATOR_PLACEHOLDER_HASH};
-use aptos_types::multi_signature::AggregatedSignature;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::{
     block_info::BlockInfo,
     epoch_state::EpochState,

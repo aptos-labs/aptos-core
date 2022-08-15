@@ -133,7 +133,7 @@ impl Arbitrary for EpochChangeProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::multi_signature::{AggregatedSignature, PartialSignatures};
+    use crate::aggregated_signature::{AggregatedSignature, PartialSignatures};
     use crate::{block_info::BlockInfo, epoch_state::EpochState, waypoint::Waypoint};
 
     #[test]

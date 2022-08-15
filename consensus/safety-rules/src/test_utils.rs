@@ -8,11 +8,11 @@ use crate::{
 use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
 use aptos_secure_storage::{InMemoryStorage, Storage};
 use aptos_types::{
+    aggregated_signature::{AggregatedSignature, PartialSignatures},
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures, LedgerInfoWithSignatures},
-    multi_signature::{AggregatedSignature, PartialSignatures},
     on_chain_config::ValidatorSet,
     proof::AccumulatorExtensionProof,
     validator_info::ValidatorInfo,
