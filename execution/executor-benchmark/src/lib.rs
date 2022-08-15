@@ -13,8 +13,7 @@ use crate::{
     transaction_generator::TransactionGenerator,
 };
 use aptos_config::config::{
-    NodeConfig, RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
-    TARGET_SNAPSHOT_SIZE,
+    NodeConfig, PrunerConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
 };
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
@@ -73,7 +72,7 @@ pub fn run_benchmark(
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
-    pruner_config: StoragePrunerConfig,
+    pruner_config: PrunerConfig,
 ) {
     create_checkpoint(source_dir.as_ref(), checkpoint_dir.as_ref());
 
@@ -108,7 +107,7 @@ pub fn add_accounts(
     block_size: usize,
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
-    pruner_config: StoragePrunerConfig,
+    pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
 ) {
     assert!(source_dir.as_ref() != checkpoint_dir.as_ref());
@@ -130,7 +129,7 @@ fn add_accounts_impl(
     block_size: usize,
     source_dir: impl AsRef<Path>,
     output_dir: impl AsRef<Path>,
-    pruner_config: StoragePrunerConfig,
+    pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
 ) {
     let (mut config, genesis_key) = aptos_genesis::test_utils::test_config();
