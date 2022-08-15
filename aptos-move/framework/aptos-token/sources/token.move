@@ -41,6 +41,7 @@ module aptos_token::token {
     const ETOEKN_PROPERTY_EXISTED: u64 = 18;
     const ENO_TOKEN_IN_TOKEN_STORE: u64 = 19;
     const ENON_ZERO_PROPERTY_VERSION_ONLY_ONE_INSTANCE: u64 = 20;
+    const EUSER_NOT_OPT_IN_DIRECT_TRANSFER: u64 = 21;
 
 
     //
@@ -125,6 +126,7 @@ module aptos_token::token {
     struct TokenStore has key {
         // the tokens owned by a token owner
         tokens: Table<TokenId, Token>,
+        direct_transfer: bool,
         deposit_events: EventHandle<DepositEvent>,
         withdraw_events: EventHandle<WithdrawEvent>,
         burn_events: EventHandle<BurnTokenEvent>,
@@ -290,6 +292,15 @@ module aptos_token::token {
         initialize_token_store(account);
     }
 
+    public entry fun opt_in_direct_transfer(account: &signer, opt_in: bool) acquires TokenStore {
+        let addr = signer::address_of(account);
+        assert!(exists<TokenStore>(addr), ETOKEN_STORE_NOT_PUBLISHED);
+        let opt_in_flag = &mut borrow_global_mut<TokenStore>(addr).direct_transfer;
+        *opt_in_flag = opt_in;
+    }
+
+
+
     /// mutate the token property and save the new property in TokenStore
     /// if the token property_version is 0, we will create a new property_version per token and store the properties
     /// if the token property_version is not 0, we will just update the propertyMap
@@ -436,6 +447,7 @@ module aptos_token::token {
                 account,
                 TokenStore {
                     tokens: table::new(),
+                    direct_transfer: false,
                     deposit_events: event::new_event_handle<DepositEvent>(account),
                     withdraw_events: event::new_event_handle<WithdrawEvent>(account),
                     burn_events: event::new_event_handle<BurnTokenEvent>(account),
@@ -467,12 +479,14 @@ module aptos_token::token {
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
-    fun transfer(
+    public fun transfer(
         from: &signer,
         id: TokenId,
         to: address,
         amount: u64,
     ) acquires TokenStore {
+        let opt_in_transfer = borrow_global<TokenStore>(to).direct_transfer;
+        assert!(opt_in_transfer, EUSER_NOT_OPT_IN_DIRECT_TRANSFER);
         let token = withdraw_token(from, id, amount);
         direct_deposit(to, token);
     }
@@ -903,7 +917,7 @@ module aptos_token::token {
         );
     }
 
-    #[test(creator = @0x1, owner = @0x2)]
+    #[test(creator = @0xFA, owner = @0xAF)]
     public entry fun direct_transfer_test(
         creator: signer,
         owner: signer,
@@ -1048,6 +1062,7 @@ module aptos_token::token {
         assert!(balance_of(signer::address_of(creator), new_id_3) == 0, 1);
         // transfer token with property_version > 0 also transfer the token properties
         initialize_token_store(owner);
+        opt_in_direct_transfer(owner, true);
         transfer(creator, new_id_1, signer::address_of(owner), 1);
 
         let props = &borrow_global<TokenStore>(signer::address_of(owner)).tokens;
