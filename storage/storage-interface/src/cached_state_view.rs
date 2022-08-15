@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::state_view::DbStateView;
-use crate::{proof_fetcher::ProofFetcher, DbReader};
+use crate::{proof_fetcher::ProofFetcher, state_view::DbStateView, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_state_view::{StateView, StateViewId};
@@ -131,9 +130,11 @@ impl CachedStateView {
             StateStoreStatus::ExistsInDB | StateStoreStatus::Unknown => {
                 match self.snapshot {
                     Some((version, root_hash)) => {
-                        let (value, proof) = self
-                            .proof_fetcher
-                            .fetch_state_value_and_proof(state_key, version)?;
+                        let (value, proof) = self.proof_fetcher.fetch_state_value_and_proof(
+                            state_key,
+                            version,
+                            Some(root_hash),
+                        )?;
                         // TODO: proof verification can be opted out, for performance
                         if let Some(proof) = proof {
                             proof

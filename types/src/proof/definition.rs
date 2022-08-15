@@ -177,6 +177,47 @@ impl SparseMerkleProof {
         )
     }
 
+    pub fn verify_by_root_hash(
+        &self,
+        expected_root_hash: HashValue,
+        element_key: HashValue,
+    ) -> Result<()> {
+        ensure!(
+            self.siblings.len() <= HashValue::LENGTH_IN_BITS,
+            "Sparse Merkle Tree proof has more than {} ({}) siblings.",
+            HashValue::LENGTH_IN_BITS,
+            self.siblings.len(),
+        );
+
+        let current_hash = self
+            .leaf
+            .map_or(*SPARSE_MERKLE_PLACEHOLDER_HASH, |leaf| leaf.hash());
+        let actual_root_hash = self
+            .siblings
+            .iter()
+            .zip(
+                element_key
+                    .iter_bits()
+                    .rev()
+                    .skip(HashValue::LENGTH_IN_BITS - self.siblings.len()),
+            )
+            .fold(current_hash, |hash, (sibling_hash, bit)| {
+                if bit {
+                    SparseMerkleInternalNode::new(*sibling_hash, hash).hash()
+                } else {
+                    SparseMerkleInternalNode::new(hash, *sibling_hash).hash()
+                }
+            });
+        ensure!(
+            actual_root_hash == expected_root_hash,
+            "Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
+            actual_root_hash,
+            expected_root_hash,
+        );
+
+        Ok(())
+    }
+
     /// If `element_hash` is present, verifies an element whose key is `element_key` and value is
     /// authenticated by `element_hash` exists in the Sparse Merkle Tree using the provided proof.
     /// Otherwise verifies the proof is a valid non-inclusion proof that shows this key doesn't
@@ -187,13 +228,6 @@ impl SparseMerkleProof {
         element_key: HashValue,
         element_hash: Option<HashValue>,
     ) -> Result<()> {
-        ensure!(
-            self.siblings.len() <= HashValue::LENGTH_IN_BITS,
-            "Sparse Merkle Tree proof has more than {} ({}) siblings.",
-            HashValue::LENGTH_IN_BITS,
-            self.siblings.len(),
-        );
-
         match (element_hash, self.leaf) {
             (Some(hash), Some(leaf)) => {
                 // This is an inclusion proof, so the key and value hash provided in the proof
@@ -237,33 +271,7 @@ impl SparseMerkleProof {
             }
         }
 
-        let current_hash = self
-            .leaf
-            .map_or(*SPARSE_MERKLE_PLACEHOLDER_HASH, |leaf| leaf.hash());
-        let actual_root_hash = self
-            .siblings
-            .iter()
-            .zip(
-                element_key
-                    .iter_bits()
-                    .rev()
-                    .skip(HashValue::LENGTH_IN_BITS - self.siblings.len()),
-            )
-            .fold(current_hash, |hash, (sibling_hash, bit)| {
-                if bit {
-                    SparseMerkleInternalNode::new(*sibling_hash, hash).hash()
-                } else {
-                    SparseMerkleInternalNode::new(hash, *sibling_hash).hash()
-                }
-            });
-        ensure!(
-            actual_root_hash == expected_root_hash,
-            "Root hashes do not match. Actual root hash: {:x}. Expected root hash: {:x}.",
-            actual_root_hash,
-            expected_root_hash,
-        );
-
-        Ok(())
+        self.verify_by_root_hash(expected_root_hash, element_key)
     }
 }
 
