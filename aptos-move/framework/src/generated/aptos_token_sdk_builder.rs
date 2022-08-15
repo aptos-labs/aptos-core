@@ -101,6 +101,10 @@ pub enum ScriptFunctionCall {
         types: Vec<Vec<u8>>,
     },
 
+    TokenOptInDirectTransfer {
+        opt_in: bool,
+    },
+
     /// Token owner lists their token for swapping
     TokenCoinSwapListTokenForSwap {
         coin_type: TypeTag,
@@ -228,6 +232,7 @@ impl ScriptFunctionCall {
                 values,
                 types,
             ),
+            TokenOptInDirectTransfer { opt_in } => token_opt_in_direct_transfer(opt_in),
             TokenCoinSwapListTokenForSwap {
                 coin_type,
                 creators_address,
@@ -507,6 +512,21 @@ pub fn token_mutate_token_properties(
     ))
 }
 
+pub fn token_opt_in_direct_transfer(opt_in: bool) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("token").to_owned(),
+        ),
+        ident_str!("opt_in_direct_transfer").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&opt_in).unwrap()],
+    ))
+}
+
 /// Token owner lists their token for swapping
 pub fn token_coin_swap_list_token_for_swap(
     coin_type: TypeTag,
@@ -735,6 +755,18 @@ mod decoder {
         }
     }
 
+    pub fn token_opt_in_direct_transfer(
+        payload: &TransactionPayload,
+    ) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::TokenOptInDirectTransfer {
+                opt_in: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn token_coin_swap_list_token_for_swap(
         payload: &TransactionPayload,
     ) -> Option<ScriptFunctionCall> {
@@ -840,6 +872,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "token_mutate_token_properties".to_string(),
             Box::new(decoder::token_mutate_token_properties),
+        );
+        map.insert(
+            "token_opt_in_direct_transfer".to_string(),
+            Box::new(decoder::token_opt_in_direct_transfer),
         );
         map.insert(
             "token_coin_swap_list_token_for_swap".to_string(),
