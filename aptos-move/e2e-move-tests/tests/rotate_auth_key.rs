@@ -8,6 +8,7 @@ use aptos_types::{
     state_store::state_key::StateKey, state_store::table::TableHandle,
     transaction::authenticator::AuthenticationKey,
 };
+
 use cached_framework_packages::aptos_stdlib;
 use e2e_move_tests::{assert_success, enable_golden, MoveHarness};
 use move_deps::move_core_types::parser::parse_struct_tag;
