@@ -8,8 +8,8 @@ use crate::requests::{
 use crate::responses::{CompleteDataRange, DataSummary, ProtocolMetadata};
 use crate::{Epoch, StorageServiceRequest};
 use aptos_crypto::hash::HashValue;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use aptos_types::multi_signature::AggregatedSignature;
 use aptos_types::transaction::Version;
 use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
 use claim::{assert_err, assert_ok};

@@ -8,7 +8,7 @@ use aptos_crypto::{
     HashValue, PrivateKey, Uniform,
 };
 use aptos_data_client::GlobalDataSummary;
-use aptos_types::multi_signature::AggregatedSignature;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::on_chain_config::ValidatorSet;
 use aptos_types::{
     account_address::AccountAddress,

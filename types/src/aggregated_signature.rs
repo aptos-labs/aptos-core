@@ -101,7 +101,8 @@ impl PartialSignatures {
         &self.signatures
     }
 }
-
+/// This struct represents partial signatures along with corresponding rounds collected during
+/// timeout aggregation.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct PartialSignaturesWithRound {
     signatures: BTreeMap<AccountAddress, (Round, bls12381::Signature)>,
@@ -119,7 +120,7 @@ impl PartialSignaturesWithRound {
         &self.signatures
     }
 
-    //#[cfg(test)]
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn replace_signature(
         &mut self,
         validator: AccountAddress,
@@ -129,7 +130,7 @@ impl PartialSignaturesWithRound {
         self.signatures.insert(validator, (round, signature));
     }
 
-    //#[cfg(test)]
+    #[cfg(any(test, feature = "fuzzing"))]
     pub fn remove_signature(&mut self, validator: &AccountAddress) {
         self.signatures.remove(validator);
     }
@@ -145,7 +146,8 @@ impl PartialSignaturesWithRound {
             .or_insert((round, signature));
     }
 
-    /// Returns partial signature and a vector of rounds ordered by validator index
+    /// Returns partial signature and a vector of rounds ordered by validator index in the validator
+    /// verifier.
     pub fn get_partial_sig_with_rounds(
         &self,
         address_to_validator_index: &HashMap<AccountAddress, usize>,
@@ -191,16 +193,20 @@ impl AggregatedSignatureWithRounds {
         }
     }
 
-    pub fn get_voters(&self, validator_addresses: &[AccountAddress]) -> Vec<AccountAddress> {
-        self.aggregated_sig.get_voter_addresses(validator_addresses)
+    pub fn get_voters(
+        &self,
+        ordered_validator_addresses: &[AccountAddress],
+    ) -> Vec<AccountAddress> {
+        self.aggregated_sig
+            .get_voter_addresses(ordered_validator_addresses)
     }
 
     pub fn get_voters_and_rounds(
         &self,
-        validator_addresses: &[AccountAddress],
+        ordered_validator_addresses: &[AccountAddress],
     ) -> Vec<(AccountAddress, Round)> {
         self.aggregated_sig
-            .get_voter_addresses(validator_addresses)
+            .get_voter_addresses(ordered_validator_addresses)
             .into_iter()
             .zip(self.rounds.clone())
             .collect()

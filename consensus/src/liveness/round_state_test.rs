@@ -9,7 +9,7 @@ use crate::{
 };
 
 use aptos_crypto::HashValue;
-use aptos_types::multi_signature::AggregatedSignature;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},

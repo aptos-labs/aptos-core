@@ -353,7 +353,7 @@ impl LedgerInfoWithPartialSignatures {
 // Arbitrary implementation of LedgerInfoWithV0 (for fuzzing)
 //
 
-use crate::multi_signature::{AggregatedSignature, PartialSignatures};
+use crate::aggregated_signature::{AggregatedSignature, PartialSignatures};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_verifier::generate_validator_verifier;
 #[cfg(any(test, feature = "fuzzing"))]

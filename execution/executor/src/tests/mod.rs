@@ -7,7 +7,7 @@ use proptest::prelude::*;
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_state_view::StateViewId;
-use aptos_types::multi_signature::AggregatedSignature;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,

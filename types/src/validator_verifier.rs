@@ -10,7 +10,7 @@ use std::{
 };
 use thiserror::Error;
 
-use crate::multi_signature::{AggregatedSignature, PartialSignatures};
+use crate::aggregated_signature::{AggregatedSignature, PartialSignatures};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_signer::ValidatorSigner;
 use anyhow::{ensure, Result};
@@ -38,9 +38,12 @@ pub enum VerifyError {
     #[error("Signature is empty")]
     /// The signature is empty
     EmptySignature,
-    #[error("Signature is invalid")]
-    /// The signature is invalid
-    InvalidSignature,
+    #[error("Multi signature is invalid")]
+    /// The multi signature is invalid
+    InvalidMultiSignature,
+    #[error("Aggregated signature is invalid")]
+    /// The multi signature is invalid
+    InvalidAggregatedSignature,
     #[error("Inconsistent Block Info")]
     InconsistentBlockInfo,
     #[error("Failed to aggregate public keys")]
@@ -183,12 +186,13 @@ impl ValidatorVerifier {
         match self.get_public_key(&author) {
             Some(public_key) => public_key
                 .verify_struct_signature(message, signature)
-                .map_err(|_| VerifyError::InvalidSignature),
+                .map_err(|_| VerifyError::InvalidMultiSignature),
             None => Err(VerifyError::UnknownAuthor),
         }
     }
 
-    // Generates a multi signature from partial signatures without actually verifying it.
+    // Generates a multi signature or aggregate signature
+    // from partial signatures without actually verifying it.
     pub fn aggregate_signature(
         &self,
         partial_signatures: &PartialSignatures,
@@ -227,7 +231,9 @@ impl ValidatorVerifier {
         message: &T,
     ) -> Result<AggregatedSignature, VerifyError> {
         let (aggregated_sig, aggregated_key, _) = self.aggregate_signature(partial_signatures)?;
-        // Verify the multi-signature
+        // Verify the multi-signature. Please note that the verification is not really needed here
+        // because we already trust all the signatures from the validators. This is just good to have.
+        // We can consider removing this if it turns out to be too expensive.
         aggregated_sig
             .aggregated_sig()
             .as_ref()
@@ -245,7 +251,9 @@ impl ValidatorVerifier {
     ) -> Result<AggregatedSignature, VerifyError> {
         let (aggregated_sig, _aggregated_key, public_keys) =
             self.aggregate_signature(partial_signatures)?;
-        // Verify the aggregated signature
+        // Verify the aggregated signature. Please note that the verification is not really needed here
+        // because we already trust all the signatures from the validators. This is just good to have.
+        // We can consider removing this if it turns out to be too expensive.
         if verify {
             aggregated_sig
                 .aggregated_sig()
@@ -300,7 +308,7 @@ impl ValidatorVerifier {
 
         multi_sig
             .verify(message, &aggregated_key)
-            .map_err(|_| VerifyError::InvalidSignature)?;
+            .map_err(|_| VerifyError::InvalidMultiSignature)?;
         Ok(())
     }
 
@@ -331,7 +339,7 @@ impl ValidatorVerifier {
 
         aggregated_sig
             .verify_aggregate(messages, &pub_keys)
-            .map_err(|_| VerifyError::InvalidSignature)?;
+            .map_err(|_| VerifyError::InvalidAggregatedSignature)?;
         Ok(())
     }
 
@@ -614,7 +622,7 @@ mod tests {
         );
         assert_eq!(
             validator.verify(validator_signer.author(), &dummy_struct, &unknown_signature),
-            Err(VerifyError::InvalidSignature)
+            Err(VerifyError::InvalidMultiSignature)
         );
     }
 
@@ -639,7 +647,7 @@ mod tests {
 
         assert_eq!(
             validator.verify_multi_signatures(&dummy_struct, &multi_sig),
-            Err(VerifyError::InvalidSignature)
+            Err(VerifyError::InvalidMultiSignature)
         );
     }
 

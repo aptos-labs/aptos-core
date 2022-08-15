@@ -6,9 +6,9 @@ use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::hash::HashValue;
 use aptos_crypto::{PrivateKey, SigningKey, Uniform};
 use aptos_types::account_address::AccountAddress;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::chain_id::ChainId;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
-use aptos_types::multi_signature::AggregatedSignature;
 use aptos_types::transaction::{
     ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
     TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,

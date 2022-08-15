@@ -32,7 +32,7 @@ use aptos_api::{context::Context, index};
 use aptos_api_types::HexEncodedBytes;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_types::multi_signature::AggregatedSignature;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use bytes::Bytes;
 use hyper::Response;
 use rand::SeedableRng;

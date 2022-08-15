@@ -10,8 +10,8 @@
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
+    aggregated_signature::PartialSignatures,
     ledger_info::LedgerInfoWithPartialSignatures,
-    multi_signature::PartialSignatures,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;

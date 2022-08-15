@@ -10,7 +10,7 @@ use aptos_config::config::StorageServiceConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_logger::Level;
 use aptos_time_service::{MockTimeService, TimeService};
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::write_set::WriteSet;
 use aptos_types::{
     account_address::AccountAddress,
