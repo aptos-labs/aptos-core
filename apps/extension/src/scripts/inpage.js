@@ -102,7 +102,8 @@ class Web3 {
       window.addEventListener('message', function handler(event) {
         if (event.data.responseMethod === method
             && event.data.id === id
-            && event.data.response) {
+            && (event.data.response !== undefined
+              || event.data.response !== null)) {
           const { response } = event.data;
           this.removeEventListener('message', handler);
           if (response && response.error) {

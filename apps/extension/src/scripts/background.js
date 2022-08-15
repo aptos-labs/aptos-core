@@ -38,7 +38,7 @@ async function signTransaction(account, signingMessage) {
 }
 
 async function checkConnected(address, sendResponse) {
-  if (Permissions.isDomainAllowed(await getCurrentDomain(), address)) {
+  if (await Permissions.isDomainAllowed(await getCurrentDomain(), address)) {
     return true;
   }
   sendResponse({ error: DappErrorType.UNAUTHORIZED });
