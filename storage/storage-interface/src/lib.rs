@@ -40,7 +40,7 @@ pub mod async_proof_fetcher;
 pub mod cached_state_view;
 mod executed_trees;
 mod metrics;
-#[cfg(any(feature = "fuzzing"))]
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod mock;
 pub mod proof_fetcher;
 pub mod state_delta;
