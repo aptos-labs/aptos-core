@@ -30,7 +30,7 @@ jobs:
   # if there are any changes that would affect it within the PR / commit. If
   # everything is checked in, run tests, build the SDK, and upload it to npm.js.
   test-sdk-confirm-client-generated-publish:
-    runs-on: ubuntu-latest 
+    runs-on: high-perf-docker
     permissions:
       contents: read
       id-token: write
@@ -52,7 +52,12 @@ jobs:
           node-version-file: .node-version
           registry-url: 'https://registry.npmjs.org'
 
-      - run: mkdir -p /tmp
+      # When using high-perf-docker, the CI is actually run with two containers
+      # in a k8s pod, one for docker commands run in the CI steps (docker), and
+      # one for everything else (runner). These containers share some volume
+      # mounts, /runner is one of them. Writing the specs here ensures the docker
+      # run step writes to a same place that the runner can read from.
+      - run: mkdir -p /runner/specs
 
       # Build the API specs.
       - uses: nick-fields/retry@v2
@@ -60,7 +65,7 @@ jobs:
         with:
           max_attempts: 3
           timeout_minutes: 20
-          command: docker run --rm --mount=type=bind,source=/tmp,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
+          command: docker run --rm --mount=type=bind,source=/runner/specs,target=/specs ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/tools:${{ inputs.GIT_SHA }} aptos-openapi-spec-generator -f yaml -o /specs/spec.yaml
       - uses: nick-fields/retry@v2
         name: generate-json-spec
         with:
@@ -72,8 +77,8 @@ jobs:
       - run: echo "If this step fails, run the following commands locally to fix it:"
       - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/v1/spec.yaml"
       - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/v1/spec.json"
-      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/spec.yaml api/doc/v1/spec.yaml
-      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /tmp/spec.json api/doc/v1/spec.json
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /runner/specs/spec.yaml api/doc/v1/spec.yaml
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines /runner/specs/spec.json api/doc/v1/spec.json
 
       # Set up dotenv file for tests (jest doesn't read env vars properly).
       - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env
