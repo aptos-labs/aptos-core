@@ -33,6 +33,7 @@ use move_deps::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::btree_map::Entry,
     convert::TryInto,
     ops::{Deref, DerefMut},
 };
@@ -240,7 +241,7 @@ impl SessionOutput {
             .map_err(|_| VMStatus::Error(StatusCode::DATA_FORMAT_ERROR))?;
         self.events.extend(other.events.into_iter());
 
-        // Squash the table changes
+        // Squash the table changes.
         self.table_change_set
             .new_tables
             .extend(other.table_change_set.new_tables);
@@ -264,6 +265,42 @@ impl SessionOutput {
                 });
             my_changes.entries.extend(changes.entries.into_iter());
         }
+
+        // Squash aggregator changes.
+        for (other_id, other_change) in other.aggregator_change_set.changes {
+            match self.aggregator_change_set.changes.entry(other_id) {
+                // If something was changed only in `other` session, add it.
+                Entry::Vacant(entry) => {
+                    entry.insert(other_change);
+                }
+                // Otherwise, we might need to aggregate deltas.
+                Entry::Occupied(mut entry) => {
+                    use AggregatorChange::*;
+
+                    let entry_mut = entry.get_mut();
+                    match (*entry_mut, other_change) {
+                        (Write(_) | Merge(_), Write(data)) => *entry_mut = Write(data),
+                        (Write(_) | Merge(_), Delete) => *entry_mut = Delete,
+                        (Write(data), Merge(delta)) => {
+                            let new_data = delta
+                                .apply_to(data)
+                                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+                            *entry_mut = Write(new_data);
+                        }
+                        (Merge(delta1), Merge(delta2)) => {
+                            let new_delta = delta1
+                                .merge_with(delta2)
+                                .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
+                            *entry_mut = Merge(new_delta)
+                        }
+                        // Hashing properties guarantee that aggregator keys should
+                        // not collide, making this case impossible.
+                        (Delete, _) => unreachable!("resource cannot be accessed after deletion"),
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
 }

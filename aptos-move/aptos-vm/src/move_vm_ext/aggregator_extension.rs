@@ -207,7 +207,7 @@ impl AggregatorData {
 }
 
 /// Represents a single aggregator change.
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum AggregatorChange {
     // A value should be written to storage.
     Write(u128),
