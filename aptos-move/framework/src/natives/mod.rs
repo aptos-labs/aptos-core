@@ -3,6 +3,7 @@
 
 pub mod account;
 pub mod code;
+pub mod cryptography;
 pub mod event;
 pub mod hash;
 mod helpers;
@@ -27,6 +28,7 @@ pub mod status {
 pub struct GasParameters {
     pub account: account::GasParameters,
     pub signature: signature::GasParameters,
+    pub bls12381: cryptography::bls12381::GasParameters,
     pub hash: hash::GasParameters,
     pub type_info: type_info::GasParameters,
     pub util: util::GasParameters,
@@ -42,33 +44,34 @@ impl GasParameters {
                 create_address: account::CreateAddressGasParameters { base_cost: 0 },
                 create_signer: account::CreateSignerGasParameters { base_cost: 0 },
             },
-            signature: signature::GasParameters {
+            bls12381: cryptography::bls12381::GasParameters {
                 // BLS signatures over BLS12-381 curves
                 bls12381_aggregate_pop_verified_pubkeys:
-                    signature::Bls12381AggregatePopVerifiedPubkeysGasParameters {
+                    cryptography::bls12381::Bls12381AggregatePopVerifiedPubkeysGasParameters {
                         base_cost: 0,
                         per_pubkey_deserialize_cost: 0,
                         per_pubkey_aggregate_cost: 0,
                     },
                 bls12381_aggregate_signatures:
-                    signature::Bls12381AggregateSignaturesGasParameters {
+                    cryptography::bls12381::Bls12381AggregateSignaturesGasParameters {
                         base_cost: 0,
                         per_sig_deserialize_cost: 0,
                         per_sig_aggregate_cost: 0,
                     },
                 bls12381_signature_subgroup_check:
-                    signature::Bls12381SignatureSubgroupCheckGasParameters {
+                    cryptography::bls12381::Bls12381SignatureSubgroupCheckGasParameters {
                         base_cost: 0,
                         per_sig_deserialize_cost: 0,
                         per_sig_subgroup_check_cost: 0,
                     },
-                bls12381_validate_pubkey: signature::Bls12381ValidatePubkeyGasParameters {
-                    base_cost: 0,
-                    per_pubkey_deserialize_cost: 0,
-                    per_pubkey_subgroup_check_cost: 0,
-                },
+                bls12381_validate_pubkey:
+                    cryptography::bls12381::Bls12381ValidatePubkeyGasParameters {
+                        base_cost: 0,
+                        per_pubkey_deserialize_cost: 0,
+                        per_pubkey_subgroup_check_cost: 0,
+                    },
                 bls12381_verify_aggregate_signature:
-                    signature::Bls12381VerifyAggregateSignatureGasParameters {
+                    cryptography::bls12381::Bls12381VerifyAggregateSignatureGasParameters {
                         base_cost: 0,
                         per_pubkey_deserialize_cost: 0,
                         per_sig_deserialize_cost: 0,
@@ -77,7 +80,7 @@ impl GasParameters {
                         per_msg_byte_hashing_cost: 0,
                     },
                 bls12381_verify_multisignature:
-                    signature::Bls12381VerifyMultisignatureGasParameters {
+                    cryptography::bls12381::Bls12381VerifyMultisignatureGasParameters {
                         base_cost: 0,
                         per_pubkey_deserialize_cost: 0,
                         per_pubkey_subgroup_check_cost: 0,
@@ -87,7 +90,7 @@ impl GasParameters {
                         per_msg_byte_hashing_cost: 0,
                     },
                 bls12381_verify_normal_signature:
-                    signature::Bls12381VerifyNormalSignatureGasParameters {
+                    cryptography::bls12381::Bls12381VerifyNormalSignatureGasParameters {
                         base_cost: 0,
                         per_pubkey_deserialize_cost: 0,
                         per_pubkey_subgroup_check_cost: 0,
@@ -97,14 +100,14 @@ impl GasParameters {
                         per_msg_byte_hashing_cost: 0,
                     },
                 bls12381_verify_proof_of_possession:
-                    signature::Bls12381VerifyProofOfPosessionGasParameters {
+                    cryptography::bls12381::Bls12381VerifyProofOfPosessionGasParameters {
                         base_cost: 0,
                         per_pubkey_deserialize_cost: 0,
                         per_sig_deserialize_cost: 0,
                         per_pop_verify_cost: 0,
                     },
                 bls12381_verify_signature_share:
-                    signature::Bls12381VerifySignatureShareGasParameters {
+                    cryptography::bls12381::Bls12381VerifySignatureShareGasParameters {
                         base_cost: 0,
                         per_pubkey_deserialize_cost: 0,
                         per_pubkey_subgroup_check_cost: 0,
@@ -113,7 +116,8 @@ impl GasParameters {
                         per_msg_hashing_base_cost: 0,
                         per_msg_byte_hashing_cost: 0,
                     },
-
+            },
+            signature: signature::GasParameters {
                 // Ed25519
                 ed25519_validate_pubkey: signature::Ed25519ValidatePubkeyGasParameters {
                     base_cost: 0,
@@ -188,6 +192,10 @@ pub fn all_natives(
 
     add_natives_from_module!("account", account::make_all(gas_params.account));
     add_natives_from_module!("signature", signature::make_all(gas_params.signature));
+    add_natives_from_module!(
+        "bls12381",
+        cryptography::bls12381::make_all(gas_params.bls12381)
+    );
     add_natives_from_module!("aptos_hash", hash::make_all(gas_params.hash));
     add_natives_from_module!("type_info", type_info::make_all(gas_params.type_info));
     add_natives_from_module!("util", util::make_all(gas_params.util));
