@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{PrivateKey, SigningKey, Uniform};
 use aptos_types::{
