@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{
-    AccountAddressWrapper, CliError, CliTypedResult, PromptOptions, TransactionOptions,
+    CliError, CliTypedResult, PoolAddressArgs, PromptOptions, TransactionOptions,
 };
 use crate::common::utils::prompt_yes_with_override;
 use crate::{CliCommand, CliResult};
@@ -42,9 +42,8 @@ impl GovernanceTool {
 pub struct SubmitProposal {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    /// Delegated pool address to submit proposal on behalf of
-    #[clap(long)]
-    pub(crate) pool_address: AccountAddressWrapper,
+    #[clap(flatten)]
+    pub(crate) pool_address_args: PoolAddressArgs,
     /// Execution hash of the script to be voted on
     #[clap(long, parse(try_from_str = read_hex_hash))]
     pub(crate) execution_hash: HashValue,
@@ -99,7 +98,6 @@ impl CliCommand<Transaction> for SubmitProposal {
         println!("{}", metadata);
         prompt_yes_with_override("Do you want to submit this proposal?", self.prompt_options)?;
 
-        // TODO: Allow Pool Address to use profile aliases
         self.txn_options
             .submit_script_function(
                 AccountAddress::ONE,
@@ -107,7 +105,7 @@ impl CliCommand<Transaction> for SubmitProposal {
                 "create_proposal",
                 vec![],
                 vec![
-                    bcs::to_bytes(&self.pool_address.account_address)?,
+                    bcs::to_bytes(&self.pool_address_args.pool_address())?,
                     bcs::to_bytes(&self.execution_hash)?,
                     bcs::to_bytes(&self.metadata_url.to_string())?,
                     bcs::to_bytes(&metadata_hash)?,
@@ -126,9 +124,8 @@ fn read_hex_hash(str: &str) -> CliTypedResult<HashValue> {
 pub struct SubmitVote {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    /// Delegated pool address to vote on behalf of
-    #[clap(long)]
-    pub(crate) pool_address: AccountAddressWrapper,
+    #[clap(flatten)]
+    pub(crate) pool_address_args: PoolAddressArgs,
     /// Id of proposal to vote on
     #[clap(long)]
     pub(crate) proposal_id: u64,
@@ -160,7 +157,7 @@ impl CliCommand<Transaction> for SubmitVote {
                 "vote",
                 vec![],
                 vec![
-                    bcs::to_bytes(&self.pool_address.account_address)?,
+                    bcs::to_bytes(&self.pool_address_args.pool_address())?,
                     bcs::to_bytes(&self.proposal_id)?,
                     bcs::to_bytes(&self.should_pass)?,
                 ],
