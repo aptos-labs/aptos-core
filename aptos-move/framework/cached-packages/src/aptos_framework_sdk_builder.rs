@@ -119,7 +119,7 @@ pub enum ScriptFunctionCall {
         coin_type: TypeTag,
         name: Vec<u8>,
         symbol: Vec<u8>,
-        decimals: u64,
+        decimals: u8,
         monitor_supply: bool,
     },
 
@@ -599,7 +599,7 @@ pub fn managed_coin_initialize(
     coin_type: TypeTag,
     name: Vec<u8>,
     symbol: Vec<u8>,
-    decimals: u64,
+    decimals: u8,
     monitor_supply: bool,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
