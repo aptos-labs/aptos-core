@@ -3,11 +3,11 @@
 
 use crate::add_accounts_impl;
 use aptos_config::{
-    config::{RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG},
+    config::{RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG},
     utils::get_genesis_txn,
 };
 
-use aptos_config::config::TARGET_SNAPSHOT_SIZE;
+use aptos_config::config::{PrunerConfig, TARGET_SNAPSHOT_SIZE};
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
 use executor::db_bootstrapper::{generate_waypoint, maybe_bootstrap};
@@ -19,7 +19,7 @@ pub fn run(
     init_account_balance: u64,
     block_size: usize,
     db_dir: impl AsRef<Path>,
-    storage_pruner_config: StoragePrunerConfig,
+    storage_pruner_config: PrunerConfig,
     verify_sequence_numbers: bool,
 ) {
     println!("Initializing...");

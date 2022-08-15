@@ -71,7 +71,7 @@ pub struct StorageConfig {
     pub address: SocketAddr,
     pub backup_service_address: SocketAddr,
     pub dir: PathBuf,
-    pub storage_pruner_config: StoragePrunerConfig,
+    pub storage_pruner_config: PrunerConfig,
     #[serde(skip)]
     data_dir: PathBuf,
     /// The threshold that determine whether a snapshot should be committed to state merkle db.
@@ -84,53 +84,80 @@ pub struct StorageConfig {
     pub enable_indexer: bool,
 }
 
-pub const NO_OP_STORAGE_PRUNER_CONFIG: StoragePrunerConfig = StoragePrunerConfig {
-    enable_state_store_pruner: false,
-    enable_ledger_pruner: false,
-    state_store_prune_window: 0,
-    ledger_prune_window: 0,
-    ledger_pruning_batch_size: 10_000,
-    state_store_pruning_batch_size: 10_000,
-    user_pruning_window_offset: 0,
+pub const NO_OP_STORAGE_PRUNER_CONFIG: PrunerConfig = PrunerConfig {
+    ledger_pruner_config: LedgerPrunerConfig {
+        enable: false,
+        prune_window: 0,
+        batch_size: 0,
+        user_pruning_window_offset: 0,
+    },
+    state_merkle_pruner_config: StateMerklePrunerConfig {
+        enable: false,
+        prune_window: 0,
+        batch_size: 0,
+        user_pruning_window_offset: 0,
+    },
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct StoragePrunerConfig {
-    /// Boolean to enable/disable the state store pruner. The state pruner is responsible for
-    /// pruning state tree nodes.
-    pub enable_state_store_pruner: bool,
+pub struct LedgerPrunerConfig {
     /// Boolean to enable/disable the ledger pruner. The ledger pruner is responsible for pruning
     /// everything else except for states (e.g. transactions, events etc.)
-    pub enable_ledger_pruner: bool,
-    /// The size of the window should be calculated based on disk space availability and system TPS.
-    pub state_store_prune_window: u64,
+    pub enable: bool,
     /// This is the default pruning window for any other store except for state store. State store
     /// being big in size, we might want to configure a smaller window for state store vs other
     /// store.
-    pub ledger_prune_window: u64,
+    pub prune_window: u64,
     /// Batch size of the versions to be sent to the ledger pruner - this is to avoid slowdown due to
     /// issuing too many DB calls and batch prune instead. For ledger pruner, this means the number
     /// of versions to prune a time.
-    pub ledger_pruning_batch_size: usize,
-    /// Similar to the variable above but for state store pruner. It means the number of stale
-    /// nodes to prune a time.
-    pub state_store_pruning_batch_size: usize,
+    pub batch_size: usize,
     /// The offset for user pruning window to adjust
     pub user_pruning_window_offset: u64,
 }
 
-impl Default for StoragePrunerConfig {
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct StateMerklePrunerConfig {
+    /// Boolean to enable/disable the state store pruner. The state pruner is responsible for
+    /// pruning state tree nodes.
+    pub enable: bool,
+    /// The size of the window should be calculated based on disk space availability and system TPS.
+    pub prune_window: u64,
+    /// Similar to the variable above but for state store pruner. It means the number of stale
+    /// nodes to prune a time.
+    pub batch_size: usize,
+    /// The offset for user pruning window to adjust
+    pub user_pruning_window_offset: u64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, Default)]
+#[serde(default, deny_unknown_fields)]
+pub struct PrunerConfig {
+    pub ledger_pruner_config: LedgerPrunerConfig,
+    pub state_merkle_pruner_config: StateMerklePrunerConfig,
+}
+
+impl Default for LedgerPrunerConfig {
     fn default() -> Self {
-        StoragePrunerConfig {
-            enable_state_store_pruner: true,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 1_000_000,
-            ledger_prune_window: 10_000_000,
-            ledger_pruning_batch_size: 500,
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 10_000_000,
+            batch_size: 500,
+            user_pruning_window_offset: 200_000,
+        }
+    }
+}
+
+impl Default for StateMerklePrunerConfig {
+    fn default() -> Self {
+        StateMerklePrunerConfig {
+            enable: true,
+            prune_window: 1_000_000,
             // A 10k transaction block (touching 60k state values, in the case of the account
             // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
-            state_store_pruning_batch_size: 1_000,
+            batch_size: 1_000,
             user_pruning_window_offset: 200_000,
         }
     }
@@ -148,7 +175,7 @@ impl Default for StorageConfig {
             // of the DB might require, 10k (TPS)  * 100 (seconds)  =  1 Million might be a
             // conservatively safe minimal prune window. It'll take a few Gigabytes of disk space
             // depending on the size of an average account blob.
-            storage_pruner_config: StoragePrunerConfig::default(),
+            storage_pruner_config: PrunerConfig::default(),
             data_dir: PathBuf::from("/opt/aptos/data"),
             rocksdb_configs: RocksdbConfigs::default(),
             enable_indexer: false,

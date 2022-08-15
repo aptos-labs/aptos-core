@@ -18,7 +18,7 @@ use aptos_types::transaction::{AtomicVersion, Version};
 use schemadb::{ReadOptions, SchemaBatch, DB};
 use std::sync::{atomic::Ordering, Arc};
 
-pub const LEDGER_PRUNER_NAME: &str = "ledger pruner";
+pub const LEDGER_PRUNER_NAME: &str = "ledger_pruner";
 
 #[derive(Debug)]
 /// Responsible for pruning everything except for the state tree.

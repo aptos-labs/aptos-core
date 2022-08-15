@@ -19,11 +19,11 @@ use std::sync::{
 #[cfg(test)]
 mod test;
 
-pub const STATE_STORE_PRUNER_NAME: &str = "state store pruner";
+pub const STATE_MERKLE_PRUNER_NAME: &str = "state_merkle_pruner";
 
 #[derive(Debug)]
 /// Responsible for pruning the state tree.
-pub struct StateStorePruner {
+pub struct StateMerklePruner {
     db: Arc<DB>,
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
@@ -33,9 +33,9 @@ pub struct StateStorePruner {
     pruned_to_the_end_of_target_version: AtomicBool,
 }
 
-impl DBPruner for StateStorePruner {
+impl DBPruner for StateMerklePruner {
     fn name(&self) -> &'static str {
-        STATE_STORE_PRUNER_NAME
+        STATE_MERKLE_PRUNER_NAME
     }
 
     fn prune(&self, batch_size: usize) -> Result<Version> {
@@ -105,9 +105,9 @@ impl DBPruner for StateStorePruner {
     }
 }
 
-impl StateStorePruner {
+impl StateMerklePruner {
     pub fn new(db: Arc<DB>) -> Self {
-        let pruner = StateStorePruner {
+        let pruner = StateMerklePruner {
             db,
             target_version: AtomicVersion::new(0),
             min_readable_version: AtomicVersion::new(0),
