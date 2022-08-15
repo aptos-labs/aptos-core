@@ -86,3 +86,8 @@ variable "db_publicly_accessible" {
   default     = false
   description = "Determines if RDS instance is publicly accessible"
 }
+
+variable "performance_insights_enabled" {
+  default     = false
+  description = "Determines if performance insights are enabled for the RDS DB"
+}
