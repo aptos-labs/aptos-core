@@ -9,7 +9,7 @@ import { ProviderEvent, sendProviderEvent } from 'core/utils/providerEvents';
 
 export enum DefaultNetworks {
   Devnet = 'Devnet',
-  LocalHost = 'Localhost',
+  Localhost = 'Localhost',
   Testnet = 'Testnet',
 }
 
@@ -21,20 +21,23 @@ export interface Network {
 
 export type Networks = Record<string, Network>;
 
+const defaultCustomNetworks: Networks = {
+  [DefaultNetworks.Localhost]: {
+    faucetUrl: 'http://localhost:8081',
+    name: DefaultNetworks.Localhost,
+    nodeUrl: 'http://localhost:8080',
+  },
+};
+
 export const defaultNetworks: Networks = Object.freeze({
   [DefaultNetworks.Devnet]: {
     faucetUrl: 'https://faucet.devnet.aptoslabs.com',
-    name: 'Devnet',
+    name: DefaultNetworks.Devnet,
     nodeUrl: 'https://fullnode.devnet.aptoslabs.com',
-  },
-  [DefaultNetworks.LocalHost]: {
-    faucetUrl: 'http://0.0.0.0:8000',
-    name: 'Localhost',
-    nodeUrl: 'http://0.0.0.0:8080',
   },
   [DefaultNetworks.Testnet]: {
     faucetUrl: undefined,
-    name: 'Testnet',
+    name: DefaultNetworks.Testnet,
     nodeUrl: 'https://ait3.aptosdev.com/',
   },
 } as const);
@@ -56,7 +59,7 @@ export default function useNetworks() {
     areCustomNetworksReady,
   ] = usePersistentStorageState<Networks>(
     WALLET_STATE_CUSTOM_NETWORKS_STORAGE_KEY,
-    { },
+    defaultCustomNetworks,
   );
 
   const networks = customNetworks

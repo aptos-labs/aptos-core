@@ -38,7 +38,7 @@ export default function Faucet() {
         },
       });
     } catch (err) {
-      const localhostMessage = (activeNetworkName === DefaultNetworks.LocalHost)
+      const localhostMessage = (activeNetworkName === DefaultNetworks.Localhost)
         ? 'If you are on localhost, please ensure that the faucet is running.'
         : undefined;
       toast({

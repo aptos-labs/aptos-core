@@ -1,44 +1,94 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import axios from 'axios';
-import { useQuery } from 'react-query';
-import { faucetUrlMap, nodeUrlMap } from 'core/utils/network';
+import { useQuery, UseQueryOptions } from 'react-query';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { AptosClient, FaucetClient } from 'aptos';
 
-export const getLocalhostIsLive = async () => {
+async function getIsNodeAvailable(nodeUrl: string) {
+  const aptosClient = new AptosClient(nodeUrl);
   try {
-    const localNode = axios.get(nodeUrlMap.Localhost);
-    const localFaucet = axios.get(faucetUrlMap.Localhost);
-    const localHostIsLive = await Promise.all(
-      [localNode, localFaucet],
-    ).then(([localNodeValue, localFaucetValue]) => (
-      localNodeValue.status === 200 && localFaucetValue.status === 200
-    ));
-    return localHostIsLive;
-  } catch (err: any) {
-    // TODO, this MUST be changed in the future, currently there are CORS issues
-    // on faucet and its difficult to tell if the faucet port is live. Current
-    // behavior is that it just assumes its live if localFaucet returns an error.
-    // Should be fixed so that CORS errors are eliminated and we can accurately
-    // tell if the network is live or not
-    if (err.config.url === faucetUrlMap.Localhost) {
-      return true;
-    }
+    await aptosClient.getLedgerInfo();
+    return true;
+  } catch {
     return false;
   }
-};
+}
+
+interface GetIsFaucetAvailableParams {
+  address: string,
+  faucetUrl: string,
+  nodeUrl: string,
+}
+
+/**
+ * The only way to consistently know whether the faucet is
+ * available is to call the `/mint` endpoint, which requires an account address.
+ * Using the active account address is preferred.
+ * @param address
+ * @param faucetUrl
+ * @param nodeUrl
+ */
+async function getIsFaucetAvailable({
+  address,
+  faucetUrl,
+  nodeUrl,
+}: GetIsFaucetAvailableParams) {
+  const faucetClient = new FaucetClient(nodeUrl, faucetUrl);
+  try {
+    // Note: since we're funding 0 coins, the request is fast (no need to wait for transactions)
+    const txns = await faucetClient.fundAccount(address, 0);
+    return txns.length === 0;
+  } catch (err) {
+    return false;
+  }
+}
 
 export const networkQueryKeys = Object.freeze({
   getChainId: 'getChainId',
-  getTestnetStatus: 'getTestnetStatus',
+  getFaucetStatus: 'getFaucetStatus',
+  getNodeStatus: 'getNodeStatus',
 } as const);
 
-export const useTestnetStatus = () => useQuery(
-  networkQueryKeys.getTestnetStatus,
-  getLocalhostIsLive,
-  { refetchInterval: 1000 },
-);
+export function useNodeStatus(
+  nodeUrl: string | undefined,
+  options?: UseQueryOptions<boolean>,
+) {
+  const { data, ...rest } = useQuery<boolean>(
+    [networkQueryKeys.getNodeStatus, nodeUrl],
+    async () => getIsNodeAvailable(nodeUrl!),
+    {
+      ...options,
+      enabled: Boolean(nodeUrl) && options?.enabled,
+    },
+  );
+  return { isNodeAvailable: data, ...rest };
+}
+
+export interface UseFaucetStatusProps {
+  faucetUrl: string | undefined,
+  nodeUrl: string | undefined
+}
+
+export function useFaucetStatus(
+  { faucetUrl, nodeUrl }: UseFaucetStatusProps,
+  options?: UseQueryOptions<boolean>,
+) {
+  const { activeAccountAddress } = useGlobalStateContext();
+  const { data, ...rest } = useQuery<boolean>(
+    [networkQueryKeys.getFaucetStatus, faucetUrl],
+    async () => getIsFaucetAvailable({
+      address: activeAccountAddress!,
+      faucetUrl: faucetUrl!,
+      nodeUrl: nodeUrl!,
+    }),
+    {
+      ...options,
+      enabled: Boolean(nodeUrl && faucetUrl && activeAccountAddress) && options?.enabled,
+    },
+  );
+  return { isFaucetAvailable: data, ...rest };
+}
 
 /**
  * Query chain id associated with the current node,
@@ -56,5 +106,3 @@ export function useChainId() {
     },
   );
 }
-
-export default getLocalhostIsLive;

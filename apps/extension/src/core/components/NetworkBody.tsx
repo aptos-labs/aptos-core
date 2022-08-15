@@ -59,7 +59,7 @@ export default function NetworkBody() {
             size="sm"
             leftIcon={<AddIcon />}
           >
-            Add network
+            Add
           </Button>
         </ChakraLink>
       </HStack>

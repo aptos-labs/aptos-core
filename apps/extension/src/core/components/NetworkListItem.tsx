@@ -5,7 +5,7 @@ import React from 'react';
 import {
   Box,
   Button,
-  Center,
+  Circle,
   HStack,
   Modal,
   ModalCloseButton,
@@ -16,16 +16,16 @@ import {
   ModalProps,
   Spinner,
   Text,
-  useColorMode, useDisclosure,
+  useColorMode,
+  useDisclosure,
   useRadio,
   UseRadioProps,
   VStack,
 } from '@chakra-ui/react';
 import { secondaryHoverBgColor, secondaryButtonColor } from 'core/colors';
-import {
-  Network, DefaultNetworks, defaultNetworks,
-} from 'core/hooks/useGlobalState';
+import { Network, defaultNetworks } from 'core/hooks/useGlobalState';
 import { DeleteIcon } from '@chakra-ui/icons';
+import { useNodeStatus } from 'core/queries/network';
 
 type ConfirmationModalProps = Omit<ModalProps, 'children'> & {
   name: string,
@@ -40,7 +40,7 @@ function ConfirmationModal(props: ConfirmationModalProps) {
       <ModalOverlay />
       <ModalContent>
         <ModalHeader>
-          {`Are you sure you want to delete network '${name}'?`}
+          {`Are you sure you want to delete network ${name}?`}
         </ModalHeader>
         <ModalCloseButton />
         <ModalFooter>
@@ -57,35 +57,64 @@ function ConfirmationModal(props: ConfirmationModalProps) {
 }
 
 type NetworkListItemProps = UseRadioProps & {
-  isLoading: boolean,
   network: Network,
   onRemove: (networkName: string) => void,
 };
 
 export default function NetworkListItem(props: NetworkListItemProps) {
-  const { getCheckboxProps, getInputProps } = useRadio(props);
-  const { isOpen, onClose, onOpen } = useDisclosure();
-  const { colorMode } = useColorMode();
   const {
-    isChecked, isDisabled, isLoading, network, onRemove, value,
+    isChecked,
+    network,
+    onRemove,
   } = props;
 
+  const queryIntervalMs = 5000;
+  const queryOptions = {
+    cacheTime: queryIntervalMs,
+    refetchInterval: queryIntervalMs,
+    staleTime: queryIntervalMs,
+  };
+  const {
+    isLoading: isNodeStatusLoading,
+    isNodeAvailable,
+  } = useNodeStatus(network.nodeUrl, queryOptions);
+  const isDisabled = !isNodeAvailable;
+
+  const { getCheckboxProps, getInputProps } = useRadio({ ...props, isDisabled });
+  const { isOpen, onClose, onOpen } = useDisclosure();
+  const { colorMode } = useColorMode();
+
   const isCustomNetwork = !(network.name in defaultNetworks);
+
+  const onDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    onOpen();
+  };
+
+  const enabledBoxProps = !isDisabled ? {
+    _hover: {
+      bg: isChecked
+        ? 'teal.700'
+        : secondaryHoverBgColor[colorMode],
+    },
+    cursor: 'pointer',
+  } : {};
 
   return (
     <Box as="label">
       <input disabled={isDisabled} {...getInputProps()} />
       <Box
         {...getCheckboxProps()}
-        cursor="pointer"
+        {...enabledBoxProps}
         borderRadius="md"
         bgColor={secondaryButtonColor[colorMode]}
+        _disabled={{
+          bg: 'gray.50',
+          color: 'gray.400',
+        }}
         _checked={{
           bg: 'teal.600',
           color: 'white',
-        }}
-        _hover={{
-          bg: (isChecked) ? 'teal.700' : secondaryHoverBgColor[colorMode],
         }}
         _focus={{
           boxShadow: 'outline',
@@ -93,44 +122,34 @@ export default function NetworkListItem(props: NetworkListItemProps) {
         px={5}
         py={3}
       >
-        {
-          !isLoading ? (
-            <VStack alignItems="flex-start">
-              <HStack w="100%" justifyContent="space-between">
-                <Text fontSize="md" fontWeight={600}>
-                  {network.name}
-                </Text>
-                {
-                  isCustomNetwork ? (
-                    <DeleteIcon
-                      fontSize="lg"
-                      cursor="pointer"
-                      _hover={{
-                        color: 'red.400',
-                      }}
-                      onClick={(e: React.MouseEvent) => {
-                        e.preventDefault();
-                        onOpen();
-                      }}
-                    />
-                  ) : null
-                }
-              </HStack>
-              <Text fontSize="md" fontWeight={400}>
-                {network.nodeUrl}
+        <HStack w="100%" justifyContent="space-between">
+          <VStack alignItems="flex-start">
+            <HStack>
+              <Circle bg={isNodeAvailable ? 'green.300' : 'red.400'} size={2} as="span" />
+              <Text fontSize="md" fontWeight={600}>
+                {network.name}
               </Text>
               {
-                (isDisabled && value === DefaultNetworks.LocalHost) ? (
-                  <Text fontSize="sm">(Please start testnet and testnet faucet on localhost to switch)</Text>
-                ) : undefined
+                isNodeStatusLoading
+                  ? <Spinner ml={2} size="xs" as="span" />
+                  : null
               }
-            </VStack>
-          ) : (
-            <Center>
-              <Spinner />
-            </Center>
-          )
-        }
+            </HStack>
+            <Text fontSize="md" fontWeight={400}>
+              {network.nodeUrl}
+            </Text>
+          </VStack>
+          {
+            isCustomNetwork ? (
+              <DeleteIcon
+                fontSize="lg"
+                cursor="pointer"
+                _hover={{ color: 'red.400' }}
+                onClick={onDeleteClick}
+              />
+            ) : null
+          }
+        </HStack>
       </Box>
       <ConfirmationModal
         isOpen={isOpen}
