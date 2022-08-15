@@ -15,7 +15,6 @@ serde = { version = "1.0.137", features = ["rc"], default-features = false }
 thiserror = "1.0.31"
 
 aptos-logger = { path = "../../crates/aptos-logger" }
-aptos-secure-push-metrics = { path = "../push-metrics" }
-
+aptos-metrics-core = { path = "../../crates/aptos-metrics-core" }
 [dev-dependencies]
 aptos-config = { path = "../../config" }

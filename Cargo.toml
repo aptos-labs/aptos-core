@@ -86,7 +86,6 @@ members = [
     "sdk",
     "sdk/transaction-builder",
     "secure/net",
-    "secure/push-metrics",
     "secure/storage",
     "secure/storage/github",
     "secure/storage/vault",
