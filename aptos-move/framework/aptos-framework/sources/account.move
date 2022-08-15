@@ -49,7 +49,7 @@ module aptos_framework::account {
     struct RotationCapability has drop, store { account: address }
     struct SignerCapability has drop, store { account: address }
 
-    struct OriginatingAddress has key, store {
+    struct OriginatingAddress has key {
         address_map: Table<address, address>,
     }
 
