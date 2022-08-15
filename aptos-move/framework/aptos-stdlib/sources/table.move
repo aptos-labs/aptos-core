@@ -7,7 +7,6 @@
 
 module aptos_std::table {
     friend aptos_std::table_with_length;
-    friend aptos_std::table_with_aggregator_length;
 
     // native code raises this with error::invalid_arguments()
     const EALREADY_EXISTS: u64 = 100;
