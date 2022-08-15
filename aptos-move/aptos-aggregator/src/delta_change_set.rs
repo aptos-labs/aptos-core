@@ -157,6 +157,11 @@ impl DeltaChangeSet {
         self.delta_change_set.is_empty()
     }
 
+    #[inline]
+    pub fn iter(&self) -> ::std::slice::Iter<'_, (StateKey, DeltaOp)> {
+        self.into_iter()
+    }
+
     /// Consumes the delta change set and tries to materialize it. Returns a
     /// mutable write set if materialization succeeds (mutability since we want
     /// to merge these writes with transaction outputs).
@@ -181,6 +186,15 @@ impl ::std::iter::IntoIterator for DeltaChangeSet {
 
     fn into_iter(self) -> Self::IntoIter {
         self.delta_change_set.into_iter()
+    }
+}
+
+impl<'a> ::std::iter::IntoIterator for &'a DeltaChangeSet {
+    type Item = &'a (StateKey, DeltaOp);
+    type IntoIter = ::std::slice::Iter<'a, (StateKey, DeltaOp)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.delta_change_set.iter()
     }
 }
 

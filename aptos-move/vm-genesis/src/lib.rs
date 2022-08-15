@@ -139,7 +139,10 @@ pub fn encode_genesis_change_set(
     let session2_out = session.finish().unwrap();
 
     session1_out.squash(session2_out).unwrap();
-    let change_set = session1_out.into_change_set(&mut ()).unwrap();
+
+    // Publishing stdlib should not produce any deltas.
+    let change_set_ext = session1_out.into_change_set(&mut ()).unwrap();
+    let (_, change_set) = change_set_ext.into_inner();
 
     assert!(!change_set
         .write_set()

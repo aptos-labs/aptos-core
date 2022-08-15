@@ -8,6 +8,10 @@ mod session;
 mod vm;
 
 pub use crate::move_vm_ext::{
+    aggregator_extension::{
+        aggregator_natives, AggregatorChange, AggregatorChangeSet, AggregatorID,
+        NativeAggregatorContext,
+    },
     resolver::MoveResolverExt,
     session::{SessionExt, SessionId, SessionOutput},
     vm::MoveVmExt,
