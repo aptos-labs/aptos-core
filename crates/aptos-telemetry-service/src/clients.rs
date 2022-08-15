@@ -2,22 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, Result};
-use aptos_rest_client::{state::State, Client, Response};
+use aptos_rest_client::{state::State, Client, Response as AptosResponse};
 use aptos_types::{
     account_address::AccountAddress, account_config::CORE_CODE_ADDRESS,
     network_address::NetworkAddress, PeerId,
 };
+use reqwest::Client as ReqwestClient;
 use serde::de::DeserializeOwned;
 use url::Url;
+use warp::hyper::body::Bytes;
 
 use crate::types::validator_set::{ValidatorConfig, ValidatorInfo, ValidatorSet};
 
 #[derive(Clone)]
-pub struct RestClient {
+pub struct AptosAPIRestClient {
     client: Client,
 }
 
-impl RestClient {
+impl AptosAPIRestClient {
     pub fn new(api_url: Url) -> Self {
         Self {
             client: Client::new(api_url),
@@ -28,7 +30,7 @@ impl RestClient {
         &self,
         address: AccountAddress,
         resource_type: &str,
-    ) -> Result<Response<T>> {
+    ) -> Result<AptosResponse<T>> {
         return self.client.get_resource(address, resource_type).await;
     }
 
@@ -75,5 +77,42 @@ impl RestClient {
         }
 
         Ok((decoded_set, state))
+    }
+}
+
+#[derive(Clone)]
+pub struct VictoriaMetricsClient {
+    inner: ReqwestClient,
+    base_url: Url,
+    auth_token: String,
+}
+
+impl VictoriaMetricsClient {
+    pub fn new(base_url: Url, auth_token: String) -> Self {
+        Self {
+            inner: ReqwestClient::new(),
+            base_url,
+            auth_token,
+        }
+    }
+
+    pub async fn post_prometheus_metrics(
+        &self,
+        raw_metrics_body: Bytes,
+        extra_labels: Vec<String>,
+    ) -> Result<reqwest::Response, anyhow::Error> {
+        let labels: Vec<(String, String)> = extra_labels
+            .iter()
+            .map(|label| ("extra_label".into(), label.into()))
+            .collect();
+
+        self.inner
+            .post(format!("{}/api/v1/import/prometheus", self.base_url))
+            .bearer_auth(self.auth_token.clone())
+            .query(&labels)
+            .body(raw_metrics_body)
+            .send()
+            .await
+            .map_err(|e| anyhow!("failed to post metrics: {}", e))
     }
 }
