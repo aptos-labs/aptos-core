@@ -90,7 +90,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let builder = aptos_genesis::builder::Builder::new(
         tmp_dir.path(),
-        framework::current_release_bundle().clone(),
+        framework::head_release_bundle().clone(),
     )
     .unwrap()
     .with_init_genesis_config(Some(Arc::new(|genesis_config| {
@@ -204,15 +204,11 @@ impl TestContext {
             self.golden_output = Some(GoldenOutputs::new(self.test_name.replace(':', "_")));
         }
 
-        let msg = pretty(&msg);
+        let msg = pretty(&Self::prune_golden(msg));
         let re = regex::Regex::new("hash\": \".*\"").unwrap();
         let msg = re.replace_all(&msg, "hash\": \"\"");
 
         self.golden_output.as_ref().unwrap().log(&msg);
-    }
-
-    pub fn check_golden_output_pruned(&mut self, msg: Value) {
-        self.check_golden_output(Self::prune_golden(msg))
     }
 
     /// Prune well-known excessively large entries from a resource array response.

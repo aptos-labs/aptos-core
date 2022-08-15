@@ -42,6 +42,6 @@ do
     cp target/release/$BIN dist/$BIN
 done
 
-# Build the Aptos Move framework
-cargo run --package framework -- --package aptos-framework --output current
-cargo run --package framework -- --package aptos-token --output current
+# Build the Aptos Move framework. In fact the framework should be guaranteed to be up-to-date
+# via tests but better be sure.
+cargo run --package framework -- release

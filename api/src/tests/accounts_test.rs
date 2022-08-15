@@ -11,7 +11,7 @@ async fn test_get_account_resources_returns_empty_array_for_account_has_no_resou
     let address = "0x1";
 
     let resp = context.get(&account_resources(address)).await;
-    context.check_golden_output_pruned(resp);
+    context.check_golden_output(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -23,7 +23,7 @@ async fn test_get_account_resources_by_address_0x0() {
         .expect_status_code(404)
         .get(&account_resources(address))
         .await;
-    context.check_golden_output_pruned(resp);
+    context.check_golden_output(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -35,7 +35,7 @@ async fn test_get_account_resources_by_invalid_address_missing_0x_prefix() {
             .expect_status_code(400)
             .get(&account_resources(invalid_address))
             .await;
-        context.check_golden_output_pruned(resp);
+        context.check_golden_output(resp);
     }
 }
 
@@ -56,7 +56,7 @@ async fn test_account_resources_response() {
     let address = "0x1";
 
     let resp = context.get(&account_resources(address)).await;
-    context.check_golden_output_pruned(resp);
+    context.check_golden_output(resp);
 }
 
 // Unstable due to framework changes
@@ -67,7 +67,7 @@ async fn test_account_modules() {
     let address = "0x1";
 
     let resp = context.get(&account_modules(address)).await;
-    context.check_golden_output_pruned(resp);
+    context.check_golden_output(resp);
 }
 
 // Unstable due to framework changes
@@ -78,7 +78,7 @@ async fn test_get_module_with_script_functions() {
     let address = "0x1";
 
     let resp = context.get(&account_modules(address)).await;
-    context.check_golden_output_pruned(resp);
+    context.check_golden_output(resp);
 }
 
 // Unstable due to framework changes
@@ -89,7 +89,7 @@ async fn test_get_module_aptos_config() {
     let address = "0x1";
 
     let resp = context.get(&account_modules(address)).await;
-    context.check_golden_output_pruned(resp);
+    context.check_golden_output(resp);
 }
 
 // Unstable due to framework changes
@@ -100,7 +100,7 @@ async fn test_account_modules_structs() {
     let address = "0x1";
 
     let resp = context.get(&account_modules(address)).await;
-    context.check_golden_output_pruned(resp);
+    context.check_golden_output(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -142,7 +142,7 @@ async fn test_get_account_resources_by_ledger_version_is_too_large() {
             1000000000000000000,
         ))
         .await;
-    context.check_golden_output_pruned(resp);
+    context.check_golden_output(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -155,7 +155,7 @@ async fn test_get_account_resources_by_invalid_ledger_version() {
             -1,
         ))
         .await;
-    context.check_golden_output_pruned(resp);
+    context.check_golden_output(resp);
 }
 
 // figure out a working module code, no idea where the existing one comes from
@@ -192,14 +192,14 @@ async fn test_get_account_modules_by_ledger_version() {
 async fn test_get_core_account_data() {
     let mut context = new_test_context(current_function_name!());
     let resp = context.get("/accounts/0x1").await;
-    context.check_golden_output_pruned(resp);
+    context.check_golden_output(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_core_account_data_not_found() {
     let mut context = new_test_context(current_function_name!());
     let resp = context.expect_status_code(404).get("/accounts/0xf").await;
-    context.check_golden_output_pruned(resp);
+    context.check_golden_output(resp);
 }
 
 fn account_resources(address: &str) -> String {

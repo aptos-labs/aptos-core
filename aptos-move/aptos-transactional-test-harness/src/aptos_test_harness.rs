@@ -284,8 +284,8 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     let deps = vec![PackagePaths {
         name: None,
-        paths: framework::current_release_bundle().files().unwrap(),
-        named_address_map: framework::current_release_bundle().named_addresses(),
+        paths: framework::head_release_bundle().files().unwrap(),
+        named_address_map: framework::named_addresses().clone(),
     }];
     let program_res = move_compiler::construct_pre_compiled_lib(
         deps,
@@ -557,7 +557,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             None => BTreeMap::new(),
         };
 
-        let mut named_address_mapping = framework::current_release_bundle().named_addresses();
+        let mut named_address_mapping = framework::named_addresses().clone();
 
         for (name, addr) in additional_named_address_mapping.clone() {
             if named_address_mapping.contains_key(&name) {

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::built_package::{BuildOptions, BuiltPackage};
+use crate::path_relative_to_crate;
 use crate::release_bundle::{ReleaseBundle, ReleasePackage};
 use aptos_sdk_builder::rust;
 use clap::Parser;
@@ -47,7 +48,8 @@ impl ReleaseOptions {
                 Self::generate_rust_bindings(&released, &PathBuf::from(rust_binding_path))?;
             }
             released_packages.push(released);
-            source_paths.push(package_path.join("sources").display().to_string());
+            let relative_path = path_relative_to_crate(package_path.join("sources"));
+            source_paths.push(relative_path.display().to_string());
         }
         let bundle = ReleaseBundle::new(released_packages, source_paths);
         std::fs::create_dir_all(&output.parent().unwrap())?;

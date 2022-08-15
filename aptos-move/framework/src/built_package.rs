@@ -45,8 +45,6 @@ impl Default for BuildOptions {
 /// just build Move code.
 pub struct BuiltPackage {
     package_path: PathBuf,
-    #[allow(unused)]
-    options: BuildOptions,
     package: CompiledPackage,
     error_map: Option<ErrorMapping>,
 }
@@ -76,7 +74,6 @@ impl BuiltPackage {
         };
         Ok(Self {
             package_path,
-            options,
             package,
             error_map,
         })

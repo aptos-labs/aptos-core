@@ -43,7 +43,7 @@ pub(crate) fn generate_error_map(
             all_files_as_targets: true,
         },
     ) {
-        let mut gen = ErrmapGen::new(&model);
+        let mut gen = ErrorMapGenerator::new(&model);
         gen.gen();
         Some(gen.finish())
     } else {
@@ -51,7 +51,7 @@ pub(crate) fn generate_error_map(
     }
 }
 
-struct ErrmapGen<'env> {
+struct ErrorMapGenerator<'env> {
     /// Input definitions
     env: &'env GlobalEnv,
     /// Output error mapping
@@ -60,13 +60,13 @@ struct ErrmapGen<'env> {
     error_category_module: ModuleId,
 }
 
-impl<'env> ErrmapGen<'env> {
+impl<'env> ErrorMapGenerator<'env> {
     fn new(env: &'env GlobalEnv) -> Self {
         Self {
             env,
             output: ErrorMapping::default(),
             error_category_module: ModuleId::new(
-                AccountAddress::from_hex_literal("0x1").unwrap(),
+                AccountAddress::ONE,
                 Identifier::new("error").unwrap(),
             ),
         }
