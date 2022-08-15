@@ -15,8 +15,9 @@ use aptos_telemetry_service::types::{
     telemetry::TelemetryDump,
 };
 use aptos_types::{chain_id::ChainId, PeerId};
+use flate2::{write::GzEncoder, Compression};
 use reqwest::StatusCode;
-use std::sync::Arc;
+use std::{io::Write, sync::Arc};
 use tokio_retry::{
     strategy::{jitter, ExponentialBackoff},
     Retry,
@@ -58,6 +59,54 @@ impl TelemetrySender {
         }
     }
 
+    pub(crate) async fn push_prometheus_metrics(&self) -> Result<(), anyhow::Error> {
+        debug!("Sending Prometheus Metrics");
+
+        let token = self.get_auth_token().await?;
+
+        let scraped_metrics =
+            prometheus::TextEncoder::new().encode_to_string(&aptos_metrics_core::gather())?;
+
+        let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
+        gzip_encoder.write_all(scraped_metrics.as_bytes()).unwrap();
+        let compressed_bytes = gzip_encoder.finish()?;
+
+        let response = self
+            .client
+            .post(format!("{}/push-metrics", self.base_url))
+            .header("Content-Encoding", "gzip")
+            .bearer_auth(token)
+            .body(compressed_bytes)
+            .send()
+            .await;
+
+        match response {
+            Err(e) => Err(anyhow!("Prometheus Metrics push failed: {}", e)),
+            Ok(response) => {
+                if response.status().is_success() {
+                    debug!("Prometheus Metrics pushed successfully.");
+                    Ok(())
+                } else {
+                    Err(anyhow!(
+                        "Prometheus Metrics push failed with response: {}, body: {}",
+                        response.status(),
+                        response
+                            .text()
+                            .await
+                            .unwrap_or_else(|_| "empty body".to_string()),
+                    ))
+                }
+            }
+        }
+    }
+
+    pub(crate) async fn try_push_prometheus_metrics(&self) {
+        self.push_prometheus_metrics().await.map_or_else(
+            |e| error!("Failed to push Prometheus Metrics: {}", e),
+            |_| debug!("Prometheus Metrics pushed successfully."),
+        );
+    }
+
     pub async fn send_metrics(&self, event_name: String, telemetry_dump: TelemetryDump) {
         let retry_strategy = ExponentialBackoff::from_millis(10)
             .map(jitter) // add jitter to delays
@@ -84,7 +133,7 @@ impl TelemetrySender {
     }
 
     async fn post_metrics(&self, telemetry_dump: &TelemetryDump) -> Result<(), anyhow::Error> {
-        let token = self.get_token().await?;
+        let token = self.get_auth_token().await?;
 
         // Send the request and wait for a response
         let send_result = self
@@ -112,7 +161,7 @@ impl TelemetrySender {
         }
     }
 
-    async fn get_token(&self) -> Result<String, Error> {
+    async fn get_auth_token(&self) -> Result<String, Error> {
         // Try to read the token holding a read lock
         let token = { self.auth_context.token.read().as_ref().cloned() };
         match token {
