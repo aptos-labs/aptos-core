@@ -28,6 +28,7 @@ use aptos_types::{
     account_config::{NewBlockEvent, CORE_CODE_ADDRESS},
     transaction::SignedTransaction,
 };
+use poem_openapi::types::ParseFromJSON;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -510,7 +511,7 @@ impl Client {
         let response = self.inner.get(url.clone()).send().await?;
 
         if !response.status().is_success() {
-            let error_response = response.json::<AptosError>().await?;
+            let error_response = AptosError::parse_from_json(Some(response.json().await?));
             return Err(anyhow::anyhow!("Request failed: {:?}", error_response));
         }
 
@@ -525,7 +526,7 @@ impl Client {
         response: reqwest::Response,
     ) -> Result<(reqwest::Response, State)> {
         if !response.status().is_success() {
-            let error_response = response.json::<AptosError>().await?;
+            let error_response = AptosError::parse_from_json(Some(response.json().await?));
             return Err(anyhow::anyhow!("Request failed: {:?}", error_response));
         }
         let state = State::from_headers(response.headers())?;
