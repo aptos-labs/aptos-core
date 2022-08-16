@@ -16,6 +16,7 @@ module aptos_framework::genesis {
     use aptos_framework::transaction_fee;
     use aptos_framework::staking_config;
     use aptos_framework::version;
+    use aptos_framework::state_storage;
 
     struct ValidatorConfiguration has copy, drop {
         owner_address: address,
@@ -87,6 +88,7 @@ module aptos_framework::genesis {
         reconfiguration::initialize(&aptos_framework_account);
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         timestamp::set_time_has_started(&aptos_framework_account);
+        state_storage::initialize(&aptos_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.
