@@ -5,7 +5,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
 ## Unreleased
-N/A
+- Make all functions that accept `BigInt` parameters accept `BigInt | number` instead.
 
 ## 1.3.6 (2022-08-10)
 - Switch back to representing certain move types (MoveModuleId, MoveStructTag, ScriptFunctionId) as strings, for both requests and responses. This reverts the change made in 1.3.2. See [#2663](https://github.com/aptos-labs/aptos-core/pull/2663) for more.
