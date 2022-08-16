@@ -99,7 +99,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
     .with_randomize_first_validator_ports(false);
 
     let (root_key, genesis, genesis_waypoint, validators) = builder.build(&mut rng).unwrap();
-    let (validator_identity, _, _) = validators[0].get_key_objects(None).unwrap();
+    let (validator_identity, _, _, _) = validators[0].get_key_objects(None).unwrap();
     let validator_owner = validator_identity.account_address.unwrap();
 
     let (db, db_rw) = if use_db_with_indexer {
