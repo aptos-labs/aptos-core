@@ -44,7 +44,9 @@ pub enum ScriptFunctionCall {
     },
 
     AccountRotateAuthenticationKeyEd25519 {
-        signature: Vec<u8>,
+        rotation_proof_current_signature: Vec<u8>,
+        rotation_proof_next_signature: Vec<u8>,
+        current_public_key: Vec<u8>,
         new_public_key: Vec<u8>,
     },
 
@@ -247,9 +249,16 @@ impl ScriptFunctionCall {
                 account_rotate_authentication_key(new_auth_key)
             }
             AccountRotateAuthenticationKeyEd25519 {
-                signature,
+                rotation_proof_current_signature,
+                rotation_proof_next_signature,
+                current_public_key,
                 new_public_key,
-            } => account_rotate_authentication_key_ed25519(signature, new_public_key),
+            } => account_rotate_authentication_key_ed25519(
+                rotation_proof_current_signature,
+                rotation_proof_next_signature,
+                current_public_key,
+                new_public_key,
+            ),
             AccountTransfer { to, amount } => account_transfer(to, amount),
             AptosCoinClaimMintCapability {} => aptos_coin_claim_mint_capability(),
             AptosCoinDelegateMintCapability { to } => aptos_coin_delegate_mint_capability(to),
@@ -397,7 +406,9 @@ pub fn account_rotate_authentication_key(new_auth_key: Vec<u8>) -> TransactionPa
 }
 
 pub fn account_rotate_authentication_key_ed25519(
-    signature: Vec<u8>,
+    rotation_proof_current_signature: Vec<u8>,
+    rotation_proof_next_signature: Vec<u8>,
+    current_public_key: Vec<u8>,
     new_public_key: Vec<u8>,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -411,7 +422,9 @@ pub fn account_rotate_authentication_key_ed25519(
         ident_str!("rotate_authentication_key_ed25519").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&signature).unwrap(),
+            bcs::to_bytes(&rotation_proof_current_signature).unwrap(),
+            bcs::to_bytes(&rotation_proof_next_signature).unwrap(),
+            bcs::to_bytes(&current_public_key).unwrap(),
             bcs::to_bytes(&new_public_key).unwrap(),
         ],
     ))
@@ -1014,8 +1027,10 @@ mod decoder {
     ) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::AccountRotateAuthenticationKeyEd25519 {
-                signature: bcs::from_bytes(script.args().get(0)?).ok()?,
-                new_public_key: bcs::from_bytes(script.args().get(1)?).ok()?,
+                rotation_proof_current_signature: bcs::from_bytes(script.args().get(0)?).ok()?,
+                rotation_proof_next_signature: bcs::from_bytes(script.args().get(1)?).ok()?,
+                current_public_key: bcs::from_bytes(script.args().get(2)?).ok()?,
+                new_public_key: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
             None
