@@ -208,12 +208,12 @@ impl MoveHarness {
 
     pub fn new_block_with_metadata(
         &mut self,
-        proposer_index: Option<u32>,
+        proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
     ) {
         self.fast_forward(1);
         self.executor
-            .new_block_with_metadata(proposer_index, failed_proposer_indices);
+            .new_block_with_metadata(proposer, failed_proposer_indices);
     }
 
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {

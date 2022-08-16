@@ -488,7 +488,6 @@ pub struct BlockMetadata {
     epoch: u64,
     round: u64,
     proposer: AccountAddress,
-    proposer_index: Option<u32>,
     previous_block_votes: Vec<bool>,
     failed_proposer_indices: Vec<u32>,
     timestamp_usecs: u64,

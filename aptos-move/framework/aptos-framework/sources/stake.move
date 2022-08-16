@@ -834,19 +834,19 @@ module aptos_framework::stake {
 
     /// Update the validator performance (proposal statistics). This is only called by block::prologue().
     /// This function cannot abort.
-    public(friend) fun update_performance_statistics(proposer_index_optional: vector<u64>, failed_proposer_indices: vector<u64>) acquires ValidatorPerformance {
+    public(friend) fun update_performance_statistics(proposer_index: Option<u64>, failed_proposer_indices: vector<u64>) acquires ValidatorPerformance {
         // Validator set cannot change until the end of the epoch, so the validator index in arguments should
         // match with those of the validators in ValidatorPerformance resource.
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
         let validator_len = vector::length(&validator_perf.validators);
 
-        // proposer_indices is a vector because it can be missing (for NilBlocks)
-        if (vector::length(&proposer_index_optional) >= 1) {
-            let proposer_index = *vector::borrow(&proposer_index_optional, 0);
+        // proposer_index is an option because it can be missing (for NilBlocks)
+        if (option::is_some(&proposer_index)) {
+            let cur_proposer_index = option::extract(&mut proposer_index);
             // Here, and in all other vector::borrow, skip any validator indices that are out of bounds,
             // this ensures that this function doesn't abort if there are out of bounds errors.
-            if (proposer_index < validator_len) {
-                let validator = vector::borrow_mut(&mut validator_perf.validators, proposer_index);
+            if (cur_proposer_index < validator_len) {
+                let validator = vector::borrow_mut(&mut validator_perf.validators, cur_proposer_index);
                 validator.successful_proposals = validator.successful_proposals + 1;
             };
         };

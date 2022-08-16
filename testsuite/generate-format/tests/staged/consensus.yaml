@@ -65,8 +65,6 @@ BlockMetadata:
     - round: U64
     - proposer:
         TYPENAME: AccountAddress
-    - proposer_index:
-        OPTION: U32
     - previous_block_votes_bitvec: BYTES
     - failed_proposer_indices:
         SEQ: U32

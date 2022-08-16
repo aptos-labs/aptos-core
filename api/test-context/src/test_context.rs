@@ -547,7 +547,6 @@ impl TestContext {
             0,
             round,
             self.validator_owner,
-            Some(0),
             vec![0],
             vec![],
             self.fake_time_usecs,
