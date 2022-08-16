@@ -42,6 +42,7 @@ module aptos_framework::resource_account {
     use aptos_framework::account;
     use aptos_std::simple_map::{Self, SimpleMap};
 
+    /// Container resource is expected to exist on the specified account.
     const ECONTAINER_NOT_PUBLISHED: u64 = 0;
 
     struct Container has key {

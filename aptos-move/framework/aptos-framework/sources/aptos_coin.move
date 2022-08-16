@@ -12,9 +12,11 @@ module aptos_framework::aptos_coin {
 
     friend aptos_framework::genesis;
 
-    /// Error codes
+    /// Account does not have mint capability.
     const ENO_CAPABILITIES: u64 = 1;
+    /// Mint capability has already been delegated to this specified address.
     const EALREADY_DELEGATED: u64 = 2;
+    /// Cannot find delegation of mint capability to this account.
     const EDELEGATION_NOT_FOUND: u64 = 3;
 
     struct AptosCoin has key { }

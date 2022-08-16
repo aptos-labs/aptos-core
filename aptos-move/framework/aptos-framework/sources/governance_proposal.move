@@ -7,6 +7,7 @@ module aptos_framework::governance_proposal {
     use std::string::{String, length, utf8};
     use std::error;
 
+    /// Provided metadata location or metadata hash cannot be longer than 256 chars.
     const ETOO_LONG: u64 = 1;
 
     struct GovernanceProposal has store, drop {
