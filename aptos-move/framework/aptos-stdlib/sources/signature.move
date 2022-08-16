@@ -13,6 +13,8 @@ module aptos_std::signature {
     use std::option::Option;
     use aptos_std::type_info::{Self, TypeInfo};
 
+    // Proof a generic type that includes the type info of a Proof
+    // and the corresponding message of ProofType
     struct Proof<ProofType> has drop {
         type_info: TypeInfo,
         inner: ProofType,
@@ -184,6 +186,7 @@ module aptos_std::signature {
         signature: vector<u8>
     ): (vector<u8>, bool);
 
+    // This function is used to verify proof of private key ownership upon authentication key rotation
     public fun ed25519_verify_t<T: drop> (signature: vector<u8>, public_key: vector<u8>, data: T): bool {
         let encoded = Proof {
             type_info: type_info::type_of<T>(),

@@ -53,9 +53,14 @@ module aptos_framework::account {
         address_map: Table<address, address>,
     }
 
-    struct RotationProof has drop {
+    // This holds information that will be provided to prove that
+    // the user owns the public-private key pair and knows that
+    // they are going to perform an auth key rotation
+    struct RotationProof has copy, drop {
+        sequence_number: u64,
         originator: address, // originating address
         current_auth_key: address, // current auth key
+        new_public_key: vector<u8>,
     }
 
     const MAX_U64: u128 = 18446744073709551615;
@@ -208,33 +213,42 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-
-    public entry fun rotate_authentication_key_ed25519(account: &signer, signature: vector<u8>, new_public_key: vector<u8>) acquires Account, OriginatingAddress {
+    // This function rotates the authentication key upon successful verification of private key ownership, and records
+    // the new authentication key <> originating address mapping on chain.
+    // `rotation_proof_current_signature` refers to the struct RotationProof signed by the current private key
+    // `rotation_proof_next_signature` refers to the struct RotationProof signed by the next private key
+    public entry fun rotate_authentication_key_ed25519(account: &signer, rotation_proof_current_signature: vector<u8>, rotation_proof_next_signature: vector<u8>, current_public_key: vector<u8>, new_public_key: vector<u8>) acquires Account, OriginatingAddress {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT));
         assert!(
-            vector::length(&new_public_key) == 32,
+            vector::length(&current_public_key) == 32 && vector::length(&new_public_key) == 32,
             error::invalid_argument(EMALFORMED_PUBLIC_KEY)
         );
         assert!(
-            vector::length(&signature) == 64,
+            vector::length(&rotation_proof_current_signature) == 64 && vector::length(&rotation_proof_next_signature) == 64,
             error::invalid_argument(EMALFORMED_PROOF_OF_KNOWLEDGE)
         );
 
         let account_resource = borrow_global_mut<Account>(addr);
         let current_auth_key = create_address(account_resource.authentication_key);
 
-        let proof = RotationProof {
+        let rotation_proof = RotationProof {
+            sequence_number: account_resource.sequence_number,
             originator: addr,
             current_auth_key,
+            new_public_key,
         };
 
-        assert!(signature::ed25519_verify_t(signature, new_public_key, proof), EINVALID_PROOF_OF_KNOWLEDGE);
+        assert!(signature::ed25519_verify_t(rotation_proof_current_signature, current_public_key, copy rotation_proof), EINVALID_PROOF_OF_KNOWLEDGE);
+        assert!(signature::ed25519_verify_t(rotation_proof_next_signature, new_public_key, rotation_proof), EINVALID_PROOF_OF_KNOWLEDGE);
+
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
         if (table::contains(address_map, current_auth_key)) {
             table::remove(address_map, current_auth_key);
         };
 
+        // The authentication key is the sha256 hash of the public key and its scheme.
+        // For ed25519, we are adding scheme 0 at the end of the public key.
         vector::push_back(&mut new_public_key, 0);
         let new_auth_key = hash::sha3_256(new_public_key);
         let new_address = create_address(new_auth_key);
@@ -565,7 +579,7 @@ module aptos_framework::account {
         create_account(signer::address_of(&alice));
         let test_public_key = vector::empty<u8>();
         let test_signature = vector::empty<u8>();
-        rotate_authentication_key_ed25519(&alice, test_public_key, test_signature);
+        rotate_authentication_key_ed25519(&alice, test_signature, test_signature, test_public_key, test_public_key);
     }
 
     #[test(alice = @0xa11ce)]
@@ -574,6 +588,6 @@ module aptos_framework::account {
         create_account(signer::address_of(&alice));
         let account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
         let test_signature = vector::empty<u8>();
-        rotate_authentication_key_ed25519(&alice, account_resource.authentication_key, test_signature);
+        rotate_authentication_key_ed25519(&alice, test_signature, test_signature, account_resource.authentication_key, account_resource.authentication_key);
     }
 }
