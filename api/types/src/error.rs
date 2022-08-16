@@ -47,6 +47,7 @@ impl From<anyhow::Error> for AptosError {
 // Make sure the integer codes increment one by one.
 #[derive(Debug, Deserialize, Enum)]
 #[oai(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum AptosErrorCode {
     /// The API failed to read from storage for this request, not because of a
     /// bad request, but because of some internal error.
