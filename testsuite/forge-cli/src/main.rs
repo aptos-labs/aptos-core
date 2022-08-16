@@ -58,6 +58,8 @@ pub struct SuccessCriteriaArgs {
     avg_tps: usize,
     #[structopt(long, default_value = "10000")]
     max_latency_ms: usize,
+    #[structopt(long)]
+    wait_for_all_nodes_to_catchup_secs: Option<u64>,
 }
 
 #[derive(StructOpt, Debug)]
@@ -195,6 +197,9 @@ fn main() -> Result<()> {
     let success_criteria = SuccessCriteria::new(
         args.success_criteria.avg_tps,
         args.success_criteria.max_latency_ms,
+        args.success_criteria
+            .wait_for_all_nodes_to_catchup_secs
+            .map(Duration::from_secs),
     );
 
     let runtime = Runtime::new()?;

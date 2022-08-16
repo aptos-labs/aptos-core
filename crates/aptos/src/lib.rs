@@ -11,6 +11,7 @@ pub mod governance;
 pub mod move_tool;
 pub mod node;
 pub mod op;
+pub mod stake;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod test;
 
@@ -40,6 +41,8 @@ pub enum Tool {
     Move(move_tool::MoveTool),
     #[clap(subcommand)]
     Node(node::NodeTool),
+    #[clap(subcommand)]
+    Stake(stake::StakeTool),
 }
 
 impl Tool {
@@ -56,6 +59,7 @@ impl Tool {
             Key(tool) => tool.execute().await,
             Move(tool) => tool.execute().await,
             Node(tool) => tool.execute().await,
+            Stake(tool) => tool.execute().await,
         }
     }
 }

@@ -7,7 +7,7 @@ use crate::metrics::TIMER;
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
-    proof::SparseMerkleProof,
+    proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
@@ -32,7 +32,7 @@ static IO_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
 
 struct Proof {
     state_key_hash: HashValue,
-    proof: SparseMerkleProof,
+    proof: SparseMerkleProofExt,
 }
 
 pub struct AsyncProofFetcher {
@@ -57,7 +57,7 @@ impl AsyncProofFetcher {
     // Waits scheduled proof read to finish, and returns all read proofs.
     //
     // This is only expected to be called in a single thread, after all reads being scheduled.
-    fn wait(&self) -> HashMap<HashValue, SparseMerkleProof> {
+    fn wait(&self) -> HashMap<HashValue, SparseMerkleProofExt> {
         let _timer = TIMER.with_label_values(&["wait_async_proof"]).start_timer();
         // TODO(grao): Find a way to verify the proof.
         let mut proofs = HashMap::new();
@@ -86,7 +86,7 @@ impl AsyncProofFetcher {
         let data_sender = self.data_sender.clone();
         IO_POOL.spawn(move || {
             let proof = reader
-                .get_state_proof_by_version(&state_key, version)
+                .get_state_proof_by_version_ext(&state_key, version)
                 .expect("Proof reading should succeed.");
             data_sender
                 .send(Proof {
@@ -103,7 +103,7 @@ impl ProofFetcher for AsyncProofFetcher {
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, Option<SparseMerkleProof>)> {
+    ) -> Result<(Option<StateValue>, Option<SparseMerkleProofExt>)> {
         let _timer = TIMER
             .with_label_values(&["async_proof_fetcher_fetch"])
             .start_timer();
@@ -112,7 +112,7 @@ impl ProofFetcher for AsyncProofFetcher {
         Ok((value, None))
     }
 
-    fn get_proof_cache(&self) -> HashMap<HashValue, SparseMerkleProof> {
+    fn get_proof_cache(&self) -> HashMap<HashValue, SparseMerkleProofExt> {
         self.wait()
     }
 }

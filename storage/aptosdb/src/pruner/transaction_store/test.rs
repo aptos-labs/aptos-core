@@ -15,7 +15,7 @@ use aptos_types::{
 };
 
 use accumulator::HashReader;
-use aptos_config::config::StoragePrunerConfig;
+use aptos_config::config::LedgerPrunerConfig;
 use aptos_types::proof::position::Position;
 use aptos_types::{
     transaction::{TransactionInfo, Version},
@@ -55,13 +55,10 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
 
     let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        StoragePrunerConfig {
-            enable_state_store_pruner: true,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 0,
-            ledger_prune_window: 0,
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 100,
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
             user_pruning_window_offset: 0,
         },
     );
@@ -104,13 +101,10 @@ fn verify_txn_store_pruner(
 
     let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        StoragePrunerConfig {
-            enable_state_store_pruner: true,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 0,
-            ledger_prune_window: 0,
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 100,
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
             user_pruning_window_offset: 0,
         },
     );

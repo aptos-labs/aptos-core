@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::pruner::db_pruner::DBPruner;
 use crate::pruner::ledger_store::ledger_store_pruner::LedgerPruner;
-use aptos_config::config::StoragePrunerConfig;
+use aptos_config::config::LedgerPrunerConfig;
 use aptos_logger::{
     error,
     prelude::{sample, SampleRate},
@@ -33,12 +33,12 @@ pub struct LedgerPrunerWorker {
 impl LedgerPrunerWorker {
     pub(crate) fn new(
         ledger_pruner: Arc<LedgerPruner>,
-        storage_pruner_config: StoragePrunerConfig,
+        ledger_pruner_config: LedgerPrunerConfig,
     ) -> Self {
         Self {
             pruning_time_interval_in_ms: if cfg!(test) { 100 } else { 1 },
             pruner: ledger_pruner,
-            max_versions_to_prune_per_batch: storage_pruner_config.ledger_pruning_batch_size as u64,
+            max_versions_to_prune_per_batch: ledger_pruner_config.batch_size as u64,
             quit_worker: AtomicBool::new(false),
         }
     }

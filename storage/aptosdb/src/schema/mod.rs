@@ -21,6 +21,7 @@ pub(crate) mod transaction_accumulator;
 pub(crate) mod transaction_by_account;
 pub(crate) mod transaction_by_hash;
 pub(crate) mod transaction_info;
+pub(crate) mod version_data;
 pub(crate) mod write_set;
 
 use anyhow::{ensure, Result};
@@ -43,6 +44,7 @@ pub const TRANSACTION_ACCUMULATOR_CF_NAME: ColumnFamilyName = "transaction_accum
 pub const TRANSACTION_BY_ACCOUNT_CF_NAME: ColumnFamilyName = "transaction_by_account";
 pub const TRANSACTION_BY_HASH_CF_NAME: ColumnFamilyName = "transaction_by_hash";
 pub const TRANSACTION_INFO_CF_NAME: ColumnFamilyName = "transaction_info";
+pub const VERSION_DATA_CF_NAME: ColumnFamilyName = "version_data";
 pub const WRITE_SET_CF_NAME: ColumnFamilyName = "write_set";
 
 fn ensure_slice_len_eq(data: &[u8], len: usize) -> Result<()> {
@@ -82,6 +84,7 @@ pub mod fuzzing {
             );
             assert_no_panic_decoding::<super::ledger_counters::LedgerCountersSchema>(data);
             assert_no_panic_decoding::<super::ledger_info::LedgerInfoSchema>(data);
+            assert_no_panic_decoding::<super::version_data::VersionDataSchema>(data);
             assert_no_panic_decoding::<super::stale_node_index::StaleNodeIndexSchema>(data);
             assert_no_panic_decoding::<super::state_value::StateValueSchema>(data);
             assert_no_panic_decoding::<super::transaction::TransactionSchema>(data);

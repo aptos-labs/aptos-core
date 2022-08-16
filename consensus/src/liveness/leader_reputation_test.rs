@@ -43,7 +43,7 @@ impl MockHistory {
 }
 
 impl MetadataBackend for MockHistory {
-    fn get_block_metadata(&self, _target_round: Round) -> Vec<NewBlockEvent> {
+    fn get_block_metadata(&self, _target_epoch: u64, _target_round: Round) -> Vec<NewBlockEvent> {
         let start = if self.data.len() > self.window_size {
             self.data.len() - self.window_size
         } else {
@@ -541,7 +541,7 @@ fn backend_wrapper_test() {
 
     let mut assert_history = |round, expected_history: Vec<Round>, to_fetch| {
         let history: Vec<Round> = backend
-            .get_block_metadata(round)
+            .get_block_metadata(1, round)
             .iter()
             .map(|e| e.round())
             .collect();
@@ -605,6 +605,41 @@ fn backend_wrapper_test() {
     // Second one should know that there is nothing new.
     assert_history(14, vec![13, 12, 11], true);
     assert_history(14, vec![13, 12, 11], false);
+}
+
+#[test]
+fn backend_test_cross_epoch() {
+    let aptos_db = Arc::new(MockDbReader::new());
+    let backend = AptosDBBackend::new(3, 3, aptos_db.clone());
+
+    aptos_db.add_event(0, 1);
+    aptos_db.add_event(1, 1);
+    aptos_db.add_event(1, 2);
+    aptos_db.add_event(1, 3);
+    aptos_db.add_event(2, 1);
+    aptos_db.add_event(2, 2);
+
+    let mut fetch_count = 0;
+
+    let mut assert_history = |epoch, round, expected_history: Vec<(u64, Round)>, to_fetch| {
+        let history: Vec<(u64, Round)> = backend
+            .get_block_metadata(epoch, round)
+            .iter()
+            .map(|e| (e.epoch(), e.round()))
+            .collect();
+        assert_eq!(expected_history, history, "At round {}", round);
+        if to_fetch {
+            fetch_count += 1;
+        }
+        assert_eq!(fetch_count, aptos_db.fetched(), "At round {}", round);
+    };
+
+    assert_history(2, 2, vec![(2, 2), (2, 1), (1, 3)], true);
+    assert_history(2, 1, vec![(2, 1), (1, 3), (1, 2)], false);
+
+    aptos_db.add_event(3, 1);
+
+    assert_history(3, 2, vec![(3, 1), (2, 2), (2, 1)], true);
 }
 
 #[test]

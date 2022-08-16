@@ -7,11 +7,25 @@ aptos_chains:
   devnet:
     id: 23
     waypoint: 0:d88fc7e7e94668dd534a5bb8f8ac510225f76902cf6bbf5ff2cdad34a6e1d8ca
+
+# fullnode network config
 fullnode_identity:
   # Set this to start fullnode from an existing key.
   # If not set, it will generate a random one on startup.
+fullnode_max_inbound_connections: 100
 
-fullnode_max_inbound_connections: 1000
+# fullnode pruner config
+# disable ledger pruning will keep all the history transaction
+enable_ledger_pruner: true
+# set pruner window to override the default value
+ledger_prune_window: 
+
+# fullnode state sync config
+# To make fullnode execute every transaction, set:
+# bootstrapping_mode: ExecuteTransactionsFromGenesis
+# continuous_syncing_mode: ExecuteTransactions
+bootstrapping_mode: ApplyTransactionOutputsFromGenesis
+continuous_syncing_mode: ApplyTransactionOutputs
 
 rust_log: info
 

@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "api",
     "api/openapi-spec-generator",
+    "api/test-context",
     "api/types",
     "aptos-move/aptos-gas",
     "aptos-move/aptos-resource-viewer",
@@ -56,6 +57,7 @@ members = [
     "crates/aptos-telemetry-service",
     "crates/aptos-temppath",
     "crates/aptos-time-service",
+    "crates/aptos-warp-webserver",
     "crates/bounded-executor",
     "crates/channel",
     "crates/crash-handler",
@@ -105,6 +107,7 @@ members = [
     "storage/backup/backup-service",
     "storage/indexer",
     "storage/jellyfish-merkle",
+    "storage/rocksdb-options",
     "storage/schemadb",
     "storage/scratchpad",
     "storage/state-view",

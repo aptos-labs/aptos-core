@@ -19,7 +19,7 @@ mod tests {
     use aptos_keygen::KeyGen;
     use aptos_rest_client::{
         aptos_api_types::{
-            AccountData, DirectWriteSet, LedgerInfo, PendingTransaction, Response,
+            AccountData, DirectWriteSet, LedgerInfo, PendingTransaction,
             TransactionPayload as TransactionPayloadData, WriteSet, WriteSetPayload,
         },
         FaucetClient,
@@ -36,6 +36,7 @@ mod tests {
             LocalAccount,
         },
     };
+    use aptos_warp_webserver::Response;
     use serde::Serialize;
     use std::{
         collections::HashMap,

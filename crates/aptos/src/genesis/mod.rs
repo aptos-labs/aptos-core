@@ -12,7 +12,7 @@ use crate::{
         types::{CliError, CliTypedResult, PromptOptions},
         utils::{check_if_file_exists, write_to_file},
     },
-    genesis::git::{Client, GitOptions, LAYOUT_NAME},
+    genesis::git::{Client, GitOptions, LAYOUT_FILE},
     CliCommand, CliResult,
 };
 use aptos_crypto::{bls12381, ed25519::Ed25519PublicKey, x25519, ValidCryptoMaterialStringExt};
@@ -25,6 +25,7 @@ use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::Parser;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::{path::PathBuf, str::FromStr};
 
 const WAYPOINT_FILE: &str = "waypoint.txt";
@@ -38,6 +39,7 @@ const GENESIS_FILE: &str = "genesis.blob";
 pub enum GenesisTool {
     GenerateGenesis(GenerateGenesis),
     GenerateKeys(keys::GenerateKeys),
+    GenerateLayoutTemplate(keys::GenerateLayoutTemplate),
     SetupGit(git::SetupGit),
     SetValidatorConfiguration(keys::SetValidatorConfiguration),
 }
@@ -47,6 +49,7 @@ impl GenesisTool {
         match self {
             GenesisTool::GenerateGenesis(tool) => tool.execute_serialized().await,
             GenesisTool::GenerateKeys(tool) => tool.execute_serialized().await,
+            GenesisTool::GenerateLayoutTemplate(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetupGit(tool) => tool.execute_serialized_success().await,
             GenesisTool::SetValidatorConfiguration(tool) => tool.execute_serialized_success().await,
         }
@@ -101,7 +104,15 @@ impl CliCommand<Vec<PathBuf>> for GenerateGenesis {
 /// Retrieves all information for genesis from the Git repository
 pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo> {
     let client = git_options.get_client()?;
-    let layout: Layout = client.get(LAYOUT_NAME)?;
+    let layout: Layout = client.get(Path::new(LAYOUT_FILE))?;
+
+    // TODO: Remove this requirement when root key isn't needed
+    if layout.root_key.is_none() {
+        return Err(CliError::UnexpectedError(
+            "Layout field root_key was not set.  Please provide a hex encoded Ed25519PublicKey."
+                .to_string(),
+        ));
+    }
 
     let mut validators = Vec::new();
     let mut errors = Vec::new();
@@ -135,7 +146,7 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
 
     Ok(GenesisInfo::new(
         layout.chain_id,
-        layout.root_key,
+        layout.root_key.unwrap(),
         validators,
         modules,
         &GenesisConfiguration {
@@ -156,7 +167,8 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
 
 /// Do proper parsing so more information is known about failures
 fn get_config(client: &Client, user: &str) -> CliTypedResult<ValidatorConfiguration> {
-    let config = client.get::<StringValidatorConfiguration>(user)?;
+    let file = PathBuf::from(format!("{}.yaml", user));
+    let config = client.get::<StringValidatorConfiguration>(file.as_path())?;
 
     // Convert each individually
     let account_address = AccountAddress::from_str(&config.account_address)

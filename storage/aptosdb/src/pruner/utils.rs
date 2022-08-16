@@ -4,7 +4,7 @@
 //! This module provides common utilities for the DB pruner.
 
 use crate::{
-    pruner::{ledger_store::ledger_store_pruner::LedgerPruner, state_store::StateStorePruner},
+    pruner::{ledger_store::ledger_store_pruner::LedgerPruner, state_store::StateMerklePruner},
     EventStore, LedgerStore, TransactionStore,
 };
 
@@ -12,8 +12,8 @@ use schemadb::DB;
 use std::sync::Arc;
 
 /// A utility function to instantiate the state pruner
-pub fn create_state_pruner(state_merkle_db: Arc<DB>) -> Arc<StateStorePruner> {
-    Arc::new(StateStorePruner::new(Arc::clone(&state_merkle_db)))
+pub fn create_state_pruner(state_merkle_db: Arc<DB>) -> Arc<StateMerklePruner> {
+    Arc::new(StateMerklePruner::new(Arc::clone(&state_merkle_db)))
 }
 
 /// A utility function to instantiate the ledger pruner

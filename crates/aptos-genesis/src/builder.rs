@@ -7,11 +7,11 @@ use crate::{
     GenesisInfo,
 };
 use anyhow::ensure;
+use aptos_config::config::RocksDbStorageConfig;
 use aptos_config::{
     config::{
         DiscoveryMethod, Identity, IdentityBlob, InitialSafetyRulesConfig, NetworkConfig,
-        NodeConfig, OnDiskStorageConfig, PeerRole, RoleType, SafetyRulesService, SecureBackend,
-        WaypointConfig,
+        NodeConfig, PeerRole, RoleType, SafetyRulesService, SecureBackend, WaypointConfig,
     },
     generator::build_seed_for_network,
     network_id::NetworkId,
@@ -524,10 +524,11 @@ impl Builder {
 
         // Ensure safety rules runs in a thread
         config.consensus.safety_rules.service = SafetyRulesService::Thread;
-        let mut storage = OnDiskStorageConfig::default();
-        storage.set_data_dir(validator.dir.clone());
 
-        config.consensus.safety_rules.backend = SecureBackend::OnDiskStorage(storage);
+        // Use a rocksdb storage backend for safety rules
+        let mut storage = RocksDbStorageConfig::default();
+        storage.set_data_dir(validator.dir.clone());
+        config.consensus.safety_rules.backend = SecureBackend::RocksDbStorage(storage);
 
         if index > 0 || self.randomize_first_validator_ports {
             config.randomize_ports();

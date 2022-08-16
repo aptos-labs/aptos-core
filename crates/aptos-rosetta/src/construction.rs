@@ -321,6 +321,11 @@ async fn construction_parse(
                 && create_account_function_identifier() == function_name
             {
                 parse_create_account_operation(sender, &type_args, &args)?
+            } else if AccountAddress::ONE == *module.address()
+                && stake_module_identifier() == module_name
+                && set_operator_function_identifier() == function_name
+            {
+                parse_set_operator_operation(sender, &type_args, &args)?
             } else {
                 return Err(ApiError::TransactionParseError(Some(
                     "Unsupported operation type",
@@ -420,6 +425,28 @@ fn parse_transfer_operation(
     Ok(operations)
 }
 
+fn parse_set_operator_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    // There are no typeargs for create account
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(
+            "Set operator should not have type arguments",
+        )));
+    }
+
+    // Set operator
+    if let Some(encoded_operator) = args.first() {
+        let operator: AccountAddress = bcs::from_bytes(encoded_operator)?;
+
+        Ok(vec![Operation::set_operator(0, None, sender, operator)])
+    } else {
+        Err(ApiError::InvalidOperations)
+    }
+}
+
 /// Construction payloads command (OFFLINE)
 ///
 /// Constructs payloads for given known operations
@@ -453,6 +480,10 @@ async fn construction_payloads(
                 transfer.sender,
             )
         }
+        InternalOperation::SetOperator(set_operator) => (
+            aptos_stdlib::stake_set_operator(set_operator.operator),
+            set_operator.owner,
+        ),
     };
 
     // Build the transaction and make it ready for signing

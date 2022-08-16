@@ -313,7 +313,10 @@ impl CliCommand<&'static str> for ProvePackage {
 }
 
 /// Compiles a Move package dir, and returns the compiled modules.
-fn compile_move(build_config: BuildConfig, package_dir: &Path) -> CliTypedResult<CompiledPackage> {
+pub(crate) fn compile_move(
+    build_config: BuildConfig,
+    package_dir: &Path,
+) -> CliTypedResult<CompiledPackage> {
     // TODO: Add caching
     build_config
         .compile_package(package_dir, &mut Vec::new())
@@ -552,7 +555,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
 }
 
 #[derive(Clone, Debug)]
-enum FunctionArgType {
+pub(crate) enum FunctionArgType {
     Address,
     Bool,
     Hex,
@@ -611,8 +614,8 @@ impl FromStr for FunctionArgType {
 
 /// A parseable arg with a type separated by a colon
 pub struct ArgWithType {
-    _ty: FunctionArgType,
-    arg: Vec<u8>,
+    pub(crate) _ty: FunctionArgType,
+    pub(crate) arg: Vec<u8>,
 }
 
 impl FromStr for ArgWithType {

@@ -3,19 +3,10 @@
 
 #![allow(unused_imports)]
 
+use crate::response::InternalError;
 use anyhow::{format_err, Result};
-use aptos_api_types::{AptosError, Error};
-
-use crate::poem_backend::InternalError;
+use aptos_api_types::AptosError;
 use poem_openapi::payload::Json;
-
-#[allow(unused_variables)]
-#[inline]
-pub fn fail_point(name: &str) -> Result<(), Error> {
-    Ok(fail::fail_point!(format!("api::{}", name).as_str(), |_| {
-        Err(format_err!("unexpected internal error for {}", name).into())
-    }))
-}
 
 #[allow(unused_variables)]
 #[inline]
