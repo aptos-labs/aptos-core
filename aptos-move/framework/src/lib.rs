@@ -4,7 +4,9 @@
 #![forbid(unsafe_code)]
 
 mod aptos;
+
 pub use aptos::*;
+use std::io::{Read, Write};
 
 mod generated;
 pub use generated::aptos_framework_sdk_builder;
@@ -21,6 +23,9 @@ pub use release_builder::*;
 mod release_bundle;
 pub use release_bundle::*;
 
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use std::path::PathBuf;
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf
@@ -35,6 +40,20 @@ pub(crate) fn path_relative_to_crate(path: PathBuf) -> PathBuf {
     path.strip_prefix(crate_path).unwrap_or(&path).to_path_buf()
 }
 
+pub fn zip_metadata(data: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let mut gz = GzEncoder::new(Vec::new(), Compression::best());
+    gz.write_all(data)?;
+    let result = gz.finish()?;
+    Ok(result)
+}
+
+pub fn unzip_metadata(data: &[u8]) -> anyhow::Result<Vec<u8>> {
+    let mut gz = GzDecoder::new(data);
+    let mut result = vec![];
+    gz.read_to_end(&mut result)?;
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{ReleaseBundle, ReleaseTarget};
@@ -47,7 +66,7 @@ mod tests {
             .to_path_buf()
             .join(ReleaseTarget::Head.file_name());
         ReleaseTarget::Head
-            .create_release(Some(actual_name.clone()))
+            .create_release(true, Some(actual_name.clone()))
             .unwrap();
         let actual = ReleaseBundle::read(actual_name).unwrap();
         assert!(

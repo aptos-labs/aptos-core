@@ -31,7 +31,7 @@ pub struct ReleaseOptions {
 
 impl ReleaseOptions {
     /// Creates a release bundle from the specified options and saves it to disk.
-    pub fn create_release(self) -> anyhow::Result<()> {
+    pub fn create_release(self, strip: bool) -> anyhow::Result<()> {
         let ReleaseOptions {
             build_options,
             packages,
@@ -43,10 +43,23 @@ impl ReleaseOptions {
         for (package_path, rust_binding_path) in packages.into_iter().zip(rust_bindings.into_iter())
         {
             let built = BuiltPackage::build(package_path.clone(), build_options.clone())?;
-            let released = ReleasePackage::new(built)?;
+            let mut released = ReleasePackage::new(built)?;
             if !rust_binding_path.is_empty() {
                 Self::generate_rust_bindings(&released, &PathBuf::from(rust_binding_path))?;
             }
+            // Strip redundant information from the package.
+            if strip {
+                let metadata = released.package_metadata_mut();
+                for module in metadata.modules.iter_mut() {
+                    module.source_map.clear();
+                }
+            }
+            let size = bcs::to_bytes(&released)?.len();
+            println!(
+                "Including package `{}` size {}k",
+                released.name(),
+                size / 1000,
+            );
             released_packages.push(released);
             let relative_path = path_relative_to_crate(package_path.join("sources"));
             source_paths.push(relative_path.display().to_string());

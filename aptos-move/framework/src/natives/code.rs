@@ -37,6 +37,9 @@ pub struct PackageMetadata {
     pub name: String,
     /// The upgrade policy of this package.
     pub upgrade_policy: UpgradePolicy,
+    /// The numbers of times this module has been upgraded. Also serves as the on-chain version.
+    /// This field will be automatically assigned on successful upgrade.
+    pub upgrade_counter: u64,
     /// Build info, in BuildInfo.yaml format
     pub build_info: String,
     /// The package manifest, in the Move.toml format.
@@ -54,9 +57,10 @@ pub struct PackageMetadata {
 pub struct ModuleMetadata {
     /// Name of the module.
     pub name: String,
-    /// Source text if available.
-    pub source: String,
-    /// Source map, in BCS encoding.
+    /// Source text if available, in gzipped form.
+    #[serde(with = "serde_bytes")]
+    pub source: Vec<u8>,
+    /// Source map, in BCS encoding, then gzipped.
     #[serde(with = "serde_bytes")]
     pub source_map: Vec<u8>,
 }

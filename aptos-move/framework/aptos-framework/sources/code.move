@@ -23,6 +23,9 @@ module aptos_framework::code {
         name: String,
         /// The upgrade policy of this package.
         upgrade_policy: UpgradePolicy,
+        /// The numbers of times this module has been upgraded. Also serves as the on-chain version.
+        /// This field will be automatically assigned on successful upgrade.
+        upgrade_counter: u64,
         /// The BuildInfo, in the BuildInfo.yaml format.
         build_info: String,
         /// The package manifest, in the Move.toml format.
@@ -39,9 +42,9 @@ module aptos_framework::code {
     struct ModuleMetadata has store, copy, drop {
         /// Name of the module.
         name: String,
-        /// Source text.
-        source: String,
-        /// Source map, in internal encoding
+        /// Source text, in gzipped form.
+        source: vector<u8>,
+        /// Source map, in internal encoding, and then gziped.
         source_map: vector<u8>,
     }
 
@@ -114,9 +117,11 @@ module aptos_framework::code {
         let len = vector::length(packages);
         let index = len;
         let i = 0;
+        let upgrade_counter = 0;
         while (i < len) {
             let old = vector::borrow(packages, i);
             if (old.name == pack.name) {
+                upgrade_counter = old.upgrade_counter + 1;
                 check_upgradability(old, &pack, &module_names);
                 index = i;
             } else {
@@ -124,6 +129,9 @@ module aptos_framework::code {
             };
             i = i + 1;
         };
+
+        // Assign the upgrade counter.
+        *&mut pack.upgrade_counter = upgrade_counter;
 
         // Update registry
         if (index < len) {

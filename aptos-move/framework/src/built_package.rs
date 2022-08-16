@@ -3,6 +3,7 @@
 
 use crate::error_map::generate_error_map;
 use crate::natives::code::{ModuleMetadata, PackageMetadata, UpgradePolicy};
+use crate::zip_metadata;
 use aptos_types::account_address::AccountAddress;
 use clap::Parser;
 use move_deps::move_core_types::errmap::ErrorMapping;
@@ -105,8 +106,8 @@ impl BuiltPackage {
         let mut modules = vec![];
         for u in &self.package.root_compiled_units {
             let name = u.unit.name().to_string();
-            let source = std::fs::read_to_string(&u.source_path)?;
-            let source_map = u.unit.serialize_source_map();
+            let source = zip_metadata(std::fs::read_to_string(&u.source_path)?.as_bytes())?;
+            let source_map = zip_metadata(&u.unit.serialize_source_map())?;
             modules.push(ModuleMetadata {
                 name,
                 source,
@@ -127,6 +128,7 @@ impl BuiltPackage {
         Ok(PackageMetadata {
             name: self.name().to_string(),
             upgrade_policy,
+            upgrade_counter: 0,
             build_info,
             manifest,
             modules,

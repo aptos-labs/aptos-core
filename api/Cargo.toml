@@ -57,8 +57,8 @@ aptos-vm = { path = "../aptos-move/aptos-vm" }
 aptosdb = { path = "../storage/aptosdb", features = ["fuzzing"] }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
-goldenfile = "1.1.0"
 framework = { path = "../aptos-move/framework" }
+goldenfile = "1.1.0"
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
 move-deps = { path = "../aptos-move/move-deps" }
 proptest = { version = "1.0.0", default-features = true }

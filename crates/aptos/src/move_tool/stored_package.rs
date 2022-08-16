@@ -6,6 +6,7 @@ use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::ScriptABI;
 use framework::natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
+use framework::unzip_metadata;
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
 use std::fs;
@@ -135,10 +136,8 @@ impl<'a> CachedPackageMetadata<'a> {
         let sources_dir = path.join(CompiledPackageLayout::Sources.path());
         fs::create_dir_all(&sources_dir)?;
         for module in &self.metadata.modules {
-            fs::write(
-                sources_dir.join(format!("{}.move", module.name)),
-                &module.source,
-            )?;
+            let source = std::str::from_utf8(&unzip_metadata(&module.source)?)?.to_string();
+            fs::write(sources_dir.join(format!("{}.move", module.name)), source)?;
         }
         if with_derived_artifacts {
             let abis_dir = path.join(CompiledPackageLayout::CompiledABIs.path());
@@ -175,11 +174,12 @@ impl<'a> CachedModuleMetadata<'a> {
         &self.metadata.name
     }
 
-    pub fn source(&self) -> &str {
+    /// Returns the zipped source.
+    pub fn zipped_source(&self) -> &[u8] {
         &self.metadata.source
     }
 
-    pub fn source_map_raw(&self) -> &[u8] {
+    pub fn zipped_source_map_raw(&self) -> &[u8] {
         &self.metadata.source_map
     }
 }
