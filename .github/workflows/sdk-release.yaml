@@ -79,10 +79,10 @@ jobs:
 
       # Confirm that the specs we built here are the same as those checked in.
       - run: echo "If this step fails, run the following commands locally to fix it:"
-      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/v1/spec.yaml"
-      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/v1/spec.json"
-      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.yaml api/doc/v1/spec.yaml
-      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.json api/doc/v1/spec.json
+      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f yaml -o api/doc/spec.yaml"
+      - run: echo "cargo run -p aptos-openapi-spec-generator -- -f json -o api/doc/spec.json"
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.yaml api/doc/spec.yaml
+      - run: git diff --no-index --ignore-space-at-eol --ignore-blank-lines ${{ runner.temp }}/specs/spec.json api/doc/spec.json
 
       # Set up dotenv file for tests (jest doesn't read env vars properly).
       - run: echo 'APTOS_NODE_URL="http://127.0.0.1:8080/v1"' >> ./ecosystem/typescript/sdk/.env

@@ -4,7 +4,7 @@
 mod fake_context;
 
 use anyhow::Result;
-use aptos_api::poem_backend::get_api_service;
+use aptos_api::get_api_service;
 use clap::{ArgEnum, Parser};
 use fake_context::get_fake_context;
 use std::path::PathBuf;
