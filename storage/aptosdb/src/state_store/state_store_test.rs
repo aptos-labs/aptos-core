@@ -14,7 +14,7 @@ use aptos_types::{
 };
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver};
 
-use crate::{pruner::state_store::StateStorePruner, AptosDB};
+use crate::{pruner::state_store::StateMerklePruner, AptosDB};
 
 use super::*;
 
@@ -42,7 +42,7 @@ fn put_value_set(
 }
 
 fn prune_stale_indices(
-    state_pruner: &StateStorePruner,
+    state_pruner: &StateMerklePruner,
     min_readable_version: Version,
     target_min_readable_version: Version,
     limit: usize,
@@ -254,7 +254,7 @@ fn test_stale_node_index() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let pruner = StateStorePruner::new(Arc::clone(&db.state_merkle_db));
+    let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
 
     // Update.
     // ```text
@@ -374,7 +374,7 @@ fn test_stale_node_index_with_target_version() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let pruner = StateStorePruner::new(Arc::clone(&db.state_merkle_db));
+    let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
 
     // Update.
     // ```text
@@ -480,7 +480,7 @@ fn test_stale_node_index_all_at_once() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let pruner = StateStorePruner::new(Arc::clone(&db.state_merkle_db));
+    let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
 
     // Update.
     // ```text

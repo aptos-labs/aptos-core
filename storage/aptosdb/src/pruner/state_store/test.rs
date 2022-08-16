@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::StoragePrunerConfig;
+use aptos_config::config::StateMerklePrunerConfig;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -78,13 +78,10 @@ fn test_state_store_pruner() {
     );
     let pruner = StatePrunerManager::new(
         Arc::clone(&aptos_db.state_merkle_db),
-        StoragePrunerConfig {
-            enable_state_store_pruner: true,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 0,
-            ledger_prune_window: 0,
-            ledger_pruning_batch_size: prune_batch_size,
-            state_store_pruning_batch_size: prune_batch_size,
+        StateMerklePrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: prune_batch_size,
             user_pruning_window_offset: 0,
         },
     );
@@ -169,13 +166,10 @@ fn test_state_store_pruner_partial_version() {
     let state_store = &aptos_db.state_store;
     let pruner = StatePrunerManager::new(
         Arc::clone(&aptos_db.state_merkle_db),
-        StoragePrunerConfig {
-            enable_state_store_pruner: true,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 0,
-            ledger_prune_window: 0,
-            ledger_pruning_batch_size: prune_batch_size,
-            state_store_pruning_batch_size: prune_batch_size,
+        StateMerklePrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: prune_batch_size,
             user_pruning_window_offset: 0,
         },
     );
@@ -341,13 +335,10 @@ fn test_worker_quit_eagerly() {
         let state_pruner = utils::create_state_pruner(Arc::clone(&aptos_db.state_merkle_db));
         let worker = StatePrunerWorker::new(
             state_pruner,
-            StoragePrunerConfig {
-                enable_state_store_pruner: true,
-                enable_ledger_pruner: true,
-                state_store_prune_window: 1,
-                ledger_prune_window: 1,
-                ledger_pruning_batch_size: 100,
-                state_store_pruning_batch_size: 100,
+            StateMerklePrunerConfig {
+                enable: true,
+                prune_window: 1,
+                batch_size: 100,
                 user_pruning_window_offset: 0,
             },
         );

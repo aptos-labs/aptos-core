@@ -57,8 +57,7 @@ use crate::{
 };
 use anyhow::{bail, ensure, Result};
 use aptos_config::config::{
-    RocksdbConfig, RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
-    TARGET_SNAPSHOT_SIZE,
+    PrunerConfig, RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
 };
 use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
@@ -107,7 +106,7 @@ use std::{
 
 use crate::pruner::{
     ledger_pruner_manager::LedgerPrunerManager, ledger_store::ledger_store_pruner::LedgerPruner,
-    state_pruner_manager::StatePrunerManager, state_store::StateStorePruner,
+    state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
 };
 use storage_interface::{
     state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
@@ -273,16 +272,20 @@ impl AptosDB {
     fn new_with_dbs(
         ledger_rocksdb: DB,
         state_merkle_rocksdb: DB,
-        storage_pruner_config: StoragePrunerConfig,
+        pruner_config: PrunerConfig,
         target_snapshot_size: usize,
         hack_for_tests: bool,
     ) -> Self {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
         let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
-        let state_pruner =
-            StatePrunerManager::new(Arc::clone(&arc_state_merkle_rocksdb), storage_pruner_config);
-        let ledger_pruner =
-            LedgerPrunerManager::new(Arc::clone(&arc_ledger_rocksdb), storage_pruner_config);
+        let state_pruner = StatePrunerManager::new(
+            Arc::clone(&arc_state_merkle_rocksdb),
+            pruner_config.state_merkle_pruner_config,
+        );
+        let ledger_pruner = LedgerPrunerManager::new(
+            Arc::clone(&arc_ledger_rocksdb),
+            pruner_config.ledger_pruner_config,
+        );
 
         AptosDB {
             ledger_db: Arc::clone(&arc_ledger_rocksdb),
@@ -311,13 +314,13 @@ impl AptosDB {
     pub fn open<P: AsRef<Path> + Clone>(
         db_root_path: P,
         readonly: bool,
-        storage_pruner_config: StoragePrunerConfig,
+        pruner_config: PrunerConfig,
         rocksdb_configs: RocksdbConfigs,
         enable_indexer: bool,
         target_snapshot_size: usize,
     ) -> Result<Self> {
         ensure!(
-            storage_pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
+            pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
             "Do not set prune_window when opening readonly.",
         );
 
@@ -360,7 +363,7 @@ impl AptosDB {
         let mut myself = Self::new_with_dbs(
             ledger_db,
             state_merkle_db,
-            storage_pruner_config,
+            pruner_config,
             target_snapshot_size,
             readonly,
         );
@@ -1620,7 +1623,7 @@ impl DbWriter for AptosDB {
             )?;
 
             // Delete the genesis transaction
-            StateStorePruner::prune_genesis(self.state_merkle_db.clone(), &mut change_set)?;
+            StateMerklePruner::prune_genesis(self.state_merkle_db.clone(), &mut change_set)?;
             LedgerPruner::prune_genesis(self.ledger_db.clone(), &mut change_set)?;
 
             // Apply the change set writes to the database (atomically) and update in-memory state

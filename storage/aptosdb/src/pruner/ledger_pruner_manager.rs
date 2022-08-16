@@ -3,7 +3,7 @@
 
 use crate::metrics::{PRUNER_BATCH_SIZE, PRUNER_WINDOW};
 
-use aptos_config::config::StoragePrunerConfig;
+use aptos_config::config::LedgerPrunerConfig;
 use aptos_infallible::Mutex;
 
 use crate::pruner::db_pruner::DBPruner;
@@ -128,29 +128,29 @@ impl PrunerManager for LedgerPrunerManager {
 
 impl LedgerPrunerManager {
     /// Creates a worker thread that waits on a channel for pruning commands.
-    pub fn new(ledger_rocksdb: Arc<DB>, storage_pruner_config: StoragePrunerConfig) -> Self {
+    pub fn new(ledger_rocksdb: Arc<DB>, ledger_pruner_config: LedgerPrunerConfig) -> Self {
         let ledger_db_clone = Arc::clone(&ledger_rocksdb);
 
         let ledger_pruner = utils::create_ledger_pruner(ledger_db_clone);
 
-        if storage_pruner_config.enable_ledger_pruner {
+        if ledger_pruner_config.enable {
             PRUNER_WINDOW
                 .with_label_values(&["ledger_pruner"])
-                .set(storage_pruner_config.ledger_prune_window as i64);
+                .set(ledger_pruner_config.prune_window as i64);
 
             PRUNER_BATCH_SIZE
                 .with_label_values(&["ledger_pruner"])
-                .set(storage_pruner_config.ledger_pruning_batch_size as i64);
+                .set(ledger_pruner_config.batch_size as i64);
         }
 
         let ledger_pruner_worker = Arc::new(LedgerPrunerWorker::new(
             Arc::clone(&ledger_pruner),
-            storage_pruner_config,
+            ledger_pruner_config,
         ));
 
         let ledger_pruner_worker_clone = Arc::clone(&ledger_pruner_worker);
 
-        let ledger_pruner_worker_thread = if storage_pruner_config.enable_ledger_pruner {
+        let ledger_pruner_worker_thread = if ledger_pruner_config.enable {
             Some(
                 std::thread::Builder::new()
                     .name("aptosdb_ledger_pruner".into())
@@ -164,15 +164,15 @@ impl LedgerPrunerManager {
         let min_readable_version = ledger_pruner.min_readable_version();
 
         Self {
-            pruner_enabled: storage_pruner_config.enable_ledger_pruner,
-            prune_window: storage_pruner_config.ledger_prune_window,
+            pruner_enabled: ledger_pruner_config.enable,
+            prune_window: ledger_pruner_config.prune_window,
             pruner: ledger_pruner,
             pruner_worker: ledger_pruner_worker,
             worker_thread: ledger_pruner_worker_thread,
             last_version_sent_to_pruner: Arc::new(Mutex::new(min_readable_version)),
-            pruning_batch_size: storage_pruner_config.ledger_pruning_batch_size,
+            pruning_batch_size: ledger_pruner_config.batch_size,
             latest_version: Arc::new(Mutex::new(min_readable_version)),
-            user_pruning_window_offset: storage_pruner_config.user_pruning_window_offset,
+            user_pruning_window_offset: ledger_pruner_config.user_pruning_window_offset,
         }
     }
 

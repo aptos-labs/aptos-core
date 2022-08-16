@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 use crate::pruner::db_pruner::DBPruner;
-use crate::pruner::state_store::StateStorePruner;
-use aptos_config::config::StoragePrunerConfig;
+use crate::pruner::state_store::StateMerklePruner;
+use aptos_config::config::StateMerklePrunerConfig;
 use aptos_logger::{
     error,
     prelude::{sample, SampleRate},
@@ -21,7 +21,7 @@ pub struct StatePrunerWorker {
     /// The worker will sleep for this period of time after pruning each batch.
     pruning_time_interval_in_ms: u64,
     /// State store pruner.
-    pruner: Arc<StateStorePruner>,
+    pruner: Arc<StateMerklePruner>,
     /// Max items to prune per batch (i.e. the max stale nodes to prune.)
     max_node_to_prune_per_batch: u64,
     /// Indicates whether the pruning loop should be running. Will only be set to true on pruner
@@ -31,14 +31,13 @@ pub struct StatePrunerWorker {
 
 impl StatePrunerWorker {
     pub(crate) fn new(
-        state_pruner: Arc<StateStorePruner>,
-        storage_pruner_config: StoragePrunerConfig,
+        state_pruner: Arc<StateMerklePruner>,
+        state_merkle_pruner_config: StateMerklePrunerConfig,
     ) -> Self {
         Self {
             pruning_time_interval_in_ms: if cfg!(test) { 100 } else { 1 },
             pruner: state_pruner,
-            max_node_to_prune_per_batch: storage_pruner_config.state_store_pruning_batch_size
-                as u64,
+            max_node_to_prune_per_batch: state_merkle_pruner_config.batch_size as u64,
             quit_worker: AtomicBool::new(false),
         }
     }

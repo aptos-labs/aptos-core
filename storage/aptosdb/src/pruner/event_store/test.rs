@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{AptosDB, ChangeSet, EventStore, LedgerPrunerManager, PrunerManager};
-use aptos_config::config::StoragePrunerConfig;
+use aptos_config::config::LedgerPrunerConfig;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
@@ -60,13 +60,10 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
     let num_versions = events.len();
     let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
-        StoragePrunerConfig {
-            enable_state_store_pruner: true,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 0,
-            ledger_prune_window: 0,
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 100,
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
             user_pruning_window_offset: 0,
         },
     );
