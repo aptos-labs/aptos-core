@@ -5,7 +5,7 @@ use crate::common::types::OptionalPoolAddressArgs;
 use crate::common::utils::read_from_file;
 use crate::genesis::git::from_yaml;
 use crate::genesis::git::FRAMEWORK_NAME;
-use crate::genesis::keys::GenerateLayoutTemplate;
+use crate::genesis::keys::{GenerateLayoutTemplate, PUBLIC_KEYS_FILE};
 use crate::{
     common::{
         types::{PromptOptions, RngArgs},
@@ -178,10 +178,12 @@ async fn add_public_keys(username: String, git_options: GitOptions, keys_dir: &P
     let command = SetValidatorConfiguration {
         username,
         git_options,
-        keys_dir: Some(PathBuf::from(keys_dir)),
+        owner_public_identity_file: Some(PathBuf::from(keys_dir).join(PUBLIC_KEYS_FILE)),
         validator_host: HostAndPort::from_str("localhost:6180").unwrap(),
-        full_node_host: None,
         stake_amount: 100_000_000_000_000,
+        full_node_host: None,
+        operator_public_identity_file: None,
+        voter_public_identity_file: None,
     };
 
     command.execute().await.unwrap()

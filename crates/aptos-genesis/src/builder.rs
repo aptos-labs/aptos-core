@@ -179,12 +179,16 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
                 .try_into()?,
         );
         Ok(ValidatorConfiguration {
-            account_address: private_identity.account_address,
+            owner_account_address: private_identity.account_address,
+            owner_account_public_key: private_identity.account_private_key.public_key(),
+            operator_account_address: private_identity.account_address,
+            operator_account_public_key: private_identity.account_private_key.public_key(),
+            voter_account_address: private_identity.account_address,
+            voter_account_public_key: private_identity.account_private_key.public_key(),
             consensus_public_key: private_identity.consensus_private_key.public_key(),
             proof_of_possession: bls12381::ProofOfPossession::create(
                 &private_identity.consensus_private_key,
             ),
-            account_public_key: private_identity.account_private_key.public_key(),
             validator_network_public_key: private_identity
                 .validator_network_private_key
                 .public_key(),

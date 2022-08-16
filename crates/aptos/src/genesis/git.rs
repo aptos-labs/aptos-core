@@ -165,9 +165,17 @@ impl Client {
     pub fn put<T: Serialize + ?Sized>(&self, name: &Path, input: &T) -> CliTypedResult<()> {
         match self {
             Client::Local(local_repository_path) => {
-                self.create_dir(local_repository_path.as_path())?;
-
                 let path = local_repository_path.join(name);
+
+                // Create repository path and any sub-directories
+                if let Some(dir) = path.parent() {
+                    self.create_dir(dir)?;
+                } else {
+                    return Err(CliError::UnexpectedError(format!(
+                        "Path should always have a parent {}",
+                        path.display()
+                    )));
+                }
                 write_to_file(
                     path.as_path(),
                     &path.display().to_string(),
