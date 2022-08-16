@@ -3967,19 +3967,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "genesis-viewer"
-version = "0.1.0"
-dependencies = [
- "aptos-resource-viewer",
- "aptos-types",
- "aptos-vm",
- "framework",
- "move-deps",
- "structopt 0.3.26",
- "vm-genesis",
-]
-
-[[package]]
 name = "get_if_addrs"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"

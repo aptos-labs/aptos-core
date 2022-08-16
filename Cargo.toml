@@ -17,7 +17,6 @@ members = [
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
-    "aptos-move/genesis-viewer",
     "aptos-move/move-deps",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
@@ -128,7 +127,6 @@ members = [
 #
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
-    "aptos-move/genesis-viewer",
     "aptos-move/transaction-replay",
     "aptos-node",
     "consensus/safety-rules",
