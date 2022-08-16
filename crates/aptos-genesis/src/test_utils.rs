@@ -23,6 +23,7 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
         },
         _,
         _,
+        _,
     ) = validators[0].get_key_objects(None).unwrap();
     let mut configs = validators.into_iter().map(|v| v.config).collect::<Vec<_>>();
 

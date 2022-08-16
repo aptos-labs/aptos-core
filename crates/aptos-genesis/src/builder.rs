@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::keys::PublicIdentity;
 use crate::{
     config::ValidatorConfiguration,
     keys::{generate_key_objects, PrivateIdentity},
@@ -38,6 +39,7 @@ use std::{
 const VALIDATOR_IDENTITY: &str = "validator-identity.yaml";
 const VFN_IDENTITY: &str = "vfn-identity.yaml";
 const PRIVATE_IDENTITY: &str = "private-identity.yaml";
+const PUBLIC_IDENTITY: &str = "public-identity.yaml";
 const CONFIG_FILE: &str = "node.yaml";
 const GENESIS_BLOB: &str = "genesis.blob";
 
@@ -88,21 +90,24 @@ impl ValidatorNodeConfig {
     pub fn get_key_objects(
         &self,
         seed: Option<[u8; 32]>,
-    ) -> anyhow::Result<(IdentityBlob, IdentityBlob, PrivateIdentity)> {
+    ) -> anyhow::Result<(IdentityBlob, IdentityBlob, PrivateIdentity, PublicIdentity)> {
         let dir = &self.dir;
         let val_identity_file = dir.join(VALIDATOR_IDENTITY);
         let vfn_identity_file = dir.join(VFN_IDENTITY);
         let private_identity_file = dir.join(PRIVATE_IDENTITY);
+        let public_identity_file = dir.join(PUBLIC_IDENTITY);
 
         // If they all already exist, use them, otherwise generate new ones and overwrite
         if val_identity_file.exists()
             && vfn_identity_file.exists()
             && private_identity_file.exists()
+            && public_identity_file.exists()
         {
             Ok((
                 read_yaml(val_identity_file.as_path())?,
                 read_yaml(vfn_identity_file.as_path())?,
                 read_yaml(private_identity_file.as_path())?,
+                read_yaml(public_identity_file.as_path())?,
             ))
         } else {
             let mut key_generator = if let Some(seed) = seed {
@@ -111,14 +116,20 @@ impl ValidatorNodeConfig {
                 KeyGen::from_os_rng()
             };
 
-            let (validator_identity, vfn_identity, private_identity) =
+            let (validator_identity, vfn_identity, private_identity, public_identity) =
                 generate_key_objects(&mut key_generator)?;
 
             // Write identities in files
             write_yaml(val_identity_file.as_path(), &validator_identity)?;
             write_yaml(vfn_identity_file.as_path(), &vfn_identity)?;
             write_yaml(private_identity_file.as_path(), &private_identity)?;
-            Ok((validator_identity, vfn_identity, private_identity))
+            write_yaml(public_identity_file.as_path(), &public_identity)?;
+            Ok((
+                validator_identity,
+                vfn_identity,
+                private_identity,
+                public_identity,
+            ))
         }
     }
 
@@ -149,7 +160,7 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
     type Error = anyhow::Error;
 
     fn try_from(config: &ValidatorNodeConfig) -> Result<Self, Self::Error> {
-        let (_, _, private_identity) = config.get_key_objects(None)?;
+        let (_, _, private_identity, _) = config.get_key_objects(None)?;
         let validator_host = (&config
             .config
             .validator_network
