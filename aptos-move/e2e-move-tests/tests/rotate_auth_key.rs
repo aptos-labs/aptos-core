@@ -14,18 +14,17 @@ use e2e_move_tests::{assert_success, enable_golden, MoveHarness};
 use move_deps::move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
 
+// This struct includes TypeInfo (account_address, module_name, and struct_name)
+// and RotationProof-specific information (sequence_number, originator, current_auth_key, and new_public_key)
 #[derive(Serialize, Deserialize)]
-struct OriginatingAddress {
-    handle: u128,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Proof {
+struct RotationProof {
     account_address: AccountAddress,
     module_name: String,
     struct_name: String,
+    sequence_number: u64,
     originator: AccountAddress,
     current_auth_key: AccountAddress,
+    new_public_key: Vec<u8>,
 }
 
 #[test]
@@ -39,25 +38,35 @@ fn rotate_auth_key() {
     let new_public_key = new_private_key.public_key();
     let new_auth_key = AuthenticationKey::ed25519(&new_public_key);
 
-    let rotation_proof = Proof {
+    // create an instance of RotationProof that includes information about the current account
+    // and the new public key
+    let rotation_proof = RotationProof {
         account_address: CORE_CODE_ADDRESS,
         module_name: String::from("account"),
         struct_name: String::from("RotationProof"),
+        sequence_number: 10,
         originator: *account1.address(),
         current_auth_key: AccountAddress::from_bytes(&account1.auth_key()).unwrap(),
+        new_public_key: new_public_key.to_bytes().to_vec(),
     };
 
-    let msg = bcs::to_bytes(&rotation_proof);
-    let signature = new_private_key.sign_arbitrary_message(&msg.unwrap());
+    let rotation_msg = bcs::to_bytes(&rotation_proof);
+
+    // sign the struct using both the current private key and the next private key
+    let rotation_proof_signed_by_current_private_key = account1.privkey.sign_arbitrary_message(&rotation_msg.clone().unwrap());
+    let rotation_proof_signed_by_new_private_key = new_private_key.sign_arbitrary_message(&rotation_msg.unwrap());
 
     assert_success!(harness.run_transaction_payload(
         &account1,
         aptos_stdlib::account_rotate_authentication_key_ed25519(
-            signature.to_bytes().to_vec(),
+            rotation_proof_signed_by_current_private_key.to_bytes().to_vec(),
+            rotation_proof_signed_by_new_private_key.to_bytes().to_vec(),
+            account1.pubkey.to_bytes().to_vec(),
             new_public_key.to_bytes().to_vec(),
         )
     ));
 
+    // get the address redirection table
     let originating_address_handle = harness
         .read_resource::<TableHandle>(
             &CORE_CODE_ADDRESS,
@@ -68,6 +77,7 @@ fn rotate_auth_key() {
         originating_address_handle,
         AccountAddress::from_bytes(new_auth_key).unwrap().to_vec(),
     );
+    // verify that the value in the address redirection table is expected
     let result = harness.read_state_value(state_key).unwrap();
     assert_eq!(result, address.to_vec());
 }
