@@ -21,7 +21,6 @@ members = [
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/parallel-executor",
-    "aptos-move/transaction-replay",
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
     "aptos-node",
@@ -127,7 +126,6 @@ members = [
 #
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
-    "aptos-move/transaction-replay",
     "aptos-node",
     "consensus/safety-rules",
     "crates/aptos",
