@@ -759,12 +759,6 @@ impl AptosVM {
             Err(e) => return e,
         };
 
-        let (delta_change_set, change_set) = change_set_ext.into_inner();
-        if let Err(e) = self.read_writeset(storage, change_set.write_set()) {
-            // Any error at this point would be an invalid writeset
-            return Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET)));
-        };
-
         // Run the epilogue function.
         let mut session = self.0.new_session(storage, SessionId::txn_meta(&txn_data));
         self.0.run_writeset_epilogue(
@@ -773,6 +767,12 @@ impl AptosVM {
             writeset_payload.should_trigger_reconfiguration_by_default(),
             log_context,
         )?;
+
+        let (delta_change_set, change_set) = change_set_ext.into_inner();
+        if let Err(e) = self.read_writeset(storage, change_set.write_set()) {
+            // Any error at this point would be an invalid writeset
+            return Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET)));
+        };
 
         let session_out = session.finish().map_err(|e| e.into_vm_status())?;
         let (epilogue_delta_change_set, epilogue_change_set) =
