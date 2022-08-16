@@ -11,17 +11,18 @@ class ProjectsController < ApplicationController
 
   # GET /projects
   def index
-    @projects = Project.where(public: true)
+    @categories = Category.all.index_by(&:id)
+    @projects = Project.where(public: true).includes(:project_categories)
 
     selected_category = params[:category]&.to_i
     @projects = @projects.filter_by_category(selected_category) if selected_category
 
     @groups = @projects.each_with_object({}) do |project, groups|
-      project.categories.each do |category|
-        (groups[category] ||= []) << project
+      project.project_categories.each do |project_category|
+        (groups[project_category.category_id] ||= []) << project
       end
     end
-    @groups.delete_if { |category| category.id != selected_category } if selected_category
+    @groups.delete_if { |category_id| category_id != selected_category } if selected_category
   end
 
   # GET /projects/1
