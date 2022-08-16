@@ -57,8 +57,12 @@ impl AptosTelemetryServiceArgs {
 
         let cache = ValidatorSetCache::new(aptos_infallible::RwLock::new(HashMap::new()));
 
-        let gcp_bigquery_client =
-            Client::from_service_account_key_file(&config.gcp_sa_key_file).await;
+        let gcp_bigquery_client = Client::from_service_account_key_file(
+            env::var("GOOGLE_APPLICATION_CREDENTIALS")
+                .expect("environment variable GOOGLE_APPLICATION_CREDENTIALS must be set")
+                .as_str(),
+        )
+        .await;
 
         let victoria_metrics_client = VictoriaMetricsClient::new(
             Url::parse(&config.victoria_metrics_base_url)
@@ -109,7 +113,6 @@ pub struct TelemetryServiceConfig {
     pub server_private_key: ConfigKey<x25519::PrivateKey>,
     pub jwt_signing_key: String,
     pub update_interval: u64,
-    pub gcp_sa_key_file: String,
     pub gcp_bq_config: GCPBigQueryConfig,
     pub victoria_metrics_base_url: String,
     pub victoria_metrics_token: String,
