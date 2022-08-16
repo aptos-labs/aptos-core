@@ -22,7 +22,7 @@ pub use report::*;
 mod github;
 pub use github::*;
 
-pub mod perf_success_criteria;
 mod slack;
+pub mod success_criteria;
 
 pub use slack::*;

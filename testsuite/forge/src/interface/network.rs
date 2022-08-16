@@ -4,7 +4,7 @@
 use std::time::Duration;
 
 use super::Test;
-use crate::perf_success_criteria::SuccessCriteria;
+use crate::success_criteria::SuccessCriteria;
 use crate::{CoreContext, Result, Swarm, TestReport};
 use transaction_emitter_lib::{EmitJobRequest, TxnStats};
 
