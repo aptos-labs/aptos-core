@@ -457,6 +457,11 @@ module aptos_framework::account {
         borrow_global_mut<Account>(addr).sequence_number = s;
     }
 
+    #[test_only]
+    public fun create_test_signer_cap(account: address): SignerCapability {
+        SignerCapability { account }
+    }
+
     #[test]
     /// Verify test-only sequence number mocking
     public entry fun mock_sequence_numbers()
