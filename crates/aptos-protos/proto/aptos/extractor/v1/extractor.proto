@@ -3,11 +3,11 @@
 
 syntax = "proto3";
 
-option go_package = "github.com/streamingfast/firehose-aptos/types/pb/sf/aptos/type/v1;pbaptos";
-
-import "timestamp.proto";
-
 package aptos.extractor.v1;
+
+option go_package = "github.com/streamingfast/firehose-aptos/types/pb/aptos/extractor/v1;pbaptos";
+
+import "aptos/util/timestamp/timestamp.proto";
 
 // A block on Aptos holds transactions in chronological order (ordered by a transactions monotonically increasing `version` field)
 // All blocks start with a `BlockMetadataTransaction`, and are followed by zero or more transactions.
