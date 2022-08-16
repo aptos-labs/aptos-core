@@ -15,6 +15,7 @@ class Project < ApplicationRecord
     forum_url: 'forum.aptoslabs.com'
   }.freeze
 
+  belongs_to :user
   has_many :project_categories, dependent: :destroy
   has_many :categories, through: :project_categories
   has_many :project_members, dependent: :destroy

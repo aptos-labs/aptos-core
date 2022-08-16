@@ -16,9 +16,33 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     ProjectsController.any_instance.stubs(:verify_recaptcha).returns(true)
   end
 
+  test 'view project' do
+    project = FactoryBot.create(:project, user: @user)
+    get project_path(project)
+    assert_response :success
+  end
+
+  test 'view private project fails if current user is not the creator' do
+    project = FactoryBot.create(:project, user: FactoryBot.create(:user), public: false)
+    get project_path(project)
+    assert_response :forbidden
+  end
+
   test 'new project page' do
     get new_project_path
     assert_response :success
+  end
+
+  test 'edit project page' do
+    project = FactoryBot.create(:project, user: @user)
+    get edit_project_path(project)
+    assert_response :success
+  end
+
+  test 'edit project page fails if current user is not the creator' do
+    project = FactoryBot.create(:project, user: FactoryBot.create(:user))
+    get edit_project_path(project)
+    assert_response :forbidden
   end
 
   test 'create new project' do
@@ -50,11 +74,13 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
       } }
     end
 
-    assert_redirected_to project_path(Project.last)
+    project = Project.last
+    assert_redirected_to project_path(project)
+    assert_equal @user, project.user
   end
 
   test 'update existing project' do
-    project = FactoryBot.create(:project)
+    project = FactoryBot.create(:project, user: @user)
     assert_equal true, project.public
 
     patch project_path(project), params: { project: {
@@ -66,9 +92,31 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     assert_equal false, project.public
   end
 
-  test 'view project' do
-    project = FactoryBot.create(:project)
-    get project_path(project)
-    assert_response :success
+  test 'update existing project fails if current user is not the creator' do
+    project = FactoryBot.create(:project, user: FactoryBot.create(:user))
+    patch project_path(project), params: { project: {
+      public: true
+    } }
+    assert_response :forbidden
+  end
+
+  test 'delete existing project' do
+    project = FactoryBot.create(:project, user: @user)
+
+    assert_difference('Project.count', -1) do
+      delete project_path(project)
+    end
+
+    assert_redirected_to projects_path
+  end
+
+  test 'delete existing project fails if current user is not the creator' do
+    project = FactoryBot.create(:project, user: FactoryBot.create(:user))
+
+    assert_no_difference('Project.count') do
+      delete project_path(project)
+    end
+
+    assert_response :forbidden
   end
 end

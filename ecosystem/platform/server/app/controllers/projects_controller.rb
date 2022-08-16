@@ -7,16 +7,18 @@ class ProjectsController < ApplicationController
   before_action :authenticate_user!
   before_action :ensure_projects_enabled!
   before_action :ensure_confirmed!
-  before_action :set_project, only: %i[show edit update destroy]
   respond_to :html
 
   # GET /projects
   def index
-    @projects = Project.all
+    @projects = Project.where(public: true).all
   end
 
   # GET /projects/1
-  def show; end
+  def show
+    @project = Project.find(params[:id])
+    head :forbidden if @project.user_id != current_user.id && !@project.public
+  end
 
   # GET /projects/new
   def new
@@ -27,11 +29,16 @@ class ProjectsController < ApplicationController
   end
 
   # GET /projects/1/edit
-  def edit; end
+  def edit
+    @project = Project.find(params[:id])
+    head :forbidden unless @project.user_id == current_user.id
+  end
 
   # POST /projects
   def create
-    @project = Project.new(project_params)
+    params = project_params
+    params[:user] = current_user
+    @project = Project.new(params)
 
     return unless check_recaptcha
 
@@ -46,6 +53,9 @@ class ProjectsController < ApplicationController
   def update
     return unless check_recaptcha
 
+    @project = Project.find(params[:id])
+    return head :forbidden unless @project.user_id == current_user.id
+
     if @project.update(project_params)
       redirect_to project_url(@project), notice: 'Project was successfully updated.'
     else
@@ -55,17 +65,15 @@ class ProjectsController < ApplicationController
 
   # DELETE /projects/1
   def destroy
+    @project = Project.find(params[:id])
+    return head :forbidden unless @project.user_id == current_user.id
+
     @project.destroy
 
     redirect_to projects_url, notice: 'Project was successfully destroyed.'
   end
 
   private
-
-  # Use callbacks to share common setup or constraints between actions.
-  def set_project
-    @project = Project.find(params[:id])
-  end
 
   # Only allow a list of trusted parameters through.
   def project_params
