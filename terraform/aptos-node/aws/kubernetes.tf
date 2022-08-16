@@ -29,6 +29,23 @@ resource "kubernetes_storage_class" "gp3" {
   depends_on = [null_resource.delete-gp2, aws_eks_addon.aws-ebs-csi-driver]
 }
 
+resource "kubernetes_storage_class" "gp3-maxiops" {
+  metadata {
+    name = "gp3-maxiops"
+    annotations = {
+      "storageclass.kubernetes.io/is-default-class" = false
+    }
+  }
+  storage_provisioner = "ebs.csi.aws.com"
+  volume_binding_mode = "WaitForFirstConsumer"
+  parameters = {
+    type = "gp3"
+    iops = "16000"
+  }
+
+  depends_on = [null_resource.delete-gp2, aws_eks_addon.aws-ebs-csi-driver]
+}
+
 resource "kubernetes_storage_class" "io1" {
   metadata {
     name = "io1"
