@@ -88,6 +88,8 @@ const sidebars = {
           collapsible: true,
           collapsed: true,
           items: [
+            "nodes/ait/whats-new-in-ait3",
+            "nodes/ait/steps-in-ait3",
             "nodes/ait/node-requirements",
             "nodes/ait/node-liveness-criteria",
             "nodes/ait/connect-to-testnet",
