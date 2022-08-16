@@ -16,7 +16,14 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
     ProjectsController.any_instance.stubs(:verify_recaptcha).returns(true)
   end
 
+  test 'view all projects' do
+    sign_out @user
+    get projects_path
+    assert_response :success
+  end
+
   test 'view project' do
+    sign_out @user
     project = FactoryBot.create(:project, user: @user)
     get project_path(project)
     assert_response :success
@@ -61,9 +68,7 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
         linkedin_url: Faker::Internet.url(host: 'linkedin.com'),
         youtube_url: Faker::Internet.url(host: 'www.youtube.com'),
         thumbnail: Rack::Test::UploadedFile.new('public/favicon.png', 'image/png'),
-        project_categories_attributes: [
-          { category_id: category.id }
-        ],
+        category_ids: [category.id],
         project_members_attributes: [
           { user_id: @user.id, role: 'admin', public: true }
         ],
