@@ -47,26 +47,27 @@ fn rpc_request() -> bcs::Result<()> {
 }
 
 #[test]
-fn libranet_wire_test_vectors() {
-    let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
+fn aptosnet_wire_test_vectors() {
+    let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: ProtocolId::MempoolDirectSend,
         priority: 0,
         raw_msg: Vec::from("hello world"),
-    });
+    }));
     let message_bytes = [
-        // [0, 0, 0, 15] -> frame length
+        // [0, 0, 0, 16] -> frame length
+        // [0] -> multiplex message type
         // [3] -> network message type
         // [2] -> protocol_id
         // [0] -> priority
         // [11] -> raw message length
         // [104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100] -> raw message bytes
-        0_u8, 0, 0, 15, 3, 2, 0, 11, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100,
+        0_u8, 0, 0, 16, 0, 3, 2, 0, 11, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100,
     ];
 
     // test reading and deserializing gives us the expected message
 
     let socket_rx = ReadOnlyTestSocket::new(&message_bytes);
-    let message_rx = NetworkMessageStream::new(socket_rx, 128, None);
+    let message_rx = MultiplexMessageStream::new(socket_rx, 128, None);
 
     let recv_messages = block_on(message_rx.collect::<Vec<_>>());
     let recv_messages = recv_messages
@@ -81,7 +82,7 @@ fn libranet_wire_test_vectors() {
     let mut write_buf = Vec::new();
     socket_tx.save_writing(&mut write_buf);
 
-    let mut message_tx = NetworkMessageSink::new(socket_tx, 128, None);
+    let mut message_tx = MultiplexMessageSink::new(socket_tx, 128, None);
     block_on(message_tx.send(&message)).unwrap();
 
     assert_eq!(&write_buf, &message_bytes);
@@ -90,15 +91,15 @@ fn libranet_wire_test_vectors() {
 #[test]
 fn send_fails_when_larger_than_frame_limit() {
     let (memsocket_tx, _memsocket_rx) = MemorySocket::new_pair();
-    let mut message_tx = NetworkMessageSink::new(memsocket_tx, 64, None);
+    let mut message_tx = MultiplexMessageSink::new(memsocket_tx, 64, None);
 
     // attempting to send an outbound message larger than your frame size will
     // return an Err
-    let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
+    let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: ProtocolId::ConsensusRpcBcs,
         priority: 0,
         raw_msg: vec![0; 123],
-    });
+    }));
     block_on(message_tx.send(&message)).unwrap_err();
 }
 
@@ -106,15 +107,15 @@ fn send_fails_when_larger_than_frame_limit() {
 fn recv_fails_when_larger_than_frame_limit() {
     let (memsocket_tx, memsocket_rx) = MemorySocket::new_pair();
     // sender won't error b/c their max frame size is larger
-    let mut message_tx = NetworkMessageSink::new(memsocket_tx, 128, None);
+    let mut message_tx = MultiplexMessageSink::new(memsocket_tx, 128, None);
     // receiver will reject the message b/c the frame size is > 64 bytes max
-    let mut message_rx = NetworkMessageStream::new(memsocket_rx, 64, None);
+    let mut message_rx = MultiplexMessageStream::new(memsocket_rx, 64, None);
 
-    let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
+    let message = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: ProtocolId::ConsensusRpcBcs,
         priority: 0,
         raw_msg: vec![0; 80],
-    });
+    }));
     let f_send = message_tx.send(&message);
     let f_recv = message_rx.next();
 
@@ -165,13 +166,14 @@ fn arb_direct_send_msg(max_frame_size: usize) -> impl Strategy<Value = DirectSen
     })
 }
 
-fn arb_network_message(max_frame_size: usize) -> impl Strategy<Value = NetworkMessage> {
+fn arb_multiplex_message(max_frame_size: usize) -> impl Strategy<Value = MultiplexMessage> {
     prop_oneof![
         any::<ErrorCode>().prop_map(NetworkMessage::Error),
         arb_rpc_request(max_frame_size).prop_map(NetworkMessage::RpcRequest),
         arb_rpc_response(max_frame_size).prop_map(NetworkMessage::RpcResponse),
         arb_direct_send_msg(max_frame_size).prop_map(NetworkMessage::DirectSendMsg),
     ]
+    .prop_map(MultiplexMessage::Message)
     .prop_filter("larger than max frame size", move |msg| {
         bcs::serialized_size(&msg).unwrap() <= max_frame_size
     })
@@ -189,7 +191,7 @@ proptest! {
     /// other and fully preserve the NetworkMessages being sent
     #[test]
     fn network_message_socket_roundtrip(
-        messages in vec(arb_network_message(128), 1..20),
+        messages in vec(arb_multiplex_message(128), 1..20),
         fragmented_read in any::<bool>(),
         fragmented_write in any::<bool>(),
     ) {
@@ -202,8 +204,8 @@ proptest! {
             socket_tx.set_fragmented_write();
         }
 
-        let mut message_tx = NetworkMessageSink::new(socket_tx, 128, None);
-        let message_rx = NetworkMessageStream::new(socket_rx, 128, None);
+        let mut message_tx = MultiplexMessageSink::new(socket_tx, 128, None);
+        let message_rx = MultiplexMessageStream::new(socket_rx, 128, None);
 
         let f_send_all = async {
             for message in &messages {

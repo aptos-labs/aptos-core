@@ -51,7 +51,6 @@ use crate::{
     },
     logging::NetworkSchema,
     peer::PeerNotification,
-    peer_manager::PeerManagerError,
     protocols::{
         network::SerializedRequest,
         wire::messaging::v1::{NetworkMessage, Priority, RequestId, RpcRequest, RpcResponse},
@@ -297,10 +296,7 @@ impl InboundRpcs {
     /// the outbound write queue.
     pub async fn send_outbound_response(
         &mut self,
-        write_reqs_tx: &mut channel::Sender<(
-            NetworkMessage,
-            oneshot::Sender<Result<(), PeerManagerError>>,
-        )>,
+        write_reqs_tx: &mut channel::Sender<NetworkMessage>,
         maybe_response: Result<RpcResponse, RpcError>,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;
@@ -322,8 +318,7 @@ impl InboundRpcs {
             response.request_id,
         );
         let message = NetworkMessage::RpcResponse(response);
-        let (ack_tx, _) = oneshot::channel();
-        write_reqs_tx.send((message, ack_tx)).await?;
+        write_reqs_tx.send(message).await?;
 
         // Collect counters for sent response.
         counters::rpc_messages(network_context, RESPONSE_LABEL, SENT_LABEL).inc();
@@ -384,10 +379,7 @@ impl OutboundRpcs {
     pub async fn handle_outbound_request(
         &mut self,
         request: OutboundRpcRequest,
-        write_reqs_tx: &mut channel::Sender<(
-            NetworkMessage,
-            oneshot::Sender<Result<(), PeerManagerError>>,
-        )>,
+        write_reqs_tx: &mut channel::Sender<NetworkMessage>,
     ) -> Result<(), RpcError> {
         let network_context = &self.network_context;
         let peer_id = &self.remote_peer_id;
@@ -438,8 +430,7 @@ impl OutboundRpcs {
             priority: Priority::default(),
             raw_request: Vec::from(request_data.as_ref()),
         });
-        let (ack_tx, _) = oneshot::channel();
-        write_reqs_tx.send((message, ack_tx)).await?;
+        write_reqs_tx.send(message).await?;
 
         // Collect counters for requests sent.
         counters::rpc_messages(network_context, REQUEST_LABEL, SENT_LABEL).inc();
