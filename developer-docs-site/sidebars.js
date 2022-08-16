@@ -27,6 +27,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
+        "tutorials/first-transaction-sdk",
         "tutorials/first-transaction",
         "tutorials/first-move-module",
         "tutorials/first-dapp",
