@@ -88,7 +88,7 @@ function TransferDrawer() {
   const validRecipient = doesRecipientAccountExist ? recipient : undefined;
 
   const amount = watch('amount');
-  const amountInputFontSize = useMemo(getAmountInputFontSize, [amount]);
+  const amountInputFontSize = useMemo(() => getAmountInputFontSize(amount), [amount]);
   const debouncedAmount = useDebounce(amount, 500);
   const amountNumeral = numeral(debouncedAmount).format('0,0');
 
