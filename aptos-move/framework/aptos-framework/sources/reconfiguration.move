@@ -132,6 +132,10 @@ module aptos_framework::reconfiguration {
         borrow_global<Configuration>(@aptos_framework).last_reconfiguration_time
     }
 
+    public fun current_epoch(): u64 acquires Configuration {
+        borrow_global<Configuration>(@aptos_framework).epoch
+    }
+
     /// Emit a `NewEpochEvent` event. This function will be invoked by genesis directly to generate the very first
     /// reconfiguration event.
     fun emit_genesis_reconfiguration_event() acquires Configuration {

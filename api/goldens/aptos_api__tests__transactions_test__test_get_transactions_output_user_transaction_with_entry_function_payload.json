@@ -50,6 +50,19 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::state_storage::StateStorageUsage",
+          "data": {
+            "bytes": "278613",
+            "epoch": "1",
+            "items": "96"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "500000"

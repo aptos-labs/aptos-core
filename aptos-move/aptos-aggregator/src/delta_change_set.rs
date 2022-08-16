@@ -187,6 +187,7 @@ impl ::std::iter::IntoIterator for DeltaChangeSet {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_state_view::state_storage_usage::StateStorageUsage;
     use claim::{assert_err, assert_matches, assert_ok_eq};
     use once_cell::sync::Lazy;
     use std::collections::HashMap;
@@ -231,6 +232,10 @@ mod tests {
 
         fn is_genesis(&self) -> bool {
             self.data.is_empty()
+        }
+
+        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+            Ok(StateStorageUsage::new_untracked())
         }
     }
 
