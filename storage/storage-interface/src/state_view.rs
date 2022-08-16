@@ -3,6 +3,7 @@
 
 use crate::DbReader;
 use anyhow::Result;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateView;
 use aptos_types::{state_store::state_key::StateKey, transaction::Version};
 use std::sync::Arc;
@@ -31,6 +32,10 @@ impl StateView for DbStateView {
 
     fn is_genesis(&self) -> bool {
         self.version.is_none()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        self.db.get_state_storage_usage(self.version)
     }
 }
 

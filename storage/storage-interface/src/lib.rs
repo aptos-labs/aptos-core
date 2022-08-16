@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::account_config::NewBlockEvent;
 use aptos_types::state_store::table::{TableHandle, TableInfo};
 use aptos_types::{
@@ -502,6 +503,11 @@ pub trait DbReader: Send + Sync {
 
     /// Returns whether the internal indexer DB has been enabled or not
     fn indexer_enabled(&self) -> bool {
+        unimplemented!()
+    }
+
+    /// Returns state storage usage at the end of an epoch.
+    fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         unimplemented!()
     }
 }

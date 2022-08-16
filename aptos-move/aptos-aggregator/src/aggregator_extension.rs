@@ -563,6 +563,7 @@ fn not_supported_error() -> PartialVMError {
 #[cfg(test)]
 mod test {
     use super::*;
+    use aptos_state_view::state_storage_usage::StateStorageUsage;
     use aptos_state_view::StateView;
     use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
     use claim::{assert_err, assert_matches, assert_ok};
@@ -595,6 +596,10 @@ mod test {
 
         fn is_genesis(&self) -> bool {
             self.data.is_empty()
+        }
+
+        fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+            Ok(StateStorageUsage::new_untracked())
         }
     }
 

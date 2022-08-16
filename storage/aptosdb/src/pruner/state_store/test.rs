@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use aptos_crypto::HashValue;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_temppath::TempPath;
 use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
 use aptos_types::transaction::Version;
@@ -44,7 +45,12 @@ fn put_value_set(
 
     let mut cs = ChangeSet::new();
     state_store
-        .put_value_sets(vec![&value_set], version, &mut cs)
+        .put_value_sets(
+            vec![&value_set],
+            version,
+            StateStorageUsage::new_untracked(),
+            &mut cs,
+        )
         .unwrap();
     db.write_schemas(cs.batch).unwrap();
 
