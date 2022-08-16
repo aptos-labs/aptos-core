@@ -357,12 +357,12 @@ fn bls12381_validatable_pk() {
     // Low-order points were sampled from bls12_381 crate (https://github.com/zkcrypto/bls12_381/blob/main/src/g1.rs)
     // - The first point was convereted from projective to affine coordinates and serialized via `point.to_affine().to_compressed()`.
     // - The second point was in affine coordinates and serialized via `a.to_compressed()`.
-    let points = [
+    let low_order_points = [
         "ae3cd9403b69c20a0d455fd860e977fe6ee7140a7f091f26c860f2caccd3e0a7a7365798ac10df776675b3a67db8faa0",
         "928d4862a40439a67fd76a9c7560e2ff159e770dcf688ff7b2dd165792541c88ee76c82eb77dd6e9e72c89cbf1a56a68",
     ];
 
-    for p in points {
+    for p in low_order_points {
         let point = hex::decode(p).unwrap();
         assert_eq!(point.len(), PublicKey::LENGTH);
 
@@ -576,6 +576,42 @@ fn bls12381_sample_aggregate_pk_and_multisig() {
     println!("let multisigs = vector[");
     for multisig in multisigs {
         println!("    x\"{}\",", multisig);
+    }
+    println!("];");
+}
+
+#[test]
+#[ignore]
+/// Not an actual test: only used to generate test cases for testing the BLS Move module in
+/// aptos-move/framework/move-stdlib/sources/signer.move
+fn bls12381_sample_aggregate_sigs() {
+    let mut rng = OsRng;
+
+    let num = 5;
+    let message = b"Hello, Aptoverse!";
+
+    let mut sigs = vec![];
+    let mut multisigs = vec![];
+
+    for _i in 1..=num {
+        let keypair = KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
+
+        sigs.push(keypair.private_key.sign_arbitrary_message(message));
+
+        multisigs.push(bls12381::Signature::aggregate(sigs.clone()).unwrap());
+    }
+
+    println!("// Signatures of each signer i");
+    println!("let sigs = vector[");
+    for sig in sigs {
+        println!("    signature_from_bytes(x\"{}\"),", sig);
+    }
+    println!("];\n");
+
+    println!("// multisigs[i] is a signature on \"Hello, Aptoverse!\" from signers 1 through i (inclusive)");
+    println!("let multisigs = vector[");
+    for multisig in multisigs {
+        println!("    AggrOrMultiSignature {{ bytes: x\"{}\" }},", multisig);
     }
     println!("];");
 }
