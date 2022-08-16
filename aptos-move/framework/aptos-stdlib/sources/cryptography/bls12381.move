@@ -19,13 +19,13 @@ module aptos_std::bls12381 {
     ///
     /// This struct can be combined with a ProofOfPossession struct in order to create a PublicKeyWithPop struct, which
     /// can be used to verify a multisignature.
-    struct PublicKey has copy, drop, key, store {
+    struct PublicKey has copy, drop, store {
         bytes: vector<u8>
     }
 
     /// A proof-of-possession (PoP).
     /// Given such a struct and a PublicKey struct, one can construct a PublicKeyWithPoP (see below).
-    struct ProofOfPossession has copy, drop, key, store {
+    struct ProofOfPossession has copy, drop, store {
         bytes: vector<u8>
     }
 
@@ -35,19 +35,19 @@ module aptos_std::bls12381 {
     ///   (1) used to verify an aggregate signature
     ///   (2) aggregated with other PublicKeyWithPoP structs into an AggrPublicKeysWithPoP, which in turn can be used
     ///       to verify a multisignature
-    struct PublicKeyWithPoP has copy, drop, key, store {
+    struct PublicKeyWithPoP has copy, drop, store {
         bytes: vector<u8>
     }
 
     /// An aggregation of public keys with verified PoPs, which can be used to verify multisignatures.
-    struct AggrPublicKeysWithPoP has copy, drop, key, store {
+    struct AggrPublicKeysWithPoP has copy, drop, store {
         bytes: vector<u8>
     }
 
     /// A BLS signature. This can be either a:
     ///   (1) normal (non-aggregated) signature
     ///   (2) signature share (for a multisignature or aggregate signature)
-    struct Signature has copy, drop, key, store {
+    struct Signature has copy, drop, store {
         bytes: vector<u8>
     }
 
@@ -58,7 +58,7 @@ module aptos_std::bls12381 {
     /// We distinguish between a Signature type and a AggrOrMultiSignature type to prevent developers from interchangeably
     /// calling `verify_multisignature` and `verify_signature_share` to verify both multisignatures and signature shares,
     /// which could create problems down the line.
-    struct AggrOrMultiSignature has copy, drop, key, store {
+    struct AggrOrMultiSignature has copy, drop, store {
         bytes: vector<u8>
     }
 
