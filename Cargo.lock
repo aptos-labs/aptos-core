@@ -193,6 +193,64 @@ name = "aptos-api"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "aptos-api-test-context",
+ "aptos-api-types",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-genesis",
+ "aptos-global-constants",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics-core",
+ "aptos-proptest-helpers",
+ "aptos-sdk",
+ "aptos-secure-storage",
+ "aptos-state-view",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptosdb",
+ "async-trait",
+ "bcs",
+ "bytes 1.2.1",
+ "cached-framework-packages",
+ "executor",
+ "executor-types",
+ "fail 0.5.0",
+ "futures",
+ "goldenfile",
+ "hex",
+ "hyper 0.14.20",
+ "mempool-notifications",
+ "mime",
+ "move-deps",
+ "once_cell",
+ "paste",
+ "percent-encoding",
+ "poem",
+ "poem-openapi",
+ "proptest",
+ "rand 0.7.3",
+ "regex",
+ "reqwest 0.11.11",
+ "serde 1.0.141",
+ "serde_json",
+ "serde_path_to_error",
+ "storage-interface",
+ "thiserror",
+ "tokio 1.19.2",
+ "url",
+ "vm-validator",
+ "warp",
+ "warp-reverse-proxy",
+]
+
+[[package]]
+name = "aptos-api-test-context"
+version = "0.2.0"
+dependencies = [
+ "anyhow",
+ "aptos-api",
  "aptos-api-types",
  "aptos-config",
  "aptos-crypto",
@@ -267,7 +325,6 @@ dependencies = [
  "serde 1.0.141",
  "serde_json",
  "storage-interface",
- "warp",
 ]
 
 [[package]]
@@ -410,6 +467,7 @@ dependencies = [
  "aptos-logger",
  "aptos-rest-client",
  "aptos-sdk",
+ "aptos-warp-webserver",
  "bcs",
  "bytes 1.2.1",
  "clap 3.2.16",
@@ -919,7 +977,6 @@ name = "aptos-rosetta"
 version = "0.0.1"
 dependencies = [
  "anyhow",
- "aptos-api",
  "aptos-config",
  "aptos-crypto",
  "aptos-logger",
@@ -929,6 +986,7 @@ dependencies = [
  "aptos-sdk",
  "aptos-transaction-builder",
  "aptos-types",
+ "aptos-warp-webserver",
  "async-trait",
  "bcs",
  "clap 3.2.16",
@@ -1049,6 +1107,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-api",
+ "aptos-api-test-context",
  "aptos-api-types",
  "aptos-config",
  "aptos-crypto",
@@ -1359,6 +1418,21 @@ dependencies = [
  "serde_json",
  "smallvec",
  "tracing",
+]
+
+[[package]]
+name = "aptos-warp-webserver"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-api-types",
+ "aptos-config",
+ "aptos-logger",
+ "bcs",
+ "hyper 0.14.20",
+ "serde 1.0.141",
+ "serde_json",
+ "warp",
 ]
 
 [[package]]
