@@ -142,7 +142,7 @@ variable "helm_enable_validator" {
 
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
-  default     = "t3.medium"
+  default     = "t4g.medium"
 }
 
 variable "utility_instance_num" {
@@ -162,7 +162,7 @@ variable "utility_instance_max_num" {
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c5.xlarge"
+  default     = "c6i.4xlarge"
 }
 
 variable "validator_instance_num" {
