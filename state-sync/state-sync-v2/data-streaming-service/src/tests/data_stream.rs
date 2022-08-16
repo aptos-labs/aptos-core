@@ -527,8 +527,8 @@ fn create_data_stream(
         .unwrap()],
     };
 
-    // Create a aptos data client mock and notification generator
-    let aptos_data_client = MockAptosDataClient::new(false);
+    // Create an aptos data client mock and notification generator
+    let aptos_data_client = MockAptosDataClient::new(false, false, false);
     let notification_generator = Arc::new(U64IdGenerator::new());
 
     // Return the data stream and listener pair
