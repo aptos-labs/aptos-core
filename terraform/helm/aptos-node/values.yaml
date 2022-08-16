@@ -5,6 +5,8 @@ chain:
   era: 1
   # -- Chain ID
   chain_id: 4
+  # -- Epoch duration
+  epoch_duration_secs: 600
 
 # -- Default image tag to use for all validator and fullnode images
 imageTag: devnet
