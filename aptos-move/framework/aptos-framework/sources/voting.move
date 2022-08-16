@@ -33,10 +33,13 @@ module aptos_framework::voting {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_context;
 
-    /// Error codes.
+    /// Current script's execution has does not match the specified proposal's.
     const EPROPOSAL_EXECUTION_HASH_NOT_MATCHING: u64 = 1;
+    /// Proposal cannot be resolved. Either voting duration has not passed, not enough votes, or fewer yes than no votes
     const EPROPOSAL_CANNOT_BE_RESOLVED: u64 = 2;
+    /// Proposal cannot be resolved more than once.
     const EPROPOSAL_ALREADY_RESOLVED: u64 = 3;
+    /// Proposal cannot contain an empty execution script hash.
     const EPROPOSAL_EMPTY_EXECUTION_HASH: u64 = 4;
 
     /// ProposalStateEnum representing proposal state.

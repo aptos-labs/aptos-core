@@ -8,11 +8,6 @@
 module aptos_std::table {
     friend aptos_std::table_with_length;
 
-    // native code raises this with error::invalid_arguments()
-    const EALREADY_EXISTS: u64 = 100;
-    // native code raises this with error::invalid_arguments()
-    const ENOT_FOUND: u64 = 101;
-
     /// Type of tables
     struct Table<phantom K: copy + drop, phantom V> has store {
         handle: u128,

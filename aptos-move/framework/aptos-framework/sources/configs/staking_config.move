@@ -6,12 +6,13 @@ module aptos_framework::staking_config {
 
     friend aptos_framework::genesis;
 
-    /// Invalid required stake lockup value.
-    const EINVALID_LOCKUP_VALUE: u64 = 1;
-    /// Invalid rewards rate.
-    const EINVALID_REWARDS_RATE: u64 = 2;
-    /// Invalid required stake range, usually happens if min > max.
+    /// Stake lockup duration cannot be zero
+    const EZERO_LOCKUP_DURATION: u64 = 1;
+    /// Reward rate denominator cannot be zero
+    const EZERO_REWARDS_RATE_DENOMINATOR: u64 = 2;
+    /// Specified stake range is invalid. Max must be greater than min
     const EINVALID_STAKE_RANGE: u64 = 3;
+    /// The voting power increase limit percentage must be within (0, 50]
     const EINVALID_VOTING_POWER_INCREASE_LIMIT: u64 = 4;
 
     /// Validator set configurations that will be stored with the @aptos_framework account.
@@ -56,7 +57,7 @@ module aptos_framework::staking_config {
 
         assert!(
             rewards_rate_denominator > 0,
-            error::invalid_argument(EINVALID_REWARDS_RATE),
+            error::invalid_argument(EZERO_REWARDS_RATE_DENOMINATOR),
         );
 
         assert!(
@@ -126,7 +127,7 @@ module aptos_framework::staking_config {
         aptos_framework: &signer,
         new_recurring_lockup_duration_secs: u64,
     ) acquires StakingConfig {
-        assert!(new_recurring_lockup_duration_secs > 0, error::invalid_argument(EINVALID_LOCKUP_VALUE));
+        assert!(new_recurring_lockup_duration_secs > 0, error::invalid_argument(EZERO_LOCKUP_DURATION));
         system_addresses::assert_aptos_framework(aptos_framework);
 
         let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
@@ -143,7 +144,7 @@ module aptos_framework::staking_config {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(
             new_rewards_rate_denominator > 0,
-            error::invalid_argument(EINVALID_REWARDS_RATE),
+            error::invalid_argument(EZERO_REWARDS_RATE_DENOMINATOR),
         );
 
         let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);

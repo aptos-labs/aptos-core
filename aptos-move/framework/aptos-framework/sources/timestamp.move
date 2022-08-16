@@ -26,7 +26,7 @@ module aptos_framework::timestamp {
     /// The blockchain is not in an operating state yet
     const ENOT_OPERATING: u64 = 1;
     /// An invalid timestamp was provided
-    const ETIMESTAMP: u64 = 2;
+    const EINVALID_TIMESTAMP: u64 = 2;
 
     /// Marks that time has started and genesis has finished. This can only be called from genesis and with the
     /// aptos framework account.
@@ -55,10 +55,10 @@ module aptos_framework::timestamp {
         let now = global_timer.microseconds;
         if (proposer == @vm_reserved) {
             // NIL block with null address as proposer. Timestamp must be equal.
-            assert!(now == timestamp, error::invalid_argument(ETIMESTAMP));
+            assert!(now == timestamp, error::invalid_argument(EINVALID_TIMESTAMP));
         } else {
             // Normal block. Time must advance
-            assert!(now < timestamp, error::invalid_argument(ETIMESTAMP));
+            assert!(now < timestamp, error::invalid_argument(EINVALID_TIMESTAMP));
         };
         global_timer.microseconds = timestamp;
     }
@@ -94,7 +94,7 @@ module aptos_framework::timestamp {
     public fun update_global_time_for_test(timestamp_microsecs: u64) acquires CurrentTimeMicroseconds {
         let global_timer = borrow_global_mut<CurrentTimeMicroseconds>(@aptos_framework);
         let now = global_timer.microseconds;
-        assert!(now < timestamp_microsecs, error::invalid_argument(ETIMESTAMP));
+        assert!(now < timestamp_microsecs, error::invalid_argument(EINVALID_TIMESTAMP));
         global_timer.microseconds = timestamp_microsecs;
     }
 

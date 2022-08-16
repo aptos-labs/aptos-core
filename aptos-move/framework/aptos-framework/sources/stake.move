@@ -1503,7 +1503,7 @@ module aptos_framework::stake {
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
-    #[expected_failure(abort_code = 0x10005)]
+    #[expected_failure(abort_code = 0x10006)]
     public entry fun test_active_validator_unlocking_more_than_available_stake_should_error_out(
         aptos_framework: signer,
         validator: signer,

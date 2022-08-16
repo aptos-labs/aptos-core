@@ -17,10 +17,6 @@ module aptos_framework::genesis {
     use aptos_framework::staking_config;
     use aptos_framework::version;
 
-    /// Invalid epoch duration.
-    const EINVALID_EPOCH_DURATION: u64 = 1;
-    const EINVALID_ADDRESSES: u64 = 2;
-
     struct ValidatorConfiguration has copy, drop {
         owner_address: address,
         operator_address: address,

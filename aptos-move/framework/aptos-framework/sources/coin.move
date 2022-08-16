@@ -15,35 +15,35 @@ module aptos_framework::coin {
     // Errors.
     //
 
-    /// When address of account which is used to initilize a coin `CoinType`
-    /// doesn't match the deployer of module containining `CoinType`.
-    const ECOIN_INFO_ADDRESS_MISMATCH: u64 = 0;
+    /// Address of account which is used to initialize a coin `CoinType` doesn't match the deployer of module
+    const ECOIN_INFO_ADDRESS_MISMATCH: u64 = 1;
 
-    /// When `CoinType` is already initilized as a coin.
-    const ECOIN_INFO_ALREADY_PUBLISHED: u64 = 1;
+    /// `CoinType` is already initialized as a coin
+    const ECOIN_INFO_ALREADY_PUBLISHED: u64 = 2;
 
-    /// When `CoinType` hasn't been initialized as a coin.
-    const ECOIN_INFO_NOT_PUBLISHED: u64 = 2;
+    /// `CoinType` hasn't been initialized as a coin
+    const ECOIN_INFO_NOT_PUBLISHED: u64 = 3;
 
-    /// When an account already has `CoinStore` registered for `CoinType`.
-    const ECOIN_STORE_ALREADY_PUBLISHED: u64 = 3;
+    /// Account already has `CoinStore` registered for `CoinType`
+    const ECOIN_STORE_ALREADY_PUBLISHED: u64 = 4;
 
-    /// When an account hasn't registered `CoinStore` for `CoinType`.
-    const ECOIN_STORE_NOT_PUBLISHED: u64 = 4;
+    /// Account hasn't registered `CoinStore` for `CoinType`
+    const ECOIN_STORE_NOT_PUBLISHED: u64 = 5;
 
-    /// When there's not enough funds to withdraw from an account or from `Coin` resource.
-    const EINSUFFICIENT_BALANCE: u64 = 5;
+    /// Not enough coins to complete transaction
+    const EINSUFFICIENT_BALANCE: u64 = 6;
 
-    /// When destruction of `Coin` resource contains non-zero value attempted.
-    const EDESTRUCTION_OF_NONZERO_TOKEN: u64 = 6;
+    /// Cannot destroy non-zero coins
+    const EDESTRUCTION_OF_NONZERO_TOKEN: u64 = 7;
 
-    /// Total supply of the coin overflows. No additional coins can be minted.
-    const ETOTAL_SUPPLY_OVERFLOW: u64 = 7;
+    /// Total supply of the coin has overflown. No additional coins can be minted
+    const ETOTAL_SUPPLY_OVERFLOW: u64 = 8;
 
-    const EINVALID_COIN_AMOUNT: u64 = 8;
+    /// Coin amount cannot be zero
+    const EZERO_COIN_AMOUNT: u64 = 9;
 
-    /// Coins cannot be deposited or withdrawn from this CoinStore.
-    const EFROZEN: u64 = 9;
+    /// CoinStore is frozen. Coins cannot be deposited or withdrawn
+    const EFROZEN: u64 = 10;
 
     const MAX_U128: u128 = 340282366920938463463374607431768211455;
 
@@ -156,7 +156,7 @@ module aptos_framework::coin {
         _cap: &BurnCapability<CoinType>,
     ) acquires CoinInfo {
         let Coin { value: amount } = coin;
-        assert!(amount > 0, error::invalid_argument(EINVALID_COIN_AMOUNT));
+        assert!(amount > 0, error::invalid_argument(EZERO_COIN_AMOUNT));
 
         let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
         if (option::is_some(supply)) {
@@ -505,7 +505,7 @@ module aptos_framework::coin {
     }
 
     #[test(source = @0x2)]
-    #[expected_failure(abort_code = 0x10000)]
+    #[expected_failure(abort_code = 0x10001)]
     public fun fail_initialize(source: signer) {
         let (burn_cap, freeze_cap, mint_cap) = initialize<FakeMoney>(
             &source,
@@ -523,7 +523,7 @@ module aptos_framework::coin {
     }
 
     #[test(source = @0x1, destination = @0x2)]
-    #[expected_failure(abort_code = 0x60004)]
+    #[expected_failure(abort_code = 0x60005)]
     public entry fun fail_transfer(
         source: signer,
         destination: signer,
@@ -584,7 +584,7 @@ module aptos_framework::coin {
     }
 
     #[test(source = @0x1)]
-    #[expected_failure(abort_code = 0x10006)]
+    #[expected_failure(abort_code = 0x10007)]
     public fun test_destroy_non_zero(
         source: signer,
     ) acquires CoinInfo {
@@ -693,7 +693,7 @@ module aptos_framework::coin {
     }
 
     #[test(account = @0x1)]
-    #[expected_failure(abort_code = 0x50009)]
+    #[expected_failure(abort_code = 0x5000A)]
     public entry fun withdraw_frozen(account: signer) acquires CoinStore {
         let account_addr = signer::address_of(&account);
 
@@ -718,7 +718,7 @@ module aptos_framework::coin {
     }
 
     #[test(account = @0x1)]
-    #[expected_failure(abort_code = 0x50009)]
+    #[expected_failure(abort_code = 0x5000A)]
     public entry fun deposit_frozen(account: signer) acquires CoinInfo, CoinStore {
         let account_addr = signer::address_of(&account);
 
