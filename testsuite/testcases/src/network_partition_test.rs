@@ -44,8 +44,7 @@ impl NetworkTest for NetworkPartitionTest {
         ctx.swarm().remove_chaos(partition)?;
 
         // ensure we meet the success criteria
-        ctx.success_criteria()
-            .check_for_success(&txn_stat, &duration)?;
+        ctx.check_for_success(&txn_stat, &duration)?;
 
         Ok(())
     }
