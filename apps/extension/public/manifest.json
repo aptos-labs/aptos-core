@@ -3,7 +3,7 @@
   "name": "Petra",
   "version": "0.1.4",
   "manifest_version": 3,
-  "description": "A crypto wallet on Aptos, built by Aptos Labs",
+  "description": "A crypto wallet on Aptos.",
   "action": {
     "default_popup": "index.html"
   },
