@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::types::OptionalPoolAddressArgs;
 use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
 use crate::genesis::git::LAYOUT_FILE;
 use crate::{
@@ -29,6 +30,8 @@ const VFN_FILE: &str = "validator-full-node-identity.yaml";
 #[derive(Parser)]
 pub struct GenerateKeys {
     #[clap(flatten)]
+    pub(crate) pool_address_args: OptionalPoolAddressArgs,
+    #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
     #[clap(flatten)]
     pub rng_args: RngArgs,
@@ -54,8 +57,14 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
         check_if_file_exists(vfn_file.as_path(), self.prompt_options)?;
 
         let mut key_generator = self.rng_args.key_generator()?;
-        let (validator_blob, vfn_blob, private_identity) =
+        let (mut validator_blob, mut vfn_blob, private_identity) =
             generate_key_objects(&mut key_generator)?;
+
+        // Allow for the owner to be different than the operator
+        if let Some(pool_address) = self.pool_address_args.pool_address() {
+            validator_blob.account_address = Some(pool_address);
+            vfn_blob.account_address = Some(pool_address);
+        }
 
         // Create the directory if it doesn't exist
         create_dir_if_not_exist(output_dir.as_path())?;

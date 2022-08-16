@@ -11,8 +11,8 @@ use crate::common::init::InitTool;
 use crate::common::types::{
     account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
     EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-    MovePackageDir, PrivateKeyInputOptions, PromptOptions, RestOptions, RngArgs, SaveFile,
-    TransactionOptions, TransactionSummary,
+    MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions, RestOptions,
+    RngArgs, SaveFile, TransactionOptions, TransactionSummary,
 };
 use crate::common::utils::write_to_file;
 use crate::move_tool::{
@@ -768,7 +768,11 @@ impl CliTestFramework {
 
     fn operator_args(&self, pool_index: Option<usize>) -> OperatorArgs {
         OperatorArgs {
-            pool_address: pool_index.map(|idx| self.account_id(idx)),
+            pool_address_args: OptionalPoolAddressArgs {
+                pool_address: pool_index.map(|idx| AccountAddressWrapper {
+                    account_address: self.account_id(idx),
+                }),
+            },
         }
     }
 

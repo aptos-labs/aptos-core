@@ -129,7 +129,7 @@ impl SfStreamer {
             }
         };
 
-        let ledger_info = self.context.get_latest_ledger_info().unwrap();
+        let ledger_info = self.context.get_latest_ledger_info_wrapped().unwrap();
         let block_timestamp = self
             .context
             .get_block_timestamp(block_start_version)

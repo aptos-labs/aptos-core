@@ -72,7 +72,7 @@ use aptos_types::{
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
-        accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProof,
+        accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
         TransactionInfoListWithProof,
     },
     state_proof::StateProof,
@@ -1141,29 +1141,29 @@ impl DbReader for AptosDB {
     }
 
     /// Returns the proof of the given state key and version.
-    fn get_state_proof_by_version(
+    fn get_state_proof_by_version_ext(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<SparseMerkleProof> {
+    ) -> Result<SparseMerkleProofExt> {
         gauged_api("get_proof_by_version", || {
             error_if_version_is_pruned(&self.state_pruner, "State", version)?;
 
             self.state_store
-                .get_state_proof_by_version(state_key, version)
+                .get_state_proof_by_version_ext(state_key, version)
         })
     }
 
-    fn get_state_value_with_proof_by_version(
+    fn get_state_value_with_proof_by_version_ext(
         &self,
         state_store_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        gauged_api("get_state_value_with_proof_by_version", || {
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
+        gauged_api("get_state_value_with_proof_by_version_ext", || {
             error_if_version_is_pruned(&self.state_pruner, "State", version)?;
 
             self.state_store
-                .get_state_value_with_proof_by_version(state_store_key, version)
+                .get_state_value_with_proof_by_version_ext(state_store_key, version)
         })
     }
 

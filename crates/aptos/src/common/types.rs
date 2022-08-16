@@ -1115,3 +1115,29 @@ impl TransactionOptions {
         Ok(response.into_inner())
     }
 }
+
+#[derive(Parser)]
+pub struct OptionalPoolAddressArgs {
+    /// Address of the Staking pool
+    #[clap(long)]
+    pub(crate) pool_address: Option<AccountAddressWrapper>,
+}
+
+impl OptionalPoolAddressArgs {
+    pub fn pool_address(&self) -> Option<AccountAddress> {
+        self.pool_address.map(|inner| inner.account_address)
+    }
+}
+
+#[derive(Parser)]
+pub struct PoolAddressArgs {
+    /// Address of the Staking pool
+    #[clap(long)]
+    pub(crate) pool_address: AccountAddressWrapper,
+}
+
+impl PoolAddressArgs {
+    pub fn pool_address(&self) -> AccountAddress {
+        self.pool_address.account_address
+    }
+}

@@ -1,10 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::poem_backend::{AptosErrorResponse, BasicErrorWith404, InternalError, NotFoundError};
+use crate::response::{AptosErrorResponse, BasicErrorWith404, InternalError, NotFoundError};
 use anyhow::{anyhow, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
-    AptosErrorCode, AsConverter, Block, BlockInfo, Error, LedgerInfo, TransactionOnChainData,
+    AptosErrorCode, AsConverter, Block, BlockInfo, LedgerInfo, TransactionOnChainData,
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
@@ -24,12 +24,11 @@ use aptos_types::{
 };
 use aptos_vm::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use futures::{channel::oneshot, SinkExt};
-use std::{collections::HashMap, convert::Infallible, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 use storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
     DbReader, Order,
 };
-use warp::{filters::BoxedFilter, Filter, Reply};
 
 // Context holds application scope context
 #[derive(Clone)]
@@ -89,10 +88,6 @@ impl Context {
         self.node_config.api.failpoints_enabled
     }
 
-    pub fn filter(self) -> impl Filter<Extract = (Context,), Error = Infallible> + Clone {
-        warp::any().map(move || self.clone())
-    }
-
     pub async fn submit_transaction(&self, txn: SignedTransaction) -> Result<SubmissionStatus> {
         let (req_sender, callback) = oneshot::channel();
         self.mp_sender
@@ -103,25 +98,15 @@ impl Context {
         callback.await?
     }
 
-    pub fn get_latest_ledger_info(&self) -> Result<LedgerInfo, Error> {
-        let maybe_oldest_version = self.db.get_first_viable_txn_version()?;
-        let ledger_info = self.get_latest_ledger_info_with_signatures()?;
-        let (oldest_version, oldest_block_event) =
-            self.db.get_next_block_event(maybe_oldest_version)?;
-        let (_, _, newest_block_event) = self
-            .db
-            .get_block_info_by_version(ledger_info.ledger_info().version())?;
-        Ok(LedgerInfo::new(
-            &self.chain_id(),
-            &ledger_info,
-            oldest_version,
-            oldest_block_event.height(),
-            newest_block_event.height(),
-        ))
+    // For use from external crates where they don't want to handle
+    // the API response error types.
+    pub fn get_latest_ledger_info_wrapped(&self) -> anyhow::Result<LedgerInfo> {
+        self.get_latest_ledger_info::<crate::response::BasicError>()
+            .map_err(|e| e.into())
     }
 
     // TODO: Add error codes to these errors.
-    pub fn get_latest_ledger_info_poem<E: InternalError>(&self) -> Result<LedgerInfo, E> {
+    pub fn get_latest_ledger_info<E: InternalError>(&self) -> Result<LedgerInfo, E> {
         let maybe_oldest_version = self
             .db
             .get_first_viable_txn_version()
@@ -495,10 +480,6 @@ impl Context {
                     result
                 })
         }
-    }
-
-    pub fn health_check_route(&self) -> BoxedFilter<(impl Reply,)> {
-        super::health_check::health_check_route(self.db.clone())
     }
 }
 

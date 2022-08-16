@@ -188,6 +188,11 @@ pub enum ScriptFunctionCall {
         pool_address: AccountAddress,
     },
 
+    /// Move `amount` of coins from pending_inactive to active.
+    StakeReactivateStake {
+        amount: u64,
+    },
+
     /// Rotate the consensus key of the validator, it'll take effect in next epoch.
     StakeRotateConsensusKey {
         pool_address: AccountAddress,
@@ -310,6 +315,7 @@ impl ScriptFunctionCall {
             ),
             StakeJoinValidatorSet { pool_address } => stake_join_validator_set(pool_address),
             StakeLeaveValidatorSet { pool_address } => stake_leave_validator_set(pool_address),
+            StakeReactivateStake { amount } => stake_reactivate_stake(amount),
             StakeRotateConsensusKey {
                 pool_address,
                 new_consensus_pubkey,
@@ -823,6 +829,22 @@ pub fn stake_leave_validator_set(pool_address: AccountAddress) -> TransactionPay
     ))
 }
 
+/// Move `amount` of coins from pending_inactive to active.
+pub fn stake_reactivate_stake(amount: u64) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("stake").to_owned(),
+        ),
+        ident_str!("reactivate_stake").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&amount).unwrap()],
+    ))
+}
+
 /// Rotate the consensus key of the validator, it'll take effect in next epoch.
 pub fn stake_rotate_consensus_key(
     pool_address: AccountAddress,
@@ -1224,6 +1246,16 @@ mod decoder {
         }
     }
 
+    pub fn stake_reactivate_stake(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::StakeReactivateStake {
+                amount: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn stake_rotate_consensus_key(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::StakeRotateConsensusKey {
@@ -1408,6 +1440,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "stake_leave_validator_set".to_string(),
             Box::new(decoder::stake_leave_validator_set),
+        );
+        map.insert(
+            "stake_reactivate_stake".to_string(),
+            Box::new(decoder::stake_reactivate_stake),
         );
         map.insert(
             "stake_rotate_consensus_key".to_string(),

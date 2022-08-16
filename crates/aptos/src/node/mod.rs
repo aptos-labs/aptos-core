@@ -3,7 +3,7 @@
 
 pub mod analyze;
 
-use crate::common::types::{ConfigSearchMode, PromptOptions};
+use crate::common::types::{ConfigSearchMode, OptionalPoolAddressArgs, PromptOptions};
 use crate::common::utils::prompt_yes_with_override;
 use crate::config::GlobalConfig;
 use crate::node::analyze::analyze_validators::AnalyzeValidators;
@@ -279,9 +279,8 @@ impl CliCommand<Transaction> for InitializeValidator {
 /// Arguments used for operator of the staking pool
 #[derive(Parser)]
 pub struct OperatorArgs {
-    /// Address of the Staking pool
-    #[clap(long)]
-    pub(crate) pool_address: Option<AccountAddress>,
+    #[clap(flatten)]
+    pub(crate) pool_address_args: OptionalPoolAddressArgs,
 }
 
 impl OperatorArgs {
@@ -289,7 +288,7 @@ impl OperatorArgs {
         &self,
         profile_options: &ProfileOptions,
     ) -> CliTypedResult<AccountAddress> {
-        if let Some(address) = self.pool_address {
+        if let Some(address) = self.pool_address_args.pool_address() {
             Ok(address)
         } else {
             profile_options.account_address()
@@ -300,7 +299,7 @@ impl OperatorArgs {
         &self,
         transaction_options: &TransactionOptions,
     ) -> CliTypedResult<AccountAddress> {
-        if let Some(address) = self.pool_address {
+        if let Some(address) = self.pool_address_args.pool_address() {
             Ok(address)
         } else {
             transaction_options.sender_address()

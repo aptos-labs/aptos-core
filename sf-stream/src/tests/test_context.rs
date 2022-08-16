@@ -347,7 +347,20 @@ impl TestContext {
     }
 
     pub async fn reply(&self, req: warp::test::RequestBuilder) -> Response<Bytes> {
-        req.reply(&index::routes(self.context.clone())).await
+        req.reply(&self.get_routes_with_poem(address)).await
+    }
+
+    // Currently we still run our tests with warp.
+    // https://github.com/aptos-labs/aptos-core/issues/2966
+    pub fn get_routes_with_poem(
+        &self,
+        poem_address: SocketAddr,
+    ) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+        let proxy = warp::path!("v1" / ..).and(reverse_proxy_filter(
+            "v1".to_string(),
+            format!("http://{}/v1", poem_address),
+        ));
+        proxy
     }
 
     pub async fn execute(&self, req: warp::test::RequestBuilder) -> Value {
