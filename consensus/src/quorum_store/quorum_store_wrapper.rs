@@ -148,7 +148,7 @@ impl QuorumStoreWrapper {
             self.db
                 .save_batch_id(
                     self.latest_logical_time.epoch(),
-                    self.batch_builder.batch_id() + 1,
+                    batch_id + 1,
                 )
                 .expect("Could not save to db");
 
@@ -320,7 +320,9 @@ impl QuorumStoreWrapper {
         let mut proofs_in_progress: FuturesUnordered<BoxFuture<'_, _>> = FuturesUnordered::new();
 
         // TODO: parameter? bring back back-off?
-        let mut interval = time::interval(Duration::from_millis(50));
+        let mut interval = time::interval(Duration::from_millis(
+            10 // 50 is currently the end batch timer
+        ));
 
         loop {
             let _timer = counters::WRAPPER_MAIN_LOOP.start_timer();

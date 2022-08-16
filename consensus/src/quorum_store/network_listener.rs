@@ -84,12 +84,12 @@ impl NetworkListener {
                 }
             } // Malformed request with an inconsistent expiry epoch.
         } else {
-            debug!(
-                "QS: got append_batch message from {:?} batch_id {}, fragment_id {}",
-                source,
-                fragment.fragment_info.batch_id(),
-                fragment.fragment_info.fragment_id()
-            );
+            // debug!(
+            //     "QS: got append_batch message from {:?} batch_id {}, fragment_id {}",
+            //     source,
+            //     fragment.fragment_info.batch_id(),
+            //     fragment.fragment_info.fragment_id()
+            // );
             if let Err(e) = entry.append_transactions(
                 fragment.batch_id(),
                 fragment.fragment_id(),

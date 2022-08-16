@@ -67,14 +67,11 @@ use consensus_types::{
 };
 use event_notifications::ReconfigNotificationListener;
 use fail::fail_point;
-use futures::{
-    channel::{
-        mpsc,
-        mpsc::{unbounded, Receiver, Sender, UnboundedSender},
-        oneshot,
-    },
-    SinkExt, StreamExt,
-};
+use futures::{channel::{
+    mpsc,
+    mpsc::{unbounded, Receiver, Sender, UnboundedSender},
+    oneshot,
+}, SinkExt, StreamExt};
 use itertools::Itertools;
 use network::protocols::network::{ApplicationNetworkSender, Event};
 use safety_rules::SafetyRulesManager;
