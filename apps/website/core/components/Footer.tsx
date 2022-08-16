@@ -29,17 +29,11 @@ export default function Footer() {
             </ChakraLink>
           </Flex>
           <HStack justifyContent="flex-end" spacing={[4, 4, 8]}>
-            <ChakraLink color={secondaryTextColor[colorMode]} href="/about" target="_blank">
-              About
+            <ChakraLink color={secondaryTextColor[colorMode]} href="/docs" target="_blank">
+              Docs
             </ChakraLink>
-            <ChakraLink color={secondaryTextColor[colorMode]} href="/legal" target="_blank">
-              Legal
-            </ChakraLink>
-            <ChakraLink color={secondaryTextColor[colorMode]} href="/privacy-policy" target="_blank">
+            <ChakraLink color={secondaryTextColor[colorMode]} href="https://aptoslabs.com/privacy/" target="_blank">
               Privacy
-            </ChakraLink>
-            <ChakraLink color={secondaryTextColor[colorMode]} href="/press-kit" target="_blank">
-              Press
             </ChakraLink>
           </HStack>
         </Grid>
