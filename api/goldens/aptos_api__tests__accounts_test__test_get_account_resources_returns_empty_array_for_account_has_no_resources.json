@@ -1025,6 +1025,14 @@
     }
   },
   {
+    "type": "0x1::aptos_governance::ApprovedExecutionHashes",
+    "data": {
+      "hashes": {
+        "data": []
+      }
+    }
+  },
+  {
     "type": "0x1::aptos_governance::GovernanceResponsbility",
     "data": {
       "signer_caps": {

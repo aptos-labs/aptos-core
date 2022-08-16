@@ -321,6 +321,26 @@ module aptos_framework::voting {
         proposal.expiration_secs
     }
 
+    /// Return the proposal's execution hash.
+    public fun get_execution_hash<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): vector<u8> acquires VotingForum {
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        proposal.execution_hash
+    }
+
+    /// Return true if the governance proposal has already been resolved.
+    public fun is_resolved<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): bool acquires VotingForum {
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        proposal.is_resolved
+    }
+
     #[test_only]
     use std::string::{String, utf8};
 
