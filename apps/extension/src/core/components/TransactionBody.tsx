@@ -14,14 +14,13 @@ import {
 } from '@chakra-ui/react';
 import { FaRegCheckCircle } from '@react-icons/all-files/fa/FaRegCheckCircle';
 import { FaRegTimesCircle } from '@react-icons/all-files/fa/FaRegTimesCircle';
-import { ScriptFunctionPayload } from 'aptos/dist/generated';
 import { ExternalLinkIcon } from '@chakra-ui/icons';
 import { collapseHexString } from 'core/utils/hex';
 import { HexString, MaybeHexString } from 'aptos';
 import { useParams } from 'react-router-dom';
-import { useTransaction } from 'core/queries/transaction';
 import ChakraLink from 'core/components/ChakraLink';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
+import useTransactionDetails from 'core/hooks/useTransactionDetails';
 import Copyable from './Copyable';
 
 interface DetailItemProps {
@@ -38,35 +37,6 @@ function DetailItem({ children, label }: DetailItemProps) {
   );
 }
 
-function useTransactionDetails(version?: number) {
-  const { data: txn } = useTransaction(version);
-  if (!txn) {
-    return null;
-  }
-
-  const datetime = new Date(Number(txn.timestamp) / 1000);
-  const fullDatetime = datetime.toLocaleDateString('en-us', {
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-
-  const payload = txn.payload as ScriptFunctionPayload;
-  const recipient = payload.arguments[0] as string;
-  const amount = Number(payload.arguments[1]);
-  const coinName = payload.type_arguments[0].split('::').pop();
-
-  return {
-    amount,
-    coinName,
-    fullDatetime,
-    recipient,
-    ...txn,
-  };
-}
-
 function TransactionBody() {
   const { activeAccountAddress } = useGlobalStateContext();
   const { version } = useParams();
@@ -74,6 +44,7 @@ function TransactionBody() {
   const txn = useTransactionDetails(version ? Number(version) : undefined);
   const userAddress = activeAccountAddress
     && HexString.ensure(activeAccountAddress).toShortString();
+  const explorerAddress = `https://explorer.devnet.aptos.dev/txn/${txn?.version}`;
 
   function clickableAddress(address: MaybeHexString) {
     return address === userAddress
@@ -90,24 +61,24 @@ function TransactionBody() {
   return txn && (
     <VStack
       w="100%"
-      pt={4}
+      paddingTop={8}
       px={4}
       alignItems="stretch"
     >
-      <Heading mb={4}>
+      <Heading fontSize="xl">
         Transaction detail
       </Heading>
       <Button
-        fontSize="md"
+        fontSize="sm"
         fontWeight={400}
         as="a"
         target="_blank"
         rightIcon={<ExternalLinkIcon />}
         variant="unstyled"
         cursor="pointer"
-        href={`https://explorer.devnet.aptos.dev/txn/${txn.version}`}
+        href={explorerAddress}
       >
-        View on Aptos explorer
+        View on explorer
       </Button>
       <DetailItem label="From">
         { clickableAddress(txn.sender) }

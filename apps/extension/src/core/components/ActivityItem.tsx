@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Circle,
   HStack,
@@ -22,6 +22,7 @@ import {
   timestampColor,
 } from 'core/colors';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { formatCoinName } from 'core/hooks/useTransactionDetails';
 
 /**
  * Convert a timestamp into a relative time short string. If the time difference
@@ -85,6 +86,7 @@ export function ActivityItem({ transaction }: ActivityItemProps) {
   const typedPayload = transaction.payload as ScriptFunctionPayload;
   const [recipient, amount]: string[] = typedPayload.arguments;
   const coinName = typedPayload.type_arguments[0].split('::').pop();
+  const formattedCoinName = useMemo(() => formatCoinName(coinName), [coinName]);
 
   const myAddress = aptosAccount!.address().toShortString();
   const isSent = myAddress === transaction.sender;
@@ -125,7 +127,7 @@ export function ActivityItem({ transaction }: ActivityItemProps) {
               overflow="hidden"
               textOverflow="ellipsis"
             >
-              { `${isSent ? '-' : '+'}${amount} ${coinName}` }
+              { `${isSent ? '-' : '+'}${amount} ${formattedCoinName}` }
             </Text>
           </HStack>
           <Text color={timestampColor[colorMode]} fontSize="xs">

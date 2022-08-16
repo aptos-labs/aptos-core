@@ -46,7 +46,7 @@ interface CoinTransferFormData {
 
 function isAddressValid(address?: string) {
   return address
-    ? (address.length > 60 && address.length < 70)
+    ? (address.length >= 64 && address.length <= 68)
     : false;
 }
 

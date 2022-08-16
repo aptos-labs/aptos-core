@@ -92,7 +92,7 @@ export default function WalletFooter() {
         <Center flexDir="column" width="100%">
           <ChakraLink display="flex" flexDir="column" alignItems="center" to={Routes.activity.path}>
             <IconButton
-              color={(pathname.includes(Routes.activity.path))
+              color={(pathname.includes(Routes.activity.path) || pathname.includes('/transactions'))
                 ? secondaryIconUnpressedColor[colorMode]
                 : secondaryIconColor[colorMode]}
               variant="unstyled"
@@ -105,7 +105,7 @@ export default function WalletFooter() {
             />
             <Text
               fontWeight={600}
-              color={(pathname.includes(Routes.activity.path))
+              color={(pathname.includes(Routes.activity.path) || pathname.includes('/transactions'))
                 ? secondaryIconUnpressedColor[colorMode]
                 : secondaryIconColor[colorMode]}
               pt={1}
