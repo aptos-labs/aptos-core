@@ -1,8 +1,8 @@
 [package]
-name = "aptos-sf-stream"
+name = "aptos-fh-stream"
 version = "0.1.0"
 authors = ["Aptos Labs <opensource@aptoslabs.com>"]
-description = "Aptos StreamingFast Stream"
+description = "Aptos StreamingFast Firehose Stream"
 repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"

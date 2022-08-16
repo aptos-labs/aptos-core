@@ -375,7 +375,7 @@ impl TestContext {
         if self.golden_output.is_none() {
             self.golden_output = Some(GoldenOutputs::new(
                 self.test_name.replace(':', "_"),
-                "sf_v1",
+                "fh_v1",
             ));
         }
 
