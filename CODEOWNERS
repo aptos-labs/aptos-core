@@ -1,5 +1,5 @@
 # **Please** keep this file ordered alphabetically by directory paths!
-/aptos-move/framework/aptos-stdlib/sources/cryptography @alinush
+/aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush
 /aptos-move/framework/src/natives/cryptography/ @alinush
 # Owners for the `/developer-docs-site` directory and all its subdirectories.
 /developer-docs-site/ @davidiw @rajkaramchedu

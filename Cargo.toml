@@ -120,7 +120,7 @@ members = [
     "vm-validator",
 ]
 
-exclude=[
+exclude =[
     "ecosystem/sf-indexer/aptos-substreams",
 ]
 

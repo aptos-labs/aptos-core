@@ -5,8 +5,7 @@
 ///     as per the [IETF BLS draft standard](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature#section-2.1).
 
 module aptos_std::bls12381 {
-    use std::option;
-    use std::option::Option;
+    use std::option::{Self, Option};
 
     // TODO: Performance would increase if structs in this module are implemented natively via handles (similar to Table and
     // RistrettoPoint). This will avoid unnecessary (de)serialization. We would need to allow storage of these structs too.
@@ -19,13 +18,13 @@ module aptos_std::bls12381 {
     ///
     /// This struct can be combined with a ProofOfPossession struct in order to create a PublicKeyWithPop struct, which
     /// can be used to verify a multisignature.
-    struct PublicKey has copy, drop, key, store {
+    struct PublicKey has copy, drop, store {
         bytes: vector<u8>
     }
 
     /// A proof-of-possession (PoP).
     /// Given such a struct and a PublicKey struct, one can construct a PublicKeyWithPoP (see below).
-    struct ProofOfPossession has copy, drop, key, store {
+    struct ProofOfPossession has copy, drop, store {
         bytes: vector<u8>
     }
 
@@ -35,19 +34,19 @@ module aptos_std::bls12381 {
     ///   (1) used to verify an aggregate signature
     ///   (2) aggregated with other PublicKeyWithPoP structs into an AggrPublicKeysWithPoP, which in turn can be used
     ///       to verify a multisignature
-    struct PublicKeyWithPoP has copy, drop, key, store {
+    struct PublicKeyWithPoP has copy, drop, store {
         bytes: vector<u8>
     }
 
     /// An aggregation of public keys with verified PoPs, which can be used to verify multisignatures.
-    struct AggrPublicKeysWithPoP has copy, drop, key, store {
+    struct AggrPublicKeysWithPoP has copy, drop, store {
         bytes: vector<u8>
     }
 
     /// A BLS signature. This can be either a:
     ///   (1) normal (non-aggregated) signature
     ///   (2) signature share (for a multisignature or aggregate signature)
-    struct Signature has copy, drop, key, store {
+    struct Signature has copy, drop, store {
         bytes: vector<u8>
     }
 
@@ -58,7 +57,7 @@ module aptos_std::bls12381 {
     /// We distinguish between a Signature type and a AggrOrMultiSignature type to prevent developers from interchangeably
     /// calling `verify_multisignature` and `verify_signature_share` to verify both multisignatures and signature shares,
     /// which could create problems down the line.
-    struct AggrOrMultiSignature has copy, drop, key, store {
+    struct AggrOrMultiSignature has copy, drop, store {
         bytes: vector<u8>
     }
 
@@ -288,22 +287,18 @@ module aptos_std::bls12381 {
     /// The associated SK is 07416693b6b32c84abe45578728e2379f525729e5b94762435a31e65ecc728da.
     const RANDOM_PK: vector<u8> = x"8a53e7ae5270e3e765cd8a4032c2e77c6f7e87a44ebb85bf28a4d7865565698f975346714262f9e47c6f3e0d5d951660";
 
+    //
+    // Tests
+    //
+
+    #[test_only]
     fun get_random_aggsig(): AggrOrMultiSignature {
         assert!(signature_subgroup_check_internal(RANDOM_SIGNATURE), 1);
 
         AggrOrMultiSignature { bytes: RANDOM_SIGNATURE }
     }
 
-    fun get_random_sig(): Signature {
-        assert!(signature_subgroup_check_internal(RANDOM_SIGNATURE), 1);
-
-        signature_from_bytes(RANDOM_SIGNATURE)
-    }
-
-    fun get_random_pk(): PublicKey {
-        option::extract(&mut public_key_from_bytes(RANDOM_PK))
-    }
-
+    #[test_only]
     fun get_random_pk_with_pop(): PublicKeyWithPoP {
         assert!(validate_pubkey_internal(RANDOM_PK), 1);
 
@@ -311,18 +306,6 @@ module aptos_std::bls12381 {
             bytes: RANDOM_PK
         }
     }
-
-    fun get_random_aggr_pks_with_pop(): AggrPublicKeysWithPoP {
-        assert!(validate_pubkey_internal(RANDOM_PK), 1);
-
-        AggrPublicKeysWithPoP {
-            bytes: RANDOM_PK
-        }
-    }
-
-    //
-    // Tests
-    //
 
     #[test]
     fun test_pubkey_validation() {

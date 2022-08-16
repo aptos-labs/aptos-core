@@ -59,9 +59,6 @@ module aptos_std::signature {
         signature: vector<u8>
     ): (vector<u8>, bool);
 
-    #[test_only]
-    use std::vector;
-
     //
     // Tests
     //

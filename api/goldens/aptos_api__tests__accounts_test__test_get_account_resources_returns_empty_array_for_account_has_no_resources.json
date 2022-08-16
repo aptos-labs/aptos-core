@@ -699,7 +699,7 @@
           "val": "1"
         },
         {
-          "key": "aptos_framework.bls12381.per_pubkey_subgroup_check_cost",
+          "key": "aptos_framework.bls12381.per_pubkey_subgroup_check",
           "val": "1"
         },
         {

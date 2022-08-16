@@ -11,7 +11,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
 
     [.bls12381.per_pubkey_deserialize_cost, "bls12381.per_pubkey_deserialize", 1],
     [.bls12381.per_pubkey_aggregate_cost, "bls12381.per_pubkey_aggregate", 1],
-    [.bls12381.per_pubkey_subgroup_check_cost, "bls12381.per_pubkey_subgroup_check_cost", 1],
+    [.bls12381.per_pubkey_subgroup_check_cost, "bls12381.per_pubkey_subgroup_check", 1],
 
     [.bls12381.per_sig_deserialize_cost, "bls12381.per_sig_deserialize", 1],
     [.bls12381.per_sig_aggregate_cost, "bls12381.per_sig_aggregate", 1],
