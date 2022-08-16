@@ -105,6 +105,10 @@ module aptos_framework::reconfiguration {
         borrow_global<Configuration>(@aptos_framework).last_reconfiguration_time
     }
 
+    public fun current_epoch(): u64 acquires Configuration {
+        borrow_global<Configuration>(@aptos_framework).epoch
+    }
+
     /// Private function to do reconfiguration. Updates reconfiguration status resource
     /// `Configuration` and emits a `NewEpochEvent`
     fun reconfigure_() acquires Configuration {

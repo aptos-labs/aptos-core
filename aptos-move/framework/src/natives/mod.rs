@@ -7,6 +7,7 @@ pub mod event;
 pub mod hash;
 mod helpers;
 pub mod signature;
+pub mod state_storage_context;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
