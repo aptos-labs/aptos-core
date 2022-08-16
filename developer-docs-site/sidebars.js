@@ -62,7 +62,7 @@ const sidebars = {
         "guides/sign-a-transaction",
         "guides/interacting-with-the-blockchain",
         "guides/building-wallet-extension",
-        "guides/guide-for-system-integrators",
+        "guides/system-integrators-guide",
         "guides/local-testnet-dev-flow",
         {
           type: "category",

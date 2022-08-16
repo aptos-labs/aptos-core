@@ -1,13 +1,11 @@
 ---
 title: "System Integrators Guide"
-slug: "guide-for-system-integrators"
+slug: "system-integrators-guide"
 ---
 
 :::tip 
 This documentation is currently under construction with more being added on a regular basis.
 :::
-
-# System Integrators Guide
 
 If you provide blockchain services to your customers and wish to add the Aptos blockchain to your platform, then this guide is for you. This system integrators guide will walk you through all you need to integrate the Aptos blockchain into your platform. This guide assumes that you are familiar with the blockchains.
 
@@ -261,11 +259,14 @@ The current balance for a `Coin<T>` where T is the Aptos coin is available at th
 
 ### Querying events
 
+Aptos provides clear and canonical events for all withdraw and deposit of coins. This can be used in coordination with the associated transactions to present to a user the change of their account balance over time, when that happened, and what caused it. With some amount of additional parsing, metadata such as the transaction type and the other parties involved can also be shared.
+
 Events can be queried by the events by handle url: `https://{rest_api_server}/accounts/{address}/events/0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>/withdraw_events`
 
 ```
 [
   {
+    "version":"13629679",
     "key": "0x0200000000000000cb2f940705c44ba110cd3b4f6540c96f2634938bd5f2aabd6946abf12ed88457",
     "sequence_number": "0",
     "type": "0x1::coin::WithdrawEvent",
@@ -276,36 +277,64 @@ Events can be queried by the events by handle url: `https://{rest_api_server}/ac
 ]
 ```
 
-For most coins, adding all the deposit amounts and substracting all the withdraw amounts would suffice for computing the total balance for a user. However, for Aptos coins, they are also used for gas in transactions, as shown below from the query: `https://{rest_server_api}/accounts/{address}/transactions`:
+More information can be gathered from the transaction that generated the event. To do so, query: `https://{rest_server_api}/transactions/by_version/{version}`, where `{version}` is the same value as the `{version}` in the event query.
 
 ```
-[
-  {
-    "type": "user_transaction",
-    "version": "282269",
-    "hash": "0x29b742e17be140eff7f04b85cff599e26000558e4a20b9a12bd5d31b3f99c65d",
+{
+  "version": "13629679",
+  "gas_used": "4",
+  "success": true,
+  "vm_status": "Executed successfully",
+  "changes": [
     ...
-    "gas_used": "73",
-    "success": true,
-    "vm_status": "Executed successfully",
-    "sequence_number": "0",
-    "payload": {
-      "type": "script_function_payload",
-      "function": "0x1::coin::transfer",
-      "type_arguments": [
-        "0x1::aptos_coin::AptosCoin"
-      ],
-      "arguments": [
-        "0x62c48bd04cbb57444b4a15996f30b03a795ca866d0fd3adfca72dda66356943f",
-        "1000"
-      ]
+  ],
+  "sender": "0x810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
+  "sequence_number": "0",
+  "max_gas_amount": "2000",
+  "gas_unit_price": "1",
+  "expiration_timestamp_secs": "1660616127",
+  "payload": {
+    "function": "0x1::coin::transfer",
+    "type_arguments": [
+      "0x1::aptos_coin::AptosCoin"
+    ],
+    "arguments": [
+      "0x5098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
+      "1000"
+    ],
+    "type": "script_function_payload"
+  },
+  "events": [
+    {
+      "key": "0x0200000000000000810026ca8291dd88b5b30a1d3ca2edd683d33d06c4a7f7c451d96f6d47bc5e8b",
+      "sequence_number": "0",
+      "type": "0x1::coin::WithdrawEvent",
+      "data": {
+        "amount": "1000"
+      }
     },
-    ...
-    "timestamp": "1659677872988457"
-  }
-]
+    {
+      "key": "0x01000000000000005098df8e7969b58ab3bd2d440c6203f64c60a1fd5c08b9d4abe6ae4216246c3e",
+      "sequence_number": "0",
+      "type": "0x1::coin::DepositEvent",
+      "data": {
+        "amount": "1000"
+      }
+    }
+  ],
+  "timestamp": "1660615531147935",
+  "type": "user_transaction"
+}
 ```
 
-Transactions contain all relevant information to present to the user including the events, time executed, and changes made. Currently, there is no easy method to go from event to transaction from the REST API. This will be added shortly.
+The transaction in turn provides other important information for generating a complete perspective on what caused the event. For example, this gives the `timestamp` for when the transaction was executed, other related events, and the `gas_used`. Transactions contain all relevant information to present to the user including the events, time executed, and changes made.
+
+:::tip
+
+When tracking full movement of coins, normally events are sufficient. `0x1::aptos_coin::AptosCoin`, however, requires also look at the `gas_used` for each transaction sent from the given account. To reduce unnecessary overheads, extracting gas fees due to transactions does not emit an event. All transactions for an account can be retrieved from this API: `https://{rest_server_api}/accounts/{address}/transactions`.
+
+:::
+
+To create some sample data to explore see ["Your first transaction"](../tutorials/your-first-transaction).
 
 To learn more about coin creation see ["Your First Coin"](../tutorials/your-first-coin).
