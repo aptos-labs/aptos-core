@@ -32,7 +32,12 @@ fn put_value_set(
         .unwrap();
     let mut cs = ChangeSet::new();
     state_store
-        .put_value_sets(vec![&value_set], version, &mut cs)
+        .put_value_sets(
+            vec![&value_set],
+            version,
+            StateStorageUsage::new_untracked(),
+            &mut cs,
+        )
         .unwrap();
     state_store.ledger_db.write_schemas(cs.batch).unwrap();
     root
@@ -570,16 +575,10 @@ pub fn test_get_state_snapshot_before() {
     assert_eq!(store.get_state_snapshot_before(2).unwrap(), Some((0, hash)));
 
     // hack: VersionData expected on every version, so duplicate the data at version 1
-    let (state_items, total_state_bytes) = store.get_usage(Some(0)).unwrap();
+    let usage = store.get_usage(Some(0)).unwrap();
     store
         .ledger_db
-        .put::<VersionDataSchema>(
-            &1,
-            &VersionData {
-                state_items,
-                total_state_bytes,
-            },
-        )
+        .put::<VersionDataSchema>(&1, &usage.into())
         .unwrap();
 
     // put in another version
@@ -788,8 +787,9 @@ proptest! {
             let (items, bytes) = snapshot.iter().fold((0, 0), |(items, bytes), (k, v)| {
                 (items + 1, bytes + k.size() + v.size())
             });
+            let expected_usage = StateStorageUsage::new(items, bytes);
             prop_assert_eq!(
-                (items, bytes),
+                expected_usage,
                 store.get_usage(Some(last_version)).unwrap(),
                 "version: {} next_version: {}",
                 version,
@@ -808,7 +808,7 @@ proptest! {
             restore.add_chunk(snapshot, proof).unwrap();
             restore.finish_box().unwrap();
             prop_assert_eq!(
-                (items, bytes),
+                expected_usage,
                 db2.state_store.get_usage(Some(100)).unwrap(),
                 "version: {} next_version: {}",
                 version,
