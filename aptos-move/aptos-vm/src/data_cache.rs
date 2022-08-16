@@ -7,6 +7,7 @@ use crate::{counters::CRITICAL_ERRORS, create_access_path, logging::AdapterLogSc
 use anyhow::format_err;
 use anyhow::Error;
 use aptos_logger::prelude::*;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     access_path::AccessPath,
@@ -16,6 +17,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use fail::fail_point;
+use framework::natives::state_storage_context::StateStorageUsageResolver;
 use move_deps::{
     move_binary_format::errors::*,
     move_core_types::{
@@ -113,6 +115,10 @@ impl<'block, S: StateView> StateView for StateViewCache<'block, S> {
     fn id(&self) -> StateViewId {
         self.data_view.id()
     }
+
+    fn get_usage(&self) -> Result<StateStorageUsage, Error> {
+        self.data_view.get_usage()
+    }
 }
 
 // Adapter to convert a `StateView` into a `RemoteCache`.
@@ -170,6 +176,12 @@ impl<'a, S: StateView> TableResolver for RemoteStorage<'a, S> {
 impl<'a, S: StateView> ConfigStorage for RemoteStorage<'a, S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         self.get(&access_path).ok()?
+    }
+}
+
+impl<'a, S: StateView> StateStorageUsageResolver for RemoteStorage<'a, S> {
+    fn get_state_storage_usage(&self) -> Result<StateStorageUsage, Error> {
+        self.get_usage()
     }
 }
 
@@ -247,6 +259,12 @@ impl<S: StateView> TableResolver for RemoteStorageOwned<S> {
 impl<S: StateView> ConfigStorage for RemoteStorageOwned<S> {
     fn fetch_config(&self, access_path: AccessPath) -> Option<Vec<u8>> {
         self.as_move_resolver().fetch_config(access_path)
+    }
+}
+
+impl<S: StateView> StateStorageUsageResolver for RemoteStorageOwned<S> {
+    fn get_state_storage_usage(&self) -> Result<StateStorageUsage, anyhow::Error> {
+        self.as_move_resolver().get_usage()
     }
 }
 

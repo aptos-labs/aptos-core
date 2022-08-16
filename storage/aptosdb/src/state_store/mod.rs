@@ -13,6 +13,7 @@ use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, restore::StateSnapshotRestore, StateValueWriter,
 };
 use aptos_logger::info;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateViewId;
 #[cfg(test)]
 use aptos_types::nibble::nibble_path::NibblePath;
@@ -448,8 +449,8 @@ impl StateStore {
         add_kv_batch(&mut cs.batch, &kv_batch)
     }
 
-    pub fn get_usage(&self, version: Option<Version>) -> Result<(usize, usize)> {
-        version.map_or(Ok((0, 0)), |version| {
+    pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
+        version.map_or(Ok(StateStorageUsage::zero()), |version| {
             let VersionData {
                 state_items,
                 total_state_bytes,
@@ -457,7 +458,10 @@ impl StateStore {
                 .ledger_db
                 .get::<VersionDataSchema>(&version)?
                 .ok_or_else(|| AptosDbError::NotFound(format!("VersionData at {}", version)))?;
-            Ok((state_items, total_state_bytes))
+            Ok(StateStorageUsage {
+                items: state_items,
+                bytes: total_state_bytes,
+            })
         })
     }
 
@@ -480,8 +484,7 @@ impl StateStore {
             .with_label_values(&["put_total_state_bytes"])
             .start_timer();
 
-        let (mut state_items, mut total_state_bytes) =
-            self.get_usage(first_version.checked_sub(1))?;
+        let mut usage = self.get_usage(first_version.checked_sub(1))?;
 
         let base_version = first_version.checked_sub(1);
         let mut cache = HashMap::<StateKey, (Version, Option<StateValue>)>::new();
@@ -492,8 +495,8 @@ impl StateStore {
 
             for (key, value) in kvs.iter() {
                 if let Some(value) = value {
-                    state_items += 1;
-                    total_state_bytes += key.size() + value.size();
+                    usage.items += 1;
+                    usage.bytes += key.size() + value.size();
                 } else {
                     // stale index of the tombstone at current version.
                     cs.batch.put::<StaleStateValueIndexSchema>(
@@ -519,8 +522,8 @@ impl StateStore {
                     };
 
                     if let Some((old_version, old_value)) = old_version_and_value_opt {
-                        state_items -= 1;
-                        total_state_bytes -= key.size() + old_value.size();
+                        usage.items -= 1;
+                        usage.bytes -= key.size() + old_value.size();
                         // stale index of the old value at its version.
                         cs.batch.put::<StaleStateValueIndexSchema>(
                             &StaleStateValueIndex {
@@ -534,16 +537,9 @@ impl StateStore {
                 }
             }
 
-            cs.batch.put::<VersionDataSchema>(
-                &version,
-                &VersionData {
-                    state_items,
-                    total_state_bytes,
-                },
-            )?;
-
-            STATE_ITEMS.set(state_items as i64);
-            TOTAL_STATE_BYTES.set(total_state_bytes as i64);
+            STATE_ITEMS.set(usage.items as i64);
+            TOTAL_STATE_BYTES.set(usage.bytes as i64);
+            cs.batch.put::<VersionDataSchema>(&version, &usage.into())?;
         }
 
         Ok(())
