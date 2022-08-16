@@ -5,6 +5,7 @@
 
 FactoryBot.define do
   factory :project do
+    user { nil }
     title { Faker::Company.name }
     short_description { Faker::Company.catch_phrase }
     full_description { Faker::Lorem.paragraphs(number: 3).map { |p| "<p>#{p}</p>" }.join }

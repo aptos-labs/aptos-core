@@ -337,6 +337,7 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_11_165636) do
   end
 
   create_table "projects", force: :cascade do |t|
+    t.bigint "user_id", null: false
     t.string "title", null: false
     t.string "short_description", null: false
     t.string "full_description", null: false
@@ -352,6 +353,7 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_11_165636) do
     t.boolean "public", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_projects_on_user_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -403,4 +405,5 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_11_165636) do
   add_foreign_key "project_members", "users"
   add_foreign_key "project_milestones", "projects"
   add_foreign_key "project_screenshots", "projects"
+  add_foreign_key "projects", "users"
 end
