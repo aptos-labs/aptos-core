@@ -957,6 +957,7 @@ dependencies = [
  "bcs",
  "hex",
  "move-deps",
+ "poem-openapi",
  "reqwest 0.11.11",
  "serde 1.0.141",
  "serde_json",
