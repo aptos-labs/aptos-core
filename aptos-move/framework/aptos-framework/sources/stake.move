@@ -367,7 +367,7 @@ module aptos_framework::stake {
     /// except it leaves the ValidatorConfig to be set by another entity.
     /// Note: this triggers setting the operator and owner, set it to the account's address
     /// to set later.
-    public entry fun initialize_owner_only(
+    public entry fun initialize_stake_owner(
         owner: &signer,
         initial_stake_amount: u64,
         operator: address,
@@ -2128,7 +2128,7 @@ module aptos_framework::stake {
         aptos_framework::coin::register_for_test<AptosCoin>(account);
         let address = signer::address_of(account);
         coin::deposit<AptosCoin>(address, coin::mint<AptosCoin>(1000, mint_cap));
-        initialize_owner_only(account, 0, address, address);
+        initialize_stake_owner(account, 0, address, address);
         add_stake(account, 100);
         assert_validator_state(signer::address_of(account), 100, 0, 0, 0, 0);
     }
@@ -2243,7 +2243,7 @@ module aptos_framework::stake {
         locked_until_secs: u64,
     ) acquires OwnerCapability, StakePool, ValidatorSet {
         let account_address = signer::address_of(account);
-        initialize_owner_only(account, 0, account_address, account_address);
+        initialize_stake_owner(account, 0, account_address, account_address);
         let stake_pool = borrow_global_mut<StakePool>(account_address);
         coin::merge(&mut stake_pool.active, active);
         coin::merge(&mut stake_pool.pending_inactive, pending_inactive);
