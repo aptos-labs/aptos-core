@@ -252,7 +252,7 @@ impl RoundState {
                 reason: new_round_reason,
                 timeout,
             };
-            debug!(round = new_round, "Starting new round: {}", new_round_event);
+            info!(round = new_round, "Starting new round: {}", new_round_event);
             return Some(new_round_event);
         }
         None

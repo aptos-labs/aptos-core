@@ -1,22 +1,34 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{context::Context, index, poem_backend::attach_poem_to_runtime};
+use std::{net::SocketAddr, sync::Arc};
+
+use crate::blocks::BlocksApi;
+use crate::log::middleware_log;
+use crate::set_failpoints;
+use crate::{
+    accounts::AccountsApi, basic::BasicApi, check_size::PostSizeLimit, context::Context,
+    error_converter::convert_error, events::EventsApi, index::IndexApi, state::StateApi,
+    transactions::TransactionsApi,
+};
 use anyhow::Context as AnyhowContext;
-use aptos_config::config::{ApiConfig, NodeConfig};
+use aptos_config::config::NodeConfig;
+use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
 use aptos_types::chain_id::ChainId;
-use std::{convert::Infallible, net::SocketAddr, sync::Arc};
+use poem::{
+    http::{header, Method},
+    listener::{Listener, RustlsCertificate, RustlsConfig, TcpListener},
+    middleware::Cors,
+    EndpointExt, Route, Server,
+};
+use poem_openapi::{ContactObject, LicenseObject, OpenApiService};
 use storage_interface::DbReader;
-use tokio::runtime::{Builder, Runtime};
-use warp::{Filter, Reply};
-use warp_reverse_proxy::reverse_proxy_filter;
+use tokio::runtime::{Builder, Handle, Runtime};
 
-/// Creates HTTP server (warp-based) serves for both REST and JSON-RPC API.
-/// When api and json-rpc are configured with same port, both API will be served for the port.
-/// When api and json-rpc are configured with different port, both API will be served for
-/// both ports.
-/// Returns corresponding Tokio runtime
+const VERSION: &str = include_str!("../doc/.version");
+
+/// Create a runtime and attach the Poem webserver to it.
 pub fn bootstrap(
     config: &NodeConfig,
     chain_id: ChainId,
@@ -28,90 +40,178 @@ pub fn bootstrap(
         .enable_all()
         .build()
         .context("[api] failed to create runtime")?;
+
     let context = Context::new(chain_id, db, mp_sender, config.clone());
 
-    // Poem will run on a different port.
-    let poem_address = attach_poem_to_runtime(runtime.handle(), context.clone(), config)
+    attach_poem_to_runtime(runtime.handle(), context, config, false)
         .context("Failed to attach poem to runtime")?;
-
-    let api = WebServer::from(config.api.clone());
-    runtime.spawn(async move {
-        let routes = get_routes_with_poem(poem_address, context);
-        api.serve(routes).await;
-    });
 
     Ok(runtime)
 }
 
-// TODO: This proxy is temporary while we have both APIs running.
-pub fn get_routes_with_poem(
-    poem_address: SocketAddr,
+// TODOs regarding spec generation:
+// TODO: https://github.com/aptos-labs/aptos-core/issues/2280
+// TODO: https://github.com/poem-web/poem/issues/321
+// TODO: https://github.com/poem-web/poem/issues/332
+// TODO: https://github.com/poem-web/poem/issues/333
+
+pub fn get_api_service(
+    context: Arc<Context>,
+) -> OpenApiService<
+    (
+        AccountsApi,
+        BasicApi,
+        BlocksApi,
+        EventsApi,
+        IndexApi,
+        StateApi,
+        TransactionsApi,
+    ),
+    (),
+> {
+    // These APIs get merged.
+    let apis = (
+        AccountsApi {
+            context: context.clone(),
+        },
+        BasicApi {
+            context: context.clone(),
+        },
+        BlocksApi {
+            context: context.clone(),
+        },
+        EventsApi {
+            context: context.clone(),
+        },
+        IndexApi {
+            context: context.clone(),
+        },
+        StateApi {
+            context: context.clone(),
+        },
+        TransactionsApi { context },
+    );
+
+    let version = VERSION.to_string();
+    let license =
+        LicenseObject::new("Apache 2.0").url("https://www.apache.org/licenses/LICENSE-2.0.html");
+    let contact = ContactObject::new()
+        .name("Aptos Labs")
+        .url("https://github.com/aptos-labs/aptos-core");
+
+    OpenApiService::new(apis, "Aptos Node API", version.trim())
+        .server("/v1")
+        .description("The Aptos Node API is a RESTful API for client applications to interact with the Aptos blockchain.")
+        .license(license)
+        .contact(contact)
+        .external_document("https://github.com/aptos-labs/aptos-core")
+}
+
+/// Returns address it is running at.
+pub fn attach_poem_to_runtime(
+    runtime_handle: &Handle,
     context: Context,
-) -> impl Filter<Extract = impl Reply, Error = Infallible> + Clone {
-    let proxy = warp::path!("v1" / ..).and(reverse_proxy_filter(
-        "v1".to_string(),
-        format!("http://{}", poem_address),
-    ));
-    proxy.or(index::routes(context))
-}
+    config: &NodeConfig,
+    random_port: bool,
+) -> anyhow::Result<SocketAddr> {
+    let context = Arc::new(context);
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct WebServer {
-    pub address: SocketAddr,
-    pub tls_cert_path: Option<String>,
-    pub tls_key_path: Option<String>,
-}
+    let size_limit = context.content_length_limit();
 
-impl From<ApiConfig> for WebServer {
-    fn from(cfg: ApiConfig) -> Self {
-        Self::new(cfg.address, cfg.tls_cert_path, cfg.tls_key_path)
+    let api_service = get_api_service(context.clone());
+
+    let spec_json = api_service.spec_endpoint();
+    let spec_yaml = api_service.spec_endpoint_yaml();
+
+    let mut address = config.api.address;
+
+    if random_port {
+        // Let the OS assign an open port.
+        address.set_port(0);
     }
-}
 
-impl WebServer {
-    pub fn new(
-        address: SocketAddr,
-        tls_cert_path: Option<String>,
-        tls_key_path: Option<String>,
-    ) -> Self {
-        Self {
-            address,
-            tls_cert_path,
-            tls_key_path,
+    let listener = match (&config.api.tls_cert_path, &config.api.tls_key_path) {
+        (Some(tls_cert_path), Some(tls_key_path)) => {
+            info!("Using TLS for API");
+            let cert = std::fs::read_to_string(tls_cert_path).context(format!(
+                "Failed to read TLS cert from path: {}",
+                tls_cert_path
+            ))?;
+            let key = std::fs::read_to_string(tls_key_path).context(format!(
+                "Failed to read TLS key from path: {}",
+                tls_key_path
+            ))?;
+            let rustls_certificate = RustlsCertificate::new().cert(cert).key(key);
+            let rustls_config = RustlsConfig::new().fallback(rustls_certificate);
+            TcpListener::bind(address).rustls(rustls_config).boxed()
         }
-    }
-
-    pub async fn serve<F>(&self, routes: F)
-    where
-        F: Filter<Error = Infallible> + Clone + Sync + Send + 'static,
-        F::Extract: Reply,
-    {
-        match &self.tls_cert_path {
-            None => warp::serve(routes).bind(self.address).await,
-            Some(cert_path) => {
-                warp::serve(routes)
-                    .tls()
-                    .cert_path(cert_path)
-                    .key_path(self.tls_key_path.as_ref().unwrap())
-                    .bind(self.address)
-                    .await
-            }
+        _ => {
+            info!("Not using TLS for API");
+            TcpListener::bind(address).boxed()
         }
-    }
+    };
+
+    let acceptor = tokio::task::block_in_place(move || {
+        runtime_handle
+            .block_on(async move { listener.into_acceptor().await })
+            .with_context(|| format!("Failed to bind Poem to address: {}", address))
+    })?;
+
+    let actual_address = &acceptor.local_addr()[0];
+    let actual_address = *actual_address
+        .as_socket_addr()
+        .context("Failed to get socket addr from local addr for Poem webserver")?;
+    runtime_handle.spawn(async move {
+        let cors = Cors::new()
+            .allow_methods(vec![Method::GET, Method::POST])
+            .allow_headers(vec![header::CONTENT_TYPE, header::ACCEPT]);
+        let route = Route::new()
+            .nest(
+                "/v1",
+                Route::new()
+                    .nest("/", api_service)
+                    .at("/spec.json", spec_json)
+                    .at("/spec.yaml", spec_yaml)
+                    // TODO: We add this manually outside of the OpenAPI spec for now.
+                    // https://github.com/poem-web/poem/issues/364
+                    .at(
+                        "/set_failpoint",
+                        poem::get(set_failpoints::set_failpoint_poem).data(context.clone()),
+                    ),
+            )
+            .with(cors)
+            .with(PostSizeLimit::new(size_limit))
+            // NOTE: Make sure to keep this after all the `with` middleware.
+            .catch_all_error(convert_error)
+            .around(middleware_log);
+        Server::new_with_acceptor(acceptor)
+            .run(route)
+            .await
+            .map_err(anyhow::Error::msg)
+    });
+
+    info!(
+        "Poem is running at {}, behind the reverse proxy at the API port",
+        actual_address
+    );
+
+    Ok(actual_address)
 }
 
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
 
+    use aptos_api_test_context::{new_test_context, TestContext};
     use aptos_config::config::NodeConfig;
     use aptos_types::chain_id::ChainId;
 
-    use crate::{
-        runtime::bootstrap,
-        tests::{new_test_context, TestContext},
-    };
+    use super::bootstrap;
 
+    // TODO: Unignore this when I figure out why this only works when being
+    // run alone (it fails when run with other tests).
+    // https://github.com/aptos-labs/aptos-core/issues/2977
+    #[ignore]
     #[test]
     fn test_bootstrap_jsonprc_and_api_configured_at_different_port() {
         let mut cfg = NodeConfig::default();
@@ -136,7 +236,7 @@ mod tests {
     }
 
     pub fn assert_web_server(port: u16) {
-        let base_url = format!("http://localhost:{}", port);
+        let base_url = format!("http://localhost:{}/v1", port);
         let client = reqwest::blocking::Client::new();
         // first call have retry to ensure the server is ready to serve
         let api_resp = with_retry(|| Ok(client.get(&base_url).send()?)).unwrap();
@@ -166,6 +266,6 @@ mod tests {
     }
 
     pub async fn new_test_context_async(test_name: String) -> TestContext {
-        new_test_context(test_name, "v0")
+        new_test_context(test_name, false)
     }
 }

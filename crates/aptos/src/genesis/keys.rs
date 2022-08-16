@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::common::types::OptionalPoolAddressArgs;
 use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
+use crate::genesis::git::LAYOUT_FILE;
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions, RngArgs},
@@ -11,6 +13,7 @@ use crate::{
     CliCommand,
 };
 use aptos_crypto::{bls12381, PrivateKey};
+use aptos_genesis::config::Layout;
 use aptos_genesis::{
     config::{HostAndPort, ValidatorConfiguration},
     keys::{generate_key_objects, PrivateIdentity},
@@ -27,10 +30,12 @@ const VFN_FILE: &str = "validator-full-node-identity.yaml";
 #[derive(Parser)]
 pub struct GenerateKeys {
     #[clap(flatten)]
+    pub(crate) pool_address_args: OptionalPoolAddressArgs,
+    #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
     #[clap(flatten)]
     pub rng_args: RngArgs,
-    /// Output path for the three keys
+    /// Output directory for the key files
     #[clap(long, parse(from_os_str))]
     pub(crate) output_dir: Option<PathBuf>,
 }
@@ -52,8 +57,14 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
         check_if_file_exists(vfn_file.as_path(), self.prompt_options)?;
 
         let mut key_generator = self.rng_args.key_generator()?;
-        let (validator_blob, vfn_blob, private_identity) =
+        let (mut validator_blob, mut vfn_blob, private_identity) =
             generate_key_objects(&mut key_generator)?;
+
+        // Allow for the owner to be different than the operator
+        if let Some(pool_address) = self.pool_address_args.pool_address() {
+            validator_blob.account_address = Some(pool_address);
+            vfn_blob.account_address = Some(pool_address);
+        }
 
         // Create the directory if it doesn't exist
         create_dir_if_not_exist(output_dir.as_path())?;
@@ -73,21 +84,21 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
     }
 }
 
-/// Set ValidatorConfiguration for a single validator in the git repository
+/// Set validator configuration for a single validator in the git repository
 #[derive(Parser)]
 pub struct SetValidatorConfiguration {
-    /// Username
+    /// Name of validator
     #[clap(long)]
     pub(crate) username: String,
     #[clap(flatten)]
     pub(crate) git_options: GitOptions,
-    /// Path to folder with account.key, consensus.key, and network.key
+    /// Path to directory used in GenerateKeys
     #[clap(long, parse(from_os_str))]
     pub(crate) keys_dir: Option<PathBuf>,
-    /// Host and port pair for the validator e.g. 127.0.0.1:6180
+    /// Host and port pair for the validator e.g. 127.0.0.1:6180 or aptoslabs.com:6180
     #[clap(long)]
     pub(crate) validator_host: HostAndPort,
-    /// Host and port pair for the fullnode e.g. 127.0.0.1:6180
+    /// Host and port pair for the fullnode e.g. 127.0.0.1:6180 or aptoslabs.com:6180
     #[clap(long)]
     pub(crate) full_node_host: Option<HostAndPort>,
     /// Stake amount for stake distribution
@@ -132,8 +143,40 @@ impl CliCommand<()> for SetValidatorConfiguration {
             stake_amount: self.stake_amount,
         };
 
+        let file = PathBuf::from(format!("{}.yaml", self.username));
         self.git_options
             .get_client()?
-            .put(&self.username, &credentials)
+            .put(file.as_path(), &credentials)
+    }
+}
+
+/// Generate a Layout template file with empty values
+///
+/// This will generate a layout template file for genesis with some default values.  To start a
+/// new chain, these defaults should be carefully thought through and chosen.
+#[derive(Parser)]
+pub struct GenerateLayoutTemplate {
+    /// Path of the output layout template
+    #[clap(long, parse(from_os_str), default_value = LAYOUT_FILE)]
+    pub(crate) output_file: PathBuf,
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
+}
+
+#[async_trait]
+impl CliCommand<()> for GenerateLayoutTemplate {
+    fn command_name(&self) -> &'static str {
+        "GenerateLayoutTemplate"
+    }
+
+    async fn execute(self) -> CliTypedResult<()> {
+        check_if_file_exists(self.output_file.as_path(), self.prompt_options)?;
+        let layout = Layout::default();
+
+        write_to_user_only_file(
+            self.output_file.as_path(),
+            &self.output_file.display().to_string(),
+            to_yaml(&layout)?.as_bytes(),
+        )
     }
 }

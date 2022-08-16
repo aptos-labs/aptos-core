@@ -177,7 +177,7 @@ function App() {
   // ...
 
   // Use the AptosClient to retrieve details about the account.
-  const [account, setAccount] = React.useState<Types.Account | null>(null);
+  const [account, setAccount] = React.useState<Types.AccountData | null>(null);
   React.useEffect(() => {
     if (!address) return;
     client.getAccount(address).then(setAccount);

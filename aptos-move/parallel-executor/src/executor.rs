@@ -11,16 +11,7 @@ use aptos_infallible::Mutex;
 use mvhashmap::MVHashMap;
 use num_cpus;
 use once_cell::sync::Lazy;
-use std::{
-    collections::HashSet,
-    hash::Hash,
-    marker::PhantomData,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    thread::spawn,
-};
+use std::{collections::HashSet, hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
 
 static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -148,7 +139,7 @@ where
         versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
         scheduler: &'a Scheduler,
         executor: &E,
-    ) -> anyhow::Result<SchedulerTask<'a>> {
+    ) -> SchedulerTask<'a> {
         let (idx_to_execute, incarnation) = version;
         let txn = &signature_verified_block[idx_to_execute];
 
@@ -201,8 +192,8 @@ where
             versioned_data_cache.delete(k, idx_to_execute);
         }
 
-        last_input_output.record(idx_to_execute, state_view.take_reads(), result)?;
-        Ok(scheduler.finish_execution(idx_to_execute, incarnation, writes_outside, guard))
+        last_input_output.record(idx_to_execute, state_view.take_reads(), result);
+        scheduler.finish_execution(idx_to_execute, incarnation, writes_outside, guard)
     }
 
     fn validate<'a>(
@@ -255,16 +246,12 @@ where
         >,
         versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
         scheduler: &Scheduler,
-        module_publish_may_race: &AtomicBool,
     ) {
         // Make executor for each task. TODO: fast concurrent executor.
         let executor = E::init(*executor_arguments);
 
         let mut scheduler_task = SchedulerTask::NoTask;
         loop {
-            if module_publish_may_race.load(Ordering::Acquire) {
-                break;
-            }
             scheduler_task = match scheduler_task {
                 SchedulerTask::ValidationTask(version_to_validate, guard) => self.validate(
                     version_to_validate,
@@ -273,23 +260,15 @@ where
                     versioned_data_cache,
                     scheduler,
                 ),
-                SchedulerTask::ExecutionTask(version_to_execute, None, guard) => {
-                    match self.execute(
-                        version_to_execute,
-                        guard,
-                        block,
-                        last_input_output,
-                        versioned_data_cache,
-                        scheduler,
-                        &executor,
-                    ) {
-                        Ok(task) => task,
-                        Err(_) => {
-                            module_publish_may_race.store(true, Ordering::Release);
-                            break;
-                        }
-                    }
-                }
+                SchedulerTask::ExecutionTask(version_to_execute, None, guard) => self.execute(
+                    version_to_execute,
+                    guard,
+                    block,
+                    last_input_output,
+                    versioned_data_cache,
+                    scheduler,
+                    &executor,
+                ),
                 SchedulerTask::ExecutionTask(_, Some(condvar), _guard) => {
                     let (lock, cvar) = &*condvar;
                     // Mark dependency resolved.
@@ -320,7 +299,6 @@ where
         let versioned_data_cache = MVHashMap::new();
         let last_input_output = TxnLastInputOutput::new(num_txns);
         let scheduler = Scheduler::new(num_txns);
-        let module_publish_may_race = AtomicBool::new(false);
 
         RAYON_EXEC_POOL.scope(|s| {
             for _ in 0..self.concurrency_level {
@@ -331,7 +309,6 @@ where
                         &last_input_output,
                         &versioned_data_cache,
                         &scheduler,
-                        &module_publish_may_race,
                     );
                 });
             }
@@ -341,7 +318,7 @@ where
         let num_txns = scheduler.num_txn_to_execute();
         let mut final_results = Vec::with_capacity(num_txns);
 
-        let maybe_err = if module_publish_may_race.load(Ordering::Acquire) {
+        let maybe_err = if last_input_output.module_publishing_may_race() {
             Some(Error::ModulePathReadWrite)
         } else {
             let mut ret = None;

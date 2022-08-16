@@ -8,10 +8,10 @@ use crate::{
 };
 use aptos_crypto::hash::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    multi_signature::MultiSignature,
 };
 use mirai_annotations::*;
 use serde::{Deserialize, Serialize};
@@ -263,7 +263,7 @@ fn test_reconfiguration_suffix() {
         ),
     );
     let reconfig_suffix_block = BlockData::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(),
         AccountAddress::random(),
         Vec::new(),
         2,

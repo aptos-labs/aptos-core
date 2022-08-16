@@ -50,8 +50,7 @@ impl NetworkTest for NetworkBandwidthTest {
         ctx.swarm().remove_chaos(bandwidth)?;
 
         // ensure we meet the success criteria
-        ctx.success_criteria()
-            .check_for_success(&txn_stat, &duration)?;
+        ctx.check_for_success(&txn_stat, &duration)?;
 
         Ok(())
     }

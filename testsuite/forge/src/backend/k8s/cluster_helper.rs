@@ -146,7 +146,8 @@ async fn wait_node_haproxy(
     .await
 }
 
-/// Waits for all given K8sNodes to be ready. Called when the testnet is first started.
+/// Waits for all given K8sNodes to be ready. Called when the testnet is first started, so we may have to wait a while for
+/// machines to be provisioned by the cloud provider.
 async fn wait_nodes_stateful_set(
     kube_client: &K8sClient,
     kube_namespace: &str,
@@ -154,8 +155,10 @@ async fn wait_nodes_stateful_set(
 ) -> Result<()> {
     // wait for all nodes healthy
     for node in nodes.values() {
-        // retry for ~20 min exponentially
-        let retry_policy = RetryPolicy::exponential(Duration::from_secs(5)).with_max_retries(5);
+        // retry exponentially until 1 min, then every 1 min until ~22 min
+        let retry_policy = RetryPolicy::exponential(Duration::from_secs(5))
+            .with_max_retries(25)
+            .with_max_delay(Duration::from_secs(60));
         wait_stateful_set(
             kube_client,
             kube_namespace,

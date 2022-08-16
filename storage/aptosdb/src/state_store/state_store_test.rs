@@ -27,7 +27,7 @@ fn put_value_set(
 ) -> HashValue {
     let value_set: HashMap<_, _> = value_set
         .iter()
-        .map(|(key, value)| (key.clone(), value.clone()))
+        .map(|(key, value)| (key.clone(), Some(value.clone())))
         .collect();
     let jmt_updates = jmt_updates(&value_set);
 
@@ -49,7 +49,12 @@ fn prune_stale_indices(
     limit: usize,
 ) -> Version {
     state_pruner
-        .prune_state_store(min_readable_version, target_min_readable_version, limit)
+        .prune_state_store(
+            min_readable_version,
+            target_min_readable_version,
+            limit,
+            None,
+        )
         .unwrap()
 }
 
@@ -772,7 +777,7 @@ fn update_store(
     first_version: Version,
 ) {
     for (i, (key, value)) in input.enumerate() {
-        let value_state_set = vec![(key, value)].into_iter().collect();
+        let value_state_set = vec![(key, Some(value))].into_iter().collect();
         let jmt_updates = jmt_updates(&value_state_set);
         let version = first_version + i as Version;
         store

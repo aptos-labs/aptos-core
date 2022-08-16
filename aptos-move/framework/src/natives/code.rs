@@ -30,7 +30,7 @@ pub struct PackageRegistry {
     pub packages: Vec<PackageMetadata>,
 }
 
-/// The PackakeMetadata type.
+/// The PackageMetadata type.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PackageMetadata {
     /// Name of this package.

@@ -40,7 +40,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                     state
                         .updates_since_base
                         .iter()
-                        .map(|(k, v)| (k.hash(), v))
+                        .map(|(k, v)| (k.hash(), v.as_ref()))
                         .collect(),
                     &ProofReader::new_empty(),
                 )
@@ -61,7 +61,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                 state
                     .updates_since_base
                     .iter()
-                    .map(|(k, v)| (k.hash(), v))
+                    .map(|(k, v)| (k.hash(), v.as_ref()))
                     .collect(),
                 &ProofReader::new_empty(),
             )
@@ -201,7 +201,7 @@ fn verify_epochs(db: &AptosDB, ledger_infos_with_sigs: &[LedgerInfoWithSignature
 }
 
 fn gen_snapshot_version(
-    updates: &mut HashMap<StateKey, StateValue>,
+    updates: &mut HashMap<StateKey, Option<StateValue>>,
     txns_to_commit: &[TransactionToCommit],
     cur_ver: Version,
     threshold: usize,
@@ -343,7 +343,7 @@ fn verify_snapshots(
     txns_to_commit: Vec<&TransactionToCommit>,
 ) {
     let mut cur_version = start_version;
-    let mut updates: HashMap<&StateKey, &StateValue> = HashMap::new();
+    let mut updates: HashMap<&StateKey, Option<&StateValue>> = HashMap::new();
     for snapshot_version in snapshot_versions {
         let start = (cur_version - start_version) as usize;
         let end = (snapshot_version - start_version) as usize;
@@ -357,14 +357,18 @@ fn verify_snapshots(
         updates.extend(
             txns_to_commit[start..=end]
                 .iter()
-                .flat_map(|x| x.state_updates().iter())
-                .collect::<HashMap<&StateKey, &StateValue>>(),
+                .flat_map(|x| {
+                    x.state_updates()
+                        .iter()
+                        .map(|(k, v_opt)| (k, v_opt.as_ref()))
+                })
+                .collect::<HashMap<&StateKey, Option<&StateValue>>>(),
         );
         for (state_key, state_value) in &updates {
             let (state_value_in_db, proof) = db
                 .get_state_value_with_proof_by_version(state_key, snapshot_version)
                 .unwrap();
-            assert_eq!(state_value_in_db, Some((*state_value).clone()));
+            assert_eq!(state_value_in_db.as_ref(), *state_value);
             proof
                 .verify(
                     expected_root_hash,
@@ -619,7 +623,7 @@ pub fn verify_committed_transactions(
         for (state_key, state_value) in txn_to_commit.state_updates() {
             updates.insert(state_key, state_value);
             let state_value_in_db = db.get_state_value_by_version(state_key, cur_ver).unwrap();
-            assert_eq!(state_value_in_db, Some(state_value.clone()));
+            assert_eq!(state_value_in_db, *state_value);
         }
 
         if !txn_to_commit.is_state_checkpoint() {
@@ -717,10 +721,10 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
         .put::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version), &leaf_node)
         .unwrap();
     let smt = SparseMerkleTree::<StateValue>::default()
-        .batch_update(vec![(key.hash(), &value)], &ProofReader::new_empty())
+        .batch_update(vec![(key.hash(), Some(&value))], &ProofReader::new_empty())
         .unwrap();
     db.ledger_db
-        .put::<StateValueSchema>(&(key.clone(), version), &value)
+        .put::<StateValueSchema>(&(key.clone(), version), &Some(value.clone()))
         .unwrap();
     let mut in_memory_state = db
         .state_store
@@ -730,7 +734,7 @@ pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: S
         .clone();
     in_memory_state.current = smt;
     in_memory_state.current_version = Some(version);
-    in_memory_state.updates_since_base.insert(key, value);
+    in_memory_state.updates_since_base.insert(key, Some(value));
     db.state_store
         .buffered_state()
         .lock()

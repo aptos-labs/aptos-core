@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { Deserializer, Serializer, Bytes, Seq, deserializeVector, serializeVector } from "../bcs";
 
 import { ModuleId } from "./transaction";

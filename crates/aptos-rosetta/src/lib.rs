@@ -11,12 +11,12 @@ use crate::{
     common::{handle_request, with_context},
     error::{ApiError, ApiResult},
 };
-use aptos_api::runtime::WebServer;
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
-use aptos_rest_client::aptos_api_types::Error;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
+use aptos_warp_webserver::WebServer;
+use aptos_warp_webserver::{logger, Error};
 use std::collections::BTreeMap;
 use std::{convert::Infallible, sync::Arc};
 use tokio::sync::Mutex;
@@ -143,7 +143,7 @@ pub fn routes(
                 .allow_methods(vec![Method::GET, Method::POST])
                 .allow_headers(vec![warp::http::header::CONTENT_TYPE]),
         )
-        .with(aptos_api::log::logger())
+        .with(logger())
         .recover(handle_rejection)
 }
 

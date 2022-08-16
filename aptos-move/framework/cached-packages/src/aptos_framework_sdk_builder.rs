@@ -48,15 +48,18 @@ pub enum ScriptFunctionCall {
         amount: u64,
     },
 
+    /// Only callable in tests and testnets where the core resources account exists.
     /// Claim the delegated mint capability and destroy the delegated token.
     AptosCoinClaimMintCapability {},
 
+    /// Only callable in tests and testnets where the core resources account exists.
     /// Create delegated token for the address so the account could claim MintCapability later.
     AptosCoinDelegateMintCapability {
         to: AccountAddress,
     },
 
-    /// Create new test coins and deposit them into dst_addr's account.
+    /// Only callable in tests and testnets where the core resources account exists.
+    /// Create new coins and deposit them into dst_addr's account.
     AptosCoinMint {
         dst_addr: AccountAddress,
         amount: u64,
@@ -116,7 +119,7 @@ pub enum ScriptFunctionCall {
         coin_type: TypeTag,
         name: Vec<u8>,
         symbol: Vec<u8>,
-        decimals: u64,
+        decimals: u8,
         monitor_supply: bool,
     },
 
@@ -183,6 +186,11 @@ pub enum ScriptFunctionCall {
     /// Can only be called by the operator of the validator/staking pool.
     StakeLeaveValidatorSet {
         pool_address: AccountAddress,
+    },
+
+    /// Move `amount` of coins from pending_inactive to active.
+    StakeReactivateStake {
+        amount: u64,
     },
 
     /// Rotate the consensus key of the validator, it'll take effect in next epoch.
@@ -307,6 +315,7 @@ impl ScriptFunctionCall {
             ),
             StakeJoinValidatorSet { pool_address } => stake_join_validator_set(pool_address),
             StakeLeaveValidatorSet { pool_address } => stake_leave_validator_set(pool_address),
+            StakeReactivateStake { amount } => stake_reactivate_stake(amount),
             StakeRotateConsensusKey {
                 pool_address,
                 new_consensus_pubkey,
@@ -396,6 +405,7 @@ pub fn account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
     ))
 }
 
+/// Only callable in tests and testnets where the core resources account exists.
 /// Claim the delegated mint capability and destroy the delegated token.
 pub fn aptos_coin_claim_mint_capability() -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -412,6 +422,7 @@ pub fn aptos_coin_claim_mint_capability() -> TransactionPayload {
     ))
 }
 
+/// Only callable in tests and testnets where the core resources account exists.
 /// Create delegated token for the address so the account could claim MintCapability later.
 pub fn aptos_coin_delegate_mint_capability(to: AccountAddress) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -428,7 +439,8 @@ pub fn aptos_coin_delegate_mint_capability(to: AccountAddress) -> TransactionPay
     ))
 }
 
-/// Create new test coins and deposit them into dst_addr's account.
+/// Only callable in tests and testnets where the core resources account exists.
+/// Create new coins and deposit them into dst_addr's account.
 pub fn aptos_coin_mint(dst_addr: AccountAddress, amount: u64) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
@@ -593,7 +605,7 @@ pub fn managed_coin_initialize(
     coin_type: TypeTag,
     name: Vec<u8>,
     symbol: Vec<u8>,
-    decimals: u64,
+    decimals: u8,
     monitor_supply: bool,
 ) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
@@ -814,6 +826,22 @@ pub fn stake_leave_validator_set(pool_address: AccountAddress) -> TransactionPay
         ident_str!("leave_validator_set").to_owned(),
         vec![],
         vec![bcs::to_bytes(&pool_address).unwrap()],
+    ))
+}
+
+/// Move `amount` of coins from pending_inactive to active.
+pub fn stake_reactivate_stake(amount: u64) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("stake").to_owned(),
+        ),
+        ident_str!("reactivate_stake").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&amount).unwrap()],
     ))
 }
 
@@ -1218,6 +1246,16 @@ mod decoder {
         }
     }
 
+    pub fn stake_reactivate_stake(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::StakeReactivateStake {
+                amount: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn stake_rotate_consensus_key(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::StakeRotateConsensusKey {
@@ -1402,6 +1440,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "stake_leave_validator_set".to_string(),
             Box::new(decoder::stake_leave_validator_set),
+        );
+        map.insert(
+            "stake_reactivate_stake".to_string(),
+            Box::new(decoder::stake_reactivate_stake),
         );
         map.insert(
             "stake_rotate_consensus_key".to_string(),

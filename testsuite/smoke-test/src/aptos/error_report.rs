@@ -4,7 +4,7 @@
 use aptos_sdk::{transaction_builder::TransactionBuilder, types::LocalAccount};
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
-    account_address::AccountAddress, account_config::aptos_root_address, chain_id::ChainId,
+    account_address::AccountAddress, account_config::aptos_test_root_address, chain_id::ChainId,
 };
 use forge::{AptosPublicInfo, Swarm};
 
@@ -75,7 +75,7 @@ async fn test_error_report() {
     submit_and_check_err(
         &local_account,
         &mut info,
-        |t| t.sender(aptos_root_address()),
+        |t| t.sender(aptos_test_root_address()),
         "SEQUENCE_NUMBER_TOO_OLD",
     )
     .await;
@@ -84,7 +84,7 @@ async fn test_error_report() {
         &local_account,
         &mut info,
         |t| {
-            t.sender(aptos_root_address())
+            t.sender(aptos_test_root_address())
                 .sequence_number(root_account_sequence_number)
         },
         "INVALID_AUTH_KEY",

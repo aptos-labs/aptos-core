@@ -655,24 +655,13 @@ fn spawn_state_snapshot_receiver<
                                     "Failed to finish the state value synchronization! Error: {:?}",
                                     error
                                 ))
-                            } else if let Err(error) = storage
-                                .writer
-                                .finalize_state_snapshot(version, target_output_with_proof)
-                            {
+                            } else if let Err(error) = storage.writer.finalize_state_snapshot(
+                                version,
+                                target_output_with_proof,
+                                &epoch_change_proofs,
+                            ) {
                                 Err(format!(
                                     "Failed to finalize the state snapshot! Error: {:?}",
-                                    error
-                                ))
-                            } else if let Err(error) =
-                                storage.writer.save_ledger_infos(&epoch_change_proofs)
-                            {
-                                Err(format!(
-                                    "Failed to save all epoch ending ledger infos! Error: {:?}",
-                                    error
-                                ))
-                            } else if let Err(error) = storage.writer.delete_genesis() {
-                                Err(format!(
-                                    "Failed to delete the genesis transaction! Error: {:?}",
                                     error
                                 ))
                             } else if let Err(error) = metadata_storage

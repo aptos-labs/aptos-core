@@ -27,8 +27,7 @@ impl NetworkTest for PerformanceBenchmarkWithFN {
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
         // ensure we meet the success criteria
-        ctx.success_criteria()
-            .check_for_success(&txn_stat, &duration)?;
+        ctx.check_for_success(&txn_stat, &duration)?;
 
         Ok(())
     }

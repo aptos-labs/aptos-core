@@ -718,7 +718,12 @@ pub struct CoinStoreResourceGen {
 
 impl CoinStoreResourceGen {
     pub fn materialize(self) -> CoinStoreResource {
-        CoinStoreResource::new(self.coin, EventHandle::random(0), EventHandle::random(0))
+        CoinStoreResource::new(
+            self.coin,
+            false,
+            EventHandle::random(0),
+            EventHandle::random(0),
+        )
     }
 }
 
@@ -842,7 +847,7 @@ impl TransactionToCommitGen {
                     .map(move |(key, value)| {
                         let state_key = StateKey::AccessPath(AccessPath::new(address, key));
                         (
-                            (state_key.clone(), StateValue::from(value.clone())),
+                            (state_key.clone(), Some(StateValue::from(value.clone()))),
                             (state_key, WriteOp::Value(value)),
                         )
                     })

@@ -4,7 +4,7 @@
 use anyhow::Result;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::aptos_root_address,
+    account_config::aptos_test_root_address,
     transaction::{Script, WriteSetPayload},
 };
 use handlebars::Handlebars;
@@ -70,7 +70,7 @@ pub fn remove_validators_payload(validators: Vec<AccountAddress>) -> WriteSetPay
 
     WriteSetPayload::Script {
         script,
-        execute_as: aptos_root_address(),
+        execute_as: aptos_test_root_address(),
     }
 }
 
@@ -93,7 +93,7 @@ pub fn custom_script<T: Serialize>(
 
     WriteSetPayload::Script {
         script,
-        execute_as: execute_as.unwrap_or_else(aptos_root_address),
+        execute_as: execute_as.unwrap_or_else(aptos_test_root_address),
     }
 }
 
@@ -107,6 +107,6 @@ pub fn halt_network_payload() -> WriteSetPayload {
             vec![],
             vec![],
         ),
-        execute_as: aptos_root_address(),
+        execute_as: aptos_test_root_address(),
     }
 }

@@ -60,8 +60,11 @@ use std::{
 use tokio::task;
 use transactional_tests_runner::TransactionalTestOpts;
 
-/// CLI tool for performing Move tasks
+/// Tool for Move related operations
 ///
+/// This tool lets you compile, test, and publish Move code, in addition
+/// to run any other tools that help run, verify, or provide information
+/// about this code.
 #[derive(Subcommand)]
 pub enum MoveTool {
     Compile(CompilePackage),
@@ -304,13 +307,16 @@ impl CliCommand<&'static str> for ProvePackage {
 
         match result {
             Ok(_) => Ok("Success"),
-            Err(_) => Err(CliError::MoveProverError),
+            Err(err) => Err(CliError::MoveProverError(err.to_string())),
         }
     }
 }
 
 /// Compiles a Move package dir, and returns the compiled modules.
-fn compile_move(build_config: BuildConfig, package_dir: &Path) -> CliTypedResult<CompiledPackage> {
+pub(crate) fn compile_move(
+    build_config: BuildConfig,
+    package_dir: &Path,
+) -> CliTypedResult<CompiledPackage> {
     // TODO: Add caching
     build_config
         .compile_package(package_dir, &mut Vec::new())
@@ -549,7 +555,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
 }
 
 #[derive(Clone, Debug)]
-enum FunctionArgType {
+pub(crate) enum FunctionArgType {
     Address,
     Bool,
     Hex,
@@ -608,8 +614,8 @@ impl FromStr for FunctionArgType {
 
 /// A parseable arg with a type separated by a colon
 pub struct ArgWithType {
-    _ty: FunctionArgType,
-    arg: Vec<u8>,
+    pub(crate) _ty: FunctionArgType,
+    pub(crate) arg: Vec<u8>,
 }
 
 impl FromStr for ArgWithType {

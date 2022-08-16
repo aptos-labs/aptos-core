@@ -2,6 +2,7 @@ module aptos_framework::account {
     use std::bcs;
     use std::error;
     use std::hash;
+    use std::option::{Self, Option};
     use std::signer;
     use std::vector;
     use aptos_std::event::{Self, EventHandle};
@@ -21,6 +22,8 @@ module aptos_framework::account {
         authentication_key: vector<u8>,
         sequence_number: u64,
         coin_register_events: EventHandle<CoinRegisterEvent>,
+        rotation_capability_offer: CapabilityOffer<RotationCapability>,
+        signer_capability_offer: CapabilityOffer<SignerCapability>,
     }
 
     struct CoinRegisterEvent has drop, store {
@@ -40,6 +43,8 @@ module aptos_framework::account {
         writeset_epilogue_name: vector<u8>,
     }
 
+    struct CapabilityOffer<phantom T> has store { for: Option<address> }
+    struct RotationCapability has drop, store { account: address }
     struct SignerCapability has drop, store { account: address }
 
     const MAX_U64: u128 = 18446744073709551615;
@@ -86,7 +91,8 @@ module aptos_framework::account {
     native fun create_address(bytes: vector<u8>): address;
     native fun create_signer(addr: address): signer;
 
-    public fun initialize(account: &signer,
+    public(friend) fun initialize(
+        account: &signer,
         module_addr: address,
         module_name: vector<u8>,
         script_prologue_name: vector<u8>,
@@ -108,19 +114,6 @@ module aptos_framework::account {
             user_epilogue_name,
             writeset_epilogue_name,
         });
-    }
-
-    /// Construct an authentication key, aborting if the prefix is not valid.
-    fun create_authentication_key(account: &signer, auth_key_prefix: vector<u8>): vector<u8> {
-        let authentication_key = auth_key_prefix;
-        vector::append(
-            &mut authentication_key, bcs::to_bytes(signer::borrow_address(account))
-        );
-        assert!(
-            vector::length(&authentication_key) == 32,
-            error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
-        );
-        authentication_key
     }
 
     /// Publishes a new `Account` resource under `new_address`. A signer representing `new_address`
@@ -154,6 +147,8 @@ module aptos_framework::account {
                 authentication_key,
                 sequence_number: 0,
                 coin_register_events: event::new_event_handle<CoinRegisterEvent>(&new_account),
+                rotation_capability_offer: CapabilityOffer { for: option::none() },
+                signer_capability_offer: CapabilityOffer { for: option::none() },
             }
         );
 
@@ -172,8 +167,8 @@ module aptos_framework::account {
         *&borrow_global<Account>(addr).authentication_key
     }
 
-    public entry fun rotate_authentication_key(account: signer, new_auth_key: vector<u8>) acquires Account {
-        rotate_authentication_key_internal(&account, new_auth_key);
+    public entry fun rotate_authentication_key(account: &signer, new_auth_key: vector<u8>) acquires Account {
+        rotate_authentication_key_internal(account, new_auth_key);
     }
 
     public fun rotate_authentication_key_internal(
@@ -193,7 +188,7 @@ module aptos_framework::account {
     fun prologue_common(
         sender: signer,
         txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
+        txn_authentication_key: vector<u8>,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
@@ -208,7 +203,7 @@ module aptos_framework::account {
         assert!(exists<Account>(transaction_sender), error::invalid_argument(PROLOGUE_EACCOUNT_DNE));
         let sender_account = borrow_global<Account>(transaction_sender);
         assert!(
-            hash::sha3_256(txn_public_key) == *&sender_account.authentication_key,
+            txn_authentication_key == *&sender_account.authentication_key,
             error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
         );
         assert!(
@@ -380,7 +375,7 @@ module aptos_framework::account {
     }
 
     /// Create the account for @aptos_framework to help module upgrades on testnet.
-    public(friend) fun create_core_framework_account(): (signer, SignerCapability) {
+    public(friend) fun create_aptos_framework_account(): (signer, SignerCapability) {
         timestamp::assert_genesis();
         let signer = create_account_unchecked(@aptos_framework);
         let signer_cap = SignerCapability { account: @aptos_framework };
@@ -482,14 +477,14 @@ module aptos_framework::account {
     // Test account helpers
     ///////////////////////////////////////////////////////////////////////////
 
-    #[test(alice = @0xa11ce, mint = @0xA550C18, core = @0x1)]
-    public fun test_transfer(alice: signer, mint: signer, core: signer) acquires Account {
+    #[test(alice = @0xa11ce, core = @0x1)]
+    public fun test_transfer(alice: signer, core: signer) acquires Account {
         let bob = create_address(x"0000000000000000000000000000000000000000000000000000000000000b0b");
         let carol = create_address(x"00000000000000000000000000000000000000000000000000000000000ca501");
 
-        let (mint_cap, burn_cap) = aptos_framework::aptos_coin::initialize(&core, &mint);
+        let (burn_cap, mint_cap) = aptos_framework::aptos_coin::initialize_for_test(&core);
         create_account(signer::address_of(&alice));
-        aptos_framework::aptos_coin::mint(&mint, signer::address_of(&alice), 10000);
+        coin::deposit(signer::address_of(&alice), coin::mint(10000, &mint_cap));
         transfer(&alice, bob, 500);
         assert!(coin::balance<AptosCoin>(bob) == 500, 0);
         transfer(&alice, carol, 500);
@@ -497,8 +492,8 @@ module aptos_framework::account {
         transfer(&alice, carol, 1500);
         assert!(coin::balance<AptosCoin>(carol) == 2000, 2);
 
-        coin::destroy_mint_cap(mint_cap);
         coin::destroy_burn_cap(burn_cap);
+        coin::destroy_mint_cap(mint_cap);
         let _bob = bob;
     }
 }

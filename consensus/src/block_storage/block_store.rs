@@ -554,6 +554,9 @@ impl BlockStore {
     /// Helper function to insert the block with the qc together
     pub async fn insert_block_with_qc(&self, block: Block) -> anyhow::Result<Arc<ExecutedBlock>> {
         self.insert_single_quorum_cert(block.quorum_cert().clone())?;
+        if self.ordered_root().round() < block.quorum_cert().commit_info().round() {
+            self.commit(block.quorum_cert().clone()).await?;
+        }
         self.execute_and_insert_block(block).await
     }
 }

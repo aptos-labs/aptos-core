@@ -46,6 +46,11 @@ variable "num_fullnodes" {
   description = "Number of fullnodes"
 }
 
+variable "num_extra_instance" {
+  default     = 0
+  description = "Number of extra instances to add into node pool"
+}
+
 variable "image_tag" {
   default     = "devnet"
   description = "Docker image tag to use for the fullnode"

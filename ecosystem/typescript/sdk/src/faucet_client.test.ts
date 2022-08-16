@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { AptosClient } from "./aptos_client";
 import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
@@ -7,6 +10,13 @@ import * as Gen from "./generated/index";
 import { NODE_URL, FAUCET_URL } from "./util.test";
 
 const aptosCoin = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";
+
+test("faucet url empty", () => {
+  expect(() => {
+    const faucetClient = new FaucetClient("http://localhost:8080", "");
+    faucetClient.getAccount("0x1");
+  }).toThrow("Faucet URL cannot be empty.");
+});
 
 test(
   "full tutorial faucet flow",

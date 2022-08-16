@@ -91,20 +91,12 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(container_cpu_usage_seconds_total{container=~\"$container\"}[$interval])",
+          "expr": "rate(container_cpu_usage_seconds_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", container=~\"$container\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{container}}",
           "refId": "A"
-        },
-        {
-          "expr": "rate(container_cpu_usage_seconds_total{container_name=~\"$container\"}[$interval])",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{pod}}-{{container_name}}",
-          "refId": "B"
         }
       ],
       "thresholds": [],
@@ -190,20 +182,12 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{container=~\"$container\"}",
+          "expr": "container_memory_working_set_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", container=~\"$container\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{container}}",
           "refId": "A"
-        },
-        {
-          "expr": "container_memory_working_set_bytes{container_name=~\"$container\"}",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{pod}}-{{container_name}}",
-          "refId": "B"
         }
       ],
       "thresholds": [],
@@ -289,20 +273,12 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "container_memory_working_set_bytes{container=~\"$container\"} / container_spec_memory_limit_bytes{container=~\"$container\"}",
+          "expr": "container_memory_working_set_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", container=~\"$container\"} / container_spec_memory_limit_bytes{chain_name=~\"$chain_name\", namespace=~\"$namespace\", container=~\"$container\"}",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{container}}",
           "refId": "A"
-        },
-        {
-          "expr": "container_memory_working_set_bytes{container_name=~\"$container\"} / container_spec_memory_limit_bytes{container_name=~\"$container\"}",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{pod}}-{{container_name}}",
-          "refId": "B"
         }
       ],
       "thresholds": [],
@@ -671,20 +647,12 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rate(container_fs_reads_total{container=~\"$container\"}[$interval]) + rate(container_fs_writes_total{container=~\"$container\"}[$interval])",
+          "expr": "rate(container_fs_reads_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", container=~\"$container\"}[$interval]) + rate(container_fs_writes_total{chain_name=~\"$chain_name\", namespace=~\"$namespace\", container=~\"$container\"}[$interval])",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
           "legendFormat": "{{pod}}-{{pod}}:{{container}}:{{device}}",
           "refId": "A"
-        },
-        {
-          "expr": "rate(container_fs_reads_total{container_name=~\"$container\"}[$interval]) + rate(container_fs_writes_total{container_name=~\"$container\"}[$interval])",
-          "format": "time_series",
-          "interval": "",
-          "intervalFactor": 1,
-          "legendFormat": "{{pod}}-{{pod_name}}:{{container_name}}:{{device}}",
-          "refId": "B"
         }
       ],
       "thresholds": [],
