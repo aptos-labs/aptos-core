@@ -3,6 +3,7 @@
 
 #![forbid(unsafe_code)]
 
+use crate::telemetry_log_sender::TelemetryLogSender;
 use crate::{
     build_information::create_build_info_telemetry_event,
     constants::{
@@ -21,6 +22,7 @@ use aptos_config::config::NodeConfig;
 use aptos_logger::prelude::*;
 use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
 use aptos_types::chain_id::ChainId;
+use futures::channel::mpsc;
 use futures::StreamExt;
 use once_cell::sync::Lazy;
 use rand::Rng;
@@ -57,7 +59,11 @@ fn telemetry_is_disabled() -> bool {
 
 /// Starts the telemetry service and returns the execution runtime.
 /// Note: The service will not be created if telemetry is disabled.
-pub fn start_telemetry_service(node_config: NodeConfig, chain_id: ChainId) -> Option<Runtime> {
+pub fn start_telemetry_service(
+    node_config: NodeConfig,
+    chain_id: ChainId,
+    remote_log_rx: Option<mpsc::Receiver<String>>,
+) -> Option<Runtime> {
     // Don't start the service if telemetry has been disabled
     if telemetry_is_disabled() {
         warn!("Aptos telemetry is disabled!");
@@ -70,6 +76,12 @@ pub fn start_telemetry_service(node_config: NodeConfig, chain_id: ChainId) -> Op
         .enable_all()
         .build()
         .expect("Failed to create the Aptos Telemetry runtime!");
+
+    if let Some(rx) = remote_log_rx {
+        let telemetry_log_sender =
+            TelemetryLogSender::new(TELEMETRY_SERVICE_URL, chain_id, &node_config);
+        telemetry_runtime.spawn(telemetry_log_sender.start(rx));
+    }
 
     // Spawn the telemetry service
     let peer_id = fetch_peer_id(&node_config);

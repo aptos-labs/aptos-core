@@ -26,6 +26,7 @@ mod custom_event;
 mod error;
 mod index;
 mod jwt_auth;
+mod log_ingest;
 mod rest_client;
 #[cfg(any(test))]
 pub(crate) mod tests;

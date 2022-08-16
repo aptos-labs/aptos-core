@@ -15,7 +15,10 @@ use aptos_telemetry_service::types::{
     telemetry::TelemetryDump,
 };
 use aptos_types::{chain_id::ChainId, PeerId};
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use reqwest::StatusCode;
+use std::io::Write;
 use std::sync::Arc;
 use tokio_retry::{
     strategy::{jitter, ExponentialBackoff},
@@ -39,7 +42,7 @@ impl AuthContext {
 }
 
 #[derive(Clone)]
-pub(crate) struct TelemetrySender {
+pub struct TelemetrySender {
     base_url: String,
     chain_id: ChainId,
     peer_id: PeerId,
@@ -55,6 +58,58 @@ impl TelemetrySender {
             peer_id: node_config.peer_id().unwrap_or(PeerId::ZERO),
             client: reqwest::Client::new(),
             auth_context: Arc::new(AuthContext::new(node_config)),
+        }
+    }
+
+    pub async fn send_logs(&self, batch: Vec<String>) {
+        if let Ok(json) = serde_json::to_string(&batch) {
+            // TODO: retry
+            let len = json.len();
+            let result = self.post_logs(json.as_bytes()).await;
+            match result {
+                Ok(_) => {
+                    debug!("Sent log of length: {}", len);
+                }
+                Err(error) => {
+                    error!("Failed send log of length: {} with error: {}", len, error);
+                }
+            }
+        } else {
+            error!("Failed json serde of batch: {:?}", batch);
+        }
+    }
+
+    async fn post_logs(&self, json: &[u8]) -> Result<(), anyhow::Error> {
+        let token = self.get_token().await?;
+
+        let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
+        gzip_encoder.write_all(json)?;
+        let compressed_bytes = gzip_encoder.finish()?;
+
+        // Send the request and wait for a response
+        let send_result = self
+            .client
+            .post(format!("{}/log_ingest", self.base_url))
+            .header("Content-Encoding", "gzip")
+            .bearer_auth(token)
+            .body(compressed_bytes)
+            .send()
+            .await;
+
+        // Process the result
+        match send_result {
+            Ok(response) => {
+                let status_code = response.status();
+                if status_code.is_success() {
+                    Ok(())
+                } else if status_code == StatusCode::UNAUTHORIZED {
+                    self.reset_token();
+                    Err(anyhow!("Unauthorized"))
+                } else {
+                    Err(anyhow!("Error status received: {}", status_code))
+                }
+            }
+            Err(error) => Err(anyhow!("Error sending log. Err: {}", error)),
         }
     }
 

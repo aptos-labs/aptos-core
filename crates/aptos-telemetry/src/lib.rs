@@ -12,4 +12,5 @@ mod network_metrics;
 mod sender;
 pub mod service;
 mod system_information;
+mod telemetry_log_sender;
 pub mod utils;
