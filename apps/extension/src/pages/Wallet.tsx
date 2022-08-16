@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import {
-  Box,
   Button,
   Flex,
   HStack,
-  Text,
   useColorMode,
   VStack,
 } from '@chakra-ui/react';
@@ -40,11 +38,6 @@ function Wallet() {
             >
               <HStack spacing={0} alignItems="flex-end">
                 <WalletAccountBalance />
-                <Box pb="2px">
-                  <Text fontSize="xl" fontWeight={600}>
-                    APT
-                  </Text>
-                </Box>
               </HStack>
               <Flex width="100%" flexDir="column" px={4}>
                 <HStack spacing={4} pt={4}>
