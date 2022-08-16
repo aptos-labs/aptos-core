@@ -38,7 +38,6 @@ module aptos_std::aggregator_factory {
 
     // TODO: only certain modules are allowed to create a aggregator.
     friend aptos_std::optional_aggregator;
-    friend aptos_std::table_with_aggregator_length;
 
     /// When aggregator factory has already been published.
     const EAGGREGATOR_FACTORY_EXISTS: u64 = 1;
