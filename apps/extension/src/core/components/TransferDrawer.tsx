@@ -46,8 +46,12 @@ interface CoinTransferFormData {
 
 function isAddressValid(address?: string) {
   return address
-    ? address.slice(0, 2) === '0x' && address.length === 66
+    ? (address.length > 60 && address.length < 70)
     : false;
+}
+
+function formatAddress(address?: string) {
+  return (address && address.startsWith('0x')) ? address : `0x${address}`;
 }
 
 function getAmountInputFontSize(amount?: number) {
@@ -77,7 +81,7 @@ function TransferDrawer() {
   } = useForm<CoinTransferFormData>();
 
   const recipient = watch('recipient');
-  const validRecipientAddress = isAddressValid(recipient) ? recipient : undefined;
+  const validRecipientAddress = isAddressValid(recipient) ? formatAddress(recipient) : undefined;
   const {
     data: doesRecipientAccountExist,
   } = useAccountExists({ address: validRecipientAddress });
@@ -173,6 +177,7 @@ function TransferDrawer() {
                     size="sm"
                     fontWeight={600}
                     autoComplete="off"
+                    spellCheck="false"
                     placeholder="Please enter an address"
                     {...register('recipient')}
                   />
