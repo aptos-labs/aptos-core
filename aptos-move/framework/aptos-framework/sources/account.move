@@ -49,23 +49,18 @@ module aptos_framework::account {
 
     const MAX_U64: u128 = 18446744073709551615;
 
-    /// Account already existed
-    const EACCOUNT: u64 = 0;
-    /// Sequence number exceeded the maximum value for a u64
-    const ESEQUENCE_NUMBER_TOO_BIG: u64 = 1;
-    /// The address provided didn't match the `aptos_framework` address.
-    const ENOT_APTOS_FRAMEWORK: u64 = 2;
+    /// Account already existed.
+    const EACCOUNT_ALREADY_EXISTS: u64 = 1;
+    /// Sequence number exceeded the maximum value for a u64.
+    const ESEQUENCE_NUMBER_TOO_BIG: u64 = 2;
     /// The provided authentication had an invalid length
     const EMALFORMED_AUTHENTICATION_KEY: u64 = 3;
-
-    const ECANNOT_CREATE_AT_VM_RESERVED: u64 = 4;
-    const EGAS: u64 = 5;
-    const ECANNOT_CREATE_AT_CORE_CODE: u64 = 6;
-    const EADDR_NOT_MATCH_PREIMAGE: u64 = 7;
-    const EWRITESET_NOT_ALLOWED: u64 = 8;
-    const EMULTI_AGENT_NOT_SUPPORTED: u64 = 9;
-    const EMODULE_NOT_ALLOWED: u64 = 10;
-    const ESCRIPT_NOT_ALLOWED: u64 = 11;
+    /// Cannot create an account because address has been reserved by the system.
+    const ECANNOT_RESERVED_ADDRESS: u64 = 4;
+    /// Transaction's gas limit has been exceeded and thus ran out of gas.
+    const EOUT_OF_GAS: u64 = 5;
+    /// Writesets are not allowed.
+    const EWRITESET_NOT_ALLOWED: u64 = 6;
 
     /// Prologue errors. These are separated out from the other errors in this
     /// module since they are mapped separately to major VM statuses, and are
@@ -73,15 +68,13 @@ module aptos_framework::account {
     const PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY: u64 = 1001;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_OLD: u64 = 1002;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_NEW: u64 = 1003;
-    const PROLOGUE_EACCOUNT_DNE: u64 = 1004;
+    const PROLOGUE_EACCOUNT_DOES_NOT_EXIST: u64 = 1004;
     const PROLOGUE_ECANT_PAY_GAS_DEPOSIT: u64 = 1005;
     const PROLOGUE_ETRANSACTION_EXPIRED: u64 = 1006;
     const PROLOGUE_EBAD_CHAIN_ID: u64 = 1007;
-    const PROLOGUE_ESCRIPT_NOT_ALLOWED: u64 = 1008;
-    const PROLOGUE_EMODULE_NOT_ALLOWED: u64 = 1009;
-    const PROLOGUE_EINVALID_WRITESET_SENDER: u64 = 1010;
-    const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1011;
-    const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1012;
+    const PROLOGUE_EINVALID_WRITESET_SENDER: u64 = 1008;
+    const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1009;
+    const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1010;
 
     #[test_only]
     public fun create_address_for_test(bytes: vector<u8>): address {
@@ -121,14 +114,10 @@ module aptos_framework::account {
     /// `new_address`.
     public(friend) fun create_account_internal(new_address: address): signer {
         // there cannot be an Account resource under new_addr already.
-        assert!(!exists<Account>(new_address), error::already_exists(EACCOUNT));
+        assert!(!exists<Account>(new_address), error::already_exists(EACCOUNT_ALREADY_EXISTS));
         assert!(
-            new_address != @vm_reserved,
-            error::invalid_argument(ECANNOT_CREATE_AT_VM_RESERVED)
-        );
-        assert!(
-            new_address != @aptos_framework,
-            error::invalid_argument(ECANNOT_CREATE_AT_CORE_CODE)
+            new_address != @vm_reserved && new_address != @aptos_framework,
+            error::invalid_argument(ECANNOT_RESERVED_ADDRESS)
         );
 
         create_account_unchecked(new_address)
@@ -176,7 +165,7 @@ module aptos_framework::account {
         new_auth_key: vector<u8>,
     ) acquires Account {
         let addr = signer::address_of(account);
-        assert!(exists_at(addr), error::not_found(EACCOUNT));
+        assert!(exists_at(addr), error::not_found(EACCOUNT_ALREADY_EXISTS));
         assert!(
             vector::length(&new_auth_key) == 32,
             error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
@@ -200,7 +189,7 @@ module aptos_framework::account {
         );
         let transaction_sender = signer::address_of(&sender);
         assert!(chain_id::get() == chain_id, error::invalid_argument(PROLOGUE_EBAD_CHAIN_ID));
-        assert!(exists<Account>(transaction_sender), error::invalid_argument(PROLOGUE_EACCOUNT_DNE));
+        assert!(exists<Account>(transaction_sender), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
         let sender_account = borrow_global<Account>(transaction_sender);
         assert!(
             txn_authentication_key == *&sender_account.authentication_key,
@@ -292,7 +281,7 @@ module aptos_framework::account {
         let i = 0;
         while (i < num_secondary_signers) {
             let secondary_address = *vector::borrow(&secondary_signer_addresses, i);
-            assert!(exists_at(secondary_address), error::invalid_argument(PROLOGUE_EACCOUNT_DNE));
+            assert!(exists_at(secondary_address), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
 
             let signer_account = borrow_global<Account>(secondary_address);
             let signer_public_key_hash = *vector::borrow(&secondary_signer_public_key_hashes, i);
@@ -321,12 +310,12 @@ module aptos_framework::account {
         txn_max_gas_units: u64,
         gas_units_remaining: u64
     ) acquires Account {
-        assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EGAS));
+        assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EOUT_OF_GAS));
         let gas_used = txn_max_gas_units - gas_units_remaining;
 
         assert!(
             (txn_gas_price as u128) * (gas_used as u128) <= MAX_U64,
-            error::out_of_range(EGAS)
+            error::out_of_range(EOUT_OF_GAS)
         );
         let transaction_fee_amount = txn_gas_price * gas_used;
         let addr = signer::address_of(&account);

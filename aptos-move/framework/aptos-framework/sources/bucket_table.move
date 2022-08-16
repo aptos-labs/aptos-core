@@ -11,14 +11,14 @@ module aptos_framework::bucket_table {
     const TARGET_LOAD_PER_BUCKET: u64 = 10;
     const SPLIT_THRESHOLD: u64 = 75;
 
-    /// Not found in the table;
-    const ENOT_FOUND: u64 = 0;
+    /// Not found in the bucket.
+    const ENOT_FOUND: u64 = 1;
     /// Capacity should be larger than 0.
-    const EZERO_CAPACITY: u64 = 1;
+    const EZERO_CAPACITY: u64 = 2;
     /// Destroy non-empty hashmap.
-    const ENOT_EMPTY: u64 = 2;
-    /// Key already exists
-    const EALREADY_EXIST: u64 = 3;
+    const ENOT_EMPTY: u64 = 3;
+    /// Key already exists.
+    const EALREADY_EXIST: u64 = 4;
 
     /// BucketTable entry contains both the key and value.
     struct Entry<K, V> has store {

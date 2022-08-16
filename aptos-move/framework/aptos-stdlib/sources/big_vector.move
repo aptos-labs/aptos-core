@@ -4,11 +4,11 @@ module aptos_std::big_vector {
     use aptos_std::table_with_length::{Self, TableWithLength};
 
     /// The index into the vector is out of bounds
-    const EINDEX_OUT_OF_BOUNDS: u64 = 0;
+    const EINDEX_OUT_OF_BOUNDS: u64 = 1;
     /// Need to reserve more buckets for push_back_no_grow.
-    const EOUT_OF_CAPACITY: u64 = 1;
+    const EOUT_OF_CAPACITY: u64 = 2;
     /// Destory a non-empty vector.
-    const ENOT_EMPTY: u64 = 2;
+    const ENOT_EMPTY: u64 = 3;
 
     /// Index of the value in the buckets.
     struct BigVectorIndex has copy, drop, store {
