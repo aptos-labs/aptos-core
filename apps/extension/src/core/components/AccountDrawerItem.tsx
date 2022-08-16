@@ -91,7 +91,9 @@ function AccountDrawerItem(
     refetchInterval: 4000,
   });
   const { data: coinBalance } = useAccountCoinBalance(address, { refetchInterval: 4000 });
-  const coinBalanceString = numeral(coinBalance).format('0,0');
+  const coinBalanceString = (coinBalance && coinBalance > 1e6)
+    ? `~${numeral(coinBalance).format('0.0a')}`
+    : numeral(coinBalance).format('0,0');
 
   const walletAddressFormatted = `Wallet: ${address.substring(0, 15)}...`;
 
