@@ -26,7 +26,7 @@ use storage_interface::{DbReader, Order};
 pub trait MetadataBackend: Send + Sync {
     /// Return a contiguous NewBlockEvent window in which last one is at target_round or
     /// latest committed, return all previous one if not enough.
-    fn get_block_metadata(&self, target_round: Round) -> Vec<NewBlockEvent>;
+    fn get_block_metadata(&self, target_epoch: u64, target_round: Round) -> Vec<NewBlockEvent>;
 }
 
 pub struct AptosDBBackend {
@@ -90,19 +90,38 @@ impl AptosDBBackend {
 
     fn get_from_db_result(
         &self,
+        target_epoch: u64,
         target_round: Round,
         events: &Vec<NewBlockEvent>,
         hit_end: bool,
     ) -> Vec<NewBlockEvent> {
+        let has_larger = events.first().map_or(false, |e| {
+            (e.epoch(), e.round()) >= (target_epoch, target_round)
+        });
+        if !has_larger {
+            // error, and not a fatal, in an unlikely scenario that we have many failed consecutive rounds,
+            // and nobody has any newer successful blocks.
+            error!(
+                "Local history is too old, asking for {} epoch and {} round, and latest from db is {} epoch and {} round! Elected proposers are unlikely to match!!",
+                target_epoch, target_round, events.first().map_or(0, |e| e.epoch()), events.first().map_or(0, |e| e.round()))
+        }
+
         let mut result = vec![];
         for event in events {
-            if event.round() <= target_round && result.len() < self.window_size {
+            if (event.epoch(), event.round()) <= (target_epoch, target_round)
+                && result.len() < self.window_size
+            {
                 result.push(event.clone());
             }
         }
 
         if result.len() < self.window_size && !hit_end {
-            error!("We are not fetching far enough in history, we filtered from {} to {}, but asked for {}", events.len(), result.len(), self.window_size);
+            error!(
+                "We are not fetching far enough in history, we filtered from {} to {}, but asked for {}",
+                events.len(),
+                result.len(),
+                self.window_size
+            );
         }
         result
     }
@@ -110,20 +129,22 @@ impl AptosDBBackend {
 
 impl MetadataBackend for AptosDBBackend {
     // assume the target_round only increases
-    fn get_block_metadata(&self, target_round: Round) -> Vec<NewBlockEvent> {
+    fn get_block_metadata(&self, target_epoch: u64, target_round: Round) -> Vec<NewBlockEvent> {
         let locked = self.db_result.lock();
         let events = &locked.0;
         let version = locked.1;
         let hit_end = locked.2;
 
-        let has_larger = events.first().map_or(false, |e| e.round() >= target_round);
+        let has_larger = events.first().map_or(false, |e| {
+            (e.epoch(), e.round()) >= (target_epoch, target_round)
+        });
         let lastest_db_version = self.aptos_db.get_latest_version().unwrap_or(0);
         // check if fresher data has potential to give us different result
         if !has_larger && version < lastest_db_version {
             let fresh_db_result = self.refresh_db_result(locked, lastest_db_version);
             match fresh_db_result {
                 Ok((events, _version, hit_end)) => {
-                    self.get_from_db_result(target_round, &events, hit_end)
+                    self.get_from_db_result(target_epoch, target_round, &events, hit_end)
                 }
                 Err(e) => {
                     error!(
@@ -133,7 +154,7 @@ impl MetadataBackend for AptosDBBackend {
                 }
             }
         } else {
-            self.get_from_db_result(target_round, events, hit_end)
+            self.get_from_db_result(target_epoch, target_round, events, hit_end)
         }
     }
 }
@@ -459,7 +480,7 @@ impl LeaderReputation {
 impl ProposerElection for LeaderReputation {
     fn get_valid_proposer(&self, round: Round) -> Author {
         let target_round = round.saturating_sub(self.exclude_round);
-        let sliding_window = self.backend.get_block_metadata(target_round);
+        let sliding_window = self.backend.get_block_metadata(self.epoch, target_round);
         let mut weights =
             self.heuristic
                 .get_weights(self.epoch, &self.epoch_to_proposers, &sliding_window);
