@@ -5,6 +5,7 @@
 
 use crate::account::AccountData;
 use anyhow::Result;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
@@ -103,5 +104,9 @@ impl StateView for FakeDataStore {
 
     fn is_genesis(&self) -> bool {
         self.state_data.is_empty()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        unimplemented!()
     }
 }

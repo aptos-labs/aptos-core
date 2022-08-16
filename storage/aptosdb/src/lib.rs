@@ -63,6 +63,7 @@ use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -1380,6 +1381,15 @@ impl DbReader for AptosDB {
     /// Returns whether the indexer DB has been enabled or not
     fn indexer_enabled(&self) -> bool {
         self.indexer.is_some()
+    }
+
+    fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
+        gauged_api("get_state_storage_usage", || {
+            if let Some(v) = version {
+                error_if_version_is_pruned(&self.ledger_pruner, "state storage usage", v)?;
+            }
+            self.state_store.get_usage(version)
+        })
     }
 }
 
