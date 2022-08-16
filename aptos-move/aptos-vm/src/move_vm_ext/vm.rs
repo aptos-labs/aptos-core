@@ -9,6 +9,7 @@ use aptos_gas::NativeGasParameters;
 use framework::natives::{code::NativeCodeContext, transaction_context::NativeTransactionContext};
 use move_deps::{
     move_binary_format::errors::VMResult,
+    move_bytecode_verifier::VerifierConfig,
     move_table_extension::NativeTableContext,
     move_vm_runtime::{move_vm::MoveVM, native_extensions::NativeContextExtensions},
 };
@@ -21,7 +22,12 @@ pub struct MoveVmExt {
 impl MoveVmExt {
     pub fn new(native_gas_params: NativeGasParameters) -> VMResult<Self> {
         Ok(Self {
-            inner: MoveVM::new(aptos_natives(native_gas_params))?,
+            inner: MoveVM::new_with_verifier_config(
+                aptos_natives(native_gas_params),
+                VerifierConfig {
+                    max_loop_depth: Some(5),
+                },
+            )?,
         })
     }
 
