@@ -3,6 +3,7 @@ module aptos_framework::block {
     use std::error;
     use std::vector;
     use aptos_std::event::{Self, EventHandle};
+    use std::option;
 
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
@@ -80,12 +81,12 @@ module aptos_framework::block {
         epoch: u64,
         round: u64,
         proposer: address,
-        proposer_index_optional: vector<u64>,
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64
     ) acquires BlockResource {
         timestamp::assert_operating();
+
         // Operational constraint: can only be invoked by the VM.
         system_addresses::assert_vm(&vm);
 
@@ -94,6 +95,11 @@ module aptos_framework::block {
             proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
             error::permission_denied(EINVALID_PROPOSER),
         );
+
+        let proposer_index = option::none();
+        if (proposer != @vm_reserved) {
+            proposer_index = option::some(stake::get_validator_index(proposer));
+        };
 
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
@@ -111,7 +117,7 @@ module aptos_framework::block {
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
-        stake::update_performance_statistics(proposer_index_optional, failed_proposer_indices);
+        stake::update_performance_statistics(proposer_index, failed_proposer_indices);
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             reconfiguration::reconfigure();

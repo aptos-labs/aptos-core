@@ -439,12 +439,17 @@ impl FakeExecutor {
 
     pub fn new_block_with_timestamp(&mut self, time_microseconds: u64) {
         self.block_time = time_microseconds;
-        self.new_block_with_metadata(None, vec![])
+
+        let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
+            .expect("Unable to retrieve the validator set from storage");
+        let proposer = *validator_set.payload().next().unwrap().account_address();
+        // when updating time, proposer cannot be ZERO.
+        self.new_block_with_metadata(proposer, vec![])
     }
 
     pub fn new_block_with_metadata(
         &mut self,
-        proposer_index: Option<u32>,
+        proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
     ) {
         let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
@@ -453,8 +458,7 @@ impl FakeExecutor {
             HashValue::zero(),
             0,
             0,
-            *validator_set.payload().next().unwrap().account_address(),
-            proposer_index,
+            proposer,
             BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             failed_proposer_indices,
             self.block_time,
