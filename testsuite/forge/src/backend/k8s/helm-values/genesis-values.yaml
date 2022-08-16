@@ -8,6 +8,8 @@ chain:
   era: {era}
   # expect the root key without 0x prefix
   root_key: 0x{root_key}
+  # Lower the epoch duration for forge to catch reconfiguration issues
+  epoch_duration_secs: 1800
 
 genesis:
   numValidators: {num_validators}
