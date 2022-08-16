@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    current_function_name,
     runtime::SfStreamer,
     tests::{new_test_context, TestContext},
 };
 
+use aptos_api_test_context::current_function_name;
 use aptos_protos::extractor::v1::{
     transaction::{TransactionType, TxnData},
     transaction_payload::{Payload, Type as PayloadType},
@@ -22,9 +22,9 @@ use move_deps::{
 use serde_json::{json, Value};
 use std::{collections::HashMap, convert::TryInto, path::PathBuf, sync::Arc, time::Duration};
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_genesis_works() {
-    let test_context = new_test_context(current_function_name!(), 0);
+    let test_context = new_test_context(current_function_name!());
 
     let context = Arc::new(test_context.context);
     let mut streamer = SfStreamer::new(context, 0, None);
@@ -43,9 +43,9 @@ async fn test_genesis_works() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_block_transactions_work() {
-    let mut test_context = new_test_context(current_function_name!(), 0);
+    let mut test_context = new_test_context(current_function_name!());
 
     // create user transactions
     let account = test_context.gen_account();
@@ -111,10 +111,11 @@ async fn test_block_transactions_work() {
     assert_eq!(txn.r#type(), TransactionType::StateCheckpoint);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_block_height_and_ts_work() {
     let start_ts_usecs = 1000 * 1000000;
-    let mut test_context = new_test_context(current_function_name!(), start_ts_usecs as u64);
+    let mut test_context = new_test_context(current_function_name!());
+    test_context.set_fake_time_usecs(start_ts_usecs as u64);
 
     // Creating 2 blocks w/ user transactions and 1 empty block
     let mut root_account = test_context.root_account();
@@ -170,9 +171,9 @@ async fn test_block_height_and_ts_work() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_table_item_parsing_works() {
-    let mut test_context = new_test_context(current_function_name!(), 0);
+    let mut test_context = new_test_context(current_function_name!());
     let ctx = &mut test_context;
     let mut account = ctx.gen_account();
     let acc = &mut account;

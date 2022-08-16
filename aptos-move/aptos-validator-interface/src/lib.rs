@@ -117,10 +117,10 @@ impl<'a> DebuggerStateView<'a> {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<Vec<u8>>> {
-        match self.db.get_state_value_by_version(state_key, version)? {
-            None => Ok(None),
-            Some(state_value) => Ok(state_value.maybe_bytes),
-        }
+        Ok(self
+            .db
+            .get_state_value_by_version(state_key, version)?
+            .map(|v| v.maybe_bytes))
     }
 }
 

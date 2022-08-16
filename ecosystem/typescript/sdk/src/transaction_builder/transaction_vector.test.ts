@@ -47,7 +47,7 @@ import { TransactionBuilderEd25519 } from "./builder";
 
 // eslint-disable-next-line operator-linebreak
 const VECTOR_FILES_ROOT_DIR =
-  process.env.VECTOR_FILES_ROOT_DIR || path.resolve(__dirname, "..", "..", "..", "..", "..", "api", "goldens", "v1");
+  process.env.VECTOR_FILES_ROOT_DIR || path.resolve(__dirname, "..", "..", "..", "..", "..", "api", "goldens");
 
 const SCRIPT_FUNCTION_VECTOR = path.join(
   VECTOR_FILES_ROOT_DIR,

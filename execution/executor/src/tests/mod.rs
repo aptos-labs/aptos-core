@@ -473,8 +473,6 @@ fn test_deleted_key_from_state_store() {
         .get_state_value_with_proof_by_version(&dummy_state_key1, 5)
         .unwrap()
         .0
-        .unwrap()
-        .maybe_bytes
         .is_none());
 
     // Ensure the key that was not touched by the transaction is not accidentally deleted

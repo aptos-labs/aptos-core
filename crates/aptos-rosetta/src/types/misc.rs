@@ -83,18 +83,21 @@ pub enum OperationType {
     CreateAccount,
     Deposit,
     Withdraw,
+    SetOperator,
 }
 
 impl OperationType {
     const CREATE_ACCOUNT: &'static str = "create_account";
     const DEPOSIT: &'static str = "deposit";
     const WITHDRAW: &'static str = "withdraw";
+    const SET_OPERATOR: &'static str = "set_operator";
 
     pub fn all() -> Vec<OperationType> {
         vec![
             OperationType::CreateAccount,
             OperationType::Deposit,
             OperationType::Withdraw,
+            OperationType::SetOperator,
         ]
     }
 }
@@ -107,6 +110,7 @@ impl FromStr for OperationType {
             Self::CREATE_ACCOUNT => Ok(OperationType::CreateAccount),
             Self::DEPOSIT => Ok(OperationType::Deposit),
             Self::WITHDRAW => Ok(OperationType::Withdraw),
+            Self::SET_OPERATOR => Ok(OperationType::SetOperator),
             _ => Err(ApiError::DeserializationFailed(Some(format!(
                 "Invalid OperationType: {}",
                 s
@@ -121,6 +125,7 @@ impl Display for OperationType {
             OperationType::CreateAccount => Self::CREATE_ACCOUNT,
             OperationType::Deposit => Self::DEPOSIT,
             OperationType::Withdraw => Self::WITHDRAW,
+            OperationType::SetOperator => Self::SET_OPERATOR,
         })
     }
 }
