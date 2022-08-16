@@ -26,7 +26,7 @@ use vm_genesis::Validator;
 pub struct Layout {
     /// Root key for the blockchain
     /// TODO: In the future, we won't need a root key
-    pub root_key: Ed25519PublicKey,
+    pub root_key: Option<Ed25519PublicKey>,
     /// List of usernames or identifiers
     pub users: Vec<String>,
     /// ChainId for the target network
@@ -51,6 +51,8 @@ pub struct Layout {
     pub rewards_apy_percentage: u64,
     /// Voting duration for a proposal in seconds.
     pub voting_duration_secs: u64,
+    /// % of current epoch's total voting power that can be added in this epoch.
+    pub voting_power_increase_limit: u64,
 }
 
 impl Layout {
@@ -65,6 +67,27 @@ impl Layout {
         })?;
 
         Ok(serde_yaml::from_str(&contents)?)
+    }
+}
+
+impl Default for Layout {
+    fn default() -> Self {
+        Layout {
+            root_key: None,
+            users: vec![],
+            chain_id: ChainId::test(),
+            allow_new_validators: false,
+            epoch_duration_secs: 7_200,
+            is_test: true,
+            min_stake: 100_000_000_000_000,
+            min_voting_threshold: 100_000_000_000_000,
+            max_stake: 100_000_000_000_000_000,
+            recurring_lockup_duration_secs: 86_400,
+            required_proposer_stake: 100_000_000_000_000,
+            rewards_apy_percentage: 10,
+            voting_duration_secs: 43_200,
+            voting_power_increase_limit: 20,
+        }
     }
 }
 
@@ -148,10 +171,12 @@ impl TryFrom<ValidatorConfiguration> for Validator {
             )));
         }
         Ok(Validator {
-            address: derived_address,
+            owner_address: derived_address,
+            // TODO: Set operator and voter according to genesis config file.
+            operator_address: derived_address,
+            voter_address: derived_address,
             consensus_pubkey: config.consensus_public_key.to_bytes().to_vec(),
             proof_of_possession: config.proof_of_possession.to_bytes().to_vec(),
-            operator_address: auth_key.derived_address(),
             network_addresses: bcs::to_bytes(&validator_addresses).unwrap(),
             full_node_network_addresses: bcs::to_bytes(&full_node_addresses).unwrap(),
             stake_amount: config.stake_amount,

@@ -50,13 +50,13 @@ impl KeyTool {
 #[derive(Debug, Parser)]
 pub struct ExtractPeer {
     #[clap(flatten)]
-    private_key_input_options: PrivateKeyInputOptions,
+    pub(crate) private_key_input_options: PrivateKeyInputOptions,
     #[clap(flatten)]
-    output_file_options: SaveFile,
+    pub(crate) output_file_options: SaveFile,
     #[clap(flatten)]
-    encoding_options: EncodingOptions,
+    pub(crate) encoding_options: EncodingOptions,
     #[clap(flatten)]
-    profile_options: ProfileOptions,
+    pub(crate) profile_options: ProfileOptions,
 }
 
 #[async_trait]
@@ -104,11 +104,11 @@ impl CliCommand<HashMap<AccountAddress, Peer>> for ExtractPeer {
 pub struct GenerateKey {
     /// Key type to generate. Must be one of [x25519, ed25519]
     #[clap(long, default_value_t = KeyType::Ed25519)]
-    key_type: KeyType,
+    pub(crate) key_type: KeyType,
     #[clap(flatten)]
     pub rng_args: RngArgs,
     #[clap(flatten)]
-    save_params: SaveKey,
+    pub(crate) save_params: SaveKey,
 }
 
 #[async_trait]
@@ -188,9 +188,9 @@ impl GenerateKey {
 #[derive(Debug, Parser)]
 pub struct SaveKey {
     #[clap(flatten)]
-    file_options: SaveFile,
+    pub(crate) file_options: SaveFile,
     #[clap(flatten)]
-    encoding_options: EncodingOptions,
+    pub(crate) encoding_options: EncodingOptions,
 }
 
 impl SaveKey {

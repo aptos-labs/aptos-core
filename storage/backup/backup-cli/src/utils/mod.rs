@@ -136,7 +136,10 @@ impl TreeWriter<StateKey> for MockStore {
 }
 
 impl StateValueWriter<StateKey, StateValue> for MockStore {
-    fn write_kv_batch(&self, _kv_batch: &StateValueBatch<StateKey, StateValue>) -> Result<()> {
+    fn write_kv_batch(
+        &self,
+        _kv_batch: &StateValueBatch<StateKey, Option<StateValue>>,
+    ) -> Result<()> {
         Ok(())
     }
 }

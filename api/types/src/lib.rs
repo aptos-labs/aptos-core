@@ -10,11 +10,11 @@ mod derives;
 mod error;
 mod event_key;
 mod hash;
+mod headers;
 mod index;
 mod ledger_info;
 pub mod mime_types;
 mod move_types;
-mod response;
 mod table;
 mod transaction;
 mod wrappers;
@@ -25,9 +25,10 @@ pub use block::Block;
 pub use block::BlockInfo;
 pub use bytecode::Bytecode;
 pub use convert::{new_vm_utf8_string, AsConverter, MoveConverter};
-pub use error::{AptosError, AptosErrorCode, Error};
+pub use error::{AptosError, AptosErrorCode};
 pub use event_key::EventKey;
 pub use hash::HashValue;
+pub use headers::*;
 pub use index::IndexResponse;
 pub use ledger_info::LedgerInfo;
 pub use move_types::{
@@ -35,10 +36,6 @@ pub use move_types::{
     MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
     MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType, MoveValue,
     ScriptFunctionId, U128, U64,
-};
-pub use response::{
-    Response, X_APTOS_BLOCK_HEIGHT, X_APTOS_CHAIN_ID, X_APTOS_EPOCH, X_APTOS_LEDGER_OLDEST_VERSION,
-    X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION, X_APTOS_OLDEST_BLOCK_HEIGHT,
 };
 pub use table::TableItemRequest;
 pub use transaction::{

@@ -22,7 +22,8 @@ use crate::{
     liveness::{
         cached_proposer_election::CachedProposerElection,
         leader_reputation::{
-            AptosDBBackend, LeaderReputation, ProposerAndVoterHeuristic, ReputationHeuristic,
+            extract_epoch_to_proposers, AptosDBBackend, LeaderReputation,
+            ProposerAndVoterHeuristic, ReputationHeuristic,
         },
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
@@ -32,6 +33,7 @@ use crate::{
     },
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
+    monitor,
     network::{IncomingBlockRetrievalRequest, NetworkReceivers, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkSender},
     payload_manager::QuorumStoreClient,
@@ -75,10 +77,10 @@ use futures::{channel::{
 use itertools::Itertools;
 use network::protocols::network::{ApplicationNetworkSender, Event};
 use safety_rules::SafetyRulesManager;
-use std::collections::HashMap;
 use std::{
     cmp::Ordering,
     convert::TryInto,
+    collections::HashMap,
     mem::{discriminant, Discriminant},
     sync::Arc,
     time::Duration,
@@ -400,7 +402,7 @@ impl EpochManager {
         let ledger_info = proof
             .verify(self.epoch_state())
             .context("[EpochManager] Invalid EpochChangeProof")?;
-        debug!(
+        info!(
             LogSchema::new(LogEvent::NewEpoch).epoch(ledger_info.ledger_info().next_block_epoch()),
             "Received verified epoch change",
         );

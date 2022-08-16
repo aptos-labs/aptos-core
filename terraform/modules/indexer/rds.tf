@@ -28,6 +28,12 @@ resource "aws_db_parameter_group" "indexer" {
     name  = "log_connections"
     value = "1"
   }
+
+  lifecycle {
+    ignore_changes = [
+      parameter
+    ]
+  }
 }
 
 
@@ -38,15 +44,16 @@ resource "aws_db_instance" "indexer" {
   allocated_storage     = var.db_allocated_storage
   max_allocated_storage = var.db_max_allocated_storage
 
-  engine                 = var.db_engine
-  engine_version         = var.db_engine_version
-  username               = "indexer"
-  password               = var.db_password
-  db_subnet_group_name   = aws_db_subnet_group.indexer.name
-  vpc_security_group_ids = [aws_security_group.indexer.id]
-  parameter_group_name   = aws_db_parameter_group.indexer.name
-  publicly_accessible    = var.db_publicly_accessible
-  skip_final_snapshot    = true
+  engine                       = var.db_engine
+  engine_version               = var.db_engine_version
+  username                     = "indexer"
+  password                     = var.db_password
+  db_subnet_group_name         = aws_db_subnet_group.indexer.name
+  vpc_security_group_ids       = [aws_security_group.indexer.id]
+  parameter_group_name         = aws_db_parameter_group.indexer.name
+  publicly_accessible          = var.db_publicly_accessible
+  skip_final_snapshot          = true
+  performance_insights_enabled = var.performance_insights_enabled
 }
 
 resource "kubernetes_secret" "indexer_credentials" {

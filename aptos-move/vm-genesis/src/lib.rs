@@ -39,6 +39,7 @@ use move_deps::{
 };
 use once_cell::sync::Lazy;
 use rand::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 // The seed is arbitrarily picked to produce a consistent key. XXX make this more formal?
@@ -49,6 +50,7 @@ const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
+const APTOS_COINS_BASE_WITH_DECIMALS: u64 = u64::pow(10, 8);
 
 pub struct GenesisConfiguration {
     pub allow_new_validators: bool,
@@ -62,6 +64,7 @@ pub struct GenesisConfiguration {
     pub required_proposer_stake: u64,
     pub rewards_apy_percentage: u64,
     pub voting_duration_secs: u64,
+    pub voting_power_increase_limit: u64,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -179,6 +182,11 @@ fn validate_genesis_config(genesis_config: &GenesisConfiguration) {
         genesis_config.voting_duration_secs < genesis_config.recurring_lockup_duration_secs,
         "Voting duration must be strictly smaller than recurring lockup"
     );
+    assert!(
+        genesis_config.voting_power_increase_limit > 0
+            && genesis_config.voting_power_increase_limit <= 50,
+        "voting_power_increase_limit must be > 0 and <= 50"
+    );
 }
 
 fn exec_function(
@@ -251,6 +259,7 @@ fn initialize(
             MoveValue::Bool(genesis_config.allow_new_validators),
             MoveValue::U64(rewards_rate_numerator),
             MoveValue::U64(rewards_rate_denominator),
+            MoveValue::U64(genesis_config.voting_power_increase_limit),
         ]),
     );
 }
@@ -308,36 +317,15 @@ fn create_and_initialize_validators(
     session: &mut SessionExt<impl MoveResolver>,
     validators: &[Validator],
 ) {
-    let mut owners = vec![];
-    let mut consensus_pubkeys = vec![];
-    let mut proof_of_possession = vec![];
-    let mut validator_network_addresses = vec![];
-    let mut full_node_network_addresses = vec![];
-    let mut staking_distribution = vec![];
-
-    for v in validators {
-        owners.push(MoveValue::Address(v.address));
-        consensus_pubkeys.push(MoveValue::vector_u8(v.consensus_pubkey.clone()));
-        proof_of_possession.push(MoveValue::vector_u8(v.proof_of_possession.clone()));
-        validator_network_addresses.push(MoveValue::vector_u8(v.network_addresses.clone()));
-        full_node_network_addresses
-            .push(MoveValue::vector_u8(v.full_node_network_addresses.clone()));
-        staking_distribution.push(MoveValue::U64(v.stake_amount));
-    }
+    let validators_bytes = bcs::to_bytes(validators).expect("Validators can be serialized");
+    let mut serialized_values = serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]);
+    serialized_values.push(validators_bytes);
     exec_function(
         session,
         GENESIS_MODULE_NAME,
         "create_initialize_validators",
         vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-            MoveValue::Vector(owners),
-            MoveValue::Vector(consensus_pubkeys),
-            MoveValue::Vector(proof_of_possession),
-            MoveValue::Vector(validator_network_addresses),
-            MoveValue::Vector(full_node_network_addresses),
-            MoveValue::Vector(staking_distribution),
-        ]),
+        serialized_values,
     );
 }
 
@@ -488,6 +476,16 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
     generate_test_genesis(&modules, Some(1)).0
 }
 
+/// Generate a genesis `ChangeSet` for mainnet
+pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
+    let modules = match genesis_options {
+        GenesisOptions::Compiled => cached_framework_packages::module_blobs().to_vec(),
+        GenesisOptions::Fresh => framework::aptos::module_blobs(),
+    };
+
+    generate_mainnet_genesis(&modules, Some(1)).0
+}
+
 pub fn test_genesis_transaction() -> Transaction {
     let changeset = test_genesis_change_set_and_validators(None).0;
     Transaction::GenesisTransaction(WriteSetPayload::Direct(changeset))
@@ -499,23 +497,25 @@ pub fn test_genesis_change_set_and_validators(
     generate_test_genesis(cached_framework_packages::module_blobs(), count)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Validator {
-    /// The Aptos account address of the validator
-    pub address: AccountAddress,
-    /// bls12381 public key used to sign consensus messages
-    pub consensus_pubkey: Vec<u8>,
-    /// Proof of Possession of the consensus pubkey
-    pub proof_of_possession: Vec<u8>,
+    /// The Aptos account address of the validator.
+    pub owner_address: AccountAddress,
     /// The Aptos account address of the validator's operator (same as `address` if the validator is
-    /// its own operator)
+    /// its own operator).
     pub operator_address: AccountAddress,
-    /// `NetworkAddress` for the validator
-    pub network_addresses: Vec<u8>,
-    /// `NetworkAddress` for the validator's full node
-    pub full_node_network_addresses: Vec<u8>,
-    /// Amount to stake for consensus
+    pub voter_address: AccountAddress,
+    /// Amount to stake for consensus. Also the intial amount minted to the owner account.
     pub stake_amount: u64,
+
+    /// bls12381 public key used to sign consensus messages.
+    pub consensus_pubkey: Vec<u8>,
+    /// Proof of Possession of the consensus pubkey.
+    pub proof_of_possession: Vec<u8>,
+    /// `NetworkAddress` for the validator.
+    pub network_addresses: Vec<u8>,
+    /// `NetworkAddress` for the validator's full node.
+    pub full_node_network_addresses: Vec<u8>,
 }
 
 pub struct TestValidator {
@@ -525,17 +525,17 @@ pub struct TestValidator {
 }
 
 impl TestValidator {
-    pub fn new_test_set(count: Option<usize>) -> Vec<TestValidator> {
-        let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_seed([1u8; 32]);
+    pub fn new_test_set(count: Option<usize>, initial_stake: Option<u64>) -> Vec<TestValidator> {
+        let mut rng = rand::SeedableRng::from_seed([1u8; 32]);
         (0..count.unwrap_or(10))
-            .map(|_| TestValidator::gen(&mut rng))
+            .map(|_| TestValidator::gen(&mut rng, initial_stake))
             .collect()
     }
 
-    fn gen(rng: &mut rand::rngs::StdRng) -> TestValidator {
+    fn gen(rng: &mut StdRng, initial_stake: Option<u64>) -> TestValidator {
         let key = Ed25519PrivateKey::generate(rng);
         let auth_key = AuthenticationKey::ed25519(&key.public_key());
-        let address = auth_key.derived_address();
+        let owner_address = auth_key.derived_address();
         let consensus_key = bls12381::PrivateKey::generate(rng);
         let consensus_pubkey = consensus_key.public_key().to_bytes().to_vec();
         let proof_of_possession = bls12381::ProofOfPossession::create(&consensus_key)
@@ -544,14 +544,20 @@ impl TestValidator {
         let network_address = [0u8; 0].to_vec();
         let full_node_network_address = [0u8; 0].to_vec();
 
+        let stake_amount = if let Some(amount) = initial_stake {
+            amount
+        } else {
+            1
+        };
         let data = Validator {
-            address,
+            owner_address,
             consensus_pubkey,
             proof_of_possession,
-            operator_address: address,
+            operator_address: owner_address,
+            voter_address: owner_address,
             network_addresses: network_address,
             full_node_network_addresses: full_node_network_address,
-            stake_amount: 1,
+            stake_amount,
         };
         Self {
             key,
@@ -565,7 +571,7 @@ pub fn generate_test_genesis(
     stdlib_modules: &[Vec<u8>],
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    let test_validators = TestValidator::new_test_set(count);
+    let test_validators = TestValidator::new_test_set(count, Some(100_000_000));
     let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
     let validators = &validators_;
 
@@ -587,6 +593,41 @@ pub fn generate_test_genesis(
             required_proposer_stake: 0,
             rewards_apy_percentage: 10,
             voting_duration_secs: 3600,
+            voting_power_increase_limit: 50,
+        },
+    );
+    (genesis, test_validators)
+}
+
+pub fn generate_mainnet_genesis(
+    stdlib_modules: &[Vec<u8>],
+    count: Option<usize>,
+) -> (ChangeSet, Vec<TestValidator>) {
+    // TODO: Update to have custom validators/accounts with initial balances at genesis.
+    let test_validators = TestValidator::new_test_set(count, Some(1_000_000_000_000_000));
+    let validators_: Vec<Validator> = test_validators.iter().map(|t| t.data.clone()).collect();
+    let validators = &validators_;
+
+    let genesis = encode_genesis_change_set(
+        &GENESIS_KEYPAIR.1,
+        validators,
+        stdlib_modules,
+        OnChainConsensusConfig::default(),
+        ChainId::test(),
+        // TODO: Update once mainnet numbers are decided. These numbers are just placeholders.
+        &GenesisConfiguration {
+            allow_new_validators: true,
+            epoch_duration_secs: 2 * 3600, // 2 hours
+            is_test: false,
+            min_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
+            // 400M APT
+            min_voting_threshold: (400_000_000 * APTOS_COINS_BASE_WITH_DECIMALS as u128),
+            max_stake: 50_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 50M APT.
+            recurring_lockup_duration_secs: 30 * 24 * 3600,         // 1 month
+            required_proposer_stake: 1_000_000 * APTOS_COINS_BASE_WITH_DECIMALS, // 1M APT
+            rewards_apy_percentage: 10,
+            voting_duration_secs: 7 * 24 * 3600, // 7 days
+            voting_power_increase_limit: 30,
         },
     );
     (genesis, test_validators)

@@ -34,6 +34,10 @@ impl<T: Hashable> Buffer<T> {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
     pub fn head_cursor(&self) -> &Cursor {
         &self.head
     }

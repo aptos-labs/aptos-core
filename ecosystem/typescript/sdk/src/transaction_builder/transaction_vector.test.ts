@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 /**
  * Do fuzzing tests with test vectors. The test vectors are produced by the same code
  * used by the Aptos Blockchain. The test vectors are arrays of JSON objects.
@@ -44,7 +47,7 @@ import { TransactionBuilderEd25519 } from "./builder";
 
 // eslint-disable-next-line operator-linebreak
 const VECTOR_FILES_ROOT_DIR =
-  process.env.VECTOR_FILES_ROOT_DIR || path.resolve(__dirname, "..", "..", "..", "..", "..", "api", "goldens", "v1");
+  process.env.VECTOR_FILES_ROOT_DIR || path.resolve(__dirname, "..", "..", "..", "..", "..", "api", "goldens");
 
 const SCRIPT_FUNCTION_VECTOR = path.join(
   VECTOR_FILES_ROOT_DIR,

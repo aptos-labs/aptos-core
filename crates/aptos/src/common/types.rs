@@ -557,6 +557,24 @@ impl PrivateKeyInputOptions {
         })
     }
 
+    pub fn from_x25519_private_key(private_key: &x25519::PrivateKey) -> CliTypedResult<Self> {
+        Ok(PrivateKeyInputOptions {
+            private_key: Some(
+                private_key
+                    .to_encoded_string()
+                    .map_err(|err| CliError::UnexpectedError(err.to_string()))?,
+            ),
+            private_key_file: None,
+        })
+    }
+
+    pub fn from_file(file: PathBuf) -> Self {
+        PrivateKeyInputOptions {
+            private_key: None,
+            private_key_file: Some(file),
+        }
+    }
+
     /// Extract private key from CLI args with fallback to config
     pub fn extract_private_key(
         &self,
@@ -1045,6 +1063,11 @@ impl TransactionOptions {
         self.rest_options.client(&self.profile_options.profile)
     }
 
+    pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
+        let sender_key = self.private_key()?;
+        Ok(account_address_from_public_key(&sender_key.public_key()))
+    }
+
     /// Submits a script function based on module name and function inputs
     pub async fn submit_script_function(
         &self,
@@ -1072,8 +1095,7 @@ impl TransactionOptions {
         let client = self.rest_client()?;
 
         // Get sender address
-        let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
-        let sender_address = AccountAddress::new(*sender_address);
+        let sender_address = self.sender_address()?;
 
         // Get sequence number for account
         let sequence_number = get_sequence_number(&client, sender_address).await?;
@@ -1091,5 +1113,31 @@ impl TransactionOptions {
             .map_err(|err| CliError::ApiError(err.to_string()))?;
 
         Ok(response.into_inner())
+    }
+}
+
+#[derive(Parser)]
+pub struct OptionalPoolAddressArgs {
+    /// Address of the Staking pool
+    #[clap(long)]
+    pub(crate) pool_address: Option<AccountAddressWrapper>,
+}
+
+impl OptionalPoolAddressArgs {
+    pub fn pool_address(&self) -> Option<AccountAddress> {
+        self.pool_address.map(|inner| inner.account_address)
+    }
+}
+
+#[derive(Parser)]
+pub struct PoolAddressArgs {
+    /// Address of the Staking pool
+    #[clap(long)]
+    pub(crate) pool_address: AccountAddressWrapper,
+}
+
+impl PoolAddressArgs {
+    pub fn pool_address(&self) -> AccountAddress {
+        self.pool_address.account_address
     }
 }

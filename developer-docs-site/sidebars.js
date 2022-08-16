@@ -27,6 +27,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
+        "tutorials/first-transaction-sdk",
         "tutorials/first-transaction",
         "tutorials/first-move-module",
         "tutorials/first-dapp",
@@ -62,7 +63,7 @@ const sidebars = {
         "guides/sign-a-transaction",
         "guides/interacting-with-the-blockchain",
         "guides/building-wallet-extension",
-        "guides/guide-for-system-integrators",
+        "guides/system-integrators-guide",
         "guides/local-testnet-dev-flow",
         {
           type: "category",

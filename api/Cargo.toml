@@ -29,8 +29,6 @@ serde_json = { version = "1.0.81", features = ["preserve_order"] }
 thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["full"] }
 url = "2.2.2"
-warp = { version = "0.3.2", features = ["default", "tls"] }
-warp-reverse-proxy = "0.5.0"
 
 aptos-api-types = { path = "./types", package = "aptos-api-types" }
 aptos-config = { path = "../config" }
@@ -46,12 +44,7 @@ move-deps = { path = "../aptos-move/move-deps", features = ["address32"] }
 storage-interface = { path = "../storage/storage-interface" }
 
 [dev-dependencies]
-goldenfile = "1.1.0"
-proptest = { version = "1.0.0", default-features = true }
-rand = "0.7.3"
-regex = "1.5.5"
-reqwest = { version = "0.11.10", features = ["blocking", "json"], default_features = false }
-
+aptos-api-test-context = { path = "./test-context", package = "aptos-api-test-context" }
 aptos-crypto = { path = "../crates/aptos-crypto" }
 aptos-genesis = { path = "../crates/aptos-genesis", features = ["testing"] }
 aptos-global-constants = { path = "../config/global-constants" }
@@ -65,10 +58,17 @@ aptosdb = { path = "../storage/aptosdb", features = ["fuzzing"] }
 cached-framework-packages = { path = "../aptos-move/framework/cached-packages" }
 executor = { path = "../execution/executor" }
 executor-types = { path = "../execution/executor-types" }
+goldenfile = "1.1.0"
 mempool-notifications = { path = "../state-sync/inter-component/mempool-notifications" }
 move-deps = { path = "../aptos-move/move-deps" }
+proptest = { version = "1.0.0", default-features = true }
+rand = "0.7.3"
+regex = "1.5.5"
+reqwest = { version = "0.11.10", features = ["blocking", "json"], default_features = false }
 serde_path_to_error = "0.1"
 vm-validator = { path = "../vm-validator" }
+warp = { version = "0.3.2", features = ["default"] }
+warp-reverse-proxy = "0.5.0"
 
 [features]
 failpoints = ["fail/failpoints"]

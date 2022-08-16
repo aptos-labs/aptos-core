@@ -49,7 +49,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let parent_block_id = executor.committed_block_id();
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
-        validators[0].data.address,
+        validators[0].data.owner_address,
         validators[0].consensus_key.clone(),
     );
 

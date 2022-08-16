@@ -54,6 +54,13 @@ impl MoveHarness {
         }
     }
 
+    pub fn new_mainnet() -> Self {
+        Self {
+            executor: FakeExecutor::from_mainnet_genesis(),
+            txn_seq_no: BTreeMap::default(),
+        }
+    }
+
     pub fn new_no_parallel() -> Self {
         Self {
             executor: FakeExecutor::from_fresh_genesis().set_not_parallel(),
@@ -66,8 +73,8 @@ impl MoveHarness {
     pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
-        // APTOS has 8 decimals so this is only 1000 coins.
-        let data = AccountData::with_account(acc, 100_000_000_000, 10);
+        // Mint the account 10M Aptos coins (with 8 decimals).
+        let data = AccountData::with_account(acc, 1_000_000_000_000_000, 10);
         self.txn_seq_no.insert(addr, 10);
         self.executor.add_account_data(&data);
         data.account().clone()
@@ -200,7 +207,7 @@ impl MoveHarness {
     }
 
     pub fn new_epoch(&mut self) {
-        self.fast_forward(3600);
+        self.fast_forward(7200);
         self.executor.new_block()
     }
 

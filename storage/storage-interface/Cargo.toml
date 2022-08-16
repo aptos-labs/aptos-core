@@ -30,6 +30,9 @@ aptos-vm = { path = "../../aptos-move/aptos-vm" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 scratchpad = { path = "../scratchpad" }
 
+[dev-dependencies]
+aptos-types = { path = "../../types", features = ["fuzzing"] }
+
 [features]
 default = []
 fuzzing = ["aptos-types/fuzzing"]

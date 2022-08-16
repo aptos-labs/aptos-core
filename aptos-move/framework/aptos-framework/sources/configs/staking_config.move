@@ -12,6 +12,7 @@ module aptos_framework::staking_config {
     const EINVALID_REWARDS_RATE: u64 = 2;
     /// Invalid required stake range, usually happens if min > max.
     const EINVALID_STAKE_RANGE: u64 = 3;
+    const EINVALID_VOTING_POWER_INCREASE_LIMIT: u64 = 4;
 
     /// Validator set configurations that will be stored with the @aptos_framework account.
     struct StakingConfig has copy, drop, key {
@@ -30,6 +31,11 @@ module aptos_framework::staking_config {
         // For example, 0.001% (0.00001) can be represented as 10 / 1000000.
         rewards_rate: u64,
         rewards_rate_denominator: u64,
+        // Only this % of current total voting power is allowed to join the validator set in each epoch.
+        // This is necessary to prevent a massive amount of new stake from joining that can potentially take down the
+        // network if corresponding validators are not ready to participate in consensus in time.
+        // This value is within (0, 100%), not inclusive.
+        voting_power_increase_limit: u64,
     }
 
     /// Only called during genesis.
@@ -41,6 +47,7 @@ module aptos_framework::staking_config {
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
+        voting_power_increase_limit: u64,
     ) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
@@ -52,6 +59,11 @@ module aptos_framework::staking_config {
             error::invalid_argument(EINVALID_REWARDS_RATE),
         );
 
+        assert!(
+            voting_power_increase_limit > 0 && voting_power_increase_limit <= 50,
+            error::invalid_argument(EINVALID_VOTING_POWER_INCREASE_LIMIT),
+        );
+
         move_to(aptos_framework, StakingConfig {
             minimum_stake,
             maximum_stake,
@@ -59,6 +71,7 @@ module aptos_framework::staking_config {
             allow_validator_set_change,
             rewards_rate,
             rewards_rate_denominator,
+            voting_power_increase_limit,
         });
     }
 
@@ -85,6 +98,11 @@ module aptos_framework::staking_config {
     /// Return the reward rate.
     public fun get_reward_rate(config: &StakingConfig): (u64, u64) {
         (config.rewards_rate, config.rewards_rate_denominator)
+    }
+
+    /// Return the joining limit %.
+    public fun get_voting_power_increase_limit(config: &StakingConfig): u64 {
+        config.voting_power_increase_limit
     }
 
     /// Update the min and max stake amounts.
@@ -133,17 +151,34 @@ module aptos_framework::staking_config {
         staking_config.rewards_rate_denominator = new_rewards_rate_denominator;
     }
 
+    /// Update the joining limit %.
+    /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
+    public fun update_voting_power_increase_limit(
+        aptos_framework: &signer,
+        new_voting_power_increase_limit: u64,
+    ) acquires StakingConfig {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        assert!(
+            new_voting_power_increase_limit > 0 && new_voting_power_increase_limit <= 50,
+            error::invalid_argument(EINVALID_VOTING_POWER_INCREASE_LIMIT),
+        );
+
+        let staking_config = borrow_global_mut<StakingConfig>(@aptos_framework);
+        staking_config.voting_power_increase_limit = new_voting_power_increase_limit;
+    }
+
     fun validate_required_stake(minimum_stake: u64, maximum_stake: u64) {
         assert!(minimum_stake <= maximum_stake && maximum_stake > 0, error::invalid_argument(EINVALID_STAKE_RANGE));
     }
 
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_change_staking_configs(aptos_framework: signer) acquires StakingConfig {
-        initialize(&aptos_framework, 0, 1, 1, false, 1, 1);
+        initialize(&aptos_framework, 0, 1, 1, false, 1, 1, 1);
 
         update_required_stake(&aptos_framework, 100, 1000);
         update_recurring_lockup_duration_secs(&aptos_framework, 10000);
         update_rewards_rate(&aptos_framework, 10, 100);
+        update_voting_power_increase_limit(&aptos_framework, 10);
 
         let config = borrow_global<StakingConfig>(@aptos_framework);
         assert!(config.minimum_stake == 100, 0);
@@ -151,6 +186,7 @@ module aptos_framework::staking_config {
         assert!(config.recurring_lockup_duration_secs == 10000, 3);
         assert!(config.rewards_rate == 10, 4);
         assert!(config.rewards_rate_denominator == 100, 4);
+        assert!(config.voting_power_increase_limit == 10, 5);
     }
 
     #[test(account = @0x123)]
@@ -169,6 +205,12 @@ module aptos_framework::staking_config {
     #[expected_failure(abort_code = 0x50002)]
     public entry fun test_update_rewards_unauthorized_should_fail(account: signer) acquires StakingConfig {
         update_rewards_rate(&account, 1, 10);
+    }
+
+    #[test(account = @0x123)]
+    #[expected_failure(abort_code = 0x50002)]
+    public entry fun test_update_voting_power_increase_limit_unauthorized_should_fail(account: signer) acquires StakingConfig {
+        update_voting_power_increase_limit(&account, 10);
     }
 
     #[test(aptos_framework = @aptos_framework)]
@@ -195,6 +237,24 @@ module aptos_framework::staking_config {
         update_rewards_rate(&aptos_framework, 1, 0);
     }
 
+    #[test(aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = 0x10004)]
+    public entry fun test_update_voting_power_increase_limit_to_zero_should_fail(
+        aptos_framework: signer
+    ) acquires StakingConfig {
+        update_voting_power_increase_limit(&aptos_framework, 0);
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    #[expected_failure(abort_code = 0x10004)]
+    public entry fun test_update_voting_power_increase_limit_to_more_than_upper_bound_should_fail(
+        aptos_framework: signer
+    ) acquires StakingConfig {
+        update_voting_power_increase_limit(&aptos_framework, 51);
+    }
+
+    // For tests to bypass all validations.
+    #[test_only]
     public fun initialize_for_test(
         aptos_framework: &signer,
         minimum_stake: u64,
@@ -203,15 +263,16 @@ module aptos_framework::staking_config {
         allow_validator_set_change: bool,
         rewards_rate: u64,
         rewards_rate_denominator: u64,
+        voting_power_increase_limit: u64,
     ) {
-        initialize(
-            aptos_framework,
+        move_to(aptos_framework, StakingConfig {
             minimum_stake,
             maximum_stake,
             recurring_lockup_duration_secs,
             allow_validator_set_change,
             rewards_rate,
             rewards_rate_denominator,
-        );
+            voting_power_increase_limit,
+        });
     }
 }

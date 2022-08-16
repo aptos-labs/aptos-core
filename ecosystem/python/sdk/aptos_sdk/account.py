@@ -34,6 +34,11 @@ class Account:
         account_address = AccountAddress.from_key(private_key.public_key())
         return Account(account_address, private_key)
 
+    def load_key(key: str) -> Account:
+        private_key = ed25519.PrivateKey.from_hex(key)
+        account_address = AccountAddress.from_key(private_key.public_key())
+        return Account(account_address, private_key)
+
     def load(path: str) -> Account:
         with open(path) as file:
             data = json.load(file)

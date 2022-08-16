@@ -15,11 +15,10 @@ use aptos_crypto::{
     hash::{CryptoHash, HashValue},
     PrivateKey, Uniform,
 };
-use aptos_types::ledger_info::generate_ledger_info_with_sig;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
-    ledger_info::LedgerInfo,
+    ledger_info::{generate_ledger_info_with_sig, LedgerInfo},
     test_helpers::transaction_test_helpers::get_test_signed_txn,
     validator_signer::{proptests, ValidatorSigner},
 };
@@ -43,7 +42,7 @@ prop_compose! {
         parent_qc in Just(parent_qc)
     ) -> Block {
         Block::new_proposal(
-            Payload::new_empty(),
+            Payload::empty(),
             round,
             aptos_infallible::duration_since_epoch().as_micros() as u64,
             parent_qc,
