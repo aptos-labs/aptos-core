@@ -254,7 +254,6 @@ fn test_stale_node_index() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
 
     // Update.
     // ```text
@@ -299,6 +298,7 @@ fn test_stale_node_index() {
     // Prune with limit = 2 and target_min_readable_version = 2, two entries with
     // stale_since_version = 1 will be pruned. min_readable_version will be promoted to 1.
     {
+        let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
         assert_eq!(
             prune_stale_indices(
                 &pruner, 0, /* min_readable_version */
@@ -319,6 +319,7 @@ fn test_stale_node_index() {
     // stale_since_version = 2 will be pruned. Min readable version will change even though there
     // is one more entry with stale_since_version = 2 remaining.
     {
+        let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
         assert_eq!(
             prune_stale_indices(
                 &pruner, 1, /* min_readable_version */
@@ -340,6 +341,7 @@ fn test_stale_node_index() {
     // stale_since_version = 2 will be pruned. Min_readable_version will change since there is
     // one more entry with stale_since_version = 2 remaining.
     {
+        let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
         assert_eq!(
             prune_stale_indices(
                 &pruner, 1, /* min_readable_version */
@@ -374,7 +376,6 @@ fn test_stale_node_index_with_target_version() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
 
     // Update.
     // ```text
@@ -417,8 +418,10 @@ fn test_stale_node_index_with_target_version() {
 
     // Verify.
     // Prune with limit = 2 and target_min_readable_version = 1, two entries with
-    // stale_since_version = 1 will be pruned. min_readable_version will be promoted to 1.
+    // stale_since_version = 1 will be pruned. min_readable_version will be promoted to 1. Create a
+    // new pruner everytime to test the min_readable_version initialization logic.
     {
+        let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
         assert_eq!(
             prune_stale_indices(
                 &pruner, 0, /* min_readable_version */
@@ -444,8 +447,10 @@ fn test_stale_node_index_with_target_version() {
         verify_value_and_proof(store, key3.clone(), Some(&value3), 1, root1);
     }
     // Prune with limit = 1 and target_min_readable_version = 1, entries with
-    // stale_since_version = 2 will not be pruned.
+    // stale_since_version = 2 will not be pruned. Create a new pruner everytime to test the
+    // min_readable_version initialization logic.
     {
+        let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
         assert_eq!(
             prune_stale_indices(
                 &pruner, 1, /* min_readable_version */

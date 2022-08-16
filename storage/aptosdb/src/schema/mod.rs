@@ -14,6 +14,7 @@ pub(crate) mod event_by_version;
 pub(crate) mod jellyfish_merkle_node;
 pub(crate) mod ledger_counters;
 pub(crate) mod ledger_info;
+pub(crate) mod pruner_metadata;
 pub(crate) mod stale_node_index;
 pub(crate) mod stale_state_value_index;
 pub(crate) mod state_value;
@@ -48,6 +49,7 @@ pub const TRANSACTION_BY_HASH_CF_NAME: ColumnFamilyName = "transaction_by_hash";
 pub const TRANSACTION_INFO_CF_NAME: ColumnFamilyName = "transaction_info";
 pub const VERSION_DATA_CF_NAME: ColumnFamilyName = "version_data";
 pub const WRITE_SET_CF_NAME: ColumnFamilyName = "write_set";
+pub const DB_METADATA_CF_NAME: ColumnFamilyName = "db_metadata";
 
 fn ensure_slice_len_eq(data: &[u8], len: usize) -> Result<()> {
     ensure!(
@@ -102,6 +104,7 @@ pub mod fuzzing {
             assert_no_panic_decoding::<super::transaction_info::TransactionInfoSchema>(data);
             assert_no_panic_decoding::<super::version_data::VersionDataSchema>(data);
             assert_no_panic_decoding::<super::write_set::WriteSetSchema>(data);
+            assert_no_panic_decoding::<super::pruner_metadata::PrunerMetadataSchema>(data);
         }
     }
 }
