@@ -1,6 +1,6 @@
 /// This module provides the foundation for Tokens.
 module aptos_token::token {
-    use std::string::String;
+    use std::string::{Self, String};
     use std::error;
     use aptos_std::event::{Self, EventHandle};
     use std::signer;
@@ -96,6 +96,8 @@ module aptos_token::token {
         default_properties: PropertyMap,
         //control the TokenData field mutability
         mutability_config: TokenMutabilityConfig,
+        // content hash of the media
+        content_hash: String,
     }
 
     /// The royalty of a token
@@ -192,6 +194,7 @@ module aptos_token::token {
         property_keys: vector<String>,
         property_values: vector<vector<u8>>,
         property_types: vector<String>,
+        content_hash: String,
     }
 
     /// mint token event. This event triggered when creator adds more supply to existing token
@@ -586,7 +589,8 @@ module aptos_token::token {
         token_mutate_config: TokenMutabilityConfig,
         property_keys: vector<String>,
         property_values: vector<vector<u8>>,
-        property_types: vector<String>
+        property_types: vector<String>,
+        content_hash: String,
     ): TokenDataId acquires Collections {
         let account_addr = signer::address_of(account);
         assert!(
@@ -628,6 +632,7 @@ module aptos_token::token {
             description,
             default_properties: property_map::new(property_keys, property_values, property_types),
             mutability_config: token_mutate_config,
+            content_hash,
         };
 
         table::add(&mut collections.token_data, token_data_id, token_data);
@@ -647,6 +652,7 @@ module aptos_token::token {
                 property_keys,
                 property_values,
                 property_types,
+                content_hash: string::utf8(b""),
             },
         );
 
@@ -703,7 +709,8 @@ module aptos_token::token {
             token_mut_config,
             property_keys,
             property_values,
-            property_types
+            property_types,
+            string::utf8(b""),
         );
 
         mint_token(
@@ -712,6 +719,52 @@ module aptos_token::token {
             balance,
         );
     }
+
+    /// create token with raw inputs
+    public entry fun create_token_with_content_hash_script(
+        account: &signer,
+        collection: String,
+        name: String,
+        description: String,
+        balance: u64,
+        maximum: u64,
+        uri: String,
+        royalty_payee_address: address,
+        royalty_points_denominator: u64,
+        royalty_points_numerator: u64,
+        mutate_setting: vector<bool>,
+        property_keys: vector<String>,
+        property_values: vector<vector<u8>>,
+        property_types: vector<String>,
+        content_hash: String,
+    ) acquires Collections, TokenStore {
+        let token_mut_config = create_token_mutability_config(&mutate_setting);
+
+        let tokendata_id = create_tokendata(
+            account,
+            collection,
+            name,
+            description,
+            maximum,
+            uri,
+            royalty_payee_address,
+            royalty_points_denominator,
+            royalty_points_numerator,
+            token_mut_config,
+            property_keys,
+            property_values,
+            property_types,
+            content_hash,
+        );
+
+        mint_token(
+            account,
+            tokendata_id,
+            balance,
+        );
+    }
+
+
 
     public fun mint_token(
         account: &signer,
