@@ -8,6 +8,7 @@ module aptos_framework::block {
     use aptos_framework::system_addresses;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
+    use aptos_framework::state_storage;
 
     friend aptos_framework::genesis;
 
@@ -106,6 +107,10 @@ module aptos_framework::block {
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
         stake::update_performance_statistics(proposer_index_optional, failed_proposer_indices);
+
+        if (round == 0) {
+            state_storage::on_epoch_begin();
+        };
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             reconfiguration::reconfigure();
