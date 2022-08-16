@@ -128,10 +128,11 @@ impl StatePrunerManager {
     /// Creates a worker thread that waits on a channel for pruning commands.
     pub fn new(
         state_merkle_rocksdb: Arc<DB>,
+        ledger_db: Arc<DB>,
         state_merkle_pruner_config: StateMerklePrunerConfig,
     ) -> Self {
         let state_db_clone = Arc::clone(&state_merkle_rocksdb);
-        let state_pruner = utils::create_state_pruner(state_db_clone);
+        let state_pruner = utils::create_state_pruner(state_db_clone, ledger_db);
 
         if state_merkle_pruner_config.enable {
             PRUNER_WINDOW

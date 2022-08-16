@@ -90,6 +90,7 @@ fn test_storage_config() {
         for enable_state in [false, true] {
             let state_pruner = StatePrunerManager::new(
                 Arc::clone(&aptos_db.state_merkle_db),
+                Arc::clone(&aptos_db.ledger_db),
                 StateMerklePrunerConfig {
                     enable: enable_state,
                     prune_window: 20,
@@ -122,6 +123,7 @@ fn test_error_if_version_is_pruned() {
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let state_pruner = StatePrunerManager::new(
         Arc::clone(&aptos_db.state_merkle_db),
+        Arc::clone(&aptos_db.ledger_db),
         StateMerklePrunerConfig {
             enable: true,
             prune_window: 0,
