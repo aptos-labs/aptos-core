@@ -5,13 +5,13 @@
 
 use crate::components::apply_chunk_output::ApplyChunkOutput;
 use anyhow::Result;
-use aptos_logger::trace;
+use aptos_logger::{debug, trace};
 use aptos_state_view::StateView;
 use aptos_types::transaction::{Transaction, TransactionOutput};
 use aptos_vm::VMExecutor;
 use executor_types::ExecutedChunk;
 use fail::fail_point;
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Instant};
 use storage_interface::{
     cached_state_view::{CachedStateView, StateCache},
     ExecutedTrees,
@@ -33,8 +33,14 @@ impl ChunkOutput {
         transactions: Vec<Transaction>,
         state_view: CachedStateView,
     ) -> Result<Self> {
+        let start = Instant::now();
         let transaction_outputs = V::execute_block(transactions.clone(), &state_view)?;
 
+        debug!(
+            "Chunk execution for {} transactions lasted: {}",
+            transactions.len(),
+            start.elapsed().as_secs_f32()
+        );
         Ok(Self {
             transactions,
             transaction_outputs,
