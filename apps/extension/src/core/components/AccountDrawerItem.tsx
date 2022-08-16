@@ -155,6 +155,8 @@ function AccountDrawerItem(
               Balance:
               {' '}
               {coinBalanceString}
+              &nbsp;
+              APT
             </Text>
             <Text noOfLines={1} fontSize="sm">
               {
