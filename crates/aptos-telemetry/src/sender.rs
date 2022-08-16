@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics;
+use crate::metrics::{increment_log_ingest_failures_by, increment_log_ingest_successes_by};
 use anyhow::{anyhow, Error};
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{
@@ -40,7 +41,7 @@ impl AuthContext {
 }
 
 #[derive(Clone)]
-pub(crate) struct TelemetrySender {
+pub struct TelemetrySender {
     base_url: String,
     chain_id: ChainId,
     peer_id: PeerId,
@@ -129,6 +130,60 @@ impl TelemetrySender {
             |e| error!("Failed to push Prometheus Metrics: {}", e),
             |_| debug!("Prometheus Metrics pushed successfully."),
         );
+    }
+
+    pub async fn send_logs(&self, batch: Vec<String>) {
+        if let Ok(json) = serde_json::to_string(&batch) {
+            // TODO: retry
+            let len = json.len();
+            let result = self.post_logs(json.as_bytes()).await;
+            match result {
+                Ok(_) => {
+                    increment_log_ingest_successes_by(batch.len() as u64);
+                    debug!("Sent log of length: {}", len);
+                }
+                Err(error) => {
+                    increment_log_ingest_failures_by(batch.len() as u64);
+                    error!("Failed send log of length: {} with error: {}", len, error);
+                }
+            }
+        } else {
+            error!("Failed json serde of batch: {:?}", batch);
+        }
+    }
+
+    async fn post_logs(&self, json: &[u8]) -> Result<(), anyhow::Error> {
+        let token = self.get_auth_token().await?;
+
+        let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
+        gzip_encoder.write_all(json)?;
+        let compressed_bytes = gzip_encoder.finish()?;
+
+        // Send the request and wait for a response
+        let send_result = self
+            .client
+            .post(format!("{}/log_ingest", self.base_url))
+            .header("Content-Encoding", "gzip")
+            .bearer_auth(token)
+            .body(compressed_bytes)
+            .send()
+            .await;
+
+        // Process the result
+        match send_result {
+            Ok(response) => {
+                let status_code = response.status();
+                if status_code.is_success() {
+                    Ok(())
+                } else if status_code == StatusCode::UNAUTHORIZED {
+                    self.reset_token();
+                    Err(anyhow!("Unauthorized"))
+                } else {
+                    Err(anyhow!("Error status received: {}", status_code))
+                }
+            }
+            Err(error) => Err(anyhow!("Error sending log. Err: {}", error)),
+        }
     }
 
     pub async fn send_metrics(&self, event_name: String, telemetry_dump: TelemetryDump) {

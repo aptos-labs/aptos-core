@@ -4,6 +4,7 @@
 //! Implementation of writing logs to both local printers (e.g. stdout) and remote loggers
 //! (e.g. Logstash)
 
+use crate::telemetry_log_writer::TelemetryLogWriter;
 use crate::{
     counters::{
         PROCESSED_STRUCT_LOG_COUNT, SENT_STRUCT_LOG_BYTES, SENT_STRUCT_LOG_COUNT,
@@ -16,19 +17,18 @@ use crate::{
 use aptos_infallible::RwLock;
 use backtrace::Backtrace;
 use chrono::{SecondsFormat, Utc};
+use futures::channel;
 use once_cell::sync::Lazy;
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
+use std::fmt::Debug;
 use std::io::Stdout;
 use std::{
     collections::BTreeMap,
     env, fmt,
     io::Write,
     str::FromStr,
-    sync::{
-        mpsc::{self, Receiver, SyncSender},
-        Arc,
-    },
+    sync::{self, Arc},
     thread,
 };
 use strum_macros::EnumString;
@@ -206,6 +206,7 @@ pub struct AptosDataBuilder {
     remote_level: Level,
     address: Option<String>,
     printer: Option<Box<dyn Writer>>,
+    remote_log_tx: Option<channel::mpsc::Sender<String>>,
     is_async: bool,
     custom_format: Option<fn(&LogEntry) -> Result<String, fmt::Error>>,
 }
@@ -221,6 +222,7 @@ impl AptosDataBuilder {
             remote_level: Level::Info,
             address: None,
             printer: Some(Box::new(StdoutWriter::new())),
+            remote_log_tx: None,
             is_async: false,
             custom_format: None,
         }
@@ -267,6 +269,12 @@ impl AptosDataBuilder {
         self.console_port = console_port;
         self
     }
+
+    pub fn remote_log_tx(&mut self, remote_log_tx: channel::mpsc::Sender<String>) -> &mut Self {
+        self.remote_log_tx = Some(remote_log_tx);
+        self
+    }
+
     pub fn is_async(&mut self, is_async: bool) -> &mut Self {
         self.is_async = is_async;
         self
@@ -300,7 +308,7 @@ impl AptosDataBuilder {
             let remote_filter = {
                 let mut filter_builder = Filter::builder();
 
-                if self.is_async && self.address.is_some() {
+                if self.is_async && (self.address.is_some() || self.remote_log_tx.is_some()) {
                     if env::var(RUST_LOG_REMOTE).is_ok() {
                         filter_builder.with_env(RUST_LOG_REMOTE);
                     } else if env::var(RUST_LOG).is_ok() {
@@ -330,7 +338,12 @@ impl AptosDataBuilder {
         }
 
         let logger = if self.is_async {
-            let (sender, receiver) = mpsc::sync_channel(self.channel_size);
+            let (sender, receiver) = sync::mpsc::sync_channel(self.channel_size);
+            let mut remote_tx = None;
+            if let Some(tx) = self.remote_log_tx.take() {
+                remote_tx = Some(tx);
+            }
+
             let logger = Arc::new(AptosData {
                 enable_backtrace: self.enable_backtrace,
                 sender: Some(sender),
@@ -343,6 +356,7 @@ impl AptosDataBuilder {
                 address: self.address.clone(),
                 printer: self.printer.take(),
                 facade: logger.clone(),
+                remote_tx,
             };
 
             thread::spawn(move || service.run());
@@ -384,7 +398,7 @@ impl FilterPair {
 
 pub struct AptosData {
     enable_backtrace: bool,
-    sender: Option<SyncSender<LoggerServiceEvent>>,
+    sender: Option<sync::mpsc::SyncSender<LoggerServiceEvent>>,
     printer: Option<Box<dyn Writer>>,
     filter: RwLock<FilterPair>,
     pub(crate) formatter: fn(&LogEntry) -> Result<String, fmt::Error>,
@@ -454,7 +468,7 @@ impl Logger for AptosData {
 
     fn flush(&self) {
         if let Some(sender) = &self.sender {
-            let (oneshot_sender, oneshot_receiver) = mpsc::sync_channel(1);
+            let (oneshot_sender, oneshot_receiver) = sync::mpsc::sync_channel(1);
             sender
                 .send(LoggerServiceEvent::Flush(oneshot_sender))
                 .unwrap();
@@ -465,23 +479,25 @@ impl Logger for AptosData {
 
 enum LoggerServiceEvent {
     LogEntry(LogEntry),
-    Flush(SyncSender<()>),
+    Flush(sync::mpsc::SyncSender<()>),
 }
 
 /// A service for running a log listener, that will continually export logs through a local printer
 /// or to a `AptosData` for external logging.
 struct LoggerService {
-    receiver: Receiver<LoggerServiceEvent>,
+    receiver: sync::mpsc::Receiver<LoggerServiceEvent>,
     address: Option<String>,
     printer: Option<Box<dyn Writer>>,
     facade: Arc<AptosData>,
+    remote_tx: Option<channel::mpsc::Sender<String>>,
 }
 
 impl LoggerService {
     pub fn run(mut self) {
-        let mut writer = self.address.take().map(TcpWriter::new);
+        let mut tcp_writer = self.address.take().map(TcpWriter::new);
+        let mut telemetry_writer = self.remote_tx.take().map(TelemetryLogWriter::new);
 
-        for event in self.receiver {
+        for event in &self.receiver {
             match event {
                 LoggerServiceEvent::LogEntry(entry) => {
                     PROCESSED_STRUCT_LOG_COUNT.inc();
@@ -499,7 +515,7 @@ impl LoggerService {
                         }
                     }
 
-                    if let Some(writer) = &mut writer {
+                    if let Some(writer) = &mut tcp_writer {
                         if self
                             .facade
                             .filter
@@ -507,7 +523,20 @@ impl LoggerService {
                             .remote_filter
                             .enabled(&entry.metadata)
                         {
-                            Self::write_to_logstash(writer, entry);
+                            Self::write_to_logstash(writer, &entry);
+                        }
+                    }
+
+                    if let Some(writer) = &mut telemetry_writer {
+                        if self
+                            .facade
+                            .filter
+                            .read()
+                            .remote_filter
+                            .enabled(&entry.metadata)
+                        {
+                            let s = (self.facade.formatter)(&entry).expect("Unable to format");
+                            let _ = writer.write(s);
                         }
                     }
                 }
@@ -521,8 +550,8 @@ impl LoggerService {
     }
 
     /// Writes a log line into json_lines logstash format, which has a newline at the end
-    fn write_to_logstash(stream: &mut TcpWriter, entry: LogEntry) {
-        let message = if let Ok(json) = json_format(&entry) {
+    fn write_to_logstash(stream: &mut TcpWriter, entry: &LogEntry) {
+        let message = if let Ok(json) = json_format(entry) {
             json
         } else {
             return;

@@ -30,6 +30,7 @@ mod custom_event;
 mod error;
 mod index;
 mod jwt_auth;
+mod log_ingest;
 mod prometheus_push_metrics;
 #[cfg(any(test))]
 pub(crate) mod tests;

@@ -3,6 +3,11 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_config::config::NodeConfig;
+use aptos_logger::prelude::*;
+use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
+use aptos_types::chain_id::ChainId;
+use futures::channel::mpsc;
 use std::future::Future;
 use std::time::Duration;
 use std::{
@@ -22,11 +27,6 @@ use tokio::{
 };
 use uuid::Uuid;
 
-use aptos_config::config::NodeConfig;
-use aptos_logger::prelude::*;
-use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
-use aptos_types::chain_id::ChainId;
-
 use crate::constants::{
     ENV_APTOS_DISABLE_EXPERIMENTAL_PUSH_METRICS, ENV_TELEMETRY_SERVICE_URL,
     PROMETHEUS_PUSH_METRICS_FREQ_SECS,
@@ -44,6 +44,7 @@ use crate::{
     network_metrics::create_network_metric_telemetry_event,
     sender::TelemetrySender,
     system_information::create_system_info_telemetry_event,
+    telemetry_log_sender::TelemetryLogSender,
 };
 
 const IP_ADDRESS_KEY: &str = "IP_ADDRESS";
@@ -73,7 +74,11 @@ fn enable_experimental_prometheus_push_metrics() -> bool {
 
 /// Starts the telemetry service and returns the execution runtime.
 /// Note: The service will not be created if telemetry is disabled.
-pub fn start_telemetry_service(node_config: NodeConfig, chain_id: ChainId) -> Option<Runtime> {
+pub fn start_telemetry_service(
+    node_config: NodeConfig,
+    chain_id: ChainId,
+    remote_log_rx: Option<mpsc::Receiver<String>>,
+) -> Option<Runtime> {
     // Don't start the service if telemetry has been disabled
     if telemetry_is_disabled() {
         warn!("Aptos telemetry is disabled!");
@@ -86,6 +91,12 @@ pub fn start_telemetry_service(node_config: NodeConfig, chain_id: ChainId) -> Op
         .enable_all()
         .build()
         .expect("Failed to create the Aptos Telemetry runtime!");
+
+    if let Some(rx) = remote_log_rx {
+        let telemetry_log_sender =
+            TelemetryLogSender::new(TELEMETRY_SERVICE_URL, chain_id, &node_config);
+        telemetry_runtime.spawn(telemetry_log_sender.start(rx));
+    }
 
     // Spawn the telemetry service
     let peer_id = fetch_peer_id(&node_config);
