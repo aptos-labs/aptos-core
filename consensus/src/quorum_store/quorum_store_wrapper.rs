@@ -146,10 +146,7 @@ impl QuorumStoreWrapper {
             }
 
             self.db
-                .save_batch_id(
-                    self.latest_logical_time.epoch(),
-                    batch_id + 1,
-                )
+                .save_batch_id(self.latest_logical_time.epoch(), batch_id + 1)
                 .expect("Could not save to db");
 
             let (proof_tx, proof_rx) = oneshot::channel();
@@ -321,7 +318,7 @@ impl QuorumStoreWrapper {
 
         // TODO: parameter? bring back back-off?
         let mut interval = time::interval(Duration::from_millis(
-            10 // 50 is currently the end batch timer
+            10, // 50 is currently the end batch timer
         ));
 
         loop {

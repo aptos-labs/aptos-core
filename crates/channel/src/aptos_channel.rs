@@ -10,12 +10,12 @@
 use crate::message_queues::{PerKeyQueue, QueueStyle};
 use anyhow::{ensure, Result};
 use aptos_infallible::{Mutex, NonZeroUsize};
+use aptos_logger::debug;
 use aptos_metrics_core::IntCounterVec;
 use futures::{
     channel::oneshot,
     stream::{FusedStream, Stream},
 };
-use aptos_logger::debug;
 use std::{
     fmt::{Debug, Formatter},
     hash::Hash,

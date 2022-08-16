@@ -14,9 +14,9 @@ use crate::multi_signature::{MultiSignature, PartialSignatures};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_signer::ValidatorSigner;
 use anyhow::{ensure, Result};
-use itertools::Itertools;
 use aptos_bitvec::BitVec;
 use aptos_crypto::bls12381::PublicKey;
+use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 

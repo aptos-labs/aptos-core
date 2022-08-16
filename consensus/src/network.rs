@@ -302,8 +302,11 @@ impl NetworkTask {
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) =
             aptos_channel::new(QueueStyle::LIFO, 1, Some(&counters::CONSENSUS_CHANNEL_MSGS));
-        let (quorum_store_messages_tx, quorum_store_messages) =
-            aptos_channel::new(QueueStyle::FIFO, 100, Some(&counters::QUORUM_STORE_CHANNEL_MSGS));
+        let (quorum_store_messages_tx, quorum_store_messages) = aptos_channel::new(
+            QueueStyle::FIFO,
+            100,
+            Some(&counters::QUORUM_STORE_CHANNEL_MSGS),
+        );
         let (block_retrieval_tx, block_retrieval) = aptos_channel::new(
             QueueStyle::LIFO,
             1,
@@ -328,37 +331,33 @@ impl NetworkTask {
     pub async fn start(mut self) {
         while let Some(message) = self.all_events.next().await {
             match message {
-                Event::Message(peer_id, msg) => {
-                    match msg {
-                        quorum_store_msg @ (ConsensusMsg::SignedDigestMsg(_)
-                        | ConsensusMsg::FragmentMsg(_)
-                        | ConsensusMsg::BatchMsg(_)
-                        | ConsensusMsg::ProofOfStoreBroadcastMsg(_)) => {
-                            if let Err(e) = self
-                                .quorum_store_messages_tx
-                                .push((peer_id, discriminant(&quorum_store_msg)), (peer_id, quorum_store_msg))
-                            {
-                                warn!(
-                            remote_peer = peer_id,
-                            error = ?e, "Error pushing consensus quorum store msg",
-                        );
-                            }
+                Event::Message(peer_id, msg) => match msg {
+                    quorum_store_msg @ (ConsensusMsg::SignedDigestMsg(_)
+                    | ConsensusMsg::FragmentMsg(_)
+                    | ConsensusMsg::BatchMsg(_)
+                    | ConsensusMsg::ProofOfStoreBroadcastMsg(_)) => {
+                        if let Err(e) = self.quorum_store_messages_tx.push(
+                            (peer_id, discriminant(&quorum_store_msg)),
+                            (peer_id, quorum_store_msg),
+                        ) {
+                            warn!(
+                                remote_peer = peer_id,
+                                error = ?e, "Error pushing consensus quorum store msg",
+                            );
                         }
-                        consensus_msg=> {
-                            if let Err(e) = self
-                                .consensus_messages_tx
-                                .push((peer_id, discriminant(&consensus_msg)), (peer_id, consensus_msg))
-                            {
-                                warn!(
-                            remote_peer = peer_id,
-                            error = ?e, "Error pushing consensus msg",
-                        );
-                            }
-                        }
-
                     }
-
-                }
+                    consensus_msg => {
+                        if let Err(e) = self.consensus_messages_tx.push(
+                            (peer_id, discriminant(&consensus_msg)),
+                            (peer_id, consensus_msg),
+                        ) {
+                            warn!(
+                                remote_peer = peer_id,
+                                error = ?e, "Error pushing consensus msg",
+                            );
+                        }
+                    }
+                },
                 Event::RpcRequest(peer_id, msg, protocol, callback) => match msg {
                     ConsensusMsg::BlockRetrievalRequest(request) => {
                         debug!(

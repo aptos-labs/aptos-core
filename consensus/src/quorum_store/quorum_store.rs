@@ -280,7 +280,8 @@ impl QuorumStore {
                         .await;
 
                     self.network_sender
-                         .broadcast_without_self(ConsensusMsg::FragmentMsg(Box::new(fragment))).await;
+                        .broadcast_without_self(ConsensusMsg::FragmentMsg(Box::new(fragment)))
+                        .await;
 
                     self.batch_store_tx
                         .send(batch_store_command)

@@ -321,7 +321,7 @@ pub static QUORUM_STORE_CHANNEL_MSGS: Lazy<IntCounterVec> = Lazy::new(|| {
         "Counters(queued,dequeued,dropped) related to quorum store channel",
         &["state"]
     )
-        .unwrap()
+    .unwrap()
 });
 
 /// Counters(queued,dequeued,dropped) related to consensus round manager channel

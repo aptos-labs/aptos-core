@@ -1,8 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::liveness::leader_reputation::extract_epoch_to_proposers;
-use crate::monitor;
 use crate::quorum_store::{
     batch_reader::BatchReader,
     quorum_store::{QuorumStore, QuorumStoreCommand, QuorumStoreConfig},
@@ -69,18 +67,21 @@ use consensus_types::{
 };
 use event_notifications::ReconfigNotificationListener;
 use fail::fail_point;
-use futures::{channel::{
-    mpsc,
-    mpsc::{unbounded, Receiver, Sender, UnboundedSender},
-    oneshot,
-}, SinkExt, StreamExt};
+use futures::{
+    channel::{
+        mpsc,
+        mpsc::{unbounded, Receiver, Sender, UnboundedSender},
+        oneshot,
+    },
+    SinkExt, StreamExt,
+};
 use itertools::Itertools;
 use network::protocols::network::{ApplicationNetworkSender, Event};
 use safety_rules::SafetyRulesManager;
 use std::{
     cmp::Ordering,
-    convert::TryInto,
     collections::HashMap,
+    convert::TryInto,
     mem::{discriminant, Discriminant},
     sync::Arc,
     time::Duration,

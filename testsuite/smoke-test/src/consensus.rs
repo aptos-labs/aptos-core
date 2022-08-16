@@ -371,7 +371,6 @@ async fn test_no_failures() {
     .await;
 }
 
-
 #[tokio::test]
 async fn test_no_failures_long() {
     let num_validators = 20;
