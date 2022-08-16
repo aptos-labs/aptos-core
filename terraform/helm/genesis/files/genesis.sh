@@ -67,7 +67,7 @@ done
 
 # get the framework
 # this is the directory the aptos-framework is located in the aptoslabs/tools docker image
-cp $MOVE_FRAMEWORK_DIR/head.mbr ${WORKSPACE}/framework.mbr
+cp $MOVE_FRAMEWORK_DIR/head.mrb ${WORKSPACE}/framework.mrb
 
 # run genesis
 aptos genesis generate-genesis --local-repository-dir ${WORKSPACE} --output-dir ${WORKSPACE}

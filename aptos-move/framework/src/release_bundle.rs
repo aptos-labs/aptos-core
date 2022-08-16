@@ -48,7 +48,6 @@ impl ReleaseBundle {
 
     /// Read a release bundle from a file.
     pub fn read(file: PathBuf) -> anyhow::Result<ReleaseBundle> {
-        eprintln!("{}", file.display());
         let content = std::fs::read(file)?;
         Ok(bcs::from_bytes::<ReleaseBundle>(&content)?)
     }
@@ -135,8 +134,10 @@ impl ReleaseBundle {
 impl ReleasePackage {
     /// Creates a new released package.
     pub fn new(package: BuiltPackage) -> anyhow::Result<Self> {
+        // TODO: remove poliocy and put it into toml
+        let metadata = package.extract_metadata(UpgradePolicy::compat())?;
         Ok(ReleasePackage {
-            metadata: package.extract_metadata(/* TODO: remove */ UpgradePolicy::compat())?,
+            metadata,
             code: package.extract_code(),
         })
     }
@@ -159,6 +160,11 @@ impl ReleasePackage {
     /// Returns the package metadata.
     pub fn package_metadata(&self) -> &PackageMetadata {
         &self.metadata
+    }
+
+    /// Returns the package metadata, mutable.
+    pub fn package_metadata_mut(&mut self) -> &mut PackageMetadata {
+        &mut self.metadata
     }
 
     /// Returns the ABIs.

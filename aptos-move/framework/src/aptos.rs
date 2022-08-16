@@ -86,7 +86,7 @@ impl ReleaseTarget {
         ReleaseBundle::read(path)
     }
 
-    pub fn create_release(self, out: Option<PathBuf>) -> anyhow::Result<()> {
+    pub fn create_release(self, strip: bool, out: Option<PathBuf>) -> anyhow::Result<()> {
         let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let packages = self
             .packages()
@@ -120,15 +120,18 @@ impl ReleaseTarget {
                 crate_dir.join("releases").join(self.file_name())
             },
         };
-        options.create_release()
+        options.create_release(strip)
     }
 }
 
 // ===============================================================================================
 // Inlined Package Artifacts
 
-static HEAD_RELEASE_BUNDLE: Lazy<ReleaseBundle> =
-    Lazy::new(|| ReleaseTarget::Head.load_bundle().unwrap());
+const HEAD_RELEASE_BUNDLE_BYTES: &[u8] = include_bytes!("../releases/head.mrb");
+
+static HEAD_RELEASE_BUNDLE: Lazy<ReleaseBundle> = Lazy::new(|| {
+    bcs::from_bytes::<ReleaseBundle>(HEAD_RELEASE_BUNDLE_BYTES).expect("bcs succeeds")
+});
 
 /// Returns the release bundle for the current code.
 pub fn head_release_bundle() -> &'static ReleaseBundle {

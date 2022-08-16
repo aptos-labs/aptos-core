@@ -23,7 +23,6 @@ ENV BUILT_VIA_BUILDKIT $BUILT_VIA_BUILDKIT
 RUN test -n "$BUILT_VIA_BUILDKIT" || (printf "===\nREAD ME\n===\n\nYou likely just tried run a docker build using this Dockerfile using\nthe standard docker builder (e.g. docker build). The standard docker\nbuild command uses a builder that does not respect our .dockerignore\nfile, which will lead to a build failure. To build, you should instead\nrun a command like one of these:\n\ndocker/docker-bake-rust-all.sh\ndocker/docker-bake-rust-all.sh indexer\n\nIf you are 100 percent sure you know what you're doing, you can add this flag:\n--build-arg BUILT_VIA_BUILDKIT=true\n\nFor more information, see https://github.com/aptos-labs/aptos-core/pull/2472\n\nThanks!" && false)
 
 COPY --link . /aptos/
-COPY --link ./aptos-move /aptos/aptos-move
 
 RUN ARCHITECTURE=$(uname -m | sed -e "s/arm64/arm_64/g" | sed -e "s/aarch64/aarch_64/g") \
     && curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v21.5/protoc-21.5-linux-$ARCHITECTURE.zip" \
@@ -148,9 +147,7 @@ COPY --link --from=builder /aptos/dist/transaction-emitter /usr/local/bin/transa
 
 ### Get Aptos Move releases for genesis ceremony
 RUN mkdir -p /aptos-framework/move
-COPY --link --from=builder /aptos/aptos-move/framework/releases/* /aptos-framework/move
-RUN test -n "/aptos-framework/move/head.mbr" || (printf "expected head.mbr release!" && false)
-
+COPY --link --from=builder /aptos/aptos-move/framework/releases/head.mrb /aptos-framework/move/head.mrb
 
 # add build info
 ARG BUILD_DATE
