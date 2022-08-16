@@ -3,6 +3,8 @@
 
 use crate::{natives::util::make_native_from_func, pop_vec_arg};
 use aptos_crypto::{bls12381, traits};
+use move_deps::move_binary_format::errors::PartialVMError;
+use move_deps::move_core_types::vm_status::StatusCode;
 use move_deps::move_vm_types::values::Struct;
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
@@ -14,33 +16,34 @@ use move_deps::{
 use smallvec::smallvec;
 use std::{collections::VecDeque, convert::TryFrom};
 
-/// TODO: remove these
-/// Returns the equivalent of a Move std::option::none() natively in Rust.
-fn none_option() -> Value {
-    Value::struct_(Struct::pack(std::iter::once(
-        Value::vector_for_testing_only(std::iter::empty()),
-    )))
-}
+/// Pops a Vec<T> off the argument stack and converts it to a Vec<Vec<u8>> by reading the first
+/// field of T, which is a Vec<u8> field named `bytes`.
+fn pop_vec_of_vec_u8(arguments: &mut VecDeque<Value>) -> PartialVMResult<Vec<Vec<u8>>> {
+    let structs = pop_vec_arg!(arguments, Struct);
+    let mut v = Vec::with_capacity(structs.len());
 
-/// TODO: remove these
-/// Returns the equivalent of a Move std::option<vector<u8>>::some(v) natively in Rust.
-fn some_option(v: Vec<u8>) -> Value {
-    let vv = Value::vector_u8(v.into_iter());
-    Value::struct_(Struct::pack(std::iter::once(
-        Value::vector_for_testing_only(std::iter::once(vv)),
-    )))
+    for s in structs {
+        let field = s
+            .unpack()?
+            .next()
+            .ok_or_else(|| PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR))?;
+
+        v.push(field.value_as::<Vec<u8>>()?);
+    }
+
+    PartialVMResult::Ok(v)
 }
 
 /// Deserializes a vector of PK bytes into bls12381::PublicKey structs.
 fn bls12381_deserialize_pks_with_gas(
     pks_serialized: Vec<Vec<u8>>,
     cost: &mut u64,
-    per_pubkey_cost: u64,
+    gas_params: &GasParameters,
 ) -> Vec<bls12381::PublicKey> {
     let mut pks = vec![];
 
     for pk_bytes in pks_serialized {
-        *cost += per_pubkey_cost;
+        *cost += gas_params.per_pubkey_deserialize_cost;
 
         let pk = match bls12381::PublicKey::try_from(&pk_bytes[..]) {
             Ok(key) => key,
@@ -58,9 +61,9 @@ fn bls12381_deserialize_pks_with_gas(
 fn bls12381_deserialize_pk_with_gas(
     pk_bytes: Vec<u8>,
     cost: &mut u64,
-    per_pubkey_cost: u64,
+    gas_params: &GasParameters,
 ) -> Option<bls12381::PublicKey> {
-    *cost += per_pubkey_cost;
+    *cost += gas_params.per_pubkey_deserialize_cost;
 
     match bls12381::PublicKey::try_from(&pk_bytes[..]) {
         Ok(key) => Some(key),
@@ -73,12 +76,12 @@ fn bls12381_deserialize_pk_with_gas(
 fn bls12381_deserialize_sigs_with_gas(
     sigs_serialized: Vec<Vec<u8>>,
     cost: &mut u64,
-    per_sig_cost: u64,
+    gas_params: &GasParameters,
 ) -> Vec<bls12381::Signature> {
     let mut sigs = vec![];
 
     for sig_bytes in sigs_serialized {
-        *cost += per_sig_cost;
+        *cost += gas_params.per_sig_deserialize_cost;
 
         let pk = match bls12381::Signature::try_from(&sig_bytes[..]) {
             Ok(sig) => sig,
@@ -96,9 +99,9 @@ fn bls12381_deserialize_sigs_with_gas(
 fn bls12381_deserialize_sig_with_gas(
     sig_bytes: Vec<u8>,
     cost: &mut u64,
-    per_sig_cost: u64,
+    gas_params: &GasParameters,
 ) -> Option<bls12381::Signature> {
-    *cost += per_sig_cost;
+    *cost += gas_params.per_sig_deserialize_cost;
 
     match bls12381::Signature::try_from(&sig_bytes[..]) {
         Ok(sig) => Some(sig),
@@ -111,9 +114,9 @@ fn bls12381_deserialize_sig_with_gas(
 fn bls12381_deserialize_pop_with_gas(
     pop_bytes: Vec<u8>,
     cost: &mut u64,
-    per_pop_cost: u64,
+    gas_params: &GasParameters,
 ) -> Option<bls12381::ProofOfPossession> {
-    *cost += per_pop_cost;
+    *cost += gas_params.per_sig_deserialize_cost;
 
     match bls12381::ProofOfPossession::try_from(&pop_bytes[..]) {
         Ok(pop) => Some(pop),
@@ -126,10 +129,10 @@ fn bls12381_deserialize_pop_with_gas(
 fn bls12381_pk_subgroub_check_with_gas(
     pk: &bls12381::PublicKey,
     cost: &mut u64,
-    per_pk_cost: u64,
+    gas_params: &GasParameters,
 ) -> bool {
     // NOTE(Gas): constant-time; around 39 microseconds on Apple M1
-    *cost += per_pk_cost;
+    *cost += gas_params.per_pubkey_deserialize_cost;
     pk.subgroup_check().is_ok()
 }
 
@@ -137,9 +140,9 @@ fn bls12381_pk_subgroub_check_with_gas(
 fn bls12381_sig_subgroub_check_with_gas(
     sig: &bls12381::Signature,
     cost: &mut u64,
-    per_sig_cost: u64,
+    gas_params: &GasParameters,
 ) -> bool {
-    *cost += per_sig_cost;
+    *cost += gas_params.per_sig_subgroup_check_cost;
     sig.subgroup_check().is_ok()
 }
 
@@ -149,11 +152,11 @@ fn signature_verify_with_gas<S: traits::Signature>(
     pk: &S::VerifyingKeyMaterial,
     msg: Vec<u8>,
     cost: &mut u64,
-    sig_verify_cost: u64,
-    msg_hashing_base_cost: u64,
-    msg_hashing_per_byte_cost: u64,
+    gas_params: &GasParameters,
 ) -> bool {
-    *cost += sig_verify_cost + msg_hashing_base_cost + msg_hashing_per_byte_cost * msg.len() as u64;
+    *cost += gas_params.per_sig_verify_cost
+        + gas_params.per_msg_hashing_cost
+        + gas_params.per_byte_hashing_cost * msg.len() as u64;
 
     sig.verify_arbitrary_msg(&msg[..], pk).is_ok()
 }
@@ -186,32 +189,18 @@ pub fn bls12381_verify_signature_helper(
     let aggpk_bytes = pop_arg!(arguments, Vec<u8>);
     let multisig_bytes = pop_arg!(arguments, Vec<u8>);
 
-    let pk = match bls12381_deserialize_pk_with_gas(
-        aggpk_bytes,
-        &mut cost,
-        gas_params.per_pubkey_deserialize_cost,
-    ) {
+    let pk = match bls12381_deserialize_pk_with_gas(aggpk_bytes, &mut cost, gas_params) {
         Some(pk) => pk,
         None => {
             return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
         }
     };
 
-    if check_pk_subgroup
-        && !bls12381_pk_subgroub_check_with_gas(
-            &pk,
-            &mut cost,
-            gas_params.per_pubkey_subgroup_check_cost,
-        )
-    {
+    if check_pk_subgroup && !bls12381_pk_subgroub_check_with_gas(&pk, &mut cost, gas_params) {
         return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
     }
 
-    let sig = match bls12381_deserialize_sig_with_gas(
-        multisig_bytes,
-        &mut cost,
-        gas_params.per_sig_deserialize_cost,
-    ) {
+    let sig = match bls12381_deserialize_sig_with_gas(multisig_bytes, &mut cost, gas_params) {
         Some(sig) => sig,
         None => {
             return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
@@ -219,15 +208,7 @@ pub fn bls12381_verify_signature_helper(
     };
 
     // NOTE(Gas): 2 bilinear pairings and a hash-to-curve
-    let verify_result = signature_verify_with_gas(
-        &sig,
-        &pk,
-        msg_bytes,
-        &mut cost,
-        gas_params.per_sig_verify_cost,
-        gas_params.per_msg_hashing_cost,
-        gas_params.per_byte_hashing_cost,
-    );
+    let verify_result = signature_verify_with_gas(&sig, &pk, msg_bytes, &mut cost, gas_params);
 
     Ok(NativeResult::ok(
         cost,
@@ -263,25 +244,27 @@ fn native_bls12381_aggregate_pop_verified_pubkeys(
     debug_assert!(arguments.len() == 1);
 
     // Parses a Vec<Vec<u8>> of all serialized public keys
-    let pks_serialized = pop_vec_arg!(arguments, Vec<u8>);
-    let num_pks = pks_serialized.len();
+    let pks_bytes = pop_vec_of_vec_u8(&mut arguments)?;
+    let num_pks = pks_bytes.len();
     let mut cost = gas_params.base_cost;
 
     // If zero PKs were given as input, return None.
-    if pks_serialized.is_empty() {
-        return Ok(NativeResult::ok(cost, smallvec![none_option()]));
+    if pks_bytes.is_empty() {
+        return Ok(NativeResult::ok(
+            cost,
+            smallvec![Value::vector_u8(vec![]), Value::bool(false)],
+        ));
     }
 
-    let pks = bls12381_deserialize_pks_with_gas(
-        pks_serialized,
-        &mut cost,
-        gas_params.per_pubkey_deserialize_cost,
-    );
+    let pks = bls12381_deserialize_pks_with_gas(pks_bytes, &mut cost, gas_params);
     debug_assert!(pks.len() <= num_pks);
 
     // If not all PKs were successfully deserialized, return None and only charge for the actual work done
     if pks.len() != num_pks {
-        return Ok(NativeResult::ok(cost, smallvec![none_option()]));
+        return Ok(NativeResult::ok(
+            cost,
+            smallvec![Value::vector_u8(vec![]), Value::bool(false)],
+        ));
     }
 
     // Aggregate the public keys (this will NOT subgroup-check the individual PKs)
@@ -290,12 +273,20 @@ fn native_bls12381_aggregate_pop_verified_pubkeys(
     let aggpk =
         match bls12381::PublicKey::aggregate(pks.iter().collect::<Vec<&bls12381::PublicKey>>()) {
             Ok(aggpk) => aggpk,
-            Err(_) => return Ok(NativeResult::ok(cost, smallvec![none_option()])),
+            Err(_) => {
+                return Ok(NativeResult::ok(
+                    cost,
+                    smallvec![Value::vector_u8(vec![]), Value::bool(false)],
+                ))
+            }
         };
 
     Ok(NativeResult::ok(
         cost,
-        smallvec![some_option(aggpk.to_bytes().to_vec())],
+        smallvec![
+            Value::vector_u8(aggpk.to_bytes().to_vec()),
+            Value::bool(true)
+        ],
     ))
 }
 
@@ -323,24 +314,26 @@ pub fn native_bls12381_aggregate_signatures(
     debug_assert!(arguments.len() == 1);
 
     // Parses a Vec<Vec<u8>> of all serialized signatures
-    let sigs_serialized = pop_vec_arg!(arguments, Vec<u8>);
+    let sigs_serialized = pop_vec_of_vec_u8(&mut arguments)?;
     let num_sigs = sigs_serialized.len();
 
     let mut cost = gas_params.base_cost;
 
     // If zero signatures were given as input, return None.
     if sigs_serialized.is_empty() {
-        return Ok(NativeResult::ok(cost, smallvec![none_option()]));
+        return Ok(NativeResult::ok(
+            cost,
+            smallvec![Value::vector_u8(vec![]), Value::bool(false)],
+        ));
     }
 
-    let sigs = bls12381_deserialize_sigs_with_gas(
-        sigs_serialized,
-        &mut cost,
-        gas_params.per_sig_deserialize_cost,
-    );
+    let sigs = bls12381_deserialize_sigs_with_gas(sigs_serialized, &mut cost, gas_params);
 
-    if sigs.len() <= num_sigs {
-        return Ok(NativeResult::ok(cost, smallvec![none_option()]));
+    if sigs.len() != num_sigs {
+        return Ok(NativeResult::ok(
+            cost,
+            smallvec![Value::vector_u8(vec![]), Value::bool(false)],
+        ));
     }
 
     // Aggregate the signatures (this will NOT group-check the individual signatures)
@@ -348,12 +341,20 @@ pub fn native_bls12381_aggregate_signatures(
     cost += gas_params.per_sig_aggregate_cost * sigs.len() as u64;
     let aggsig = match bls12381::Signature::aggregate(sigs) {
         Ok(aggsig) => aggsig,
-        Err(_) => return Ok(NativeResult::ok(cost, smallvec![none_option()])),
+        Err(_) => {
+            return Ok(NativeResult::ok(
+                cost,
+                smallvec![Value::vector_u8(vec![]), Value::bool(false)],
+            ))
+        }
     };
 
     Ok(NativeResult::ok(
         cost,
-        smallvec![some_option(aggsig.to_bytes().to_vec())],
+        smallvec![
+            Value::vector_u8(aggsig.to_bytes().to_vec()),
+            Value::bool(true)
+        ],
     ))
 }
 
@@ -378,20 +379,12 @@ pub fn native_bls12381_signature_subgroup_check(
 
     let sig_bytes = pop_arg!(arguments, Vec<u8>);
 
-    let sig = match bls12381_deserialize_sig_with_gas(
-        sig_bytes,
-        &mut cost,
-        gas_params.per_sig_deserialize_cost,
-    ) {
+    let sig = match bls12381_deserialize_sig_with_gas(sig_bytes, &mut cost, gas_params) {
         Some(key) => key,
         None => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
     };
 
-    let valid = bls12381_sig_subgroub_check_with_gas(
-        &sig,
-        &mut cost,
-        gas_params.per_sig_subgroup_check_cost,
-    );
+    let valid = bls12381_sig_subgroub_check_with_gas(&sig, &mut cost, gas_params);
 
     Ok(NativeResult::ok(cost, smallvec![Value::bool(valid)]))
 }
@@ -416,20 +409,12 @@ fn native_bls12381_validate_pubkey(
     let mut cost = gas_params.base_cost;
     let pk_bytes = pop_arg!(arguments, Vec<u8>);
 
-    let pk = match bls12381_deserialize_pk_with_gas(
-        pk_bytes,
-        &mut cost,
-        gas_params.per_pubkey_deserialize_cost,
-    ) {
+    let pk = match bls12381_deserialize_pk_with_gas(pk_bytes, &mut cost, gas_params) {
         Some(key) => key,
         None => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
     };
 
-    let valid = bls12381_pk_subgroub_check_with_gas(
-        &pk,
-        &mut cost,
-        gas_params.per_pubkey_subgroup_check_cost,
-    );
+    let valid = bls12381_pk_subgroub_check_with_gas(&pk, &mut cost, gas_params);
 
     Ok(NativeResult::ok(cost, smallvec![Value::bool(valid)]))
 }
@@ -477,7 +462,7 @@ pub fn native_bls12381_verify_aggregate_signature(
     // Parses a Vec<Vec<u8>> of all messages
     let messages = pop_vec_arg!(arguments, Vec<u8>);
     // Parses a Vec<Vec<u8>> of all serialized public keys
-    let pks_serialized = pop_vec_arg!(arguments, Vec<u8>);
+    let pks_serialized = pop_vec_of_vec_u8(&mut arguments)?;
     let num_pks = pks_serialized.len();
 
     // Parses the signature as a Vec<u8>
@@ -488,11 +473,7 @@ pub fn native_bls12381_verify_aggregate_signature(
         return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
     }
 
-    let pks = bls12381_deserialize_pks_with_gas(
-        pks_serialized,
-        &mut cost,
-        gas_params.per_pubkey_deserialize_cost,
-    );
+    let pks = bls12381_deserialize_pks_with_gas(pks_serialized, &mut cost, gas_params);
     debug_assert!(pks.len() <= num_pks);
 
     // If less PKs than expected were deserialized, return None.
@@ -500,11 +481,7 @@ pub fn native_bls12381_verify_aggregate_signature(
         return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)]));
     }
 
-    let aggsig = match bls12381_deserialize_sig_with_gas(
-        aggsig_bytes,
-        &mut cost,
-        gas_params.per_sig_deserialize_cost,
-    ) {
+    let aggsig = match bls12381_deserialize_sig_with_gas(aggsig_bytes, &mut cost, gas_params) {
         Some(aggsig) => aggsig,
         None => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
     };
@@ -600,20 +577,12 @@ fn native_bls12381_verify_proof_of_possession(
     let pop_bytes = pop_arg!(arguments, Vec<u8>);
     let key_bytes = pop_arg!(arguments, Vec<u8>);
 
-    let pk = match bls12381_deserialize_pk_with_gas(
-        key_bytes,
-        &mut cost,
-        gas_params.per_pubkey_deserialize_cost,
-    ) {
+    let pk = match bls12381_deserialize_pk_with_gas(key_bytes, &mut cost, gas_params) {
         Some(pk) => pk,
         None => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
     };
 
-    let pop = match bls12381_deserialize_pop_with_gas(
-        pop_bytes,
-        &mut cost,
-        gas_params.per_sig_deserialize_cost,
-    ) {
+    let pop = match bls12381_deserialize_pop_with_gas(pop_bytes, &mut cost, gas_params) {
         Some(pop) => pop,
         None => return Ok(NativeResult::ok(cost, smallvec![Value::bool(false)])),
     };
@@ -677,67 +646,49 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
     let natives = [
         // BLS over BLS12-381
         (
-            "aggregate_pop_verified_pubkeys",
+            "aggregate_pubkeys_internal",
             make_native_from_func(
                 gas_params.clone(),
                 native_bls12381_aggregate_pop_verified_pubkeys,
             ),
         ),
         (
-            "aggregate_signatures",
-            make_native_from_func(
-                gas_params.clone(),
-                native_bls12381_aggregate_signatures,
-            ),
+            "aggregate_signatures_internal",
+            make_native_from_func(gas_params.clone(), native_bls12381_aggregate_signatures),
         ),
         (
-            "signature_subgroup_check",
-            make_native_from_func(
-                gas_params.clone(),
-                native_bls12381_signature_subgroup_check,
-            ),
+            "signature_subgroup_check_internal",
+            make_native_from_func(gas_params.clone(), native_bls12381_signature_subgroup_check),
         ),
         (
-            "validate_pubkey",
-            make_native_from_func(
-                gas_params.clone(),
-                native_bls12381_validate_pubkey,
-            ),
+            "validate_pubkey_internal",
+            make_native_from_func(gas_params.clone(), native_bls12381_validate_pubkey),
         ),
         (
-            "verify_aggregate_signature",
+            "verify_aggregate_signature_internal",
             make_native_from_func(
                 gas_params.clone(),
                 native_bls12381_verify_aggregate_signature,
             ),
         ),
         (
-            "verify_multisignature",
-            make_native_from_func(
-                gas_params.clone(),
-                native_bls12381_verify_multisignature,
-            ),
+            "verify_multisignature_internal",
+            make_native_from_func(gas_params.clone(), native_bls12381_verify_multisignature),
         ),
         (
-            "verify_normal_signature",
-            make_native_from_func(
-                gas_params.clone(),
-                native_bls12381_verify_normal_signature,
-            ),
+            "verify_normal_signature_internal",
+            make_native_from_func(gas_params.clone(), native_bls12381_verify_normal_signature),
         ),
         (
-            "verify_proof_of_possession",
+            "verify_proof_of_possession_internal",
             make_native_from_func(
                 gas_params.clone(),
                 native_bls12381_verify_proof_of_possession,
             ),
         ),
         (
-            "verify_signature_share",
-            make_native_from_func(
-                gas_params.clone(),
-                native_bls12381_verify_signature_share,
-            ),
+            "verify_signature_share_internal",
+            make_native_from_func(gas_params, native_bls12381_verify_signature_share),
         ),
     ];
 
