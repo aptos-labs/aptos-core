@@ -11,7 +11,10 @@ use crate::{
     },
     protocols::wire::{
         handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
-        messaging::v1::{ErrorCode, NetworkMessage, NetworkMessageSink, NetworkMessageStream},
+        messaging::v1::{
+            ErrorCode, MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream,
+            NetworkMessage,
+        },
     },
     transport,
     transport::{Connection, ConnectionId, ConnectionMetadata},
@@ -128,8 +131,9 @@ fn build_test_peer_manager(
 async fn ping_pong(connection: &mut MemorySocket) -> Result<(), PeerManagerError> {
     let (read_half, write_half) = tokio::io::split(connection.compat());
     let mut msg_tx =
-        NetworkMessageSink::new(write_half.compat_write(), constants::MAX_FRAME_SIZE, None);
-    let mut msg_rx = NetworkMessageStream::new(read_half.compat(), constants::MAX_FRAME_SIZE, None);
+        MultiplexMessageSink::new(write_half.compat_write(), constants::MAX_FRAME_SIZE, None);
+    let mut msg_rx =
+        MultiplexMessageStream::new(read_half.compat(), constants::MAX_FRAME_SIZE, None);
 
     // Send a garbage frame to trigger an expected Error response message
     msg_tx
@@ -141,7 +145,7 @@ async fn ping_pong(connection: &mut MemorySocket) -> Result<(), PeerManagerError
         .ok_or_else(|| PeerManagerError::Error(anyhow!("Failed to read pong msg")))??;
     assert_eq!(
         error_msg,
-        NetworkMessage::Error(ErrorCode::parsing_error(255, 111))
+        MultiplexMessage::Message(NetworkMessage::Error(ErrorCode::parsing_error(255, 111)))
     );
     Ok(())
 }
