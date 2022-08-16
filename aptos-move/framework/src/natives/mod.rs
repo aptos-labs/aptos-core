@@ -56,7 +56,7 @@ impl GasParameters {
                 per_pop_verify_cost: 0,
                 per_pairing_cost: 0,
                 per_msg_hashing_cost: 0,
-                per_byte_hashing_cost: 0
+                per_byte_hashing_cost: 0,
             },
             signature: signature::GasParameters {
                 // Ed25519
