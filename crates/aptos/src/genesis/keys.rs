@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::OptionalPoolAddressArgs;
-use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current};
-use crate::genesis::git::LAYOUT_FILE;
+use crate::common::utils::{create_dir_if_not_exist, current_dir, dir_default_to_current};
+use crate::genesis::git::{LAYOUT_FILE, OPERATOR_FILE, OWNER_FILE};
 use crate::{
     common::{
         types::{CliError, CliTypedResult, PromptOptions, RngArgs},
@@ -12,18 +12,15 @@ use crate::{
     genesis::git::{from_yaml, to_yaml, GitOptions},
     CliCommand,
 };
-use aptos_crypto::{bls12381, PrivateKey};
-use aptos_genesis::config::Layout;
-use aptos_genesis::{
-    config::{HostAndPort, ValidatorConfiguration},
-    keys::{generate_key_objects, PrivateIdentity},
-};
+use aptos_genesis::config::{Layout, OperatorConfiguration, OwnerConfiguration};
+use aptos_genesis::keys::PublicIdentity;
+use aptos_genesis::{config::HostAndPort, keys::generate_key_objects};
 use async_trait::async_trait;
 use clap::Parser;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const PRIVATE_KEYS_FILE: &str = "private-keys.yaml";
-const PUBLIC_KEYS_FILE: &str = "public-keys.yaml";
+pub const PUBLIC_KEYS_FILE: &str = "public-keys.yaml";
 const VALIDATOR_FILE: &str = "validator-identity.yaml";
 const VFN_FILE: &str = "validator-full-node-identity.yaml";
 
@@ -105,9 +102,6 @@ pub struct SetValidatorConfiguration {
     pub(crate) username: String,
     #[clap(flatten)]
     pub(crate) git_options: GitOptions,
-    /// Path to directory used in GenerateKeys
-    #[clap(long, parse(from_os_str))]
-    pub(crate) keys_dir: Option<PathBuf>,
     /// Host and port pair for the validator e.g. 127.0.0.1:6180 or aptoslabs.com:6180
     #[clap(long)]
     pub(crate) validator_host: HostAndPort,
@@ -117,6 +111,15 @@ pub struct SetValidatorConfiguration {
     /// Stake amount for stake distribution
     #[clap(long, default_value_t = 1)]
     pub(crate) stake_amount: u64,
+    /// Path to private identity generated from GenerateKeys
+    #[clap(long, parse(from_os_str))]
+    pub(crate) owner_public_identity_file: Option<PathBuf>,
+    /// Path to operator public identity, defaults to owner identity
+    #[clap(long, parse(from_os_str))]
+    pub(crate) operator_public_identity_file: Option<PathBuf>,
+    /// Path to voter public identity, defaults to owner identity
+    #[clap(long, parse(from_os_str))]
+    pub(crate) voter_public_identity_file: Option<PathBuf>,
 }
 
 #[async_trait]
@@ -126,41 +129,107 @@ impl CliCommand<()> for SetValidatorConfiguration {
     }
 
     async fn execute(self) -> CliTypedResult<()> {
-        let keys_dir = dir_default_to_current(self.keys_dir.clone())?;
-        let private_keys_path = keys_dir.join(PRIVATE_KEYS_FILE);
-        let bytes = read_from_file(private_keys_path.as_path())?;
-        let key_files: PrivateIdentity =
-            from_yaml(&String::from_utf8(bytes).map_err(CliError::from)?)?;
-        let account_address = key_files.account_address;
-        let account_key = key_files.account_private_key.public_key();
-        let consensus_key = key_files.consensus_private_key.public_key();
-        let proof_of_possession =
-            bls12381::ProofOfPossession::create(&key_files.consensus_private_key);
-        let validator_network_key = key_files.validator_network_private_key.public_key();
+        // Load owner
+        let owner_keys_file = if let Some(owner_keys_file) = self.owner_public_identity_file {
+            owner_keys_file
+        } else {
+            current_dir()?.join(PUBLIC_KEYS_FILE)
+        };
+        let owner_identity = read_public_identity_file(owner_keys_file.as_path())?;
 
-        let full_node_network_key = if self.full_node_host.is_some() {
-            Some(key_files.full_node_network_private_key.public_key())
+        // Load voter
+        let voter_identity = if let Some(voter_keys_file) = self.voter_public_identity_file {
+            read_public_identity_file(voter_keys_file.as_path())?
+        } else {
+            owner_identity.clone()
+        };
+
+        // Load operator
+        let (operator_identity, operator_keys_file) =
+            if let Some(operator_keys_file) = self.operator_public_identity_file {
+                (
+                    read_public_identity_file(operator_keys_file.as_path())?,
+                    operator_keys_file,
+                )
+            } else {
+                (owner_identity.clone(), owner_keys_file)
+            };
+
+        // Extract the possible optional fields
+        let consensus_public_key =
+            if let Some(consensus_public_key) = operator_identity.consensus_public_key {
+                consensus_public_key
+            } else {
+                return Err(CliError::CommandArgumentError(format!(
+                    "Failed to read consensus public key from public identity file {}",
+                    operator_keys_file.display()
+                )));
+            };
+
+        let validator_network_public_key = if let Some(validator_network_public_key) =
+            operator_identity.validator_network_public_key
+        {
+            validator_network_public_key
+        } else {
+            return Err(CliError::CommandArgumentError(format!(
+                "Failed to read validator network public key from public identity file {}",
+                operator_keys_file.display()
+            )));
+        };
+
+        let consensus_proof_of_possession = if let Some(consensus_proof_of_possession) =
+            operator_identity.consensus_proof_of_possession
+        {
+            consensus_proof_of_possession
+        } else {
+            return Err(CliError::CommandArgumentError(format!(
+                "Failed to read consensus proof of possession from public identity file {}",
+                operator_keys_file.display()
+            )));
+        };
+
+        // Only add the public key if there is a full node
+        let full_node_network_public_key = if self.full_node_host.is_some() {
+            operator_identity.validator_network_public_key
         } else {
             None
         };
 
-        let credentials = ValidatorConfiguration {
-            account_address,
-            consensus_public_key: consensus_key,
-            proof_of_possession,
-            account_public_key: account_key,
-            validator_network_public_key: validator_network_key,
+        // Build operator configuration file
+        let operator_config = OperatorConfiguration {
+            operator_account_address: operator_identity.account_address,
+            operator_account_public_key: operator_identity.account_public_key.clone(),
+            consensus_public_key,
+            consensus_proof_of_possession,
+            validator_network_public_key,
             validator_host: self.validator_host,
-            full_node_network_public_key: full_node_network_key,
+            full_node_network_public_key,
             full_node_host: self.full_node_host,
+        };
+
+        let owner_config = OwnerConfiguration {
+            owner_account_address: owner_identity.account_address,
+            owner_account_public_key: owner_identity.account_public_key,
+            voter_account_address: voter_identity.account_address,
+            voter_account_public_key: voter_identity.account_public_key,
+            operator_account_address: operator_identity.account_address,
+            operator_account_public_key: operator_identity.account_public_key,
             stake_amount: self.stake_amount,
         };
 
-        let file = PathBuf::from(format!("{}.yaml", self.username));
-        self.git_options
-            .get_client()?
-            .put(file.as_path(), &credentials)
+        let directory = PathBuf::from(&self.username);
+        let operator_file = directory.join(OPERATOR_FILE);
+        let owner_file = directory.join(OWNER_FILE);
+
+        let git_client = self.git_options.get_client()?;
+        git_client.put(operator_file.as_path(), &operator_config)?;
+        git_client.put(owner_file.as_path(), &owner_config)
     }
+}
+
+pub fn read_public_identity_file(public_identity_file: &Path) -> CliTypedResult<PublicIdentity> {
+    let bytes = read_from_file(public_identity_file)?;
+    from_yaml(&String::from_utf8(bytes).map_err(CliError::from)?)
 }
 
 /// Generate a Layout template file with empty values
