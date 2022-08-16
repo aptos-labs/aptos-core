@@ -83,7 +83,7 @@ impl K8sSwarm {
         let prom_client = match prometheus::get_prometheus_client() {
             Ok(p) => Some(p),
             Err(e) => {
-                info!("Could not build prometheus client: {}", e);
+                error!("Could not build prometheus client: {}", e);
                 None
             }
         };
@@ -313,8 +313,10 @@ impl Swarm for K8sSwarm {
             )
             .await?;
             threshold.ensure_threshold(&system_metrics)?;
+            Ok(())
+        } else {
+            bail!("No prom client");
         }
-        bail!("No prom client");
     }
 }
 
