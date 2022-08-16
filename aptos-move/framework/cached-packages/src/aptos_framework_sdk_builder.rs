@@ -103,6 +103,7 @@ pub enum ScriptFunctionCall {
         coin_type: TypeTag,
     },
 
+    /// This can be called by on-chain governance to update gas schedule.
     GasScheduleSetGasSchedule {
         gas_schedule_blob: Vec<u8>,
     },
@@ -135,9 +136,6 @@ pub enum ScriptFunctionCall {
     ManagedCoinRegister {
         coin_type: TypeTag,
     },
-
-    /// Force an epoch change.
-    ReconfigurationForceReconfigure {},
 
     /// Creates a new resource account and rotates the authentication key to either
     /// the optional auth key if it is non-empty (though auth keys are 32-bytes)
@@ -290,7 +288,6 @@ impl ScriptFunctionCall {
                 amount,
             } => managed_coin_mint(coin_type, dst_addr, amount),
             ManagedCoinRegister { coin_type } => managed_coin_register(coin_type),
-            ReconfigurationForceReconfigure {} => reconfiguration_force_reconfigure(),
             ResourceAccountCreateResourceAccount {
                 seed,
                 optional_auth_key,
@@ -568,6 +565,7 @@ pub fn coins_register(coin_type: TypeTag) -> TransactionPayload {
     ))
 }
 
+/// This can be called by on-chain governance to update gas schedule.
 pub fn gas_schedule_set_gas_schedule(gas_schedule_blob: Vec<u8>) -> TransactionPayload {
     TransactionPayload::ScriptFunction(ScriptFunction::new(
         ModuleId::new(
@@ -663,22 +661,6 @@ pub fn managed_coin_register(coin_type: TypeTag) -> TransactionPayload {
         ),
         ident_str!("register").to_owned(),
         vec![coin_type],
-        vec![],
-    ))
-}
-
-/// Force an epoch change.
-pub fn reconfiguration_force_reconfigure() -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("reconfiguration").to_owned(),
-        ),
-        ident_str!("force_reconfigure").to_owned(),
-        vec![],
         vec![],
     ))
 }
@@ -1160,16 +1142,6 @@ mod decoder {
         }
     }
 
-    pub fn reconfiguration_force_reconfigure(
-        payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(_script) = payload {
-            Some(ScriptFunctionCall::ReconfigurationForceReconfigure {})
-        } else {
-            None
-        }
-    }
-
     pub fn resource_account_create_resource_account(
         payload: &TransactionPayload,
     ) -> Option<ScriptFunctionCall> {
@@ -1408,10 +1380,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "managed_coin_register".to_string(),
             Box::new(decoder::managed_coin_register),
-        );
-        map.insert(
-            "reconfiguration_force_reconfigure".to_string(),
-            Box::new(decoder::reconfiguration_force_reconfigure),
         );
         map.insert(
             "resource_account_create_resource_account".to_string(),

@@ -2,8 +2,7 @@
 module aptos_framework::block {
     use std::error;
     use std::vector;
-    use aptos_std::event;
-    use aptos_std::event::EventHandle;
+    use aptos_std::event::{Self, EventHandle};
 
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
@@ -19,7 +18,7 @@ module aptos_framework::block {
         /// Time period between epochs.
         epoch_interval: u64,
         /// Handle where events with the time of new blocks are emitted
-        new_block_events: event::EventHandle<Self::NewBlockEvent>,
+        new_block_events: EventHandle<Self::NewBlockEvent>,
     }
 
     /// Should be in-sync with NewBlockEvent rust struct in new_block.rs
@@ -84,7 +83,7 @@ module aptos_framework::block {
         // Operational constraint: can only be invoked by the VM.
         system_addresses::assert_vm(&vm);
 
-        // Authorization
+        // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
         assert!(
             proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
             error::permission_denied(EVM_OR_VALIDATOR)
@@ -108,7 +107,7 @@ module aptos_framework::block {
         // transition is the last block in the previous epoch.
         stake::update_performance_statistics(proposer_index_optional, failed_proposer_indices);
 
-        if (timestamp - reconfiguration::last_reconfiguration_time() > block_metadata_ref.epoch_interval) {
+        if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             reconfiguration::reconfigure();
         };
     }
@@ -144,7 +143,6 @@ module aptos_framework::block {
         );
     }
 
-
     #[test(aptos_framework = @aptos_framework)]
     public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockResource {
         initialize(&aptos_framework, 1);
@@ -154,7 +152,7 @@ module aptos_framework::block {
     }
 
     #[test(aptos_framework = @aptos_framework, account = @0x123)]
-    #[expected_failure(abort_code = 0x50002)]
+    #[expected_failure(abort_code = 0x50003)]
     public entry fun test_update_epoch_interval_unauthorized_should_fail(
         aptos_framework: signer,
         account: signer,
