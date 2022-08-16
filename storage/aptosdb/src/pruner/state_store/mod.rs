@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::pruner::pruned_until_values::{PrunedUtilVersion, PrunerTag};
+use crate::pruner_min_readable_version_index::PrunerMinReadableVersionIndexSchema;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, metrics::PRUNER_LEAST_READABLE_VERSION,
     pruner::db_pruner::DBPruner, stale_node_index::StaleNodeIndexSchema, utils, ChangeSet,
@@ -24,7 +26,10 @@ pub const STATE_MERKLE_PRUNER_NAME: &str = "state_merkle_pruner";
 #[derive(Debug)]
 /// Responsible for pruning the state tree.
 pub struct StateMerklePruner {
-    db: Arc<DB>,
+    /// State DB.
+    state_merkle_db: Arc<DB>,
+    /// Ledger DB.
+    ledger_db: Arc<DB>,
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
     min_readable_version: AtomicVersion,
@@ -61,15 +66,16 @@ impl DBPruner for StateMerklePruner {
 
     fn initialize_min_readable_version(&self) -> Result<Version> {
         let mut iter = self
-            .db
-            .iter::<StaleNodeIndexSchema>(ReadOptions::default())?;
-        iter.seek_to_first();
-        Ok(iter.next().transpose()?.map_or(0, |(index, _)| {
-            index
-                .stale_since_version
-                .checked_sub(1)
-                .expect("Nothing is stale since version 0.")
-        }))
+            .ledger_db
+            .iter::<PrunerMinReadableVersionIndexSchema>(ReadOptions::default())?;
+        iter.seek(&PrunerTag::StateMerklePruner)?;
+        let version = iter
+            .next()
+            .transpose()?
+            .map_or(0, |(_, pruned_until_version)| match pruned_until_version {
+                PrunedUtilVersion::LatestVersion(version) => version,
+            });
+        Ok(version)
     }
 
     fn min_readable_version(&self) -> Version {
@@ -106,9 +112,10 @@ impl DBPruner for StateMerklePruner {
 }
 
 impl StateMerklePruner {
-    pub fn new(db: Arc<DB>) -> Self {
+    pub fn new(state_merkle_db: Arc<DB>, ledger_db: Arc<DB>) -> Self {
         let pruner = StateMerklePruner {
-            db,
+            state_merkle_db,
+            ledger_db,
             target_version: AtomicVersion::new(0),
             min_readable_version: AtomicVersion::new(0),
             pruned_to_the_end_of_target_version: AtomicBool::new(false),
@@ -118,11 +125,15 @@ impl StateMerklePruner {
     }
 
     /// Prunes the genesis state and saves the db alterations to the given change set
-    pub fn prune_genesis(state_merkle_db: Arc<DB>, change_set: &mut ChangeSet) -> Result<()> {
+    pub fn prune_genesis(
+        state_merkle_db: Arc<DB>,
+        ledger_db: Arc<DB>,
+        change_set: &mut ChangeSet,
+    ) -> Result<()> {
         let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
         let max_version = 1; // We should only be pruning a single version
 
-        let state_pruner = utils::create_state_pruner(state_merkle_db);
+        let state_pruner = utils::create_state_pruner(state_merkle_db, ledger_db);
         state_pruner.set_target_version(target_version);
 
         let min_readable_version = state_pruner.min_readable_version.load(Ordering::Relaxed);
@@ -137,6 +148,9 @@ impl StateMerklePruner {
         Ok(())
     }
 
+    // If the existing schema batch is not none, this function only adds items need to be
+    // deleted to the schema batch and the caller is responsible for committing the schema batches
+    // to the DB.
     pub fn prune_state_store(
         &self,
         min_readable_version: Version,
@@ -172,8 +186,15 @@ impl StateMerklePruner {
                     batch.delete::<StaleNodeIndexSchema>(&index)
                 })?;
 
-                // Delete the stale node indices.
-                self.db.write_schemas(batch)?;
+                let ledger_batch = SchemaBatch::new();
+                ledger_batch.put::<PrunerMinReadableVersionIndexSchema>(
+                    &PrunerTag::StateMerklePruner,
+                    &PrunedUtilVersion::LatestVersion(new_min_readable_version),
+                )?;
+
+                // Commit to DB.
+                self.ledger_db.write_schemas(ledger_batch)?;
+                self.state_merkle_db.write_schemas(batch)?;
             }
 
             // TODO(zcc): recording progress after writing schemas might provide wrong answers to
@@ -194,7 +215,7 @@ impl StateMerklePruner {
     ) -> Result<(Vec<StaleNodeIndex>, bool)> {
         let mut indices = Vec::new();
         let mut iter = self
-            .db
+            .state_merkle_db
             .iter::<StaleNodeIndexSchema>(ReadOptions::default())?;
         iter.seek(&start_version)?;
 

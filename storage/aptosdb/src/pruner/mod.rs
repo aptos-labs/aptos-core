@@ -5,6 +5,7 @@ pub(crate) mod db_sub_pruner;
 pub(crate) mod event_store;
 pub(crate) mod ledger_pruner_worker;
 pub(crate) mod ledger_store;
+pub(crate) mod pruned_until_values;
 pub(crate) mod pruner_manager;
 pub(crate) mod state_pruner_worker;
 pub(crate) mod state_store;

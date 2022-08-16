@@ -1,5 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
+use crate::pruner::pruned_until_values::{PrunedUtilVersion, PrunerTag};
+use crate::pruner_min_readable_version_index::PrunerMinReadableVersionIndexSchema;
 use crate::{
     metrics::PRUNER_LEAST_READABLE_VERSION,
     pruner::{
@@ -11,7 +13,6 @@ use crate::{
             transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
         },
     },
-    transaction::TransactionSchema,
     utils, ChangeSet, EventStore, LedgerStore, TransactionStore,
 };
 use aptos_types::transaction::{AtomicVersion, Version};
@@ -46,7 +47,10 @@ impl DBPruner for LedgerPruner {
         // Collect the schema batch writes
         let mut db_batch = SchemaBatch::new();
         let current_target_version = self.prune_inner(max_versions, &mut db_batch)?;
-
+        db_batch.put::<PrunerMinReadableVersionIndexSchema>(
+            &PrunerTag::LedgerPruner,
+            &PrunedUtilVersion::LatestVersion(current_target_version),
+        )?;
         // Commit all the changes to DB atomically
         self.db.write_schemas(db_batch)?;
 
@@ -58,9 +62,16 @@ impl DBPruner for LedgerPruner {
     }
 
     fn initialize_min_readable_version(&self) -> anyhow::Result<Version> {
-        let mut iter = self.db.iter::<TransactionSchema>(ReadOptions::default())?;
-        iter.seek_to_first();
-        let version = iter.next().transpose()?.map_or(0, |(version, _)| version);
+        let mut iter = self
+            .db
+            .iter::<PrunerMinReadableVersionIndexSchema>(ReadOptions::default())?;
+        iter.seek(&PrunerTag::LedgerPruner)?;
+        let version = iter
+            .next()
+            .transpose()?
+            .map_or(0, |(_, pruned_until_version)| match pruned_until_version {
+                PrunedUtilVersion::LatestVersion(version) => version,
+            });
         Ok(version)
     }
 
@@ -147,6 +158,7 @@ impl LedgerPruner {
         self.event_store_pruner
             .prune(db_batch, min_readable_version, current_target_version)?;
 
+        println!("min_readable_version: {}", current_target_version);
         Ok(current_target_version)
     }
 }
