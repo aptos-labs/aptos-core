@@ -3,18 +3,34 @@
 
 use crate::common::types::{
     CliError, CliTypedResult, PoolAddressArgs, PromptOptions, TransactionOptions,
+    TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
+use crate::move_tool::{compile_move, ArgWithType, FunctionArgType};
 use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
-use aptos_rest_client::Transaction;
-use aptos_types::account_address::AccountAddress;
+use aptos_rest_client::{aptos_api_types::MoveType, Transaction};
+use aptos_types::{
+    account_address::AccountAddress,
+    transaction::{Script, TransactionPayload},
+};
 use async_trait::async_trait;
 use clap::Parser;
+use move_deps::{
+    move_compiler::compiled_unit::CompiledUnitEnum,
+    move_core_types::{language_storage::TypeTag, transaction_argument::TransactionArgument},
+    move_package::BuildConfig,
+};
 use reqwest::Url;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::Formatter;
+use std::{
+    collections::BTreeMap,
+    convert::{TryFrom, TryInto},
+    fmt::Formatter,
+    fs,
+    path::PathBuf,
+};
 
 /// Tool for on-chain governance
 ///
@@ -25,6 +41,8 @@ use std::fmt::Formatter;
 pub enum GovernanceTool {
     Propose(SubmitProposal),
     Vote(SubmitVote),
+    PrepareProposal(PrepareProposal),
+    ExecuteProposal(ExecuteProposal),
 }
 
 impl GovernanceTool {
@@ -33,6 +51,8 @@ impl GovernanceTool {
         match self {
             Propose(tool) => tool.execute_serialized().await,
             Vote(tool) => tool.execute_serialized().await,
+            PrepareProposal(tool) => tool.execute_serialized().await,
+            ExecuteProposal(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -181,5 +201,171 @@ impl std::fmt::Display for ProposalMetadata {
             "Proposal:\n\tTitle:{}\n\tDescription:{}\n\tScript URL:{}\n\tScript hash:{}",
             self.title, self.description, self.script_url, self.script_hash
         )
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct ScriptHash {
+    hash: String,
+    bytecode: String,
+}
+
+#[derive(Parser)]
+pub struct PrepareProposal {
+    /// Path to the Move package that contains the execution script
+    #[clap(long, parse(from_os_str))]
+    pub path: PathBuf,
+}
+
+#[async_trait]
+impl CliCommand<ScriptHash> for PrepareProposal {
+    fn command_name(&self) -> &'static str {
+        "PrepareProposal"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<ScriptHash> {
+        let build_config = BuildConfig {
+            additional_named_addresses: BTreeMap::new(),
+            generate_abis: false,
+            generate_docs: false,
+            ..Default::default()
+        };
+
+        let compiled_package = compile_move(build_config, self.path.as_path())?;
+        let scripts_count = compiled_package.scripts().count();
+
+        if scripts_count != 1 {
+            return Err(CliError::UnexpectedError(format!(
+                "Only one script can be prepared a time. Make sure one and only one script file \
+                is included in the Move package. Found {} scripts.",
+                scripts_count
+            )));
+        }
+
+        let script = *compiled_package
+            .scripts()
+            .collect::<Vec<_>>()
+            .get(0)
+            .unwrap();
+
+        match script.unit {
+            CompiledUnitEnum::Script(ref s) => {
+                let mut bytes = vec![];
+
+                s.script.serialize(&mut bytes).map_err(|err| {
+                    CliError::UnexpectedError(format!("Unexpected error: {}", err))
+                })?;
+
+                Ok(ScriptHash {
+                    hash: hex::encode(HashValue::sha3_256_of(bytes.as_slice()).to_vec()),
+                    bytecode: hex::encode(bytes),
+                })
+            }
+            CompiledUnitEnum::Module(_) => Err(CliError::UnexpectedError(
+                "You can only execute a script, a module is not supported.".to_string(),
+            )),
+        }
+    }
+}
+
+#[derive(Parser)]
+pub struct ExecuteProposal {
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+
+    /// Path to the compiled script file
+    #[clap(long, parse(from_os_str))]
+    pub path: PathBuf,
+
+    /// Hex encoded arguments separated by spaces.
+    ///
+    /// Example: `0x01 0x02 0x03`
+    #[clap(long, multiple_values = true)]
+    pub(crate) args: Vec<ArgWithType>,
+    /// TypeTag arguments separated by spaces.
+    ///
+    /// Example: `u8 u64 u128 bool address vector true false signer`
+    #[clap(long, multiple_values = true)]
+    pub(crate) type_args: Vec<MoveType>,
+}
+
+impl TryFrom<&ArgWithType> for TransactionArgument {
+    type Error = CliError;
+
+    fn try_from(arg: &ArgWithType) -> Result<Self, Self::Error> {
+        let txn_arg = match arg._ty {
+            FunctionArgType::Address => TransactionArgument::Address(
+                bcs::from_bytes(&arg.arg)
+                    .map_err(|err| CliError::UnableToParse("address", err.to_string()))?,
+            ),
+            FunctionArgType::Bool => TransactionArgument::Bool(
+                bcs::from_bytes(&arg.arg)
+                    .map_err(|err| CliError::UnableToParse("bool", err.to_string()))?,
+            ),
+            FunctionArgType::Hex => TransactionArgument::U8Vector(
+                bcs::from_bytes(&arg.arg)
+                    .map_err(|err| CliError::UnableToParse("hex", err.to_string()))?,
+            ),
+            FunctionArgType::String => TransactionArgument::U8Vector(
+                bcs::from_bytes(&arg.arg)
+                    .map_err(|err| CliError::UnableToParse("string", err.to_string()))?,
+            ),
+            FunctionArgType::U128 => TransactionArgument::U128(
+                bcs::from_bytes(&arg.arg)
+                    .map_err(|err| CliError::UnableToParse("u128", err.to_string()))?,
+            ),
+            FunctionArgType::U64 => TransactionArgument::U64(
+                bcs::from_bytes(&arg.arg)
+                    .map_err(|err| CliError::UnableToParse("u64", err.to_string()))?,
+            ),
+            FunctionArgType::U8 => TransactionArgument::U8(
+                bcs::from_bytes(&arg.arg)
+                    .map_err(|err| CliError::UnableToParse("u8", err.to_string()))?,
+            ),
+        };
+
+        Ok(txn_arg)
+    }
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for ExecuteProposal {
+    fn command_name(&self) -> &'static str {
+        "ExecuteProposal"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        if !self.path.exists() {
+            return Err(CliError::UnableToReadFile(
+                self.path.display().to_string(),
+                "Path doesn't exist".to_string(),
+            ));
+        }
+
+        let code = fs::read(self.path.as_path()).map_err(|err| {
+            CliError::UnableToReadFile(self.path.display().to_string(), err.to_string())
+        })?;
+
+        let args = self
+            .args
+            .iter()
+            .map(|arg_with_type| arg_with_type.try_into())
+            .collect::<Result<Vec<TransactionArgument>, CliError>>()?;
+
+        let mut type_args: Vec<TypeTag> = Vec::new();
+
+        // These TypeArgs are used for generics
+        for type_arg in self.type_args.iter().cloned() {
+            let type_tag = TypeTag::try_from(type_arg)
+                .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
+            type_args.push(type_tag)
+        }
+
+        let txn = TransactionPayload::Script(Script::new(code, type_args, args));
+
+        self.txn_options
+            .submit_transaction(txn)
+            .await
+            .map(TransactionSummary::from)
     }
 }
