@@ -36,7 +36,7 @@ class HelloBlockchainClient(RestClient):
         """ Potentially initialize and set the resource message::MessageHolder::message """
 
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": f"0x{contract_address}::message::set_message",
             "type_arguments": [],
             "arguments": [

@@ -2713,7 +2713,7 @@ components:
       enum:
       - validator
       - full_node
-    ScriptFunctionId:
+    EntryFunctionId:
       type: string
       description: |
         Script function id is string representation of a script function defined on-chain.
@@ -2722,7 +2722,7 @@ components:
 
         Both `module name` and `function name` are case-sensitive.
       example: 0x1::aptos_coin::transfer
-    ScriptFunctionPayload:
+    EntryFunctionPayload:
       type: object
       required:
       - function
@@ -2730,7 +2730,7 @@ components:
       - arguments
       properties:
         function:
-          $ref: '#/components/schemas/ScriptFunctionId'
+          $ref: '#/components/schemas/EntryFunctionId'
         type_arguments:
           type: array
           items:
@@ -2856,14 +2856,14 @@ components:
     TransactionPayload:
       type: object
       oneOf:
-      - $ref: '#/components/schemas/TransactionPayload_ScriptFunctionPayload'
+      - $ref: '#/components/schemas/TransactionPayload_EntryFunctionPayload'
       - $ref: '#/components/schemas/TransactionPayload_ScriptPayload'
       - $ref: '#/components/schemas/TransactionPayload_ModuleBundlePayload'
       - $ref: '#/components/schemas/TransactionPayload_WriteSetPayload'
       discriminator:
         propertyName: type
         mapping:
-          script_function_payload: '#/components/schemas/TransactionPayload_ScriptFunctionPayload'
+          entry_function_payload: '#/components/schemas/TransactionPayload_EntryFunctionPayload'
           script_payload: '#/components/schemas/TransactionPayload_ScriptPayload'
           module_bundle_payload: '#/components/schemas/TransactionPayload_ModuleBundlePayload'
           write_set_payload: '#/components/schemas/TransactionPayload_WriteSetPayload'
@@ -2877,7 +2877,7 @@ components:
             type: string
             example: module_bundle_payload
       - $ref: '#/components/schemas/ModuleBundlePayload'
-    TransactionPayload_ScriptFunctionPayload:
+    TransactionPayload_EntryFunctionPayload:
       allOf:
       - type: object
         required:
@@ -2885,8 +2885,8 @@ components:
         properties:
           type:
             type: string
-            example: script_function_payload
-      - $ref: '#/components/schemas/ScriptFunctionPayload'
+            example: entry_function_payload
+      - $ref: '#/components/schemas/EntryFunctionPayload'
     TransactionPayload_ScriptPayload:
       allOf:
       - type: object

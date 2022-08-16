@@ -8,7 +8,7 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 N/A
 
 ## 1.3.6 (2022-08-10)
-- Switch back to representing certain move types (MoveModuleId, MoveStructTag, ScriptFunctionId) as strings, for both requests and responses. This reverts the change made in 1.3.2. See [#2663](https://github.com/aptos-labs/aptos-core/pull/2663) for more.
+- Switch back to representing certain move types (MoveModuleId, MoveStructTag, EntryFunctionId) as strings, for both requests and responses. This reverts the change made in 1.3.2. See [#2663](https://github.com/aptos-labs/aptos-core/pull/2663) for more.
 - Represent certain fields with slightly different snake casing, e.g. `ed25519_signature` now instead of `ed_25519_signature`.
 - Add generated types for healthcheck endpoint.
 - If the given URL is missing `/v1`, the `AptosClient` constructor will add it for you. You can opt out of this behavior by setting `doNotFixNodeUrl` to true when calling the constructor.

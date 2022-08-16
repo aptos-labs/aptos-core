@@ -51,7 +51,7 @@ function App() {
 
     const message = ref.current.value;
     const transaction = {
-      type: "script_function_payload",
+      type: "entry_function_payload",
       function: `${address}::Message::set_message`,
       arguments: [stringToHex(message)],
       type_arguments: [],

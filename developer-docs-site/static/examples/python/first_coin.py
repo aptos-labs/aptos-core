@@ -15,7 +15,7 @@ class FirstCoin(RestClient):
     def initialize_coin(self, account_from: Account) -> Optional[str]:
         """ Initialize a new coin with the given coin type. """
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::managed_coin::initialize",
             "type_arguments": [f"0x{account_from.address()}::moon_coin::MoonCoin"],
             "arguments": [
@@ -34,7 +34,7 @@ class FirstCoin(RestClient):
         """ Register the receiver account to receive transfers for the new coin. """
 
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::coins::register",
             "type_arguments": [f"0x{coin_type_address}::moon_coin::MoonCoin"],
             "arguments": []
@@ -53,7 +53,7 @@ class FirstCoin(RestClient):
         """ Register the receiver account to receive transfers for the new coin. """
 
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::managed_coin::mint",
             "type_arguments": [f"0x{account_coin_owner.address()}::moon_coin::MoonCoin"],
             "arguments": [

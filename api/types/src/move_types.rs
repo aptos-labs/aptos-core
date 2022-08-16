@@ -959,37 +959,37 @@ impl MoveScriptBytecode {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ScriptFunctionId {
+pub struct EntryFunctionId {
     pub module: MoveModuleId,
     pub name: IdentifierWrapper,
 }
 
-impl FromStr for ScriptFunctionId {
+impl FromStr for EntryFunctionId {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Some((module, name)) = s.rsplit_once("::") {
             return Ok(Self {
-                module: module.parse().map_err(|_| invalid_script_function_id(s))?,
-                name: name.parse().map_err(|_| invalid_script_function_id(s))?,
+                module: module.parse().map_err(|_| invalid_entry_function_id(s))?,
+                name: name.parse().map_err(|_| invalid_entry_function_id(s))?,
             });
         }
-        Err(invalid_script_function_id(s))
+        Err(invalid_entry_function_id(s))
     }
 }
 
 #[inline]
-fn invalid_script_function_id(s: &str) -> anyhow::Error {
+fn invalid_entry_function_id(s: &str) -> anyhow::Error {
     format_err!("invalid script function id {:?}", s)
 }
 
-impl Serialize for ScriptFunctionId {
+impl Serialize for EntryFunctionId {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.to_string().serialize(serializer)
     }
 }
 
-impl<'de> Deserialize<'de> for ScriptFunctionId {
+impl<'de> Deserialize<'de> for EntryFunctionId {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -999,7 +999,7 @@ impl<'de> Deserialize<'de> for ScriptFunctionId {
     }
 }
 
-impl fmt::Display for ScriptFunctionId {
+impl fmt::Display for EntryFunctionId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}::{}", self.module, self.name)
     }
@@ -1189,9 +1189,9 @@ mod tests {
     }
 
     #[test]
-    fn test_serialize_deserialize_move_script_function_id() {
+    fn test_serialize_deserialize_move_entry_function_id() {
         test_serialize_deserialize(
-            ScriptFunctionId {
+            EntryFunctionId {
                 module: MoveModuleId {
                     address: "0x1".parse().unwrap(),
                     name: "Diem".parse().unwrap(),
@@ -1203,23 +1203,19 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_invalid_move_script_function_id_string() {
+    fn test_parse_invalid_move_entry_function_id_string() {
         assert_eq!(
             "invalid script function id \"0x1\"",
-            "0x1".parse::<ScriptFunctionId>().err().unwrap().to_string()
+            "0x1".parse::<EntryFunctionId>().err().unwrap().to_string()
         );
         assert_eq!(
             "invalid script function id \"0x1:\"",
-            "0x1:"
-                .parse::<ScriptFunctionId>()
-                .err()
-                .unwrap()
-                .to_string()
+            "0x1:".parse::<EntryFunctionId>().err().unwrap().to_string()
         );
         assert_eq!(
             "invalid script function id \"0x1:::\"",
             "0x1:::"
-                .parse::<ScriptFunctionId>()
+                .parse::<EntryFunctionId>()
                 .err()
                 .unwrap()
                 .to_string()
@@ -1227,7 +1223,7 @@ mod tests {
         assert_eq!(
             "invalid script function id \"0x1::???\"",
             "0x1::???"
-                .parse::<ScriptFunctionId>()
+                .parse::<EntryFunctionId>()
                 .err()
                 .unwrap()
                 .to_string()
@@ -1235,7 +1231,7 @@ mod tests {
         assert_eq!(
             "invalid script function id \"Diem::Diem\"",
             "Diem::Diem"
-                .parse::<ScriptFunctionId>()
+                .parse::<EntryFunctionId>()
                 .err()
                 .unwrap()
                 .to_string()
@@ -1243,7 +1239,7 @@ mod tests {
         assert_eq!(
             "invalid script function id \"Diem::Diem::??\"",
             "Diem::Diem::??"
-                .parse::<ScriptFunctionId>()
+                .parse::<EntryFunctionId>()
                 .err()
                 .unwrap()
                 .to_string()
@@ -1251,7 +1247,7 @@ mod tests {
         assert_eq!(
             "invalid script function id \"0x1::Diem::Diem::Diem\"",
             "0x1::Diem::Diem::Diem"
-                .parse::<ScriptFunctionId>()
+                .parse::<EntryFunctionId>()
                 .err()
                 .unwrap()
                 .to_string()

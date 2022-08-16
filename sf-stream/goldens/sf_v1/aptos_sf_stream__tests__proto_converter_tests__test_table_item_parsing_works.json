@@ -178,7 +178,7 @@
         "maxGasAmount": "4000000",
         "expirationTimestampSecs": "1969-12-31T23:59:59.000000000Z",
         "payload": {
-          "scriptFunctionPayload": {
+          "EntryFunctionPayload": {
             "function": {
               "module": {
                 "address": "0x1",
@@ -1262,7 +1262,7 @@
         "maxGasAmount": "1000000",
         "expirationTimestampSecs": "+520831-11-11T19:21:28.000000000Z",
         "payload": {
-          "scriptFunctionPayload": {
+          "EntryFunctionPayload": {
             "function": {
               "module": {
                 "address": "0x34bf7e2d17674feb234371a7ea58efd715f0e56ba20ebf13789480d9d643afaf",

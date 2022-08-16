@@ -42,11 +42,11 @@ pub fn read_abis(dir_paths: &[impl AsRef<Path>]) -> anyhow::Result<Vec<ScriptABI
     #[allow(clippy::unnecessary_sort_by)]
     abis.sort_by(|a, b| {
         let a0 = match a {
-            ScriptABI::ScriptFunction(sf) => sf.module_name().to_string(),
+            ScriptABI::EntryFunction(sf) => sf.module_name().to_string(),
             _ => "".to_owned(),
         };
         let b0 = match b {
-            ScriptABI::ScriptFunction(sf) => sf.module_name().to_string(),
+            ScriptABI::EntryFunction(sf) => sf.module_name().to_string(),
             _ => "".to_owned(),
         };
 

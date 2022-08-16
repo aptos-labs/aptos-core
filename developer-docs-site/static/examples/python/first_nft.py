@@ -22,7 +22,7 @@ class TokenClient(RestClient):
         """Creates a new collection within the specified account"""
         mutate_setting = [False, False, False]
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": f"0x3::token::create_collection_script",
             "type_arguments": [],
             "arguments": [
@@ -48,7 +48,7 @@ class TokenClient(RestClient):
     ):
         mutate_setting = [False, False, False, False, False]
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": f"0x3::token::create_token_script",
             "type_arguments": [],
             "arguments": [
@@ -81,7 +81,7 @@ class TokenClient(RestClient):
             amount: int
     ):
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": f"0x3::token_transfers::offer_script",
             "type_arguments": [],
             "arguments": [
@@ -106,7 +106,7 @@ class TokenClient(RestClient):
             token_name: str,
     ):
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": f"0x3::token_transfers::claim_script",
             "type_arguments": [],
             "arguments": [
@@ -135,7 +135,7 @@ class TokenClient(RestClient):
             types: list[str],
     ):
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": f"0x3::token::mutate_token_properties",
             "type_arguments": [],
             "arguments": [
@@ -219,7 +219,7 @@ class TokenClient(RestClient):
             token_name: str,
     ):
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": f"0x3::token_transfers::cancel_offer_script",
             "type_arguments": [],
             "arguments": [

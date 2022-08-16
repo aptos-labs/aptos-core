@@ -3,10 +3,10 @@
 /* eslint-disable */
 
 import type { MoveType } from './MoveType';
-import type { ScriptFunctionId } from './ScriptFunctionId';
+import type { EntryFunctionId } from './EntryFunctionId';
 
-export type ScriptFunctionPayload = {
-    function: ScriptFunctionId;
+export type EntryFunctionPayload = {
+    function: EntryFunctionId;
     type_arguments: Array<MoveType>;
     arguments: Array<any>;
 };

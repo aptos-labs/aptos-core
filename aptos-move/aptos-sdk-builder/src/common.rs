@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::transaction::{
-    ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI,
+    ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArgumentABI,
 };
 use heck::CamelCase;
 use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
@@ -69,7 +69,7 @@ pub(crate) fn make_abi_enum_container(abis: &[ScriptABI]) -> ContainerFormat {
         }
 
         let name = match abi {
-            ScriptABI::ScriptFunction(sf) => {
+            ScriptABI::EntryFunction(sf) => {
                 format!(
                     "{}{}",
                     sf.module_name().name().to_string().to_camel_case(),
@@ -159,16 +159,16 @@ pub(crate) fn transaction_script_abis(abis: &[ScriptABI]) -> Vec<TransactionScri
         .cloned()
         .filter_map(|abi| match abi {
             ScriptABI::TransactionScript(abi) => Some(abi),
-            ScriptABI::ScriptFunction(_) => None,
+            ScriptABI::EntryFunction(_) => None,
         })
         .collect::<Vec<_>>()
 }
 
-pub(crate) fn script_function_abis(abis: &[ScriptABI]) -> Vec<ScriptFunctionABI> {
+pub(crate) fn entry_function_abis(abis: &[ScriptABI]) -> Vec<EntryFunctionABI> {
     abis.iter()
         .cloned()
         .filter_map(|abi| match abi {
-            ScriptABI::ScriptFunction(abi) => Some(abi),
+            ScriptABI::EntryFunction(abi) => Some(abi),
             ScriptABI::TransactionScript(_) => None,
         })
         .collect::<Vec<_>>()

@@ -83,9 +83,9 @@ async fn test_block_transactions_work() {
                 .as_ref()
                 .unwrap()
                 .r#type(),
-            PayloadType::ScriptFunctionPayload
+            PayloadType::EntryFunctionPayload
         );
-        if let Payload::ScriptFunctionPayload(payload) = txn
+        if let Payload::EntryFunctionPayload(payload) = txn
             .request
             .as_ref()
             .unwrap()
@@ -228,7 +228,7 @@ async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
 
     ctx.api_publish_module(account, module.try_into().unwrap())
         .await;
-    ctx.api_execute_script_function(
+    ctx.api_execute_entry_function(
         account,
         "TableTestData",
         "make_test_tables",

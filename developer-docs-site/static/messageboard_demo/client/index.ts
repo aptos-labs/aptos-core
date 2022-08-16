@@ -22,9 +22,9 @@ enum BoardType {
 
 class MessageboardUtil {
   // generate txn payload for any script function
-  static getScriptFunctionTxnPayload(funcName: string, args: Types.MoveValue[]): Types.TransactionPayload {
+  static getEntryFunctionTxnPayload(funcName: string, args: Types.MoveValue[]): Types.TransactionPayload {
     const payload = {
-      type: "script_function_payload",
+      type: "entry_function_payload",
       function: `${funcName}`,
       type_arguments: [],
       arguments: args,
@@ -116,7 +116,7 @@ class Messageboard {
 
     var fname = `${this.contractAddr.toString()}::${this.boardType}::message_board_init`;
     var args = [];
-    const initPayload = MessageboardUtil.getScriptFunctionTxnPayload(fname, args);
+    const initPayload = MessageboardUtil.getEntryFunctionTxnPayload(fname, args);
     await MessageboardUtil.executeTransaction(this.client, account, initPayload);
   }
 
@@ -129,7 +129,7 @@ class Messageboard {
     await MessageboardUtil.executeTransaction(
       this.client,
       account,
-      MessageboardUtil.getScriptFunctionTxnPayload(fname, args),
+      MessageboardUtil.getEntryFunctionTxnPayload(fname, args),
     );
   }
 
@@ -148,7 +148,7 @@ class Messageboard {
       await MessageboardUtil.executeTransaction(
         this.client,
         account,
-        MessageboardUtil.getScriptFunctionTxnPayload(cap_fname, cap_args),
+        MessageboardUtil.getEntryFunctionTxnPayload(cap_fname, cap_args),
       );
       const res = await this.client.getAccountResources(account.address());
       console.log(res);
@@ -163,7 +163,7 @@ class Messageboard {
     await MessageboardUtil.executeTransaction(
       this.client,
       account,
-      MessageboardUtil.getScriptFunctionTxnPayload(fname, args),
+      MessageboardUtil.getEntryFunctionTxnPayload(fname, args),
     );
   }
 
@@ -198,7 +198,7 @@ class Messageboard {
     console.log("add participants to messageboard");
     let args = [participant_addr];
     let fname = `${this.contractAddr.toString()}::${this.boardType}::add_participant`;
-    const addParticipantPayload = MessageboardUtil.getScriptFunctionTxnPayload(fname, args);
+    const addParticipantPayload = MessageboardUtil.getEntryFunctionTxnPayload(fname, args);
     await MessageboardUtil.executeTransaction(this.client, admin, addParticipantPayload);
     this.participants.add(participant_addr);
   }
@@ -207,7 +207,7 @@ class Messageboard {
     console.log("remove participant from messageboard");
     let args = [participant_addr];
     let fname = `${this.contractAddr.toString()}::${this.boardType}::remove_participant`;
-    const removeParticipantPayload = MessageboardUtil.getScriptFunctionTxnPayload(fname, args);
+    const removeParticipantPayload = MessageboardUtil.getEntryFunctionTxnPayload(fname, args);
     await MessageboardUtil.executeTransaction(this.client, admin, removeParticipantPayload);
     this.participants.delete(participant_addr);
   }

@@ -9,7 +9,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     state_store::state_key::StateKey,
-    transaction::{ScriptFunction, SignedTransaction, TransactionPayload, TransactionStatus},
+    transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
 use cached_framework_packages::aptos_stdlib;
 use framework::natives::code::UpgradePolicy;
@@ -145,7 +145,7 @@ impl MoveHarness {
         } = fun;
         self.create_transaction_payload(
             account,
-            TransactionPayload::ScriptFunction(ScriptFunction::new(
+            TransactionPayload::EntryFunction(EntryFunction::new(
                 module_id,
                 function_id,
                 ty_args,

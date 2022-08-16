@@ -129,7 +129,7 @@ pub enum TransactionPayload {
     /// A transaction that publishes code.
     Module(Module),
     /// A transaction that executes an existing script function published on-chain.
-    ScriptFunction(ScriptFunction),
+    EntryFunction(EntryFunction),
 }
 
 /// Two different kinds of WriteSet transactions.
@@ -159,7 +159,7 @@ pub struct Script {
 }
 
 /// Call a Move script function.
-pub struct ScriptFunction {
+pub struct EntryFunction {
     module: ModuleId,
     function: Identifier,
     ty_args: Vec<TypeTag>,
@@ -244,14 +244,14 @@ successful, this value is returned as the `governance_role` field of the
 `VMValidatorResult` so that the client can choose to prioritize governance
 transactions.
 
-* If the transaction payload is a `ScriptFunction`, check if the on-chain
+* If the transaction payload is a `EntryFunction`, check if the on-chain
 Aptos Version number is 2 or later. For version 1, validation will fail with
 a `FEATURE_UNDER_GATING` status code.
 
 ### Gas and Size Checks
 
 Next, there are a series of checks related to the transaction size and gas
-parameters. These checks are performed for `Script`, `ScriptFunction`,
+parameters. These checks are performed for `Script`, `EntryFunction`,
 and `Module` payloads, but
 not for `WriteSet` transactions. The constraints for these checks are defined
 by the `GasConstants` structure in the `VMConfig` module.
@@ -292,18 +292,18 @@ Move VM with gas metering disabled. Each kind of transaction payload has a
 corresponding prologue function that is used for validation. These prologue
 functions are defined in the `AptosAccount` module of the Aptos Framework:
 
-* Single-agent `ScriptFunction` and `Script`: The prologue function is `script_prologue`.
+* Single-agent `EntryFunction` and `Script`: The prologue function is `script_prologue`.
 In addition to the common checks listed below, it also calls the `is_script_allowed`
 function in the `TransactionPublishingOption` module to determine if the script
 should be allowed. A script sent by an account with `has_aptos_root_role` is always
 allowed. Otherwise, a `Script` payload is allowed if the hash of the
 script bytecode is on the list of allowed scripts published at
 `0x1::TransactionPublishingOption::TransactionPublishingOption.script_allowlist`.
-`ScriptFunction` payloads, for which the adapter uses an empty vector in place
+`EntryFunction` payloads, for which the adapter uses an empty vector in place
 of the script hash, are always allowed. If the script is not allowed, validation
 fails with an `UNKNOWN_SCRIPT` status code.
 
-* Multi-agent `ScriptFunction` and `Script`: The prologue function is `multi_agent_script_prologue`.
+* Multi-agent `EntryFunction` and `Script`: The prologue function is `multi_agent_script_prologue`.
 In addition to the common checks listed below, it also performs the following checks:
     * Check that the number of secondary signer addresses provided is the same
       as the number of secondary signer public key hashes provided. If not,
@@ -684,7 +684,7 @@ is hardcoded in the adapter.
 In the common case, the payload is either a script
 function, script, or a module:
 
-* `ScriptFunction`: The Move VM is used to [execute](#Script-Function-Execution)
+* `EntryFunction`: The Move VM is used to [execute](#Script-Function-Execution)
 the script function with the types and arguments specified in the transaction.
 
 * `Script`: The Move VM is used to [execute](#Script-Execution) the script with
@@ -960,7 +960,7 @@ in an on-chain module. The script function is specified by the module and functi
 name:
 
 ```rust
-pub fn execute_script_function(
+pub fn execute_entry_function(
     &mut self,
     module: &ModuleId,
     function_name: &IdentStr,
@@ -976,7 +976,7 @@ from a script, the script function is loaded from the on-chain module, and the M
 checks that it has `script` visibility. The rest of the script function execution is
 the same as for scripts. If the function does not exist, execution fails with a
 `FUNCTION_RESOLUTION_FAILURE` status code. If the function does not have `script` visibility,
-it will fail with the `EXECUTE_SCRIPT_FUNCTION_CALLED_ON_NON_SCRIPT_VISIBLE` status code.
+it will fail with the `EXECUTE_entry_function_CALLED_ON_NON_SCRIPT_VISIBLE` status code.
 
 ## Function Execution
 

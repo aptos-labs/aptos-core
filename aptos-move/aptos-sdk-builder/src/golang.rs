@@ -3,7 +3,7 @@
 
 use crate::common;
 use aptos_types::transaction::{
-    ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI,
+    ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArgumentABI,
 };
 use move_deps::move_core_types::{
     account_address::AccountAddress,
@@ -46,7 +46,7 @@ pub fn output(
         .iter()
         .cloned()
         .filter(|abi| {
-            if let ScriptABI::ScriptFunction(sf) = abi {
+            if let ScriptABI::EntryFunction(sf) = abi {
                 sf.module_name().name().as_str() != "code" && sf.name() != "publish_package_txn"
             } else {
                 true
@@ -59,16 +59,14 @@ pub fn output(
 
     emitter.output_encode_method(abis)?;
     emitter.output_transaction_script_decode_method()?;
-    emitter.output_script_function_decode_method()?;
+    emitter.output_entry_function_decode_method()?;
 
     for abi in abis {
         match abi {
             ScriptABI::TransactionScript(abi) => {
                 emitter.output_transaction_script_encoder_function(abi)?
             }
-            ScriptABI::ScriptFunction(abi) => {
-                emitter.output_script_function_encoder_function(abi)?
-            }
+            ScriptABI::EntryFunction(abi) => emitter.output_entry_function_encoder_function(abi)?,
         };
     }
 
@@ -77,9 +75,7 @@ pub fn output(
             ScriptABI::TransactionScript(abi) => {
                 emitter.output_transaction_script_decoder_function(abi)?
             }
-            ScriptABI::ScriptFunction(abi) => {
-                emitter.output_script_function_decoder_function(abi)?
-            }
+            ScriptABI::EntryFunction(abi) => emitter.output_entry_function_decoder_function(abi)?,
         };
     }
 
@@ -87,7 +83,7 @@ pub fn output(
         emitter.output_code_constant(abi)?;
     }
     emitter.output_transaction_script_decoder_map(&common::transaction_script_abis(abis))?;
-    emitter.output_script_function_decoder_map(&common::script_function_abis(abis))?;
+    emitter.output_entry_function_decoder_map(&common::entry_function_abis(abis))?;
 
     emitter.output_encoding_helpers(abis)?;
     emitter.output_decoding_helpers(&common::filter_transaction_scripts(abis))?;
@@ -141,15 +137,15 @@ where
         .into_iter()
         .collect();
 
-        // Generate `ScriptFunctionCall` enums for all new transaction scripts
-        let mut script_function_registry: BTreeMap<_, _> = vec![(
-            "ScriptFunctionCall".to_string(),
+        // Generate `EntryFunctionCall` enums for all new transaction scripts
+        let mut entry_function_registry: BTreeMap<_, _> = vec![(
+            "EntryFunctionCall".to_string(),
             crate::common::make_abi_enum_container(script_fun_abis.as_slice()),
         )]
         .into_iter()
         .collect();
 
-        script_registry.append(&mut script_function_registry);
+        script_registry.append(&mut entry_function_registry);
 
         let mut comments: BTreeMap<_, _> = abis
             .iter()
@@ -160,7 +156,7 @@ where
                         if abi.is_transaction_script_abi() {
                             "ScriptCall".to_string()
                         } else {
-                            "ScriptFunctionCall".to_string()
+                            "EntryFunctionCall".to_string()
                         },
                         abi.name().to_camel_case(),
                     ],
@@ -178,7 +174,7 @@ where
         comments.insert(
             vec![
                 self.package_name.to_string(),
-                "ScriptFunctionCall".to_string(),
+                "EntryFunctionCall".to_string(),
             ],
             "Structured representation of a call into a known Move script function.".into(),
         );
@@ -239,13 +235,13 @@ func EncodeScript(call ScriptCall) aptostypes.Script {{"#
             writeln!(
                 self.out,
                 r#"
-// Build an Aptos `TransactionPayload` from a structured object `ScriptFunctionCall`.
-func EncodeScriptFunction(call ScriptFunctionCall) aptostypes.TransactionPayload {{"#
+// Build an Aptos `TransactionPayload` from a structured object `EntryFunctionCall`.
+func EncodeEntryFunction(call EntryFunctionCall) aptostypes.TransactionPayload {{"#
             )?;
             self.out.indent();
             writeln!(self.out, "switch call := call.(type) {{")?;
             for abi in script_fun_abis {
-                if let ScriptABI::ScriptFunction(abi) = abi {
+                if let ScriptABI::EntryFunction(abi) = abi {
                     let params = std::iter::empty()
                         .chain(abi.ty_args().iter().map(TypeArgumentABI::name))
                         .chain(abi.args().iter().map(ArgumentABI::name))
@@ -254,7 +250,7 @@ func EncodeScriptFunction(call ScriptFunctionCall) aptostypes.TransactionPayload
                         .join(", ");
                     writeln!(
                         self.out,
-                        r#"case *ScriptFunctionCall__{0}{1}:
+                        r#"case *EntryFunctionCall__{0}{1}:
                 return Encode{0}{1}({2})"#,
                         abi.module_name().name().to_string().to_camel_case(),
                         abi.name().to_camel_case(),
@@ -286,15 +282,15 @@ func DecodeScript(script *aptostypes.Script) (ScriptCall, error) {{
         )
     }
 
-    fn output_script_function_decode_method(&mut self) -> Result<()> {
+    fn output_entry_function_decode_method(&mut self) -> Result<()> {
         writeln!(
             self.out,
             r#"
-// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
-func DecodeScriptFunctionPayload(script aptostypes.TransactionPayload) (ScriptFunctionCall, error) {{
+// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `EntryFunctionCall`.
+func DecodeEntryFunctionPayload(script aptostypes.TransactionPayload) (EntryFunctionCall, error) {{
     switch script := script.(type) {{
-        case *aptostypes.TransactionPayload__ScriptFunction:
-            if helper := script_function_decoder_map[string(script.Value.Module.Name) + "_" + string(script.Value.Function)]; helper != nil {{
+        case *aptostypes.TransactionPayload__EntryFunction:
+            if helper := entry_function_decoder_map[string(script.Value.Module.Name) + "_" + string(script.Value.Function)]; helper != nil {{
                     val, err := helper(script)
                     return val, err
             }} else {{
@@ -339,7 +335,7 @@ func DecodeScriptFunctionPayload(script aptostypes.TransactionPayload) (ScriptFu
         writeln!(self.out, "}}")
     }
 
-    fn output_script_function_encoder_function(&mut self, abi: &ScriptFunctionABI) -> Result<()> {
+    fn output_entry_function_encoder_function(&mut self, abi: &EntryFunctionABI) -> Result<()> {
         writeln!(
             self.out,
             "\n{}\nfunc Encode{}{}({}) aptostypes.TransactionPayload {{",
@@ -356,8 +352,8 @@ func DecodeScriptFunctionPayload(script aptostypes.TransactionPayload) (ScriptFu
         self.out.indent();
         writeln!(
             self.out,
-            r#"return &aptostypes.TransactionPayload__ScriptFunction {{
-            aptostypes.ScriptFunction {{
+            r#"return &aptostypes.TransactionPayload__EntryFunction {{
+            aptostypes.EntryFunction {{
                 Module: {},
                 Function: {},
                 TyArgs: []aptostypes.TypeTag{{{}}},
@@ -426,10 +422,10 @@ func DecodeScriptFunctionPayload(script aptostypes.TransactionPayload) (ScriptFu
         Ok(())
     }
 
-    fn output_script_function_decoder_function(&mut self, abi: &ScriptFunctionABI) -> Result<()> {
+    fn output_entry_function_decoder_function(&mut self, abi: &EntryFunctionABI) -> Result<()> {
         writeln!(
             self.out,
-            "\nfunc decode_{}_{}(script aptostypes.TransactionPayload) (ScriptFunctionCall, error) {{",
+            "\nfunc decode_{}_{}(script aptostypes.TransactionPayload) (EntryFunctionCall, error) {{",
             abi.module_name().name(),
             abi.name(),
         )?;
@@ -438,7 +434,7 @@ func DecodeScriptFunctionPayload(script aptostypes.TransactionPayload) (ScriptFu
         self.out.indent();
         writeln!(
             self.out,
-            "case *aptostypes.TransactionPayload__ScriptFunction:"
+            "case *aptostypes.TransactionPayload__EntryFunction:"
         )?;
         self.out.indent();
         writeln!(
@@ -453,7 +449,7 @@ func DecodeScriptFunctionPayload(script aptostypes.TransactionPayload) (ScriptFu
         )?;
         writeln!(
             self.out,
-            "var call ScriptFunctionCall__{0}{1}",
+            "var call EntryFunctionCall__{0}{1}",
             abi.module_name().name().to_string().to_camel_case(),
             abi.name().to_camel_case(),
         )?;
@@ -530,11 +526,11 @@ var script_decoder_map = map[string]func(*aptostypes.Script) (ScriptCall, error)
         writeln!(self.out, "}}")
     }
 
-    fn output_script_function_decoder_map(&mut self, abis: &[ScriptFunctionABI]) -> Result<()> {
+    fn output_entry_function_decoder_map(&mut self, abis: &[EntryFunctionABI]) -> Result<()> {
         writeln!(
             self.out,
             r#"
-var script_function_decoder_map = map[string]func(aptostypes.TransactionPayload) (ScriptFunctionCall, error) {{"#
+var entry_function_decoder_map = map[string]func(aptostypes.TransactionPayload) (EntryFunctionCall, error) {{"#
         )?;
         self.out.indent();
         for abi in abis {

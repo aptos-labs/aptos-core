@@ -2,9 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ScriptFunctionPayload } from './ScriptFunctionPayload';
+import type { EntryFunctionPayload } from './EntryFunctionPayload';
 
-export type TransactionPayload_ScriptFunctionPayload = ({
+export type TransactionPayload_EntryFunctionPayload = ({
     type: string;
-} & ScriptFunctionPayload);
+} & EntryFunctionPayload);
 

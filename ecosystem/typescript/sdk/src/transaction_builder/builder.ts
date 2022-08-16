@@ -15,17 +15,17 @@ import {
   SigningMessage,
   MultiAgentRawTransaction,
   AccountAddress,
-  ScriptFunction,
+  EntryFunction,
   Identifier,
   ChainId,
   Script,
   TransactionPayload,
   TransactionArgument,
-  TransactionPayloadScriptFunction,
+  TransactionPayloadEntryFunction,
   TransactionPayloadScript,
 } from "./aptos_types";
 import { bcsToBytes, Bytes, Deserializer, Serializer, Uint64, Uint8 } from "./bcs";
-import { ScriptABI, ScriptFunctionABI, TransactionScriptABI } from "./aptos_types/abi";
+import { ScriptABI, EntryFunctionABI, TransactionScriptABI } from "./aptos_types/abi";
 import { HexString } from "../hex_string";
 import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
 
@@ -165,8 +165,8 @@ export class TransactionBuilderABI {
       const deserializer = new Deserializer(abi);
       const scriptABI = ScriptABI.deserialize(deserializer);
       let k: string;
-      if (scriptABI instanceof ScriptFunctionABI) {
-        const funcABI = scriptABI as ScriptFunctionABI;
+      if (scriptABI instanceof EntryFunctionABI) {
+        const funcABI = scriptABI as EntryFunctionABI;
         const { address: addr, name: moduleName } = funcABI.module_name;
         k = `${HexString.fromUint8Array(addr.address).toShortString()}::${moduleName.value}::${funcABI.name}`;
       } else {
@@ -233,11 +233,11 @@ export class TransactionBuilderABI {
 
     const scriptABI = this.abiMap.get(func);
 
-    if (scriptABI instanceof ScriptFunctionABI) {
-      const funcABI = scriptABI as ScriptFunctionABI;
+    if (scriptABI instanceof EntryFunctionABI) {
+      const funcABI = scriptABI as EntryFunctionABI;
       const bcsArgs = TransactionBuilderABI.toBCSArgs(funcABI.args, args);
-      payload = new TransactionPayloadScriptFunction(
-        new ScriptFunction(funcABI.module_name, new Identifier(funcABI.name), typeTags, bcsArgs),
+      payload = new TransactionPayloadEntryFunction(
+        new EntryFunction(funcABI.module_name, new Identifier(funcABI.name), typeTags, bcsArgs),
       );
     }
 

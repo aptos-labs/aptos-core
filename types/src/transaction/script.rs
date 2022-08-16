@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub use move_deps::move_core_types::abi::{
-    ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI,
+    ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArgumentABI,
 };
 
 /// Call a Move script.
@@ -60,7 +60,7 @@ impl fmt::Debug for Script {
 
 /// Call a Move script function.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
-pub struct ScriptFunction {
+pub struct EntryFunction {
     module: ModuleId,
     function: Identifier,
     ty_args: Vec<TypeTag>,
@@ -68,14 +68,14 @@ pub struct ScriptFunction {
     args: Vec<Vec<u8>>,
 }
 
-impl ScriptFunction {
+impl EntryFunction {
     pub fn new(
         module: ModuleId,
         function: Identifier,
         ty_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> Self {
-        ScriptFunction {
+        EntryFunction {
             module,
             function,
             ty_args,

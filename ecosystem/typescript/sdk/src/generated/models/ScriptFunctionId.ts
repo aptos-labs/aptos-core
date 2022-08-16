@@ -10,4 +10,4 @@
  * Both `module name` and `function name` are case-sensitive.
  *
  */
-export type ScriptFunctionId = string;
+export type EntryFunctionId = string;

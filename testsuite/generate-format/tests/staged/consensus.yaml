@@ -314,7 +314,7 @@ Script:
     - args:
         SEQ:
           TYPENAME: TransactionArgument
-ScriptFunction:
+EntryFunction:
   STRUCT:
     - module:
         TYPENAME: ModuleId
@@ -454,9 +454,9 @@ TransactionPayload:
         NEWTYPE:
           TYPENAME: ModuleBundle
     3:
-      ScriptFunction:
+      EntryFunction:
         NEWTYPE:
-          TYPENAME: ScriptFunction
+          TYPENAME: EntryFunction
 TwoChainTimeout:
   STRUCT:
     - epoch: U64

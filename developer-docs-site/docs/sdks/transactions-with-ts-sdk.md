@@ -72,26 +72,26 @@ With the above code we created two accounts on Aptos devnet and minted 5000 test
 
 The Typescript SDK supports three types of transaction payloads:
 
-1. `ScriptFunction`
+1. `EntryFunction`
 2. `Script` and
 3. `ModuleBundle`.
 
 See [https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html](https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html) for details.
 
-The `ScriptFunction` payload is used to invoke an on-chain Move script function. Within `ScriptFunction` payload you can specify the function name and arguments.
+The `EntryFunction` payload is used to invoke an on-chain Move script function. Within `EntryFunction` payload you can specify the function name and arguments.
 
 The `Script` payload contains the bytecode for the Aptos MoveVM (Move Virtual Machine) to execute. Within the `Script` payload, you can provide the script code in bytes and the arguments to the script.
 
 The `ModuleBundle` payload is used to publish multiple modules at once. Within `ModuleBundle` payload, you can provide the module bytecode.
 
-To transfer coins from Alice’s account to Bob’s account, we need to prepare a `ScriptFunction` payload with a `transfer` function.
+To transfer coins from Alice’s account to Bob’s account, we need to prepare a `EntryFunction` payload with a `transfer` function.
 
 ```ts
 // We need to pass a token type to the `transfer` function.
 const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-  TxnBuilderTypes.ScriptFunction.natural(
+const EntryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+  TxnBuilderTypes.EntryFunction.natural(
     // Fully qualified module name, `AccountAddress::ModuleName`
     "0x1::coin",
     // Module function
@@ -109,7 +109,7 @@ The Move function `transfer` requires a coin type as type argument. The function
 In above code snippet, we want to transfer the `AptosCoin` that is defined under account `0x1` and module `AptosCoin`. The fully qualified name for the `AptosCoin` is therefore `0x1::aptos_coin::AptosCoin`.
 
 :::note
-All arguments in `ScriptFunction` payload must be BCS serialized. In above code, we serialized Bob’s account address and the amount number to transfer.
+All arguments in `EntryFunction` payload must be BCS serialized. In above code, we serialized Bob’s account address and the amount number to transfer.
 :::
 
 ## Step 3: Sign and submit the transaction
@@ -118,7 +118,7 @@ After assembling a transaction payload, we are ready to create a `RawTransaction
 
 ```ts
 // Create a raw transaction out of the transaction payload
-const rawTxn = await client.generateRawTransaction(alice.address(), scriptFunctionPayload);
+const rawTxn = await client.generateRawTransaction(alice.address(), EntryFunctionPayload);
 
 // Sign the raw transaction with Alice's private key
 const bcsTxn = AptosClient.generateBCSTransaction(alice, rawTxn);

@@ -38,8 +38,8 @@ test(
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as { coin: { value: string } }).coin.value).toBe("0");
 
-    const payload: Gen.TransactionPayload_ScriptFunctionPayload = {
-      type: "script_function_payload",
+    const payload: Gen.TransactionPayload_EntryFunctionPayload = {
+      type: "entry_function_payload",
       function: "0x1::coin::transfer",
       type_arguments: ["0x1::aptos_coin::AptosCoin"],
       arguments: [account2.address().hex(), "717"],

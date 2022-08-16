@@ -292,7 +292,7 @@ fn ensure_txn_valid_for_vacant_entry(transaction: &Transaction) -> Result<()> {
         Transaction::UserTransaction(txn) => match txn.payload() {
             TransactionPayload::ModuleBundle(_)
             | TransactionPayload::Script(_)
-            | TransactionPayload::ScriptFunction(_) => {
+            | TransactionPayload::EntryFunction(_) => {
                 bail!("Write set should be a subset of read set.")
             }
             TransactionPayload::WriteSet(_) => (),

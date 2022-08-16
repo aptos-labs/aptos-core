@@ -148,7 +148,7 @@ After the modules are published under the developer’s account address, we can 
 ```tsx
 var fname = `${this.contractAddr.toString()}::${this.boardType}::message_board_init`;
 var args = [];
-const initPayload = MessageboardUtil.getScriptFunctionTxnPayload(fname, args);
+const initPayload = MessageboardUtil.getEntryFunctionTxnPayload(fname, args);
 await MessageboardUtil.executeTransaction(this.client, account, initPayload);
 ```
 
@@ -161,7 +161,7 @@ async sendMessage(account: AptosAccount, message: string) {
     var fname = `${this.contractAddr.toString()}::${this.boardType}::send_message_to`;
     await MessageboardUtil.executeTransaction(this.client,
         account,
-        MessageboardUtil.getScriptFunctionTxnPayload(fname, args)
+        MessageboardUtil.getEntryFunctionTxnPayload(fname, args)
     );
 }
 ```

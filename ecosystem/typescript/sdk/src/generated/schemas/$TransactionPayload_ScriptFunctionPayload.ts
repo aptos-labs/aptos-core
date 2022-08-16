@@ -1,7 +1,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export const $TransactionPayload_ScriptFunctionPayload = {
+export const $TransactionPayload_EntryFunctionPayload = {
     type: 'all-of',
     contains: [{
         properties: {
@@ -11,6 +11,6 @@ export const $TransactionPayload_ScriptFunctionPayload = {
             },
         },
     }, {
-        type: 'ScriptFunctionPayload',
+        type: 'EntryFunctionPayload',
     }],
 } as const;

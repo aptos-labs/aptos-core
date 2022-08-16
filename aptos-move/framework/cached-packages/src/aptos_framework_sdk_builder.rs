@@ -14,7 +14,7 @@
 #![allow(unused_imports)]
 use aptos_types::{
     account_address::AccountAddress,
-    transaction::{ScriptFunction, TransactionPayload},
+    transaction::{EntryFunction, TransactionPayload},
 };
 use move_deps::move_core_types::{
     ident_str,
@@ -25,15 +25,15 @@ type Bytes = Vec<u8>;
 
 /// Structured representation of a call into a known Move script function.
 /// ```ignore
-/// impl ScriptFunctionCall {
+/// impl EntryFunctionCall {
 ///     pub fn encode(self) -> TransactionPayload { .. }
-///     pub fn decode(&TransactionPayload) -> Option<ScriptFunctionCall> { .. }
+///     pub fn decode(&TransactionPayload) -> Option<EntryFunctionCall> { .. }
 /// }
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
-pub enum ScriptFunctionCall {
+pub enum EntryFunctionCall {
     /// Basic account creation methods.
     AccountCreateAccount {
         auth_key: AccountAddress,
@@ -234,10 +234,10 @@ pub enum ScriptFunctionCall {
     },
 }
 
-impl ScriptFunctionCall {
-    /// Build an Aptos `TransactionPayload` from a structured object `ScriptFunctionCall`.
+impl EntryFunctionCall {
+    /// Build an Aptos `TransactionPayload` from a structured object `EntryFunctionCall`.
     pub fn encode(self) -> TransactionPayload {
-        use ScriptFunctionCall::*;
+        use EntryFunctionCall::*;
         match self {
             AccountCreateAccount { auth_key } => account_create_account(auth_key),
             AccountRotateAuthenticationKey { new_auth_key } => {
@@ -342,10 +342,10 @@ impl ScriptFunctionCall {
         }
     }
 
-    /// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `ScriptFunctionCall`.
-    pub fn decode(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            match SCRIPT_FUNCTION_DECODER_MAP.get(&format!(
+    /// Try to recognize an Aptos `TransactionPayload` and convert it into a structured object `EntryFunctionCall`.
+    pub fn decode(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            match entry_function_DECODER_MAP.get(&format!(
                 "{}_{}",
                 script.module().name(),
                 script.function()
@@ -361,7 +361,7 @@ impl ScriptFunctionCall {
 
 /// Basic account creation methods.
 pub fn account_create_account(auth_key: AccountAddress) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -376,7 +376,7 @@ pub fn account_create_account(auth_key: AccountAddress) -> TransactionPayload {
 }
 
 pub fn account_rotate_authentication_key(new_auth_key: Vec<u8>) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -391,7 +391,7 @@ pub fn account_rotate_authentication_key(new_auth_key: Vec<u8>) -> TransactionPa
 }
 
 pub fn account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -408,7 +408,7 @@ pub fn account_transfer(to: AccountAddress, amount: u64) -> TransactionPayload {
 /// Only callable in tests and testnets where the core resources account exists.
 /// Claim the delegated mint capability and destroy the delegated token.
 pub fn aptos_coin_claim_mint_capability() -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -425,7 +425,7 @@ pub fn aptos_coin_claim_mint_capability() -> TransactionPayload {
 /// Only callable in tests and testnets where the core resources account exists.
 /// Create delegated token for the address so the account could claim MintCapability later.
 pub fn aptos_coin_delegate_mint_capability(to: AccountAddress) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -442,7 +442,7 @@ pub fn aptos_coin_delegate_mint_capability(to: AccountAddress) -> TransactionPay
 /// Only callable in tests and testnets where the core resources account exists.
 /// Create new coins and deposit them into dst_addr's account.
 pub fn aptos_coin_mint(dst_addr: AccountAddress, amount: u64) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -468,7 +468,7 @@ pub fn aptos_governance_create_proposal(
     metadata_location: Vec<u8>,
     metadata_hash: Vec<u8>,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -493,7 +493,7 @@ pub fn aptos_governance_vote(
     proposal_id: u64,
     should_pass: bool,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -517,7 +517,7 @@ pub fn code_publish_package_txn(
     pack_serialized: Vec<u8>,
     code: Vec<Vec<u8>>,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -536,7 +536,7 @@ pub fn code_publish_package_txn(
 
 /// Transfers `amount` of coins `CoinType` from `from` to `to`.
 pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -554,7 +554,7 @@ pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> Tra
 /// has to explicitly registers to do so. The register creates a special `CoinStore`
 /// to hold the specified `CoinType`.
 pub fn coins_register(coin_type: TypeTag) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -569,7 +569,7 @@ pub fn coins_register(coin_type: TypeTag) -> TransactionPayload {
 }
 
 pub fn gas_schedule_set_gas_schedule(gas_schedule_blob: Vec<u8>) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -585,7 +585,7 @@ pub fn gas_schedule_set_gas_schedule(gas_schedule_blob: Vec<u8>) -> TransactionP
 
 /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
 pub fn managed_coin_burn(coin_type: TypeTag, amount: u64) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -608,7 +608,7 @@ pub fn managed_coin_initialize(
     decimals: u8,
     monitor_supply: bool,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -633,7 +633,7 @@ pub fn managed_coin_mint(
     dst_addr: AccountAddress,
     amount: u64,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -653,7 +653,7 @@ pub fn managed_coin_mint(
 /// Creating a resource that stores balance of `CoinType` on user's account, withdraw and deposit event handlers.
 /// Required if user wants to start accepting deposits of `CoinType` in his account.
 pub fn managed_coin_register(coin_type: TypeTag) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -669,7 +669,7 @@ pub fn managed_coin_register(coin_type: TypeTag) -> TransactionPayload {
 
 /// Force an epoch change.
 pub fn reconfiguration_force_reconfigure() -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -690,7 +690,7 @@ pub fn resource_account_create_resource_account(
     seed: Vec<u8>,
     optional_auth_key: Vec<u8>,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -709,7 +709,7 @@ pub fn resource_account_create_resource_account(
 
 /// Add `amount` of coins from the `account` owning the StakePool.
 pub fn stake_add_stake(amount: u64) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -725,7 +725,7 @@ pub fn stake_add_stake(amount: u64) -> TransactionPayload {
 
 /// Similar to increase_lockup_with_cap but will use ownership capability from the signing account.
 pub fn stake_increase_lockup() -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -748,7 +748,7 @@ pub fn stake_initialize_owner_only(
     operator: AccountAddress,
     voter: AccountAddress,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -773,7 +773,7 @@ pub fn stake_initialize_validator(
     network_addresses: Vec<u8>,
     fullnode_addresses: Vec<u8>,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -794,7 +794,7 @@ pub fn stake_initialize_validator(
 
 /// This can only called by the operator of the validator/staking pool.
 pub fn stake_join_validator_set(pool_address: AccountAddress) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -815,7 +815,7 @@ pub fn stake_join_validator_set(pool_address: AccountAddress) -> TransactionPayl
 ///
 /// Can only be called by the operator of the validator/staking pool.
 pub fn stake_leave_validator_set(pool_address: AccountAddress) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -831,7 +831,7 @@ pub fn stake_leave_validator_set(pool_address: AccountAddress) -> TransactionPay
 
 /// Move `amount` of coins from pending_inactive to active.
 pub fn stake_reactivate_stake(amount: u64) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -851,7 +851,7 @@ pub fn stake_rotate_consensus_key(
     new_consensus_pubkey: Vec<u8>,
     proof_of_possession: Vec<u8>,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -871,7 +871,7 @@ pub fn stake_rotate_consensus_key(
 
 /// Allows an owner to change the delegated voter of the stake pool.
 pub fn stake_set_delegated_voter(new_delegated_voter: AccountAddress) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -887,7 +887,7 @@ pub fn stake_set_delegated_voter(new_delegated_voter: AccountAddress) -> Transac
 
 /// Allows an owner to change the operator of the stake pool.
 pub fn stake_set_operator(new_operator: AccountAddress) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -903,7 +903,7 @@ pub fn stake_set_operator(new_operator: AccountAddress) -> TransactionPayload {
 
 /// Similar to unlock_with_cap but will use ownership capability from the signing account.
 pub fn stake_unlock(amount: u64) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -923,7 +923,7 @@ pub fn stake_update_network_and_fullnode_addresses(
     new_network_addresses: Vec<u8>,
     new_fullnode_addresses: Vec<u8>,
 ) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -943,7 +943,7 @@ pub fn stake_update_network_and_fullnode_addresses(
 
 /// Withdraw from `account`'s inactive stake.
 pub fn stake_withdraw(withdraw_amount: u64) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -960,7 +960,7 @@ pub fn stake_withdraw(withdraw_amount: u64) -> TransactionPayload {
 /// Updates the major version to a larger version.
 /// This is only used in test environments and outside of them, the core resources account shouldn't exist.
 pub fn version_set_version(major: u64) -> TransactionPayload {
-    TransactionPayload::ScriptFunction(ScriptFunction::new(
+    TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -975,9 +975,9 @@ pub fn version_set_version(major: u64) -> TransactionPayload {
 }
 mod decoder {
     use super::*;
-    pub fn account_create_account(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::AccountCreateAccount {
+    pub fn account_create_account(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountCreateAccount {
                 auth_key: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -987,9 +987,9 @@ mod decoder {
 
     pub fn account_rotate_authentication_key(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::AccountRotateAuthenticationKey {
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountRotateAuthenticationKey {
                 new_auth_key: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -997,9 +997,9 @@ mod decoder {
         }
     }
 
-    pub fn account_transfer(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::AccountTransfer {
+    pub fn account_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AccountTransfer {
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
@@ -1010,9 +1010,9 @@ mod decoder {
 
     pub fn aptos_coin_claim_mint_capability(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(_script) = payload {
-            Some(ScriptFunctionCall::AptosCoinClaimMintCapability {})
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AptosCoinClaimMintCapability {})
         } else {
             None
         }
@@ -1020,9 +1020,9 @@ mod decoder {
 
     pub fn aptos_coin_delegate_mint_capability(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::AptosCoinDelegateMintCapability {
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosCoinDelegateMintCapability {
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -1030,9 +1030,9 @@ mod decoder {
         }
     }
 
-    pub fn aptos_coin_mint(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::AptosCoinMint {
+    pub fn aptos_coin_mint(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosCoinMint {
                 dst_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
@@ -1043,9 +1043,9 @@ mod decoder {
 
     pub fn aptos_governance_create_proposal(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::AptosGovernanceCreateProposal {
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosGovernanceCreateProposal {
                 stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
                 execution_hash: bcs::from_bytes(script.args().get(1)?).ok()?,
                 metadata_location: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -1056,9 +1056,9 @@ mod decoder {
         }
     }
 
-    pub fn aptos_governance_vote(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::AptosGovernanceVote {
+    pub fn aptos_governance_vote(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AptosGovernanceVote {
                 stake_pool: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proposal_id: bcs::from_bytes(script.args().get(1)?).ok()?,
                 should_pass: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -1068,9 +1068,9 @@ mod decoder {
         }
     }
 
-    pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::CodePublishPackageTxn {
+    pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CodePublishPackageTxn {
                 pack_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
                 code: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
@@ -1079,9 +1079,9 @@ mod decoder {
         }
     }
 
-    pub fn coin_transfer(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::CoinTransfer {
+    pub fn coin_transfer(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinTransfer {
                 coin_type: script.ty_args().get(0)?.clone(),
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -1091,9 +1091,9 @@ mod decoder {
         }
     }
 
-    pub fn coins_register(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::CoinsRegister {
+    pub fn coins_register(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinsRegister {
                 coin_type: script.ty_args().get(0)?.clone(),
             })
         } else {
@@ -1103,9 +1103,9 @@ mod decoder {
 
     pub fn gas_schedule_set_gas_schedule(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::GasScheduleSetGasSchedule {
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::GasScheduleSetGasSchedule {
                 gas_schedule_blob: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -1113,9 +1113,9 @@ mod decoder {
         }
     }
 
-    pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::ManagedCoinBurn {
+    pub fn managed_coin_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ManagedCoinBurn {
                 coin_type: script.ty_args().get(0)?.clone(),
                 amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
@@ -1124,9 +1124,9 @@ mod decoder {
         }
     }
 
-    pub fn managed_coin_initialize(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::ManagedCoinInitialize {
+    pub fn managed_coin_initialize(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ManagedCoinInitialize {
                 coin_type: script.ty_args().get(0)?.clone(),
                 name: bcs::from_bytes(script.args().get(0)?).ok()?,
                 symbol: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -1138,9 +1138,9 @@ mod decoder {
         }
     }
 
-    pub fn managed_coin_mint(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::ManagedCoinMint {
+    pub fn managed_coin_mint(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ManagedCoinMint {
                 coin_type: script.ty_args().get(0)?.clone(),
                 dst_addr: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
@@ -1150,9 +1150,9 @@ mod decoder {
         }
     }
 
-    pub fn managed_coin_register(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::ManagedCoinRegister {
+    pub fn managed_coin_register(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ManagedCoinRegister {
                 coin_type: script.ty_args().get(0)?.clone(),
             })
         } else {
@@ -1162,9 +1162,9 @@ mod decoder {
 
     pub fn reconfiguration_force_reconfigure(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(_script) = payload {
-            Some(ScriptFunctionCall::ReconfigurationForceReconfigure {})
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::ReconfigurationForceReconfigure {})
         } else {
             None
         }
@@ -1172,9 +1172,9 @@ mod decoder {
 
     pub fn resource_account_create_resource_account(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::ResourceAccountCreateResourceAccount {
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ResourceAccountCreateResourceAccount {
                 seed: bcs::from_bytes(script.args().get(0)?).ok()?,
                 optional_auth_key: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
@@ -1183,9 +1183,9 @@ mod decoder {
         }
     }
 
-    pub fn stake_add_stake(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeAddStake {
+    pub fn stake_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeAddStake {
                 amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -1193,17 +1193,17 @@ mod decoder {
         }
     }
 
-    pub fn stake_increase_lockup(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(_script) = payload {
-            Some(ScriptFunctionCall::StakeIncreaseLockup {})
+    pub fn stake_increase_lockup(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::StakeIncreaseLockup {})
         } else {
             None
         }
     }
 
-    pub fn stake_initialize_owner_only(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeInitializeOwnerOnly {
+    pub fn stake_initialize_owner_only(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeInitializeOwnerOnly {
                 initial_stake_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
                 operator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 voter: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -1213,9 +1213,9 @@ mod decoder {
         }
     }
 
-    pub fn stake_initialize_validator(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeInitializeValidator {
+    pub fn stake_initialize_validator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeInitializeValidator {
                 consensus_pubkey: bcs::from_bytes(script.args().get(0)?).ok()?,
                 proof_of_possession: bcs::from_bytes(script.args().get(1)?).ok()?,
                 network_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -1226,9 +1226,9 @@ mod decoder {
         }
     }
 
-    pub fn stake_join_validator_set(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeJoinValidatorSet {
+    pub fn stake_join_validator_set(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeJoinValidatorSet {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -1236,9 +1236,9 @@ mod decoder {
         }
     }
 
-    pub fn stake_leave_validator_set(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeLeaveValidatorSet {
+    pub fn stake_leave_validator_set(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeLeaveValidatorSet {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -1246,9 +1246,9 @@ mod decoder {
         }
     }
 
-    pub fn stake_reactivate_stake(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeReactivateStake {
+    pub fn stake_reactivate_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeReactivateStake {
                 amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -1256,9 +1256,9 @@ mod decoder {
         }
     }
 
-    pub fn stake_rotate_consensus_key(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeRotateConsensusKey {
+    pub fn stake_rotate_consensus_key(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeRotateConsensusKey {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_consensus_pubkey: bcs::from_bytes(script.args().get(1)?).ok()?,
                 proof_of_possession: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -1268,9 +1268,9 @@ mod decoder {
         }
     }
 
-    pub fn stake_set_delegated_voter(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeSetDelegatedVoter {
+    pub fn stake_set_delegated_voter(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeSetDelegatedVoter {
                 new_delegated_voter: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -1278,9 +1278,9 @@ mod decoder {
         }
     }
 
-    pub fn stake_set_operator(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeSetOperator {
+    pub fn stake_set_operator(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeSetOperator {
                 new_operator: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -1288,9 +1288,9 @@ mod decoder {
         }
     }
 
-    pub fn stake_unlock(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeUnlock {
+    pub fn stake_unlock(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeUnlock {
                 amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -1300,9 +1300,9 @@ mod decoder {
 
     pub fn stake_update_network_and_fullnode_addresses(
         payload: &TransactionPayload,
-    ) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeUpdateNetworkAndFullnodeAddresses {
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeUpdateNetworkAndFullnodeAddresses {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 new_network_addresses: bcs::from_bytes(script.args().get(1)?).ok()?,
                 new_fullnode_addresses: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -1312,9 +1312,9 @@ mod decoder {
         }
     }
 
-    pub fn stake_withdraw(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::StakeWithdraw {
+    pub fn stake_withdraw(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::StakeWithdraw {
                 withdraw_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -1322,9 +1322,9 @@ mod decoder {
         }
     }
 
-    pub fn version_set_version(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
-        if let TransactionPayload::ScriptFunction(script) = payload {
-            Some(ScriptFunctionCall::VersionSetVersion {
+    pub fn version_set_version(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VersionSetVersion {
                 major: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
@@ -1333,18 +1333,18 @@ mod decoder {
     }
 }
 
-type ScriptFunctionDecoderMap = std::collections::HashMap<
+type EntryFunctionDecoderMap = std::collections::HashMap<
     String,
     Box<
-        dyn Fn(&TransactionPayload) -> Option<ScriptFunctionCall>
+        dyn Fn(&TransactionPayload) -> Option<EntryFunctionCall>
             + std::marker::Sync
             + std::marker::Send,
     >,
 >;
 
-static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderMap> =
+static entry_function_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMap> =
     once_cell::sync::Lazy::new(|| {
-        let mut map: ScriptFunctionDecoderMap = std::collections::HashMap::new();
+        let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
         map.insert(
             "account_create_account".to_string(),
             Box::new(decoder::account_create_account),

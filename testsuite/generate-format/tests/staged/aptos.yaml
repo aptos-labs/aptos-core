@@ -114,7 +114,7 @@ Script:
     - args:
         SEQ:
           TYPENAME: TransactionArgument
-ScriptFunction:
+EntryFunction:
   STRUCT:
     - module:
         TYPENAME: ModuleId
@@ -240,9 +240,9 @@ TransactionPayload:
         NEWTYPE:
           TYPENAME: ModuleBundle
     3:
-      ScriptFunction:
+      EntryFunction:
         NEWTYPE:
-          TYPENAME: ScriptFunction
+          TYPENAME: EntryFunction
 TypeTag:
   ENUM:
     0:

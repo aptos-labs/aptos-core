@@ -99,7 +99,7 @@ impl CliCommand<Transaction> for SubmitProposal {
         prompt_yes_with_override("Do you want to submit this proposal?", self.prompt_options)?;
 
         self.txn_options
-            .submit_script_function(
+            .submit_entry_function(
                 AccountAddress::ONE,
                 "aptos_governance",
                 "create_proposal",
@@ -151,7 +151,7 @@ impl CliCommand<Transaction> for SubmitVote {
         )?;
 
         self.txn_options
-            .submit_script_function(
+            .submit_entry_function(
                 AccountAddress::ONE,
                 "aptos_governance",
                 "vote",

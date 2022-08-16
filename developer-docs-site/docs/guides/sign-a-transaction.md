@@ -178,7 +178,7 @@ interface ModuleId {
   name: string
 }
 
-interface ScriptFunction {
+interface EntryFunction {
   module: ModuleId,
   function: string,
   ty_args: string[],
@@ -188,7 +188,7 @@ interface ScriptFunction {
 interface RawTransaction {
   sender: AccountAddress,
   sequence_number: number,
-  payload: ScriptFunction,
+  payload: EntryFunction,
   max_gas_amount: number,
   gas_unit_price: number,
   expiration_timestamp_secs: number,
@@ -196,7 +196,7 @@ interface RawTransaction {
 }
 
 function createRawTransaction(): RawTransaction {
-  const payload: ScriptFunction = {
+  const payload: EntryFunction = {
     module: {
       address: hexToAccountAddress("0x01"),
       name: "AptosCoin"

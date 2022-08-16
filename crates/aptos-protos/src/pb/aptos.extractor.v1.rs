@@ -365,7 +365,7 @@ pub mod transaction_payload {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Type {
-        ScriptFunctionPayload = 0,
+        EntryFunctionPayload = 0,
         ScriptPayload = 1,
         ModuleBundlePayload = 2,
         WriteSetPayload = 3,
@@ -377,7 +377,7 @@ pub mod transaction_payload {
         /// (if the ProtoBuf definition does not change) and safe for programmatic use.
         pub fn as_str_name(&self) -> &'static str {
             match self {
-                Type::ScriptFunctionPayload => "SCRIPT_FUNCTION_PAYLOAD",
+                Type::EntryFunctionPayload => "entry_function_PAYLOAD",
                 Type::ScriptPayload => "SCRIPT_PAYLOAD",
                 Type::ModuleBundlePayload => "MODULE_BUNDLE_PAYLOAD",
                 Type::WriteSetPayload => "WRITE_SET_PAYLOAD",
@@ -387,7 +387,7 @@ pub mod transaction_payload {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Payload {
         #[prost(message, tag = "2")]
-        ScriptFunctionPayload(super::ScriptFunctionPayload),
+        EntryFunctionPayload(super::EntryFunctionPayload),
         #[prost(message, tag = "3")]
         ScriptPayload(super::ScriptPayload),
         #[prost(message, tag = "4")]
@@ -397,9 +397,9 @@ pub mod transaction_payload {
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ScriptFunctionPayload {
+pub struct EntryFunctionPayload {
     #[prost(message, optional, tag = "1")]
-    pub function: ::core::option::Option<ScriptFunctionId>,
+    pub function: ::core::option::Option<EntryFunctionId>,
     #[prost(message, repeated, tag = "2")]
     pub type_arguments: ::prost::alloc::vec::Vec<MoveType>,
     #[prost(string, repeated, tag = "3")]
@@ -552,7 +552,7 @@ pub struct WriteSetPayload {
     pub write_set: ::core::option::Option<WriteSet>,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ScriptFunctionId {
+pub struct EntryFunctionId {
     #[prost(message, optional, tag = "1")]
     pub module: ::core::option::Option<MoveModuleId>,
     #[prost(string, tag = "2")]
