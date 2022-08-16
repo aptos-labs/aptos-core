@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::interface::system_metrics::SystemMetricsThreshold;
 use crate::{
     AptosPublicInfo, ChainInfo, FullNode, NodeExt, Result, SwarmChaos, Validator, Version,
 };
@@ -84,6 +85,13 @@ pub trait Swarm: Sync {
 
     async fn ensure_no_validator_restart(&mut self) -> Result<()>;
     async fn ensure_no_fullnode_restart(&mut self) -> Result<()>;
+
+    async fn ensure_healthy_system_metrics(
+        &mut self,
+        start_time: i64,
+        end_time: i64,
+        threshold: SystemMetricsThreshold,
+    ) -> Result<()>;
 
     // Get prometheus metrics from the swarm
     async fn query_metrics(

@@ -5,7 +5,7 @@ use anyhow::{format_err, Result};
 use aptos_logger::Level;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{move_types::account_address::AccountAddress, transaction_builder::aptos_stdlib};
-use forge::success_criteria::SuccessCriteria;
+use forge::perf_success_criteria::SuccessCriteria;
 use forge::{ForgeConfig, Options, *};
 use std::convert::TryInto;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -429,7 +429,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
     let config =
         ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(30).unwrap());
     let single_test_suite = match test_name {
-        "bench" => config.with_network_tests(&[&PerformanceBenchmark]),
         "state_sync" => config
             .with_initial_fullnode_count(1)
             .with_network_tests(&[&StateSyncPerformance]),

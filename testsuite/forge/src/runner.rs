@@ -13,7 +13,7 @@ use structopt::{clap::arg_enum, StructOpt};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
 // TODO going to remove random seed once cluster deployment supports re-run genesis
-use crate::success_criteria::SuccessCriteria;
+use crate::perf_success_criteria::SuccessCriteria;
 use rand::rngs::OsRng;
 
 #[derive(Debug, StructOpt)]
