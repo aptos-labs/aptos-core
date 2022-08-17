@@ -13,7 +13,9 @@ pub use stored_package::*;
 use crate::common::types::MoveManifestAccountWrapper;
 use crate::common::types::{ProfileOptions, RestOptions};
 use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current, write_to_file};
-use crate::move_tool::manifest::{Dependency, MovePackageManifest, PackageInfo};
+use crate::move_tool::manifest::{
+    Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo,
+};
 use crate::{
     common::{
         types::{
@@ -120,50 +122,67 @@ impl CliCommand<()> for InitPackage {
 
     async fn execute(self) -> CliTypedResult<()> {
         let package_dir = dir_default_to_current(self.package_dir.clone())?;
-        let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
-        check_if_file_exists(move_toml.as_path(), self.prompt_options)?;
-        create_dir_if_not_exist(
-            package_dir
-                .join(SourcePackageLayout::Sources.path())
-                .as_path(),
-        )?;
-
         let addresses = self
             .named_addresses
             .clone()
             .into_iter()
             .map(|(key, value)| (key, value.account_address.into()))
             .collect();
-        let mut dependencies = BTreeMap::new();
-        dependencies.insert(
-            "AptosFramework".to_string(),
-            Dependency {
-                local: None,
-                git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
-                rev: Some("devnet".to_string()),
-                subdir: Some("aptos-move/framework/aptos-framework".to_string()),
-                aptos: None,
-                address: None,
-            },
-        );
-        let manifest = MovePackageManifest {
-            package: PackageInfo {
-                name: self.name,
-                version: "0.0.0".to_string(),
-                author: None,
-            },
-            addresses,
-            dependencies,
-        };
 
-        write_to_file(
-            move_toml.as_path(),
-            SourcePackageLayout::Manifest.location_str(),
-            toml::to_string_pretty(&manifest)
-                .map_err(|err| CliError::UnexpectedError(err.to_string()))?
-                .as_bytes(),
+        init_move_dir(
+            package_dir.as_path(),
+            &self.name,
+            "devnet",
+            addresses,
+            self.prompt_options,
         )
     }
+}
+
+pub fn init_move_dir(
+    package_dir: &Path,
+    name: &str,
+    rev: &str,
+    addresses: BTreeMap<String, ManifestNamedAddress>,
+    prompt_options: PromptOptions,
+) -> CliTypedResult<()> {
+    let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
+    check_if_file_exists(move_toml.as_path(), prompt_options)?;
+    create_dir_if_not_exist(
+        package_dir
+            .join(SourcePackageLayout::Sources.path())
+            .as_path(),
+    )?;
+
+    let mut dependencies = BTreeMap::new();
+    dependencies.insert(
+        "AptosFramework".to_string(),
+        Dependency {
+            local: None,
+            git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
+            rev: Some(rev.to_string()),
+            subdir: Some("aptos-move/framework/aptos-framework".to_string()),
+            aptos: None,
+            address: None,
+        },
+    );
+    let manifest = MovePackageManifest {
+        package: PackageInfo {
+            name: name.to_string(),
+            version: "1.0.0".to_string(),
+            author: None,
+        },
+        addresses,
+        dependencies,
+    };
+
+    write_to_file(
+        move_toml.as_path(),
+        SourcePackageLayout::Manifest.location_str(),
+        toml::to_string_pretty(&manifest)
+            .map_err(|err| CliError::UnexpectedError(err.to_string()))?
+            .as_bytes(),
+    )
 }
 
 /// Compiles a package and returns the [`ModuleId`]s
