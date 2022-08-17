@@ -585,14 +585,16 @@ pub struct RunFunction {
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
     #[clap(long)]
     pub(crate) function_id: MemberId,
-    /// Hex encoded arguments separated by spaces.
+    /// Arguments combined with their type separated by spaces.
     ///
-    /// Example: `0x01 0x02 0x03`
+    /// Supported types [u8, u64, u128, bool, hex, string, address]
+    ///
+    /// Example: `address:0x1 bool:true u8:0`
     #[clap(long, multiple_values = true)]
     pub(crate) args: Vec<ArgWithType>,
     /// TypeTag arguments separated by spaces.
     ///
-    /// Example: `u8 u64 u128 bool address vector true false signer`
+    /// Example: `u8 u64 u128 bool address vector signer`
     #[clap(long, multiple_values = true)]
     pub(crate) type_args: Vec<MoveType>,
 }

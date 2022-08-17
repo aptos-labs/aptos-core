@@ -154,6 +154,7 @@ fn read_hex_hash(str: &str) -> CliTypedResult<HashValue> {
     HashValue::from_hex(hex).map_err(|err| CliError::CommandArgumentError(err.to_string()))
 }
 
+/// Submit a vote on a current proposal
 #[derive(Parser)]
 pub struct SubmitVote {
     /// Id of proposal to vote on
@@ -240,6 +241,9 @@ pub struct ScriptHash {
     bytecode: String,
 }
 
+/// Prepare a proposal for voting
+///
+/// This builds a hash from a voting proposal source
 #[derive(Parser)]
 pub struct PrepareProposal {
     /// Path to the Move package that contains the execution script
@@ -298,15 +302,18 @@ impl CliCommand<ScriptHash> for PrepareProposal {
     }
 }
 
+/// Execute a proposal that has passed voting requirements
 #[derive(Parser)]
 pub struct ExecuteProposal {
     /// Path to the compiled script file
     #[clap(long, parse(from_os_str))]
     pub path: PathBuf,
 
-    /// Hex encoded arguments separated by spaces.
+    /// Arguments combined with their type separated by spaces.
     ///
-    /// Example: `0x01 0x02 0x03`
+    /// Supported types [u8, u64, u128, bool, hex, string, address]
+    ///
+    /// Example: `address:0x1 bool:true u8:0`
     #[clap(long, multiple_values = true)]
     pub(crate) args: Vec<ArgWithType>,
 
