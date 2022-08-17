@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod aptos_debug_natives;
-mod built_package;
-pub use built_package::*;
 mod manifest;
 pub mod package_hooks;
 pub use package_hooks::*;
@@ -35,6 +33,7 @@ use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload}
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
 use framework::natives::code::UpgradePolicy;
+use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
 use move_deps::move_cli::base::test::UnitTestResult;
 use move_deps::{
@@ -275,7 +274,7 @@ pub struct ProvePackage {
     #[clap(flatten)]
     move_options: MovePackageDir,
 
-    /// A filter string to determine which unit tests to run
+    /// A filter string to determine which files to verify
     #[clap(long)]
     pub filter: Option<String>,
 }
@@ -307,7 +306,7 @@ impl CliCommand<&'static str> for ProvePackage {
 
         match result {
             Ok(_) => Ok("Success"),
-            Err(err) => Err(CliError::MoveProverError(err.to_string())),
+            Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),
         }
     }
 }
@@ -352,7 +351,12 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             legacy_flow,
             upgrade_policy,
         } = self;
-        let package = BuiltPackage::build(move_options, true, true)?;
+        let package_path = move_options.get_package_path()?;
+        let options = BuildOptions {
+            named_addresses: move_options.named_addresses(),
+            ..BuildOptions::default()
+        };
+        let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
         if legacy_flow {
             if upgrade_policy.is_some() {

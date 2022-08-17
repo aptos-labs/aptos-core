@@ -1,18 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos::{
-    common::types::MovePackageDir,
-    move_tool::{BuiltPackage, MemberId},
-};
+use aptos::move_tool::MemberId;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     state_store::state_key::StateKey,
     transaction::{ScriptFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
-use cached_framework_packages::aptos_stdlib;
+use framework::aptos_stdlib;
 use framework::natives::code::UpgradePolicy;
+use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
@@ -75,9 +73,14 @@ impl MoveHarness {
         let acc = Account::new_genesis_account(addr);
         // Mint the account 10M Aptos coins (with 8 decimals).
         let data = AccountData::with_account(acc, 1_000_000_000_000_000, 10);
-        self.txn_seq_no.insert(addr, 10);
         self.executor.add_account_data(&data);
+        self.txn_seq_no.insert(addr, 10);
         data.account().clone()
+    }
+
+    /// Gets the account where the Aptos framework is installed (0x1).
+    pub fn aptos_framework_account(&mut self) -> Account {
+        self.new_account_at(AccountAddress::ONE)
     }
 
     /// Runs a signed transaction. On success, applies the write set.
@@ -174,7 +177,7 @@ impl MoveHarness {
         path: &Path,
         upgrade_policy: UpgradePolicy,
     ) -> SignedTransaction {
-        let package = BuiltPackage::build(MovePackageDir::new(path.to_owned()), true, false)
+        let package = BuiltPackage::build(path.to_owned(), BuildOptions::default())
             .expect("building package must succeed");
         let code = package.extract_code();
         let metadata = package

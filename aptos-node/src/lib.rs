@@ -35,6 +35,7 @@ use data_streaming_service::{
 };
 use event_notifications::EventSubscriptionService;
 use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
+use framework::ReleaseBundle;
 use futures::channel::mpsc::channel;
 use hex::FromHex;
 use mempool_notifications::MempoolNotificationSender;
@@ -93,11 +94,9 @@ pub struct AptosNodeArgs {
     #[clap(long, requires("test"))]
     random_ports: bool,
 
-    /// Paths to Aptos framework module blobs to be included in genesis.
-    ///
-    /// Can be both files and directories
+    /// Paths to the Aptos framework release package to be used for genesis.
     #[clap(long, requires("test"))]
-    genesis_modules: Option<Vec<PathBuf>>,
+    genesis_framework: Option<PathBuf>,
 
     /// Enable lazy mode
     ///
@@ -115,17 +114,17 @@ impl AptosNodeArgs {
                 .seed
                 .map(StdRng::from_seed)
                 .unwrap_or_else(StdRng::from_entropy);
-            let genesis_modules = if let Some(module_paths) = self.genesis_modules {
-                framework::load_modules_from_paths(&module_paths)
+            let genesis_framework = if let Some(path) = self.genesis_framework {
+                ReleaseBundle::read(path).unwrap()
             } else {
-                cached_framework_packages::module_blobs().to_vec()
+                framework::head_release_bundle().clone()
             };
             load_test_environment(
                 self.config,
                 self.test_dir,
                 self.random_ports,
                 self.lazy,
-                genesis_modules,
+                &genesis_framework,
                 rng,
             )
             .expect("Test mode should start correctly");
@@ -207,7 +206,7 @@ pub fn load_test_environment<R>(
     test_dir: Option<PathBuf>,
     random_ports: bool,
     lazy: bool,
-    genesis_modules: Vec<Vec<u8>>,
+    framework: &ReleaseBundle,
     rng: R,
 ) -> anyhow::Result<()>
 where
@@ -253,7 +252,7 @@ where
         }
 
         // Build genesis and validator node
-        let builder = aptos_genesis::builder::Builder::new(&test_dir, genesis_modules)?
+        let builder = aptos_genesis::builder::Builder::new(&test_dir, framework.clone())?
             .with_init_config(Some(Arc::new(move |_, config, _| {
                 *config = template.clone();
             })))

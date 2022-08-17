@@ -215,7 +215,7 @@ fn main() -> Result<()> {
                 end,
                 if reload_stdlib {
                     let mut change_set = ChangeSet::new();
-                    for module in framework::aptos::modules() {
+                    for module in framework::head_release_bundle().compiled_modules() {
                         let mut bytes = vec![];
                         module.serialize(&mut bytes)?;
                         change_set.add_module_op(module.self_id(), Op::New(bytes))?;

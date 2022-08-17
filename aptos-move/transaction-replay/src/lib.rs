@@ -423,8 +423,8 @@ fn compile_move_script(file_path: &str) -> Result<Vec<u8>> {
 
     let (files, units_or_diags) = Compiler::from_files(
         cur_path,
-        framework::aptos::files(),
-        framework::aptos::named_addresses(),
+        framework::head_release_bundle().files().unwrap(),
+        framework::named_addresses().clone(),
     )
     .set_flags(Flags::empty().set_sources_shadow_deps(false))
     .build()?;

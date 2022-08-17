@@ -142,13 +142,13 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
         ));
     }
 
-    let modules = client.get_modules("framework")?;
+    let framework = client.get_framework()?;
 
     Ok(GenesisInfo::new(
         layout.chain_id,
         layout.root_key.unwrap(),
         validators,
-        modules,
+        framework,
         &GenesisConfiguration {
             allow_new_validators: layout.allow_new_validators,
             epoch_duration_secs: layout.epoch_duration_secs,

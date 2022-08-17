@@ -18,6 +18,7 @@ use aptos_sdk::{
         PeerId,
     },
 };
+use framework::ReleaseBundle;
 use prometheus_http_query::response::PromqlResult;
 use std::{
     collections::HashMap,
@@ -102,7 +103,7 @@ impl LocalSwarm {
         init_config: Option<InitConfigFn>,
         init_genesis_config: Option<InitGenesisConfigFn>,
         dir: Option<PathBuf>,
-        genesis_modules: Option<Vec<Vec<u8>>>,
+        genesis_framework: Option<ReleaseBundle>,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
@@ -121,8 +122,7 @@ impl LocalSwarm {
         let (root_key, genesis, genesis_waypoint, validators) =
             aptos_genesis::builder::Builder::new(
                 &dir_actual,
-                genesis_modules
-                    .unwrap_or_else(|| cached_framework_packages::module_blobs().to_vec()),
+                genesis_framework.unwrap_or_else(|| framework::head_release_bundle().clone()),
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(

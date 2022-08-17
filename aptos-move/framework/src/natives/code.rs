@@ -24,45 +24,48 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 /// The package registry at the given address.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PackageRegistry {
     /// Packages installed at this address.
     pub packages: Vec<PackageMetadata>,
 }
 
 /// The PackageMetadata type.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PackageMetadata {
     /// Name of this package.
     pub name: String,
     /// The upgrade policy of this package.
     pub upgrade_policy: UpgradePolicy,
+    /// The numbers of times this module has been upgraded. Also serves as the on-chain version.
+    /// This field will be automatically assigned on successful upgrade.
+    pub upgrade_counter: u64,
     /// Build info, in BuildInfo.yaml format
     pub build_info: String,
     /// The package manifest, in the Move.toml format.
     pub manifest: String,
     /// The list of modules installed by this package.
     pub modules: Vec<ModuleMetadata>,
-    /// Error map, in internal encoding
+    /// Error map, in BCS
     #[serde(with = "serde_bytes")]
     pub error_map: Vec<u8>,
+    /// ABIs, in BCS encoding
+    pub abis: Vec<Vec<u8>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModuleMetadata {
     /// Name of the module.
     pub name: String,
-    /// Source text if available.
-    pub source: String,
-    /// Source map, in internal encoding.
+    /// Source text if available, in gzipped form.
+    #[serde(with = "serde_bytes")]
+    pub source: Vec<u8>,
+    /// Source map, in BCS encoding, then gzipped.
     #[serde(with = "serde_bytes")]
     pub source_map: Vec<u8>,
-    /// ABI, in JSON byte encoding.
-    #[serde(with = "serde_bytes")]
-    pub abi: Vec<u8>,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UpgradePolicy {
     pub policy: u8,
 }

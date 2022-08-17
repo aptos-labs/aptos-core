@@ -80,8 +80,8 @@ pub fn main() {
     let ws = vm_genesis::generate_genesis_change_set_for_testing(vm_genesis::GenesisOptions::Fresh);
 
     let mut storage = InMemoryStorage::new();
-    for (blob, module) in cached_framework_packages::modules_with_blobs() {
-        storage.publish_or_overwrite_module(module.self_id(), blob.clone())
+    for (blob, module) in framework::head_release_bundle().code_and_compiled_modules() {
+        storage.publish_or_overwrite_module(module.self_id(), blob.to_vec())
     }
 
     if args.all || arg_count == 3 {

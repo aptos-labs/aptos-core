@@ -145,15 +145,9 @@ COPY --link --from=builder /aptos/dist/aptos /usr/local/bin/aptos
 COPY --link --from=builder /aptos/dist/aptos-openapi-spec-generator /usr/local/bin/aptos-openapi-spec-generator
 COPY --link --from=builder /aptos/dist/transaction-emitter /usr/local/bin/transaction-emitter
 
-### Get Aptos Move modules bytecodes for genesis ceremony
-RUN mkdir -p /aptos-framework/move/build
-RUN mkdir -p /aptos-framework/move/modules
-COPY --link --from=builder /aptos/aptos-framework/releases/artifacts/current/build /aptos-framework/move/build
-COPY --link --from=builder /aptos/aptos-token/releases/artifacts/current/build /aptos-framework/move/build
-
-RUN mv /aptos-framework/move/build/**/bytecode_modules/*.mv /aptos-framework/move/modules
-RUN mv /aptos-framework/move/build/AptosFramework/bytecode_modules/dependencies/**/*.mv /aptos-framework/move/modules
-RUN rm -rf /aptos-framework/move/build
+### Get Aptos Move releases for genesis ceremony
+RUN mkdir -p /aptos-framework/move
+COPY --link --from=builder /aptos/aptos-move/framework/releases/head.mrb /aptos-framework/move/head.mrb
 
 # add build info
 ARG BUILD_DATE

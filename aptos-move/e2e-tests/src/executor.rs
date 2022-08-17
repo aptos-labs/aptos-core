@@ -43,6 +43,7 @@ use aptos_vm::{
     parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
 };
+use framework::ReleaseBundle;
 use move_deps::{
     move_core_types::{
         account_address::AccountAddress,
@@ -189,19 +190,16 @@ impl FakeExecutor {
     /// initialization done.
     pub fn stdlib_only_genesis() -> Self {
         let mut genesis = Self::no_genesis();
-        let blobs = cached_framework_packages::module_blobs();
-        let modules = cached_framework_packages::modules();
-        assert!(blobs.len() == modules.len());
-        for (module, bytes) in modules.iter().zip(blobs) {
+        for (bytes, module) in framework::head_release_bundle().code_and_compiled_modules() {
             let id = module.self_id();
             genesis.add_module(&id, bytes.to_vec());
         }
         genesis
     }
 
-    /// Creates fresh genesis from the stdlib modules passed in.
-    pub fn custom_genesis(genesis_modules: &[Vec<u8>], validator_accounts: Option<usize>) -> Self {
-        let genesis = vm_genesis::generate_test_genesis(genesis_modules, validator_accounts);
+    /// Creates fresh genesis from the framework passed in.
+    pub fn custom_genesis(framework: &ReleaseBundle, validator_accounts: Option<usize>) -> Self {
+        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts);
         Self::from_genesis(genesis.0.write_set())
     }
 

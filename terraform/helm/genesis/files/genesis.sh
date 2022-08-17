@@ -10,13 +10,13 @@
 # USERNAME_PREFIX: default aptos-node
 # VALIDATOR_INTERNAL_HOST_SUFFIX: default validator-lb
 # FULLNODE_INTERNAL_HOST_SUFFIX: default fullnode-lb
-# 
+#
 
 WORKSPACE=${WORKSPACE:-/tmp}
 USERNAME_PREFIX=${USERNAME_PREFIX:-aptos-node}
 VALIDATOR_INTERNAL_HOST_SUFFIX=${VALIDATOR_INTERNAL_HOST_SUFFIX:-validator-lb}
 FULLNODE_INTERNAL_HOST_SUFFIX=${FULLNODE_INTERNAL_HOST_SUFFIX:-fullnode-lb}
-MOVE_MODULES_DIR=${MOVE_MODULES_DIR:-"/aptos-framework/move/modules"}
+MOVE_FRAMEWORK_DIR=${MOVE_FRAMEWORK_DIR:-"/aptos-framework/move"}
 STAKE_AMOUNT=${STAKE_AMOUNT:-1}
 
 if [ -z ${ERA} ] || [ -z ${NUM_VALIDATORS} ]; then
@@ -67,7 +67,7 @@ done
 
 # get the framework
 # this is the directory the aptos-framework is located in the aptoslabs/tools docker image
-cp -R $MOVE_MODULES_DIR ${WORKSPACE}/framework
+cp $MOVE_FRAMEWORK_DIR/head.mrb ${WORKSPACE}/framework.mrb
 
 # run genesis
 aptos genesis generate-genesis --local-repository-dir ${WORKSPACE} --output-dir ${WORKSPACE}

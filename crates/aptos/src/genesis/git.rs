@@ -14,6 +14,7 @@ use aptos_genesis::config::Layout;
 use aptos_github_client::Client as GithubClient;
 use async_trait::async_trait;
 use clap::Parser;
+use framework::ReleaseBundle;
 use serde::{de::DeserializeOwned, Serialize};
 use std::path::Path;
 use std::{fmt::Debug, io::Read, path::PathBuf, str::FromStr};
@@ -21,7 +22,7 @@ use std::{fmt::Debug, io::Read, path::PathBuf, str::FromStr};
 pub const LAYOUT_FILE: &str = "layout.yaml";
 pub const OPERATOR_FILE: &str = "operator.yaml";
 pub const OWNER_FILE: &str = "owner.yaml";
-pub const FRAMEWORK_DIR: &str = "framework";
+pub const FRAMEWORK_NAME: &str = "framework.mrb";
 
 /// Setup a shared Git repository for Genesis
 ///
@@ -49,9 +50,6 @@ impl CliCommand<()> for SetupGit {
         // Upload layout file to ensure we can read later
         let client = self.git_options.get_client()?;
         client.put(Path::new(LAYOUT_FILE), &layout)?;
-
-        // Make a place for the modules to be uploaded
-        client.create_dir(Path::new(FRAMEWORK_DIR))?;
 
         Ok(())
     }
@@ -198,50 +196,17 @@ impl Client {
         Ok(())
     }
 
-    /// Retrieve bytecode Move modules from a module folder
-    pub fn get_modules(&self, name: &str) -> CliTypedResult<Vec<Vec<u8>>> {
-        let mut modules = Vec::new();
-
+    /// Retrieve framework release bundle.
+    pub fn get_framework(&self) -> CliTypedResult<ReleaseBundle> {
         match self {
-            Client::Local(local_repository_path) => {
-                let module_folder = local_repository_path.join(name);
-                if !module_folder.is_dir() {
-                    return Err(CliError::UnexpectedError(format!(
-                        "{} is not a directory!",
-                        module_folder.display()
-                    )));
-                }
-
-                let files = std::fs::read_dir(module_folder.as_path())
-                    .map_err(|e| CliError::IO(module_folder.display().to_string(), e))?;
-
-                for maybe_file in files {
-                    let file = maybe_file
-                        .map_err(|e| CliError::UnexpectedError(e.to_string()))?
-                        .path();
-                    let extension = file.extension();
-
-                    // Only collect move files
-                    if file.is_file() && extension.is_some() && extension.unwrap() == "mv" {
-                        modules.push(
-                            std::fs::read(file.as_path())
-                                .map_err(|e| CliError::IO(file.display().to_string(), e))?,
-                        );
-                    }
-                }
-            }
+            Client::Local(local_repository_path) => Ok(ReleaseBundle::read(
+                local_repository_path.join(FRAMEWORK_NAME),
+            )?),
             Client::Github(client) => {
-                let files = client.get_directory(name)?;
-
-                for file in files {
-                    // Only collect .mv files
-                    if file.ends_with(".mv") {
-                        modules.push(base64::decode(client.get_file(&file)?)?)
-                    }
-                }
+                let bytes = base64::decode(client.get_file(FRAMEWORK_NAME)?)?;
+                Ok(bcs::from_bytes::<ReleaseBundle>(&bytes)?)
             }
         }
-        Ok(modules)
     }
 }
 

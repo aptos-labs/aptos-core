@@ -10,6 +10,7 @@ use aptos_logger::info;
 use aptos_types::{account_config::aptos_test_root_address, chain_id::ChainId};
 use forge::Node;
 use forge::{Factory, LocalFactory, LocalSwarm};
+use framework::ReleaseBundle;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
 use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
@@ -18,7 +19,7 @@ use tokio::task::JoinHandle;
 pub struct SwarmBuilder {
     local: bool,
     num_validators: NonZeroUsize,
-    genesis_modules: Option<Vec<Vec<u8>>>,
+    genesis_framework: Option<ReleaseBundle>,
     init_config: Option<InitConfigFn>,
     init_genesis_config: Option<InitGenesisConfigFn>,
 }
@@ -28,7 +29,7 @@ impl SwarmBuilder {
         Self {
             local,
             num_validators: NonZeroUsize::new(num_validators).unwrap(),
-            genesis_modules: None,
+            genesis_framework: None,
             init_config: None,
             init_genesis_config: None,
         }
@@ -39,7 +40,7 @@ impl SwarmBuilder {
     }
 
     pub fn with_aptos(mut self) -> Self {
-        self.genesis_modules = Some(cached_framework_packages::module_blobs().to_vec());
+        self.genesis_framework = Some(framework::head_release_bundle().clone());
         self
     }
 
@@ -73,7 +74,7 @@ impl SwarmBuilder {
                 OsRng,
                 self.num_validators,
                 &version,
-                self.genesis_modules,
+                self.genesis_framework,
                 self.init_config,
                 Some(Arc::new(move |genesis_config| {
                     if let Some(init_genesis_config) = &init_genesis_config {

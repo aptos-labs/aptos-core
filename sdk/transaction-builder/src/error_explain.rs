@@ -7,29 +7,14 @@
 //! Note that the ~13 KiB error descriptions will be inlined into the final binary.
 
 use move_deps::move_core_types::errmap::ErrorDescription;
-use move_deps::move_core_types::{errmap::ErrorMapping, language_storage::ModuleId};
-use once_cell::sync::Lazy;
-
-static RELEASE_ERRMAP: Lazy<Vec<ErrorMapping>> = Lazy::new(|| {
-    let error_map = cached_framework_packages::error_map();
-    error_map
-        .iter()
-        .map(|e| bcs::from_bytes(e).expect("Failed to deserialize static error descriptions"))
-        .collect()
-});
+use move_deps::move_core_types::language_storage::ModuleId;
 
 /// Given the module ID and the abort code raised from that module, returns the
 /// human-readable explanation of that abort if possible.
 pub fn get_explanation(module_id: &ModuleId, abort_code: u64) -> Option<ErrorDescription> {
-    let errmap = &*RELEASE_ERRMAP;
-    errmap
-        .iter()
-        .find_map(|e| e.get_explanation(module_id, abort_code))
-        .or_else(|| {
-            errmap
-                .iter()
-                .find_map(|e| e.get_explanation(module_id, abort_code & 0xffff))
-        })
+    framework::head_release_bundle()
+        .error_mapping()
+        .get_explanation(module_id, abort_code & 0xffff)
 }
 
 #[cfg(test)]
