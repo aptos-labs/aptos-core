@@ -192,8 +192,9 @@ impl ValidatorVerifier {
     }
 
     // Generates a multi signature or aggregate signature
-    // from partial signatures without actually verifying it.
-    pub fn aggregate_signature(
+    // from partial signatures as well as returns the aggregated pub key along with
+    // list of pub keys used in signature aggregation.
+    pub fn aggregate_signatures_and_get_keys(
         &self,
         partial_signatures: &PartialSignatures,
     ) -> Result<(AggregateSignature, PublicKey, Vec<&PublicKey>), VerifyError> {
@@ -230,7 +231,8 @@ impl ValidatorVerifier {
         partial_signatures: &PartialSignatures,
         message: &T,
     ) -> Result<AggregateSignature, VerifyError> {
-        let (aggregated_sig, aggregated_key, _) = self.aggregate_signature(partial_signatures)?;
+        let (aggregated_sig, aggregated_key, _) =
+            self.aggregate_signatures_and_get_keys(partial_signatures)?;
         // Verify the multi-signature. Please note that the verification is not really needed here
         // because we already verify signatures from validators individually, This is just good to have for now.
         // but will be needed once we support optimistic aggregation of signatures.
@@ -250,7 +252,7 @@ impl ValidatorVerifier {
         verify: bool,
     ) -> Result<AggregateSignature, VerifyError> {
         let (aggregated_sig, _aggregated_key, public_keys) =
-            self.aggregate_signature(partial_signatures)?;
+            self.aggregate_signatures_and_get_keys(partial_signatures)?;
         // Verify the aggregated signature. Please note that the verification is not really needed here
         // because we already verify signatures from validators individually, This is just good to have for now.
         // but will be needed once we support optimistic aggregation of signatures.
@@ -643,7 +645,9 @@ mod tests {
         let mut partial_sig = PartialSignatures::empty();
         partial_sig.add_signature(unknown_validator_signer.author(), unknown_signature);
 
-        let (multi_sig, _, _) = unknown_validator.aggregate_signature(&partial_sig).unwrap();
+        let (multi_sig, _, _) = unknown_validator
+            .aggregate_signatures_and_get_keys(&partial_sig)
+            .unwrap();
 
         assert_eq!(
             validator.verify_multi_signatures(&dummy_struct, &multi_sig),
@@ -719,7 +723,7 @@ mod tests {
                 .expect("Incorrect quorum size.");
 
         let mut aggregated_signature = validator_verifier
-            .aggregate_signature(&partial_signature)
+            .aggregate_signatures_and_get_keys(&partial_signature)
             .unwrap()
             .0;
         assert_eq!(
@@ -739,7 +743,7 @@ mod tests {
             .add_signature(unknown_validator_signer.author(), unknown_signature.clone());
 
         assert_eq!(
-            validator_verifier.aggregate_signature(&partial_signature),
+            validator_verifier.aggregate_signatures_and_get_keys(&partial_signature),
             Err(VerifyError::UnknownAuthor)
         );
 
@@ -749,7 +753,7 @@ mod tests {
             partial_signature.add_signature(validator.author(), validator.sign(&dummy_struct));
         }
         aggregated_signature = validator_verifier
-            .aggregate_signature(&partial_signature)
+            .aggregate_signatures_and_get_keys(&partial_signature)
             .unwrap()
             .0;
         assert_eq!(
@@ -767,7 +771,7 @@ mod tests {
             .add_signature(unknown_validator_signer.author(), unknown_signature.clone());
 
         assert_eq!(
-            validator_verifier.aggregate_signature(&partial_signature),
+            validator_verifier.aggregate_signatures_and_get_keys(&partial_signature),
             Err(VerifyError::UnknownAuthor)
         );
 
@@ -777,7 +781,7 @@ mod tests {
             partial_signature.add_signature(validator.author(), validator.sign(&dummy_struct));
         }
         aggregated_signature = validator_verifier
-            .aggregate_signature(&partial_signature)
+            .aggregate_signatures_and_get_keys(&partial_signature)
             .unwrap()
             .0;
         assert_eq!(
@@ -795,7 +799,7 @@ mod tests {
         // Add an unknown signer, we have 5 signers, but one of them is invalid; this will fail.
         partial_signature.add_signature(unknown_validator_signer.author(), unknown_signature);
         assert_eq!(
-            validator_verifier.aggregate_signature(&partial_signature),
+            validator_verifier.aggregate_signatures_and_get_keys(&partial_signature),
             Err(VerifyError::UnknownAuthor)
         );
     }
@@ -831,7 +835,7 @@ mod tests {
                 .expect("Incorrect quorum size.");
 
         let mut aggregated_signature = validator_verifier
-            .aggregate_signature(&partial_signature)
+            .aggregate_signatures_and_get_keys(&partial_signature)
             .unwrap()
             .0;
 
@@ -848,7 +852,7 @@ mod tests {
             .add_signature(unknown_validator_signer.author(), unknown_signature.clone());
 
         assert_eq!(
-            validator_verifier.aggregate_signature(&partial_signature),
+            validator_verifier.aggregate_signatures_and_get_keys(&partial_signature),
             Err(VerifyError::UnknownAuthor)
         );
 
@@ -859,7 +863,7 @@ mod tests {
         }
 
         aggregated_signature = validator_verifier
-            .aggregate_signature(&partial_signature)
+            .aggregate_signatures_and_get_keys(&partial_signature)
             .unwrap()
             .0;
 
@@ -873,7 +877,7 @@ mod tests {
         partial_signature
             .add_signature(unknown_validator_signer.author(), unknown_signature.clone());
         assert_eq!(
-            validator_verifier.aggregate_signature(&partial_signature),
+            validator_verifier.aggregate_signatures_and_get_keys(&partial_signature),
             Err(VerifyError::UnknownAuthor)
         );
 
@@ -883,7 +887,7 @@ mod tests {
             partial_signature.add_signature(validator.author(), validator.sign(&dummy_struct));
         }
         aggregated_signature = validator_verifier
-            .aggregate_signature(&partial_signature)
+            .aggregate_signatures_and_get_keys(&partial_signature)
             .unwrap()
             .0;
         assert_eq!(
@@ -897,7 +901,7 @@ mod tests {
         // Add an unknown signer, we have 5 signers, but one of them is invalid; this will fail.
         partial_signature.add_signature(unknown_validator_signer.author(), unknown_signature);
         assert_eq!(
-            validator_verifier.aggregate_signature(&partial_signature),
+            validator_verifier.aggregate_signatures_and_get_keys(&partial_signature),
             Err(VerifyError::UnknownAuthor)
         );
     }
