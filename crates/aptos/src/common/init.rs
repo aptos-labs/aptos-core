@@ -28,12 +28,15 @@ pub struct InitTool {
     /// URL to a fullnode on the network
     #[clap(long)]
     pub rest_url: Option<Url>,
+
     /// URL for the Faucet endpoint
     #[clap(long)]
     pub faucet_url: Option<Url>,
+
     /// Whether to skip the faucet for a non-faucet endpoint
     #[clap(long)]
     pub skip_faucet: bool,
+
     #[clap(flatten)]
     pub rng_args: RngArgs,
     #[clap(flatten)]

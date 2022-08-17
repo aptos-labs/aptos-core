@@ -52,6 +52,7 @@ pub struct GenerateShellCompletions {
     /// Shell to generate completions for one of [bash, elvish, powershell, zsh]
     #[clap(long)]
     shell: Shell,
+
     /// File to output shell completions to
     #[clap(long, parse(from_os_str))]
     output_file: PathBuf,

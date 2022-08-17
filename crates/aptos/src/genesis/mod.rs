@@ -60,13 +60,14 @@ impl GenesisTool {
 /// Generate genesis from a git repository
 #[derive(Parser)]
 pub struct GenerateGenesis {
+    /// Output directory for Genesis file and waypoint
+    #[clap(long, parse(from_os_str))]
+    output_dir: Option<PathBuf>,
+
     #[clap(flatten)]
     prompt_options: PromptOptions,
     #[clap(flatten)]
     git_options: GitOptions,
-    /// Output directory for Genesis file and waypoint
-    #[clap(long, parse(from_os_str))]
-    output_dir: Option<PathBuf>,
 }
 
 #[async_trait]

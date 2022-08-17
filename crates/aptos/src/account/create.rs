@@ -14,11 +14,12 @@ pub const DEFAULT_FUNDED_COINS: u64 = 10_000;
 ///
 #[derive(Debug, Parser)]
 pub struct CreateAccount {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
     /// Address of the new account
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]

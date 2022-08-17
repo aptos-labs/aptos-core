@@ -39,11 +39,12 @@ impl StakeTool {
 /// Stake coins for an account to the stake pool
 #[derive(Parser)]
 pub struct AddStake {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
     /// Amount of coins to add to stake
     #[clap(long)]
     pub amount: u64,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
