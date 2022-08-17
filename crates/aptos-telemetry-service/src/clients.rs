@@ -107,8 +107,9 @@ impl VictoriaMetricsClient {
             .collect();
 
         self.inner
-            .post(format!("{}/api/v1/import/prometheus", self.base_url))
+            .post(format!("{}api/v1/import/prometheus", self.base_url))
             .bearer_auth(self.auth_token.clone())
+            .header("Content-Encoding", "gzip")
             .query(&labels)
             .body(raw_metrics_body)
             .send()

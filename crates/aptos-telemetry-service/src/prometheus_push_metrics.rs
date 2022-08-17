@@ -7,7 +7,7 @@ use aptos_logger::{debug, error};
 use warp::{filters::BoxedFilter, hyper::body::Bytes, reply, Filter, Rejection, Reply};
 
 pub fn metrics_ingest(context: Context) -> BoxedFilter<(impl Reply,)> {
-    warp::path!("metrics-ingest")
+    warp::path!("push-metrics")
         .and(warp::post())
         .and(context.clone().filter())
         .and(with_auth(
@@ -27,7 +27,9 @@ pub async fn handle_metrics_ingest(
     let extra_labels = vec![
         format!("peer_id={}", claims.peer_id),
         format!("peer_role={}", claims.peer_role as u16),
-        format!("chain_id={}", claims.chain_id),
+        format!("chain_name={}", claims.chain_id),
+        format!("namespace={}", "telemetry-service"),
+        format!("kubernetes_pod_name={}/{}", claims.peer_role as u16, claims.peer_id),
     ];
 
     let res = context
