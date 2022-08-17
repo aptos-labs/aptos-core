@@ -114,9 +114,22 @@ impl CliCommand<Transaction> for SubmitProposal {
                 err
             ))
         })?;
+        Url::parse(&metadata.source_code_url).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Source code URL {} is invalid {}",
+                metadata.source_code_url, err
+            ))
+        })?;
+        Url::parse(&metadata.discussion_url).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Discussion URL {} is invalid {}",
+                metadata.discussion_url, err
+            ))
+        })?;
+
         let metadata_hash = HashValue::sha3_256_of(&bytes);
 
-        println!("{}", metadata);
+        println!("{}, Hash: {}", metadata, metadata_hash);
         prompt_yes_with_override("Do you want to submit this proposal?", self.prompt_options)?;
 
         self.txn_options
@@ -193,16 +206,16 @@ impl CliCommand<Transaction> for SubmitVote {
 pub struct ProposalMetadata {
     title: String,
     description: String,
-    script_url: String,
-    script_hash: String,
+    source_code_url: String,
+    discussion_url: String,
 }
 
 impl std::fmt::Display for ProposalMetadata {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Proposal:\n\tTitle:{}\n\tDescription:{}\n\tScript URL:{}\n\tScript hash:{}",
-            self.title, self.description, self.script_url, self.script_hash
+            "Proposal:\n\tTitle:{}\n\tDescription:{}\n\tSource code URL:{}\n\tDiscussion URL:{}",
+            self.title, self.description, self.source_code_url, self.discussion_url
         )
     }
 }
