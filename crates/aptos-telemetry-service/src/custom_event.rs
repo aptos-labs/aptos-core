@@ -39,9 +39,10 @@ pub async fn handle_custom_event(
     body: TelemetryDump,
 ) -> anyhow::Result<impl Reply, Rejection> {
     if body.user_id != claims.peer_id.to_string() {
-        return Err(reject::custom(ServiceError::bad_request(
-            "user_id in event does not match peer_id",
-        )));
+        return Err(reject::custom(ServiceError::bad_request(format!(
+            "user_id {} in event does not match peer_id {}",
+            body.user_id, claims.peer_id
+        ))));
     }
 
     if body.events.is_empty() {

@@ -90,9 +90,10 @@ pub async fn handle_auth(context: Context, body: AuthRequest) -> Result<impl Rep
                 "Validator set unavailable for Chain ID {}. Rejecting request.",
                 body.chain_id
             );
-            Err(reject::custom(ServiceError::unauthorized(
-                "unable to authenticate",
-            )))
+            Err(reject::custom(ServiceError::unauthorized(format!(
+                "unable to authenticate: validator set unavailable for supplied chain id {}",
+                body.chain_id
+            ))))
         }
     }?;
 
