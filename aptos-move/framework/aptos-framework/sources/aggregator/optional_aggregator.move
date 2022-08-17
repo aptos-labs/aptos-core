@@ -219,7 +219,7 @@ module aptos_framework::optional_aggregator {
     }
 
     #[test(account = @aptos_framework)]
-    fun optional_aggregator_destriy_test(account: signer) {
+    fun optional_aggregator_destroy_test(account: signer) {
         aggregator_factory::initialize_aggregator_factory(&account);
 
         let aggregator = new(30, false);
