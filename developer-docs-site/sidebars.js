@@ -50,6 +50,7 @@ const sidebars = {
         "concepts/basics-fullnodes",
         "concepts/basics-validator-nodes",
         "concepts/basics-node-networks-sync",
+        "concepts/staking",
       ],
     },
     {
@@ -134,7 +135,6 @@ const sidebars = {
         },
         "nodes/node-health-checker",
         "nodes/node-health-checker-faq",
-        "nodes/staking",
       ],
     },
     {

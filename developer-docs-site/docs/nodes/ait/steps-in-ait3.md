@@ -95,7 +95,7 @@ Proceed to the below steps only if your node has passed the NHC for AIT-3 and yo
 
   :::tip Read the Staking document
 
-  Make sure you read the [Staking](/nodes/staking) documentation before proceeding further. 
+  Make sure you read the [Staking](/concepts/staking) documentation before proceeding further. 
   :::
 
   You will begin by initializing the staking pool and delegating to the operator and the voter. 
