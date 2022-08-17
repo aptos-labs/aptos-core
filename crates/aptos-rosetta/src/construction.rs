@@ -270,6 +270,7 @@ async fn construction_metadata(
             sequence_number,
             max_gas: request.options.max_gas,
             gas_price_per_unit: request.options.gas_price_per_unit,
+            expiry_time: request.options.expiry_time,
         },
         suggested_fee: None,
     })
@@ -487,9 +488,13 @@ async fn construction_payloads(
     };
 
     // Build the transaction and make it ready for signing
-    let transaction_factory = TransactionFactory::new(server_context.chain_id)
+    let mut transaction_factory = TransactionFactory::new(server_context.chain_id)
         .with_gas_unit_price(metadata.gas_price_per_unit)
         .with_max_gas_amount(metadata.max_gas);
+    if let Some(expiry_time) = metadata.expiry_time {
+        transaction_factory = transaction_factory.with_transaction_expiration_time(expiry_time);
+    }
+
     let sequence_number = metadata.sequence_number;
     let unsigned_transaction = transaction_factory
         .payload(txn_payload)
@@ -558,6 +563,7 @@ async fn construction_preprocess(
             internal_operation,
             max_gas,
             gas_price_per_unit,
+            expiry_time: request.metadata.and_then(|inner| inner.expiry_time),
         }),
         required_public_keys: Some(required_public_keys),
     })
