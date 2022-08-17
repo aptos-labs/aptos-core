@@ -39,8 +39,8 @@ async fn test_move_compile_flow() {
     let manifest = parse_move_manifest_from_file(move_dir.join("Move.toml").as_path())
         .expect("Expect a Move.toml file");
     assert_eq!(manifest.package.name.as_str(), PACKAGE_NAME);
-    // Expect "0.0.0"
-    assert_eq!(manifest.package.version.0, 0);
+    // Expect "1.0.0"
+    assert_eq!(manifest.package.version.0, 1);
     assert_eq!(manifest.package.version.1, 0);
     assert_eq!(manifest.package.version.2, 0);
 
