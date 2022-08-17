@@ -267,6 +267,7 @@ async fn get_balance(
 
 /// This test tests all of Rosetta's functionality from the read side in one go.  Since
 /// it's block based and it needs time to run, we do all the checks in a single test.
+#[ignore]
 #[tokio::test]
 async fn test_block() {
     let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 5).await;

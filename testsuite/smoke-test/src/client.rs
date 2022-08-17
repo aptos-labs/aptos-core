@@ -14,7 +14,6 @@ use std::time::{Duration, Instant};
 #[tokio::test]
 async fn test_create_mint_transfer_block_metadata() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
-
     // This script does 4 transactions
     check_create_mint_transfer(&mut swarm).await;
 
