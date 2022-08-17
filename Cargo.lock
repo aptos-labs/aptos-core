@@ -1288,27 +1288,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-transaction-replay"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-gas",
- "aptos-resource-viewer",
- "aptos-state-view",
- "aptos-types",
- "aptos-validator-interface",
- "aptos-vm",
- "aptosdb",
- "bcs",
- "difference",
- "framework",
- "hex",
- "move-deps",
- "structopt 0.3.26",
- "vm-genesis",
-]
-
-[[package]]
 name = "aptos-transactional-test-harness"
 version = "0.1.0"
 dependencies = [
