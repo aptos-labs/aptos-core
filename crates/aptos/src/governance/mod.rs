@@ -60,19 +60,20 @@ impl GovernanceTool {
 /// Submit proposal to other validators to be proposed on
 #[derive(Parser)]
 pub struct SubmitProposal {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-    #[clap(flatten)]
-    pub(crate) pool_address_args: PoolAddressArgs,
     /// Execution hash of the script to be voted on
     #[clap(long, parse(try_from_str = read_hex_hash))]
     pub(crate) execution_hash: HashValue,
+
     /// Code location of the script to be voted on
     #[clap(long)]
     pub(crate) metadata_url: Url,
 
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+    #[clap(flatten)]
+    pub(crate) pool_address_args: PoolAddressArgs,
 }
 
 #[async_trait]
@@ -142,18 +143,20 @@ fn read_hex_hash(str: &str) -> CliTypedResult<HashValue> {
 
 #[derive(Parser)]
 pub struct SubmitVote {
+    /// Id of proposal to vote on
+    #[clap(long)]
+    pub(crate) proposal_id: u64,
+
+    /// Vote choice. True for yes. False for no.
+    #[clap(long)]
+    pub(crate) should_pass: bool,
+
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) pool_address_args: PoolAddressArgs,
-    /// Id of proposal to vote on
-    #[clap(long)]
-    pub(crate) proposal_id: u64,
-    /// Vote choice. True for yes. False for no.
-    #[clap(long)]
-    pub(crate) should_pass: bool,
-    #[clap(flatten)]
-    pub(crate) prompt_options: PromptOptions,
 }
 
 #[async_trait]
@@ -270,9 +273,6 @@ impl CliCommand<ScriptHash> for PrepareProposal {
 
 #[derive(Parser)]
 pub struct ExecuteProposal {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-
     /// Path to the compiled script file
     #[clap(long, parse(from_os_str))]
     pub path: PathBuf,
@@ -282,11 +282,15 @@ pub struct ExecuteProposal {
     /// Example: `0x01 0x02 0x03`
     #[clap(long, multiple_values = true)]
     pub(crate) args: Vec<ArgWithType>,
+
     /// TypeTag arguments separated by spaces.
     ///
     /// Example: `u8 u64 u128 bool address vector true false signer`
     #[clap(long, multiple_values = true)]
     pub(crate) type_args: Vec<MoveType>,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 impl TryFrom<&ArgWithType> for TransactionArgument {

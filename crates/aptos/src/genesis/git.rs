@@ -82,12 +82,15 @@ pub struct GitOptions {
     /// Github repository e.g. 'aptos-labs/aptos-core'
     #[clap(long)]
     pub(crate) github_repository: Option<GithubRepo>,
+
     /// Github repository branch e.g. main
     #[clap(long, default_value = "main")]
     pub(crate) github_branch: String,
+
     /// Path to Github API token.  Token must have repo:* permissions
     #[clap(long, parse(from_os_str))]
     pub(crate) github_token_file: Option<PathBuf>,
+
     /// Path to local git repository
     #[clap(long, parse(from_os_str))]
     pub(crate) local_repository_dir: Option<PathBuf>,

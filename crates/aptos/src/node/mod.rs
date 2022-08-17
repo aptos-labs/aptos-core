@@ -219,7 +219,6 @@ impl ValidatorNetworkAddressesArgs {
 pub struct InitializeValidator {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-
     #[clap(flatten)]
     pub(crate) validator_config_file_args: ValidatorConfigFileArgs,
     #[clap(flatten)]
@@ -599,10 +598,8 @@ impl CliCommand<()> for RunLocalTestnet {
 pub struct UpdateConsensusKey {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-
     #[clap(flatten)]
     pub(crate) operator_args: OperatorArgs,
-
     #[clap(flatten)]
     pub(crate) validator_config_file_args: ValidatorConfigFileArgs,
     #[clap(flatten)]
@@ -642,10 +639,8 @@ impl CliCommand<Transaction> for UpdateConsensusKey {
 pub struct UpdateValidatorNetworkAddresses {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-
     #[clap(flatten)]
     pub(crate) operator_args: OperatorArgs,
-
     #[clap(flatten)]
     pub(crate) validator_config_file_args: ValidatorConfigFileArgs,
     #[clap(flatten)]
@@ -697,18 +692,25 @@ impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
     }
 }
 
+/// Tool to analyze the performance of an individual validator
 #[derive(Parser)]
 pub struct AnalyzeValidatorPerformance {
+    /// First epoch to analyze
     #[clap(long)]
     pub start_epoch: Option<u64>,
+
+    /// Last epoch to analyze
     #[clap(long)]
     pub end_epoch: Option<u64>,
+
+    /// Analyze mode for the validator: [All, DetailedEpochTable, ValidatorHealthOverTime, NetworkHealthOverTime]
+    #[clap(arg_enum, long)]
+    pub(crate) analyze_mode: AnalyzeMode,
+
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
-    #[clap(arg_enum, long)]
-    pub(crate) analyze_mode: AnalyzeMode,
 }
 
 #[derive(PartialEq, clap::ArgEnum, Clone)]

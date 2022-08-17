@@ -27,15 +27,16 @@ const VFN_FILE: &str = "validator-full-node-identity.yaml";
 /// Generate account key, consensus key, and network key for a validator
 #[derive(Parser)]
 pub struct GenerateKeys {
+    /// Output directory for the key files
+    #[clap(long, parse(from_os_str))]
+    pub(crate) output_dir: Option<PathBuf>,
+
     #[clap(flatten)]
     pub(crate) pool_address_args: OptionalPoolAddressArgs,
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
     #[clap(flatten)]
     pub rng_args: RngArgs,
-    /// Output directory for the key files
-    #[clap(long, parse(from_os_str))]
-    pub(crate) output_dir: Option<PathBuf>,
 }
 
 #[async_trait]

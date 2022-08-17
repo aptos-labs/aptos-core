@@ -20,9 +20,6 @@ use std::str::FromStr;
 /// 2. Use a faucet to create the account
 #[derive(Debug, Parser)]
 pub struct CreateResourceAccount {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-
     /// Resource account seed
     ///
     /// Seed used in generation of the AccountId of the resource account
@@ -33,6 +30,9 @@ pub struct CreateResourceAccount {
     /// Optional Resource Account authentication key.
     #[clap(long, parse(try_from_str = AuthenticationKey::from_str))]
     pub(crate) authentication_key: Option<AuthenticationKey>,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 /// A shortened create resource account output

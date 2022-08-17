@@ -18,9 +18,6 @@ use std::collections::BTreeMap;
 ///
 #[derive(Debug, Parser)]
 pub struct TransferCoins {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-
     /// Address of account you want to send coins to
     #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
@@ -28,6 +25,9 @@ pub struct TransferCoins {
     /// Amount of coins to transfer
     #[clap(long)]
     pub(crate) amount: u64,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
