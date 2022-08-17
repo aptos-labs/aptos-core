@@ -8,6 +8,7 @@ use aptos::test::INVALID_ACCOUNT;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_config::config::PersistableConfig;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
+use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::HashValue;
 use aptos_rest_client::aptos_api_types::UserTransaction;
 use aptos_rest_client::Transaction;
@@ -28,6 +29,7 @@ use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
 use forge::{LocalSwarm, Node, NodeExt};
 use std::collections::BTreeMap;
 use std::str::FromStr;
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{future::Future, time::Duration};
 use tokio::{task::JoinHandle, time::Instant};
 
@@ -277,28 +279,151 @@ async fn test_block() {
     // Mapping of account to block and balance mappings
     let mut balances = BTreeMap::<AccountAddress, BTreeMap<u64, u64>>::new();
 
+    // Wait until the Rosetta service is ready
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(chain_id),
+    };
+
+    loop {
+        let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+            .await
+            .unwrap();
+        if status.current_block_identifier.index >= 2 {
+            break;
+        }
+    }
+
     // Do some transfers
-    // TODO: Convert these to operations made by Rosetta
-    cli.transfer_coins(0, 1, 20, None)
-        .await
-        .expect("Should transfer coins");
-    cli.transfer_coins(1, 0, 20, None)
-        .await
-        .expect("Should transfer coins");
-    cli.transfer_invalid_addr(2, 20, None)
-        .await
-        .expect_err("Should fail transaction");
-    cli.transfer_coins(3, 0, 20, None)
-        .await
-        .expect("Should transfer coins");
-    let summary = cli
-        .transfer_coins(1, 3, 20, None)
-        .await
-        .expect("Should transfer coins");
+    let account_id_0 = cli.account_id(0);
+    let account_id_1 = cli.account_id(1);
+    let account_id_3 = cli.account_id(3);
+
+    cli.fund_account(0, Some(10000000)).await.unwrap();
+    cli.fund_account(1, Some(10000000)).await.unwrap();
+    cli.fund_account(2, Some(10000000)).await.unwrap();
+    cli.fund_account(3, Some(10000000)).await.unwrap();
+
+    let private_key_0 = cli.private_key(0);
+    let private_key_1 = cli.private_key(1);
+    let private_key_2 = cli.private_key(2);
+    let private_key_3 = cli.private_key(3);
+    let network_identifier = chain_id.into();
+    let seq_no_0 = transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_0,
+        account_id_1,
+        20,
+        Duration::from_secs(5),
+        None,
+    )
+    .await
+    .unwrap()
+    .request
+    .sequence_number
+    .0;
+
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_1,
+        account_id_0,
+        20,
+        Duration::from_secs(5),
+        None,
+    )
+    .await
+    .unwrap();
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_0,
+        account_id_0,
+        20,
+        Duration::from_secs(5),
+        Some(seq_no_0 + 1),
+    )
+    .await
+    .unwrap();
+    // Create a new account via transfer
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_2,
+        AccountAddress::from_hex_literal(INVALID_ACCOUNT).unwrap(),
+        20,
+        Duration::from_secs(5),
+        None,
+    )
+    .await
+    .unwrap();
+    let seq_no_3 = transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        account_id_0,
+        20,
+        Duration::from_secs(5),
+        None,
+    )
+    .await
+    .unwrap()
+    .request
+    .sequence_number
+    .0;
+
+    // Create another account via command
+    create_account_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_3,
+        AccountAddress::from_hex_literal("0x99").unwrap(),
+        Duration::from_secs(5),
+        Some(seq_no_3 + 1),
+    )
+    .await
+    .unwrap();
+
+    transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_1,
+        account_id_3,
+        20,
+        Duration::from_secs(5),
+        // Test the default behavior
+        None,
+    )
+    .await
+    .unwrap();
+
+    // This one will fail
+    let final_txn = transfer_and_wait(
+        &rosetta_client,
+        &rest_client,
+        &network_identifier,
+        private_key_1,
+        AccountAddress::ONE,
+        20,
+        Duration::from_secs(5),
+        None,
+    )
+    .await
+    .unwrap_err();
+
     let final_block_to_check = rest_client
-        .get_block_by_version(summary.version, false)
+        .get_block_by_version(final_txn.info.version.0, false)
         .await
         .expect("Should be able to get block info for completed txns");
+
+    // Check a couple blocks past the final transaction to check more txns
     let final_block_height = final_block_to_check.into_inner().block_height.0 + 2;
 
     // TODO: Track total supply?
@@ -930,4 +1055,93 @@ where
     }
 
     result
+}
+
+async fn create_account_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    new_account: AccountAddress,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .create_account(
+            network_identifier,
+            sender_key,
+            new_account,
+            expiry_time.as_secs(),
+            sequence_number,
+        )
+        .await
+        .expect("Expect transfer to successfully submit to mempool")
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash).await
+}
+
+async fn transfer_and_wait(
+    rosetta_client: &RosettaClient,
+    rest_client: &aptos_rest_client::Client,
+    network_identifier: &NetworkIdentifier,
+    sender_key: &Ed25519PrivateKey,
+    receiver: AccountAddress,
+    amount: u64,
+    txn_expiry_duration: Duration,
+    sequence_number: Option<u64>,
+) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
+    let expiry_time = expiry_time(txn_expiry_duration);
+    let txn_hash = rosetta_client
+        .transfer(
+            network_identifier,
+            sender_key,
+            receiver,
+            amount,
+            expiry_time.as_secs(),
+            sequence_number,
+        )
+        .await
+        .expect("Expect transfer to successfully submit to mempool")
+        .hash;
+    wait_for_transaction(rest_client, expiry_time, txn_hash).await
+}
+
+async fn wait_for_transaction(
+    rest_client: &aptos_rest_client::Client,
+    expiry_time: Duration,
+    txn_hash: String,
+) -> Result<Box<UserTransaction>, Box<UserTransaction>> {
+    let hash_value = HashValue::from_str(&txn_hash).unwrap();
+    let response = rest_client
+        .wait_for_transaction_by_hash(hash_value, expiry_time.as_secs())
+        .await;
+    match response {
+        Ok(response) => {
+            if let Transaction::UserTransaction(txn) = response.into_inner() {
+                Ok(txn)
+            } else {
+                panic!("Transaction is supposed to be a UserTransaction!")
+            }
+        }
+        Err(_) => {
+            if let Transaction::UserTransaction(txn) = rest_client
+                .get_transaction_by_hash(hash_value)
+                .await
+                .unwrap()
+                .into_inner()
+            {
+                Err(txn)
+            } else {
+                panic!("Failed transaction is supposed to be a UserTransaction!");
+            }
+        }
+    }
+}
+
+fn expiry_time(txn_expiry_duration: Duration) -> Duration {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .saturating_add(txn_expiry_duration)
 }
