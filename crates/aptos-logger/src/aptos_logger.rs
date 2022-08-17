@@ -583,7 +583,7 @@ impl Writer for StdoutWriter {
     }
     fn write_buferred(&mut self, log: String) {
         self.buffer
-            .write_fmt(format_args!("{}", log))
+            .write_fmt(format_args!("{}\n", log))
             .unwrap_or_default();
     }
 }
