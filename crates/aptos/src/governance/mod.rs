@@ -97,7 +97,7 @@ impl CliCommand<Transaction> for SubmitProposal {
                 vec![],
                 vec![
                     bcs::to_bytes(&self.pool_address_args.pool_address)?,
-                    bcs::to_bytes(&self.execution_hash.to_hex())?,
+                    bcs::to_bytes(&self.execution_hash)?,
                     bcs::to_bytes(&self.metadata_url.to_string())?,
                     bcs::to_bytes(&metadata_hash.to_hex())?,
                 ],
