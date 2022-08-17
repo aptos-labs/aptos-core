@@ -5,7 +5,6 @@
 use crate::{models::transactions::Transaction, schema::signatures};
 use aptos_crypto::HashValue;
 use aptos_protos::block_output::v1::SignatureOutput;
-use aptos_rest_client::aptos_api_types::HexEncodedBytes;
 use serde::Serialize;
 
 #[derive(Associations, Clone, Debug, Identifiable, Insertable, Queryable, Serialize)]
@@ -23,7 +22,7 @@ pub struct Signature {
     pub type_: String,
     pub public_key: String,
     pub threshold: i64,
-    pub bitmap: String,
+    pub public_key_indices: serde_json::Value,
     // Default time columns
     pub inserted_at: chrono::NaiveDateTime,
 }
@@ -42,7 +41,7 @@ impl Signature {
                 .unwrap()
                 .to_string(),
             threshold: signature.threshold as i64,
-            bitmap: HexEncodedBytes::from(signature.bitmap.clone()).to_string(),
+            public_key_indices: serde_json::to_value(signature.public_key_indices.clone()).unwrap(),
             inserted_at: chrono::Utc::now().naive_utc(),
         }
     }

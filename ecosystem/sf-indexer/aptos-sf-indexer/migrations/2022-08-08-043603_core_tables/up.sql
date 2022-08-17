@@ -174,7 +174,7 @@ CREATE TABLE signatures (
   type VARCHAR(255) NOT NULL,
   public_key VARCHAR(255) NOT NULL,
   threshold BIGINT NOT NULL,
-  bitmap VARCHAR(255) NOT NULL,
+  public_key_indices jsonb NOT NULL,
   inserted_at TIMESTAMP NOT NULL DEFAULT NOW(),
   -- Constraints
   PRIMARY KEY (

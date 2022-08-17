@@ -87,7 +87,7 @@ table! {
         type_ -> Varchar,
         public_key -> Varchar,
         threshold -> Int8,
-        bitmap -> Varchar,
+        public_key_indices -> Jsonb,
         inserted_at -> Timestamp,
     }
 }

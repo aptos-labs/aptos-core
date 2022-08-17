@@ -67,7 +67,6 @@ async fn main() -> Result<(), Error> {
         info!("Could not fetch max block so starting from block 0");
         0
     });
-    let start_block = 62;
     info!("Starting stream from block {}", start_block);
 
     let mut stream = SubstreamsStream::new(
@@ -76,7 +75,7 @@ async fn main() -> Result<(), Error> {
         package.modules.clone(),
         substream_module_name.to_string(),
         start_block,
-        start_block + 1,
+        start_block + 500,
     );
 
     let mut block_height = start_block as u64;

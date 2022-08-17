@@ -152,11 +152,11 @@ fn insert_user_transactions_w_sigs(conn: &PgPoolConnection, txn_details: &[Trans
                 sig_schema::type_.eq(excluded(sig_schema::type_)),
                 sig_schema::public_key.eq(excluded(sig_schema::public_key)),
                 sig_schema::threshold.eq(excluded(sig_schema::threshold)),
-                sig_schema::bitmap.eq(excluded(sig_schema::bitmap)),
+                sig_schema::public_key_indices.eq(excluded(sig_schema::public_key_indices)),
                 sig_schema::inserted_at.eq(excluded(sig_schema::inserted_at)),
             )),
     )
-    .expect("Error inserting user transactions into database");
+    .expect("Error inserting signatures into database");
 }
 
 /// This will insert all block metadata transactions within a block
