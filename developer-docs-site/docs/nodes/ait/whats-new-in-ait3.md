@@ -16,7 +16,7 @@ Several new features are up for testing by the AIT-3 participants. See below:
 
 ### Aptos Wallet
 
-- The new Aptos Wallet, available as a Chrome webapp extension. You will use this Wallet to participate in staking and governance in AIT-3.
+- The new Aptos Wallet, available as a Chrome webapp extension. You will use this Wallet to participate in staking and governance in AIT-3. 
 
 ### Owner, operator and voter personas
 
@@ -62,6 +62,6 @@ To participate in testing the staking and the governance features in the AIT-3, 
 - **Operator**: If you are the owner, then, using your owner key, you will select the specific operator and you will:
   - Manage the settings for the specific validator, and
   - Delegate the stake pool to the validator.
-  - The operator public key is same key you (owner) used while registering your validator node with the Aptos Community Platform. This is the  `validator_network_public_key` from the "aptosbot.yaml" file for the validator.
+  - The operator public key is same key you (owner) used while registering your validator node with the Aptos Community Platform. This is the  `account_public_key` from the "aptosbot.yaml" file for the validator.
 - **Voter**: You will use the voter key to sign the governance votes in the transactions.
 
