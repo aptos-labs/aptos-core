@@ -27,7 +27,7 @@ use aptos_logger::prelude::*;
 use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
 use aptos_types::chain_id::ChainId;
 
-use crate::constants::{PROMETHEUS_PUSH_METRICS_FREQ_SECS, ENV_TELEMETRY_SERVICE_URL};
+use crate::constants::{ENV_TELEMETRY_SERVICE_URL, PROMETHEUS_PUSH_METRICS_FREQ_SECS};
 use crate::{
     build_information::create_build_info_telemetry_event,
     constants::{

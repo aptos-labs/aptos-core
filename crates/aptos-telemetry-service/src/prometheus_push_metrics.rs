@@ -29,7 +29,10 @@ pub async fn handle_metrics_ingest(
         format!("peer_role={}", claims.peer_role as u16),
         format!("chain_name={}", claims.chain_id),
         format!("namespace={}", "telemetry-service"),
-        format!("kubernetes_pod_name={}/{}", claims.peer_role as u16, claims.peer_id),
+        format!(
+            "kubernetes_pod_name={}/{}",
+            claims.peer_role as u16, claims.peer_id
+        ),
     ];
 
     let res = context
