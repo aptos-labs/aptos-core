@@ -16,7 +16,7 @@ module aptos_framework::supply {
     }
 
     /// Creates a new supply tracker for `CoinType`.
-    public fun new<CoinType>(): Supply<CoinType> {
+    public(friend) fun new<CoinType>(): Supply<CoinType> {
         let type_info = type_info::type_of<CoinType>();
         let addr = type_info::account_address(&type_info);
         new_from_address(addr)
@@ -38,30 +38,24 @@ module aptos_framework::supply {
 
     /// Upgardes non-parallelizable supply to parallelizable. The owner of supply
     /// is responsible for calling this function.
-    public(friend) fun upgrade<CoinType>(supply: Supply<CoinType>): Supply<CoinType> {
+    public(friend) fun upgrade<CoinType>(supply: &mut Supply<CoinType>) {
         if (!optional_aggregator::is_parallelizable(&supply.inner)) {
-            // This supply uses a simple integer - upgrade.
-            let Supply { inner } = supply;
-            let inner =  optional_aggregator::switch(inner);
-            Supply { inner }
-        } else {
-            // Otherwise, upgarde is not-required.
-            supply
+            optional_aggregator::switch(&mut supply.inner);
         }
     }
 
     /// Adds `amount` to total supply of `CoinType`. Called when minting coins.
-    public fun add<CoinType>(supply: &mut Supply<CoinType>, amount: u128) {
+    public(friend) fun add<CoinType>(supply: &mut Supply<CoinType>, amount: u128) {
         optional_aggregator::add(&mut supply.inner, amount);
     }
 
     /// Subtracts `amount` from total supply of `CoinType`. Called when burning coins.
-    public fun sub<CoinType>(supply: &mut Supply<CoinType>, amount: u128) {
+    public(friend) fun sub<CoinType>(supply: &mut Supply<CoinType>, amount: u128) {
         optional_aggregator::sub(&mut supply.inner, amount);
     }
 
     /// Returns the total supply of `CoinType` in existence.
-    public fun read<CoinType>(supply: &Supply<CoinType>): u128 {
+    public(friend) fun read<CoinType>(supply: &Supply<CoinType>): u128 {
         optional_aggregator::read(&supply.inner)
     }
 

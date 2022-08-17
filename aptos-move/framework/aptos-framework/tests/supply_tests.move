@@ -49,15 +49,15 @@ module aptos_framework::supply_tests {
         assert!(supply::read(&slow_supply) == 1000, 0);
 
         // But if we upgrade, we should be able to get the parallelism.
-        let upgraded_supply = supply::upgrade(slow_supply);
-        assert!(supply::is_parallelizable(&upgraded_supply), 0);
+        supply::upgrade(&mut slow_supply);
+        assert!(supply::is_parallelizable(&slow_supply), 0);
 
-        supply::add(&mut upgraded_supply, 100);
-        supply::sub(&mut upgraded_supply, 50);
-        supply::add(&mut upgraded_supply, 950);
-        assert!(supply::read(&upgraded_supply) == 2000, 0);
+        supply::add(&mut slow_supply, 100);
+        supply::sub(&mut slow_supply, 50);
+        supply::add(&mut slow_supply, 950);
+        assert!(supply::read(&slow_supply) == 2000, 0);
 
         supply::drop_unchecked(fast_supply);
-        supply::drop_unchecked(upgraded_supply);
+        supply::drop_unchecked(slow_supply);
     }
 }
