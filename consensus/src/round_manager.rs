@@ -37,7 +37,7 @@ use consensus_types::{
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeoutWithSignatures,
+    timeout_2chain::TwoChainTimeoutCertificate,
     vote::Vote,
     vote_msg::VoteMsg,
 };
@@ -705,7 +705,7 @@ impl RoundManager {
 
     async fn new_2chain_tc_aggregated(
         &mut self,
-        tc: Arc<TwoChainTimeoutWithSignatures>,
+        tc: Arc<TwoChainTimeoutCertificate>,
     ) -> anyhow::Result<()> {
         let result = self
             .block_store

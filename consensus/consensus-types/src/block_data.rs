@@ -8,7 +8,7 @@ use crate::{
 };
 use aptos_crypto::hash::HashValue;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::aggregated_signature::AggregatedSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -155,7 +155,7 @@ impl BlockData {
             VoteData::new(ancestor.clone(), ancestor.clone()),
             LedgerInfoWithSignatures::new(
                 LedgerInfo::new(ancestor, HashValue::zero()),
-                AggregatedSignature::empty(),
+                AggregateSignature::empty(),
             ),
         );
 
@@ -259,7 +259,7 @@ fn test_reconfiguration_suffix() {
                 BlockInfo::genesis(HashValue::random(), ValidatorSet::empty()),
                 HashValue::zero(),
             ),
-            AggregatedSignature::empty(),
+            AggregateSignature::empty(),
         ),
     );
     let reconfig_suffix_block = BlockData::new_proposal(

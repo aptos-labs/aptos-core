@@ -14,7 +14,7 @@ use aptos_bitvec::BitVec;
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
-    aggregated_signature::PartialSignatures,
+    aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
     ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
     on_chain_config::ValidatorSet,

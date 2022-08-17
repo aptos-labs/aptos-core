@@ -1,9 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    common::Round, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutWithSignatures,
-};
+use crate::{common::Round, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate};
 use anyhow::{ensure, Context};
 use aptos_types::{block_info::BlockInfo, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
@@ -19,7 +17,7 @@ pub struct SyncInfo {
     /// Highest commit cert (ordered cert with execution result) known to the peer.
     highest_commit_cert: QuorumCert,
     /// Optional highest timeout certificate if available.
-    highest_2chain_timeout_cert: Option<TwoChainTimeoutWithSignatures>,
+    highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
 }
 
 // this is required by structured log
@@ -47,7 +45,7 @@ impl SyncInfo {
         highest_quorum_cert: QuorumCert,
         highest_ordered_cert: QuorumCert,
         highest_commit_cert: QuorumCert,
-        highest_2chain_timeout_cert: Option<TwoChainTimeoutWithSignatures>,
+        highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
     ) -> Self {
         // No need to include HTC if it's lower than HQC
         let highest_2chain_timeout_cert = highest_2chain_timeout_cert
@@ -67,7 +65,7 @@ impl SyncInfo {
     pub fn new(
         highest_quorum_cert: QuorumCert,
         highest_ordered_cert: QuorumCert,
-        highest_2chain_timeout_cert: Option<TwoChainTimeoutWithSignatures>,
+        highest_2chain_timeout_cert: Option<TwoChainTimeoutCertificate>,
     ) -> Self {
         let highest_commit_cert = highest_ordered_cert.clone();
         Self::new_decoupled(
@@ -96,7 +94,7 @@ impl SyncInfo {
     }
 
     /// Highest 2-chain timeout certificate
-    pub fn highest_2chain_timeout_cert(&self) -> Option<&TwoChainTimeoutWithSignatures> {
+    pub fn highest_2chain_timeout_cert(&self) -> Option<&TwoChainTimeoutCertificate> {
         self.highest_2chain_timeout_cert.as_ref()
     }
 

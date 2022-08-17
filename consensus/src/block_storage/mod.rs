@@ -5,7 +5,7 @@ use aptos_crypto::HashValue;
 pub use block_store::{sync_manager::BlockRetriever, BlockStore};
 use consensus_types::{
     executed_block::ExecutedBlock, quorum_cert::QuorumCert, sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeoutWithSignatures,
+    timeout_2chain::TwoChainTimeoutCertificate,
 };
 use std::sync::Arc;
 
@@ -49,7 +49,7 @@ pub trait BlockReader: Send + Sync {
     fn highest_ordered_cert(&self) -> Arc<QuorumCert>;
 
     /// Return the highest timeout certificate if available.
-    fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutWithSignatures>>;
+    fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutCertificate>>;
 
     /// Return the highest commit decision quorum certificate.
     fn highest_commit_cert(&self) -> Arc<QuorumCert>;

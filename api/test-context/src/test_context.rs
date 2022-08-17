@@ -39,7 +39,7 @@ use storage_interface::DbReaderWriter;
 
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_types::aggregated_signature::AggregatedSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use rand::SeedableRng;
 use serde_json::{json, Value};
 use std::{boxed::Box, iter::once, net::SocketAddr, sync::Arc, time::Duration};
@@ -578,6 +578,6 @@ impl TestContext {
             ),
             HashValue::zero(),
         );
-        LedgerInfoWithSignatures::new(info, AggregatedSignature::empty())
+        LedgerInfoWithSignatures::new(info, AggregateSignature::empty())
     }
 }

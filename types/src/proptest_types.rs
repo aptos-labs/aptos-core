@@ -6,7 +6,7 @@ use crate::{
     account_address::{self, AccountAddress},
     account_config::{AccountResource, CoinStoreResource},
     account_state::AccountState,
-    aggregated_signature::PartialSignatures,
+    aggregate_signature::PartialSignatures,
     block_info::{BlockInfo, Round},
     block_metadata::BlockMetadata,
     chain_id::ChainId,

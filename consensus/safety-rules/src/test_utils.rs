@@ -8,7 +8,7 @@ use crate::{
 use aptos_crypto::hash::{CryptoHash, TransactionAccumulatorHasher};
 use aptos_secure_storage::{InMemoryStorage, Storage};
 use aptos_types::{
-    aggregated_signature::{AggregatedSignature, PartialSignatures},
+    aggregate_signature::{AggregateSignature, PartialSignatures},
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
@@ -25,7 +25,7 @@ use consensus_types::{
     block::Block,
     common::{Payload, Round},
     quorum_cert::QuorumCert,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithSignatures},
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_data::VoteData,
     vote_proposal::VoteProposal,
@@ -44,7 +44,7 @@ pub fn make_genesis(signer: &ValidatorSigner) -> (EpochChangeProof, QuorumCert) 
     let li = LedgerInfo::mock_genesis(Some(validator_set));
     let block = Block::make_genesis_block_from_ledger_info(&li);
     let qc = QuorumCert::certificate_for_genesis_from_ledger_info(&li, block.id());
-    let lis = LedgerInfoWithSignatures::new(li, AggregatedSignature::empty());
+    let lis = LedgerInfoWithSignatures::new(li, AggregateSignature::empty());
     let proof = EpochChangeProof::new(vec![lis], false);
     (proof, qc)
 }
@@ -197,7 +197,7 @@ pub fn make_timeout_cert(
     round: Round,
     hqc: &QuorumCert,
     signer: &ValidatorSigner,
-) -> TwoChainTimeoutWithSignatures {
+) -> TwoChainTimeoutCertificate {
     let timeout = TwoChainTimeout::new(1, round, hqc.clone());
     let mut tc_partial = TwoChainTimeoutWithPartialSignatures::new(timeout.clone());
     let signature = timeout.sign(signer);

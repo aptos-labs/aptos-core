@@ -152,7 +152,7 @@ impl Display for LedgerInfoWithSignatures {
 
 // proxy to create LedgerInfoWithbls12381::
 impl LedgerInfoWithSignatures {
-    pub fn new(ledger_info: LedgerInfo, signatures: AggregatedSignature) -> Self {
+    pub fn new(ledger_info: LedgerInfo, signatures: AggregateSignature) -> Self {
         LedgerInfoWithSignatures::V0(LedgerInfoWithV0::new(ledger_info, signatures))
     }
 
@@ -218,7 +218,7 @@ pub struct LedgerInfoWithV0 {
     ledger_info: LedgerInfo,
     /// Aggregated BLS signature of all the validators that signed the message. The bitmask in the
     /// aggregated signature can be used to find out the individual validators signing the message
-    signatures: AggregatedSignature,
+    signatures: AggregateSignature,
 }
 
 impl Display for LedgerInfoWithV0 {
@@ -228,7 +228,7 @@ impl Display for LedgerInfoWithV0 {
 }
 
 impl LedgerInfoWithV0 {
-    pub fn new(ledger_info: LedgerInfo, signatures: AggregatedSignature) -> Self {
+    pub fn new(ledger_info: LedgerInfo, signatures: AggregateSignature) -> Self {
         LedgerInfoWithV0 {
             ledger_info,
             signatures,
@@ -245,7 +245,7 @@ impl LedgerInfoWithV0 {
     pub fn genesis(genesis_state_root_hash: HashValue, validator_set: ValidatorSet) -> Self {
         Self::new(
             LedgerInfo::genesis(genesis_state_root_hash, validator_set),
-            AggregatedSignature::empty(),
+            AggregateSignature::empty(),
         )
     }
 
@@ -285,7 +285,7 @@ impl LedgerInfoWithV0 {
                 .iter(),
         )
     }
-    pub fn signatures(&self) -> &AggregatedSignature {
+    pub fn signatures(&self) -> &AggregateSignature {
         &self.signatures
     }
 }
@@ -353,7 +353,7 @@ impl LedgerInfoWithPartialSignatures {
 // Arbitrary implementation of LedgerInfoWithV0 (for fuzzing)
 //
 
-use crate::aggregated_signature::{AggregatedSignature, PartialSignatures};
+use crate::aggregate_signature::{AggregateSignature, PartialSignatures};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_verifier::generate_validator_verifier;
 #[cfg(any(test, feature = "fuzzing"))]

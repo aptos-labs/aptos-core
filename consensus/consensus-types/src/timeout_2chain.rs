@@ -5,15 +5,15 @@ use crate::{common::Author, quorum_cert::QuorumCert};
 use anyhow::ensure;
 use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use aptos_types::aggregated_signature::{
-    AggregatedSignatureWithRounds, PartialSignaturesWithRound,
-};
+use aptos_types::account_address::AccountAddress;
+use aptos_types::aggregate_signature::{AggregateSignature, PartialSignatures};
 use aptos_types::validator_verifier::VerifyError;
 use aptos_types::{
     block_info::Round, validator_signer::ValidatorSigner, validator_verifier::ValidatorVerifier,
 };
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Display, Formatter};
 
 /// This structure contains all the information necessary to construct a signature
@@ -100,12 +100,12 @@ pub struct TimeoutSigningRepr {
 /// have voted in round r and we can now move to round r+1. AptosBFT v4 requires signature to sign on
 /// the TimeoutSigningRepr and carry the TimeoutWithHighestQC with highest quorum cert among 2f+1.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct TwoChainTimeoutWithSignatures {
+pub struct TwoChainTimeoutCertificate {
     timeout: TwoChainTimeout,
     signatures_with_rounds: AggregatedSignatureWithRounds,
 }
 
-impl Display for TwoChainTimeoutWithSignatures {
+impl Display for TwoChainTimeoutCertificate {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -117,7 +117,7 @@ impl Display for TwoChainTimeoutWithSignatures {
     }
 }
 
-impl TwoChainTimeoutWithSignatures {
+impl TwoChainTimeoutCertificate {
     /// Creates new TimeoutCertificate
     pub fn new(timeout: TwoChainTimeout) -> Self {
         Self {
@@ -255,7 +255,7 @@ impl TwoChainTimeoutWithPartialSignatures {
         &self,
         verifier: &ValidatorVerifier,
         verify: bool,
-    ) -> Result<TwoChainTimeoutWithSignatures, VerifyError> {
+    ) -> Result<TwoChainTimeoutCertificate, VerifyError> {
         let (partial_sign, ordered_rounds) = self
             .signatures
             .get_partial_sig_with_rounds(verifier.address_to_validator_index());
@@ -270,13 +270,133 @@ impl TwoChainTimeoutWithPartialSignatures {
         let timeout_messages_ref: Vec<_> = timeout_messages.iter().collect();
         let aggregated_sig =
             verifier.generate_aggregated_signature(&partial_sign, &timeout_messages_ref, verify)?;
-        Ok(TwoChainTimeoutWithSignatures {
+        Ok(TwoChainTimeoutCertificate {
             timeout: self.timeout.clone(),
             signatures_with_rounds: AggregatedSignatureWithRounds::new(
                 aggregated_sig,
                 ordered_rounds,
             ),
         })
+    }
+}
+
+/// This struct represents partial signatures along with corresponding rounds collected during
+/// timeout aggregation.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct PartialSignaturesWithRound {
+    signatures: BTreeMap<AccountAddress, (Round, bls12381::Signature)>,
+}
+
+impl PartialSignaturesWithRound {
+    pub fn new(signatures: BTreeMap<AccountAddress, (Round, bls12381::Signature)>) -> Self {
+        Self { signatures }
+    }
+    pub fn empty() -> Self {
+        Self::new(BTreeMap::new())
+    }
+
+    pub fn signatures(&self) -> &BTreeMap<AccountAddress, (Round, bls12381::Signature)> {
+        &self.signatures
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn replace_signature(
+        &mut self,
+        validator: AccountAddress,
+        round: Round,
+        signature: bls12381::Signature,
+    ) {
+        self.signatures.insert(validator, (round, signature));
+    }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn remove_signature(&mut self, validator: &AccountAddress) {
+        self.signatures.remove(validator);
+    }
+
+    pub fn add_signature(
+        &mut self,
+        validator: AccountAddress,
+        round: Round,
+        signature: bls12381::Signature,
+    ) {
+        self.signatures
+            .entry(validator)
+            .or_insert((round, signature));
+    }
+
+    /// Returns partial signature and a vector of rounds ordered by validator index in the validator
+    /// verifier.
+    pub fn get_partial_sig_with_rounds(
+        &self,
+        address_to_validator_index: &HashMap<AccountAddress, usize>,
+    ) -> (PartialSignatures, Vec<Round>) {
+        let mut partial_sig = PartialSignatures::empty();
+        let mut index_to_rounds = BTreeMap::new();
+        self.signatures.iter().for_each(|(address, (round, sig))| {
+            address_to_validator_index
+                .get(address)
+                .into_iter()
+                .for_each(|index| {
+                    partial_sig.add_signature(*address, sig.clone());
+                    index_to_rounds.insert(index, *round);
+                });
+        });
+        (partial_sig, index_to_rounds.into_values().collect_vec())
+    }
+}
+
+/// This struct stores the aggregated signatures and corresponding rounds for timeout messages. Please
+/// note that the order of the round is same as the bitmask in the aggregated signature i.e.,
+/// first entry in the rounds corresponds to validator address with the first bitmask set in the
+/// aggregated signature and so on. The ordering is crucial for verification of the timeout messages.
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct AggregatedSignatureWithRounds {
+    aggregated_sig: AggregateSignature,
+    rounds: Vec<Round>,
+}
+
+impl AggregatedSignatureWithRounds {
+    pub fn new(aggregated_sig: AggregateSignature, rounds: Vec<Round>) -> Self {
+        assert_eq!(aggregated_sig.get_num_voters(), rounds.len());
+        Self {
+            aggregated_sig,
+            rounds,
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            aggregated_sig: AggregateSignature::empty(),
+            rounds: vec![],
+        }
+    }
+
+    pub fn get_voters(
+        &self,
+        ordered_validator_addresses: &[AccountAddress],
+    ) -> Vec<AccountAddress> {
+        self.aggregated_sig
+            .get_voter_addresses(ordered_validator_addresses)
+    }
+
+    pub fn get_voters_and_rounds(
+        &self,
+        ordered_validator_addresses: &[AccountAddress],
+    ) -> Vec<(AccountAddress, Round)> {
+        self.aggregated_sig
+            .get_voter_addresses(ordered_validator_addresses)
+            .into_iter()
+            .zip(self.rounds.clone())
+            .collect()
+    }
+
+    pub fn aggregated_sig(&self) -> &AggregateSignature {
+        &self.aggregated_sig
+    }
+
+    pub fn rounds(&self) -> &Vec<Round> {
+        &self.rounds
     }
 }
 
@@ -291,7 +411,7 @@ mod tests {
         use crate::vote_data::VoteData;
         use aptos_crypto::hash::CryptoHash;
         use aptos_types::{
-            aggregated_signature::PartialSignatures,
+            aggregate_signature::PartialSignatures,
             block_info::BlockInfo,
             ledger_info::{LedgerInfo, LedgerInfoWithPartialSignatures},
             validator_verifier::random_validator_verifier,

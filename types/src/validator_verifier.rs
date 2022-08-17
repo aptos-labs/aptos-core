@@ -10,7 +10,7 @@ use std::{
 };
 use thiserror::Error;
 
-use crate::aggregated_signature::{AggregatedSignature, PartialSignatures};
+use crate::aggregate_signature::{AggregateSignature, PartialSignatures};
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::validator_signer::ValidatorSigner;
 use anyhow::{ensure, Result};
@@ -196,7 +196,7 @@ impl ValidatorVerifier {
     pub fn aggregate_signature(
         &self,
         partial_signatures: &PartialSignatures,
-    ) -> Result<(AggregatedSignature, PublicKey, Vec<&PublicKey>), VerifyError> {
+    ) -> Result<(AggregateSignature, PublicKey, Vec<&PublicKey>), VerifyError> {
         // Need a Btree Map to ensure the public keys are ordered by the validator index.
         let mut pub_keys = BTreeMap::new();
         let mut sigs = vec![];
@@ -219,7 +219,7 @@ impl ValidatorVerifier {
         let aggregated_key = PublicKey::aggregate(ordered_pub_keys.clone())
             .map_err(|_| VerifyError::FailedToAggregatePubKey)?;
         Ok((
-            AggregatedSignature::new(masks, Some(aggregated_sig)),
+            AggregateSignature::new(masks, Some(aggregated_sig)),
             aggregated_key,
             ordered_pub_keys,
         ))
@@ -229,13 +229,13 @@ impl ValidatorVerifier {
         &self,
         partial_signatures: &PartialSignatures,
         message: &T,
-    ) -> Result<AggregatedSignature, VerifyError> {
+    ) -> Result<AggregateSignature, VerifyError> {
         let (aggregated_sig, aggregated_key, _) = self.aggregate_signature(partial_signatures)?;
         // Verify the multi-signature. Please note that the verification is not really needed here
-        // because we already trust all the signatures from the validators. This is just good to have.
-        // We can consider removing this if it turns out to be too expensive.
+        // because we already verify signatures from validators individually, This is just good to have for now.
+        // but will be needed once we support optimistic aggregation of signatures.
         aggregated_sig
-            .aggregated_sig()
+            .sig()
             .as_ref()
             .expect("Failed to get multi signature")
             .verify(message, &aggregated_key)
@@ -248,15 +248,15 @@ impl ValidatorVerifier {
         partial_signatures: &PartialSignatures,
         messages: &[&T],
         verify: bool,
-    ) -> Result<AggregatedSignature, VerifyError> {
+    ) -> Result<AggregateSignature, VerifyError> {
         let (aggregated_sig, _aggregated_key, public_keys) =
             self.aggregate_signature(partial_signatures)?;
         // Verify the aggregated signature. Please note that the verification is not really needed here
-        // because we already trust all the signatures from the validators. This is just good to have.
-        // We can consider removing this if it turns out to be too expensive.
+        // because we already verify signatures from validators individually, This is just good to have for now.
+        // but will be needed once we support optimistic aggregation of signatures.
         if verify {
             aggregated_sig
-                .aggregated_sig()
+                .sig()
                 .as_ref()
                 .expect("Failed to get aggregated signature")
                 .verify_aggregate(messages, &public_keys)
@@ -272,7 +272,7 @@ impl ValidatorVerifier {
     pub fn verify_multi_signatures<T: CryptoHash + Serialize>(
         &self,
         message: &T,
-        multi_signature: &AggregatedSignature,
+        multi_signature: &AggregateSignature,
     ) -> std::result::Result<(), VerifyError> {
         // Verify the number of signature is not greater than expected.
         Self::check_num_of_voters(self.len() as u16, multi_signature.get_voters_bitvec())?;
@@ -299,7 +299,7 @@ impl ValidatorVerifier {
         }
         // Verify empty multi signature
         let multi_sig = multi_signature
-            .aggregated_sig()
+            .sig()
             .as_ref()
             .ok_or(VerifyError::EmptySignature)?;
         // Verify the optimistically aggregated signature.
@@ -315,7 +315,7 @@ impl ValidatorVerifier {
     pub fn verify_aggregated_signatures<T: CryptoHash + Serialize>(
         &self,
         messages: &[&T],
-        aggregated_signature: &AggregatedSignature,
+        aggregated_signature: &AggregateSignature,
     ) -> std::result::Result<(), VerifyError> {
         // Verify the number of signature is not greater than expected.
         Self::check_num_of_voters(self.len() as u16, aggregated_signature.get_voters_bitvec())?;
@@ -333,7 +333,7 @@ impl ValidatorVerifier {
         self.check_voting_power(authors.iter())?;
         // Verify empty aggregated signature
         let aggregated_sig = aggregated_signature
-            .aggregated_sig()
+            .sig()
             .as_ref()
             .ok_or(VerifyError::EmptySignature)?;
 
@@ -661,7 +661,7 @@ mod tests {
         assert_eq!(
             validator.verify_multi_signatures(
                 &dummy_struct,
-                &AggregatedSignature::new(BitVec::from(vec![true]), None)
+                &AggregateSignature::new(BitVec::from(vec![true]), None)
             ),
             Err(VerifyError::EmptySignature)
         );
@@ -678,7 +678,7 @@ mod tests {
             // This should fail with insufficient quorum voting power.
             validator.verify_multi_signatures(
                 &dummy_struct,
-                &AggregatedSignature::new(BitVec::from(vec![false]), None)
+                &AggregateSignature::new(BitVec::from(vec![false]), None)
             ),
             Err(VerifyError::TooLittleVotingPower {
                 voting_power: 0,

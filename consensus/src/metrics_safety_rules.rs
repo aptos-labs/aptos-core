@@ -11,7 +11,7 @@ use aptos_types::{
 };
 use consensus_types::{
     block_data::BlockData,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithSignatures},
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::VoteProposal,
 };
@@ -96,7 +96,7 @@ impl TSafetyRules for MetricsSafetyRules {
     fn sign_timeout_with_qc(
         &mut self,
         timeout: &TwoChainTimeout,
-        timeout_cert: Option<&TwoChainTimeoutWithSignatures>,
+        timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<bls12381::Signature, Error> {
         self.retry(|inner| {
             monitor!(
@@ -109,7 +109,7 @@ impl TSafetyRules for MetricsSafetyRules {
     fn construct_and_sign_vote_two_chain(
         &mut self,
         vote_proposal: &VoteProposal,
-        timeout_cert: Option<&TwoChainTimeoutWithSignatures>,
+        timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<Vote, Error> {
         self.retry(|inner| {
             monitor!(
@@ -144,7 +144,7 @@ mod tests {
     use claim::{assert_matches, assert_ok};
     use consensus_types::{
         block_data::BlockData,
-        timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithSignatures},
+        timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
         vote::Vote,
         vote_proposal::VoteProposal,
     };
@@ -200,7 +200,7 @@ mod tests {
         fn sign_timeout_with_qc(
             &mut self,
             _: &TwoChainTimeout,
-            _: Option<&TwoChainTimeoutWithSignatures>,
+            _: Option<&TwoChainTimeoutCertificate>,
         ) -> Result<bls12381::Signature, Error> {
             unimplemented!()
         }
@@ -208,7 +208,7 @@ mod tests {
         fn construct_and_sign_vote_two_chain(
             &mut self,
             _: &VoteProposal,
-            _: Option<&TwoChainTimeoutWithSignatures>,
+            _: Option<&TwoChainTimeoutCertificate>,
         ) -> Result<Vote, Error> {
             unimplemented!()
         }

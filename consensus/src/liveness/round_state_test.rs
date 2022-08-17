@@ -9,7 +9,7 @@ use crate::{
 };
 
 use aptos_crypto::HashValue;
-use aptos_types::aggregated_signature::AggregatedSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -18,7 +18,7 @@ use consensus_types::{
     common::Round,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithSignatures},
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote_data::VoteData,
 };
 use futures::StreamExt;
@@ -123,7 +123,7 @@ fn generate_sync_info(
     );
     let ledger_info = LedgerInfoWithSignatures::new(
         LedgerInfo::new(commit_block, HashValue::zero()),
-        AggregatedSignature::empty(),
+        AggregateSignature::empty(),
     );
     let quorum_cert = QuorumCert::new(
         VoteData::new(
@@ -141,7 +141,7 @@ fn generate_sync_info(
         ledger_info,
     );
     let commit_cert = quorum_cert.clone();
-    let tc = TwoChainTimeoutWithSignatures::new(TwoChainTimeout::new(
+    let tc = TwoChainTimeoutCertificate::new(TwoChainTimeout::new(
         1,
         timeout_round,
         quorum_cert.clone(),

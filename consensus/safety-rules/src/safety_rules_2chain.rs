@@ -7,7 +7,7 @@ use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
 use consensus_types::{
     block::Block,
     safety_data::SafetyData,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithSignatures},
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::VoteProposal,
 };
@@ -17,7 +17,7 @@ impl SafetyRules {
     pub(crate) fn guarded_sign_timeout_with_qc(
         &mut self,
         timeout: &TwoChainTimeout,
-        timeout_cert: Option<&TwoChainTimeoutWithSignatures>,
+        timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<bls12381::Signature, Error> {
         self.signer()?;
         let mut safety_data = self.persistent_storage.safety_data()?;
@@ -48,7 +48,7 @@ impl SafetyRules {
     pub(crate) fn guarded_construct_and_sign_vote_two_chain(
         &mut self,
         vote_proposal: &VoteProposal,
-        timeout_cert: Option<&TwoChainTimeoutWithSignatures>,
+        timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<Vote, Error> {
         // Exit early if we cannot sign
         self.signer()?;
@@ -95,7 +95,7 @@ impl SafetyRules {
     fn safe_to_timeout(
         &self,
         timeout: &TwoChainTimeout,
-        maybe_tc: Option<&TwoChainTimeoutWithSignatures>,
+        maybe_tc: Option<&TwoChainTimeoutCertificate>,
         safety_data: &SafetyData,
     ) -> Result<(), Error> {
         let round = timeout.round();
@@ -121,7 +121,7 @@ impl SafetyRules {
     fn safe_to_vote(
         &self,
         block: &Block,
-        maybe_tc: Option<&TwoChainTimeoutWithSignatures>,
+        maybe_tc: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<(), Error> {
         let round = block.round();
         let qc_round = block.quorum_cert().certified_block().round();
@@ -136,7 +136,7 @@ impl SafetyRules {
         }
     }
 
-    fn verify_tc(&self, tc: &TwoChainTimeoutWithSignatures) -> Result<(), Error> {
+    fn verify_tc(&self, tc: &TwoChainTimeoutCertificate) -> Result<(), Error> {
         let epoch_state = self.epoch_state()?;
 
         tc.verify(&epoch_state.verifier)
