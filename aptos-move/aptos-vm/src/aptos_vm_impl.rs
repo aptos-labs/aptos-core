@@ -5,12 +5,12 @@ use crate::{
     access_path_cache::AccessPathCache,
     counters::*,
     data_cache::RemoteStorage,
-    delta_ext::TransactionOutputExt,
     errors::{convert_epilogue_error, convert_prologue_error, expect_only_successful_execution},
     logging::AdapterLogSchema,
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
     transaction_metadata::TransactionMetadata,
 };
+use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule, Gas, NativeGasParameters};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
