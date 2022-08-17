@@ -7,6 +7,8 @@ module aptos_framework::optional_aggregator {
     use aptos_framework::aggregator_factory;
     use aptos_framework::aggregator::{Self, Aggregator};
 
+    friend aptos_framework::supply;
+
     // These error codes are produced by `Aggregator` and used by `Integer` for
     // consistency.
     const EAGGREGATOR_OVERFLOW: u64 = 1;
