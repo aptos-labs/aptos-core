@@ -26,7 +26,7 @@ impl StateView for MockStateView {
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
-        unimplemented!()
+        Ok(StateStorageUsage::zero())
     }
 }
 

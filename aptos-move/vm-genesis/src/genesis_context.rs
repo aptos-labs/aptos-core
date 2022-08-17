@@ -40,6 +40,6 @@ impl StateView for GenesisStateView {
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
-        unimplemented!()
+        Ok(StateStorageUsage::zero())
     }
 }

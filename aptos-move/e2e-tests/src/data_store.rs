@@ -96,7 +96,6 @@ impl FakeDataStore {
 }
 
 // This is used by the `execute_block` API.
-// TODO: only the "sync" get is implemented
 impl StateView for FakeDataStore {
     fn get_state_value(&self, state_key: &StateKey) -> Result<Option<Vec<u8>>> {
         Ok(self.state_data.get(state_key).cloned())
@@ -107,6 +106,11 @@ impl StateView for FakeDataStore {
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
-        unimplemented!()
+        let mut usage = StateStorageUsage::zero();
+        for (k, v) in self.state_data.iter() {
+            usage.items += 1;
+            usage.bytes += k.size() + v.len();
+        }
+        Ok(usage)
     }
 }
