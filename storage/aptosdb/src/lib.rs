@@ -283,8 +283,15 @@ impl AptosDB {
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.state_merkle_pruner_config,
         );
+        let state_store = Arc::new(StateStore::new(
+            Arc::clone(&arc_ledger_rocksdb),
+            Arc::clone(&arc_state_merkle_rocksdb),
+            target_snapshot_size,
+            hack_for_tests,
+        ));
         let ledger_pruner = LedgerPrunerManager::new(
             Arc::clone(&arc_ledger_rocksdb),
+            Arc::clone(&state_store),
             pruner_config.ledger_pruner_config,
         );
 
@@ -293,12 +300,7 @@ impl AptosDB {
             state_merkle_db: Arc::clone(&arc_state_merkle_rocksdb),
             event_store: Arc::new(EventStore::new(Arc::clone(&arc_ledger_rocksdb))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&arc_ledger_rocksdb))),
-            state_store: Arc::new(StateStore::new(
-                Arc::clone(&arc_ledger_rocksdb),
-                Arc::clone(&arc_state_merkle_rocksdb),
-                target_snapshot_size,
-                hack_for_tests,
-            )),
+            state_store,
             system_store: Arc::new(SystemStore::new(Arc::clone(&arc_ledger_rocksdb))),
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&arc_ledger_rocksdb))),
             state_pruner,
@@ -1625,7 +1627,11 @@ impl DbWriter for AptosDB {
 
             // Delete the genesis transaction
             StateMerklePruner::prune_genesis(self.state_merkle_db.clone(), &mut change_set)?;
-            LedgerPruner::prune_genesis(self.ledger_db.clone(), &mut change_set)?;
+            LedgerPruner::prune_genesis(
+                self.ledger_db.clone(),
+                self.state_store.clone(),
+                &mut change_set,
+            )?;
 
             // Apply the change set writes to the database (atomically) and update in-memory state
             self.ledger_db.clone().write_schemas(change_set.batch)?;

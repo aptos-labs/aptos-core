@@ -8,7 +8,10 @@ use crate::{
 };
 use aptos_types::ledger_info::generate_ledger_info_with_sig;
 
-use aptos_crypto::hash::{CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher};
+use aptos_crypto::hash::{
+    CryptoHash, EventAccumulatorHasher, TransactionAccumulatorHasher,
+    SPARSE_MERKLE_PLACEHOLDER_HASH,
+};
 use aptos_jellyfish_merkle::node_type::{Node, NodeKey};
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -18,8 +21,51 @@ use aptos_types::{
     proptest_types::{AccountInfoUniverse, BlockGen},
 };
 use executor_types::ProofReader;
+use proptest::sample::Index;
 use proptest::{collection::vec, prelude::*};
 use scratchpad::SparseMerkleTree;
+use storage_interface::{jmt_update_refs, jmt_updates};
+
+prop_compose! {
+    pub fn arb_state_kv_sets(key_universe_size: usize, update_set_size_per_version: usize, num_versions: usize)(keys in vec(any::<StateKey>(), key_universe_size), input in vec(vec((any::<Index>(), any::<Option<StateValue>>()), 1..update_set_size_per_version), 1..num_versions)) -> Vec<Vec<(StateKey, Option<StateValue>)>> {
+            input
+            .into_iter()
+            .map(|kvs|
+                kvs
+                .into_iter()
+                .map(|(idx, value)| (idx.get(&keys).clone(), value))
+                .collect::<Vec<_>>()
+            )
+            .collect::<Vec<_>>()
+    }
+}
+
+pub(crate) fn update_store(
+    store: &StateStore,
+    input: impl Iterator<Item = (StateKey, Option<StateValue>)>,
+    first_version: Version,
+) -> HashValue {
+    let mut root_hash = *SPARSE_MERKLE_PLACEHOLDER_HASH;
+    for (i, (key, value)) in input.enumerate() {
+        let value_state_set = vec![(key, value)].into_iter().collect();
+        let jmt_updates = jmt_updates(&value_state_set);
+        let version = first_version + i as Version;
+        root_hash = store
+            .merklize_value_set(
+                jmt_update_refs(&jmt_updates),
+                None,
+                version,
+                version.checked_sub(1),
+            )
+            .unwrap();
+        let mut cs = ChangeSet::new();
+        store
+            .put_value_sets(vec![&value_state_set], version, &mut cs)
+            .unwrap();
+        store.ledger_db.write_schemas(cs.batch).unwrap();
+    }
+    root_hash
+}
 
 pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[TransactionToCommit]) {
     let mut next_version = state.current_version.map_or(0, |v| v + 1);
