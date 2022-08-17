@@ -12,7 +12,7 @@ use crate::{
             ConsensusTimeoutsEvaluatorArgs, NetworkMinimumPeersEvaluatorArgs,
             NetworkPeersWithinToleranceEvaluatorArgs, StateSyncVersionEvaluatorArgs,
         },
-        system_information::BuildVersionEvaluatorArgs,
+        system_information::{BuildVersionEvaluatorArgs, HardwareEvaluatorArgs},
     },
     runner::BlockingRunnerArgs,
 };
@@ -142,6 +142,9 @@ pub struct EvaluatorArgs {
 
     #[clap(flatten)]
     pub consensus_timeouts_args: ConsensusTimeoutsEvaluatorArgs,
+
+    #[clap(flatten)]
+    pub hardware_args: HardwareEvaluatorArgs,
 
     #[clap(flatten)]
     pub latency_args: LatencyEvaluatorArgs,
