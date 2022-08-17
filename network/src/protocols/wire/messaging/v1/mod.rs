@@ -54,7 +54,7 @@ pub enum MultiplexMessage {
 
 impl NetworkMessage {
     /// The size of the raw data excluding the headers
-    pub fn len(&self) -> usize {
+    pub fn data_len(&self) -> usize {
         match self {
             NetworkMessage::Error(_) => 0,
             NetworkMessage::RpcRequest(request) => request.raw_request.len(),

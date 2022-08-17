@@ -150,24 +150,38 @@ impl OutboundStream {
         max_message_size: usize,
         stream_tx: Sender<MultiplexMessage>,
     ) -> Self {
+        // some buffer for headers
+        let max_frame_size = max_frame_size - 64;
+        assert!(
+            max_frame_size * u8::MAX as usize >= max_message_size,
+            "Stream only supports maximum 255 chunks, frame size {}, message size {}",
+            max_frame_size,
+            max_message_size
+        );
         Self {
             request_id_gen: U32IdGenerator::new(),
-            max_frame_size: max_frame_size - 64, // some buffer for headers
+            max_frame_size,
             max_message_size,
             stream_tx,
         }
     }
 
     pub fn should_stream(&self, message: &NetworkMessage) -> bool {
-        message.len() > self.max_frame_size && !matches!(message, NetworkMessage::Error(_))
+        message.data_len() > self.max_frame_size
     }
 
     pub async fn stream_message(&mut self, mut message: NetworkMessage) -> anyhow::Result<()> {
         ensure!(
-            message.len() <= self.max_message_size,
+            message.data_len() <= self.max_message_size,
             "Message length {} exceed size limit {}",
-            message.len(),
+            message.data_len(),
             self.max_message_size,
+        );
+        ensure!(
+            message.data_len() >= self.max_frame_size,
+            "Message length {} is smaller than frame size {}, should not go through stream",
+            message.data_len(),
+            self.max_frame_size,
         );
         let request_id = self.request_id_gen.next();
         let rest = match &mut message {
@@ -185,6 +199,10 @@ impl OutboundStream {
             }
         };
         let chunks = rest.chunks(self.max_frame_size);
+        ensure!(
+            chunks.len() <= u8::MAX as usize,
+            "Number of fragments overflowed"
+        );
         let header = StreamMessage::Header(StreamHeader {
             request_id,
             num_fragments: chunks.len() as u8,
