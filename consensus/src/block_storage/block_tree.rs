@@ -13,7 +13,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures};
 use consensus_types::{
     executed_block::ExecutedBlock, quorum_cert::QuorumCert,
-    timeout_2chain::TwoChainTimeoutWithSignatures,
+    timeout_2chain::TwoChainTimeoutCertificate,
 };
 use mirai_annotations::{checked_verify_eq, precondition};
 use std::{
@@ -77,7 +77,7 @@ pub struct BlockTree {
     /// The quorum certificate of highest_certified_block
     highest_quorum_cert: Arc<QuorumCert>,
     /// The highest 2-chain timeout certificate (if any).
-    highest_2chain_timeout_cert: Option<Arc<TwoChainTimeoutWithSignatures>>,
+    highest_2chain_timeout_cert: Option<Arc<TwoChainTimeoutCertificate>>,
     /// The quorum certificate that has highest commit info.
     highest_ordered_cert: Arc<QuorumCert>,
     /// The quorum certificate that has highest commit decision info.
@@ -97,7 +97,7 @@ impl BlockTree {
         root_ordered_cert: QuorumCert,
         root_commit_cert: QuorumCert,
         max_pruned_blocks_in_mem: usize,
-        highest_2chain_timeout_cert: Option<Arc<TwoChainTimeoutWithSignatures>>,
+        highest_2chain_timeout_cert: Option<Arc<TwoChainTimeoutCertificate>>,
     ) -> Self {
         assert_eq!(
             root.id(),
@@ -196,12 +196,12 @@ impl BlockTree {
         Arc::clone(&self.highest_quorum_cert)
     }
 
-    pub(super) fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutWithSignatures>> {
+    pub(super) fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutCertificate>> {
         self.highest_2chain_timeout_cert.clone()
     }
 
     /// Replace highest timeout cert with the given value.
-    pub(super) fn replace_2chain_timeout_cert(&mut self, tc: Arc<TwoChainTimeoutWithSignatures>) {
+    pub(super) fn replace_2chain_timeout_cert(&mut self, tc: Arc<TwoChainTimeoutCertificate>) {
         self.highest_2chain_timeout_cert.replace(tc);
     }
 

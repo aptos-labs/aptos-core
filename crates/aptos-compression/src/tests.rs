@@ -6,7 +6,7 @@ use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::hash::HashValue;
 use aptos_crypto::{PrivateKey, SigningKey, Uniform};
 use aptos_types::account_address::AccountAddress;
-use aptos_types::aggregated_signature::AggregatedSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::chain_id::ChainId;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use aptos_types::transaction::{
@@ -96,7 +96,7 @@ fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWith
         ),
         HashValue::zero(),
     );
-    LedgerInfoWithSignatures::new(ledger_info, AggregatedSignature::empty())
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
 }
 
 /// Creates a test transaction output

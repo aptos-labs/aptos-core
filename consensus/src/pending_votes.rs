@@ -10,14 +10,13 @@
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_logger::prelude::*;
 use aptos_types::{
-    aggregated_signature::PartialSignatures,
+    aggregate_signature::PartialSignatures,
     ledger_info::LedgerInfoWithPartialSignatures,
     validator_verifier::{ValidatorVerifier, VerifyError},
 };
 use consensus_types::timeout_2chain::TwoChainTimeoutWithPartialSignatures;
 use consensus_types::{
-    common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutWithSignatures,
-    vote::Vote,
+    common::Author, quorum_cert::QuorumCert, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote,
 };
 use std::{
     collections::{BTreeMap, HashMap},
@@ -39,7 +38,7 @@ pub enum VoteReceptionResult {
     /// This block has just been certified after adding the vote.
     NewQuorumCertificate(Arc<QuorumCert>),
     /// The vote completes a new TwoChainTimeoutCertificate
-    New2ChainTimeoutCertificate(Arc<TwoChainTimeoutWithSignatures>),
+    New2ChainTimeoutCertificate(Arc<TwoChainTimeoutCertificate>),
     /// There might be some issues adding a vote
     ErrorAddingVote(VerifyError),
     /// Error happens when aggregating signature

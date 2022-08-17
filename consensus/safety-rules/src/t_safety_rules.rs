@@ -9,7 +9,7 @@ use aptos_types::{
 };
 use consensus_types::{
     block_data::BlockData,
-    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutWithSignatures},
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::VoteProposal,
 };
@@ -34,14 +34,14 @@ pub trait TSafetyRules {
     fn sign_timeout_with_qc(
         &mut self,
         timeout: &TwoChainTimeout,
-        timeout_cert: Option<&TwoChainTimeoutWithSignatures>,
+        timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<bls12381::Signature, Error>;
 
     /// Attempts to vote for a given proposal following the 2-chain protocol.
     fn construct_and_sign_vote_two_chain(
         &mut self,
         vote_proposal: &VoteProposal,
-        timeout_cert: Option<&TwoChainTimeoutWithSignatures>,
+        timeout_cert: Option<&TwoChainTimeoutCertificate>,
     ) -> Result<Vote, Error>;
 
     /// As the holder of the private key, SafetyRules also signs a commit vote.

@@ -12,6 +12,7 @@ use aptos_logger::Level;
 use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::aggregated_signature::AggregatedSignature;
 use aptos_types::write_set::WriteSet;
+>>>>>>> 2875c22e2a (Addressed comments)
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -1949,7 +1950,7 @@ fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWith
         ),
         HashValue::zero(),
     );
-    LedgerInfoWithSignatures::new(ledger_info, AggregatedSignature::empty())
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
 }
 
 /// Creates a test transaction output

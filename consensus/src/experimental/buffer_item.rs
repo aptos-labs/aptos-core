@@ -18,7 +18,7 @@ use consensus_types::{
 use crate::{experimental::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
 use aptos_crypto::HashValue;
 use aptos_types::{
-    aggregated_signature::PartialSignatures, ledger_info::LedgerInfoWithPartialSignatures,
+    aggregate_signature::PartialSignatures, ledger_info::LedgerInfoWithPartialSignatures,
 };
 
 fn generate_commit_ledger_info(
