@@ -16,7 +16,6 @@ use crate::validator_signer::ValidatorSigner;
 use anyhow::{ensure, Result};
 use aptos_bitvec::BitVec;
 use aptos_crypto::bls12381::PublicKey;
-use itertools::Itertools;
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 
@@ -198,8 +197,7 @@ impl ValidatorVerifier {
         &self,
         partial_signatures: &PartialSignatures,
     ) -> Result<(AggregateSignature, PublicKey), VerifyError> {
-        // Need a Btree Map to ensure the public keys are ordered by the validator index.
-        let mut pub_keys = BTreeMap::new();
+        let mut pub_keys = vec![];
         let mut sigs = vec![];
         let mut masks = BitVec::with_num_bits(self.len() as u16);
         for (addr, sig) in partial_signatures.signatures() {
@@ -208,17 +206,15 @@ impl ValidatorVerifier {
                 .get(addr)
                 .ok_or(VerifyError::UnknownAuthor)?;
             masks.set(index as u16);
-            pub_keys.insert(index, self.validator_infos[index].public_key());
+            pub_keys.push(self.validator_infos[index].public_key());
             sigs.push(sig.clone());
         }
         // Perform an optimistic aggregation of the signatures without verification.
         let aggregated_sig = bls12381::Signature::aggregate(sigs)
             .map_err(|_| VerifyError::FailedToAggregateSignature)?;
 
-        let ordered_pub_keys: Vec<_> = pub_keys.into_values().collect_vec();
-
-        let aggregated_key = PublicKey::aggregate(ordered_pub_keys.clone())
-            .map_err(|_| VerifyError::FailedToAggregatePubKey)?;
+        let aggregated_key =
+            PublicKey::aggregate(pub_keys).map_err(|_| VerifyError::FailedToAggregatePubKey)?;
         Ok((
             AggregateSignature::new(masks, Some(aggregated_sig)),
             aggregated_key,
@@ -243,7 +239,7 @@ impl ValidatorVerifier {
         Ok(aggregated_sig)
     }
 
-    pub fn generate_aggregated_signature(
+    pub fn generate_aggregate_signature(
         &self,
         partial_signatures: &PartialSignatures,
     ) -> Result<AggregateSignature, VerifyError> {
