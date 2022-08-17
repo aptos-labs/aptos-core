@@ -65,8 +65,6 @@ pub struct SubmitProposal {
     pub(crate) metadata_url: Url,
 
     #[clap(flatten)]
-    pub(crate) prompt_options: PromptOptions,
-    #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) pool_address_args: PoolAddressArgs,
@@ -90,7 +88,10 @@ impl CliCommand<Transaction> for SubmitProposal {
             "{}\n\tMetadata Hash: {}\n\tScript Hash: {}",
             metadata, metadata_hash, script_hash
         );
-        prompt_yes_with_override("Do you want to submit this proposal?", self.prompt_options)?;
+        prompt_yes_with_override(
+            "Do you want to submit this proposal?",
+            self.compile_proposal_args.prompt_options,
+        )?;
 
         self.txn_options
             .submit_script_function(
@@ -430,10 +431,10 @@ pub struct CompileProposalArgs {
 }
 
 impl CompileProposalArgs {
-    fn compile(self) -> CliTypedResult<(Vec<u8>, HashValue)> {
+    fn compile(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
         // Check script file
         let script_path = self.script_path.as_path();
-        if self.script_path.exists() {
+        if !self.script_path.exists() {
             return Err(CliError::CommandArgumentError(format!(
                 "{} does not exist",
                 script_path.display()
