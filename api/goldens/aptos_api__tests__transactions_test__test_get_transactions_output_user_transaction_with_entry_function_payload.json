@@ -52,9 +52,9 @@
         "data": {
           "type": "0x1::state_storage::StateStorageUsage",
           "data": {
-            "bytes": "279569",
+            "bytes": "279972",
             "epoch": "1",
-            "items": "96"
+            "items": "98"
           }
         },
         "type": "write_resource"

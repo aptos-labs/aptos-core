@@ -225,6 +225,17 @@ impl FakeExecutor {
         accounts
     }
 
+    /// Creates an account for the given static address. This address needs to be static so
+    /// we can load regular Move code to there without need to rewrite code addresses.
+    pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
+        // The below will use the genesis keypair but that should be fine.
+        let acc = Account::new_genesis_account(addr);
+        // Mint the account 10M Aptos coins (with 8 decimals).
+        let data = AccountData::with_account(acc, 1_000_000_000_000_000, 0);
+        self.add_account_data(&data);
+        data.account().clone()
+    }
+
     /// Applies a [`WriteSet`] to this executor's data store.
     pub fn apply_write_set(&mut self, write_set: &WriteSet) {
         self.data_store.add_write_set(write_set);
