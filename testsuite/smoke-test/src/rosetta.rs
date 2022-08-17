@@ -425,7 +425,6 @@ async fn parse_block_transactions(
             balances,
             transaction,
             actual_txn,
-            txn_metadata.transaction_type == TransactionType::User,
         )
         .await;
 
@@ -440,14 +439,13 @@ async fn parse_operations(
     balances: &mut BTreeMap<AccountAddress, BTreeMap<u64, u64>>,
     transaction: &aptos_rosetta::types::Transaction,
     actual_txn: &Transaction,
-    is_user_txn: bool,
 ) {
+    // If there are no operations, then there is no gas operation
+    let mut has_gas_op = false;
     for (expected_index, operation) in transaction.operations.iter().enumerate() {
         assert_eq!(expected_index as u64, operation.operation_identifier.index);
 
         // Gas transaction is always last
-        let is_gas_op =
-            expected_index == transaction.operations.len().saturating_sub(1) && is_user_txn;
         let status = OperationStatusType::from_str(
             operation
                 .status
@@ -527,7 +525,7 @@ async fn parse_operations(
             }
             OperationType::Withdraw => {
                 // Gas is always successful
-                if is_gas_op || actual_txn.success() {
+                if actual_txn.success() {
                     assert_eq!(OperationStatusType::Success, status);
                     let account = operation
                         .account
@@ -562,26 +560,6 @@ async fn parse_operations(
                     // Subtract with panic on overflow in case of a negative balance
                     let new_balance = *latest_balance - delta;
                     account_balances.insert(block_height, new_balance);
-
-                    // Check amount if it's gas
-                    // TODO: Check amount if it's a transfer?
-                    if is_gas_op {
-                        match actual_txn {
-                            Transaction::UserTransaction(txn) => {
-                                assert_eq!(
-                                    txn.info
-                                        .gas_used
-                                        .0
-                                        .saturating_mul(txn.request.gas_unit_price.0),
-                                    delta,
-                                    "Gas operation should always match gas used * gas unit price"
-                                )
-                            }
-                            _ => {
-                                panic!("Gas transactions should be user transactions!")
-                            }
-                        };
-                    }
                 } else {
                     assert_eq!(
                         OperationStatusType::Failure,
@@ -605,8 +583,68 @@ async fn parse_operations(
                     );
                 }
             }
+            OperationType::Fee => {
+                has_gas_op = true;
+                assert_eq!(OperationStatusType::Success, status);
+                let account = operation
+                    .account
+                    .as_ref()
+                    .expect("There should be an account in a fee operation")
+                    .account_address()
+                    .expect("Account address should be parsable");
+
+                let account_balances = balances.entry(account).or_insert_with(|| {
+                    let mut map = BTreeMap::new();
+                    map.insert(block_height, 0);
+                    map
+                });
+                let (_, latest_balance) = account_balances.iter().last().unwrap();
+                let amount = operation
+                    .amount
+                    .as_ref()
+                    .expect("Should have an amount in a fee operation");
+                assert_eq!(
+                    amount.currency,
+                    native_coin(),
+                    "Balance should be the native coin"
+                );
+                let delta = u64::parse(
+                    amount
+                        .value
+                        .strip_prefix('-')
+                        .expect("Should have a negative number"),
+                )
+                .expect("Should be able to parse amount value");
+
+                // Subtract with panic on overflow in case of a negative balance
+                let new_balance = *latest_balance - delta;
+                account_balances.insert(block_height, new_balance);
+
+                match actual_txn {
+                    Transaction::UserTransaction(txn) => {
+                        assert_eq!(
+                            txn.info
+                                .gas_used
+                                .0
+                                .saturating_mul(txn.request.gas_unit_price.0),
+                            delta,
+                            "Gas operation should always match gas used * gas unit price"
+                        )
+                    }
+                    _ => {
+                        panic!("Gas transactions should be user transactions!")
+                    }
+                };
+            }
         }
     }
+
+    assert!(
+        has_gas_op
+            || transaction.metadata.unwrap().transaction_type == TransactionType::Genesis
+            || transaction.operations.is_empty(),
+        "Must have a gas operation at least in a transaction except for Genesis",
+    );
 }
 
 /// Check that all balances are correct with the account balance command from the blocks
@@ -770,7 +808,7 @@ fn assert_transfer_transaction(
             assert_withdraw(operation, transfer_amount, sender, actual_txn.info.success);
         } else {
             // Gas is always last
-            assert_withdraw(
+            assert_gas(
                 operation,
                 actual_txn.request.gas_unit_price.0 * actual_txn.info.gas_used.0,
                 sender,
@@ -804,6 +842,16 @@ fn assert_withdraw(
     assert_transfer(
         operation,
         OperationType::Withdraw,
+        format!("-{}", expected_amount),
+        account,
+        success,
+    );
+}
+
+fn assert_gas(operation: &Operation, expected_amount: u64, account: AccountAddress, success: bool) {
+    assert_transfer(
+        operation,
+        OperationType::Fee,
         format!("-{}", expected_amount),
         account,
         success,

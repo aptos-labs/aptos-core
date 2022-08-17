@@ -348,6 +348,25 @@ impl Operation {
         )
     }
 
+    pub fn gas_fee(
+        operation_index: u64,
+        address: AccountAddress,
+        gas_used: u64,
+        gas_price_per_unit: u64,
+    ) -> Operation {
+        Operation::new(
+            OperationType::Fee,
+            operation_index,
+            Some(OperationStatusType::Success),
+            address,
+            Some(Amount {
+                value: format!("-{}", gas_used.saturating_mul(gas_price_per_unit)),
+                currency: native_coin(),
+            }),
+            None,
+        )
+    }
+
     pub fn set_operator(
         operation_index: u64,
         status: Option<OperationStatusType>,
@@ -607,13 +626,11 @@ impl Transaction {
 
         // Everything committed costs gas
         if let Some(ref request) = maybe_user_transaction_request {
-            operations.push(Operation::withdraw(
+            operations.push(Operation::gas_fee(
                 operation_index,
-                // Gas charging is always successful if it's been committed
-                Some(OperationStatusType::Success),
                 *request.sender.inner(),
-                native_coin(),
-                txn_info.gas_used.0.saturating_mul(request.gas_unit_price.0),
+                txn_info.gas_used.0,
+                request.gas_unit_price.0,
             ));
         }
 
