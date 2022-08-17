@@ -6,7 +6,13 @@ import * as Gen from "./generated/index";
 import { FAUCET_URL, NODE_URL } from "./util.test";
 import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
-import { TxnBuilderTypes, TransactionBuilderMultiEd25519, BCS, TransactionBuilder } from "./transaction_builder";
+import {
+  TxnBuilderTypes,
+  TransactionBuilderMultiEd25519,
+  BCS,
+  TransactionBuilder,
+  TransactionBuilderRemoteABI,
+} from "./transaction_builder";
 import { TokenClient } from "./token_client";
 
 const account = "0x1::account::Account";
@@ -107,6 +113,43 @@ test(
     resources = await client.getAccountResources(account2.address());
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("717");
+  },
+  30 * 1000,
+);
+
+test(
+  "submits transaction with remote ABI",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+
+    const account1 = new AptosAccount();
+    await faucetClient.fundAccount(account1.address(), 50000);
+    let resources = await client.getAccountResources(account1.address());
+    let accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("50000");
+
+    const account2 = new AptosAccount();
+    await faucetClient.fundAccount(account2.address(), 0);
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("0");
+
+    const builder = new TransactionBuilderRemoteABI(client, { sender: account1.address() });
+    const rawTxn = await builder.build(
+      "0x1::coin::transfer",
+      ["0x1::aptos_coin::AptosCoin"],
+      [account2.address(), 400],
+    );
+
+    const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
+    const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
+
+    await client.waitForTransaction(transactionRes.hash);
+
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("400");
   },
   30 * 1000,
 );
