@@ -84,50 +84,7 @@ impl CliCommand<Transaction> for SubmitProposal {
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         // Validate the proposal metadata
-        let client = reqwest::ClientBuilder::default()
-            .tls_built_in_root_certs(true)
-            .build()
-            .map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to build HTTP client {}", err))
-            })?;
-        let bytes = client
-            .get(self.metadata_url.clone())
-            .send()
-            .await
-            .map_err(|err| {
-                CliError::CommandArgumentError(format!(
-                    "Failed to fetch metadata url {}: {}",
-                    self.metadata_url, err
-                ))
-            })?
-            .bytes()
-            .await
-            .map_err(|err| {
-                CliError::CommandArgumentError(format!(
-                    "Failed to fetch metadata url {}: {}",
-                    self.metadata_url, err
-                ))
-            })?;
-        let metadata: ProposalMetadata = serde_json::from_slice(&bytes).map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Metadata is not in a proper JSON format: {}",
-                err
-            ))
-        })?;
-        Url::parse(&metadata.source_code_url).map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Source code URL {} is invalid {}",
-                metadata.source_code_url, err
-            ))
-        })?;
-        Url::parse(&metadata.discussion_url).map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Discussion URL {} is invalid {}",
-                metadata.discussion_url, err
-            ))
-        })?;
-
-        let metadata_hash = HashValue::sha3_256_of(&bytes);
+        let (metadata, metadata_hash) = get_metadata(&self.metadata_url)?;
 
         println!("{}, Hash: {}", metadata, metadata_hash);
         prompt_yes_with_override("Do you want to submit this proposal?", self.prompt_options)?;
@@ -149,6 +106,49 @@ impl CliCommand<Transaction> for SubmitProposal {
     }
 }
 
+/// Retrieve metadata and validate it
+fn get_metadata(metadata_url: &Url) -> CliTypedResult<(ProposalMetadata, HashValue)> {
+    let client = reqwest::ClientBuilder::default()
+        .tls_built_in_root_certs(true)
+        .build()
+        .map_err(|err| CliError::UnexpectedError(format!("Failed to build HTTP client {}", err)))?;
+    let bytes = client
+        .get(metadata_url)
+        .send()
+        .await
+        .map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Failed to fetch metadata url {}: {}",
+                metadata_url, err
+            ))
+        })?
+        .bytes()
+        .await
+        .map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Failed to fetch metadata url {}: {}",
+                metadata_url, err
+            ))
+        })?;
+    let metadata: ProposalMetadata = serde_json::from_slice(&bytes).map_err(|err| {
+        CliError::CommandArgumentError(format!("Metadata is not in a proper JSON format: {}", err))
+    })?;
+    Url::parse(&metadata.source_code_url).map_err(|err| {
+        CliError::CommandArgumentError(format!(
+            "Source code URL {} is invalid {}",
+            metadata.source_code_url, err
+        ))
+    })?;
+    Url::parse(&metadata.discussion_url).map_err(|err| {
+        CliError::CommandArgumentError(format!(
+            "Discussion URL {} is invalid {}",
+            metadata.discussion_url, err
+        ))
+    })?;
+    let metadata_hash = HashValue::sha3_256_of(&bytes);
+    Ok((metadata, metadata_hash))
+}
+
 fn read_hex_hash(str: &str) -> CliTypedResult<HashValue> {
     let hex = str.strip_prefix("0x").unwrap_or(str);
     HashValue::from_hex(hex).map_err(|err| CliError::CommandArgumentError(err.to_string()))
@@ -160,9 +160,13 @@ pub struct SubmitVote {
     #[clap(long)]
     pub(crate) proposal_id: u64,
 
-    /// Vote choice. True for yes. False for no.
-    #[clap(long)]
-    pub(crate) should_pass: bool,
+    /// Vote yes on the proposal
+    #[clap(long, group = "vote")]
+    pub(crate) yes: bool,
+
+    /// Vote no on the proposal
+    #[clap(long, group = "vote")]
+    pub(crate) no: bool,
 
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
@@ -179,8 +183,18 @@ impl CliCommand<Transaction> for SubmitVote {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
+        let vote = match (vote_yes, vote_no) {
+            (true, false) => "Yes",
+            (false, true) => "No",
+            (_, _) => {
+                return Err(CliError::CommandArgumentError(
+                    "Must choose either --yes or --no".to_string(),
+                ))
+            }
+        };
+
         // TODO: Display details of proposal
-        let vote = if self.should_pass { "Yes" } else { "No" };
+
         prompt_yes_with_override(
             &format!("Are you sure you want to vote {}", vote),
             self.prompt_options,
