@@ -30,6 +30,7 @@ fn run_transactions<K, V>(
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
+    Vec<u8>: From<V>,
 {
     let mut transactions: Vec<_> = transaction_gens
         .into_iter()

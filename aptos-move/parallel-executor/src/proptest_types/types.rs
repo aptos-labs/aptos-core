@@ -74,7 +74,7 @@ pub struct TransactionGenParams {
 
 #[derive(Arbitrary, Debug, Clone)]
 #[proptest(params = "TransactionGenParams")]
-pub struct TransactionGen<V: Arbitrary + Debug + 'static + Clone> {
+pub struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Debug + 'static + Clone> {
     /// Generate keys and values for possible write-sets based on above transaction gen parameters.
     #[proptest(
         strategy = "vec(vec((any::<Index>(), any::<V>()), 1..params.write_size), 1..params.read_write_alternatives)"
@@ -131,7 +131,7 @@ impl Default for TransactionGenParams {
     }
 }
 
-impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
+impl<V: Into<Vec<u8>> + Arbitrary + Debug + Clone> TransactionGen<V> {
     fn writes_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
         universe: &[K],
         gen: Vec<Vec<(Index, V)>>,
@@ -216,6 +216,7 @@ impl<K, V> TransactionType for Transaction<K, V>
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + 'static,
+    Vec<u8>: From<V>,
 {
     type Key = K;
     type Value = V;
@@ -237,6 +238,7 @@ impl<K, V> ExecutorTask for Task<K, V>
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + 'static,
+    Vec<u8>: From<V>,
 {
     type T = Transaction<K, V>;
     type Output = Output<K, V>;
@@ -286,6 +288,7 @@ impl<K, V> TransactionOutput for Output<K, V>
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + 'static,
+    Vec<u8>: From<V>,
 {
     type T = Transaction<K, V>;
 

@@ -35,7 +35,7 @@ pub struct MVHashMapView<'a, K, V> {
     captured_reads: Mutex<Vec<ReadDescriptor<K>>>,
 }
 
-impl<'a, K: ModulePath + PartialOrd + Send + Clone + Hash + Eq, V: Send + Sync>
+impl<'a, K: ModulePath + PartialOrd + Send + Clone + Hash + Eq, V: Into<Vec<u8>> + Send + Sync>
     MVHashMapView<'a, K, V>
 {
     /// Drains the captured reads.

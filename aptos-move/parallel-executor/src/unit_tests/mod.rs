@@ -18,6 +18,7 @@ fn run_and_assert<K, V>(transactions: Vec<Transaction<K, V>>)
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + Eq + 'static,
+    Vec<u8>: From<V>,
 {
     let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
         .execute_transactions_parallel((), transactions.clone());
@@ -30,6 +31,10 @@ where
 const TOTAL_KEY_NUM: u64 = 50;
 const WRITES_PER_KEY: u64 = 100;
 
+fn random_vec_u8() -> Vec<u8> {
+    (0..4).map(|_| random::<u8>()).collect()
+}
+
 #[test]
 fn cycle_transactions() {
     let mut transactions = vec![];
@@ -41,7 +46,7 @@ fn cycle_transactions() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![KeyType(key, false)]],
-                writes: vec![vec![(KeyType(key, false), random::<u64>())]],
+                writes: vec![vec![(KeyType(key, false), random_vec_u8())]],
             })
         }
     }
@@ -62,7 +67,7 @@ fn one_reads_all_barrier() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
-                writes: vec![vec![(*key, random::<u64>())]],
+                writes: vec![vec![(*key, random_vec_u8())]],
             })
         }
         // One transaction reading the write results of every prior transactions in the block.
@@ -86,7 +91,7 @@ fn one_writes_all_barrier() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
-                writes: vec![vec![(*key, random::<u64>())]],
+                writes: vec![vec![(*key, random_vec_u8())]],
             })
         }
         // One transaction writing to the write results of every prior transactions in the block.
@@ -95,7 +100,7 @@ fn one_writes_all_barrier() {
             reads: vec![keys.clone()],
             writes: vec![keys
                 .iter()
-                .map(|key| (*key, random::<u64>()))
+                .map(|key| (*key, random_vec_u8()))
                 .collect::<Vec<_>>()],
         })
     }
@@ -114,7 +119,7 @@ fn early_aborts() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
-                writes: vec![vec![(*key, random::<u64>())]],
+                writes: vec![vec![(*key, random_vec_u8())]],
             })
         }
         // One transaction that triggers an abort
@@ -135,7 +140,7 @@ fn early_skips() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
-                writes: vec![vec![(*key, random::<u64>())]],
+                writes: vec![vec![(*key, random_vec_u8())]],
             })
         }
         // One transaction that triggers an abort
