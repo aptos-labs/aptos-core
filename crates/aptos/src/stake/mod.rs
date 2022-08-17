@@ -36,7 +36,9 @@ impl StakeTool {
     }
 }
 
-/// Stake coins for an account to the stake pool
+/// Stake coins to the stake pool
+///
+/// This command allows stake pool owners to add coins to their stake.
 #[derive(Parser)]
 pub struct AddStake {
     /// Amount of coins to add to stake
@@ -65,11 +67,12 @@ impl CliCommand<Transaction> for AddStake {
 /// Coins can only be unlocked if they no longer have an applied lockup period
 #[derive(Parser)]
 pub struct UnlockStake {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
     /// Amount of coins to unlock
     #[clap(long)]
     pub amount: u64,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
@@ -85,16 +88,18 @@ impl CliCommand<Transaction> for UnlockStake {
     }
 }
 
-/// Withdraw all unlocked staked coins
+/// Withdraw unlocked staked coins
 ///
+/// This allows users to withdraw stake back into their CoinStore.
 /// Before calling `WithdrawStake`, `UnlockStake` must be called first.
 #[derive(Parser)]
 pub struct WithdrawStake {
-    #[clap(flatten)]
-    pub(crate) node_op_options: TransactionOptions,
     /// Amount of coins to withdraw
     #[clap(long)]
     pub amount: u64,
+
+    #[clap(flatten)]
+    pub(crate) node_op_options: TransactionOptions,
 }
 
 #[async_trait]
@@ -110,7 +115,9 @@ impl CliCommand<Transaction> for WithdrawStake {
     }
 }
 
-/// Increase lockup of all staked coins in an account
+/// Increase lockup of all staked coins in the stake pool
+///
+/// Lockup may need to be increased in order to vote on a proposal.
 #[derive(Parser)]
 pub struct IncreaseLockup {
     #[clap(flatten)]
@@ -130,18 +137,30 @@ impl CliCommand<Transaction> for IncreaseLockup {
     }
 }
 
-/// Register stake owner, to gain capability to delegate
-/// operator or voting capability to a different account.
+/// Initialize stake owner
+///
+/// Initializing stake owner adds the capability to delegate the
+/// stake pool to an operator, or delegate voting to a different account.
 #[derive(Parser)]
 pub struct InitializeStakeOwner {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
+    /// Initial amount of coins to be staked
     #[clap(long)]
     pub initial_stake_amount: u64,
+
+    /// Account Address of delegated operator
+    ///
+    /// If not specified, it will be the same as the owner
     #[clap(long)]
     pub operator_address: Option<AccountAddress>,
+
+    /// Account address of delegated voter
+    ///
+    /// If not specified, it will be the same as the owner
     #[clap(long)]
     pub voter_address: Option<AccountAddress>,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
@@ -162,14 +181,17 @@ impl CliCommand<Transaction> for InitializeStakeOwner {
     }
 }
 
-/// Delegate operator (running validator node) capability from the stake owner
-/// to the given voter address
+/// Delegate operator capability from the stake owner to another account
 #[derive(Parser)]
 pub struct SetOperator {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
+    /// Account Address of delegated operator
+    ///
+    /// If not specified, it will be the same as the owner
     #[clap(long)]
     pub operator_address: AccountAddress,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
@@ -185,13 +207,17 @@ impl CliCommand<Transaction> for SetOperator {
     }
 }
 
-/// Delegate voting capability from the stake owner to the given voter address
+/// Delegate voting capability from the stake owner to another account
 #[derive(Parser)]
 pub struct SetDelegatedVoter {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
+    /// Account Address of delegated voter
+    ///
+    /// If not specified, it will be the same as the owner
     #[clap(long)]
     pub voter_address: AccountAddress,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
