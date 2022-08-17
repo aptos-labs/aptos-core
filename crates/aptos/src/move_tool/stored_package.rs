@@ -5,10 +5,13 @@ use anyhow::bail;
 use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::ScriptABI;
-use framework::natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
+use framework::natives::code::{
+    ModuleMetadata, PackageMetadata, PackageRegistry, PackageRegistryJson, UpgradePolicy,
+};
 use framework::unzip_metadata;
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
+use serde_bytes::ByteBuf;
 use std::fs;
 use std::path::PathBuf;
 
@@ -34,12 +37,13 @@ impl CachedPackageRegistry {
     /// Creates a new registry.
     pub async fn create(url: Url, addr: AccountAddress) -> anyhow::Result<Self> {
         let client = Client::new(url);
-        Ok(Self {
-            inner: client
-                .get_resource::<PackageRegistry>(addr, "0x1::code::PackageRegistry")
-                .await?
-                .into_inner(),
-        })
+        // Need to use a different type to deserialize JSON
+        let from_json = client
+            .get_resource::<PackageRegistryJson>(addr, "0x1::code::PackageRegistry")
+            .await?
+            .into_inner();
+        let inner = bcs::from_bytes::<PackageRegistry>(&bcs::to_bytes(&from_json)?)?;
+        Ok(Self { inner })
     }
 
     /// Returns the list of packages in this registry by name.
@@ -87,6 +91,10 @@ impl<'a> CachedPackageMetadata<'a> {
         self.metadata.upgrade_policy
     }
 
+    pub fn upgrade_number(&self) -> u64 {
+        self.metadata.upgrade_number
+    }
+
     pub fn build_info(&self) -> &str {
         &self.metadata.build_info
     }
@@ -99,7 +107,7 @@ impl<'a> CachedPackageMetadata<'a> {
         &self.metadata.error_map
     }
 
-    pub fn abis(&self) -> &[Vec<u8>] {
+    pub fn abis(&self) -> &[ByteBuf] {
         self.metadata.abis.as_slice()
     }
 
@@ -174,7 +182,6 @@ impl<'a> CachedModuleMetadata<'a> {
         &self.metadata.name
     }
 
-    /// Returns the zipped source.
     pub fn zipped_source(&self) -> &[u8] {
         &self.metadata.source
     }

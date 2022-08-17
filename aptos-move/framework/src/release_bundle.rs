@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::built_package::BuiltPackage;
-use crate::natives::code::{PackageMetadata, UpgradePolicy};
+use crate::natives::code::PackageMetadata;
 use crate::path_in_crate;
 use aptos_types::transaction::ScriptABI;
 use move_deps::move_binary_format::access::ModuleAccess;
@@ -135,7 +135,7 @@ impl ReleasePackage {
     /// Creates a new released package.
     pub fn new(package: BuiltPackage) -> anyhow::Result<Self> {
         // TODO: remove poliocy and put it into toml
-        let metadata = package.extract_metadata(UpgradePolicy::compat())?;
+        let metadata = package.extract_metadata()?;
         Ok(ReleasePackage {
             metadata,
             code: package.extract_code(),

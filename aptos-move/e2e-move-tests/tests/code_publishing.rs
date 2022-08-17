@@ -3,7 +3,7 @@
 
 use aptos_types::account_address::AccountAddress;
 use e2e_move_tests::{assert_abort, assert_success, assert_vm_status, enable_golden, MoveHarness};
-use framework::natives::code::{PackageRegistry, UpgradePolicy};
+use framework::natives::code::PackageRegistry;
 use move_deps::move_core_types::parser::parse_struct_tag;
 use move_deps::move_core_types::vm_status::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,6 @@ struct State {
 // Unable to find package manifest in '/runner/_work/aptos-core/aptos-core/aptos-move/e2e-move-tests/tests/code_publishing.data/pack_stdlib'
 // or in its parents', aptos-move/e2e-move-tests/src/harness.rs:181:14
 
-#[ignore]
 #[test]
 fn code_publishing_basic() {
     // Parallel execution and code publishing don't work well yet, hence all test harness created
@@ -32,7 +31,6 @@ fn code_publishing_basic() {
     assert_success!(h.publish_package(
         &acc,
         &common::package_path("code_publishing.data/pack_initial"),
-        UpgradePolicy::compat(),
     ));
 
     // Validate metadata as expected.
@@ -63,7 +61,6 @@ fn code_publishing_basic() {
     assert_eq!(state.value, 42)
 }
 
-#[ignore]
 #[test]
 fn code_publishing_upgrade_success_no_compat() {
     let mut h = MoveHarness::new_no_parallel();
@@ -73,19 +70,16 @@ fn code_publishing_upgrade_success_no_compat() {
     // Install the initial version with no compat requirements
     assert_success!(h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_initial"),
-        UpgradePolicy::no_compat(),
+        &common::package_path("code_publishing.data/pack_initial_arbitrary"),
     ));
 
     // We should be able to upgrade it with the incompatible version
     assert_success!(h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_upgrade_incompat"),
-        UpgradePolicy::no_compat(),
+        &common::package_path("code_publishing.data/pack_upgrade_incompat_arbitrary"),
     ));
 }
 
-#[ignore]
 #[test]
 fn code_publishing_upgrade_success_compat() {
     let mut h = MoveHarness::new_no_parallel();
@@ -96,18 +90,15 @@ fn code_publishing_upgrade_success_compat() {
     assert_success!(h.publish_package(
         &acc,
         &common::package_path("code_publishing.data/pack_initial"),
-        UpgradePolicy::compat(),
     ));
 
     // We should be able to upgrade it with the compatible version
     assert_success!(h.publish_package(
         &acc,
         &common::package_path("code_publishing.data/pack_upgrade_compat"),
-        UpgradePolicy::compat(),
     ));
 }
 
-#[ignore]
 #[test]
 fn code_publishing_upgrade_fail_compat() {
     let mut h = MoveHarness::new_no_parallel();
@@ -118,19 +109,16 @@ fn code_publishing_upgrade_fail_compat() {
     assert_success!(h.publish_package(
         &acc,
         &common::package_path("code_publishing.data/pack_initial"),
-        UpgradePolicy::compat(),
     ));
 
     // We should not be able to upgrade it with the incompatible version
     let status = h.publish_package(
         &acc,
         &common::package_path("code_publishing.data/pack_upgrade_incompat"),
-        UpgradePolicy::compat(),
     );
     assert_vm_status!(status, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
-#[ignore]
 #[test]
 fn code_publishing_upgrade_fail_immutable() {
     let mut h = MoveHarness::new_no_parallel();
@@ -140,20 +128,17 @@ fn code_publishing_upgrade_fail_immutable() {
     // Install the initial version with immutable requirements
     assert_success!(h.publish_package(
         &acc,
-        &common::package_path("code_publishing.data/pack_initial"),
-        UpgradePolicy::immutable(),
+        &common::package_path("code_publishing.data/pack_initial_immutable"),
     ));
 
     // We should not be able to upgrade it with the compatible version
     let status = h.publish_package(
         &acc,
         &common::package_path("code_publishing.data/pack_upgrade_compat"),
-        UpgradePolicy::immutable(),
     );
     assert_abort!(status, _);
 }
 
-#[ignore]
 #[test]
 fn code_publishing_upgrade_fail_overlapping_module() {
     let mut h = MoveHarness::new_no_parallel();
@@ -164,14 +149,12 @@ fn code_publishing_upgrade_fail_overlapping_module() {
     assert_success!(h.publish_package(
         &acc,
         &common::package_path("code_publishing.data/pack_initial"),
-        UpgradePolicy::compat(),
     ));
 
     // Install a different package with the same module.
     let status = h.publish_package(
         &acc,
         &common::package_path("code_publishing.data/pack_other_name"),
-        UpgradePolicy::compat(),
     );
     assert_abort!(status, _);
 }
@@ -183,7 +166,6 @@ fn code_publishing_upgrade_fail_overlapping_module() {
 /// the flush operation out, then this test fails.
 ///
 /// TODO: for some reason this test did not capture a serious bug in `code::check_coexistence`.
-#[ignore]
 #[test]
 fn code_publishing_upgrade_loader_cache_consistency() {
     let mut h = MoveHarness::new_no_parallel();
@@ -195,13 +177,11 @@ fn code_publishing_upgrade_loader_cache_consistency() {
         h.create_publish_package(
             &acc,
             &common::package_path("code_publishing.data/pack_initial"),
-            UpgradePolicy::compat(),
         ),
         // Compatible with above package
         h.create_publish_package(
             &acc,
             &common::package_path("code_publishing.data/pack_upgrade_compat"),
-            UpgradePolicy::compat(),
         ),
         // Not compatible with above package, but with first one.
         // Correct behavior: should create backward_incompatible error
@@ -209,7 +189,6 @@ fn code_publishing_upgrade_loader_cache_consistency() {
         h.create_publish_package(
             &acc,
             &common::package_path("code_publishing.data/pack_compat_first_not_second"),
-            UpgradePolicy::compat(),
         ),
     ];
     let result = h.run_block(txns);
@@ -218,7 +197,6 @@ fn code_publishing_upgrade_loader_cache_consistency() {
     assert_vm_status!(result[2], StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
 
-#[ignore]
 #[test]
 fn code_publishing_framework_upgrade() {
     let mut h = MoveHarness::new_no_parallel();
@@ -230,11 +208,9 @@ fn code_publishing_framework_upgrade() {
     assert_success!(h.publish_package(
         &acc,
         &common::package_path("code_publishing.data/pack_stdlib"),
-        UpgradePolicy::compat(),
     ));
 }
 
-#[ignore]
 #[test]
 fn code_publishing_framework_upgrade_fail() {
     let mut h = MoveHarness::new_no_parallel();
@@ -246,7 +222,6 @@ fn code_publishing_framework_upgrade_fail() {
     let result = h.publish_package(
         &acc,
         &common::package_path("code_publishing.data/pack_stdlib_incompat"),
-        UpgradePolicy::compat(),
     );
     assert_vm_status!(result, StatusCode::BACKWARD_INCOMPATIBLE_MODULE_UPDATE)
 }
