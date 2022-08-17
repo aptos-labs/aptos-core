@@ -77,7 +77,7 @@ Proceed to the below steps only if your node has passed the NHC for AIT-3 and yo
     
 3. Create wallets for the owner and the voter. 
 
-  In this step you will create wallets for two personas: the owner and the voter. See [Personas, accounts and keys](/nodes/ait/whats-new-in-ait3#personas-accounts-and-keys) for an explanation of personas. 
+  In this step you will create wallets for two personas: the owner and the voter. See [Owner, operator and voter personas](/nodes/ait/whats-new-in-ait3#owner-operator-and-voter-personas) for an explanation of personas. 
     
     1. Create the first wallet. **This first wallet will always be the owner wallet**.
         1. Open the Aptos Wallet extension from the Extensions section of the Chrome browser, or by clicking on the puzzle piece on top right of the browser and selecting Aptos Wallet.
