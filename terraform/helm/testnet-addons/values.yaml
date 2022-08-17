@@ -1,14 +1,5 @@
-aws:
-  # -- AWS region resources are deployed in
-  region:
-  # -- AWS EKS cluster resources are deployed in
-  cluster_name:
-  # -- AWS VPC ID resources are deployed in
-  vpc_id:
-  # -- AWS Role ARN for k8s integrations
-  role_arn:
-  # -- Route53 zone name to create external-dns records in
-  zone_name:
+# -- Default image tag to use for all aptos images
+imageTag: devnet
 
 genesis:
   # -- Validator username prefix, used to get genesis secrets. This should be the fullname for the aptos-node helm release
