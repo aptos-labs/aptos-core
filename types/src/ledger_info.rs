@@ -182,7 +182,7 @@ pub fn generate_ledger_info_with_sig(
     LedgerInfoWithSignatures::new(
         ledger_info,
         validator_verifier
-            .aggregate_signatures_and_get_keys(&partial_sig)
+            .aggregate_signatures(&partial_sig)
             .unwrap()
             .0,
     )
@@ -376,10 +376,7 @@ impl Arbitrary for LedgerInfoWithV0 {
                     let signature = dummy_signature.clone();
                     partial_sig.add_signature(signer.author(), signature);
                 }
-                let aggregated_sig = verifier
-                    .aggregate_signatures_and_get_keys(&partial_sig)
-                    .unwrap()
-                    .0;
+                let aggregated_sig = verifier.aggregate_signatures(&partial_sig).unwrap().0;
                 Self {
                     ledger_info,
                     signatures: aggregated_sig,

@@ -176,7 +176,7 @@ impl PendingVotes {
             let tc_voting_power = match validator_verifier.check_voting_power(partial_tc.signers())
             {
                 Ok(_) => {
-                    return match partial_tc.aggregate_signatures(validator_verifier, true) {
+                    return match partial_tc.aggregate_signatures(validator_verifier) {
                         Ok(tc_with_sig) => {
                             VoteReceptionResult::New2ChainTimeoutCertificate(Arc::new(tc_with_sig))
                         }
