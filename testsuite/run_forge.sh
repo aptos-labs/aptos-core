@@ -78,13 +78,17 @@ set_forge_namespace() {
     FORGE_NAMESPACE=${FORGE_NAMESPACE:0:64}
 }
 
-# Set an image tag to use
-set_image_tag() {
+# Gets some image tags to use based on the git history
+# Sets:
+#  IMAGE_TAG -- the latest built image
+#  OLD_IMAGE_TAG -- the second latest built image
+get_image_tags() {
     echo "Ensure image exists"
     # if IMAGE_TAG not set, check the last few commits on HEAD
     if [ -z "$IMAGE_TAG" ]; then
         echo "IMAGE_TAG not set, trying the latest commits before HEAD"
-        commit_threshold=5
+        commit_threshold=20
+        # get the IMAGE_TAG
         for i in $(seq 0 $commit_threshold); do
             IMAGE_TAG_DEFAULT=$(git rev-parse HEAD~$i)
             echo "Trying tag: ${IMAGE_TAG_DEFAULT}"
@@ -93,7 +97,19 @@ set_image_tag() {
             if [ "$?" -eq 0 ]; then
                 echo "Image tag exists. Using tag: ${IMAGE_TAG_DEFAULT}"
                 IMAGE_TAG=$IMAGE_TAG_DEFAULT
-                return 0
+                break
+            fi
+        done
+        # get the OLD_IMAGE_TAG
+        for i in $(seq 1 $commit_threshold); do
+            IMAGE_TAG_DEFAULT=$(git rev-parse $IMAGE_TAG~$i)
+            echo "Trying tag: ${IMAGE_TAG_DEFAULT}"
+            git --no-pager log --format=%B -n 1 $IMAGE_TAG_DEFAULT
+            img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG_DEFAULT 2>/dev/null)
+            if [ "$?" -eq 0 ]; then
+                echo "Image tag exists. Using tag: ${IMAGE_TAG_DEFAULT}"
+                OLD_IMAGE_TAG=$IMAGE_TAG_DEFAULT
+                break
             fi
         done
         # if IMAGE_TAG still not set after checking HEAD,
@@ -163,10 +179,17 @@ set_forge_namespace
 HUMIO_LOGS_LINK="https://cloud.us.humio.com/k8s/search?query=%24forgeLogs%28validator_instance%3Dvalidator-0%29%20%7C%20$FORGE_NAMESPACE%20&live=true&start=24h&widgetType=list-view&columns=%5B%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22%40timestamp%22%2C%22format%22%3A%22timestamp%22%2C%22width%22%3A180%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22level%22%2C%22format%22%3A%22text%22%2C%22width%22%3A54%7D%2C%7B%22type%22%3A%22link%22%2C%22openInNewBrowserTab%22%3Atrue%2C%22style%22%3A%22button%22%2C%22hrefTemplate%22%3A%22https%3A%2F%2Fgithub.com%2Faptos-labs%2Faptos-core%2Fpull%2F%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22textTemplate%22%3A%22%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22header%22%3A%22Forge%20PR%22%2C%22width%22%3A79%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.namespace%22%2C%22format%22%3A%22text%22%2C%22width%22%3A104%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.pod_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A126%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.container_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A85%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22message%22%2C%22format%22%3A%22text%22%7D%5D&newestAtBottom=true&showOnlyFirstLine=false"
 
 # set the image tag in IMAGE_TAG
-set_image_tag
-if [ -z "$UPGRADE_IMAGE_TAG" ]; then
-    UPGRADE_IMAGE_TAG=$IMAGE_TAG
-fi
+get_image_tags
+# forge itself should run the latest
+FORGE_IMAGE_TAG=$IMAGE_TAG
+# we want to upgrade to the latest
+UPGRADE_IMAGE_TAG=$IMAGE_TAG
+# and start with the oldest
+IMAGE_TAG=$OLD_IMAGE_TAG
+echo "Image tags:"
+echo "  forge: $FORGE_IMAGE_TAG"
+echo "  upgrade: $UPGRADE_IMAGE_TAG"
+echo "  base: $IMAGE_TAG"
 
 # set the o11y resource locations in
 # ES_DEFAULT_INDEX, ES_BASE_URL, GRAFANA_BASE_URL
@@ -230,6 +253,7 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
         -e "s/{FORGE_TEST_SUITE}/${FORGE_TEST_SUITE}/g" \
         -e "s/{FORGE_RUNNER_DURATION_SECS}/${FORGE_RUNNER_DURATION_SECS}/g" \
         -e "s/{FORGE_RUNNER_TPS_THRESHOLD}/${FORGE_RUNNER_TPS_THRESHOLD}/g" \
+        -e "s/{FORGE_IMAGE_TAG}/${FORGE_IMAGE_TAG}/g" \
         -e "s/{IMAGE_TAG}/${IMAGE_TAG}/g" \
         -e "s/{UPGRADE_IMAGE_TAG}/${UPGRADE_IMAGE_TAG}/g" \
         -e "s/{AWS_ACCOUNT_NUM}/${AWS_ACCOUNT_NUM}/g" \
