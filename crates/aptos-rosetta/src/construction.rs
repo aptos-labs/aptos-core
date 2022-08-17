@@ -477,7 +477,7 @@ async fn construction_payloads(
         InternalOperation::Transfer(transfer) => {
             is_native_coin(&transfer.currency)?;
             (
-                aptos_stdlib::aptos_coin_transfer(transfer.receiver, transfer.amount),
+                aptos_stdlib::account_transfer(transfer.receiver, transfer.amount),
                 transfer.sender,
             )
         }
