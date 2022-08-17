@@ -60,14 +60,6 @@ impl GovernanceTool {
 /// Submit proposal to other validators to be proposed on
 #[derive(Parser)]
 pub struct SubmitProposal {
-    /// Path to the Move script for the proposal
-    #[clap(long, parse(from_os_str))]
-    pub script_path: PathBuf,
-
-    /// Git hash or branch of the framework in aptos core
-    #[clap(long)]
-    pub framework_git_rev: String,
-
     /// Code location of the script to be voted on
     #[clap(long)]
     pub(crate) metadata_url: Url,
@@ -78,6 +70,8 @@ pub struct SubmitProposal {
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) pool_address_args: PoolAddressArgs,
+    #[clap(flatten)]
+    pub(crate) compile_proposal_args: CompileProposalArgs,
 }
 
 #[async_trait]
@@ -87,23 +81,7 @@ impl CliCommand<Transaction> for SubmitProposal {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
-        // Check script file
-        let script_path = self.script_path.as_path();
-        if self.script_path.exists() {
-            return Err(CliError::CommandArgumentError(format!(
-                "{} does not exist",
-                script_path.display()
-            )));
-        } else if self.script_path.is_dir() {
-            return Err(CliError::CommandArgumentError(format!(
-                "{} is a directory",
-                script_path.display()
-            )));
-        }
-
-        // Compile script
-        let (_bytecode, script_hash) =
-            compile_in_temp_dir(script_path, &self.framework_git_rev, self.prompt_options)?;
+        let (_bytecode, script_hash) = self.compile_proposal_args.compile()?;
 
         // Validate the proposal metadata
         let (metadata, metadata_hash) = get_metadata(self.metadata_url.clone()).await?;
@@ -281,7 +259,7 @@ fn compile_in_temp_dir(
         sources_dir.join(file_name)
     } else {
         // If for some reason we can't get the move file
-        sources_dir.join("script.mv")
+        sources_dir.join("script.move")
     };
     fs::copy(script_path, new_script_path.as_path()).map_err(|err| {
         CliError::IO(
@@ -342,14 +320,6 @@ fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
 /// Execute a proposal that has passed voting requirements
 #[derive(Parser)]
 pub struct ExecuteProposal {
-    /// Path to the Move script for the proposal
-    #[clap(long, parse(from_os_str))]
-    pub script_path: PathBuf,
-
-    /// Git hash or branch of the framework in aptos core
-    #[clap(long)]
-    pub framework_git_rev: String,
-
     /// Arguments combined with their type separated by spaces.
     ///
     /// Supported types [u8, u64, u128, bool, hex, string, address]
@@ -366,9 +336,8 @@ pub struct ExecuteProposal {
 
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-
     #[clap(flatten)]
-    pub(crate) prompt_options: PromptOptions,
+    pub(crate) compile_proposal_args: CompileProposalArgs,
 }
 
 impl TryFrom<&ArgWithType> for TransactionArgument {
@@ -417,25 +386,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
-        // TODO: Make one object so this code isn't copied
-        // Check script file
-        let script_path = self.script_path.as_path();
-        if self.script_path.exists() {
-            return Err(CliError::CommandArgumentError(format!(
-                "{} does not exist",
-                script_path.display()
-            )));
-        } else if self.script_path.is_dir() {
-            return Err(CliError::CommandArgumentError(format!(
-                "{} is a directory",
-                script_path.display()
-            )));
-        }
-
-        // Compile script
-        let (bytecode, _script_hash) =
-            compile_in_temp_dir(script_path, &self.framework_git_rev, self.prompt_options)?;
-
+        let (bytecode, _script_hash) = self.compile_proposal_args.compile()?;
         // TODO: Check hash so we don't do a failed roundtrip?
 
         // TODO: Clean these up to be common with the run function in move
@@ -460,5 +411,41 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
             .submit_transaction(txn)
             .await
             .map(TransactionSummary::from)
+    }
+}
+
+/// Execute a proposal that has passed voting requirements
+#[derive(Parser)]
+pub struct CompileProposalArgs {
+    /// Path to the Move script for the proposal
+    #[clap(long, parse(from_os_str))]
+    pub script_path: PathBuf,
+
+    /// Git hash or branch of the framework in aptos core
+    #[clap(long)]
+    pub framework_git_rev: String,
+
+    #[clap(flatten)]
+    pub prompt_options: PromptOptions,
+}
+
+impl CompileProposalArgs {
+    fn compile(self) -> CliTypedResult<(Vec<u8>, HashValue)> {
+        // Check script file
+        let script_path = self.script_path.as_path();
+        if self.script_path.exists() {
+            return Err(CliError::CommandArgumentError(format!(
+                "{} does not exist",
+                script_path.display()
+            )));
+        } else if self.script_path.is_dir() {
+            return Err(CliError::CommandArgumentError(format!(
+                "{} is a directory",
+                script_path.display()
+            )));
+        }
+
+        // Compile script
+        compile_in_temp_dir(script_path, &self.framework_git_rev, self.prompt_options)
     }
 }
