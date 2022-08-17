@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_08_11_165538) do
+ActiveRecord::Schema[7.0].define(version: 2022_08_17_185306) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -312,6 +312,17 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_11_165538) do
     t.index ["user_id"], name: "index_nfts_on_user_id"
   end
 
+  create_table "notification_preferences", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.integer "delivery_method", default: 0, null: false
+    t.boolean "node_upgrade_notification", default: true, null: false
+    t.boolean "governance_proposal_notification", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id", "delivery_method"], name: "index_notification_preferences_on_user_id_and_delivery_method", unique: true
+    t.index ["user_id"], name: "index_notification_preferences_on_user_id"
+  end
+
   create_table "notifications", force: :cascade do |t|
     t.string "recipient_type", null: false
     t.bigint "recipient_id", null: false
@@ -415,4 +426,5 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_11_165538) do
   add_foreign_key "project_members", "projects"
   add_foreign_key "project_members", "users"
   add_foreign_key "projects", "users"
+  add_foreign_key "notification_preferences", "users"
 end
