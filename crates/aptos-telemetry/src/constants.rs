@@ -7,6 +7,7 @@
 pub(crate) const ENV_APTOS_DISABLE_TELEMETRY: &str = "APTOS_DISABLE_TELEMETRY";
 pub(crate) const ENV_GA_MEASUREMENT_ID: &str = "GA_MEASUREMENT_ID";
 pub(crate) const ENV_GA_API_SECRET: &str = "GA_API_SECRET";
+pub(crate) const ENV_TELEMETRY_SERVICE_URL: &str = "TELEMETRY_SERVICE_URL";
 
 // Default Google Analytic values.
 // TODO: Rotate these periodically.

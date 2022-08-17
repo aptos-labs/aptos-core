@@ -27,7 +27,7 @@ use aptos_logger::prelude::*;
 use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
 use aptos_types::chain_id::ChainId;
 
-use crate::constants::PROMETHEUS_PUSH_METRICS_FREQ_SECS;
+use crate::constants::{PROMETHEUS_PUSH_METRICS_FREQ_SECS, ENV_TELEMETRY_SERVICE_URL};
 use crate::{
     build_information::create_build_info_telemetry_event,
     constants::{
@@ -110,7 +110,10 @@ where
 
 /// Spawns the dedicated telemetry service that operates periodically
 async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config: NodeConfig) {
-    let telemetry_sender = TelemetrySender::new(TELEMETRY_SERVICE_URL, chain_id, &node_config);
+    let telemetry_svc_url =
+        env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or(TELEMETRY_SERVICE_URL.into());
+
+    let telemetry_sender = TelemetrySender::new(telemetry_svc_url, chain_id, &node_config);
 
     // Send build information once (only on startup)
     send_build_information(

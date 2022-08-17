@@ -49,9 +49,9 @@ pub(crate) struct TelemetrySender {
 }
 
 impl TelemetrySender {
-    pub fn new(base_url: &str, chain_id: ChainId, node_config: &NodeConfig) -> Self {
+    pub fn new(base_url: String, chain_id: ChainId, node_config: &NodeConfig) -> Self {
         Self {
-            base_url: base_url.into(),
+            base_url,
             chain_id,
             peer_id: node_config.peer_id().unwrap_or(PeerId::ZERO),
             client: reqwest::Client::new(),
@@ -297,7 +297,7 @@ mod tests {
         });
 
         let node_config = NodeConfig::default();
-        let client = TelemetrySender::new(&server.base_url(), ChainId::default(), &node_config);
+        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
 
         let result1 = client.server_public_key().await;
         let result2 = client.server_public_key().await;
@@ -349,7 +349,7 @@ mod tests {
         });
 
         let node_config = NodeConfig::default();
-        let client = TelemetrySender::new(&server.base_url(), ChainId::default(), &node_config);
+        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
         {
             *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
         }
@@ -388,7 +388,7 @@ mod tests {
         });
 
         let node_config = NodeConfig::default();
-        let client = TelemetrySender::new(&server.base_url(), ChainId::default(), &node_config);
+        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
         {
             *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
         }
