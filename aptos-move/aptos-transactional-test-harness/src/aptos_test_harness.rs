@@ -446,10 +446,13 @@ impl<'a> AptosTestAdapter<'a> {
             Some(max_gas_amount) => max_gas_amount,
             None => {
                 if gas_unit_price == 0 {
-                    max_number_of_gas_units
+                    u64::from(max_number_of_gas_units)
                 } else {
                     let account_balance = self.fetch_account_balance(signer_addr).unwrap();
-                    std::cmp::min(max_number_of_gas_units, account_balance / gas_unit_price)
+                    std::cmp::min(
+                        u64::from(max_number_of_gas_units),
+                        account_balance / gas_unit_price,
+                    )
                 }
             }
         };

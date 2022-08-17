@@ -4,6 +4,7 @@
 use better_any::{Tid, TidAble};
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
+    move_core_types::gas_algebra::InternalGas,
     move_vm_runtime::native_functions::{NativeContext, NativeFunction},
     move_vm_types::{
         loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
@@ -37,7 +38,7 @@ impl NativeTransactionContext {
  **************************************************************************************************/
 #[derive(Clone, Debug)]
 pub struct GetScriptHashGasParameters {
-    pub base_cost: u64,
+    pub base_cost: InternalGas,
 }
 
 fn native_get_script_hash(

@@ -3,7 +3,7 @@
 
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
-    move_core_types::account_address::AccountAddress,
+    move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas},
     move_vm_runtime::native_functions::{NativeContext, NativeFunction},
     move_vm_types::{
         loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
@@ -21,7 +21,7 @@ use std::sync::Arc;
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct CreateAddressGasParameters {
-    pub base_cost: u64,
+    pub base_cost: InternalGas,
 }
 
 fn native_create_address(
@@ -61,7 +61,7 @@ pub fn make_native_create_address(gas_params: CreateAddressGasParameters) -> Nat
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct CreateSignerGasParameters {
-    pub base_cost: u64,
+    pub base_cost: InternalGas,
 }
 
 fn native_create_signer(

@@ -54,5 +54,6 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.code.request_publish.base_cost, "code.request_publish.base", 1],
     [.code.request_publish.unit_cost, "code.request_publish.unit", 1],
 
+    [.event.write_to_event_store.base_cost, "event.write_to_event_store.base", 1],
     [.event.write_to_event_store.unit_cost, "event.write_to_event_store.unit", 1],
 ]);

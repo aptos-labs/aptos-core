@@ -4,7 +4,7 @@
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
     move_core_types::{
-        gas_schedule::GasAlgebra,
+        gas_algebra::{InternalGas, InternalGasPerAbstractMemoryUnit},
         language_storage::{StructTag, TypeTag},
     },
     move_vm_runtime::native_functions::{NativeContext, NativeFunction},
@@ -46,8 +46,8 @@ fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std:
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct TypeOfGasParameters {
-    pub base_cost: u64,
-    pub unit_cost: u64,
+    pub base_cost: InternalGas,
+    pub unit_cost: InternalGasPerAbstractMemoryUnit,
 }
 
 fn native_type_of(
@@ -59,9 +59,10 @@ fn native_type_of(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.is_empty());
 
+    // TODO(Gas): Stop using abstract memory size
     let mut cost = gas_params.base_cost;
-    if gas_params.unit_cost > 0 {
-        cost += gas_params.unit_cost * ty_args[0].size().get()
+    if gas_params.unit_cost > 0.into() {
+        cost += gas_params.unit_cost * ty_args[0].size()
     }
 
     let type_tag = context.type_to_type_tag(&ty_args[0])?;
@@ -93,8 +94,8 @@ pub fn make_native_type_of(gas_params: TypeOfGasParameters) -> NativeFunction {
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct TypeNameGasParameters {
-    pub base_cost: u64,
-    pub unit_cost: u64,
+    pub base_cost: InternalGas,
+    pub unit_cost: InternalGasPerAbstractMemoryUnit,
 }
 
 fn native_type_name(
@@ -106,9 +107,10 @@ fn native_type_name(
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.is_empty());
 
+    // TODO(Gas): Stop using abstract memory size
     let mut cost = gas_params.base_cost;
-    if gas_params.unit_cost > 0 {
-        cost += gas_params.unit_cost * ty_args[0].size().get()
+    if gas_params.unit_cost > 0.into() {
+        cost += gas_params.unit_cost * ty_args[0].size()
     }
 
     let type_tag = context.type_to_type_tag(&ty_args[0])?;
