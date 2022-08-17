@@ -14,6 +14,8 @@ use std::convert::TryFrom;
 use std::ops::Add;
 use storage_interface::{DbReader, Order};
 
+use super::fetch_metadata::ValidatorInfo;
+
 /// Single validator stats
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ValidatorStats {
@@ -25,6 +27,8 @@ pub struct ValidatorStats {
     pub votes: u32,
     /// Number of transactions in a block
     pub transactions: u32,
+    /// Voting power
+    pub voting_power: u64,
 }
 
 impl ValidatorStats {
@@ -94,6 +98,7 @@ impl Add for ValidatorStats {
             proposal_failures: self.proposal_failures + other.proposal_failures,
             votes: self.votes + other.votes,
             transactions: self.transactions + other.transactions,
+            voting_power: 0, // cannot aggregate voting power.
         }
     }
 }
@@ -152,6 +157,7 @@ impl Add for EpochStats {
                         proposal_successes: 0,
                         votes: 0,
                         transactions: 0,
+                        voting_power: 0,
                     }),
             );
         }
@@ -221,25 +227,33 @@ impl AnalyzeValidators {
     }
 
     /// Analyze single epoch
-    pub fn analyze(
-        mut blocks: Vec<VersionedNewBlockEvent>,
-        validators: &[AccountAddress],
-    ) -> EpochStats {
+    pub fn analyze(blocks: &[VersionedNewBlockEvent], validators: &[ValidatorInfo]) -> EpochStats {
         assert!(
             validators.iter().as_slice().windows(2).all(|w| {
-                w[0].partial_cmp(&w[1])
+                w[0].validator_index
+                    .partial_cmp(&w[1].validator_index)
                     .map(|o| o != Ordering::Greater)
                     .unwrap_or(false)
             }),
             "Validators need to be sorted"
         );
-        blocks.sort_by_key(|e| e.event.round());
+        assert!(
+            blocks.iter().as_slice().windows(2).all(|w| {
+                w[0].event
+                    .round()
+                    .partial_cmp(&w[1].event.round())
+                    .map(|o| o != Ordering::Greater)
+                    .unwrap_or(false)
+            }),
+            "Blocks need to be sorted"
+        );
 
         let mut successes = HashMap::<AccountAddress, u32>::new();
         let mut failures = HashMap::<AccountAddress, u32>::new();
         let mut votes = HashMap::<AccountAddress, u32>::new();
         let mut transactions = HashMap::<AccountAddress, u32>::new();
 
+        let mut trimmed_rounds = 0;
         let mut nil_blocks = 0;
         let mut previous_round = 0;
         for (pos, block) in blocks.iter().enumerate() {
@@ -248,13 +262,16 @@ impl AnalyzeValidators {
             if is_nil {
                 nil_blocks += 1;
             }
-            if event.round() + (if is_nil { 1 } else { 0 })
-                != previous_round + 1 + event.failed_proposer_indices().len() as u64
-            {
+            let expected_round = previous_round
+                + (if is_nil { 0 } else { 1 })
+                + event.failed_proposer_indices().len() as u64;
+            if event.round() != expected_round {
                 println!(
                     "Missing failed AccountAddresss : {} {:?}",
                     previous_round, &event
                 );
+                assert!(expected_round < event.round());
+                trimmed_rounds += event.round() - expected_round;
             }
             previous_round = event.round();
 
@@ -264,7 +281,7 @@ impl AnalyzeValidators {
 
             for failed_proposer_index in event.failed_proposer_indices() {
                 *failures
-                    .entry(validators[*failed_proposer_index as usize])
+                    .entry(validators[*failed_proposer_index as usize].address)
                     .or_insert(0) += 1;
             }
 
@@ -276,7 +293,7 @@ impl AnalyzeValidators {
             );
             for (i, validator) in validators.iter().enumerate() {
                 if previous_block_votes_bitvec.is_set(i as u16) {
-                    *votes.entry(*validator).or_insert(0) += 1;
+                    *votes.entry(validator.address).or_insert(0) += 1;
                 }
             }
 
@@ -301,9 +318,13 @@ impl AnalyzeValidators {
         let total_transactions: u32 = transactions.values().sum();
         let total_rounds = total_successes + total_failures;
         assert_eq!(
-            total_rounds, previous_round as u32,
-            "{} {}",
-            total_rounds, previous_round
+            total_rounds + u32::try_from(trimmed_rounds).unwrap(),
+            previous_round as u32,
+            "{} success + {} failures + {} trimmed != {}",
+            total_successes,
+            total_failures,
+            trimmed_rounds,
+            previous_round
         );
 
         return EpochStats {
@@ -311,12 +332,13 @@ impl AnalyzeValidators {
                 .iter()
                 .map(|validator| {
                     (
-                        *validator,
+                        validator.address,
                         ValidatorStats {
-                            proposal_successes: *successes.get(validator).unwrap_or(&0),
-                            proposal_failures: *failures.get(validator).unwrap_or(&0),
-                            votes: *votes.get(validator).unwrap_or(&0),
-                            transactions: *transactions.get(validator).unwrap_or(&0),
+                            proposal_successes: *successes.get(&validator.address).unwrap_or(&0),
+                            proposal_failures: *failures.get(&validator.address).unwrap_or(&0),
+                            votes: *votes.get(&validator.address).unwrap_or(&0),
+                            transactions: *transactions.get(&validator.address).unwrap_or(&0),
+                            voting_power: validator.voting_power,
                         },
                     )
                 })
@@ -332,7 +354,7 @@ impl AnalyzeValidators {
     /// Print validator stats in a table
     pub fn print_detailed_epoch_table(
         epoch_stats: &EpochStats,
-        extra: Option<&HashMap<AccountAddress, &str>>,
+        extra: Option<(&str, &HashMap<AccountAddress, String>)>,
         sort_by_health: bool,
     ) {
         println!(
@@ -342,8 +364,15 @@ impl AnalyzeValidators {
             100.0 * epoch_stats.nil_blocks as f32 / epoch_stats.total_rounds as f32,
         );
         println!(
-            "{: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | ",
-            "elected", "% rounds", "% failed", "succeded", "failed", "voted", "transact"
+            "{: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <10} | {: <30}",
+            "elected",
+            "% rounds",
+            "% failed",
+            "succeded",
+            "failed",
+            "voted",
+            "transact",
+            extra.map(|(column, _)| column).unwrap_or("")
         );
 
         let mut validator_order: Vec<&AccountAddress> =
@@ -382,10 +411,10 @@ impl AnalyzeValidators {
                 cur_stats.proposal_failures,
                 cur_stats.votes,
                 cur_stats.transactions,
-                if let Some(extra_map) = extra {
+                if let Some((_, extra_map)) = extra {
                     format!(
                         "{: <30} | {}",
-                        extra_map.get(validator).unwrap_or(&""),
+                        extra_map.get(validator).unwrap_or(&"".to_string()),
                         validator
                     )
                 } else {
