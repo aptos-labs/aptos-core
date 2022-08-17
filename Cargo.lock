@@ -172,6 +172,7 @@ dependencies = [
  "regex",
  "reqwest 0.11.11",
  "serde 1.0.141",
+ "serde_bytes",
  "serde_json",
  "serde_yaml 0.8.26",
  "short-hex-str",
@@ -3262,6 +3263,7 @@ checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
 name = "e2e-move-tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos",
  "aptos-crypto",
  "aptos-keygen",
@@ -3734,10 +3736,10 @@ dependencies = [
  "better_any",
  "clap 3.2.16",
  "curve25519-dalek",
- "flate2",
  "include_dir 0.7.2",
  "libsecp256k1",
  "log",
+ "miniz_oxide",
  "move-deps",
  "once_cell",
  "proptest",

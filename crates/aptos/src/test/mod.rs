@@ -16,7 +16,8 @@ use crate::common::types::{
 };
 use crate::common::utils::write_to_file;
 use crate::move_tool::{
-    ArgWithType, CompilePackage, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
+    ArgWithType, CompilePackage, IncludedArtifacts, InitPackage, MemberId, PublishPackage,
+    RunFunction, TestPackage,
 };
 use crate::node::{
     AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
@@ -42,7 +43,6 @@ use aptos_types::{
     on_chain_config::ConsensusScheme, validator_config::ValidatorConfig,
     validator_info::ValidatorInfo,
 };
-use framework::natives::code::UpgradePolicy;
 use reqwest::Url;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -662,13 +662,13 @@ impl CliTestFramework {
         gas_options: Option<GasOptions>,
         account_strs: BTreeMap<&str, &str>,
         legacy_flow: bool,
-        upgrade_policy: Option<UpgradePolicy>,
     ) -> CliTypedResult<TransactionSummary> {
         PublishPackage {
             move_options: self.move_options(account_strs),
             txn_options: self.transaction_options(index, gas_options),
             legacy_flow,
-            upgrade_policy,
+            override_size_check: false,
+            included_artifacts: IncludedArtifacts::All,
         }
         .execute()
         .await

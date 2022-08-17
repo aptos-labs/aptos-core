@@ -6,7 +6,6 @@
 mod aptos;
 
 pub use aptos::*;
-use std::io::{Read, Write};
 
 mod generated;
 pub use generated::aptos_framework_sdk_builder;
@@ -23,9 +22,9 @@ pub use release_builder::*;
 mod release_bundle;
 pub use release_bundle::*;
 
-use flate2::read::GzDecoder;
-use flate2::write::GzEncoder;
-use flate2::Compression;
+use anyhow::bail;
+use miniz_oxide::deflate::compress_to_vec;
+use miniz_oxide::inflate::decompress_to_vec;
 use std::path::PathBuf;
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf
@@ -41,17 +40,14 @@ pub(crate) fn path_relative_to_crate(path: PathBuf) -> PathBuf {
 }
 
 pub fn zip_metadata(data: &[u8]) -> anyhow::Result<Vec<u8>> {
-    let mut gz = GzEncoder::new(Vec::new(), Compression::best());
-    gz.write_all(data)?;
-    let result = gz.finish()?;
-    Ok(result)
+    Ok(compress_to_vec(data, 7))
 }
 
 pub fn unzip_metadata(data: &[u8]) -> anyhow::Result<Vec<u8>> {
-    let mut gz = GzDecoder::new(data);
-    let mut result = vec![];
-    gz.read_to_end(&mut result)?;
-    Ok(result)
+    match decompress_to_vec(data) {
+        Ok(r) => Ok(r),
+        Err(e) => bail!("decompression error: {:?}", e),
+    }
 }
 
 #[cfg(test)]
@@ -59,7 +55,7 @@ mod tests {
     use crate::{ReleaseBundle, ReleaseTarget};
 
     #[test]
-    fn current_release_bundle_up_to_date() {
+    fn head_release_bundle_up_to_date() {
         let tempdir = tempfile::tempdir().unwrap();
         let actual_name = tempdir
             .path()
