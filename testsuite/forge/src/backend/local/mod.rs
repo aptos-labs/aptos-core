@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Factory, GenesisConfig, Result, Swarm, Version};
+use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version};
 use anyhow::{bail, Context};
 use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn};
 use framework::ReleaseBundle;
@@ -168,6 +168,8 @@ impl Factory for LocalFactory {
         _genesis_version: &Version,
         genesis_config: Option<&GenesisConfig>,
         _cleanup_duration: Duration,
+        _genesis_config_fn: Option<GenesisConfigFn>,
+        _node_config_fn: Option<NodeConfigFn>,
     ) -> Result<Box<dyn Swarm>> {
         let framework = match genesis_config {
             Some(config) => match config {

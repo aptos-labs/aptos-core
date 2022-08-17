@@ -395,7 +395,7 @@ impl NodeConfig {
         self.test = Some(test);
     }
 
-    fn default_config(serialized: &str, path: &'static str) -> Self {
+    pub fn default_config(serialized: &str, path: &'static str) -> Self {
         let config = Self::parse(serialized).unwrap_or_else(|e| panic!("Error in {}: {}", path, e));
         config
             .validate_network_configs()

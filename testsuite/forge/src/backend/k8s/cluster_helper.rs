@@ -3,8 +3,8 @@
 
 use crate::{
     get_fullnodes, get_validators, k8s_wait_genesis_strategy, k8s_wait_nodes_strategy,
-    nodes_healthcheck, wait_stateful_set, Create, K8sApi, K8sNode, Result,
-    APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_ROOT_KEY,
+    nodes_healthcheck, wait_stateful_set, Create, GenesisConfigFn, K8sApi, K8sNode, NodeConfigFn,
+    Result, APTOS_NODE_HELM_CHART_PATH, APTOS_NODE_HELM_RELEASE_NAME, DEFAULT_ROOT_KEY,
     FULLNODE_HAPROXY_SERVICE_SUFFIX, FULLNODE_SERVICE_SUFFIX, GENESIS_HELM_CHART_PATH,
     GENESIS_HELM_RELEASE_NAME, HELM_BIN, KUBECTL_BIN, MANAGEMENT_CONFIGMAP_PREFIX,
     NAMESPACE_CLEANUP_THRESHOLD_SECS, POD_CLEANUP_THRESHOLD_SECS, VALIDATOR_HAPROXY_SERVICE_SUFFIX,
@@ -30,6 +30,7 @@ use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
+    fs,
     fs::File,
     io::Write,
     net::TcpListener,
@@ -43,21 +44,6 @@ use tempfile::TempDir;
 use thiserror::Error;
 use tokio::time::Duration;
 
-// We use the macros below to get around the current limitations of the
-// "include_str!" macro (which loads the file content at compile time, rather
-// than at runtime).
-
-// Helm value file names.
-macro_rules! APTOS_NODE_FORGE_HELM_VALUES {
-    () => {
-        "helm-values/aptos-node-values.yaml"
-    };
-}
-macro_rules! GENESIS_FORGE_HELM_VALUES {
-    () => {
-        "helm-values/genesis-values.yaml"
-    };
-}
 /// Gets a free port
 pub fn get_free_port() -> u32 {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -402,6 +388,8 @@ pub async fn install_testnet_resources(
     genesis_modules_path: Option<String>,
     use_port_forward: bool,
     enable_haproxy: bool,
+    genesis_helm_config_fn: Option<GenesisConfigFn>,
+    node_helm_config_fn: Option<NodeConfigFn>,
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     let kube_client = create_k8s_client().await;
 
@@ -414,41 +402,35 @@ pub async fn install_testnet_resources(
     let new_era = generate_new_era();
 
     // get forge override helm values and cache it
-    let aptos_node_forge_helm_values_yaml = format!(
-        include_str!(APTOS_NODE_FORGE_HELM_VALUES!()),
-        num_validators = num_validators,
-        num_fullnodes = num_fullnodes,
-        era = &new_era,
-        image_tag = &node_image_tag,
-        enable_haproxy = enable_haproxy,
-        namespace = &kube_namespace,
-    );
+
+    let aptos_node_forge_helm_values_yaml = construct_node_helm_values(
+        node_helm_config_fn,
+        fs::read_to_string(
+            "testsuite/forge/src/backend/k8s/helm-values/aptos-node-default-values.yaml",
+        )
+        .expect("Not able to read default value file"),
+        kube_namespace.clone(),
+        new_era.clone(),
+        num_validators,
+        num_fullnodes,
+        node_image_tag,
+        enable_haproxy,
+    )?;
+
     let aptos_node_forge_values_file = dump_string_to_file(
         "aptos-node-values.yaml".to_string(),
         aptos_node_forge_helm_values_yaml,
         &tmp_dir,
     )?;
-    let validator_internal_host_suffix = if enable_haproxy {
-        VALIDATOR_HAPROXY_SERVICE_SUFFIX
-    } else {
-        VALIDATOR_SERVICE_SUFFIX
-    };
-    let fullnode_internal_host_suffix = if enable_haproxy {
-        FULLNODE_HAPROXY_SERVICE_SUFFIX
-    } else {
-        FULLNODE_SERVICE_SUFFIX
-    };
 
-    let genesis_forge_helm_values_yaml = format!(
-        include_str!(GENESIS_FORGE_HELM_VALUES!()),
-        num_validators = num_validators,
-        image_tag = &genesis_image_tag,
-        era = &new_era,
-        root_key = DEFAULT_ROOT_KEY,
-        validator_internal_host_suffix = validator_internal_host_suffix,
-        fullnode_internal_host_suffix = fullnode_internal_host_suffix,
-        namespace = &kube_namespace,
-    );
+    let genesis_forge_helm_values_yaml = construct_genesis_helm_values(
+        genesis_helm_config_fn,
+        kube_namespace.clone(),
+        new_era.clone(),
+        num_validators,
+        genesis_image_tag,
+        enable_haproxy,
+    )?;
     let genesis_forge_values_file = dump_string_to_file(
         "genesis-values.yaml".to_string(),
         genesis_forge_helm_values_yaml,
@@ -501,6 +483,65 @@ pub async fn install_testnet_resources(
     .await?;
 
     Ok((validators, fullnodes))
+}
+
+pub fn construct_node_helm_values(
+    node_helm_config_fn: Option<NodeConfigFn>,
+    base_helm_values: String,
+    kube_namespace: String,
+    era: String,
+    num_validators: usize,
+    num_fullnodes: usize,
+    image_tag: String,
+    enable_haproxy: bool,
+) -> Result<String> {
+    let mut value: serde_yaml::Value = serde_yaml::from_str(&base_helm_values)?;
+    value["numValidators"] = num_validators.into();
+    value["numFullnodeGroups"] = num_fullnodes.into();
+    value["imageTag"] = image_tag.clone().into();
+    value["chain"]["era"] = era.into();
+    value["haproxy"]["enabled"] = enable_haproxy.into();
+    value["labels"]["forge-namespace"] = kube_namespace.into();
+    value["labels"]["forge-image-tag"] = image_tag.into();
+    if let Some(config_fn) = node_helm_config_fn {
+        (config_fn)(&mut value);
+    }
+    serde_yaml::to_string(&value).map_err(|e| anyhow::anyhow!("{:?}", e))
+}
+
+pub fn construct_genesis_helm_values(
+    genesis_helm_config_fn: Option<GenesisConfigFn>,
+    kube_namespace: String,
+    era: String,
+    num_validators: usize,
+    genesis_image_tag: String,
+    enable_haproxy: bool,
+) -> Result<String> {
+    let validator_internal_host_suffix = if enable_haproxy {
+        VALIDATOR_HAPROXY_SERVICE_SUFFIX
+    } else {
+        VALIDATOR_SERVICE_SUFFIX
+    };
+    let fullnode_internal_host_suffix = if enable_haproxy {
+        FULLNODE_HAPROXY_SERVICE_SUFFIX
+    } else {
+        FULLNODE_SERVICE_SUFFIX
+    };
+    let mut value: serde_yaml::Value = serde_yaml::Value::default();
+    value["imageTag"] = genesis_image_tag.clone().into();
+    value["chain"]["era"] = era.into();
+    value["chain"]["root_key"] = DEFAULT_ROOT_KEY.into();
+    value["genesis"]["numValidators"] = num_validators.into();
+    value["genesis"]["validator"]["internal_host_suffix"] = validator_internal_host_suffix.into();
+    value["genesis"]["fullnode"]["internal_host_suffix"] = fullnode_internal_host_suffix.into();
+    value["labels"]["forge-namespace"] = kube_namespace.into();
+    value["labels"]["forge-image-tag"] = genesis_image_tag.into();
+
+    if let Some(config_fn) = genesis_helm_config_fn {
+        (config_fn)(&mut value);
+    }
+
+    serde_yaml::to_string(&value).map_err(|e| anyhow::anyhow!("{:?}", e))
 }
 
 /// Collect the running nodes in the network into K8sNodes
@@ -888,6 +929,68 @@ mod tests {
             Err(ApiError::FinalError(_)) => {}
             _ => panic!("Expected final error"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_construct_node_helm_values() {
+        let node_helm_values = construct_node_helm_values(
+            None,
+            "{}".to_string(),
+            "forge-123".to_string(),
+            "era".to_string(),
+            5,
+            6,
+            "image".to_string(),
+            true,
+        )
+        .unwrap();
+
+        let expected_helm_values = "---
+numValidators: 5
+numFullnodeGroups: 6
+imageTag: image
+chain:
+  era: era
+haproxy:
+  enabled: true
+labels:
+  forge-namespace: forge-123
+  forge-image-tag: image
+";
+        assert_eq!(node_helm_values, expected_helm_values);
+    }
+
+    #[tokio::test]
+    async fn test_construct_genesis_helm_values() {
+        let genesis_helm_values = construct_genesis_helm_values(
+            Some(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 60.into();
+            })),
+            "forge-123".to_string(),
+            "era".to_string(),
+            5,
+            "genesis_image".to_string(),
+            true,
+        )
+        .unwrap();
+        let expected_helm_values = "---
+imageTag: genesis_image
+chain:
+  era: era
+  root_key: 48136DF3174A3DE92AFDB375FFE116908B69FF6FAB9B1410E548A33FEA1D159D
+  epoch_duration_secs: 60
+genesis:
+  numValidators: 5
+  validator:
+    internal_host_suffix: validator-lb
+  fullnode:
+    internal_host_suffix: fullnode-lb
+labels:
+  forge-namespace: forge-123
+  forge-image-tag: genesis_image
+";
+        assert_eq!(genesis_helm_values, expected_helm_values);
+        println!("{}", genesis_helm_values);
     }
 
     #[tokio::test]

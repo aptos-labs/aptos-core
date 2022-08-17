@@ -286,6 +286,8 @@ fn main() -> Result<()> {
                     resize.move_modules_dir,
                     !resize.connect_directly,
                     resize.enable_haproxy,
+                    None,
+                    None,
                 ))?;
                 Ok(())
             }
@@ -429,6 +431,13 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
     let config =
         ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(30).unwrap());
     let single_test_suite = match test_name {
+        "epoch_changer_performance" => config
+            .with_network_tests(&[&PerformanceBenchmark])
+            .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
+            .with_initial_fullnode_count(2)
+            .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+                helm_values["chain"]["epoch_duration_secs"] = 60.into();
+            })),
         "state_sync" => config
             .with_initial_fullnode_count(1)
             .with_network_tests(&[&StateSyncPerformance]),
