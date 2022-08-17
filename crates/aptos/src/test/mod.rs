@@ -169,7 +169,7 @@ impl CliTestFramework {
             profile_options: Default::default(),
             account: self.account_id(index),
             faucet_options: self.faucet_options(),
-            num_coins: amount.unwrap_or(DEFAULT_FUNDED_COINS),
+            amount: amount.unwrap_or(DEFAULT_FUNDED_COINS),
             rest_options: self.rest_options(),
         }
         .execute()
@@ -769,9 +769,7 @@ impl CliTestFramework {
     fn operator_args(&self, pool_index: Option<usize>) -> OperatorArgs {
         OperatorArgs {
             pool_address_args: OptionalPoolAddressArgs {
-                pool_address: pool_index.map(|idx| AccountAddressWrapper {
-                    account_address: self.account_id(idx),
-                }),
+                pool_address: pool_index.map(|idx| self.account_id(idx)),
             },
         }
     }

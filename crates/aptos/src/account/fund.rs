@@ -24,7 +24,7 @@ pub struct FundWithFaucet {
 
     /// Coins to fund when using the faucet
     #[clap(long, default_value_t = DEFAULT_FUNDED_COINS)]
-    pub(crate) num_coins: u64,
+    pub(crate) amount: u64,
 
     #[clap(flatten)]
     pub(crate) faucet_options: FaucetOptions,
@@ -44,7 +44,7 @@ impl CliCommand<String> for FundWithFaucet {
         let hashes = fund_account(
             self.faucet_options
                 .faucet_url(&self.profile_options.profile)?,
-            self.num_coins,
+            self.amount,
             self.account,
         )
         .await?;
@@ -59,7 +59,7 @@ impl CliCommand<String> for FundWithFaucet {
         }
         return Ok(format!(
             "Added {} coins to account {}",
-            self.num_coins, self.account
+            self.amount, self.account
         ));
     }
 }
