@@ -79,6 +79,11 @@ module aptos_std::aggregator {
         limit: u128,
     }
 
+    /// Returns `limit` exceeding which aggregator overflows.
+    public fun limit(aggregator: &Aggregator): u128 {
+        aggregator.limit
+    }
+
     /// Adds `value` to aggregator. Aborts on overflowing the limit.
     public native fun add(aggregator: &mut Aggregator, value: u128);
 
