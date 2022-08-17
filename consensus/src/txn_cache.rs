@@ -81,11 +81,12 @@ impl ConcurrentTxnCache {
     }
 
     fn hash<U: Clone + Serialize>(&self, element: U) -> HashValue {
-        let bytes = to_bytes(&element).unwrap();
-        let mut hasher = DefaultHasher::new(b"CacheTesting");
-        hasher.update(&bytes);
-        let hash_res = hasher.finish();
-        hash_res
+        // let bytes = to_bytes(&element).unwrap();
+        // let mut hasher = DefaultHasher::new(b"CacheTesting");
+        // hasher.update(&bytes);
+        // let hash_res = hasher.finish();
+        // hash_res
+        HashValue::zero()
     }
 
     pub fn insert<U: Clone + Serialize>(&mut self, element: U) {
@@ -181,9 +182,9 @@ fn test_hit_rate(hit_rate: u32, cache_size: usize, thread_pool_size: usize) -> (
 
 #[test]
 fn rati_test() {
-    let hit_rates = vec![10, 50];
-    let cache_sizes = vec![70000, 10];
-    let thread_pool_sizes = vec![1, 4];
+    let hit_rates = vec![10];
+    let cache_sizes = vec![70000];
+    let thread_pool_sizes = vec![4];
     for hit_rate in hit_rates {
         for cache_size in &cache_sizes {
             for thread_pool_size in &thread_pool_sizes {
