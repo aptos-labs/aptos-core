@@ -425,14 +425,14 @@ fn test_deleted_key_from_state_store() {
     let transaction2 = create_test_transaction(1);
     let write_set1 = WriteSetMut::new(vec![(
         dummy_state_key1.clone(),
-        WriteOp::Value(dummy_value1.clone()),
+        WriteOp::Modification(dummy_value1.clone()),
     )])
     .freeze()
     .unwrap();
 
     let write_set2 = WriteSetMut::new(vec![(
         dummy_state_key2.clone(),
-        WriteOp::Value(dummy_value2.clone()),
+        WriteOp::Modification(dummy_value2.clone()),
     )])
     .freeze()
     .unwrap();

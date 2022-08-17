@@ -50,7 +50,7 @@ impl FakeDataStore {
     pub fn add_write_set(&mut self, write_set: &WriteSet) {
         for (state_key, write_op) in write_set {
             match write_op {
-                WriteOp::Value(blob) => {
+                WriteOp::Modification(blob) | WriteOp::Creation(blob) => {
                     self.set(state_key.clone(), blob.clone());
                 }
                 WriteOp::Deletion => {

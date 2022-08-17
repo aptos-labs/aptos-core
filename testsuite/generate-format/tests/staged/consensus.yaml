@@ -539,10 +539,13 @@ VoteMsg:
 WriteOp:
   ENUM:
     0:
-      Deletion: UNIT
-    1:
-      Value:
+      Creation:
         NEWTYPE: BYTES
+    1:
+      Modification:
+        NEWTYPE: BYTES
+    2:
+      Deletion: UNIT
 WriteSet:
   NEWTYPESTRUCT:
     TYPENAME: WriteSetMut

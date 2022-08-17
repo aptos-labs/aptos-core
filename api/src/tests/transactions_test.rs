@@ -828,7 +828,7 @@ async fn test_get_txn_execute_failed_by_invalid_write_set_payload() {
                     )))
                     .unwrap(),
                 )),
-                WriteOp::Value(invalid_bytecode),
+                WriteOp::Modification(invalid_bytecode),
             )])
             .freeze()
             .unwrap(),
