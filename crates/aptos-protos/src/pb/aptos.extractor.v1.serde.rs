@@ -3932,7 +3932,7 @@ impl serde::Serialize for MultiEd25519Signature {
         if self.threshold != 0 {
             len += 1;
         }
-        if !self.bitmap.is_empty() {
+        if !self.public_key_indices.is_empty() {
             len += 1;
         }
         let mut struct_ser =
@@ -3960,11 +3960,8 @@ impl serde::Serialize for MultiEd25519Signature {
         if self.threshold != 0 {
             struct_ser.serialize_field("threshold", &self.threshold)?;
         }
-        if !self.bitmap.is_empty() {
-            struct_ser.serialize_field(
-                "bitmap",
-                pbjson::private::base64::encode(&self.bitmap).as_str(),
-            )?;
+        if !self.public_key_indices.is_empty() {
+            struct_ser.serialize_field("publicKeyIndices", &self.public_key_indices)?;
         }
         struct_ser.end()
     }
@@ -3975,14 +3972,14 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &["publicKeys", "signatures", "threshold", "bitmap"];
+        const FIELDS: &[&str] = &["publicKeys", "signatures", "threshold", "publicKeyIndices"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             PublicKeys,
             Signatures,
             Threshold,
-            Bitmap,
+            PublicKeyIndices,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -4010,7 +4007,7 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                             "publicKeys" => Ok(GeneratedField::PublicKeys),
                             "signatures" => Ok(GeneratedField::Signatures),
                             "threshold" => Ok(GeneratedField::Threshold),
-                            "bitmap" => Ok(GeneratedField::Bitmap),
+                            "publicKeyIndices" => Ok(GeneratedField::PublicKeyIndices),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -4036,7 +4033,7 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                 let mut public_keys__ = None;
                 let mut signatures__ = None;
                 let mut threshold__ = None;
-                let mut bitmap__ = None;
+                let mut public_key_indices__ = None;
                 while let Some(k) = map.next_key()? {
                     match k {
                         GeneratedField::PublicKeys => {
@@ -4070,13 +4067,15 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                                     .0,
                             );
                         }
-                        GeneratedField::Bitmap => {
-                            if bitmap__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("bitmap"));
+                        GeneratedField::PublicKeyIndices => {
+                            if public_key_indices__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("publicKeyIndices"));
                             }
-                            bitmap__ = Some(
-                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
-                                    .0,
+                            public_key_indices__ = Some(
+                                map.next_value::<Vec<::pbjson::private::NumberDeserialize<_>>>()?
+                                    .into_iter()
+                                    .map(|x| x.0)
+                                    .collect(),
                             );
                         }
                     }
@@ -4085,7 +4084,7 @@ impl<'de> serde::Deserialize<'de> for MultiEd25519Signature {
                     public_keys: public_keys__.unwrap_or_default(),
                     signatures: signatures__.unwrap_or_default(),
                     threshold: threshold__.unwrap_or_default(),
-                    bitmap: bitmap__.unwrap_or_default(),
+                    public_key_indices: public_key_indices__.unwrap_or_default(),
                 })
             }
         }
