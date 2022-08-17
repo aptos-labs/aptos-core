@@ -395,7 +395,7 @@ message MultiEd25519Signature {
   repeated bytes public_keys = 1;
   repeated bytes signatures = 2;
   uint32 threshold = 3;
-  bytes bitmap = 4;
+  repeated uint32 public_key_indices = 4;
 }
 
 message MultiAgentSignature {

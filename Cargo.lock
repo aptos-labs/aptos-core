@@ -1117,6 +1117,7 @@ dependencies = [
  "aptos-api",
  "aptos-api-test-context",
  "aptos-api-types",
+ "aptos-bitvec",
  "aptos-config",
  "aptos-crypto",
  "aptos-genesis",
