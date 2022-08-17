@@ -149,47 +149,4 @@ mod tests {
         let metrics = SystemMetrics::new(vec![], vec![]);
         threshold.ensure_threshold(&metrics).unwrap_err();
     }
-
-    #[tokio::test]
-    async fn test_query_prometheus() {
-        let client = get_prometheus_client().unwrap();
-        let query = r#"rate(container_cpu_usage_seconds_total{pod=~".*validator.*", container="validator"}[1m])"#;
-        let response = client.query(query, None, None).await;
-        match response {
-            Ok(pres) => println!("{:?}", pres),
-            Err(PrometheusError::Client(e)) => {
-                println!("Skipping test. Failed to create prometheus client: {}", e);
-                return;
-            }
-            Err(e) => panic!("Expected PromqlResult: {}", e),
-        }
-
-        let start_timestamp = 1660453807;
-        let end_timestamp: i64 = 1660454554;
-        let namespace = "forge-pr-2918";
-
-        let response = query_prometheus_system_metrics(
-            &client,
-            start_timestamp,
-            end_timestamp,
-            30.0,
-            namespace,
-        )
-        .await;
-
-        match response {
-            Ok(metrics) => {
-                println!("{:?}", metrics);
-                let metrics_threshold = SystemMetricsThreshold::new(
-                    MetricsThreshold::new(12, 30),
-                    MetricsThreshold::new(3 * 1024 * 1024 * 1024, 40),
-                );
-                let result = metrics_threshold.ensure_threshold(&metrics);
-                if let Err(e) = result {
-                    panic!("Failed metrics threshold check {:?}", e);
-                }
-            }
-            _ => panic!("Expected PromqlResult"),
-        }
-    }
 }
