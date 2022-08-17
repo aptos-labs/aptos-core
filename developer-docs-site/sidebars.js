@@ -51,6 +51,7 @@ const sidebars = {
         "concepts/basics-validator-nodes",
         "concepts/basics-node-networks-sync",
         "concepts/staking",
+        "concepts/governance",
       ],
     },
     {
