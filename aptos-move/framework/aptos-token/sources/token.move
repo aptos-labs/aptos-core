@@ -316,7 +316,11 @@ module aptos_token::token {
         values: vector<vector<u8>>,
         types: vector<String>,
     ) acquires Collections, TokenStore {
-        assert!(signer::address_of(account) == creator, ENO_MUTATE_CAPABILITY);
+        assert!(
+            signer::address_of(account) == creator ||
+            (token_property_version == 0 && signer::address_of(account) == token_owner),
+            ENO_MUTATE_CAPABILITY
+        );
         // validate if the properties is mutable
         assert!(exists<Collections>(creator), ECOLLECTIONS_NOT_PUBLISHED);
         let all_token_data = &mut borrow_global_mut<Collections>(
