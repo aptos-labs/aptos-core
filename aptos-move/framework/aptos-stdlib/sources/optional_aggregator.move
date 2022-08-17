@@ -87,15 +87,15 @@ module aptos_std::optional_aggregator {
     /// the value of the new optional aggregator to zero.
     fun switch_and_zero_out(optional_aggregator: &mut OptionalAggregator) {
         if (is_parallelizable(optional_aggregator)) {
-            switch_and_zero_out_parallelizable(optional_aggregator);
+            switch_to_integer_and_zero_out(optional_aggregator);
         } else {
-            switch_and_zero_out_non_parallelizable(optional_aggregator);
+            switch_to_aggregator_and_zero_out(optional_aggregator);
         }
     }
 
     /// Switches from parallelizable to non-parallelizable implementation, zero-initializing
     /// the value.
-    fun switch_and_zero_out_parallelizable(
+    fun switch_to_integer_and_zero_out(
         optional_aggregator: &mut OptionalAggregator
     ): u128 {
         let aggregator = option::extract(&mut optional_aggregator.aggregator);
@@ -108,7 +108,7 @@ module aptos_std::optional_aggregator {
 
     /// Switches from non-parallelizable to parallelizable implementation, zero-initializing
     /// the value.
-    fun switch_and_zero_out_non_parallelizable(
+    fun switch_to_aggregator_and_zero_out(
         optional_aggregator: &mut OptionalAggregator
     ): u128 {
         let integer = option::extract(&mut optional_aggregator.integer);
@@ -122,14 +122,14 @@ module aptos_std::optional_aggregator {
     /// Destroys optional aggregator.
     public fun destroy(optional_aggregator: OptionalAggregator) {
         if (is_parallelizable(&optional_aggregator)) {
-            destroy_parallelizable(optional_aggregator);
+            destroy_optional_aggregator(optional_aggregator);
         } else {
-            destroy_non_parallelizable(optional_aggregator);
+            destroy_optional_integer(optional_aggregator);
         }
     }
 
     /// Destroys parallelizable optional aggregator and returns its limit.
-    fun destroy_parallelizable(optional_aggregator: OptionalAggregator): u128 {
+    fun destroy_optional_aggregator(optional_aggregator: OptionalAggregator): u128 {
         let OptionalAggregator { aggregator, integer } = optional_aggregator;
         let limit = aggregator::limit(option::borrow(&aggregator));
         aggregator::destroy(option::destroy_some(aggregator));
@@ -138,7 +138,7 @@ module aptos_std::optional_aggregator {
     }
 
     /// Destroys non-parallelizable optional aggregator and returns its limit.
-    fun destroy_non_parallelizable(optional_aggregator: OptionalAggregator): u128 {
+    fun destroy_optional_integer(optional_aggregator: OptionalAggregator): u128 {
         let OptionalAggregator { aggregator, integer } = optional_aggregator;
         let limit = limit(option::borrow(&integer));
         destroy_integer(option::destroy_some(integer));
@@ -229,10 +229,10 @@ module aptos_std::optional_aggregator {
         destroy(aggregator);
 
         let aggregator = new(12, false);
-        assert!(destroy_non_parallelizable(aggregator) == 12, 0);
+        assert!(destroy_optional_integer(aggregator) == 12, 0);
 
         let aggregator = new(21, true);
-        assert!(destroy_parallelizable(aggregator) == 21, 0);
+        assert!(destroy_optional_aggregator(aggregator) == 21, 0);
     }
 
     #[test(account = @aptos_framework)]
