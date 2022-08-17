@@ -203,7 +203,7 @@ pub fn make_timeout_cert(
     let signature = timeout.sign(signer);
     tc_partial.add(signer.author(), timeout, signature);
     tc_partial
-        .aggregate_signatures(&generate_validator_verifier(&[signer.clone()]), true)
+        .aggregate_signatures(&generate_validator_verifier(&[signer.clone()]))
         .unwrap()
 }
 

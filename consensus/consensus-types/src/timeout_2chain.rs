@@ -254,22 +254,11 @@ impl TwoChainTimeoutWithPartialSignatures {
     pub fn aggregate_signatures(
         &self,
         verifier: &ValidatorVerifier,
-        verify: bool,
     ) -> Result<TwoChainTimeoutCertificate, VerifyError> {
         let (partial_sign, ordered_rounds) = self
             .signatures
             .get_partial_sig_with_rounds(verifier.address_to_validator_index());
-        let timeout_messages: Vec<_> = ordered_rounds
-            .iter()
-            .map(|round| TimeoutSigningRepr {
-                epoch: self.timeout.epoch(),
-                round: self.timeout.round(),
-                hqc_round: *round,
-            })
-            .collect();
-        let timeout_messages_ref: Vec<_> = timeout_messages.iter().collect();
-        let aggregated_sig =
-            verifier.generate_aggregated_signature(&partial_sign, &timeout_messages_ref, verify)?;
+        let aggregated_sig = verifier.generate_aggregated_signature(&partial_sign)?;
         Ok(TwoChainTimeoutCertificate {
             timeout: self.timeout.clone(),
             signatures_with_rounds: AggregatedSignatureWithRounds::new(
@@ -450,7 +439,7 @@ mod tests {
         }
 
         let tc_with_sig = tc_with_partial_sig
-            .aggregate_signatures(&validators, false)
+            .aggregate_signatures(&validators)
             .unwrap();
         tc_with_sig.verify(&validators).unwrap();
 
@@ -459,7 +448,7 @@ mod tests {
         invalid_tc_with_partial_sig.timeout.round = 1;
 
         let invalid_tc_with_sig = invalid_tc_with_partial_sig
-            .aggregate_signatures(&validators, false)
+            .aggregate_signatures(&validators)
             .unwrap();
         invalid_tc_with_sig.verify(&validators).unwrap_err();
 
@@ -472,7 +461,7 @@ mod tests {
         );
 
         let invalid_tc_with_sig = invalid_timeout_cert
-            .aggregate_signatures(&validators, false)
+            .aggregate_signatures(&validators)
             .unwrap();
         invalid_tc_with_sig.verify(&validators).unwrap_err();
 
@@ -482,7 +471,7 @@ mod tests {
             .signatures
             .remove_signature(&signers[0].author());
         let invalid_tc_with_sig = invalid_timeout_cert
-            .aggregate_signatures(&validators, false)
+            .aggregate_signatures(&validators)
             .unwrap();
 
         invalid_tc_with_sig.verify(&validators).unwrap_err();
@@ -492,7 +481,7 @@ mod tests {
         invalid_timeout_cert.timeout.quorum_cert = generate_quorum(2, quorum_size);
 
         let invalid_tc_with_sig = invalid_timeout_cert
-            .aggregate_signatures(&validators, false)
+            .aggregate_signatures(&validators)
             .unwrap();
         invalid_tc_with_sig.verify(&validators).unwrap_err();
 
@@ -500,7 +489,7 @@ mod tests {
         let mut invalid_timeout_cert = invalid_tc_with_partial_sig;
         invalid_timeout_cert.timeout.quorum_cert = generate_quorum(3, quorum_size - 1);
         let invalid_tc_with_sig = invalid_timeout_cert
-            .aggregate_signatures(&validators, false)
+            .aggregate_signatures(&validators)
             .unwrap();
 
         invalid_tc_with_sig.verify(&validators).unwrap_err();
