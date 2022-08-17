@@ -46,7 +46,7 @@ module aptos_framework::account {
     }
 
     struct CapabilityOffer<phantom T> has store { for: Option<address> }
-    struct RotationCapability has drop, store { account: address }
+    struct RotationCapability has key, drop, store { account: address }
     struct SignerCapability has drop, store { account: address }
 
     struct OriginatingAddress has key {
@@ -61,6 +61,11 @@ module aptos_framework::account {
         originator: address, // originating address
         current_auth_key: address, // current auth key
         new_public_key: vector<u8>,
+    }
+
+    struct RotationCapabilityOfferProof has drop {
+        sequence_number: u64,
+        intended_receiver_address: address,
     }
 
     const MAX_U64: u128 = 18446744073709551615;
@@ -85,6 +90,7 @@ module aptos_framework::account {
     const EMALFORMED_PUBLIC_KEY: u64 = 12;
     const EMALFORMED_PROOF_OF_KNOWLEDGE: u64 = 13;
     const EINVALID_PROOF_OF_KNOWLEDGE: u64 = 14;
+    const EINVALID_ACCEPT_ROTATION_CAPABILITY: u64 = 15;
 
     /// Prologue errors. These are separated out from the other errors in this
     /// module since they are mapped separately to major VM statuses, and are
@@ -101,6 +107,14 @@ module aptos_framework::account {
     const PROLOGUE_EINVALID_WRITESET_SENDER: u64 = 1010;
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1011;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1012;
+
+    #[test_only]
+    const OFFER_ROTATION_CAPABILITY_SIGNATURE: vector<u8> = vector<u8>[128, 67, 218, 117, 250, 136, 201, 53, 214, 46, 129, 120, 102, 249, 108, 116, 158, 237, 0, 162, 227, 205, 107, 230, 159, 155, 102, 196, 166, 224, 135, 72, 138, 200, 37, 98, 140, 94, 109, 164, 48, 26, 239, 162, 140, 181, 202, 255, 87, 231, 63, 198, 50, 205, 207, 206, 89, 62, 58, 190, 116, 92, 179, 12];
+    #[test_only]
+    const OFFER_ROTATION_CAPABILITY_INVALID_SIGNATURE: vector<u8> = vector<u8>[100, 67, 218, 117, 250, 136, 201, 53, 214, 46, 129, 120, 102, 249, 108, 116, 158, 237, 0, 162, 227, 205, 107, 230, 159, 155, 102, 196, 166, 224, 135, 72, 138, 200, 37, 98, 140, 94, 109, 164, 48, 26, 239, 162, 140, 181, 202, 255, 87, 231, 63, 198, 50, 205, 207, 206, 89, 62, 58, 190, 116, 92, 179, 12];
+
+    #[test_only]
+    const OFFER_ROTATION_CAPABILITY_PUBLIC_KEY: vector<u8> = vector<u8>[246, 107, 240, 206, 92, 235, 88, 43, 147, 214, 120, 8, 32, 194, 2, 91, 153, 103, 174, 218, 162, 89, 189, 187, 159, 61, 2, 151, 236, 237, 14, 24];
 
     #[test_only]
     public fun create_address_for_test(bytes: vector<u8>): address {
@@ -254,6 +268,43 @@ module aptos_framework::account {
         let new_address = create_address(new_auth_key);
         table::add(address_map, new_address, addr);
         account_resource.authentication_key = new_auth_key;
+    }
+
+    public entry fun offer_rotation_capability(account: &signer, rotation_capability_signature: vector<u8>, public_key: vector<u8>, intended_receiver_address: address) acquires Account {
+        let addr = signer::address_of(account);
+        assert!(exists_at(addr) && exists_at(intended_receiver_address), error::not_found(EACCOUNT));
+        assert!(
+            vector::length(&public_key) == 32,
+            error::invalid_argument(EMALFORMED_PUBLIC_KEY)
+        );
+        assert!(
+            vector::length(&rotation_capability_signature) == 64,
+            error::invalid_argument(EMALFORMED_PROOF_OF_KNOWLEDGE)
+        );
+
+        let account_resource = borrow_global_mut<Account>(addr);
+
+        let rotation_capability_offer_proof = RotationCapabilityOfferProof {
+            sequence_number: account_resource.sequence_number,
+            intended_receiver_address,
+        };
+
+        assert!(signature::ed25519_verify_t(rotation_capability_signature, public_key, rotation_capability_offer_proof), EINVALID_PROOF_OF_KNOWLEDGE);
+        option::fill(&mut account_resource.rotation_capability_offer.for, intended_receiver_address);
+    }
+
+    public fun accept_rotation_capability(account: &signer, offerer_address: address) acquires Account {
+        let addr = signer::address_of(account);
+        assert!(exists_at(addr) && exists_at(offerer_address), error::not_found(EACCOUNT));
+
+        let account_resource = borrow_global_mut<Account>(offerer_address);
+        assert!(option::contains(&account_resource.rotation_capability_offer.for, &addr), EINVALID_ACCEPT_ROTATION_CAPABILITY);
+
+        let rotation_capability = RotationCapability {
+            account: offerer_address,
+        };
+        move_to(account, rotation_capability);
+        option::extract(&mut account_resource.rotation_capability_offer.for);
     }
 
     fun prologue_common(
@@ -588,5 +639,52 @@ module aptos_framework::account {
         let account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
         let test_signature = vector::empty<u8>();
         rotate_authentication_key_ed25519(&alice, test_signature, test_signature, account_resource.authentication_key, account_resource.authentication_key);
+    }
+
+    #[test(alice = @0x123, bob = @0x345)]
+    public entry fun test_valid_offer_rotation_capability(alice: signer, bob: signer) acquires Account {
+        create_account(signer::address_of(&alice));
+        create_account(signer::address_of(&bob));
+        offer_rotation_capability(&alice, OFFER_ROTATION_CAPABILITY_SIGNATURE, OFFER_ROTATION_CAPABILITY_PUBLIC_KEY, signer::address_of(&bob));
+
+        let alice_account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
+        assert!(option::contains(&alice_account_resource.rotation_capability_offer.for, &signer::address_of(&bob)), 0);
+    }
+
+    #[test(alice = @0x123, bob = @0x345)]
+    #[expected_failure(abort_code = 14)]
+    public entry fun test_invalid_offer_rotation_capability(alice: signer, bob: signer) acquires Account {
+        create_account(signer::address_of(&alice));
+        create_account(signer::address_of(&bob));
+        offer_rotation_capability(&alice, OFFER_ROTATION_CAPABILITY_INVALID_SIGNATURE, OFFER_ROTATION_CAPABILITY_PUBLIC_KEY, signer::address_of(&bob));
+    }
+
+
+    #[test(alice = @0x123, bob = @0x345)]
+    public entry fun test_valid_accept_rotation_capability(alice: signer, bob: signer) acquires Account, RotationCapability {
+        create_account(signer::address_of(&alice));
+        create_account(signer::address_of(&bob));
+        offer_rotation_capability(&alice, OFFER_ROTATION_CAPABILITY_SIGNATURE, OFFER_ROTATION_CAPABILITY_PUBLIC_KEY, signer::address_of(&bob));
+
+        let alice_account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
+        assert!(option::contains(&alice_account_resource.rotation_capability_offer.for, &signer::address_of(&bob)), 0);
+
+        accept_rotation_capability(&bob, signer::address_of(&alice));
+        let rotation_cap = borrow_global<RotationCapability>(signer::address_of(&bob));
+        assert!(rotation_cap.account == signer::address_of(&alice), 0);
+    }
+
+    #[test(alice = @0x123, bob = @0x345, charlie=@0x567)]
+    #[expected_failure(abort_code = 15)]
+    public entry fun test_invalid_accept_rotation_capability(alice: signer, bob: signer, charlie: signer) acquires Account {
+        create_account(signer::address_of(&alice));
+        create_account(signer::address_of(&bob));
+        create_account(signer::address_of(&charlie));
+        offer_rotation_capability(&alice, OFFER_ROTATION_CAPABILITY_SIGNATURE, OFFER_ROTATION_CAPABILITY_PUBLIC_KEY, signer::address_of(&bob));
+
+        let alice_account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
+        assert!(option::contains(&alice_account_resource.rotation_capability_offer.for, &signer::address_of(&bob)), 0);
+
+        accept_rotation_capability(&bob, signer::address_of(&charlie));
     }
 }

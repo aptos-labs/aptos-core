@@ -39,6 +39,12 @@ pub enum ScriptFunctionCall {
         auth_key: AccountAddress,
     },
 
+    AccountOfferRotationCapability {
+        rotation_capability_signature: Vec<u8>,
+        public_key: Vec<u8>,
+        intended_receiver_address: AccountAddress,
+    },
+
     AccountRotateAuthenticationKey {
         new_auth_key: Vec<u8>,
     },
@@ -245,6 +251,15 @@ impl ScriptFunctionCall {
         use ScriptFunctionCall::*;
         match self {
             AccountCreateAccount { auth_key } => account_create_account(auth_key),
+            AccountOfferRotationCapability {
+                rotation_capability_signature,
+                public_key,
+                intended_receiver_address,
+            } => account_offer_rotation_capability(
+                rotation_capability_signature,
+                public_key,
+                intended_receiver_address,
+            ),
             AccountRotateAuthenticationKey { new_auth_key } => {
                 account_rotate_authentication_key(new_auth_key)
             }
@@ -387,6 +402,29 @@ pub fn account_create_account(auth_key: AccountAddress) -> TransactionPayload {
         ident_str!("create_account").to_owned(),
         vec![],
         vec![bcs::to_bytes(&auth_key).unwrap()],
+    ))
+}
+
+pub fn account_offer_rotation_capability(
+    rotation_capability_signature: Vec<u8>,
+    public_key: Vec<u8>,
+    intended_receiver_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("account").to_owned(),
+        ),
+        ident_str!("offer_rotation_capability").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&rotation_capability_signature).unwrap(),
+            bcs::to_bytes(&public_key).unwrap(),
+            bcs::to_bytes(&intended_receiver_address).unwrap(),
+        ],
     ))
 }
 
@@ -1010,6 +1048,20 @@ mod decoder {
         }
     }
 
+    pub fn account_offer_rotation_capability(
+        payload: &TransactionPayload,
+    ) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::AccountOfferRotationCapability {
+                rotation_capability_signature: bcs::from_bytes(script.args().get(0)?).ok()?,
+                public_key: bcs::from_bytes(script.args().get(1)?).ok()?,
+                intended_receiver_address: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn account_rotate_authentication_key(
         payload: &TransactionPayload,
     ) -> Option<ScriptFunctionCall> {
@@ -1378,6 +1430,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "account_create_account".to_string(),
             Box::new(decoder::account_create_account),
+        );
+        map.insert(
+            "account_offer_rotation_capability".to_string(),
+            Box::new(decoder::account_offer_rotation_capability),
         );
         map.insert(
             "account_rotate_authentication_key".to_string(),
