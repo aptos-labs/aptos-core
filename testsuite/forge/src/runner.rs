@@ -91,13 +91,7 @@ impl Default for Format {
 }
 
 pub fn forge_main<F: Factory>(tests: ForgeConfig<'_>, factory: F, options: &Options) -> Result<()> {
-    let forge = Forge::new(
-        options,
-        tests,
-        factory,
-        EmitJobRequest::default(),
-        SuccessCriteria::default(),
-    );
+    let forge = Forge::new(options, tests, factory, EmitJobRequest::default());
 
     if options.list {
         forge.list()?;
@@ -145,6 +139,9 @@ pub struct ForgeConfig<'cfg> {
 
     /// Optional node helm values init function
     node_helm_config_fn: Option<NodeConfigFn>,
+
+    /// Success criteria
+    success_criteria: SuccessCriteria,
 }
 
 impl<'cfg> ForgeConfig<'cfg> {
@@ -202,6 +199,11 @@ impl<'cfg> ForgeConfig<'cfg> {
         self
     }
 
+    pub fn with_success_criteria(mut self, success_criteria: SuccessCriteria) -> Self {
+        self.success_criteria = success_criteria;
+        self
+    }
+
     pub fn number_of_tests(&self) -> usize {
         self.admin_tests.len() + self.network_tests.len() + self.aptos_tests.len()
     }
@@ -227,6 +229,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             genesis_config: None,
             genesis_helm_config_fn: None,
             node_helm_config_fn: None,
+            success_criteria: SuccessCriteria::new(3500, 10000, None),
         }
     }
 }
@@ -236,7 +239,6 @@ pub struct Forge<'cfg, F> {
     tests: ForgeConfig<'cfg>,
     factory: F,
     global_job_request: EmitJobRequest,
-    success_criteria: SuccessCriteria,
 }
 
 impl<'cfg, F: Factory> Forge<'cfg, F> {
@@ -245,14 +247,12 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
         tests: ForgeConfig<'cfg>,
         factory: F,
         global_job_request: EmitJobRequest,
-        success_criteria: SuccessCriteria,
     ) -> Self {
         Self {
             options,
             tests,
             factory,
             global_job_request,
-            success_criteria,
         }
     }
 
@@ -351,7 +351,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     &mut *swarm,
                     &mut report,
                     self.global_job_request.clone(),
-                    self.success_criteria.clone(),
+                    self.tests.success_criteria.clone(),
                 );
                 let result = run_test(|| test.run(&mut network_ctx));
                 report.report_text(result.to_string());

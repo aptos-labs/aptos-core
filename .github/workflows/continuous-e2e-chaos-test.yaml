@@ -19,8 +19,6 @@ jobs:
       FORGE_CLUSTER_NAME: aptos-forge-1
       # Run for 30 minutes
       FORGE_RUNNER_DURATION_SECS: 1800
-      # We expect slightly lower tps on longer timeline
-      FORGE_RUNNER_TPS_THRESHOLD: 100
       # Pre release has chaos applied
       FORGE_TEST_SUITE: chaos
       POST_TO_SLACK: true

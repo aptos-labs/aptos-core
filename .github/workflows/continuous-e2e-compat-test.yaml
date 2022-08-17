@@ -19,8 +19,6 @@ jobs:
       FORGE_CLUSTER_NAME: aptos-forge-1
       # Run for 5 minutes
       FORGE_RUNNER_DURATION_SECS: 300
-      # We expect slightly lower tps on longer timeline
-      FORGE_RUNNER_TPS_THRESHOLD: 5000
       # This will upgrade from devnet to the latest main
       FORGE_TEST_SUITE: compat
       IMAGE_TAG: devnet
