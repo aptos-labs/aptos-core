@@ -913,11 +913,9 @@ name = "aptos-protos"
 version = "0.1.0"
 dependencies = [
  "bytes 1.2.1",
- "chrono",
  "pbjson",
  "prost",
  "serde 1.0.141",
- "serde_json",
 ]
 
 [[package]]
