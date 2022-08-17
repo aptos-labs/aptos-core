@@ -128,7 +128,7 @@ fn test_reconfiguration() {
 
     // txn3 = set the aptos version
     let txn3 = get_test_signed_transaction(
-        aptos_test_root_address(),
+        CORE_CODE_ADDRESS,
         /* sequence_number = */ 1,
         genesis_key.clone(),
         genesis_key.public_key(),

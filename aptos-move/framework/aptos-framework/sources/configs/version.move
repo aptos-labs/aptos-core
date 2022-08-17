@@ -28,13 +28,11 @@ module aptos_framework::version {
     }
 
     /// Updates the major version to a larger version.
-    /// This is only used in test environments and outside of them, the core resources account shouldn't exist.
+    /// This can be called by on chain governance.
     public entry fun set_version(account: &signer, major: u64) acquires Version {
         let address = signer::address_of(account);
-        // Core resources account only exists in tests or testnets. In mainnet set up, only on chain governance can call
-        // with the aptos framework account to update the version.
         assert!(
-            system_addresses::is_aptos_framework_address(address) || system_addresses::is_core_resource_address(address),
+            system_addresses::is_aptos_framework_address(address),
             error::permission_denied(ENOT_AUTHORIZED));
 
         let old_major = *&borrow_global<Version>(@aptos_framework).major;
