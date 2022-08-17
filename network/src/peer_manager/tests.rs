@@ -114,6 +114,7 @@ fn build_test_peer_manager(
         constants::NETWORK_CHANNEL_SIZE,
         constants::MAX_CONCURRENT_NETWORK_REQS,
         constants::MAX_FRAME_SIZE,
+        constants::MAX_MESSAGE_SIZE,
         MAX_INBOUND_CONNECTIONS,
         TokenBucketRateLimiter::open("inbound"),
         TokenBucketRateLimiter::open("outbound"),

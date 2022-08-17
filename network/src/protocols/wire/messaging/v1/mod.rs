@@ -224,7 +224,6 @@ impl<TReadSocket: AsyncRead + Unpin> Stream for MultiplexMessageStream<TReadSock
 pub struct MultiplexMessageSink<TWriteSocket: AsyncWrite> {
     #[pin]
     framed_write: FramedWrite<Compat<AsyncRateLimiter<TWriteSocket>>, LengthDelimitedCodec>,
-    max_frame_size: usize,
 }
 
 impl<TWriteSocket: AsyncWrite> MultiplexMessageSink<TWriteSocket> {
@@ -233,14 +232,7 @@ impl<TWriteSocket: AsyncWrite> MultiplexMessageSink<TWriteSocket> {
         let rate_limited_socket = AsyncRateLimiter::new(socket, bucket);
         let compat_socket = rate_limited_socket.compat_write();
         let framed_write = FramedWrite::new(compat_socket, frame_codec);
-        Self {
-            framed_write,
-            max_frame_size,
-        }
-    }
-
-    pub fn max_frame_size(&self) -> usize {
-        self.max_frame_size
+        Self { framed_write }
     }
 }
 
