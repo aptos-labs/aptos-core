@@ -26,6 +26,7 @@ warp = { version = "0.3.2", features = ["default", "tls"] }
 
 aptos-api = { path = "../api", package = "aptos-api" }
 aptos-api-types = { path = "../api/types" }
+aptos-bitvec = { path = "../crates/aptos-bitvec" }
 aptos-config = { path = "../config" }
 aptos-logger = { path = "../crates/aptos-logger" }
 aptos-mempool = { path = "../mempool" }
