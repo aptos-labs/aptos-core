@@ -77,38 +77,46 @@ module aptos_std::optional_aggregator {
     }
 
     /// Switches between parallelizable and non-parallelizable implementations.
-    public(friend) fun switch(optional_aggregator: OptionalAggregator): OptionalAggregator {
-        let value = read(&optional_aggregator);
-        let new_optional_aggregator = switch_and_zero_out(optional_aggregator);
-        add(&mut new_optional_aggregator, value);
-
-        new_optional_aggregator
+    public(friend) fun switch(optional_aggregator: &mut OptionalAggregator) {
+        let value = read(optional_aggregator);
+        switch_and_zero_out(optional_aggregator);
+        add(optional_aggregator, value);
     }
 
     /// Switches between parallelizable and non-parallelizable implementations, setting
     /// the value of the new optional aggregator to zero.
-    fun switch_and_zero_out(optional_aggregator: OptionalAggregator): OptionalAggregator {
-        if (is_parallelizable(&optional_aggregator)) {
-            // In this case we convert from Some(Agg), None to None, Some(Int).
-            // First, get the limit and destroy old aggregator/integer pair.
-            let limit = destroy_parallelizable(optional_aggregator);
-
-            // Create a new instance of integer.
-            OptionalAggregator {
-                aggregator: option::none(),
-                integer: option::some(new_integer(limit)),
-            }
+    fun switch_and_zero_out(optional_aggregator: &mut OptionalAggregator) {
+        if (is_parallelizable(optional_aggregator)) {
+            switch_and_zero_out_parallelizable(optional_aggregator);
         } else {
-            // Otherwise, it should be None, Some(Int) into Some(Agg), None.
-            // Again, get the limit and destroy the old aggregator/integer first.
-            let limit = destroy_non_parallelizable(optional_aggregator);
-
-            // Create a new instance of aggregator.
-            OptionalAggregator {
-                aggregator: option::some(aggregator_factory::create_aggregator(limit)),
-                integer: option::none(),
-            }
+            switch_and_zero_out_non_parallelizable(optional_aggregator);
         }
+    }
+
+    /// Switches from parallelizable to non-parallelizable implementation, zero-initializing
+    /// the value.
+    fun switch_and_zero_out_parallelizable(
+        optional_aggregator: &mut OptionalAggregator
+    ): u128 {
+        let aggregator = option::extract(&mut optional_aggregator.aggregator);
+        let limit = aggregator::limit(&aggregator);
+        aggregator::destroy(aggregator);
+        let integer = new_integer(limit);
+        option::fill(&mut optional_aggregator.integer, integer);
+        limit
+    }
+
+    /// Switches from non-parallelizable to parallelizable implementation, zero-initializing
+    /// the value.
+    fun switch_and_zero_out_non_parallelizable(
+        optional_aggregator: &mut OptionalAggregator
+    ): u128 {
+        let integer = option::extract(&mut optional_aggregator.integer);
+        let limit = limit(&integer);
+        destroy_integer(integer);
+        let aggregator = aggregator_factory::create_aggregator(limit);
+        option::fill(&mut optional_aggregator.aggregator, aggregator);
+        limit
     }
 
     /// Destroys optional aggregator.
@@ -191,7 +199,7 @@ module aptos_std::optional_aggregator {
         assert!(read(&aggregator) == 5, 0);
 
         // Switch to parallelizable aggregator and check the value is preserved.
-        let aggregator = switch(aggregator);
+        switch(&mut aggregator);
         assert!(is_parallelizable(&aggregator), 0);
         assert!(read(&aggregator) == 5, 0);
 
@@ -203,7 +211,7 @@ module aptos_std::optional_aggregator {
         assert!(read(&aggregator) == 10, 0);
 
         // Switch back!
-        let aggregator = switch(aggregator);
+        switch(&mut aggregator);
         assert!(!is_parallelizable(&aggregator), 0);
         assert!(read(&aggregator) == 10, 0);
 
