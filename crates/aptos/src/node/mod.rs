@@ -97,6 +97,7 @@ pub struct ValidatorConsensusKeyArgs {
     /// Hex encoded Consensus public key
     #[clap(long, parse(try_from_str = bls12381::PublicKey::from_encoded_string))]
     pub(crate) consensus_public_key: Option<bls12381::PublicKey>,
+
     /// Hex encoded Consensus proof of possession
     #[clap(long, parse(try_from_str = bls12381::ProofOfPossession::from_encoded_string))]
     pub(crate) proof_of_possession: Option<bls12381::ProofOfPossession>,
@@ -142,12 +143,15 @@ pub struct ValidatorNetworkAddressesArgs {
     /// Host and port pair for the validator e.g. 127.0.0.1:6180
     #[clap(long)]
     pub(crate) validator_host: Option<HostAndPort>,
+
     /// Validator x25519 public network key
     #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
     pub(crate) validator_network_public_key: Option<x25519::PublicKey>,
+
     /// Host and port pair for the fullnode e.g. 127.0.0.1:6180.  Optional
     #[clap(long)]
     pub(crate) full_node_host: Option<HostAndPort>,
+
     /// Full node x25519 public network key
     #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
     pub(crate) full_node_network_public_key: Option<x25519::PublicKey>,
@@ -453,23 +457,29 @@ pub struct RunLocalTestnet {
     /// An overridable config template for the test node
     #[clap(long, parse(from_os_str))]
     config_path: Option<PathBuf>,
+
     /// The directory to save all files for the node
     #[clap(long, parse(from_os_str))]
     test_dir: Option<PathBuf>,
+
     /// Random seed for key generation in test mode
     #[clap(long, parse(try_from_str = FromHex::from_hex))]
     seed: Option<[u8; 32]>,
+
     /// Clean the state and start with a new chain at genesis
     #[clap(long)]
     force_restart: bool,
-    #[clap(flatten)]
-    prompt_options: PromptOptions,
+
     /// Run a faucet alongside the node
     #[clap(long)]
     with_faucet: bool,
+
     /// Port to run the faucet on
     #[clap(long, default_value = "8081")]
     faucet_port: u16,
+
+    #[clap(flatten)]
+    prompt_options: PromptOptions,
 }
 
 #[async_trait]
