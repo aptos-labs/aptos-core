@@ -25,18 +25,16 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.bls12381.per_msg_hashing_cost, "bls12381.per_msg_hashing", 1],
     [.bls12381.per_byte_hashing_cost, "bls12381.per_byte_hashing", 1],
 
-    [.signature.ed25519_validate_pubkey.base_cost, "signature.ed25519_validate_pubkey.base", 1],
-    [.signature.ed25519_validate_pubkey.per_pubkey_deserialize_cost, "signature.ed25519_validate_pubkey.per_pubkey_deserialize", 1],
-    [.signature.ed25519_validate_pubkey.per_pubkey_small_order_check_cost, "signature.ed25519_validate_pubkey.per_pubkey_small_order_check", 1],
+    [.ed25519.base_cost, "signature.base", 1],
+    [.ed25519.per_pubkey_deserialize_cost, "signature.per_pubkey_deserialize", 1],
+    [.ed25519.per_pubkey_small_order_check_cost, "signature.per_pubkey_small_order_check", 1],
+    [.ed25519.per_sig_deserialize_cost, "signature.per_sig_deserialize", 1],
+    [.ed25519.per_sig_strict_verify_cost, "signature.per_sig_strict_verify", 1],
+    [.ed25519.per_msg_hashing_base_cost, "signature.per_msg_hashing_base", 1],
+    [.ed25519.per_msg_byte_hashing_cost, "signature.per_msg_byte_hashing", 1],
 
-    [.signature.ed25519_verify.base_cost, "signature.ed25519_verify.base", 1],
-    [.signature.ed25519_verify.per_pubkey_deserialize_cost, "signature.ed25519_verify.per_pubkey_deserialize", 1],
-    [.signature.ed25519_verify.per_sig_deserialize_cost, "signature.ed25519_verify.per_sig_deserialize", 1],
-    [.signature.ed25519_verify.per_sig_strict_verify_cost, "signature.ed25519_verify.per_sig_strict_verify", 1],
-    [.signature.ed25519_verify.per_msg_hashing_base_cost, "signature.ed25519_verify.per_msg_hashing_base", 1],
-    [.signature.ed25519_verify.per_msg_byte_hashing_cost, "signature.ed25519_verify.per_msg_byte_hashing", 1],
-
-    [.signature.secp256k1_ecdsa_recover.base_cost, "signature.secp256k1_ecdsa_recover.base", 1],
+    [.secp256k1.base_cost, "secp256k1.base", 1],
+    [.secp256k1.ecdsa_recover_cost, "secp256k1.ecdsa_recover", 1],
 
     [.hash.sip_hash.base_cost, "hash.sip_hash.base", 1],
     [.hash.sip_hash.unit_cost, "hash.sip_hash.unit", 1],
