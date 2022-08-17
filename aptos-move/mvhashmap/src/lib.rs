@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_aggregator::delta_change_set::{deserialize, DeltaOp};
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -41,7 +42,7 @@ enum Cell<V, D> {
         data: Arc<V>,
     },
     DeltaCell {
-        /// Actual delta data stored as an actual value (should be cheap to clone or copy).
+        /// Delta stored as a value.
         data: D,
     },
 }
@@ -81,7 +82,7 @@ impl<V, D> Entry<V, D> {
 /// given key, it holds exclusive access and doesn't need to explicitly synchronize
 /// with other reader/writers.
 pub struct MVHashMap<K, V> {
-    data: DashMap<K, BTreeMap<TxnIndex, CachePadded<Entry<V, u128>>>>,
+    data: DashMap<K, BTreeMap<TxnIndex, CachePadded<Entry<V, DeltaOp>>>>,
 }
 
 /// Error type returned when reading from the multi-version data-structure.
@@ -97,16 +98,16 @@ pub enum MVHashMapError<D> {
 
 /// Output returned when reading from the multi-version data-structure.
 #[derive(Debug, PartialEq, Eq)]
-pub enum MVHashMapOutput<V, D> {
-    /// Value which is the result of delta application.
-    ResolvedDelta(D),
+pub enum MVHashMapOutput<V> {
+    /// Value which is the result of delta application, always a u128.
+    ResolvedDelta(u128),
     /// Information from the last versioned-write.
     Versioned(Version, Arc<V>),
 }
 
-pub type MVHashMapResult<V, D> = Result<MVHashMapOutput<V, D>, MVHashMapError<D>>;
+pub type MVHashMapResult<V, D> = Result<MVHashMapOutput<V>, MVHashMapError<D>>;
 
-impl<K: Hash + Clone + Eq, V> MVHashMap<K, V> {
+impl<K: Hash + Clone + Eq, V: AsRef<Vec<u8>>> MVHashMap<K, V> {
     pub fn new() -> MVHashMap<K, V> {
         MVHashMap {
             data: DashMap::new(),
@@ -149,61 +150,62 @@ impl<K: Hash + Clone + Eq, V> MVHashMap<K, V> {
 
     /// If successful, returns a read value or its version. Otherwise an error
     /// is returned.
-    pub fn read(&self, key: &K, txn_idx: TxnIndex) -> MVHashMapResult<V, u128> {
+    pub fn read(&self, key: &K, txn_idx: TxnIndex) -> MVHashMapResult<V, DeltaOp> {
+        use MVHashMapError::*;
+        use MVHashMapOutput::*;
+
         match self.data.get(key) {
             Some(tree) => {
                 let mut iter = tree.range(0..txn_idx);
-                let mut aggregated: Option<u128> = None;
+                let mut aggregated: Option<DeltaOp> = None;
 
-                // Since read can hit a delta, we need to keep reading until we
-                // hit a write.
+                // Because read can hit a delta, we need to keep reading until we
+                // reach a write or have to check storage.
                 while let Some((idx, entry)) = iter.next_back() {
                     let flag = entry.flag();
 
                     if flag == FLAG_ESTIMATE {
                         // Found a dependency.
-                        return Err(MVHashMapError::Dependency(*idx));
+                        return Err(Dependency(*idx));
                     } else {
                         // The entry should be populated.
                         debug_assert!(flag == FLAG_DONE);
 
+                        use Cell::*;
                         match &entry.inner {
-                            Cell::WriteCell { incarnation, data } => {
+                            WriteCell { incarnation, data } => {
                                 match aggregated {
                                     // Read hits a write without any aggregation. In this
                                     // case simply return the entry.
                                     None => {
                                         let write_version = (*idx, *incarnation);
-                                        return Ok(MVHashMapOutput::Versioned(
-                                            write_version,
-                                            data.clone(),
-                                        ));
+                                        return Ok(Versioned(write_version, data.clone()));
                                     }
                                     // Read hits a write during data aggregation. Apply aggregated value.
-                                    Some(value) => {
-                                        // TODO: let write_as_delta = data.clone().as_ref().convert();
-                                        let write_as_delta: u128 = 0;
-                                        // TODO: this needs to handle subtracts as well.
-                                        let read_value = write_as_delta
-                                            .checked_add(value)
-                                            .expect("erroneous delta aggregation is not supported");
-                                        return Ok(MVHashMapOutput::ResolvedDelta(read_value));
+                                    Some(delta) => {
+                                        // TODO: change this once trait is available!
+                                        let base = deserialize(data.as_ref().as_ref());
+
+                                        match delta.apply_to(base) {
+                                            Err(_) => panic!("overflow!"),
+                                            Ok(v) => {
+                                                return Ok(ResolvedDelta(v));
+                                            }
+                                        }
                                     }
                                 }
                             }
-                            Cell::DeltaCell { data } => {
+                            DeltaCell { data } => {
                                 match aggregated {
                                     // Read hits a delta value during data aggregation.
                                     // Update the currently aggregated value.
-                                    Some(value) => {
-                                        let new_value = data
-                                            .checked_add(value)
-                                            .expect("erroneous delta aggregation is not supported");
-                                        aggregated = Some(new_value);
-                                    }
+                                    Some(delta) => match delta.merge_with(data.clone()) {
+                                        Err(_) => panic!("terrible thing"),
+                                        Ok(d) => aggregated = Some(d),
+                                    },
                                     // Read hits a delta value and has to start data
                                     // aggregation. Initialize the aggregated value.
-                                    None => aggregated = Some(0),
+                                    None => aggregated = Some(data.clone()),
                                 }
                             }
                         }
@@ -214,11 +216,11 @@ impl<K: Hash + Clone + Eq, V> MVHashMap<K, V> {
                 // been seen yet (i.e. added as an entry to the data-structure). In that case,
                 // user calling read() must resolve delta with a value from the storage.
                 match aggregated {
-                    Some(delta) => Err(MVHashMapError::UnresolvedDelta(delta)),
-                    None => Err(MVHashMapError::EntryNotFound),
+                    Some(delta) => Err(UnresolvedDelta(delta)),
+                    None => Err(EntryNotFound),
                 }
             }
-            None => Err(MVHashMapError::EntryNotFound),
+            None => Err(EntryNotFound),
         }
     }
 }
