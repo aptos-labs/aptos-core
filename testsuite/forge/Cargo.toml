@@ -35,7 +35,6 @@ termcolor = "1.1.2"
 thiserror = "1.0.31"
 tokio = { version = "1.18.2", features = ["full"] }
 url = "2.2.2"
-yaml-rust = "0.4"
 
 aptos-config = { path = "../../config" }
 aptos-genesis = { path = "../../crates/aptos-genesis" }

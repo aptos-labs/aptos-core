@@ -3686,7 +3686,6 @@ dependencies = [
  "tokio 1.19.2",
  "transaction-emitter-lib",
  "url",
- "yaml-rust",
 ]
 
 [[package]]
