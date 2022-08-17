@@ -126,7 +126,7 @@ impl CliCommand<Transaction> for SubmitProposal {
                 "create_proposal",
                 vec![],
                 vec![
-                    bcs::to_bytes(&self.pool_address_args.pool_address())?,
+                    bcs::to_bytes(&self.pool_address_args.pool_address)?,
                     bcs::to_bytes(&self.execution_hash)?,
                     bcs::to_bytes(&self.metadata_url.to_string())?,
                     bcs::to_bytes(&metadata_hash)?,
@@ -180,7 +180,7 @@ impl CliCommand<Transaction> for SubmitVote {
                 "vote",
                 vec![],
                 vec![
-                    bcs::to_bytes(&self.pool_address_args.pool_address())?,
+                    bcs::to_bytes(&self.pool_address_args.pool_address)?,
                     bcs::to_bytes(&self.proposal_id)?,
                     bcs::to_bytes(&self.should_pass)?,
                 ],
