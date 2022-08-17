@@ -8275,6 +8275,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-infallible",
  "aptos-metrics-core",
+ "aptos-state-view",
  "aptos-types",
  "bitvec",
  "itertools",

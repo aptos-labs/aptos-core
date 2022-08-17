@@ -8,7 +8,7 @@ pub mod event;
 pub mod hash;
 mod helpers;
 pub mod signature;
-pub mod state_storage_context;
+pub mod state_storage;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
@@ -36,6 +36,7 @@ pub struct GasParameters {
     pub transaction_context: transaction_context::GasParameters,
     pub code: code::GasParameters,
     pub event: event::GasParameters,
+    pub state_storage: state_storage::GasParameters,
 }
 
 impl GasParameters {
@@ -123,6 +124,11 @@ impl GasParameters {
                     unit_cost: 0.into(),
                 },
             },
+            state_storage: state_storage::GasParameters {
+                get_usage: state_storage::GetUsageGasParameters {
+                    base_cost: 0.into(),
+                },
+            },
         }
     }
 }
@@ -156,6 +162,10 @@ pub fn all_natives(
     );
     add_natives_from_module!("code", code::make_all(gas_params.code));
     add_natives_from_module!("event", event::make_all(gas_params.event));
+    add_natives_from_module!(
+        "state_storage",
+        state_storage::make_all(gas_params.state_storage)
+    );
 
     make_table_from_iter(framework_addr, natives)
 }

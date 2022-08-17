@@ -87,8 +87,8 @@ module aptos_framework::genesis {
         chain_id::initialize(&aptos_framework_account, chain_id);
         reconfiguration::initialize(&aptos_framework_account);
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
-        timestamp::set_time_has_started(&aptos_framework_account);
         state_storage::initialize(&aptos_framework_account);
+        timestamp::set_time_has_started(&aptos_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.

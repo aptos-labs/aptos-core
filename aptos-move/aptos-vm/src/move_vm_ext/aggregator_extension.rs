@@ -598,7 +598,7 @@ mod test {
         }
 
         fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
-            unimplemented!()
+            Ok(StateStorageUsage::zero())
         }
     }
 

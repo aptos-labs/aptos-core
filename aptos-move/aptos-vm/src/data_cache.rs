@@ -18,7 +18,7 @@ use aptos_types::{
     write_set::{WriteOp, WriteSet},
 };
 use fail::fail_point;
-use framework::natives::state_storage_context::StateStorageUsageResolver;
+use framework::natives::state_storage::StateStorageUsageResolver;
 use move_deps::{
     move_binary_format::errors::*,
     move_core_types::{

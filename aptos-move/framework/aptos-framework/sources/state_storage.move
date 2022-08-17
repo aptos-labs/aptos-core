@@ -1,6 +1,5 @@
 module aptos_framework::state_storage {
 
-    use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
     use std::error;
 
@@ -16,7 +15,6 @@ module aptos_framework::state_storage {
     }
 
     public(friend) fun initialize(account: &signer) {
-        timestamp::assert_genesis();
         system_addresses::assert_aptos_framework(account);
         assert!(
             !exists<StateStorageUsage>(@aptos_framework),
@@ -30,12 +28,12 @@ module aptos_framework::state_storage {
 
     public(friend) fun on_epoch_begin() acquires StateStorageUsage {
         *borrow_global_mut<StateStorageUsage>(@aptos_framework)
-            = native_get_state_storage_usage_only_at_epoch_beginning()
+            = get_state_storage_usage_only_at_epoch_beginning()
     }
 
     /// Warning: the result returned is based on the base state view held by the
     /// VM for the entire block or chunk of transactions, it's only deterministic
     /// if called from the first transaction of the block because the execution layer
     /// guarantees a fresh state view then.
-    native fun native_get_state_storage_usage_only_at_epoch_beginning(): StateStorageUsage;
+    native fun get_state_storage_usage_only_at_epoch_beginning(): StateStorageUsage;
 }
