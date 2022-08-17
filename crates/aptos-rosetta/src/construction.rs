@@ -246,23 +246,11 @@ async fn construction_metadata(
         return Err(ApiError::ChainIdMismatch);
     }
 
-    // Retrieve the sequence number, always increment after taking the sequence number
-    let sequence_number = {
-        let response_account = response.inner();
-        let mut accounts = server_context.accounts.lock().await;
-        if let Some(stored_sequence_number) = accounts.get_mut(&address) {
-            // If we missed a sequence number update, we should update
-            if response_account.sequence_number > *stored_sequence_number {
-                *stored_sequence_number = response_account.sequence_number;
-            }
-            let seq_num = *stored_sequence_number;
-            *stored_sequence_number += 1;
-            seq_num
-        } else {
-            // Otherwise, let's update the local version
-            accounts.insert(address, response_account.sequence_number + 1);
-            response_account.sequence_number
-        }
+    let sequence_number = if let Some(sequence_number) = request.options.sequence_number {
+        sequence_number
+    } else {
+        // Retrieve the sequence number from the rest server if one wasn't provided
+        response.inner().sequence_number
     };
 
     Ok(ConstructionMetadataResponse {
@@ -270,7 +258,7 @@ async fn construction_metadata(
             sequence_number,
             max_gas: request.options.max_gas,
             gas_price_per_unit: request.options.gas_price_per_unit,
-            expiry_time: request.options.expiry_time,
+            expiry_time_secs: request.options.expiry_time_secs,
         },
         suggested_fee: None,
     })
@@ -491,8 +479,9 @@ async fn construction_payloads(
     let mut transaction_factory = TransactionFactory::new(server_context.chain_id)
         .with_gas_unit_price(metadata.gas_price_per_unit)
         .with_max_gas_amount(metadata.max_gas);
-    if let Some(expiry_time) = metadata.expiry_time {
-        transaction_factory = transaction_factory.with_transaction_expiration_time(expiry_time);
+    if let Some(expiry_time_secs) = metadata.expiry_time_secs {
+        transaction_factory =
+            transaction_factory.with_transaction_expiration_time(expiry_time_secs);
     }
 
     let sequence_number = metadata.sequence_number;
@@ -563,7 +552,14 @@ async fn construction_preprocess(
             internal_operation,
             max_gas,
             gas_price_per_unit,
-            expiry_time: request.metadata.and_then(|inner| inner.expiry_time),
+            expiry_time_secs: request
+                .metadata
+                .as_ref()
+                .and_then(|inner| inner.expiry_time_secs),
+            sequence_number: request
+                .metadata
+                .as_ref()
+                .and_then(|inner| inner.sequence_number),
         }),
         required_public_keys: Some(required_public_keys),
     })
