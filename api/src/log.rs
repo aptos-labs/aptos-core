@@ -49,7 +49,7 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
     if log.status >= 500 {
         sample!(SampleRate::Duration(Duration::from_secs(1)), error!(log));
     } else {
-        debug!(log);
+        sample!(SampleRate::Duration(Duration::from_secs(1)), debug!(log));
     }
 
     // Log response statuses generally.
