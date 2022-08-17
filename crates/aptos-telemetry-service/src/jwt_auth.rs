@@ -5,12 +5,13 @@ use aptos_config::config::PeerRole;
 use aptos_types::{chain_id::ChainId, PeerId};
 use chrono::Utc;
 use jsonwebtoken::{decode, encode, errors::Error, Algorithm, Header, Validation};
+use reqwest::StatusCode;
 use warp::{
     http::header::{HeaderMap, HeaderValue, AUTHORIZATION},
     reject, Rejection,
 };
 
-use crate::error::Error::JWTTokenError;
+use crate::error::ServiceError;
 use crate::{context::Context, types::auth::Claims};
 
 const BEARER: &str = "BEARER ";
@@ -66,7 +67,10 @@ pub async fn authorize_jwt(
     {
         Ok(claims)
     } else {
-        Err(reject::custom(JWTTokenError))
+        Err(reject::custom(ServiceError::new(
+            StatusCode::FORBIDDEN,
+            "invalid claim".into(),
+        )))
     }
 }
 

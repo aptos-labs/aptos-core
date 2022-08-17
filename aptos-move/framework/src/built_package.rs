@@ -8,10 +8,16 @@ use aptos_types::account_address::AccountAddress;
 use clap::Parser;
 use move_deps::move_core_types::errmap::ErrorMapping;
 use move_deps::move_package::compilation::compiled_package::CompiledPackage;
+use move_deps::move_package::source_package::manifest_parser::{
+    parse_move_manifest_string, parse_source_manifest,
+};
 use move_deps::move_package::BuildConfig;
 use serde::{Deserialize, Serialize};
+use serde_bytes::ByteBuf;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+
+pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
 
 /// Represents a set of options for building artifacts from Move.
 #[derive(Debug, Clone, Parser, Serialize, Deserialize)]
@@ -95,14 +101,17 @@ impl BuiltPackage {
     }
 
     /// Extracts metadata, as needed for releasing a package, from the built package.
-    pub fn extract_metadata(
-        &self,
-        upgrade_policy: UpgradePolicy, // TODO: put this into Move.toml
-    ) -> anyhow::Result<PackageMetadata> {
+    pub fn extract_metadata(&self) -> anyhow::Result<PackageMetadata> {
         let build_info = serde_yaml::to_string(&self.package.compiled_package_info)?;
 
         let manifest_file = self.package_path.join("Move.toml");
         let manifest = std::fs::read_to_string(&manifest_file)?;
+        let custom_props = extract_custom_fields(&manifest)?;
+        let upgrade_policy = if let Some(val) = custom_props.get(UPGRADE_POLICY_CUSTOM_FIELD) {
+            str::parse::<UpgradePolicy>(val.as_ref())?
+        } else {
+            UpgradePolicy::compat()
+        };
         let mut modules = vec![];
         for u in &self.package.root_compiled_units {
             let name = u.unit.name().to_string();
@@ -120,7 +129,7 @@ impl BuiltPackage {
             vec![]
         };
         let abis = if let Some(abis) = &self.package.compiled_abis {
-            abis.iter().map(|(_, a)| a.clone()).collect()
+            abis.iter().map(|(_, a)| ByteBuf::from(a.clone())).collect()
         } else {
             vec![]
         };
@@ -128,7 +137,7 @@ impl BuiltPackage {
         Ok(PackageMetadata {
             name: self.name().to_string(),
             upgrade_policy,
-            upgrade_counter: 0,
+            upgrade_number: 0,
             build_info,
             manifest,
             modules,
@@ -136,4 +145,14 @@ impl BuiltPackage {
             abis,
         })
     }
+}
+
+fn extract_custom_fields(toml: &str) -> anyhow::Result<BTreeMap<String, String>> {
+    let manifest = parse_source_manifest(parse_move_manifest_string(toml.to_owned())?)?;
+    Ok(manifest
+        .package
+        .custom_properties
+        .iter()
+        .map(|(s, v)| (s.to_string(), v.to_string()))
+        .collect())
 }
