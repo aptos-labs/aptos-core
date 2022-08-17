@@ -199,6 +199,15 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         Ok(())
     }
 
+    /// Returns the maximum number of concurrent requests that can be executing
+    /// at any given time.
+    fn get_max_concurrent_requests(&self) -> u64 {
+        match self.stream_engine {
+            StreamEngine::StateStreamEngine(_) => self.config.max_concurrent_state_requests,
+            _ => self.config.max_concurrent_requests,
+        }
+    }
+
     /// Creates and sends a batch of aptos data client requests to the network
     fn create_and_send_client_requests(
         &mut self,
@@ -206,9 +215,8 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
     ) -> Result<(), Error> {
         // Determine how many requests (at most) can be sent to the network
         let num_sent_requests = self.get_sent_data_requests().len() as u64;
-        let max_num_requests_to_send = self
-            .config
-            .max_concurrent_requests
+        let max_concurrent_requests = self.get_max_concurrent_requests();
+        let max_num_requests_to_send = max_concurrent_requests
             .checked_sub(num_sent_requests)
             .ok_or_else(|| {
                 Error::IntegerOverflow("Max number of requests to send has overflown!".into())
@@ -321,7 +329,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         }
 
         // Process any ready data responses
-        for _ in 0..self.config.max_concurrent_requests {
+        for _ in 0..self.get_max_concurrent_requests() {
             if let Some(pending_response) = self.pop_pending_response_queue() {
                 let mut pending_response = pending_response.lock();
                 let client_response = pending_response
