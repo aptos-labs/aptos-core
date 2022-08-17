@@ -23,8 +23,8 @@ module aptos_framework::stake {
     use std::option::{Self, Option};
     use std::signer;
     use std::vector;
+    use aptos_std::bls12381;
     use aptos_std::event::{Self, EventHandle};
-    use aptos_std::signature;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin, MintCapability};
     use aptos_framework::timestamp;
@@ -402,7 +402,11 @@ module aptos_framework::stake {
         network_addresses: vector<u8>,
         fullnode_addresses: vector<u8>,
     ) {
-        assert!(signature::bls12381_verify_proof_of_possession(consensus_pubkey, proof_of_possession), error::invalid_argument(EINVALID_PUBLIC_KEY));
+        // Checks the public key has a valid proof-of-possession to prevent rogue-key attacks.
+        assert!(option::is_some(
+            &mut bls12381::public_key_from_bytes_with_pop(consensus_pubkey,
+                &proof_of_possession_from_bytes(proof_of_possession))
+        ), error::invalid_argument(EINVALID_PUBLIC_KEY));
 
         initialize_owner(account);
         move_to(account, ValidatorConfig {
@@ -587,7 +591,11 @@ module aptos_framework::stake {
         assert!(exists<ValidatorConfig>(pool_address), error::not_found(EVALIDATOR_CONFIG));
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
         let old_consensus_pubkey = validator_info.consensus_pubkey;
-        assert!(signature::bls12381_verify_proof_of_possession(new_consensus_pubkey, proof_of_possession), error::invalid_argument(EINVALID_PUBLIC_KEY));
+        // Checks the public key has a valid proof-of-possession to prevent rogue-key attacks.
+        assert!(option::is_some(
+            &mut bls12381::public_key_from_bytes_with_pop(new_consensus_pubkey,
+            &proof_of_possession_from_bytes(proof_of_possession))
+        ), error::invalid_argument(EINVALID_PUBLIC_KEY));
         validator_info.consensus_pubkey = new_consensus_pubkey;
 
         event::emit_event<RotateConsensusKeyEvent>(
@@ -1085,6 +1093,7 @@ module aptos_framework::stake {
 
     #[test_only]
     use aptos_framework::aptos_coin;
+    use aptos_std::bls12381::proof_of_possession_from_bytes;
 
     #[test_only]
     const CONSENSUS_KEY_1: vector<u8> = x"8a54b92288d4ba5073d3a52e80cc00ae9fbbc1cc5b433b46089b7804c38a76f00fc64746c7685ee628fc2d0b929c2294";

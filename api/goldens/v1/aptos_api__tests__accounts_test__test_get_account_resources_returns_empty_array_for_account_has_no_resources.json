@@ -1,9 +1,8 @@
 [
-  "package registry omitted",
   {
     "type": "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>",
     "data": {
-      "decimals": "8",
+      "decimals": 8,
       "name": "Aptos Coin",
       "supply": {
         "vec": []
@@ -117,7 +116,7 @@
       },
       "next_proposal_id": "0",
       "proposals": {
-        "handle": "250572580766766989648150312918132283230"
+        "handle": "66250964772389598023276627514581198483"
       }
     }
   },
@@ -144,14 +143,6 @@
         "for": {
           "vec": []
         }
-      }
-    }
-  },
-  {
-    "type": "0x1::account::OriginatingAddress",
-    "data": {
-      "address_map": {
-        "handle": "66250964772389598023276627514581198483"
       }
     }
   },
@@ -699,7 +690,7 @@
           "val": "1"
         },
         {
-          "key": "aptos_framework.bls12381.per_pubkey_subgroup_check",
+          "key": "aptos_framework.bls12381.per_pubkey_subgroup_check_cost",
           "val": "1"
         },
         {
@@ -865,7 +856,7 @@
     "type": "0x1::aptos_governance::VotingRecords",
     "data": {
       "votes": {
-        "handle": "203203915414117147714730393229954298753"
+        "handle": "250572580766766989648150312918132283230"
       }
     }
   },
@@ -906,14 +897,6 @@
             "creation_num": "9"
           }
         }
-      }
-    }
-  },
-  {
-    "type": "0x1::aptos_governance::ApprovedExecutionHashes",
-    "data": {
-      "hashes": {
-        "data": []
       }
     }
   },
