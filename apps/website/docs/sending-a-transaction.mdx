@@ -22,23 +22,15 @@ See the below examples for both the options.
 The below code example shows how to use the `signAndSubmitTransaction()` API to sign the transaction and send it to the Aptos blockchain.
 
 ```typescript
-import { BCS, TxnBuilderTypes } from 'aptos';
 const wallet = getAptosWallet(); // see "Connecting"
 
-// Transaction format 
-// https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html
-const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
-const transaction = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
-        '0x1::coin',
-        'transfer',
-        [token],
-        [
-            BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(address)),
-            BCS.bcsSerializeUint64(717),
-        ],
-    ),
-);
+// Example Transaction
+const transaction = {
+    arguments: [address, '717'],
+    function: '0x1::coin::transfer',
+    type: 'script_function_payload',
+    type_arguments: ['0x1::aptos_coin::TestCoin'],
+};
 
 
 try {
@@ -55,23 +47,15 @@ The below code example shows how to use the `signTransaction()` API to only sign
 
 
 ```typescript
-import { BCS, TxnBuilderTypes } from 'aptos';
 const wallet = getAptosWallet(); // see "Connecting"
 
-// Transaction format 
-// https://aptos-labs.github.io/ts-sdk-doc/classes/TxnBuilderTypes.TransactionPayload.html
-const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
-const transaction = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
-        '0x1::coin',
-        'transfer',
-        [token],
-        [
-            BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(address)),
-            BCS.bcsSerializeUint64(717),
-        ],
-    ),
-);
+// Example Transaction
+const transaction = {
+    arguments: [address, '717'],
+    function: '0x1::coin::transfer',
+    type: 'script_function_payload',
+    type_arguments: ['0x1::aptos_coin::TestCoin'],
+};
 
 try {
     const signTransaction = await (window as any).aptos.signTransaction(transaction)

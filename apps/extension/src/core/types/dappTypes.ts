@@ -5,13 +5,11 @@ export const MessageMethod = Object.freeze({
   CONNECT: 'connect',
   DISCONNECT: 'disconnect',
   GET_ACCOUNT_ADDRESS: 'getAccountAddress',
-  GET_CHAIN_ID: 'getChainID',
   GET_NETWORK: 'getNetwork',
-  GET_SEQUENCE_NUMBER: 'getSequenceNumber',
   IS_CONNECTED: 'is_connected',
+  SIGN_AND_SUBMIT_TRANSACTION: 'signAndSubmitTransaction',
   SIGN_MESSAGE: 'signMessage',
   SIGN_TRANSACTION: 'signTransaction',
-  SUBMIT_TRANSACTION: 'submitTransaction',
 } as const);
 
 export const PermissionType = Object.freeze({

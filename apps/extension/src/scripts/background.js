@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient, BCS, HexString } from 'aptos';
+import { AptosClient, BCS } from 'aptos';
 import fetchAdapter from '@vespaiach/axios-fetch-adapter';
 import axios from 'axios';
 import { sign } from 'tweetnacl';
@@ -33,8 +33,10 @@ async function getCurrentDomain() {
   return url.hostname;
 }
 
-async function signTransaction(account, signingMessage) {
-  return account.signHexString(signingMessage).hex();
+async function signTransaction(client, account, transaction) {
+  const address = account.address();
+  const txn = await client.generateTransaction(address, transaction);
+  return client.signTransaction(account, txn);
 }
 
 async function checkConnected(address, sendResponse) {
@@ -58,32 +60,10 @@ function getAccountAddress(publicAccount, sendResponse) {
   sendResponse(publicAccount);
 }
 
-async function getChainId(client, sendResponse) {
-  try {
-    const chainId = await client.getChainId();
-    sendResponse({ chainId });
-  } catch (error) {
-    sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
-  }
-}
-
 async function getNetwork(sendResponse) {
   try {
     const network = await getBackgroundNetwork();
     sendResponse(network.name);
-  } catch (error) {
-    sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
-  }
-}
-
-async function getSequenceNumber(client, publicAccount, sendResponse) {
-  if (!checkConnected(publicAccount.address, sendResponse)) {
-    return;
-  }
-
-  try {
-    const { sequence_number: sequenceNumber } = await client.getAccount(publicAccount.address);
-    sendResponse({ sequenceNumber });
   } catch (error) {
     sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
   }
@@ -114,23 +94,36 @@ async function isConnected(address, sendResponse) {
   sendResponse(status);
 }
 
-async function submitTransaction(client, publicAccount, signedTransaction, sendResponse) {
+async function signAndSubmitTransaction(client, publicAccount, transaction, sendResponse) {
+  if (!checkConnected(publicAccount.address, sendResponse)) {
+    return;
+  }
+
+  const permission = await Permissions.requestPermissions(
+    PermissionType.SIGN_AND_SUBMIT_TRANSACTION,
+    await getCurrentDomain(),
+    publicAccount.address,
+  );
+  if (!permission) {
+    rejectRequest(sendResponse);
+    return;
+  }
+
   const account = await checkAccount(sendResponse);
-  if (!checkConnected(publicAccount.address, sendResponse) || account === undefined) {
+  if (!account) {
     return;
   }
 
   try {
-    const response = await client.submitSignedBCSTransaction(
-      new HexString(signedTransaction).toUint8Array(),
-    );
+    const signedTransaction = await signTransaction(client, account, transaction);
+    const response = await client.submitTransaction(signedTransaction);
     sendResponse(response);
   } catch (error) {
     sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
   }
 }
 
-async function signTransactionAndSendResponse(publicAccount, signingMessage, sendResponse) {
+async function signTransactionAndSendResponse(client, publicAccount, transaction, sendResponse) {
   if (!checkConnected(publicAccount.address, sendResponse)) {
     return;
   }
@@ -151,8 +144,8 @@ async function signTransactionAndSendResponse(publicAccount, signingMessage, sen
   }
 
   try {
-    const signature = await signTransaction(account, signingMessage);
-    sendResponse({ signature });
+    const signedTransaction = await signTransaction(client, account, transaction);
+    sendResponse({ signedTransaction });
   } catch (error) {
     sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
   }
@@ -212,20 +205,14 @@ async function handleDappRequest(request, sendResponse) {
     case MessageMethod.GET_ACCOUNT_ADDRESS:
       getAccountAddress(publicAccount, sendResponse);
       break;
-    case MessageMethod.GET_CHAIN_ID:
-      getChainId(client, sendResponse);
-      break;
     case MessageMethod.GET_NETWORK:
       getNetwork(sendResponse);
       break;
-    case MessageMethod.GET_SEQUENCE_NUMBER:
-      getSequenceNumber(client, publicAccount, sendResponse);
-      break;
-    case MessageMethod.SUBMIT_TRANSACTION:
-      submitTransaction(client, publicAccount, request.args.signedTransaction, sendResponse);
+    case MessageMethod.SIGN_AND_SUBMIT_TRANSACTION:
+      signAndSubmitTransaction(client, publicAccount, request.args.transaction, sendResponse);
       break;
     case MessageMethod.SIGN_TRANSACTION:
-      signTransactionAndSendResponse(publicAccount, request.args.signingMessage, sendResponse);
+      signTransactionAndSendResponse(client, publicAccount, request.args.transaction, sendResponse);
       break;
     case MessageMethod.SIGN_MESSAGE:
       signMessage(publicAccount, request.args.message, sendResponse);

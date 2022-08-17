@@ -1,14 +1,21 @@
 /* eslint-disable no-console */
 import './App.css';
 import React, { useEffect, useState } from 'react';
-import { BCS, TxnBuilderTypes } from 'aptos';
 
 function App() {
   const [address, setAddress] = useState<string | undefined>(undefined);
   const [isConnected, setIsConnected] = useState<boolean | undefined>(undefined);
   const [network, setNetwork] = useState<string | undefined>(undefined);
   const [isSubmittingTransaction, setIsSubmittingTransaction] = useState<boolean>(false);
+  const [isSigningTransaction, setIsSigningTransaction] = useState<boolean>(false);
   const [isSigningMessage, setIsSigningMessage] = useState<boolean>(false);
+
+  const transaction = {
+    arguments: [address, '717'],
+    function: '0x1::coin::transfer',
+    type: 'script_function_payload',
+    type_arguments: ['0x1::aptos_coin::AptosCoin'],
+  };
 
   useEffect(() => {
     window.aptos.on('accountChanged', async (account: any) => {
@@ -55,18 +62,6 @@ function App() {
   const onSubmitTransactionClick = async () => {
     if (!isSubmittingTransaction && address) {
       setIsSubmittingTransaction(true);
-      const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString('0x1::aptos_coin::AptosCoin'));
-      const transaction = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-        TxnBuilderTypes.ScriptFunction.natural(
-          '0x1::coin',
-          'transfer',
-          [token],
-          [
-            BCS.bcsToBytes(TxnBuilderTypes.AccountAddress.fromHex(address)),
-            BCS.bcsSerializeUint64(717),
-          ],
-        ),
-      );
       try {
         const pendingTransaction = await window.aptos.signAndSubmitTransaction(transaction);
         console.log(pendingTransaction);
@@ -74,6 +69,19 @@ function App() {
         console.error(error);
       }
       setIsSubmittingTransaction(false);
+    }
+  };
+
+  const onSignTransactionClick = async () => {
+    if (!isSubmittingTransaction && address) {
+      setIsSigningTransaction(true);
+      try {
+        const signedTransaction = await window.aptos.signTransaction(transaction);
+        console.log(signedTransaction);
+      } catch (error) {
+        console.error(error);
+      }
+      setIsSigningTransaction(false);
     }
   };
 
@@ -101,6 +109,7 @@ function App() {
         </p>
         <button className="Button" type="button" onClick={onConnectClick}>{isConnected ? 'Disconnect' : 'Connect'}</button>
         <button className="Button" type="button" onClick={onSubmitTransactionClick}>{isSubmittingTransaction ? 'Submitting...' : 'Submit Transaction'}</button>
+        <button className="Button" type="button" onClick={onSignTransactionClick}>{isSigningTransaction ? 'Sigining...' : 'Sign Transaction'}</button>
         <button className="Button" type="button" onClick={onSignMessageClick}>{isSigningMessage ? 'Signing...' : 'Sign Message'}</button>
       </header>
     </div>
