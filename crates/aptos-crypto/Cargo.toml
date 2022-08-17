@@ -52,6 +52,7 @@ default = []
 assert-private-keys-not-cloneable = []
 cloneable-private-keys = []
 fuzzing = ["proptest", "proptest-derive", "cloneable-private-keys"]
+sign-arbitrary-message = []
 
 [[bench]]
 name = "noise"
