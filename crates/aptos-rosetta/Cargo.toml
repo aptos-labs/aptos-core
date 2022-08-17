@@ -12,7 +12,7 @@ publish = false
 [dependencies]
 anyhow = "1.0.57"
 aptos-config = { path = "../../config" }
-aptos-crypto = { path = "../aptos-crypto" }
+aptos-crypto = { path = "../aptos-crypto", features = ["sign-arbitrary-message"] }
 aptos-logger = { path = "../aptos-logger" }
 aptos-metrics-core = { path = "../aptos-metrics-core" }
 aptos-node = { path = "../../aptos-node" }
