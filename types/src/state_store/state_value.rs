@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::transaction::Version;
 use crate::{proof::SparseMerkleRangeProof, state_store::state_key::StateKey};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -98,4 +99,16 @@ impl StateValueChunkWithProof {
             .iter()
             .all(|sibling| *sibling == *SPARSE_MERKLE_PLACEHOLDER_HASH)
     }
+}
+
+/// Indicates a state value becomes stale since `stale_since_version`.
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+pub struct StaleStateValueIndex {
+    /// The version since when the node is overwritten and becomes stale.
+    pub stale_since_version: Version,
+    /// The version identifying the value associated with this record.
+    pub version: Version,
+    /// The `StateKey` identifying the value associated with this record.
+    pub state_key: StateKey,
 }
