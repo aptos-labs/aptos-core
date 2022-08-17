@@ -116,8 +116,8 @@ impl Default for StorageServiceConfig {
             max_lru_cache_size: 100,
             max_network_channel_size: 4000,
             max_network_chunk_bytes: (MAX_APPLICATION_FRAME_SIZE - MESSAGE_PADDING_SIZE) as u64,
-            max_state_chunk_size: 1000,
-            max_subscription_period_ms: 10000,
+            max_state_chunk_size: 2000,
+            max_subscription_period_ms: 5000,
             max_transaction_chunk_size: 1000,
             max_transaction_output_chunk_size: 1000,
             storage_summary_refresh_interval_ms: 50,
@@ -133,6 +133,9 @@ pub struct DataStreamingServiceConfig {
 
     // Maximum number of concurrent data client requests (per stream).
     pub max_concurrent_requests: u64,
+
+    // Maximum number of concurrent data client requests (per stream) for state keys/values.
+    pub max_concurrent_state_requests: u64,
 
     // Maximum channel sizes for each data stream listener. If messages are not
     // consumed, they will be dropped (oldest messages first). The remaining
@@ -156,6 +159,7 @@ impl Default for DataStreamingServiceConfig {
         Self {
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: 2,
+            max_concurrent_state_requests: 4,
             max_data_stream_channel_sizes: 1000,
             max_request_retry: 3,
             max_notification_id_mappings: 2000,

@@ -1090,6 +1090,7 @@ fn create_streaming_client_with_mocks(
     // Create the data streaming service config
     let data_streaming_service_config = DataStreamingServiceConfig {
         max_concurrent_requests: 3,
+        max_concurrent_state_requests: 6,
         ..Default::default()
     };
 
