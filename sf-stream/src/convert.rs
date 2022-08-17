@@ -504,8 +504,8 @@ pub fn convert_multi_ed25519_signature(
             .iter()
             .map(|index| {
                 sig.public_keys
-                    .get(index.clone())
-                    .expect(&format!("Failed to get public key at position {}", index))
+                    .get(*index)
+                    .unwrap_or_else(|| panic!("Failed to get public key at position {}", index))
                     .0
                     .clone()
             })
@@ -514,7 +514,7 @@ pub fn convert_multi_ed25519_signature(
         threshold: sig.threshold as u32,
         public_key_indices: public_key_indices
             .iter()
-            .map(|ind| ind.clone() as u32)
+            .map(|index| *index as u32)
             .collect(),
     }
 }
