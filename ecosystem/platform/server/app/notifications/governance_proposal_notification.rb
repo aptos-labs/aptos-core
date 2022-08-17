@@ -8,7 +8,7 @@
 # GovernanceProposalNotification.with(network_operation: @network_operation).deliver_later(current_user)
 # GovernanceProposalNotification.with(network_operation: @network_operation).deliver(current_user)
 
-class GovernanceProposalNotification < Noticed::Base
+class GovernanceProposalNotification < BaseNotification
   # Add your delivery methods
   #
   deliver_by :database
