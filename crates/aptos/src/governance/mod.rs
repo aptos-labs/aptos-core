@@ -3,7 +3,6 @@
 
 use crate::common::types::{
     CliError, CliTypedResult, PoolAddressArgs, PromptOptions, TransactionOptions,
-    TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
 use crate::move_tool::{compile_move, ArgWithType, FunctionArgType};
@@ -128,7 +127,7 @@ impl CliCommand<Transaction> for SubmitProposal {
                     bcs::to_bytes(&self.pool_address_args.pool_address())?,
                     bcs::to_bytes(&self.execution_hash)?,
                     bcs::to_bytes(&self.metadata_url.to_string())?,
-                    bcs::to_bytes(&metadata_hash)?,
+                    bcs::to_bytes(&hex::encode(metadata_hash.to_vec()))?,
                 ],
             )
             .await
@@ -206,8 +205,8 @@ impl std::fmt::Display for ProposalMetadata {
 
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct ScriptHash {
-    hash: String,
-    bytecode: String,
+    pub hash: String,
+    pub bytecode: String,
 }
 
 #[derive(Parser)]
@@ -329,12 +328,12 @@ impl TryFrom<&ArgWithType> for TransactionArgument {
 }
 
 #[async_trait]
-impl CliCommand<TransactionSummary> for ExecuteProposal {
+impl CliCommand<Transaction> for ExecuteProposal {
     fn command_name(&self) -> &'static str {
         "ExecuteProposal"
     }
 
-    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+    async fn execute(mut self) -> CliTypedResult<Transaction> {
         if !self.path.exists() {
             return Err(CliError::UnableToReadFile(
                 self.path.display().to_string(),
@@ -363,9 +362,6 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
 
         let txn = TransactionPayload::Script(Script::new(code, type_args, args));
 
-        self.txn_options
-            .submit_transaction(txn)
-            .await
-            .map(TransactionSummary::from)
+        self.txn_options.submit_transaction(txn).await
     }
 }

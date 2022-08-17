@@ -1,20 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::account::{
-    create::{CreateAccount, DEFAULT_FUNDED_COINS},
-    fund::FundWithFaucet,
-    list::{ListAccount, ListQuery},
-    transfer::{TransferCoins, TransferSummary},
-};
 use crate::common::init::InitTool;
 use crate::common::types::{
     account_address_from_public_key, AccountAddressWrapper, CliError, CliTypedResult,
     EncodingOptions, FaucetOptions, GasOptions, KeyType, MoveManifestAccountWrapper,
-    MovePackageDir, OptionalPoolAddressArgs, PrivateKeyInputOptions, PromptOptions, RestOptions,
-    RngArgs, SaveFile, TransactionOptions, TransactionSummary,
+    MovePackageDir, OptionalPoolAddressArgs, PoolAddressArgs, PrivateKeyInputOptions,
+    PromptOptions, RestOptions, RngArgs, SaveFile, TransactionOptions, TransactionSummary,
 };
 use crate::common::utils::write_to_file;
+use crate::governance::{PrepareProposal, ScriptHash, SubmitProposal, SubmitVote};
 use crate::move_tool::{
     ArgWithType, CompilePackage, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
 };
@@ -30,7 +25,17 @@ use crate::stake::{
     WithdrawStake,
 };
 use crate::CliCommand;
+use crate::{
+    account::{
+        create::{CreateAccount, DEFAULT_FUNDED_COINS},
+        fund::FundWithFaucet,
+        list::{ListAccount, ListQuery},
+        transfer::{TransferCoins, TransferSummary},
+    },
+    governance::ExecuteProposal,
+};
 use aptos_config::config::Peer;
+use aptos_crypto::HashValue;
 use aptos_crypto::{bls12381, ed25519::Ed25519PrivateKey, x25519, PrivateKey};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
@@ -68,6 +73,18 @@ module NamedAddress0::store {
         coin::register<CoolCoin>(account);
     }
 }";
+
+pub const PROPOSAL_SCRIPT: &str = "
+script {
+    use aptos_framework::aptos_governance;
+    use aptos_framework::staking_config as stake;
+
+    fun main(proposal_id: u64) {
+      let framework_signer = aptos_governance::resolve(proposal_id, @aptos_framework);
+      stake::update_required_stake(&framework_signer, 1000, 1000000);
+    }
+}
+  ";
 
 /// A framework for testing the CLI
 pub struct CliTestFramework {
@@ -582,6 +599,90 @@ impl CliTestFramework {
             .create_as_dir()
             .expect("Expected to be able to create move temp dir");
         self.move_dir = Some(move_dir.path().to_path_buf());
+    }
+
+    pub async fn init_proposal_package(&self, package_name: &str, script_name: &str) {
+        self.init_package(package_name.to_string(), BTreeMap::new())
+            .await
+            .unwrap();
+
+        let move_dir = self.move_dir();
+        let source_path = move_dir.join(format!("sources/{}.move", script_name));
+
+        write_to_file(
+            source_path.as_path(),
+            &source_path.as_display().to_string(),
+            PROPOSAL_SCRIPT.as_bytes(),
+        )
+        .unwrap();
+    }
+
+    pub async fn prepare_proposal(&self) -> CliTypedResult<ScriptHash> {
+        PrepareProposal {
+            path: self.move_dir(),
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn submit_proposal(
+        &self,
+        voter_index: usize,
+        pool_address: String,
+        execution_hash: String,
+    ) -> CliTypedResult<Transaction> {
+        SubmitProposal {
+            txn_options: self.transaction_options(voter_index, None),
+            pool_address_args: PoolAddressArgs {
+                pool_address: AccountAddressWrapper::from_str(pool_address.as_str()).unwrap(),
+            },
+            execution_hash: HashValue::from_hex(execution_hash).unwrap(),
+            metadata_url: Url::parse("https://gist.githubusercontent.com/jjleng/55f1adc7af5a67f6fd855843b082df2d/raw/85f1fdfc7ed78984587be33fdef7782cf67367e2/governance").unwrap(),
+            prompt_options: PromptOptions {
+                assume_yes: true,
+                assume_no: false,
+            },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn submit_vote(
+        &self,
+        voter_index: usize,
+        pool_address: String,
+        proposal_id: u64,
+    ) -> CliTypedResult<Transaction> {
+        SubmitVote {
+            txn_options: self.transaction_options(voter_index, None),
+            pool_address_args: PoolAddressArgs {
+                pool_address: AccountAddressWrapper::from_str(pool_address.as_str()).unwrap(),
+            },
+            proposal_id,
+            should_pass: true,
+            prompt_options: PromptOptions {
+                assume_yes: true,
+                assume_no: false,
+            },
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn execute_proposal(
+        &self,
+        voter_index: usize,
+        script_path: &str,
+        proposal_id: u64,
+    ) -> CliTypedResult<Transaction> {
+        ExecuteProposal {
+            txn_options: self.transaction_options(voter_index, None),
+            path: PathBuf::from_str(script_path).unwrap(),
+            args: vec![ArgWithType::from_str(format!("u64:{}", proposal_id).as_str()).unwrap()],
+            type_args: vec![],
+        }
+        .execute()
+        .await
     }
 
     pub fn add_move_files(&self) {

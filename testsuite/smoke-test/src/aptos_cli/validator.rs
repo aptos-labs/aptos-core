@@ -530,10 +530,10 @@ fn dns_name(addr: &str) -> DnsName {
     DnsName::try_from(addr.to_string()).unwrap()
 }
 
-struct ValidatorNodeKeys {
-    account_private_key: Ed25519PrivateKey,
-    network_private_key: x25519::PrivateKey,
-    consensus_private_key: bls12381::PrivateKey,
+pub struct ValidatorNodeKeys {
+    pub account_private_key: Ed25519PrivateKey,
+    pub network_private_key: x25519::PrivateKey,
+    pub consensus_private_key: bls12381::PrivateKey,
 }
 
 impl ValidatorNodeKeys {
