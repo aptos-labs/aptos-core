@@ -16,7 +16,7 @@ pub mod stake;
 pub mod test;
 
 use crate::common::types::{CliCommand, CliResult, CliTypedResult};
-use aptos_telemetry::collect_build_information;
+use crate::common::utils::cli_build_information;
 use async_trait::async_trait;
 use clap::Parser;
 use std::collections::BTreeMap;
@@ -77,8 +77,6 @@ impl CliCommand<BTreeMap<String, String>> for InfoTool {
     }
 
     async fn execute(self) -> CliTypedResult<BTreeMap<String, String>> {
-        let build_information = collect_build_information!();
-
-        Ok(build_information)
+        Ok(cli_build_information())
     }
 }
