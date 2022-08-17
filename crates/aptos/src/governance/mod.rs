@@ -9,6 +9,8 @@ use crate::common::utils::prompt_yes_with_override;
 use crate::move_tool::{compile_move, init_move_dir, ArgWithType, FunctionArgType};
 use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
+use aptos_logger::warn;
+use aptos_rest_client::aptos_api_types::U64;
 use aptos_rest_client::{aptos_api_types::MoveType, Transaction};
 use aptos_types::{
     account_address::AccountAddress,
@@ -73,12 +75,12 @@ pub struct SubmitProposal {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for SubmitProposal {
+impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
     fn command_name(&self) -> &'static str {
         "SubmitProposal"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<ProposalSubmissionSummary> {
         let (_bytecode, script_hash) = self.compile_proposal_args.compile()?;
 
         // Validate the proposal metadata
@@ -93,7 +95,8 @@ impl CliCommand<Transaction> for SubmitProposal {
             self.compile_proposal_args.prompt_options,
         )?;
 
-        self.txn_options
+        let txn = self
+            .txn_options
             .submit_script_function(
                 AccountAddress::ONE,
                 "aptos_governance",
@@ -106,8 +109,57 @@ impl CliCommand<Transaction> for SubmitProposal {
                     bcs::to_bytes(&metadata_hash.to_hex())?,
                 ],
             )
-            .await
+            .await?;
+
+        if let Transaction::UserTransaction(inner) = txn {
+            // Find event with proposal id
+            let proposal_id = if let Some(event) = inner.events.iter().find(|event| {
+                event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
+            }) {
+                let data: CreateProposalEvent = serde_json::from_value(event.data.clone())
+                    .map_err(|_| {
+                        CliError::UnexpectedError(
+                            "Failed to parse Proposal event to get ProposalId".to_string(),
+                        )
+                    })?;
+                Some(data.proposal_id.0)
+            } else {
+                warn!("No proposal event found to find proposal id");
+                None
+            };
+            let request = inner.request;
+            let info = inner.info;
+
+            return Ok(ProposalSubmissionSummary {
+                proposal_id,
+                transaction_hash: info.hash.into(),
+                transaction_version: info.version.into(),
+                gas_used: info.gas_used.0,
+                gas_price_per_unit: request.gas_unit_price.0,
+                sequence_number: request.sequence_number.0,
+                vm_status: info.vm_status,
+            });
+        }
+        Err(CliError::UnexpectedError(
+            "Unable to find parse proposal transaction output".to_string(),
+        ))
     }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct CreateProposalEvent {
+    proposal_id: U64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct ProposalSubmissionSummary {
+    proposal_id: Option<u64>,
+    transaction_hash: HashValue,
+    transaction_version: u64,
+    gas_used: u64,
+    gas_price_per_unit: u64,
+    sequence_number: u64,
+    vm_status: String,
 }
 
 /// Retrieve metadata and validate it
