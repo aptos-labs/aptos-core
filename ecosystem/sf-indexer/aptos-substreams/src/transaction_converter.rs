@@ -197,7 +197,7 @@ fn parse_single_signature(
         public_key: s.public_key.clone(),
         signature: s.signature.clone(),
         threshold: 1,
-        bitmap: Vec::default(),
+        public_key_indices: Vec::default(),
         multi_agent_index,
         multi_sig_index: 0,
     }
@@ -226,7 +226,7 @@ fn parse_multi_signature(
             public_key: key.clone(),
             signature: signature.clone(),
             threshold: s.threshold,
-            bitmap: s.bitmap.clone(),
+            public_key_indices: s.public_key_indices.clone(),
             multi_agent_index,
             multi_sig_index: index as u32,
         });
