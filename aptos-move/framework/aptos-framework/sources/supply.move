@@ -23,11 +23,10 @@ module aptos_framework::supply {
     }
 
     fun new_from_address<CoinType>(addr: address): Supply<CoinType> {
-        // TODO: for now, only coins on Aptos framework accounts are parallizable.
-        // When the feature matures, we can enable it for everyone.
         if (system_addresses::is_aptos_framework_address(addr)) {
             Supply {
-                inner: optional_aggregator::new(MAX_U128, /*parallelizable=*/true),
+                // TODO: change to true once execution is working.
+                inner: optional_aggregator::new(MAX_U128, /*parallelizable=*/false),
             }
         } else {
             Supply {
