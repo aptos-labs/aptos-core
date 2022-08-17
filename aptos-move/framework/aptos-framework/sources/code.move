@@ -25,7 +25,7 @@ module aptos_framework::code {
         upgrade_policy: UpgradePolicy,
         /// The numbers of times this module has been upgraded. Also serves as the on-chain version.
         /// This field will be automatically assigned on successful upgrade.
-        upgrade_counter: u64,
+        upgrade_number: u64,
         /// The BuildInfo, in the BuildInfo.yaml format.
         build_info: String,
         /// The package manifest, in the Move.toml format.
@@ -117,11 +117,11 @@ module aptos_framework::code {
         let len = vector::length(packages);
         let index = len;
         let i = 0;
-        let upgrade_counter = 0;
+        let upgrade_number = 0;
         while (i < len) {
             let old = vector::borrow(packages, i);
             if (old.name == pack.name) {
-                upgrade_counter = old.upgrade_counter + 1;
+                upgrade_number = old.upgrade_number + 1;
                 check_upgradability(old, &pack, &module_names);
                 index = i;
             } else {
@@ -131,7 +131,7 @@ module aptos_framework::code {
         };
 
         // Assign the upgrade counter.
-        *&mut pack.upgrade_counter = upgrade_counter;
+        *&mut pack.upgrade_number = upgrade_number;
 
         // Update registry
         if (index < len) {
