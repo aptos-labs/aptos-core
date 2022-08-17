@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{GenesisConfig, Swarm, Version};
-use crate::Result;
+use crate::{GenesisConfigFn, NodeConfigFn, Result};
 use rand::rngs::StdRng;
 use std::num::NonZeroUsize;
 use std::time::Duration;
@@ -21,5 +21,7 @@ pub trait Factory {
         genesis_version: &Version,
         genesis_modules: Option<&GenesisConfig>,
         cleanup_duration: Duration,
+        genesis_config_fn: Option<GenesisConfigFn>,
+        node_config_fn: Option<NodeConfigFn>,
     ) -> Result<Box<dyn Swarm>>;
 }

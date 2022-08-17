@@ -3686,6 +3686,7 @@ dependencies = [
  "tokio 1.19.2",
  "transaction-emitter-lib",
  "url",
+ "yaml-rust",
 ]
 
 [[package]]
@@ -3699,6 +3700,7 @@ dependencies = [
  "async-trait",
  "forge",
  "framework",
+ "serde_yaml 0.8.26",
  "structopt 0.3.26",
  "testcases",
  "tokio 1.19.2",

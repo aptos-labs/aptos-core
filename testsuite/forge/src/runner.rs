@@ -3,7 +3,7 @@
 
 use crate::*;
 use rand::{Rng, SeedableRng};
-use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 use std::{
     io::{self, Write},
@@ -119,6 +119,9 @@ pub enum InitialVersion {
     Newest,
 }
 
+pub type NodeConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
+pub type GenesisConfigFn = Arc<dyn Fn(&mut serde_yaml::Value) + Send + Sync>;
+
 pub struct ForgeConfig<'cfg> {
     aptos_tests: &'cfg [&'cfg dyn AptosTest],
     admin_tests: &'cfg [&'cfg dyn AdminTest],
@@ -136,11 +139,11 @@ pub struct ForgeConfig<'cfg> {
     /// The initial genesis modules to use when starting a network
     genesis_config: Option<GenesisConfig>,
 
-    /// Optional genesis helm values overrides per test
-    genesis_helm_values_path: Option<String>,
+    /// Optional genesis helm values init function
+    genesis_helm_config_fn: Option<GenesisConfigFn>,
 
-    /// Optional node helm values overrides per test
-    node_helm_values_path: Option<String>,
+    /// Optional node helm values init function
+    node_helm_config_fn: Option<NodeConfigFn>,
 }
 
 impl<'cfg> ForgeConfig<'cfg> {
@@ -173,13 +176,13 @@ impl<'cfg> ForgeConfig<'cfg> {
         self
     }
 
-    pub fn with_genesis_helm_value_path(mut self, genesis_helm_values_path: String) -> Self {
-        self.genesis_helm_values_path = Some(genesis_helm_values_path);
+    pub fn with_genesis_helm_config_fn(mut self, genesis_helm_config_fn: GenesisConfigFn) -> Self {
+        self.genesis_helm_config_fn = Some(genesis_helm_config_fn);
         self
     }
 
-    pub fn with_node_helm_value_path(mut self, node_helm_values_path: String) -> Self {
-        self.node_helm_values_path = Some(node_helm_values_path);
+    pub fn with_node_helm_config_fn(mut self, node_helm_config_fn: NodeConfigFn) -> Self {
+        self.node_helm_config_fn = Some(node_helm_config_fn);
         self
     }
 
@@ -221,8 +224,8 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             initial_fullnode_count: 0,
             initial_version: InitialVersion::Oldest,
             genesis_config: None,
-            genesis_helm_values_path: None,
-            node_helm_values_path: None,
+            genesis_helm_config_fn: None,
+            node_helm_config_fn: None,
         }
     }
 }
@@ -313,6 +316,8 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                 self.tests.genesis_config.as_ref(),
                 self.global_job_request.duration
                     + Duration::from_secs(NAMESPACE_CLEANUP_DURATION_BUFFER_SECS),
+                self.tests.genesis_helm_config_fn.clone(),
+                self.tests.node_helm_config_fn.clone(),
             ))?;
 
             // Run AptosTests

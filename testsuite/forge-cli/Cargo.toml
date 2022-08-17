@@ -20,8 +20,8 @@ aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../../crates/aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
 forge = { path = "../forge" }
-
 framework = { path = "../../aptos-move/framework" }
+serde_yaml = "0.8.24"
 testcases = { path = "../testcases" }
 
 [[bin]]
