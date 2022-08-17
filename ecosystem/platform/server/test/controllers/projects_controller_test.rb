@@ -60,15 +60,15 @@ class ProjectsControllerTest < ActionDispatch::IntegrationTest
         telegram_url: Faker::Internet.url(host: 't.me'),
         linkedin_url: Faker::Internet.url(host: 'linkedin.com'),
         youtube_url: Faker::Internet.url(host: 'www.youtube.com'),
-        thumbnail_url: Faker::Company.logo,
+        thumbnail: Rack::Test::UploadedFile.new('public/favicon.png', 'image/png'),
         project_categories_attributes: [
           { category_id: category.id }
         ],
         project_members_attributes: [
           { user_id: @user.id, role: 'admin', public: true }
         ],
-        project_screenshots_attributes: [
-          { url: Faker::LoremFlickr.image(size: '1920x1080') }
+        screenshots: [
+          Rack::Test::UploadedFile.new('public/favicon.png', 'image/png')
         ],
         public: true
       } }

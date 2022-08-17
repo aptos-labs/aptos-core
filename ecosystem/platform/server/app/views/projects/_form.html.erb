@@ -80,8 +80,8 @@
     <div class="mb-8"><%= render DividerComponent.new %></div>
 
     <div class="mb-6">
-      <%= form.label :thumbnail_url, 'Thumbnail', class: 'font-mono uppercase block mb-2' %>
-      <%= form.url_field :thumbnail_url, placeholder: 'Enter thumbnail URL' %>
+      <%= form.label :thumbnail, 'Thumbnail', class: 'font-mono uppercase block mb-2' %>
+      <%= form.file_field :thumbnail %>
       <%= content_tag :button, class: 'w-48 h-48 bg-neutral-800 border-neutral-700 border-2 border-dashed rounded-xl flex items-center justify-center text-neutral-500 hover:text-neutral-400 focus:text-neutral-400 cursor-pointer' do %>
         <%= render IconComponent.new(:upload, size: :large) %>
       <% end %>
@@ -89,15 +89,12 @@
 
     <div class="mb-6">
       <%= form.label :screenshots, 'Screenshot Gallery', class: 'font-mono uppercase block mb-2' %>
+      <%= form.file_field :screenshots %>
       <%= content_tag :button, class: 'w-full h-96 bg-neutral-800 border-neutral-700 border-2 border-dashed rounded-xl flex items-center justify-center text-neutral-500 hover:text-neutral-400 focus:text-neutral-400 cursor-pointer' do %>
         <div class="w-96 flex flex-col gap-4 items-center">
           <%= render IconComponent.new(:upload, size: :large) %>
           <p class="font-light text-neutral-400">Upload at least one image, 1920 x 1080px / aspect ratio of 16:9, max. 5MB each.</p>
         </div>
-      <% end %>
-      <%= form.fields_for(:project_screenshots) do |screenshot_form| %>
-        <%= screenshot_form.label :url, 'Screenshot URL', class: 'font-mono uppercase block mb-2' %>
-        <%= screenshot_form.text_field :url, placeholder: 'Enter URL' %>
       <% end %>
     </div>
 

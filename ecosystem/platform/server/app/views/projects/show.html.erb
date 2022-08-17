@@ -3,7 +3,7 @@
     <%= link_to 'Back to all projects', projects_path %>
 
     <div class="flex gap-16">
-      <img src="<%= @project.thumbnail_url %>" class="h-32 w-32">
+      <img src="<%= url_for(@project.thumbnail) %>" class="h-32 w-32">
 
       <div class="max-w-prose">
         <h2 class="font-display leading-none text-2xl"><%= @project.title %></h2>
@@ -15,7 +15,7 @@
             </a>
           <% end %>
         </div>
-        <img src="<%= @project.project_screenshots.first.url %>" alt="Project screenshot">
+        <img src="<%= url_for(@project.screenshots.first) %>" alt="Project screenshot">
         <div class="prose">
           <%= sanitize @project.full_description %>
         </div>

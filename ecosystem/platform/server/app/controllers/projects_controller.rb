@@ -25,7 +25,6 @@ class ProjectsController < ApplicationController
     @project = Project.new
     @project.project_categories.new
     @project.project_members.new
-    @project.project_screenshots.new
   end
 
   # GET /projects/1/edit
@@ -42,6 +41,9 @@ class ProjectsController < ApplicationController
 
     return unless check_recaptcha
 
+    @project.thumbnail.attach(params[:thumbnail])
+    @project.screenshots.attach(params[:screenshots])
+
     if @project.save
       redirect_to project_url(@project), notice: 'Project was successfully created.'
     else
@@ -55,6 +57,9 @@ class ProjectsController < ApplicationController
 
     @project = Project.find(params[:id])
     return head :forbidden unless @project.user_id == current_user.id
+
+    @project.thumbnail.attach(params[:thumbnail])
+    @project.screenshots.attach(params[:screenshots])
 
     if @project.update(project_params)
       redirect_to project_url(@project), notice: 'Project was successfully updated.'
@@ -78,11 +83,11 @@ class ProjectsController < ApplicationController
   # Only allow a list of trusted parameters through.
   def project_params
     params.require(:project).permit(:title, :short_description, :full_description, :website_url, :github_url,
-                                    :discord_url, :twitter_url, :telegram_url, :linkedin_url, :thumbnail_url,
+                                    :discord_url, :twitter_url, :telegram_url, :linkedin_url, :thumbnail,
                                     :youtube_url, :public,
                                     project_categories_attributes: %i[id category_id],
                                     project_members_attributes: %i[id user_id role public],
-                                    project_screenshots_attributes: %i[id url])
+                                    screenshots: [])
   end
 
   def check_recaptcha

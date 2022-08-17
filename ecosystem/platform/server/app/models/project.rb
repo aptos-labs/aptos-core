@@ -24,14 +24,14 @@ class Project < ApplicationRecord
       where('project_members.public = ?', true)
     end
   end
-  has_many :project_screenshots, dependent: :destroy
-  accepts_nested_attributes_for :project_categories, :project_members, :project_screenshots
+  has_one_attached :thumbnail
+  has_many_attached :screenshots
+  accepts_nested_attributes_for :project_categories, :project_members
 
   validates :title, presence: true, length: { maximum: 140 }
   validates :short_description, presence: true, length: { maximum: 140 }
   validates :full_description, presence: true, length: { minimum: 140 }
   validates :website_url, presence: true, format: URL_FORMAT
-  validates :thumbnail_url, presence: true, format: URL_FORMAT
   validates :github_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
   validates :discord_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
   validates :twitter_url, format: URL_FORMAT, allow_nil: true, allow_blank: true
@@ -44,5 +44,5 @@ class Project < ApplicationRecord
     record.errors.add(attr, "must point to #{host}") unless URI.parse(value).host == host
   end
   validates :project_categories, length: { minimum: 1, maximum: 4 }
-  validates :project_screenshots, length: { minimum: 1, maximum: 5 }
+  validates :screenshots, length: { minimum: 1, maximum: 5 }
 end

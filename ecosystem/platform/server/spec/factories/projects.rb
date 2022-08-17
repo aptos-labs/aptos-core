@@ -16,10 +16,10 @@ FactoryBot.define do
     telegram_url { Faker::Internet.url(host: 't.me') }
     linkedin_url { Faker::Internet.url(host: 'linkedin.com') }
     youtube_url { Faker::Internet.url(host: 'www.youtube.com') }
-    thumbnail_url { Faker::Company.logo }
+    thumbnail { Rack::Test::UploadedFile.new('public/favicon.png', 'image/png') }
     public { true }
     project_categories { build_list :project_category, 2 }
     project_members { build_list :project_member, 3 }
-    project_screenshots { build_list :project_screenshot, 4 }
+    screenshots { 4.times.map { |_| Rack::Test::UploadedFile.new('public/favicon.png', 'image/png') } }
   end
 end

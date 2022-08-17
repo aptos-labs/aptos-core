@@ -11,7 +11,6 @@ class CreateProjects < ActiveRecord::Migration[7.0]
       t.string :short_description, null: false
       t.string :full_description, null: false
       t.string :website_url, null: false
-      t.string :thumbnail_url, null: false
       t.string :github_url
       t.string :discord_url
       t.string :twitter_url
