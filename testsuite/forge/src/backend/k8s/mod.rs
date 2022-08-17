@@ -139,6 +139,8 @@ impl Factory for K8sFactory {
                 genesis_modules_path,
                 self.use_port_forward,
                 self.enable_haproxy,
+                None,
+                None,
             )
             .await
             {

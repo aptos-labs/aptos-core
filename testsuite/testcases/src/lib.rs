@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod compatibility_test;
+mod epoch_change_performance;
 pub mod forge_setup_test;
 pub mod gas_price_test;
 pub mod network_bandwidth_test;

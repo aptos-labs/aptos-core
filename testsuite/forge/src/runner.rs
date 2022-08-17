@@ -3,6 +3,7 @@
 
 use crate::*;
 use rand::{Rng, SeedableRng};
+use std::path::Path;
 use std::time::Duration;
 use std::{
     io::{self, Write},
@@ -134,6 +135,12 @@ pub struct ForgeConfig<'cfg> {
 
     /// The initial genesis modules to use when starting a network
     genesis_config: Option<GenesisConfig>,
+
+    /// Optional genesis helm values overrides per test
+    genesis_helm_values_path: Option<String>,
+
+    /// Optional node helm values overrides per test
+    node_helm_values_path: Option<String>,
 }
 
 impl<'cfg> ForgeConfig<'cfg> {
@@ -163,6 +170,16 @@ impl<'cfg> ForgeConfig<'cfg> {
 
     pub fn with_initial_fullnode_count(mut self, initial_fullnode_count: usize) -> Self {
         self.initial_fullnode_count = initial_fullnode_count;
+        self
+    }
+
+    pub fn with_genesis_helm_value_path(mut self, genesis_helm_values_path: String) -> Self {
+        self.genesis_helm_values_path = Some(genesis_helm_values_path);
+        self
+    }
+
+    pub fn with_node_helm_value_path(mut self, node_helm_values_path: String) -> Self {
+        self.node_helm_values_path = Some(node_helm_values_path);
         self
     }
 
@@ -204,6 +221,8 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             initial_fullnode_count: 0,
             initial_version: InitialVersion::Oldest,
             genesis_config: None,
+            genesis_helm_values_path: None,
+            node_helm_values_path: None,
         }
     }
 }

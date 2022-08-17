@@ -12,6 +12,7 @@ use crate::{
 };
 use again::RetryPolicy;
 use anyhow::{bail, format_err};
+use aptos_config::config::Error::Yaml;
 use aptos_logger::info;
 use aptos_sdk::types::PeerId;
 use k8s_openapi::api::{
@@ -19,6 +20,7 @@ use k8s_openapi::api::{
     batch::{v1::Job, v1beta1::CronJob},
     core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod},
 };
+use kube::error::ConfigError::ParseYaml;
 use kube::{
     api::{Api, DeleteParams, ListParams, Meta, ObjectMeta, PostParams},
     client::Client as K8sClient,
@@ -30,6 +32,7 @@ use serde_json::Value;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
+    fs,
     fs::File,
     io::Write,
     net::TcpListener,
@@ -402,6 +405,8 @@ pub async fn install_testnet_resources(
     genesis_modules_path: Option<String>,
     use_port_forward: bool,
     enable_haproxy: bool,
+    genesis_helm_values_path: Option<String>,
+    node_helm_values_path: Option<String>,
 ) -> Result<(HashMap<PeerId, K8sNode>, HashMap<PeerId, K8sNode>)> {
     let kube_client = create_k8s_client().await;
 
@@ -501,6 +506,35 @@ pub async fn install_testnet_resources(
     .await?;
 
     Ok((validators, fullnodes))
+}
+
+pub fn construct_genesis_helm_values(
+    kube_namespace: String,
+    num_validators: usize,
+    genesis_image_tag: String,
+    enable_haproxy: bool,
+) -> Result<String> {
+    let validator_internal_host_suffix = if enable_haproxy {
+        VALIDATOR_HAPROXY_SERVICE_SUFFIX
+    } else {
+        VALIDATOR_SERVICE_SUFFIX
+    };
+    let fullnode_internal_host_suffix = if enable_haproxy {
+        FULLNODE_HAPROXY_SERVICE_SUFFIX
+    } else {
+        FULLNODE_SERVICE_SUFFIX
+    };
+    let mut value: serde_yaml::Value = serde_yaml::Value::default();
+    value["imageTag"] = genesis_image_tag.clone().into();
+    value["chain"]["era"] = 5.into();
+    value["chain"]["root_key"] = DEFAULT_ROOT_KEY.into();
+    value["genesis"]["numValidators"] = num_validators.into();
+    value["genesis"]["validator"]["internal_host_suffix"] = validator_internal_host_suffix.into();
+    value["genesis"]["fullnode"]["internal_host_suffix"] = fullnode_internal_host_suffix.into();
+    value["labels"]["forge-namespace"] = kube_namespace.into();
+    value["labels"]["forge-image-tag"] = genesis_image_tag.into();
+
+    serde_yaml::to_string(&value).map_err(|e| anyhow::anyhow!("{:?}", e))
 }
 
 /// Collect the running nodes in the network into K8sNodes
@@ -850,6 +884,8 @@ mod tests {
     use async_trait::async_trait;
     use hyper::http::StatusCode;
     use kube::error::ErrorResponse;
+    use std::env;
+    use yaml_rust::{YamlEmitter, YamlLoader};
 
     struct FailedNamespacesApi {
         status_code: u16,

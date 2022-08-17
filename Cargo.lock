@@ -3678,6 +3678,7 @@ dependencies = [
  "reqwest 0.11.11",
  "serde 1.0.141",
  "serde_json",
+ "serde_yaml 0.8.26",
  "structopt 0.3.26",
  "tempfile",
  "termcolor",
