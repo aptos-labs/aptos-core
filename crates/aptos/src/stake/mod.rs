@@ -150,13 +150,13 @@ pub struct InitializeStakeOwner {
     /// Account Address of delegated operator
     ///
     /// If not specified, it will be the same as the owner
-    #[clap(long)]
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub operator_address: Option<AccountAddress>,
 
     /// Account address of delegated voter
     ///
     /// If not specified, it will be the same as the owner
-    #[clap(long)]
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub voter_address: Option<AccountAddress>,
 
     #[clap(flatten)]
@@ -187,7 +187,7 @@ pub struct SetOperator {
     /// Account Address of delegated operator
     ///
     /// If not specified, it will be the same as the owner
-    #[clap(long)]
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub operator_address: AccountAddress,
 
     #[clap(flatten)]
@@ -213,7 +213,7 @@ pub struct SetDelegatedVoter {
     /// Account Address of delegated voter
     ///
     /// If not specified, it will be the same as the owner
-    #[clap(long)]
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub voter_address: AccountAddress,
 
     #[clap(flatten)]
