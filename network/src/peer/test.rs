@@ -894,3 +894,57 @@ fn peer_terminates_when_request_tx_has_dropped() {
     };
     rt.block_on(future::join(peer.start(), drop));
 }
+
+#[test]
+fn peers_send_multiplex() {
+    ::aptos_logger::Logger::init_for_testing();
+    let rt = Runtime::new().unwrap();
+    let (
+        (peer_a, mut peer_handle_a, mut connection_notifs_rx_a, mut peer_notifs_rx_a),
+        (peer_b, mut peer_handle_b, mut connection_notifs_rx_b, mut peer_notifs_rx_b),
+    ) = build_test_connected_peers(rt.handle().clone(), TimeService::mock());
+
+    let remote_peer_id_a = peer_a.remote_peer_id();
+    let remote_peer_id_b = peer_b.remote_peer_id();
+
+    let test = async move {
+        let msg_a = Message {
+            protocol_id: PROTOCOL,
+            mdata: Bytes::from(vec![0; MAX_FRAME_SIZE * 2]), // stream message
+        };
+        let msg_b = Message {
+            protocol_id: PROTOCOL,
+            mdata: Bytes::from(vec![1; 1024]), // normal message
+        };
+
+        // Peer A -> msg_a -> Peer B
+        peer_handle_a.send_direct_send(msg_a.clone());
+        // Peer A <- msg_b <- Peer B
+        peer_handle_b.send_direct_send(msg_b.clone());
+
+        // Check that each peer received the other's message
+        let notif_a = peer_notifs_rx_a.next().await;
+        let notif_b = peer_notifs_rx_b.next().await;
+        assert_eq!(notif_a, Some(PeerNotification::RecvMessage(msg_b)));
+        assert_eq!(notif_b, Some(PeerNotification::RecvMessage(msg_a)));
+
+        // Shut one peers and the other should shutdown due to ConnectionLost
+        drop(peer_handle_a);
+
+        // Check that we received both shutdown events
+        assert_disconnected_event(
+            remote_peer_id_a,
+            DisconnectReason::Requested,
+            &mut connection_notifs_rx_a,
+        )
+        .await;
+        assert_disconnected_event(
+            remote_peer_id_b,
+            DisconnectReason::ConnectionLost,
+            &mut connection_notifs_rx_b,
+        )
+        .await;
+    };
+
+    rt.block_on(future::join3(peer_a.start(), peer_b.start(), test));
+}

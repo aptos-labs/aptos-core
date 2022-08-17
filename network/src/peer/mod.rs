@@ -170,10 +170,6 @@ where
             socket,
         } = connection;
         let remote_peer_id = connection_metadata.remote_peer_id;
-        assert!(
-            max_frame_size * u8::MAX as usize > max_message_size,
-            "Stream only supports maximum 256 chunks"
-        );
         Self {
             network_context,
             executor,
