@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_ext::{addition, deserialize, serialize, subtraction, DeltaOp};
+use crate::delta_change_set::{addition, deserialize, serialize, subtraction, DeltaOp};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};

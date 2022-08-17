@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_ext::DeltaChangeSet;
+use crate::delta_change_set::DeltaChangeSet;
 use aptos_state_view::StateView;
 use aptos_types::{
     transaction::{ChangeSet, TransactionOutput},

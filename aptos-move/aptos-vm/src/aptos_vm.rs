@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_ext::TransactionOutputExt;
 use crate::{
     adapter_common,
     adapter_common::{
@@ -20,6 +19,7 @@ use crate::{
     VMExecutor, VMValidator,
 };
 use anyhow::Result;
+use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_crypto::HashValue;
 use aptos_gas::AptosGasMeter;
 use aptos_logger::prelude::*;
