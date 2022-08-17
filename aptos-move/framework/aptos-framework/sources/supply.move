@@ -5,6 +5,8 @@ module aptos_framework::supply {
     use aptos_framework::system_addresses;
     use aptos_std::type_info;
 
+    friend aptos_framework::coin;
+
     #[test_only]
     friend aptos_framework::supply_tests;
 
