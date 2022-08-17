@@ -655,7 +655,7 @@ impl Arbitrary for LedgerInfoWithSignatures {
                 LedgerInfoWithSignatures::new(
                     ledger_info,
                     validator_verifier
-                        .aggregate_signature(&partial_sig)
+                        .aggregate_signatures_and_get_keys(&partial_sig)
                         .unwrap()
                         .0,
                 )
