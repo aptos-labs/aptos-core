@@ -9,6 +9,6 @@ class ProjectMember < ApplicationRecord
 
   validates :project, presence: true
   validates :user, presence: true
-  validates :role, presence: true, inclusion: { in: %w[basic admin] }
+  validates :role, presence: true, inclusion: { in: %w[member admin] }
   validates :public, presence: true
 end

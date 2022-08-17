@@ -113,8 +113,8 @@
         <%= member_form.label :user_id, 'Add Users', class: 'font-mono uppercase block mb-2' %>
         <%= member_form.text_field :user_id, placeholder: 'Enter username or email address' %>
         <%= member_form.label :role, 'Role', class: 'font-mono uppercase block mb-2' %>
-        <%= member_form.radio_button :role, 'basic', checked: true, required: true %>
-        <%= member_form.label :role, 'Basic', value: 'basic', class: 'mr-4' %>
+        <%= member_form.radio_button :role, 'member', checked: true, required: true %>
+        <%= member_form.label :role, 'Member', value: 'member', class: 'mr-4' %>
         <%= member_form.radio_button :role, 'admin', required: true %>
         <%= member_form.label :role, 'Admin', value: 'admin' %>
         <%= member_form.label :public, 'Visibility', class: 'font-mono uppercase block mb-2' %>
