@@ -245,7 +245,7 @@ export function getAptosAccountState(accounts: Accounts, address: string): Aptos
   const account = address && accounts ? accounts[address] : undefined;
   return account ? new AptosAccount(
     HexString.ensure(account.privateKey).toUint8Array(),
-    account.publicKey,
+    account.address,
   ) : undefined;
 }
 
