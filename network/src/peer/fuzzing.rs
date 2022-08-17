@@ -106,6 +106,7 @@ pub fn fuzz(data: &[u8]) {
         constants::MAX_CONCURRENT_INBOUND_RPCS,
         constants::MAX_CONCURRENT_OUTBOUND_RPCS,
         constants::MAX_FRAME_SIZE,
+        constants::MAX_MESSAGE_SIZE,
         None,
         None,
     );

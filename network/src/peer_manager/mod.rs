@@ -120,6 +120,8 @@ where
     channel_size: usize,
     /// Max network frame size
     max_frame_size: usize,
+    /// Max network message size
+    max_message_size: usize,
     /// Inbound connection limit separate of outbound connections
     inbound_connection_limit: usize,
     /// Keyed storage of all inbound rate limiters
@@ -153,6 +155,7 @@ where
         channel_size: usize,
         max_concurrent_network_reqs: usize,
         max_frame_size: usize,
+        max_message_size: usize,
         inbound_connection_limit: usize,
         inbound_rate_limiters: IpAddrTokenBucketLimiter,
         outbound_rate_limiters: IpAddrTokenBucketLimiter,
@@ -197,6 +200,7 @@ where
             max_concurrent_network_reqs,
             channel_size,
             max_frame_size,
+            max_message_size,
             inbound_connection_limit,
             inbound_rate_limiters,
             outbound_rate_limiters,
@@ -684,6 +688,7 @@ where
             constants::MAX_CONCURRENT_INBOUND_RPCS,
             constants::MAX_CONCURRENT_OUTBOUND_RPCS,
             self.max_frame_size,
+            self.max_message_size,
             Some(inbound_rate_limiter),
             Some(outbound_rate_limiter),
         );
