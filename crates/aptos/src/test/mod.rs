@@ -20,8 +20,8 @@ use crate::move_tool::{
 };
 use crate::node::{
     AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
-    LeaveValidatorSet, OperatorArgs, ShowValidatorConfig, ShowValidatorSet, ShowValidatorStake,
-    UpdateConsensusKey, UpdateValidatorNetworkAddresses, ValidatorConfigFileArgs,
+    LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig, ShowValidatorSet,
+    ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
     ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
 use crate::op::key::{ExtractPeer, GenerateKey, SaveKey};
@@ -262,8 +262,8 @@ impl CliTestFramework {
     ) -> CliTypedResult<Transaction> {
         InitializeValidator {
             txn_options: self.transaction_options(index, None),
-            validator_config_file_args: ValidatorConfigFileArgs {
-                validator_config_file: None,
+            operator_config_file_args: OperatorConfigFileArgs {
+                operator_config_file: None,
             },
             validator_consensus_key_args: ValidatorConsensusKeyArgs {
                 consensus_public_key: Some(consensus_public_key),
@@ -351,8 +351,8 @@ impl CliTestFramework {
         UpdateValidatorNetworkAddresses {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
-            validator_config_file_args: ValidatorConfigFileArgs {
-                validator_config_file: None,
+            operator_config_file_args: OperatorConfigFileArgs {
+                operator_config_file: None,
             },
             validator_network_addresses_args: ValidatorNetworkAddressesArgs {
                 validator_host: Some(validator_host),
@@ -391,8 +391,8 @@ impl CliTestFramework {
         UpdateConsensusKey {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
-            validator_config_file_args: ValidatorConfigFileArgs {
-                validator_config_file: None,
+            operator_config_file_args: OperatorConfigFileArgs {
+                operator_config_file: None,
             },
             validator_consensus_key_args: ValidatorConsensusKeyArgs {
                 consensus_public_key: Some(consensus_public_key),

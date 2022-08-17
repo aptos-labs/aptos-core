@@ -21,7 +21,7 @@ use crate::{
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
-use aptos_genesis::config::{HostAndPort, ValidatorConfiguration};
+use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
 use aptos_rest_client::Transaction;
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::chain_id::ChainId;
@@ -75,15 +75,15 @@ impl NodeTool {
 }
 
 #[derive(Parser)]
-pub struct ValidatorConfigFileArgs {
-    /// Validator Configuration file, created from the `genesis set-validator-configuration` command
+pub struct OperatorConfigFileArgs {
+    /// Operator Configuration file, created from the `genesis set-validator-configuration` command
     #[clap(long, parse(from_os_str))]
-    pub(crate) validator_config_file: Option<PathBuf>,
+    pub(crate) operator_config_file: Option<PathBuf>,
 }
 
-impl ValidatorConfigFileArgs {
-    fn read_validator_config(&self) -> CliTypedResult<Option<ValidatorConfiguration>> {
-        if let Some(ref file) = self.validator_config_file {
+impl OperatorConfigFileArgs {
+    fn load(&self) -> CliTypedResult<Option<OperatorConfiguration>> {
+        if let Some(ref file) = self.operator_config_file {
             Ok(from_yaml(
                 &String::from_utf8(read_from_file(file)?).map_err(CliError::from)?,
             )?)
@@ -92,6 +92,7 @@ impl ValidatorConfigFileArgs {
         }
     }
 }
+
 #[derive(Parser)]
 pub struct ValidatorConsensusKeyArgs {
     /// Hex encoded Consensus public key
@@ -106,16 +107,16 @@ pub struct ValidatorConsensusKeyArgs {
 impl ValidatorConsensusKeyArgs {
     fn get_consensus_public_key(
         &self,
-        validator_config: &Option<ValidatorConfiguration>,
+        operator_config: &Option<OperatorConfiguration>,
     ) -> CliTypedResult<bls12381::PublicKey> {
         let consensus_public_key = if let Some(ref consensus_public_key) = self.consensus_public_key
         {
             consensus_public_key.clone()
-        } else if let Some(ref validator_config) = validator_config {
-            validator_config.consensus_public_key.clone()
+        } else if let Some(ref operator_config) = operator_config {
+            operator_config.consensus_public_key.clone()
         } else {
             return Err(CliError::CommandArgumentError(
-                "Must provide either --validator-config-file or --consensus-public-key".to_string(),
+                "Must provide either --operator-config-file or --consensus-public-key".to_string(),
             ));
         };
         Ok(consensus_public_key)
@@ -123,15 +124,15 @@ impl ValidatorConsensusKeyArgs {
 
     fn get_consensus_proof_of_possession(
         &self,
-        validator_config: &Option<ValidatorConfiguration>,
+        operator_config: &Option<OperatorConfiguration>,
     ) -> CliTypedResult<bls12381::ProofOfPossession> {
         let proof_of_possession = if let Some(ref proof_of_possession) = self.proof_of_possession {
             proof_of_possession.clone()
-        } else if let Some(ref validator_config) = validator_config {
-            validator_config.proof_of_possession.clone()
+        } else if let Some(ref operator_config) = operator_config {
+            operator_config.consensus_proof_of_possession.clone()
         } else {
             return Err(CliError::CommandArgumentError(
-                "Must provide either --validator-config-file or --proof-of-possession".to_string(),
+                "Must provide either --operator-config-file or --proof-of-possession".to_string(),
             ));
         };
         Ok(proof_of_possession)
@@ -160,7 +161,7 @@ pub struct ValidatorNetworkAddressesArgs {
 impl ValidatorNetworkAddressesArgs {
     fn get_network_configs(
         &self,
-        validator_config: &Option<ValidatorConfiguration>,
+        operator_config: &Option<OperatorConfiguration>,
     ) -> CliTypedResult<(
         x25519::PublicKey,
         Option<x25519::PublicKey>,
@@ -170,11 +171,11 @@ impl ValidatorNetworkAddressesArgs {
         let validator_network_public_key =
             if let Some(public_key) = self.validator_network_public_key {
                 public_key
-            } else if let Some(ref validator_config) = validator_config {
-                validator_config.validator_network_public_key
+            } else if let Some(ref operator_config) = operator_config {
+                operator_config.validator_network_public_key
             } else {
                 return Err(CliError::CommandArgumentError(
-                    "Must provide either --validator-config-file or --validator-network-public-key"
+                    "Must provide either --operator-config-file or --validator-network-public-key"
                         .to_string(),
                 ));
             };
@@ -182,26 +183,26 @@ impl ValidatorNetworkAddressesArgs {
         let full_node_network_public_key =
             if let Some(public_key) = self.full_node_network_public_key {
                 Some(public_key)
-            } else if let Some(ref validator_config) = validator_config {
-                validator_config.full_node_network_public_key
+            } else if let Some(ref operator_config) = operator_config {
+                operator_config.full_node_network_public_key
             } else {
                 None
             };
 
         let validator_host = if let Some(ref host) = self.validator_host {
             host.clone()
-        } else if let Some(ref validator_config) = validator_config {
-            validator_config.validator_host.clone()
+        } else if let Some(ref operator_config) = operator_config {
+            operator_config.validator_host.clone()
         } else {
             return Err(CliError::CommandArgumentError(
-                "Must provide either --validator-config-file or --validator-host".to_string(),
+                "Must provide either --operator-config-file or --validator-host".to_string(),
             ));
         };
 
         let full_node_host = if let Some(ref host) = self.full_node_host {
             Some(host.clone())
-        } else if let Some(ref validator_config) = validator_config {
-            validator_config.full_node_host.clone()
+        } else if let Some(ref operator_config) = operator_config {
+            operator_config.full_node_host.clone()
         } else {
             None
         };
@@ -224,7 +225,7 @@ pub struct InitializeValidator {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
-    pub(crate) validator_config_file_args: ValidatorConfigFileArgs,
+    pub(crate) operator_config_file_args: OperatorConfigFileArgs,
     #[clap(flatten)]
     pub(crate) validator_consensus_key_args: ValidatorConsensusKeyArgs,
     #[clap(flatten)]
@@ -238,13 +239,13 @@ impl CliCommand<Transaction> for InitializeValidator {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
-        let validator_config = self.validator_config_file_args.read_validator_config()?;
+        let operator_config = self.operator_config_file_args.load()?;
         let consensus_public_key = self
             .validator_consensus_key_args
-            .get_consensus_public_key(&validator_config)?;
+            .get_consensus_public_key(&operator_config)?;
         let consensus_proof_of_possession = self
             .validator_consensus_key_args
-            .get_consensus_proof_of_possession(&validator_config)?;
+            .get_consensus_proof_of_possession(&operator_config)?;
         let (
             validator_network_public_key,
             full_node_network_public_key,
@@ -252,7 +253,7 @@ impl CliCommand<Transaction> for InitializeValidator {
             full_node_host,
         ) = self
             .validator_network_addresses_args
-            .get_network_configs(&validator_config)?;
+            .get_network_configs(&operator_config)?;
         let validator_network_addresses =
             vec![validator_host.as_network_address(validator_network_public_key)?];
         let full_node_network_addresses =
@@ -611,7 +612,7 @@ pub struct UpdateConsensusKey {
     #[clap(flatten)]
     pub(crate) operator_args: OperatorArgs,
     #[clap(flatten)]
-    pub(crate) validator_config_file_args: ValidatorConfigFileArgs,
+    pub(crate) operator_config_file_args: OperatorConfigFileArgs,
     #[clap(flatten)]
     pub(crate) validator_consensus_key_args: ValidatorConsensusKeyArgs,
 }
@@ -627,13 +628,13 @@ impl CliCommand<Transaction> for UpdateConsensusKey {
             .operator_args
             .address_fallback_to_txn(&self.txn_options)?;
 
-        let validator_config = self.validator_config_file_args.read_validator_config()?;
+        let operator_config = self.operator_config_file_args.load()?;
         let consensus_public_key = self
             .validator_consensus_key_args
-            .get_consensus_public_key(&validator_config)?;
+            .get_consensus_public_key(&operator_config)?;
         let consensus_proof_of_possession = self
             .validator_consensus_key_args
-            .get_consensus_proof_of_possession(&validator_config)?;
+            .get_consensus_proof_of_possession(&operator_config)?;
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_rotate_consensus_key(
                 address,
@@ -652,7 +653,7 @@ pub struct UpdateValidatorNetworkAddresses {
     #[clap(flatten)]
     pub(crate) operator_args: OperatorArgs,
     #[clap(flatten)]
-    pub(crate) validator_config_file_args: ValidatorConfigFileArgs,
+    pub(crate) operator_config_file_args: OperatorConfigFileArgs,
     #[clap(flatten)]
     pub(crate) validator_network_addresses_args: ValidatorNetworkAddressesArgs,
 }
@@ -668,7 +669,7 @@ impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
             .operator_args
             .address_fallback_to_txn(&self.txn_options)?;
 
-        let validator_config = self.validator_config_file_args.read_validator_config()?;
+        let validator_config = self.operator_config_file_args.load()?;
         let (
             validator_network_public_key,
             full_node_network_public_key,
