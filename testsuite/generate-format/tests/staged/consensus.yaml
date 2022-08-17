@@ -25,17 +25,17 @@ AccountAuthenticator:
               TYPENAME: MultiEd25519PublicKey
           - signature:
               TYPENAME: MultiEd25519Signature
-AggregatedSignature:
+AggregateSignature:
   STRUCT:
     - validator_bitmask:
         TYPENAME: BitVec
-    - aggregated_sig:
+    - sig:
         OPTION:
           TYPENAME: Signature
 AggregatedSignatureWithRounds:
   STRUCT:
     - aggregated_sig:
-        TYPENAME: AggregatedSignature
+        TYPENAME: AggregateSignature
     - rounds:
         SEQ: U64
 BitVec:
@@ -260,7 +260,7 @@ LedgerInfoWithV0:
     - ledger_info:
         TYPENAME: LedgerInfo
     - signatures:
-        TYPENAME: AggregatedSignature
+        TYPENAME: AggregateSignature
 Module:
   STRUCT:
     - code: BYTES
@@ -374,7 +374,7 @@ SyncInfo:
         TYPENAME: QuorumCert
     - highest_2chain_timeout_cert:
         OPTION:
-          TYPENAME: TwoChainTimeoutWithSignatures
+          TYPENAME: TwoChainTimeoutCertificate
 TableHandle:
   NEWTYPESTRUCT: U128
 Transaction:
@@ -463,7 +463,7 @@ TwoChainTimeout:
     - round: U64
     - quorum_cert:
         TYPENAME: QuorumCert
-TwoChainTimeoutWithSignatures:
+TwoChainTimeoutCertificate:
   STRUCT:
     - timeout:
         TYPENAME: TwoChainTimeout
