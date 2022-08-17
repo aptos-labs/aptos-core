@@ -77,7 +77,7 @@ impl NodeTool {
 #[derive(Parser)]
 pub struct ValidatorConfigFileArgs {
     /// Validator Configuration file, created from the `genesis set-validator-configuration` command
-    #[clap(long)]
+    #[clap(long, parse(from_os_str))]
     pub(crate) validator_config_file: Option<PathBuf>,
 }
 
@@ -291,7 +291,7 @@ impl OperatorArgs {
         &self,
         profile_options: &ProfileOptions,
     ) -> CliTypedResult<AccountAddress> {
-        if let Some(address) = self.pool_address_args.pool_address() {
+        if let Some(address) = self.pool_address_args.pool_address {
             Ok(address)
         } else {
             profile_options.account_address()
@@ -302,7 +302,7 @@ impl OperatorArgs {
         &self,
         transaction_options: &TransactionOptions,
     ) -> CliTypedResult<AccountAddress> {
-        if let Some(address) = self.pool_address_args.pool_address() {
+        if let Some(address) = self.pool_address_args.pool_address {
             Ok(address)
         } else {
             transaction_options.sender_address()
