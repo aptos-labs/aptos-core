@@ -15,8 +15,6 @@ use aptos_jellyfish_merkle::{
 use aptos_logger::info;
 use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateViewId;
-#[cfg(test)]
-use aptos_types::nibble::nibble_path::NibblePath;
 use aptos_types::state_store::state_value::StaleStateValueIndex;
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
@@ -44,6 +42,9 @@ use crate::{
     change_set::ChangeSet, schema::state_value::StateValueSchema, state_merkle_db::StateMerkleDb,
     AptosDbError, LedgerStore, TransactionStore, OTHER_TIMERS_SECONDS,
 };
+
+#[cfg(test)]
+use aptos_types::nibble::nibble_path::NibblePath;
 
 pub(crate) mod buffered_state;
 mod state_merkle_batch_committer;
@@ -140,6 +141,22 @@ impl DbReader for StateDb {
             },
             proof,
         ))
+    }
+
+    fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
+        version.map_or(Ok(StateStorageUsage::zero()), |version| {
+            let VersionData {
+                state_items,
+                total_state_bytes,
+            } = self
+                .ledger_db
+                .get::<VersionDataSchema>(&version)?
+                .ok_or_else(|| AptosDbError::NotFound(format!("VersionData at {}", version)))?;
+            Ok(StateStorageUsage {
+                items: state_items,
+                bytes: total_state_bytes,
+            })
+        })
     }
 }
 
@@ -273,9 +290,14 @@ impl StateStore {
         } else {
             *SPARSE_MERKLE_PLACEHOLDER_HASH
         };
+        let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
         let mut buffered_state = BufferedState::new(
             state_db,
-            StateDelta::new_at_checkpoint(latest_snapshot_root_hash, latest_snapshot_version),
+            StateDelta::new_at_checkpoint(
+                latest_snapshot_root_hash,
+                usage,
+                latest_snapshot_version,
+            ),
             target_snapshot_size,
         );
 
@@ -450,19 +472,7 @@ impl StateStore {
     }
 
     pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
-        version.map_or(Ok(StateStorageUsage::zero()), |version| {
-            let VersionData {
-                state_items,
-                total_state_bytes,
-            } = self
-                .ledger_db
-                .get::<VersionDataSchema>(&version)?
-                .ok_or_else(|| AptosDbError::NotFound(format!("VersionData at {}", version)))?;
-            Ok(StateStorageUsage {
-                items: state_items,
-                bytes: total_state_bytes,
-            })
-        })
+        self.state_db.get_state_storage_usage(version)
     }
 
     /// Put storage usage stats and State key and value indices into the batch.
@@ -481,12 +491,11 @@ impl StateStore {
         cs: &mut ChangeSet,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
-            .with_label_values(&["put_total_state_bytes"])
+            .with_label_values(&["put_stats_and_indices"])
             .start_timer();
 
-        let mut usage = self.get_usage(first_version.checked_sub(1))?;
-
         let base_version = first_version.checked_sub(1);
+        let mut usage = self.get_usage(base_version)?;
         let mut cache = HashMap::<StateKey, (Version, Option<StateValue>)>::new();
 
         // calculate total state size in bytes

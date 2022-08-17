@@ -188,7 +188,7 @@ impl StateView for CachedStateView {
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
-        todo!()
+        Ok(self.speculative_state.usage())
     }
 }
 
@@ -231,6 +231,6 @@ impl StateView for CachedDbStateView {
     }
 
     fn get_usage(&self) -> Result<StateStorageUsage> {
-        todo!()
+        self.db_state_view.get_usage()
     }
 }
