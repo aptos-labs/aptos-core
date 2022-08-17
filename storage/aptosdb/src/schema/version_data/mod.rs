@@ -43,6 +43,15 @@ impl From<StateStorageUsage> for VersionData {
     }
 }
 
+impl VersionData {
+    pub fn get_state_storage_usage(&self) -> StateStorageUsage {
+        StateStorageUsage {
+            items: self.state_items,
+            bytes: self.total_state_bytes,
+        }
+    }
+}
+
 define_schema!(
     VersionDataSchema,
     Version,
