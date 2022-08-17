@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fmt::{Debug, Display, Formatter},
     fs::OpenOptions,
     path::{Path, PathBuf},
@@ -170,7 +170,7 @@ impl From<bcs::Error> for CliError {
 pub struct CliConfig {
     /// Map of profile configs
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub profiles: Option<HashMap<String, ProfileConfig>>,
+    pub profiles: Option<BTreeMap<String, ProfileConfig>>,
 }
 
 const CONFIG_FILE: &str = "config.yaml";
@@ -197,10 +197,36 @@ pub struct ProfileConfig {
     pub faucet_url: Option<String>,
 }
 
+/// ProfileConfig but without the private parts
+#[derive(Debug, Serialize)]
+pub struct ProfileSummary {
+    pub has_private_key: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key: Option<Ed25519PublicKey>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<AccountAddress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rest_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub faucet_url: Option<String>,
+}
+
+impl From<&ProfileConfig> for ProfileSummary {
+    fn from(config: &ProfileConfig) -> Self {
+        ProfileSummary {
+            has_private_key: config.private_key.is_some(),
+            public_key: config.public_key.clone(),
+            account: config.account,
+            rest_url: config.rest_url.clone(),
+            faucet_url: config.faucet_url.clone(),
+        }
+    }
+}
+
 impl Default for CliConfig {
     fn default() -> Self {
         CliConfig {
-            profiles: Some(HashMap::new()),
+            profiles: Some(BTreeMap::new()),
         }
     }
 }

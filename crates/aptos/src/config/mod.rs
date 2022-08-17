@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{
-    CliCommand, CliError, CliResult, CliTypedResult, ConfigSearchMode, CONFIG_FOLDER,
+    CliCommand, CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode, ProfileSummary,
+    CONFIG_FOLDER,
 };
 use crate::common::utils::{
     create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file,
@@ -16,6 +17,7 @@ use clap::Parser;
 use clap_complete::{generate, Shell};
 use serde::Deserialize;
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::fmt::Formatter;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -30,6 +32,7 @@ pub enum ConfigTool {
     GenerateShellCompletions(GenerateShellCompletions),
     SetGlobalConfig(SetGlobalConfig),
     ShowGlobalConfig(ShowGlobalConfig),
+    ShowProfiles(ShowProfiles),
 }
 
 impl ConfigTool {
@@ -39,6 +42,7 @@ impl ConfigTool {
             ConfigTool::GenerateShellCompletions(tool) => tool.execute_serialized_success().await,
             ConfigTool::SetGlobalConfig(tool) => tool.execute_serialized().await,
             ConfigTool::ShowGlobalConfig(tool) => tool.execute_serialized().await,
+            ConfigTool::ShowProfiles(tool) => tool.execute_serialized().await,
         }
     }
 }
@@ -103,6 +107,42 @@ impl CliCommand<GlobalConfig> for SetGlobalConfig {
 
         config.save()?;
         config.display()
+    }
+}
+
+/// Shows the current profiles available
+///
+/// This will only show public information and will not show
+/// private information
+#[derive(Parser, Debug)]
+pub struct ShowProfiles {
+    /// If provided, show only this profile
+    #[clap(long)]
+    profile: Option<String>,
+}
+
+#[async_trait]
+impl CliCommand<BTreeMap<String, ProfileSummary>> for ShowProfiles {
+    fn command_name(&self) -> &'static str {
+        "ShowProfiles"
+    }
+
+    async fn execute(self) -> CliTypedResult<BTreeMap<String, ProfileSummary>> {
+        // Load the profile config
+        let config = CliConfig::load(ConfigSearchMode::CurrentDir)?;
+        Ok(config
+            .profiles
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|(key, _)| {
+                if let Some(ref profile) = self.profile {
+                    profile == key
+                } else {
+                    true
+                }
+            })
+            .map(|(key, profile)| (key, ProfileSummary::from(&profile)))
+            .collect())
     }
 }
 
