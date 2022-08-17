@@ -31,7 +31,7 @@
 
   <% if @user %>
     <div class="relative">
-      <button data-action="click->header#toggleUser" class="w-8 h-8 bg-transparent ring-1 ring-teal-400 hover:ring-2 hover:bg-teal-400 hover:text-neutral-900 hover:brightness-105 active:brightness-95 text-teal-300 font-semibold rounded-lg inline-flex items-center justify-center overflow-hidden">
+      <button data-action="click->header#toggleUser" data-header-target="userButton" class="w-8 h-8 bg-transparent ring-1 ring-teal-400 hover:ring-2 hover:bg-teal-400 hover:text-neutral-900 hover:brightness-105 active:brightness-95 text-teal-300 font-semibold rounded-lg inline-flex items-center justify-center overflow-hidden">
         <span>
         <% if @user&.username? %>
         <%= @user.username&.first&.upcase %>
