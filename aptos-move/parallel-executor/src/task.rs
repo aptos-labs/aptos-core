@@ -37,7 +37,7 @@ impl ModulePath for StateKey {
 /// transaction will write to a key value storage as their side effect.
 pub trait Transaction: Sync + Send + 'static {
     type Key: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath;
-    type Value: Send + Sync;
+    type Value: Into<Vec<u8>> + Send + Sync;
 }
 
 /// Inference result of a transaction.

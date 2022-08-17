@@ -36,6 +36,7 @@ impl<K, V> Bencher<K, V>
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + Arbitrary + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
+    Vec<u8>: From<V>,
 {
     pub fn new(transaction_size: usize, universe_size: usize) -> Self {
         Self {
@@ -67,6 +68,7 @@ impl<K, V> BencherState<K, V>
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
+    Vec<u8>: From<V>,
 {
     /// Creates a new benchmark state with the given account universe strategy and number of
     /// transactions.
