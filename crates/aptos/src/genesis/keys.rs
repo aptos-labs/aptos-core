@@ -101,26 +101,33 @@ pub struct SetValidatorConfiguration {
     /// Name of validator
     #[clap(long)]
     pub(crate) username: String,
-    #[clap(flatten)]
-    pub(crate) git_options: GitOptions,
+
     /// Host and port pair for the validator e.g. 127.0.0.1:6180 or aptoslabs.com:6180
     #[clap(long)]
     pub(crate) validator_host: HostAndPort,
+
     /// Host and port pair for the fullnode e.g. 127.0.0.1:6180 or aptoslabs.com:6180
     #[clap(long)]
     pub(crate) full_node_host: Option<HostAndPort>,
+
     /// Stake amount for stake distribution
     #[clap(long, default_value_t = 1)]
     pub(crate) stake_amount: u64,
+
     /// Path to private identity generated from GenerateKeys
     #[clap(long, parse(from_os_str))]
     pub(crate) owner_public_identity_file: Option<PathBuf>,
+
     /// Path to operator public identity, defaults to owner identity
     #[clap(long, parse(from_os_str))]
     pub(crate) operator_public_identity_file: Option<PathBuf>,
+
     /// Path to voter public identity, defaults to owner identity
     #[clap(long, parse(from_os_str))]
     pub(crate) voter_public_identity_file: Option<PathBuf>,
+
+    #[clap(flatten)]
+    pub(crate) git_options: GitOptions,
 }
 
 #[async_trait]
@@ -242,6 +249,7 @@ pub struct GenerateLayoutTemplate {
     /// Path of the output layout template
     #[clap(long, parse(from_os_str), default_value = LAYOUT_FILE)]
     pub(crate) output_file: PathBuf,
+
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
 }

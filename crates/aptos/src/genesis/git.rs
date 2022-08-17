@@ -33,6 +33,7 @@ pub const FRAMEWORK_NAME: &str = "framework.mrb";
 pub struct SetupGit {
     #[clap(flatten)]
     pub(crate) git_options: GitOptions,
+
     /// Path to the `Layout` file which defines where all the files are
     #[clap(long, parse(from_os_str))]
     pub(crate) layout_file: PathBuf,
