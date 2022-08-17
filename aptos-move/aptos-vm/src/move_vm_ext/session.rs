@@ -171,7 +171,7 @@ impl SessionOutput {
                 let ap = ap_cache.get_resource_path(addr, struct_tag);
                 let op = match blob_op {
                     Delete => WriteOp::Deletion,
-                    New(blob) | Modify(blob) => WriteOp::Value(blob),
+                    New(blob) | Modify(blob) => WriteOp::Modification(blob),
                 };
                 write_set_mut.push((StateKey::AccessPath(ap), op))
             }
@@ -180,7 +180,8 @@ impl SessionOutput {
                 let ap = ap_cache.get_module_path(ModuleId::new(addr, name));
                 let op = match blob_op {
                     Delete => WriteOp::Deletion,
-                    New(blob) | Modify(blob) => WriteOp::Value(blob),
+                    New(blob) => WriteOp::Creation(blob),
+                    Modify(blob) => WriteOp::Modification(blob),
                 };
 
                 write_set_mut.push((StateKey::AccessPath(ap), op))
@@ -192,9 +193,8 @@ impl SessionOutput {
                 let state_key = StateKey::table_item(handle.into(), key);
                 match value_op {
                     Delete => write_set_mut.push((state_key, WriteOp::Deletion)),
-                    New(bytes) | Modify(bytes) => {
-                        write_set_mut.push((state_key, WriteOp::Value(bytes)))
-                    }
+                    New(bytes) => write_set_mut.push((state_key, WriteOp::Creation(bytes))),
+                    Modify(bytes) => write_set_mut.push((state_key, WriteOp::Modification(bytes))),
                 }
             }
         }

@@ -444,11 +444,11 @@ impl AccountData {
         let write_set = vec![
             (
                 StateKey::AccessPath(self.make_account_access_path()),
-                WriteOp::Value(self.to_bytes()),
+                WriteOp::Modification(self.to_bytes()),
             ),
             (
                 StateKey::AccessPath(self.make_coin_store_access_path()),
-                WriteOp::Value(self.coin_store.to_bytes()),
+                WriteOp::Modification(self.coin_store.to_bytes()),
             ),
         ];
 

@@ -219,21 +219,21 @@ fn test_new_genesis() {
         WriteSetMut::new(vec![
             (
                 StateKey::AccessPath(access_path_for_config(ValidatorSet::CONFIG_ID)),
-                WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
+                WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
             ),
             (
                 StateKey::AccessPath(AccessPath::new(
                     CORE_CODE_ADDRESS,
                     ConfigurationResource::resource_path(),
                 )),
-                WriteOp::Value(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
+                WriteOp::Modification(bcs::to_bytes(&configuration.bump_epoch_for_test()).unwrap()),
             ),
             (
                 StateKey::AccessPath(AccessPath::new(
                     account1,
                     CoinStoreResource::resource_path(),
                 )),
-                WriteOp::Value(
+                WriteOp::Modification(
                     bcs::to_bytes(&CoinStoreResource::new(
                         1_000_000,
                         false,

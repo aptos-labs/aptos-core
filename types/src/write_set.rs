@@ -11,8 +11,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub enum WriteOp {
+    Creation(#[serde(with = "serde_bytes")] Vec<u8>),
+    Modification(#[serde(with = "serde_bytes")] Vec<u8>),
     Deletion,
-    Value(#[serde(with = "serde_bytes")] Vec<u8>),
 }
 
 impl WriteOp {
@@ -20,7 +21,21 @@ impl WriteOp {
     pub fn is_deletion(&self) -> bool {
         match self {
             WriteOp::Deletion => true,
-            WriteOp::Value(_) => false,
+            WriteOp::Modification(_) | WriteOp::Creation(_) => false,
+        }
+    }
+
+    pub fn is_creation(&self) -> bool {
+        match self {
+            WriteOp::Creation(_) => true,
+            WriteOp::Modification(_) | WriteOp::Deletion => false,
+        }
+    }
+
+    pub fn is_modification(&self) -> bool {
+        match self {
+            WriteOp::Modification(_) => true,
+            WriteOp::Creation(_) | WriteOp::Deletion => false,
         }
     }
 }
@@ -28,9 +43,17 @@ impl WriteOp {
 impl std::fmt::Debug for WriteOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            WriteOp::Value(value) => write!(
+            WriteOp::Modification(value) => write!(
                 f,
-                "Value({})",
+                "Modification({})",
+                value
+                    .iter()
+                    .map(|byte| format!("{:02x}", byte))
+                    .collect::<String>()
+            ),
+            WriteOp::Creation(value) => write!(
+                f,
+                "Creation({})",
                 value
                     .iter()
                     .map(|byte| format!("{:02x}", byte))

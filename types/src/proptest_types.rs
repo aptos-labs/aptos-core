@@ -53,7 +53,7 @@ use std::{
 
 impl WriteOp {
     pub fn value_strategy() -> impl Strategy<Value = Self> {
-        vec(any::<u8>(), 0..64).prop_map(WriteOp::Value)
+        vec(any::<u8>(), 0..64).prop_map(WriteOp::Modification)
     }
 
     pub fn deletion_strategy() -> impl Strategy<Value = Self> {
@@ -848,7 +848,7 @@ impl TransactionToCommitGen {
                         let state_key = StateKey::AccessPath(AccessPath::new(address, key));
                         (
                             (state_key.clone(), Some(StateValue::from(value.clone()))),
-                            (state_key, WriteOp::Value(value)),
+                            (state_key, WriteOp::Modification(value)),
                         )
                     })
             })

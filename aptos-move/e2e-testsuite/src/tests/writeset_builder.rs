@@ -45,7 +45,7 @@ fn build_upgrade_writeset() {
         let mut writeset = version_writes.into_mut();
         writeset.push((
             StateKey::AccessPath(AccessPath::code_access_path(module.self_id())),
-            WriteOp::Value(module_bytes),
+            WriteOp::Modification(module_bytes),
         ));
         ChangeSet::new(writeset.freeze().unwrap(), events)
     };
