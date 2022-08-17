@@ -70,6 +70,8 @@ const sidebars = {
           type: "category",
           label: "Move Guides",
           link: { type: "doc", id: "guides/move-guides/index" },
+          collapsible: true,
+          collapsed: true,
           items: ["guides/move-guides/move-on-aptos", "guides/move-guides/guide-move-transactional-testing"],
         },
       ],
