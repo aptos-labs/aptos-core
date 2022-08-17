@@ -1,11 +1,11 @@
 /// This module provides an interface to aggregate integers either via
 /// aggregator (parallelizable) or via normal integers.
-module aptos_std::optional_aggregator {
+module aptos_framework::optional_aggregator {
     use std::error;
     use std::option::{Self, Option};
 
-    use aptos_std::aggregator_factory;
-    use aptos_std::aggregator::{Self, Aggregator};
+    use aptos_framework::aggregator_factory;
+    use aptos_framework::aggregator::{Self, Aggregator};
 
     // These error codes are produced by `Aggregator` and used by `Integer` for
     // consistency.
