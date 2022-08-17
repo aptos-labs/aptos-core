@@ -319,8 +319,6 @@ async fn test_join_and_leave_validator() {
     .await;
 }
 
-//TODO: debug me and re-enable the test!
-#[ignore]
 #[tokio::test]
 async fn test_owner_create_and_delegate_flow() {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
@@ -436,7 +434,10 @@ async fn test_owner_create_and_delegate_flow() {
     .await;
 
     assert_validator_set_sizes(&cli, 1, 0, 0).await;
-    assert_validator_state(&cli, owner_cli_index, ValidatorState::NONE).await;
+    assert_eq!(
+        get_validator_state(&cli, owner_cli_index).await,
+        ValidatorState::NONE
+    );
 
     let port = 6543;
 
@@ -472,16 +473,22 @@ async fn test_owner_create_and_delegate_flow() {
         .await
         .unwrap();
 
-    assert_validator_state(&cli, owner_cli_index, ValidatorState::JOINING).await;
+    let owner_state = get_validator_state(&cli, owner_cli_index).await;
+    if owner_state == ValidatorState::JOINING {
+        reconfig(
+            &rest_client,
+            &transaction_factory,
+            swarm.chain_info().root_account(),
+        )
+        .await;
 
-    reconfig(
-        &rest_client,
-        &transaction_factory,
-        swarm.chain_info().root_account(),
-    )
-    .await;
-
-    assert_validator_state(&cli, owner_cli_index, ValidatorState::ACTIVE).await;
+        assert_eq!(
+            get_validator_state(&cli, owner_cli_index).await,
+            ValidatorState::ACTIVE
+        );
+    } else {
+        assert_eq!(owner_state, ValidatorState::ACTIVE);
+    }
 
     let new_operator_keys = ValidatorNodeKeys::new(&mut keygen);
     let new_voter_cli_index = cli.add_account_to_cli(keygen.generate_ed25519_private_key());
@@ -512,20 +519,31 @@ async fn test_owner_create_and_delegate_flow() {
     cli.leave_validator_set(new_operator_cli_index, Some(owner_cli_index))
         .await
         .unwrap();
-    assert_validator_state(&cli, owner_cli_index, ValidatorState::LEAVING).await;
 
-    reconfig(
-        &rest_client,
-        &transaction_factory,
-        swarm.chain_info().root_account(),
-    )
-    .await;
+    let owner_state = get_validator_state(&cli, owner_cli_index).await;
+    if owner_state == ValidatorState::LEAVING {
+        reconfig(
+            &rest_client,
+            &transaction_factory,
+            swarm.chain_info().root_account(),
+        )
+        .await;
 
-    assert_validator_state(&cli, owner_cli_index, ValidatorState::NONE).await;
+        assert_eq!(
+            get_validator_state(&cli, owner_cli_index).await,
+            ValidatorState::NONE
+        );
+    } else {
+        assert_eq!(owner_state, ValidatorState::NONE);
+    }
+
     cli.join_validator_set(operator_cli_index, Some(owner_cli_index))
         .await
         .unwrap_err();
-    assert_validator_state(&cli, owner_cli_index, ValidatorState::NONE).await;
+    assert_eq!(
+        get_validator_state(&cli, owner_cli_index).await,
+        ValidatorState::NONE
+    );
 }
 
 fn dns_name(addr: &str) -> DnsName {
@@ -603,7 +621,7 @@ async fn assert_validator_set_sizes(
     );
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum ValidatorState {
     ACTIVE,
     JOINING,
@@ -611,38 +629,20 @@ enum ValidatorState {
     NONE,
 }
 
-async fn assert_validator_state(cli: &CliTestFramework, pool_index: usize, state: ValidatorState) {
+async fn get_validator_state(cli: &CliTestFramework, pool_index: usize) -> ValidatorState {
     let validator_set = cli.show_validator_set().await.unwrap();
     let pool_address = cli.account_id(pool_index);
 
-    if let ValidatorState::NONE = state {
-        for list in [
-            &validator_set.active_validators,
-            &validator_set.pending_active,
-            &validator_set.pending_inactive,
-        ] {
-            assert!(
-                !list.iter().any(|info| info.account_address == pool_address),
-                "{} shouldn't be in any for {:?}",
-                pool_address,
-                validator_set
-            );
+    for (state, list) in [
+        (ValidatorState::ACTIVE, &validator_set.active_validators),
+        (ValidatorState::JOINING, &validator_set.pending_active),
+        (ValidatorState::LEAVING, &validator_set.pending_inactive),
+    ] {
+        if list.iter().any(|info| info.account_address == pool_address) {
+            return state;
         }
-    } else {
-        let list = match state {
-            ValidatorState::ACTIVE => &validator_set.active_validators,
-            ValidatorState::JOINING => &validator_set.pending_active,
-            ValidatorState::LEAVING => &validator_set.pending_inactive,
-            ValidatorState::NONE => panic!(),
-        };
-        assert!(
-            list.iter().any(|info| info.account_address == pool_address),
-            "{} not in {:?} of {:?}",
-            pool_address,
-            state,
-            validator_set
-        );
     }
+    ValidatorState::NONE
 }
 
 fn get_gas(transaction: Transaction) -> u64 {
