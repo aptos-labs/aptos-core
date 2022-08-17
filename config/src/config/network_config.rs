@@ -41,9 +41,10 @@ pub const MAX_CONCURRENT_NETWORK_REQS: usize = 100;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
 pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 4;
 pub const MAX_INBOUND_CONNECTIONS: usize = 100;
-pub const MAX_FRAME_SIZE: usize = 64 * 1024 * 1024; /* 64 MB: the hard limit for messages on the wire */
 pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KB: a buffer for metadata that might be added to messages by networking */
-pub const MAX_APPLICATION_FRAME_SIZE: usize = MAX_FRAME_SIZE - MAX_MESSAGE_METADATA_SIZE; /* The frame size that applications should check against */
+pub const MAX_APPLICATION_MESSAGE_SIZE: usize = MAX_MESSAGE_SIZE - MAX_MESSAGE_METADATA_SIZE; /* The message size that applications should check against */
+pub const MAX_FRAME_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB */
+pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;
 pub const IP_BYTE_BUCKET_RATE: usize = 102400 /* 100 KiB */;
 pub const IP_BYTE_BUCKET_SIZE: usize = IP_BYTE_BUCKET_RATE;
@@ -99,6 +100,8 @@ pub struct NetworkConfig {
     pub inbound_rate_limit_config: Option<RateLimitConfig>,
     // Outbound rate limiting configuration, if not specified, no rate limiting
     pub outbound_rate_limit_config: Option<RateLimitConfig>,
+    // The maximum size of an inbound or outbound message (it may be divided into multiple frame)
+    pub max_message_size: usize,
 }
 
 impl Default for NetworkConfig {
@@ -133,6 +136,7 @@ impl NetworkConfig {
             max_inbound_connections: MAX_INBOUND_CONNECTIONS,
             inbound_rate_limit_config: None,
             outbound_rate_limit_config: None,
+            max_message_size: MAX_MESSAGE_SIZE,
         };
         config.prepare_identity();
         config

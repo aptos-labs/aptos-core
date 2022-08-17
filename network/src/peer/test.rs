@@ -4,7 +4,7 @@
 use crate::{
     constants::{
         INBOUND_RPC_TIMEOUT_MS, MAX_CONCURRENT_INBOUND_RPCS, MAX_CONCURRENT_OUTBOUND_RPCS,
-        MAX_FRAME_SIZE, NETWORK_CHANNEL_SIZE,
+        MAX_FRAME_SIZE, MAX_MESSAGE_SIZE, NETWORK_CHANNEL_SIZE,
     },
     peer::{DisconnectReason, Peer, PeerNotification, PeerRequest},
     peer_manager::TransportNotification,
@@ -88,6 +88,7 @@ fn build_test_peer(
         MAX_CONCURRENT_INBOUND_RPCS,
         MAX_CONCURRENT_OUTBOUND_RPCS,
         MAX_FRAME_SIZE,
+        MAX_MESSAGE_SIZE,
         None,
         None,
     );

@@ -83,7 +83,7 @@ impl InboundStreamBuffer {
         let stream = self
             .stream
             .as_mut()
-            .ok_or(anyhow::anyhow!("No stream exist"))?;
+            .ok_or_else(|| anyhow::anyhow!("No stream exist"))?;
         let stream_end = stream.append_fragment(fragment)?;
         if stream_end {
             Ok(Some(self.stream.take().unwrap().message))
@@ -140,14 +140,20 @@ impl InboundStream {
 pub struct OutboundStream {
     request_id_gen: U32IdGenerator,
     max_frame_size: usize,
+    max_message_size: usize,
     stream_tx: Sender<MultiplexMessage>,
 }
 
 impl OutboundStream {
-    pub fn new(max_frame_size: usize, stream_tx: Sender<MultiplexMessage>) -> Self {
+    pub fn new(
+        max_frame_size: usize,
+        max_message_size: usize,
+        stream_tx: Sender<MultiplexMessage>,
+    ) -> Self {
         Self {
             request_id_gen: U32IdGenerator::new(),
             max_frame_size: max_frame_size - 64, // some buffer for headers
+            max_message_size,
             stream_tx,
         }
     }
@@ -157,6 +163,12 @@ impl OutboundStream {
     }
 
     pub async fn stream_message(&mut self, mut message: NetworkMessage) -> anyhow::Result<()> {
+        ensure!(
+            message.len() <= self.max_message_size,
+            "Message length {} exceed size limit {}",
+            message.len(),
+            self.max_message_size,
+        );
         let request_id = self.request_id_gen.next();
         let rest = match &mut message {
             NetworkMessage::Error(_) => {

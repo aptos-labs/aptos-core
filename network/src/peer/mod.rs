@@ -133,8 +133,9 @@ pub struct Peer<TSocket> {
     /// Flag to indicate if the actor is being shut down.
     state: State,
     /// The maximum size of an inbound or outbound request frame
-    /// Currently, requests are only a single frame
     max_frame_size: usize,
+    /// The maximum size of an inbound or outbound request message
+    max_message_size: usize,
     /// Optional inbound rate limiter
     inbound_rate_limiter: Option<SharedBucket>,
     /// Optional outbound rate limiter
@@ -147,6 +148,7 @@ impl<TSocket> Peer<TSocket>
 where
     TSocket: AsyncRead + AsyncWrite + Send + 'static,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         network_context: NetworkContext,
         executor: Handle,
@@ -159,6 +161,7 @@ where
         max_concurrent_inbound_rpcs: u32,
         max_concurrent_outbound_rpcs: u32,
         max_frame_size: usize,
+        max_message_size: usize,
         inbound_rate_limiter: Option<SharedBucket>,
         outbound_rate_limiter: Option<SharedBucket>,
     ) -> Self {
@@ -167,6 +170,10 @@ where
             socket,
         } = connection;
         let remote_peer_id = connection_metadata.remote_peer_id;
+        assert!(
+            max_frame_size * u8::MAX as usize > max_message_size,
+            "Stream only supports maximum 256 chunks"
+        );
         Self {
             network_context,
             executor,
@@ -191,6 +198,7 @@ where
             ),
             state: State::Connected,
             max_frame_size,
+            max_message_size,
             inbound_rate_limiter,
             outbound_rate_limiter,
             inbound_stream: InboundStreamBuffer::new(),
@@ -237,6 +245,8 @@ where
             self.connection_metadata.clone(),
             self.network_context,
             writer,
+            self.max_frame_size,
+            self.max_message_size,
         );
 
         // Start main Peer event loop.
@@ -313,6 +323,8 @@ where
         connection_metadata: ConnectionMetadata,
         network_context: NetworkContext,
         mut writer: MultiplexMessageSink<impl AsyncWrite + Unpin + Send + 'static>,
+        max_frame_size: usize,
+        max_message_size: usize,
     ) -> (channel::Sender<NetworkMessage>, oneshot::Sender<()>) {
         let remote_peer_id = connection_metadata.remote_peer_id;
         let (write_reqs_tx, mut write_reqs_rx): (channel::Sender<NetworkMessage>, _) =
@@ -323,7 +335,6 @@ where
         let (stream_msg_tx, stream_msg_rx) =
             channel::new(1024, &counters::PENDING_MULTIPLEX_STREAM);
 
-        let max_frame_size = writer.max_frame_size();
         // this task ends when the multiplex task ends (by dropping the senders)
         let writer_task = async move {
             let mut stream = select(msg_rx, stream_msg_rx);
@@ -386,7 +397,8 @@ where
             }
         };
         let multiplex_task = async move {
-            let mut outbound_stream = OutboundStream::new(max_frame_size - 32, stream_msg_tx);
+            let mut outbound_stream =
+                OutboundStream::new(max_frame_size, max_message_size, stream_msg_tx);
             loop {
                 futures::select! {
                     message = write_reqs_rx.select_next_some() => {
