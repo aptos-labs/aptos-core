@@ -16,6 +16,7 @@ use clap::Parser;
 
 /// Command to fund an account with tokens from a faucet
 ///
+/// If the account doesn't exist, it will create it when funding it from the faucet
 #[derive(Debug, Parser)]
 pub struct FundWithFaucet {
     /// Address to fund

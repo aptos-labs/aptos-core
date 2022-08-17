@@ -44,10 +44,7 @@ impl CliCommand<TransferSummary> for TransferCoins {
     }
 }
 
-const SUPPORTED_COINS: [&str; 2] = [
-    "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
-    "0x1::coin::CoinStore<0x1::aptoscoin::AptosCoin>",
-];
+const SUPPORTED_COINS: [&str; 1] = ["0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"];
 
 /// A shortened transaction output
 #[derive(Clone, Debug, Serialize)]
