@@ -255,10 +255,10 @@ impl TwoChainTimeoutWithPartialSignatures {
         &self,
         verifier: &ValidatorVerifier,
     ) -> Result<TwoChainTimeoutCertificate, VerifyError> {
-        let (partial_sign, ordered_rounds) = self
+        let (partial_sig, ordered_rounds) = self
             .signatures
             .get_partial_sig_with_rounds(verifier.address_to_validator_index());
-        let aggregated_sig = verifier.generate_aggregated_signature(&partial_sign)?;
+        let aggregated_sig = verifier.generate_aggregate_signature(&partial_sig)?;
         Ok(TwoChainTimeoutCertificate {
             timeout: self.timeout.clone(),
             signatures_with_rounds: AggregatedSignatureWithRounds::new(
@@ -323,13 +323,10 @@ impl PartialSignaturesWithRound {
         let mut partial_sig = PartialSignatures::empty();
         let mut index_to_rounds = BTreeMap::new();
         self.signatures.iter().for_each(|(address, (round, sig))| {
-            address_to_validator_index
-                .get(address)
-                .into_iter()
-                .for_each(|index| {
-                    partial_sig.add_signature(*address, sig.clone());
-                    index_to_rounds.insert(index, *round);
-                });
+            if let Some(index) = address_to_validator_index.get(address) {
+                partial_sig.add_signature(*address, sig.clone());
+                index_to_rounds.insert(index, *round);
+            }
         });
         (partial_sig, index_to_rounds.into_values().collect_vec())
     }
