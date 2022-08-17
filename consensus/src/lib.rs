@@ -35,6 +35,7 @@ mod state_replication;
 mod test_utils;
 #[cfg(test)]
 mod twins;
+mod txn_cache;
 mod txn_notifier;
 mod util;
 
