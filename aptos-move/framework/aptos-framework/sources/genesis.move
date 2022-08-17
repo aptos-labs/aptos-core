@@ -2,6 +2,7 @@ module aptos_framework::genesis {
     use std::vector;
 
     use aptos_framework::account;
+    use aptos_framework::aggregator_factory;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::aptos_governance;
     use aptos_framework::block;
@@ -84,6 +85,7 @@ module aptos_framework::genesis {
             voting_power_increase_limit,
         );
         gas_schedule::initialize(&aptos_framework_account, gas_schedule);
+        aggregator_factory::initialize_aggregator_factory(&aptos_framework_account);
 
         // This needs to be called at the very end because earlier initializations might rely on timestamp not being
         // initialized yet.
