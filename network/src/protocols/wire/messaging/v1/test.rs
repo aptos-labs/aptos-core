@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket};
+use crate::{
+    protocols::stream::{InboundStreamBuffer, OutboundStream, StreamFragment, StreamHeader},
+    testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
+};
 use bcs::test_helpers::assert_canonical_encode_decode;
 use futures::{executor::block_on, future, sink::SinkExt, stream::StreamExt};
+use futures_util::stream::select;
 use memsocket::MemorySocket;
 use proptest::{collection::vec, prelude::*};
 
@@ -44,6 +48,33 @@ fn rpc_request() -> bcs::Result<()> {
         vec![0, 25, 0, 0, 0, 0, 4, 0, 1, 2, 3]
     );
     Ok(())
+}
+
+#[test]
+fn stream_message() {
+    let message = NetworkMessage::DirectSendMsg(DirectSendMsg {
+        protocol_id: ProtocolId::MempoolDirectSend,
+        priority: 0,
+        raw_msg: Vec::from("hello world"),
+    });
+    let stream_header = StreamHeader {
+        request_id: 42,
+        num_fragments: 10,
+        message,
+    };
+    assert_eq!(
+        bcs::to_bytes(&stream_header).unwrap(),
+        vec![42, 0, 0, 0, 10, 3, 2, 0, 11, 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100],
+    );
+    let stream_fragment = StreamFragment {
+        request_id: 42,
+        fragment_id: 254,
+        raw_data: vec![11, 22, 33],
+    };
+    assert_eq!(
+        bcs::to_bytes(&stream_fragment).unwrap(),
+        vec![42, 0, 0, 0, 254, 3, 11, 22, 33],
+    );
 }
 
 #[test]
@@ -166,14 +197,13 @@ fn arb_direct_send_msg(max_frame_size: usize) -> impl Strategy<Value = DirectSen
     })
 }
 
-fn arb_multiplex_message(max_frame_size: usize) -> impl Strategy<Value = MultiplexMessage> {
+fn arb_network_message(max_frame_size: usize) -> impl Strategy<Value = NetworkMessage> {
     prop_oneof![
         any::<ErrorCode>().prop_map(NetworkMessage::Error),
         arb_rpc_request(max_frame_size).prop_map(NetworkMessage::RpcRequest),
         arb_rpc_response(max_frame_size).prop_map(NetworkMessage::RpcResponse),
         arb_direct_send_msg(max_frame_size).prop_map(NetworkMessage::DirectSendMsg),
     ]
-    .prop_map(MultiplexMessage::Message)
     .prop_filter("larger than max frame size", move |msg| {
         bcs::serialized_size(&msg).unwrap() <= max_frame_size
     })
@@ -183,15 +213,15 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(100))]
 
     #[test]
-    fn network_message_canonical_serialization(message in any::<NetworkMessage>()) {
+    fn network_message_canonical_serialization(message in any::<MultiplexMessage>()) {
         assert_canonical_encode_decode(message);
     }
 
-    /// Test that NetworkMessageSink and NetworkMessageStream can understand each
-    /// other and fully preserve the NetworkMessages being sent
+    /// Test that MultiplexMessageSink and MultiplexMessageStream can understand each
+    /// other and fully preserve the MultiplexMessages being sent
     #[test]
-    fn network_message_socket_roundtrip(
-        messages in vec(arb_multiplex_message(128), 1..20),
+    fn multiplex_stream_socket_roundtrip(
+        messages in vec(arb_network_message(64 * 255), 1..20),
         fragmented_read in any::<bool>(),
         fragmented_write in any::<bool>(),
     ) {
@@ -206,19 +236,57 @@ proptest! {
 
         let mut message_tx = MultiplexMessageSink::new(socket_tx, 128, None);
         let message_rx = MultiplexMessageStream::new(socket_rx, 128, None);
+        let (stream_tx, stream_rx) = channel::new_test(1024);
+        let (mut msg_tx, msg_rx) = channel::new_test(1024);
+        let mut outbound_stream = OutboundStream::new(128, 64 * 255, stream_tx);
+        let mut inbound_stream = InboundStreamBuffer::new();
+
+        let messages_clone = messages.clone();
+        let f_stream_all = async move {
+            for message in messages_clone {
+                if outbound_stream.should_stream(&message) {
+                    outbound_stream.stream_message(message).await.unwrap();
+                } else {
+                    msg_tx.send(MultiplexMessage::Message(message)).await.unwrap();
+                }
+            }
+        };
 
         let f_send_all = async {
-            for message in &messages {
-                message_tx.send(message).await.unwrap();
+            let mut stream = select(msg_rx, stream_rx);
+            while let Some(message) = stream.next().await {
+                message_tx.send(&message).await.unwrap();
             }
             message_tx.close().await.unwrap();
         };
+
         let f_recv_all = message_rx.collect::<Vec<_>>();
 
-        let (_, recv_messages) = block_on(future::join(f_send_all, f_recv_all));
+        let (_, recv_messages, _) = block_on(future::join3(f_send_all, f_recv_all, f_stream_all));
 
-        for (message, recv_message) in messages.into_iter().zip(recv_messages.into_iter()) {
-            assert_eq!(message, recv_message.unwrap());
+        let mut recv = vec![];
+        for message in recv_messages {
+            match message.unwrap() {
+                MultiplexMessage::Message(network_msg) => {
+                    recv.push(network_msg);
+                }
+                MultiplexMessage::Stream(msg) => {
+                    match msg {
+                        StreamMessage::Header(header) => inbound_stream.new_stream(header).unwrap(),
+                        StreamMessage::Fragment(fragment) => {
+                            if let Some(network_msg) = inbound_stream.append_fragment(fragment).unwrap() {
+                                recv.push(network_msg);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // messages can arrive out of order because of fragments
+        assert_eq!(messages.len(), recv.len());
+        for m in messages {
+            assert!(recv.contains(&m));
         }
     }
 }
