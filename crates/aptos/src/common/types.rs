@@ -687,7 +687,7 @@ pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
     /// Defaults to <https://fullnode.devnet.aptoslabs.com/v1>
-    #[clap(long, parse(try_from_str))]
+    #[clap(long)]
     url: Option<reqwest::Url>,
 }
 
@@ -1119,25 +1119,13 @@ impl TransactionOptions {
 #[derive(Parser)]
 pub struct OptionalPoolAddressArgs {
     /// Address of the Staking pool
-    #[clap(long)]
-    pub(crate) pool_address: Option<AccountAddressWrapper>,
-}
-
-impl OptionalPoolAddressArgs {
-    pub fn pool_address(&self) -> Option<AccountAddress> {
-        self.pool_address.map(|inner| inner.account_address)
-    }
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) pool_address: Option<AccountAddress>,
 }
 
 #[derive(Parser)]
 pub struct PoolAddressArgs {
     /// Address of the Staking pool
-    #[clap(long)]
-    pub(crate) pool_address: AccountAddressWrapper,
-}
-
-impl PoolAddressArgs {
-    pub fn pool_address(&self) -> AccountAddress {
-        self.pool_address.account_address
-    }
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) pool_address: AccountAddress,
 }

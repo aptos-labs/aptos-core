@@ -62,7 +62,7 @@ impl CliCommand<Vec<PathBuf>> for GenerateKeys {
             generate_key_objects(&mut key_generator)?;
 
         // Allow for the owner to be different than the operator
-        if let Some(pool_address) = self.pool_address_args.pool_address() {
+        if let Some(pool_address) = self.pool_address_args.pool_address {
             validator_blob.account_address = Some(pool_address);
             vfn_blob.account_address = Some(pool_address);
         }
