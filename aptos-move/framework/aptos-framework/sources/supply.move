@@ -36,7 +36,7 @@ module aptos_framework::supply {
         }
     }
 
-    /// Upgardes non-parallelizable supply to parallelizable. The owne of supply
+    /// Upgardes non-parallelizable supply to parallelizable. The owner of supply
     /// is responsible for calling this function.
     public(friend) fun upgrade<CoinType>(supply: Supply<CoinType>): Supply<CoinType> {
         if (!optional_aggregator::is_parallelizable(&supply.inner)) {
