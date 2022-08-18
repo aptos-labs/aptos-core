@@ -3,14 +3,11 @@
 
 #![forbid(unsafe_code)]
 
-use std::future::Future;
-use std::time::Duration;
 use std::{
     env,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use futures::future;
 use once_cell::sync::Lazy;
 use rand::Rng;
 use rand_core::OsRng;
@@ -97,15 +94,16 @@ fn fetch_peer_id(node_config: &NodeConfig) -> String {
     }
 }
 
-async fn spawn_periodic_background_task<Fut>(interval_seconds: u64, task_fn: impl Fn() -> Fut)
-where
-    Fut: Future<Output = ()>,
-{
-    let mut interval = time::interval(Duration::from_secs(interval_seconds));
-    loop {
-        interval.tick().await;
-        task_fn().await;
-    }
+macro_rules! spawn_periodic_background_task {
+    ($i:expr, $fn:block) => {
+        tokio::spawn(async move {
+            let mut interval = time::interval(Duration::from_secs($i));
+            loop {
+                interval.tick().await;
+                $fn.await;
+            }
+        })
+    };
 }
 
 /// Spawns the dedicated telemetry service that operates periodically
@@ -115,9 +113,12 @@ async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config
 
     let telemetry_sender = TelemetrySender::new(telemetry_svc_url, chain_id, &node_config);
 
+    let mut pid = peer_id.clone();
+    let mut ts = telemetry_sender.clone();
+
     // Send build information once (only on startup)
     send_build_information(
-        peer_id.clone(),
+        pid.clone(),
         chain_id.to_string().clone(),
         telemetry_sender.clone(),
     )
@@ -125,25 +126,35 @@ async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config
 
     info!("Telemetry service started!");
 
-    future::join4(
+    let _ = tokio::join!(
         // Periodically send system information
-        spawn_periodic_background_task(NODE_SYS_INFO_FREQ_SECS, || {
-            send_system_information(peer_id.clone(), telemetry_sender.clone())
-        }),
+        {
+            pid = peer_id.clone();
+            spawn_periodic_background_task!(NODE_SYS_INFO_FREQ_SECS, {
+                send_system_information(pid.clone(), ts.clone())
+            })
+        },
         // Periodically send node core metrics
-        spawn_periodic_background_task(NODE_CORE_METRICS_FREQ_SECS, || {
-            send_node_core_metrics(peer_id.clone(), &node_config, telemetry_sender.clone())
-        }),
-        // Periodically send node network metrics
-        spawn_periodic_background_task(NODE_NETWORK_METRICS_FREQ_SECS, || {
-            send_node_network_metrics(peer_id.clone(), telemetry_sender.clone())
-        }),
+        {
+            pid = peer_id.clone();
+            ts = telemetry_sender.clone();
+            spawn_periodic_background_task!(NODE_CORE_METRICS_FREQ_SECS, {
+                send_node_core_metrics(pid.clone(), &node_config, ts.clone())
+            })
+        },
+        {
+            // Periodically send node network metrics
+            pid = peer_id.clone();
+            ts = telemetry_sender.clone();
+            spawn_periodic_background_task!(NODE_NETWORK_METRICS_FREQ_SECS, {
+                send_node_network_metrics(pid.clone(), ts.clone())
+            })
+        },
         // Periodically send ALL prometheus metrics (This replaces the previous core and network metrics implementation)
-        spawn_periodic_background_task(PROMETHEUS_PUSH_METRICS_FREQ_SECS, || {
+        spawn_periodic_background_task!(PROMETHEUS_PUSH_METRICS_FREQ_SECS, {
             telemetry_sender.try_push_prometheus_metrics()
         }),
-    )
-    .await;
+    );
 }
 
 /// Collects and sends the build information via telemetry
