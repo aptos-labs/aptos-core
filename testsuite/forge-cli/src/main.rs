@@ -401,7 +401,7 @@ fn run_forever() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_aptos_tests(&[&FundAccount, &TransferCoins])
         .with_admin_tests(&[&GetMetadata])
-        .with_genesis_module_bundle(framework::head_release_bundle().clone())
+        .with_genesis_module_bundle(cached_packages::head_release_bundle().clone())
         .with_aptos_tests(&[&RunForever])
 }
 
@@ -410,7 +410,7 @@ fn local_test_suite() -> ForgeConfig<'static> {
         .with_aptos_tests(&[&FundAccount, &TransferCoins])
         .with_admin_tests(&[&GetMetadata])
         .with_network_tests(&[&RestartValidator, &EmitTransaction])
-        .with_genesis_module_bundle(framework::head_release_bundle().clone())
+        .with_genesis_module_bundle(cached_packages::head_release_bundle().clone())
 }
 
 fn k8s_test_suite() -> ForgeConfig<'static> {

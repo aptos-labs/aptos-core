@@ -97,3 +97,6 @@ node_modules
 
 # Cached python files
 __pycache__
+
+# Move release bundle which is build on the fly and should not be submitted
+head.mrb

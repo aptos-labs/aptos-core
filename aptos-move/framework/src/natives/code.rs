@@ -130,7 +130,7 @@ pub struct PackageRegistryJson {
     pub packages: Vec<PackageMetadataJson>,
 }
 
-/// The PackageMetadata type.
+/// The PackageMetadata type, with an annotation on `upgrade_number`.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PackageMetadataJson {
     pub name: String,
@@ -139,19 +139,10 @@ pub struct PackageMetadataJson {
     pub upgrade_number: u64,
     pub build_info: String,
     pub manifest: String,
-    pub modules: Vec<ModuleMetadataJson>,
+    pub modules: Vec<ModuleMetadata>,
     #[serde(with = "serde_bytes")]
     pub error_map: Vec<u8>,
     pub abis: Vec<ByteBuf>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ModuleMetadataJson {
-    pub name: String,
-    #[serde(with = "serde_bytes")]
-    pub source: Vec<u8>,
-    #[serde(with = "serde_bytes")]
-    pub source_map: Vec<u8>,
 }
 
 // ========================================================================================

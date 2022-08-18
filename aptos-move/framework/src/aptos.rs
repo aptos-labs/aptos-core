@@ -63,11 +63,11 @@ impl ReleaseTarget {
             ("aptos-stdlib", None),
             (
                 "aptos-framework",
-                Some("src/generated/aptos_framework_sdk_builder.rs"),
+                Some("cached-packages/src/aptos_framework_sdk_builder.rs"),
             ),
             (
                 "aptos-token",
-                Some("src/generated/aptos_token_sdk_builder.rs"),
+                Some("cached-packages/src/aptos_token_sdk_builder.rs"),
             ),
         ];
         // Currently we don't have experimental packages only included in particular targets.
@@ -117,33 +117,12 @@ impl ReleaseTarget {
             output: if let Some(path) = out {
                 path
             } else {
-                crate_dir.join("releases").join(self.file_name())
+                // Place in current directory
+                PathBuf::from(self.file_name())
             },
         };
         options.create_release(strip)
     }
-}
-
-// ===============================================================================================
-// Inlined Package Artifacts
-
-const HEAD_RELEASE_BUNDLE_BYTES: &[u8] = include_bytes!("../releases/head.mrb");
-
-static HEAD_RELEASE_BUNDLE: Lazy<ReleaseBundle> = Lazy::new(|| {
-    bcs::from_bytes::<ReleaseBundle>(HEAD_RELEASE_BUNDLE_BYTES).expect("bcs succeeds")
-});
-
-/// Returns the release bundle for the current code.
-pub fn head_release_bundle() -> &'static ReleaseBundle {
-    &HEAD_RELEASE_BUNDLE
-}
-
-/// Placeholder for returning the release bundle for the last devnet release(?).
-/// TODO: this is currently only used to differentiate between GenesisOptions::Fresh
-/// and GenesisOptions::Compiled. It is not clear what the difference should be.
-/// For now, we return the same as with head_release_bundle.
-pub fn devnet_release_bundle() -> &'static ReleaseBundle {
-    &HEAD_RELEASE_BUNDLE
 }
 
 // ===============================================================================================

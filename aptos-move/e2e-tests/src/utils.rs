@@ -49,7 +49,7 @@ pub fn upgrade_df(
     update_version_number: Option<u64>,
 ) {
     close_module_publishing(executor, dr_account, dr_seqno);
-    for (bytes, module) in framework::head_release_bundle().code_and_compiled_modules() {
+    for (bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules() {
         executor.add_module(&module.self_id(), bytes.to_vec());
     }
 

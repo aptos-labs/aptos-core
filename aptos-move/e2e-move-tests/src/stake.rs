@@ -8,7 +8,7 @@ use aptos_types::{
     on_chain_config::ValidatorSet, stake_pool::StakePool, transaction::TransactionStatus,
     validator_config::ValidatorConfig,
 };
-use framework::aptos_stdlib;
+use cached_packages::aptos_stdlib;
 use language_e2e_tests::account::Account;
 use move_deps::move_core_types::parser::parse_struct_tag;
 
