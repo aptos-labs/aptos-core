@@ -17,7 +17,7 @@ const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
 
 /** Publish a new module to the blockchain within the specified account */
 export async function publishModule(accountFrom: AptosAccount, moduleHex: string): Promise<string> {
-  const moudleBundlePayload = new TxnBuilderTypes.TransactionPayloadModuleBundle(
+  const moduleBundlePayload = new TxnBuilderTypes.TransactionPayloadModuleBundle(
     new TxnBuilderTypes.ModuleBundle([new TxnBuilderTypes.Module(new HexString(moduleHex).toUint8Array())]),
   );
 
@@ -29,7 +29,7 @@ export async function publishModule(accountFrom: AptosAccount, moduleHex: string
   const rawTxn = new TxnBuilderTypes.RawTransaction(
     TxnBuilderTypes.AccountAddress.fromHex(accountFrom.address()),
     BigInt(sequenceNumber),
-    moudleBundlePayload,
+    moduleBundlePayload,
     1000n,
     1n,
     BigInt(Math.floor(Date.now() / 1000) + 10),

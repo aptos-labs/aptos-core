@@ -23,6 +23,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+const MAX_WAIT_SECS: u64 = 60;
+
 #[tokio::test]
 async fn test_db_restore() {
     // pre-build tools
@@ -133,12 +135,12 @@ async fn test_db_restore() {
     swarm
         .validator_mut(node_to_restart)
         .unwrap()
-        .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+        .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
     // verify it's caught up
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(60))
+        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
 

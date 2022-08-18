@@ -16,9 +16,9 @@ pub static EMPTY_SCRIPT: Lazy<Vec<u8>> = Lazy::new(|| {
       return;
     }
 ";
-
+    let modules = framework::head_release_bundle().compiled_modules();
     let compiler = Compiler {
-        deps: cached_framework_packages::modules().iter().collect(),
+        deps: modules.iter().collect(),
     };
     compiler.into_script_blob(code).expect("Failed to compile")
 });

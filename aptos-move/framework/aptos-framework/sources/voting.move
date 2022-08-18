@@ -33,10 +33,13 @@ module aptos_framework::voting {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_context;
 
-    /// Error codes.
+    /// Current script's execution has does not match the specified proposal's.
     const EPROPOSAL_EXECUTION_HASH_NOT_MATCHING: u64 = 1;
+    /// Proposal cannot be resolved. Either voting duration has not passed, not enough votes, or fewer yes than no votes
     const EPROPOSAL_CANNOT_BE_RESOLVED: u64 = 2;
+    /// Proposal cannot be resolved more than once.
     const EPROPOSAL_ALREADY_RESOLVED: u64 = 3;
+    /// Proposal cannot contain an empty execution script hash.
     const EPROPOSAL_EMPTY_EXECUTION_HASH: u64 = 4;
 
     /// ProposalStateEnum representing proposal state.
@@ -319,6 +322,26 @@ module aptos_framework::voting {
         let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
         let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
         proposal.expiration_secs
+    }
+
+    /// Return the proposal's execution hash.
+    public fun get_execution_hash<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): vector<u8> acquires VotingForum {
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        proposal.execution_hash
+    }
+
+    /// Return true if the governance proposal has already been resolved.
+    public fun is_resolved<ProposalType: store>(
+        voting_forum_address: address,
+        proposal_id: u64,
+    ): bool acquires VotingForum {
+        let voting_forum = borrow_global_mut<VotingForum<ProposalType>>(voting_forum_address);
+        let proposal = table::borrow_mut(&mut voting_forum.proposals, proposal_id);
+        proposal.is_resolved
     }
 
     #[test_only]

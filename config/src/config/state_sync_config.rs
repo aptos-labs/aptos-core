@@ -1,7 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::config::MAX_APPLICATION_FRAME_SIZE;
 use serde::{Deserialize, Serialize};
+
+/// We allow a buffer in case network messages get slightly larger after they
+/// are checked against the max frame size but before they are actually sent to
+/// the networking stack. This can occur in specific cases, e.g., if the
+/// message is wrapped in an another type before being sent down the wire. We
+/// should rarely see this in practice (if ever), but let's play it safe.
+const MESSAGE_PADDING_SIZE: usize = 128 * 1024; // 128 KB
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -92,6 +100,7 @@ pub struct StorageServiceConfig {
     pub max_epoch_chunk_size: u64,    // Max num of epoch ending ledger infos per chunk
     pub max_lru_cache_size: u64,      // Max num of items in the lru cache before eviction
     pub max_network_channel_size: u64, // Max num of pending network messages
+    pub max_network_chunk_bytes: u64, // Max num of bytes to send per network message
     pub max_state_chunk_size: u64,    // Max num of state keys and values per chunk
     pub max_subscription_period_ms: u64, // Max period (ms) of pending subscription requests
     pub max_transaction_chunk_size: u64, // Max num of transactions per chunk
@@ -106,8 +115,9 @@ impl Default for StorageServiceConfig {
             max_epoch_chunk_size: 100,
             max_lru_cache_size: 100,
             max_network_channel_size: 4000,
-            max_state_chunk_size: 1000,
-            max_subscription_period_ms: 10000,
+            max_network_chunk_bytes: (MAX_APPLICATION_FRAME_SIZE - MESSAGE_PADDING_SIZE) as u64,
+            max_state_chunk_size: 2000,
+            max_subscription_period_ms: 5000,
             max_transaction_chunk_size: 1000,
             max_transaction_output_chunk_size: 1000,
             storage_summary_refresh_interval_ms: 50,
@@ -123,6 +133,9 @@ pub struct DataStreamingServiceConfig {
 
     // Maximum number of concurrent data client requests (per stream).
     pub max_concurrent_requests: u64,
+
+    // Maximum number of concurrent data client requests (per stream) for state keys/values.
+    pub max_concurrent_state_requests: u64,
 
     // Maximum channel sizes for each data stream listener. If messages are not
     // consumed, they will be dropped (oldest messages first). The remaining
@@ -146,6 +159,7 @@ impl Default for DataStreamingServiceConfig {
         Self {
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: 2,
+            max_concurrent_state_requests: 4,
             max_data_stream_channel_sizes: 1000,
             max_request_retry: 3,
             max_notification_id_mappings: 2000,

@@ -4,7 +4,6 @@
 #![forbid(unsafe_code)]
 use crate::{account::Account, compile, executor::FakeExecutor};
 use aptos_transaction_builder::aptos_stdlib;
-use move_deps::move_binary_format::file_format::CompiledModule;
 
 pub fn close_module_publishing(
     executor: &mut FakeExecutor,
@@ -50,11 +49,8 @@ pub fn upgrade_df(
     update_version_number: Option<u64>,
 ) {
     close_module_publishing(executor, dr_account, dr_seqno);
-    for compiled_module_bytes in cached_framework_packages::module_blobs().iter().cloned() {
-        let compiled_module_id = CompiledModule::deserialize(&compiled_module_bytes)
-            .unwrap()
-            .self_id();
-        executor.add_module(&compiled_module_id, compiled_module_bytes);
+    for (bytes, module) in framework::head_release_bundle().code_and_compiled_modules() {
+        executor.add_module(&module.self_id(), bytes.to_vec());
     }
 
     if let Some(version_number) = update_version_number {

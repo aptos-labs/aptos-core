@@ -14,6 +14,8 @@ export type IndexResponse = {
     epoch: U64;
     ledger_version: U64;
     oldest_ledger_version: U64;
+    block_height: U64;
+    oldest_block_height: U64;
     ledger_timestamp: U64;
     node_role: RoleType;
 };

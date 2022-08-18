@@ -3,10 +3,10 @@
 
 use aptos_crypto::hash::HashValue;
 use aptos_logger::prelude::*;
-use aptos_types::multi_signature::MultiSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    multi_signature::MultiSignature,
     transaction::Version,
 };
 use aptos_vm::AptosVM;
@@ -79,7 +79,7 @@ impl TransactionCommitter {
             let commit_start = std::time::Instant::now();
             let ledger_info_with_sigs = gen_li_with_sigs(block_id, root_hash, self.version);
             self.executor
-                .commit_blocks(vec![block_id], ledger_info_with_sigs)
+                .commit_blocks_ext(vec![block_id], ledger_info_with_sigs, false)
                 .unwrap();
 
             report_block(

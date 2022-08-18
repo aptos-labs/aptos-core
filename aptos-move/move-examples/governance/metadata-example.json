@@ -1,0 +1,6 @@
+{
+    "title": "[Staking] -- Increase recurring lockup time for staking",
+    "description": "Increase recurring lockup time for staking from 1 day to 10 days",
+    "source_code_url": "https://github.com/some-repo/my-move-update",
+    "discussion_url": "https://forum.aptoslabs.com/proposals/upgrade-potato-module-v3"
+}

@@ -270,6 +270,7 @@ async fn construction_metadata(
             sequence_number,
             max_gas: request.options.max_gas,
             gas_price_per_unit: request.options.gas_price_per_unit,
+            expiry_time: request.options.expiry_time,
         },
         suggested_fee: None,
     })
@@ -321,6 +322,11 @@ async fn construction_parse(
                 && create_account_function_identifier() == function_name
             {
                 parse_create_account_operation(sender, &type_args, &args)?
+            } else if AccountAddress::ONE == *module.address()
+                && stake_module_identifier() == module_name
+                && set_operator_function_identifier() == function_name
+            {
+                parse_set_operator_operation(sender, &type_args, &args)?
             } else {
                 return Err(ApiError::TransactionParseError(Some(
                     "Unsupported operation type",
@@ -420,6 +426,28 @@ fn parse_transfer_operation(
     Ok(operations)
 }
 
+fn parse_set_operator_operation(
+    sender: AccountAddress,
+    type_args: &[TypeTag],
+    args: &[Vec<u8>],
+) -> ApiResult<Vec<Operation>> {
+    // There are no typeargs for create account
+    if !type_args.is_empty() {
+        return Err(ApiError::TransactionParseError(Some(
+            "Set operator should not have type arguments",
+        )));
+    }
+
+    // Set operator
+    if let Some(encoded_operator) = args.first() {
+        let operator: AccountAddress = bcs::from_bytes(encoded_operator)?;
+
+        Ok(vec![Operation::set_operator(0, None, sender, operator)])
+    } else {
+        Err(ApiError::InvalidOperations)
+    }
+}
+
 /// Construction payloads command (OFFLINE)
 ///
 /// Constructs payloads for given known operations
@@ -453,12 +481,20 @@ async fn construction_payloads(
                 transfer.sender,
             )
         }
+        InternalOperation::SetOperator(set_operator) => (
+            aptos_stdlib::stake_set_operator(set_operator.operator),
+            set_operator.owner,
+        ),
     };
 
     // Build the transaction and make it ready for signing
-    let transaction_factory = TransactionFactory::new(server_context.chain_id)
+    let mut transaction_factory = TransactionFactory::new(server_context.chain_id)
         .with_gas_unit_price(metadata.gas_price_per_unit)
         .with_max_gas_amount(metadata.max_gas);
+    if let Some(expiry_time) = metadata.expiry_time {
+        transaction_factory = transaction_factory.with_transaction_expiration_time(expiry_time);
+    }
+
     let sequence_number = metadata.sequence_number;
     let unsigned_transaction = transaction_factory
         .payload(txn_payload)
@@ -527,6 +563,7 @@ async fn construction_preprocess(
             internal_operation,
             max_gas,
             gas_price_per_unit,
+            expiry_time: request.metadata.and_then(|inner| inner.expiry_time),
         }),
         required_public_keys: Some(required_public_keys),
     })

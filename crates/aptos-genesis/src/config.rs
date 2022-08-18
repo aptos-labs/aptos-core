@@ -26,7 +26,7 @@ use vm_genesis::Validator;
 pub struct Layout {
     /// Root key for the blockchain
     /// TODO: In the future, we won't need a root key
-    pub root_key: Ed25519PublicKey,
+    pub root_key: Option<Ed25519PublicKey>,
     /// List of usernames or identifiers
     pub users: Vec<String>,
     /// ChainId for the target network
@@ -36,6 +36,7 @@ pub struct Layout {
     pub allow_new_validators: bool,
     /// Duration of an epoch
     pub epoch_duration_secs: u64,
+    pub is_test: bool,
     /// Minimum stake to be in the validator set
     pub min_stake: u64,
     /// Minimum number of votes to consider a proposal valid.
@@ -50,6 +51,8 @@ pub struct Layout {
     pub rewards_apy_percentage: u64,
     /// Voting duration for a proposal in seconds.
     pub voting_duration_secs: u64,
+    /// % of current epoch's total voting power that can be added in this epoch.
+    pub voting_power_increase_limit: u64,
 }
 
 impl Layout {
@@ -67,18 +70,43 @@ impl Layout {
     }
 }
 
+impl Default for Layout {
+    fn default() -> Self {
+        Layout {
+            root_key: None,
+            users: vec![],
+            chain_id: ChainId::test(),
+            allow_new_validators: false,
+            epoch_duration_secs: 7_200,
+            is_test: true,
+            min_stake: 100_000_000_000_000,
+            min_voting_threshold: 100_000_000_000_000,
+            max_stake: 100_000_000_000_000_000,
+            recurring_lockup_duration_secs: 86_400,
+            required_proposer_stake: 100_000_000_000_000,
+            rewards_apy_percentage: 10,
+            voting_duration_secs: 43_200,
+            voting_power_increase_limit: 20,
+        }
+    }
+}
+
 /// A set of configuration needed to add a Validator to genesis
 ///
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ValidatorConfiguration {
     /// Account address
-    pub account_address: AccountAddress,
+    pub owner_account_address: AccountAddress,
+    /// Key used for signing transactions with the account
+    pub owner_account_public_key: Ed25519PublicKey,
+    pub operator_account_address: AccountAddress,
+    pub operator_account_public_key: Ed25519PublicKey,
+    pub voter_account_address: AccountAddress,
+    pub voter_account_public_key: Ed25519PublicKey,
     /// Key used for signing in consensus
     pub consensus_public_key: bls12381::PublicKey,
     /// Corresponding proof of possession of consensus public key
     pub proof_of_possession: bls12381::ProofOfPossession,
-    /// Key used for signing transactions with the account
-    pub account_public_key: Ed25519PublicKey,
     /// Public key used for validator network identity (same as account address)
     pub validator_network_public_key: x25519::PublicKey,
     /// Host for validator which can be an IP or a DNS name
@@ -93,34 +121,10 @@ pub struct ValidatorConfiguration {
     pub stake_amount: u64,
 }
 
-/// For better parsing error messages
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StringValidatorConfiguration {
-    /// Account address
-    pub account_address: String,
-    /// Key used for signing in consensus
-    pub consensus_public_key: String,
-    /// Corresponding proof of possession of consensus public key
-    pub proof_of_possession: String,
-    /// Key used for signing transactions with the account
-    pub account_public_key: String,
-    /// Public key used for validator network identity (same as account address)
-    pub validator_network_public_key: String,
-    /// Host for validator which can be an IP or a DNS name
-    pub validator_host: HostAndPort,
-    /// Public key used for full node network identity (same as account address)
-    pub full_node_network_public_key: Option<String>,
-    /// Host for full node which can be an IP or a DNS name and is optional
-    pub full_node_host: Option<HostAndPort>,
-    /// Stake amount for consensus
-    pub stake_amount: u64,
-}
-
 impl TryFrom<ValidatorConfiguration> for Validator {
     type Error = anyhow::Error;
 
     fn try_from(config: ValidatorConfiguration) -> Result<Self, Self::Error> {
-        let auth_key = AuthenticationKey::ed25519(&config.account_public_key);
         let validator_addresses = vec![config
             .validator_host
             .as_network_address(config.validator_network_public_key)
@@ -139,18 +143,39 @@ impl TryFrom<ValidatorConfiguration> for Validator {
             vec![]
         };
 
+        let auth_key = AuthenticationKey::ed25519(&config.owner_account_public_key);
         let derived_address = auth_key.derived_address();
-        if config.account_address != derived_address {
+        if config.owner_account_address != derived_address {
             return Err(anyhow::Error::msg(format!(
-                "AccountAddress {} does not match account key derived one {}",
-                config.account_address, derived_address
+                "owner_account_address {} does not match account key derived one {}",
+                config.owner_account_address, derived_address
             )));
         }
+
+        let auth_key = AuthenticationKey::ed25519(&config.operator_account_public_key);
+        let derived_address = auth_key.derived_address();
+        if config.operator_account_address != derived_address {
+            return Err(anyhow::Error::msg(format!(
+                "operator_account_address {} does not match account key derived one {}",
+                config.operator_account_address, derived_address
+            )));
+        }
+
+        let auth_key = AuthenticationKey::ed25519(&config.voter_account_public_key);
+        let derived_address = auth_key.derived_address();
+        if config.voter_account_address != derived_address {
+            return Err(anyhow::Error::msg(format!(
+                "voter_account_address {} does not match account key derived one {}",
+                config.voter_account_address, derived_address
+            )));
+        }
+
         Ok(Validator {
-            address: derived_address,
+            owner_address: config.owner_account_address,
+            operator_address: config.operator_account_address,
+            voter_address: config.voter_account_address,
             consensus_pubkey: config.consensus_public_key.to_bytes().to_vec(),
             proof_of_possession: config.proof_of_possession.to_bytes().to_vec(),
-            operator_address: auth_key.derived_address(),
             network_addresses: bcs::to_bytes(&validator_addresses).unwrap(),
             full_node_network_addresses: bcs::to_bytes(&full_node_addresses).unwrap(),
             stake_amount: config.stake_amount,
@@ -214,4 +239,50 @@ impl FromStr for HostAndPort {
             Ok(HostAndPort { host, port })
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OwnerConfiguration {
+    pub owner_account_address: AccountAddress,
+    pub owner_account_public_key: Ed25519PublicKey,
+    pub voter_account_address: AccountAddress,
+    pub voter_account_public_key: Ed25519PublicKey,
+    pub operator_account_address: AccountAddress,
+    pub operator_account_public_key: Ed25519PublicKey,
+    pub stake_amount: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct OperatorConfiguration {
+    pub operator_account_address: AccountAddress,
+    pub operator_account_public_key: Ed25519PublicKey,
+    pub consensus_public_key: bls12381::PublicKey,
+    pub consensus_proof_of_possession: bls12381::ProofOfPossession,
+    pub validator_network_public_key: x25519::PublicKey,
+    pub validator_host: HostAndPort,
+    pub full_node_network_public_key: Option<x25519::PublicKey>,
+    pub full_node_host: Option<HostAndPort>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StringOwnerConfiguration {
+    pub owner_account_address: Option<String>,
+    pub owner_account_public_key: Option<String>,
+    pub voter_account_address: Option<String>,
+    pub voter_account_public_key: Option<String>,
+    pub operator_account_address: Option<String>,
+    pub operator_account_public_key: Option<String>,
+    pub stake_amount: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct StringOperatorConfiguration {
+    pub operator_account_address: Option<String>,
+    pub operator_account_public_key: Option<String>,
+    pub consensus_public_key: Option<String>,
+    pub consensus_proof_of_possession: Option<String>,
+    pub validator_network_public_key: Option<String>,
+    pub validator_host: HostAndPort,
+    pub full_node_network_public_key: Option<String>,
+    pub full_node_host: Option<HostAndPort>,
 }

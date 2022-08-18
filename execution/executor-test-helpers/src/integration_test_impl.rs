@@ -9,10 +9,10 @@ use aptos_sdk::{
 };
 use aptos_state_view::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
 use aptos_transaction_builder::aptos_stdlib;
-use aptos_types::block_metadata::BlockMetadata;
 use aptos_types::{
-    account_config::aptos_root_address,
+    account_config::aptos_test_root_address,
     account_view::AccountView,
+    block_metadata::BlockMetadata,
     chain_id::ChainId,
     event::EventKey,
     test_helpers::transaction_test_helpers::block,
@@ -38,7 +38,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
     let genesis_txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(genesis));
 
     let mut genesis_account: LocalAccount = LocalAccount::new(
-        aptos_root_address(),
+        aptos_test_root_address(),
         AccountKey::from_private_key(vm_genesis::GENESIS_KEYPAIR.0.clone()),
         0,
     );
@@ -49,7 +49,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
 
     let parent_block_id = executor.committed_block_id();
     let signer = aptos_types::validator_signer::ValidatorSigner::new(
-        validators[0].data.address,
+        validators[0].data.owner_address,
         validators[0].consensus_key.clone(),
     );
 
@@ -75,7 +75,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         0,
         signer.author(),
         Some(0),
-        vec![false],
+        vec![0],
         vec![],
         1,
     ));
@@ -135,7 +135,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         0,
         signer.author(),
         Some(0),
-        vec![false],
+        vec![0],
         vec![],
         2,
     ));
@@ -150,7 +150,7 @@ pub fn test_execution_with_storage_impl() -> Arc<AptosDB> {
         1,
         signer.author(),
         Some(0),
-        vec![false],
+        vec![0],
         vec![],
         3,
     ));

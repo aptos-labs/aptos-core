@@ -13,6 +13,7 @@ use crate::schema::table_info::TableInfoSchema;
 use anyhow::{bail, ensure, Result};
 use aptos_config::config::RocksdbConfig;
 use aptos_logger::warn;
+use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_types::access_path::Path;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::state_store::state_key::StateKey;
@@ -24,7 +25,6 @@ use aptos_vm::data_cache::{AsMoveResolver, RemoteStorage};
 use move_deps::move_core_types::identifier::IdentStr;
 use move_deps::move_core_types::language_storage::{StructTag, TypeTag};
 use move_deps::move_resource_viewer::{AnnotatedMoveValue, MoveValueAnnotator};
-use schemadb::db_options::gen_rocksdb_options;
 use schemadb::{SchemaBatch, DB};
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -40,8 +40,6 @@ pub struct Indexer {
 }
 
 impl Indexer {
-    // FIXME(aldenhu): remove
-
     pub fn open(
         db_root_path: impl AsRef<std::path::Path>,
         rocksdb_config: RocksdbConfig,
@@ -157,7 +155,7 @@ impl<'a> TableInfoParser<'a> {
 
     pub fn parse_write_op(&mut self, state_key: &'a StateKey, write_op: &'a WriteOp) -> Result<()> {
         match write_op {
-            WriteOp::Value(bytes) => match state_key {
+            WriteOp::Modification(bytes) | WriteOp::Creation(bytes) => match state_key {
                 StateKey::AccessPath(access_path) => {
                     let path: Path = (&access_path.path).try_into()?;
                     match path {

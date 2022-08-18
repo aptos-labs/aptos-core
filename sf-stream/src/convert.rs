@@ -9,6 +9,7 @@ use aptos_api_types::{
     ScriptPayload, Transaction, TransactionInfo, TransactionPayload, TransactionSignature,
     WriteSet, WriteSetChange,
 };
+use aptos_bitvec::BitVec;
 use aptos_logger::warn;
 use aptos_protos::extractor::v1 as extractor;
 use aptos_protos::util::timestamp;
@@ -188,14 +189,6 @@ pub fn convert_transaction_payload(payload: &TransactionPayload) -> extractor::T
                     },
                 ),
             ),
-        },
-        TransactionPayload::WriteSetPayload(wsp) => extractor::TransactionPayload {
-            r#type: extractor::transaction_payload::Type::WriteSetPayload as i32,
-            payload: Some(extractor::transaction_payload::Payload::WriteSetPayload(
-                extractor::WriteSetPayload {
-                    write_set: Some(convert_write_set(&wsp.write_set)),
-                },
-            )),
         },
     }
 }
@@ -497,11 +490,15 @@ pub fn convert_ed25519_signature(sig: &Ed25519Signature) -> extractor::Ed25519Si
 pub fn convert_multi_ed25519_signature(
     sig: &MultiEd25519Signature,
 ) -> extractor::MultiEd25519Signature {
+    let public_key_indices: Vec<usize> = BitVec::from(sig.bitmap.0.clone()).iter_ones().collect();
     extractor::MultiEd25519Signature {
         public_keys: sig.public_keys.iter().map(|pk| pk.0.clone()).collect(),
         signatures: sig.signatures.iter().map(|sig| sig.0.clone()).collect(),
         threshold: sig.threshold as u32,
-        bitmap: sig.bitmap.0.clone(),
+        public_key_indices: public_key_indices
+            .iter()
+            .map(|index| *index as u32)
+            .collect(),
     }
 }
 
@@ -624,7 +621,7 @@ pub fn convert_transaction(
             extractor::transaction::TxnData::BlockMetadata(extractor::BlockMetadataTransaction {
                 id: bm.id.to_string(),
                 events: convert_events(&bm.events),
-                previous_block_votes: bm.previous_block_votes.clone(),
+                previous_block_votes_bitvec: bm.previous_block_votes_bitvec.clone(),
                 proposer: bm.proposer.to_string(),
                 failed_proposer_indices: bm.failed_proposer_indices.clone(),
                 round: bm.round.0,

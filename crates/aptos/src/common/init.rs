@@ -14,9 +14,9 @@ use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialSt
 use async_trait::async_trait;
 use clap::Parser;
 use reqwest::Url;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
-pub const DEFAULT_REST_URL: &str = "https://fullnode.devnet.aptoslabs.com";
+pub const DEFAULT_REST_URL: &str = "https://fullnode.devnet.aptoslabs.com/v1";
 pub const DEFAULT_FAUCET_URL: &str = "https://faucet.devnet.aptoslabs.com";
 const NUM_DEFAULT_COINS: u64 = 10000;
 
@@ -28,12 +28,15 @@ pub struct InitTool {
     /// URL to a fullnode on the network
     #[clap(long)]
     pub rest_url: Option<Url>,
+
     /// URL for the Faucet endpoint
     #[clap(long)]
     pub faucet_url: Option<Url>,
+
     /// Whether to skip the faucet for a non-faucet endpoint
     #[clap(long)]
     pub skip_faucet: bool,
+
     #[clap(flatten)]
     pub rng_args: RngArgs,
     #[clap(flatten)]
@@ -178,7 +181,7 @@ impl CliCommand<()> for InitTool {
 
         // Ensure the loaded config has profiles setup for a possible empty file
         if config.profiles.is_none() {
-            config.profiles = Some(HashMap::new());
+            config.profiles = Some(BTreeMap::new());
         }
         config
             .profiles

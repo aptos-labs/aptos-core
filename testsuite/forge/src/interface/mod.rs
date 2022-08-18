@@ -18,7 +18,10 @@ pub use chaos::*;
 mod node;
 pub use node::*;
 mod chain_info;
+pub mod system_metrics;
+
 pub use chain_info::*;
+use framework::ReleaseBundle;
 
 /// A wrapper around a usize in order to represent an opaque version of a Node.
 ///
@@ -45,6 +48,6 @@ impl std::fmt::Display for Version {
 
 #[derive(Clone)]
 pub enum GenesisConfig {
-    Bytes(Vec<Vec<u8>>),
+    Bundle(ReleaseBundle),
     Path(String),
 }

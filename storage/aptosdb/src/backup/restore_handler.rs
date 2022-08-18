@@ -71,6 +71,7 @@ impl RestoreHandler {
             self.ledger_db.clone(),
             self.ledger_store.clone(),
             ledger_infos,
+            None,
         )
     }
 
@@ -83,6 +84,7 @@ impl RestoreHandler {
             self.ledger_db.clone(),
             num_leaves,
             frozen_subtrees,
+            None,
         )
     }
 
@@ -102,6 +104,7 @@ impl RestoreHandler {
             txns,
             txn_infos,
             events,
+            None,
         )
     }
 

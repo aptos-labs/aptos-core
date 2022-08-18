@@ -19,6 +19,7 @@ use chrono::{SecondsFormat, Utc};
 use once_cell::sync::Lazy;
 use serde::ser::SerializeStruct;
 use serde::{Serialize, Serializer};
+use std::io::Stdout;
 use std::{
     collections::BTreeMap,
     env, fmt,
@@ -219,7 +220,7 @@ impl AptosDataBuilder {
             level: Level::Info,
             remote_level: Level::Info,
             address: None,
-            printer: Some(Box::new(StdoutWriter)),
+            printer: Some(Box::new(StdoutWriter::new())),
             is_async: false,
             custom_format: None,
         }
@@ -407,7 +408,7 @@ impl AptosData {
         Self::builder()
             .is_async(false)
             .enable_backtrace()
-            .printer(Box::new(StdoutWriter))
+            .printer(Box::new(StdoutWriter::new()))
             .build();
     }
 
@@ -485,7 +486,7 @@ impl LoggerService {
                 LoggerServiceEvent::LogEntry(entry) => {
                     PROCESSED_STRUCT_LOG_COUNT.inc();
 
-                    if let Some(printer) = &self.printer {
+                    if let Some(printer) = &mut self.printer {
                         if self
                             .facade
                             .filter
@@ -494,7 +495,7 @@ impl LoggerService {
                             .enabled(&entry.metadata)
                         {
                             let s = (self.facade.formatter)(&entry).expect("Unable to format");
-                            printer.write(s)
+                            printer.write_buferred(s);
                         }
                     }
 
@@ -555,19 +556,35 @@ impl LoggerService {
     }
 }
 
-/// An trait encapsulating the operations required for writing logs.
+/// A trait encapsulating the operations required for writing logs.
 pub trait Writer: Send + Sync {
     /// Write the log.
     fn write(&self, log: String);
+
+    /// Write the log in an async task.
+    fn write_buferred(&mut self, log: String);
 }
 
 /// A struct for writing logs to stdout
-struct StdoutWriter;
+struct StdoutWriter {
+    buffer: std::io::BufWriter<Stdout>,
+}
 
+impl StdoutWriter {
+    pub fn new() -> Self {
+        let buffer = std::io::BufWriter::new(std::io::stdout());
+        Self { buffer }
+    }
+}
 impl Writer for StdoutWriter {
     /// Write log to stdout
     fn write(&self, log: String) {
         println!("{}", log);
+    }
+    fn write_buferred(&mut self, log: String) {
+        self.buffer
+            .write_fmt(format_args!("{}\n", log))
+            .unwrap_or_default();
     }
 }
 
@@ -595,6 +612,9 @@ impl Writer for FileWriter {
         if let Err(err) = writeln!(self.log_file.write(), "{}", log) {
             eprintln!("Unable to write to log file: {}", err);
         }
+    }
+    fn write_buferred(&mut self, log: String) {
+        self.write(log);
     }
 }
 

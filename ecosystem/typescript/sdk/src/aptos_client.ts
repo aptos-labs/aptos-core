@@ -1,9 +1,12 @@
-import { MemoizeExpiring } from "typescript-memoize";
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
+import { Memoize } from "typescript-memoize";
 import { HexString, MaybeHexString } from "./hex_string";
-import { sleep } from "./util";
+import { fixNodeUrl, sleep } from "./util";
 import { AptosAccount } from "./aptos_account";
 import * as Gen from "./generated/index";
-import { TxnBuilderTypes, TransactionBuilderEd25519 } from "./transaction_builder";
+import { TxnBuilderTypes, TransactionBuilderEd25519, BCS } from "./transaction_builder";
 
 /**
  * Provides methods for retrieving data from Aptos node.
@@ -14,12 +17,24 @@ export class AptosClient {
 
   /**
    * Build a client configured to connect to an Aptos node at the given URL.
+   *
+   * Note: If you forget to append `/v1` to the URL, the client constructor
+   * will automatically append it. If you don't want this URL processing to
+   * take place, set doNotFixNodeUrl to true.
+   *
    * @param nodeUrl URL of the Aptos Node API endpoint.
    * @param config Additional configuration options for the generated Axios client.
    */
-  constructor(nodeUrl: string, config?: Partial<Gen.OpenAPIConfig>) {
+  constructor(nodeUrl: string, config?: Partial<Gen.OpenAPIConfig>, doNotFixNodeUrl: boolean = false) {
+    if (!nodeUrl) {
+      throw new Error("Node URL cannot be empty.");
+    }
     const conf = config === undefined || config === null ? {} : { ...config };
-    conf.BASE = nodeUrl;
+    if (doNotFixNodeUrl) {
+      conf.BASE = nodeUrl;
+    } else {
+      conf.BASE = fixNodeUrl(nodeUrl);
+    }
     this.client = new Gen.AptosGeneratedClient(conf);
   }
 
@@ -181,7 +196,6 @@ export class AptosClient {
    *     sequence_number: account.sequence_number,
    *     max_gas_amount: "1000",
    *     gas_unit_price: "1",
-   *     gas_currency_code: "XUS",
    *     // Unix timestamp, in seconds + 10 seconds
    *     expiration_timestamp_secs: (Math.floor(Date.now() / 1000) + 10).toString(),
    *   }
@@ -481,10 +495,9 @@ export class AptosClient {
   }
 
   /**
-   * @param params Request params
    * @returns Current chain id
    */
-  @MemoizeExpiring(5 * 60 * 1000) // cache result for 5 minutes
+  @Memoize()
   async getChainId(): Promise<number> {
     const result = await this.getLedgerInfo();
     return result.chain_id;
@@ -504,5 +517,40 @@ export class AptosClient {
   async getTableItem(handle: string, data: Gen.TableItemRequest, query?: { ledgerVersion?: BigInt }): Promise<any> {
     const tableItem = await this.client.tables.getTableItem(handle, data, query?.ledgerVersion?.toString());
     return tableItem;
+  }
+
+  /**
+   * Generates a raw transaction out of a transaction payload
+   * @param accountFrom
+   * @param payload
+   * @param extraArgs
+   * @returns
+   */
+  async generateRawTransaction(
+    accountFrom: HexString,
+    payload: TxnBuilderTypes.TransactionPayload,
+    extraArgs?: { maxGasAmount?: BCS.Uint64; gastUnitPrice?: BCS.Uint64; expireTimestamp?: BCS.Uint64 },
+  ): Promise<TxnBuilderTypes.RawTransaction> {
+    const { maxGasAmount, gastUnitPrice, expireTimestamp } = {
+      maxGasAmount: 2000n,
+      gastUnitPrice: 1n,
+      expireTimestamp: BigInt(Math.floor(Date.now() / 1000) + 20),
+      ...extraArgs,
+    };
+
+    const [{ sequence_number: sequenceNumber }, chainId] = await Promise.all([
+      this.getAccount(accountFrom),
+      this.getChainId(),
+    ]);
+
+    return new TxnBuilderTypes.RawTransaction(
+      TxnBuilderTypes.AccountAddress.fromHex(accountFrom),
+      BigInt(sequenceNumber),
+      payload,
+      maxGasAmount,
+      gastUnitPrice,
+      expireTimestamp,
+      new TxnBuilderTypes.ChainId(chainId),
+    );
   }
 }

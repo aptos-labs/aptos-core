@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { Deserializer, Serializer, Bytes, Seq, deserializeVector, serializeVector } from "../bcs";
 
 import { ModuleId } from "./transaction";
@@ -77,6 +80,7 @@ export class TransactionScriptABI extends ScriptABI {
   }
 
   serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(0);
     serializer.serializeStr(this.name);
     serializer.serializeStr(this.doc);
     serializer.serializeBytes(this.code);
@@ -114,6 +118,7 @@ export class ScriptFunctionABI extends ScriptABI {
   }
 
   serialize(serializer: Serializer): void {
+    serializer.serializeU32AsUleb128(1);
     serializer.serializeStr(this.name);
     this.module_name.serialize(serializer);
     serializer.serializeStr(this.doc);

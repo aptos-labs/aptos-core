@@ -19,6 +19,7 @@ const sidebars = {
     "index",
     "whats-new-in-docs",
     "guides/getting-started",
+
     {
       type: "category",
       label: "Aptos Quickstarts",
@@ -26,6 +27,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
+        "tutorials/first-transaction-sdk",
         "tutorials/first-transaction",
         "tutorials/first-move-module",
         "tutorials/first-dapp",
@@ -48,6 +50,8 @@ const sidebars = {
         "concepts/basics-fullnodes",
         "concepts/basics-validator-nodes",
         "concepts/basics-node-networks-sync",
+        "concepts/staking",
+        "concepts/governance",
       ],
     },
     {
@@ -61,12 +65,14 @@ const sidebars = {
         "guides/sign-a-transaction",
         "guides/interacting-with-the-blockchain",
         "guides/building-wallet-extension",
-        "guides/guide-for-system-integrators",
+        "guides/system-integrators-guide",
         "guides/local-testnet-dev-flow",
         {
           type: "category",
           label: "Move Guides",
           link: { type: "doc", id: "guides/move-guides/index" },
+          collapsible: true,
+          collapsed: true,
           items: ["guides/move-guides/move-on-aptos", "guides/move-guides/guide-move-transactional-testing"],
         },
       ],
@@ -81,11 +87,13 @@ const sidebars = {
         "nodes/aptos-deployments",
         {
           type: "category",
-          label: "AIT-2",
+          label: "AIT-3",
           link: { type: "doc", id: "nodes/ait/index" },
           collapsible: true,
           collapsed: true,
           items: [
+            "nodes/ait/whats-new-in-ait3",
+            "nodes/ait/steps-in-ait3",
             "nodes/ait/node-requirements",
             "nodes/ait/node-liveness-criteria",
             "nodes/ait/connect-to-testnet",
@@ -130,7 +138,6 @@ const sidebars = {
         },
         "nodes/node-health-checker",
         "nodes/node-health-checker-faq",
-        "nodes/staking",
       ],
     },
     {
@@ -158,6 +165,7 @@ const sidebars = {
       items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
     },
     "reference/telemetry",
+    "aptos-white-paper",
     "reference/glossary",
   ],
 };

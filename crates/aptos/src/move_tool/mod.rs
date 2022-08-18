@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod aptos_debug_natives;
-mod built_package;
-pub use built_package::*;
 mod manifest;
 pub mod package_hooks;
 pub use package_hooks::*;
@@ -15,7 +13,9 @@ pub use stored_package::*;
 use crate::common::types::MoveManifestAccountWrapper;
 use crate::common::types::{ProfileOptions, RestOptions};
 use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current, write_to_file};
-use crate::move_tool::manifest::{Dependency, MovePackageManifest, PackageInfo};
+use crate::move_tool::manifest::{
+    Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo,
+};
 use crate::{
     common::{
         types::{
@@ -34,7 +34,7 @@ use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
-use framework::natives::code::UpgradePolicy;
+use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
 use move_deps::move_cli::base::test::UnitTestResult;
 use move_deps::{
@@ -60,8 +60,11 @@ use std::{
 use tokio::task;
 use transactional_tests_runner::TransactionalTestOpts;
 
-/// CLI tool for performing Move tasks
+/// Tool for Move related operations
 ///
+/// This tool lets you compile, test, and publish Move code, in addition
+/// to run any other tools that help run, verify, or provide information
+/// about this code.
 #[derive(Subcommand)]
 pub enum MoveTool {
     Compile(CompilePackage),
@@ -119,50 +122,67 @@ impl CliCommand<()> for InitPackage {
 
     async fn execute(self) -> CliTypedResult<()> {
         let package_dir = dir_default_to_current(self.package_dir.clone())?;
-        let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
-        check_if_file_exists(move_toml.as_path(), self.prompt_options)?;
-        create_dir_if_not_exist(
-            package_dir
-                .join(SourcePackageLayout::Sources.path())
-                .as_path(),
-        )?;
-
         let addresses = self
             .named_addresses
             .clone()
             .into_iter()
             .map(|(key, value)| (key, value.account_address.into()))
             .collect();
-        let mut dependencies = BTreeMap::new();
-        dependencies.insert(
-            "AptosFramework".to_string(),
-            Dependency {
-                local: None,
-                git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
-                rev: Some("devnet".to_string()),
-                subdir: Some("aptos-move/framework/aptos-framework".to_string()),
-                aptos: None,
-                address: None,
-            },
-        );
-        let manifest = MovePackageManifest {
-            package: PackageInfo {
-                name: self.name,
-                version: "0.0.0".to_string(),
-                author: None,
-            },
-            addresses,
-            dependencies,
-        };
 
-        write_to_file(
-            move_toml.as_path(),
-            SourcePackageLayout::Manifest.location_str(),
-            toml::to_string_pretty(&manifest)
-                .map_err(|err| CliError::UnexpectedError(err.to_string()))?
-                .as_bytes(),
+        init_move_dir(
+            package_dir.as_path(),
+            &self.name,
+            "devnet",
+            addresses,
+            self.prompt_options,
         )
     }
+}
+
+pub fn init_move_dir(
+    package_dir: &Path,
+    name: &str,
+    rev: &str,
+    addresses: BTreeMap<String, ManifestNamedAddress>,
+    prompt_options: PromptOptions,
+) -> CliTypedResult<()> {
+    let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
+    check_if_file_exists(move_toml.as_path(), prompt_options)?;
+    create_dir_if_not_exist(
+        package_dir
+            .join(SourcePackageLayout::Sources.path())
+            .as_path(),
+    )?;
+
+    let mut dependencies = BTreeMap::new();
+    dependencies.insert(
+        "AptosFramework".to_string(),
+        Dependency {
+            local: None,
+            git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
+            rev: Some(rev.to_string()),
+            subdir: Some("aptos-move/framework/aptos-framework".to_string()),
+            aptos: None,
+            address: None,
+        },
+    );
+    let manifest = MovePackageManifest {
+        package: PackageInfo {
+            name: name.to_string(),
+            version: "1.0.0".to_string(),
+            author: None,
+        },
+        addresses,
+        dependencies,
+    };
+
+    write_to_file(
+        move_toml.as_path(),
+        SourcePackageLayout::Manifest.location_str(),
+        toml::to_string_pretty(&manifest)
+            .map_err(|err| CliError::UnexpectedError(err.to_string()))?
+            .as_bytes(),
+    )
 }
 
 /// Compiles a package and returns the [`ModuleId`]s
@@ -272,7 +292,7 @@ pub struct ProvePackage {
     #[clap(flatten)]
     move_options: MovePackageDir,
 
-    /// A filter string to determine which unit tests to run
+    /// A filter string to determine which files to verify
     #[clap(long)]
     pub filter: Option<String>,
 }
@@ -304,13 +324,16 @@ impl CliCommand<&'static str> for ProvePackage {
 
         match result {
             Ok(_) => Ok("Success"),
-            Err(_) => Err(CliError::MoveProverError),
+            Err(e) => Err(CliError::MoveProverError(format!("{:#}", e))),
         }
     }
 }
 
 /// Compiles a Move package dir, and returns the compiled modules.
-fn compile_move(build_config: BuildConfig, package_dir: &Path) -> CliTypedResult<CompiledPackage> {
+pub(crate) fn compile_move(
+    build_config: BuildConfig,
+    package_dir: &Path,
+) -> CliTypedResult<CompiledPackage> {
     // TODO: Add caching
     build_config
         .compile_package(package_dir, &mut Vec::new())
@@ -327,11 +350,82 @@ pub struct PublishPackage {
     /// Whether to use the legacy publishing flow. This will be soon removed.
     #[clap(long)]
     pub(crate) legacy_flow: bool,
-    /// The upgrade policy used for the published package. One of
-    /// `arbitrary`, `compatible`, or `immutable`. Defaults to `compatible`.
+    /// Whether to override the check for maximal size of published data.
     #[clap(long)]
-    pub(crate) upgrade_policy: Option<UpgradePolicy>,
+    pub(crate) override_size_check: bool,
+    /// What artifacts to include in the package. This can be one of `none`, `sparse`, and
+    /// `all`. `none` is the most compact form and does not allow to reconstruct a source
+    /// package from chain; `sparse` is the minimal set of artifacts needed to reconstruct
+    /// a source package; `all` includes all available artifacts. The choice of included
+    /// artifacts heavily influences the size and therefore gas cost of publishing: `none`
+    /// is the size of bytecode alone; `sparse` is roughly 2 times as much; and `all` 3-4
+    /// as much.
+    #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
+    pub(crate) included_artifacts: IncludedArtifacts,
 }
+
+#[derive(ArgEnum, Clone, Copy, Debug)]
+pub enum IncludedArtifacts {
+    None,
+    Sparse,
+    All,
+}
+
+impl Display for IncludedArtifacts {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use IncludedArtifacts::*;
+        match self {
+            None => f.write_str("none"),
+            Sparse => f.write_str("sparse"),
+            All => f.write_str("all"),
+        }
+    }
+}
+
+impl FromStr for IncludedArtifacts {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use IncludedArtifacts::*;
+        match s {
+            "none" => Ok(None),
+            "sparse" => Ok(Sparse),
+            "all" => Ok(All),
+            _ => Err("unknown variant"),
+        }
+    }
+}
+
+impl IncludedArtifacts {
+    fn build_options(self, named_addresses: BTreeMap<String, AccountAddress>) -> BuildOptions {
+        use IncludedArtifacts::*;
+        match self {
+            None => BuildOptions {
+                with_srcs: false,
+                with_abis: false,
+                with_source_maps: false,
+                with_error_map: false,
+                named_addresses,
+            },
+            Sparse => BuildOptions {
+                with_srcs: true,
+                with_abis: false,
+                with_source_maps: false,
+                with_error_map: false,
+                named_addresses,
+            },
+            All => BuildOptions {
+                with_srcs: true,
+                with_abis: true,
+                with_source_maps: true,
+                with_error_map: true,
+                named_addresses,
+            },
+        }
+    }
+}
+
+pub const MAX_PUBLISH_PACKAGE_SIZE: usize = 60_000;
 
 #[async_trait]
 impl CliCommand<TransactionSummary> for PublishPackage {
@@ -344,17 +438,14 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             move_options,
             txn_options,
             legacy_flow,
-            upgrade_policy,
+            override_size_check,
+            included_artifacts,
         } = self;
-        let package = BuiltPackage::build(move_options, true, true)?;
+        let package_path = move_options.get_package_path()?;
+        let options = included_artifacts.build_options(move_options.named_addresses());
+        let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
         if legacy_flow {
-            if upgrade_policy.is_some() {
-                return Err(CliError::CommandArgumentError(
-                    "`--upgrade-policy` can only be used without the `--legacy-flow` option"
-                        .to_owned(),
-                ));
-            }
             // Send the compiled module using a module bundle
             txn_options
                 .submit_transaction(TransactionPayload::ModuleBundle(ModuleBundle::new(
@@ -364,12 +455,21 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 .map(TransactionSummary::from)
         } else {
             // Send the compiled module and metadata using the code::publish_package_txn.
-            let metadata =
-                package.extract_metadata(upgrade_policy.unwrap_or_else(UpgradePolicy::compat))?;
+            let metadata = package.extract_metadata()?;
             let payload = aptos_transaction_builder::aptos_stdlib::code_publish_package_txn(
                 bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
                 compiled_units,
             );
+            let size = bcs::serialized_size(&payload)?;
+            if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+                return Err(CliError::UnexpectedError(format!(
+                    "The package is larger than {}k ({}k)! To lower the size \
+                you may want to include less artifacts via `--included_artifacts`. \
+                You can also override this check with `--override-size-check",
+                    MAX_PUBLISH_PACKAGE_SIZE / 1000,
+                    size / 1000
+                )));
+            }
             txn_options
                 .submit_transaction(payload)
                 .await
@@ -481,6 +581,7 @@ impl CliCommand<&'static str> for ListPackage {
                     let data = registry.get_package(name).await?;
                     println!("package {}", data.name());
                     println!("  upgrade_policy: {}", data.upgrade_policy());
+                    println!("  upgrade_number: {}", data.upgrade_number());
                     println!("  modules: {}", data.module_names().into_iter().join(", "));
                     println!(
                         "  build_info:\n    {}",
@@ -503,14 +604,16 @@ pub struct RunFunction {
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
     #[clap(long)]
     pub(crate) function_id: MemberId,
-    /// Hex encoded arguments separated by spaces.
+    /// Arguments combined with their type separated by spaces.
     ///
-    /// Example: `0x01 0x02 0x03`
+    /// Supported types [u8, u64, u128, bool, hex, string, address]
+    ///
+    /// Example: `address:0x1 bool:true u8:0`
     #[clap(long, multiple_values = true)]
     pub(crate) args: Vec<ArgWithType>,
     /// TypeTag arguments separated by spaces.
     ///
-    /// Example: `u8 u64 u128 bool address vector true false signer`
+    /// Example: `u8 u64 u128 bool address vector signer`
     #[clap(long, multiple_values = true)]
     pub(crate) type_args: Vec<MoveType>,
 }
@@ -549,7 +652,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
 }
 
 #[derive(Clone, Debug)]
-enum FunctionArgType {
+pub(crate) enum FunctionArgType {
     Address,
     Bool,
     Hex,
@@ -608,8 +711,8 @@ impl FromStr for FunctionArgType {
 
 /// A parseable arg with a type separated by a colon
 pub struct ArgWithType {
-    _ty: FunctionArgType,
-    arg: Vec<u8>,
+    pub(crate) _ty: FunctionArgType,
+    pub(crate) arg: Vec<u8>,
 }
 
 impl FromStr for ArgWithType {

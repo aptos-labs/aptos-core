@@ -6,6 +6,7 @@ use aptos_types::transaction::ModuleBundle;
 use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
 use move_deps::move_binary_format::errors::PartialVMError;
+use move_deps::move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
 use move_deps::move_vm_types::pop_arg;
 use move_deps::move_vm_types::values::Struct;
 use move_deps::{
@@ -16,7 +17,8 @@ use move_deps::{
         loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
     },
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_bytes::ByteBuf;
 use smallvec::smallvec;
 use std::collections::{BTreeSet, VecDeque};
 use std::fmt;
@@ -24,51 +26,54 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 /// The package registry at the given address.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PackageRegistry {
     /// Packages installed at this address.
     pub packages: Vec<PackageMetadata>,
 }
 
-/// The PackakeMetadata type.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// The PackageMetadata type.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PackageMetadata {
     /// Name of this package.
     pub name: String,
     /// The upgrade policy of this package.
     pub upgrade_policy: UpgradePolicy,
+    /// The numbers of times this module has been upgraded. Also serves as the on-chain version.
+    /// This field will be automatically assigned on successful upgrade.
+    pub upgrade_number: u64,
     /// Build info, in BuildInfo.yaml format
     pub build_info: String,
     /// The package manifest, in the Move.toml format.
     pub manifest: String,
     /// The list of modules installed by this package.
     pub modules: Vec<ModuleMetadata>,
-    /// Error map, in internal encoding
+    /// Error map, in BCS
     #[serde(with = "serde_bytes")]
     pub error_map: Vec<u8>,
+    /// ABIs, in BCS encoding
+    pub abis: Vec<ByteBuf>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModuleMetadata {
     /// Name of the module.
     pub name: String,
-    /// Source text if available.
-    pub source: String,
-    /// Source map, in internal encoding.
+    /// Source text if available, in gzipped form.
+    #[serde(with = "serde_bytes")]
+    pub source: Vec<u8>,
+    /// Source map, in BCS encoding, then gzipped.
     #[serde(with = "serde_bytes")]
     pub source_map: Vec<u8>,
-    /// ABI, in JSON byte encoding.
-    #[serde(with = "serde_bytes")]
-    pub abi: Vec<u8>,
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UpgradePolicy {
     pub policy: u8,
 }
 
 impl UpgradePolicy {
-    pub fn no_compat() -> Self {
+    pub fn arbitrary() -> Self {
         UpgradePolicy { policy: 0 }
     }
     pub fn compat() -> Self {
@@ -83,7 +88,7 @@ impl FromStr for UpgradePolicy {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "arbitrary" => Ok(UpgradePolicy::no_compat()),
+            "arbitrary" => Ok(UpgradePolicy::arbitrary()),
             "compatible" => Ok(UpgradePolicy::compat()),
             "immutable" => Ok(UpgradePolicy::immutable()),
             _ => bail!("unknown policy"),
@@ -99,6 +104,54 @@ impl fmt::Display for UpgradePolicy {
             _ => "immutable",
         })
     }
+}
+
+// ========================================================================================
+// Duplication for JSON
+
+// For JSON we need attributes on fields which aren't compatible with BCS, therefore we
+// need to duplicate the definitions...
+
+fn deserialize_from_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: FromStr,
+    <T as FromStr>::Err: std::fmt::Display,
+{
+    use serde::de::Error;
+
+    let s = <String>::deserialize(deserializer)?;
+    s.parse::<T>().map_err(D::Error::custom)
+}
+
+/// The package registry at the given address.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct PackageRegistryJson {
+    pub packages: Vec<PackageMetadataJson>,
+}
+
+/// The PackageMetadata type.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct PackageMetadataJson {
+    pub name: String,
+    pub upgrade_policy: UpgradePolicy,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub upgrade_number: u64,
+    pub build_info: String,
+    pub manifest: String,
+    pub modules: Vec<ModuleMetadataJson>,
+    #[serde(with = "serde_bytes")]
+    pub error_map: Vec<u8>,
+    pub abis: Vec<ByteBuf>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ModuleMetadataJson {
+    pub name: String,
+    #[serde(with = "serde_bytes")]
+    pub source: Vec<u8>,
+    #[serde(with = "serde_bytes")]
+    pub source_map: Vec<u8>,
 }
 
 // ========================================================================================
@@ -150,8 +203,8 @@ fn get_move_string(v: Value) -> PartialVMResult<String> {
  **************************************************************************************************/
 #[derive(Clone, Debug)]
 pub struct RequestPublishGasParameters {
-    pub base_cost: u64,
-    pub unit_cost: u64,
+    pub base_cost: InternalGas,
+    pub unit_cost: InternalGasPerByte,
 }
 
 fn native_request_publish(
@@ -176,13 +229,13 @@ fn native_request_publish(
     // TODO(Gas): fine tune the gas formula
     let cost = gas_params.base_cost
         + gas_params.unit_cost
-            * code
-                .iter()
-                .fold(0, |acc, module_code| acc + module_code.len()) as u64
+            * code.iter().fold(NumBytes::new(0), |acc, module_code| {
+                acc + NumBytes::new(module_code.len() as u64)
+            })
         + gas_params.unit_cost
-            * expected_modules
-                .iter()
-                .fold(0, |acc, name| acc + name.len()) as u64;
+            * expected_modules.iter().fold(NumBytes::new(0), |acc, name| {
+                acc + NumBytes::new(name.len() as u64)
+            });
 
     let destination = pop_arg!(args, AccountAddress);
     let code_context = context.extensions_mut().get_mut::<NativeCodeContext>();

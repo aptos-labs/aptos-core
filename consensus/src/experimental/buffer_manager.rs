@@ -39,6 +39,7 @@ use crate::{
 use aptos_crypto::HashValue;
 use aptos_types::epoch_change::EpochChangeProof;
 use futures::channel::mpsc::unbounded;
+use once_cell::sync::OnceCell;
 
 pub const BUFFER_MANAGER_RETRY_INTERVAL: u64 = 1000;
 
@@ -96,6 +97,14 @@ pub struct BufferManager {
     verifier: ValidatorVerifier,
 
     ongoing_tasks: Arc<AtomicU64>,
+    // Since proposal_generator is not aware of reconfiguration any more, the suffix blocks
+    // will not have the same timestamp as the reconfig block which violates the invariant
+    // that block.timestamp == state.timestamp because no txn is executed in suffix blocks.
+    // We change the timestamp field of the block info to maintain the invariant.
+    // If the executed blocks are b1 <- b2 <- r <- b4 <- b5 with timestamp t1..t5
+    // we replace t5 with t3 (from reconfiguration block) since that's the last timestamp
+    // being updated on-chain.
+    end_epoch_timestamp: OnceCell<u64>,
 }
 
 impl BufferManager {
@@ -139,6 +148,7 @@ impl BufferManager {
 
             verifier,
             ongoing_tasks,
+            end_epoch_timestamp: OnceCell::new(),
         }
     }
 
@@ -169,8 +179,12 @@ impl BufferManager {
             ordered_proof,
             callback,
         } = ordered_blocks;
-        debug!("Receive ordered block {}", ordered_proof.commit_info());
 
+        info!(
+            "Receive ordered block {}, the queue size is {}",
+            ordered_proof.commit_info(),
+            self.buffer.len() + 1,
+        );
         let item = BufferItem::new_ordered(ordered_blocks, ordered_proof, callback);
         self.buffer.push_back(item);
     }
@@ -184,7 +198,7 @@ impl BufferManager {
             .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
                 item.is_ordered()
             });
-        debug!(
+        info!(
             "Advance execution root from {:?} to {:?}",
             cursor, self.execution_root
         );
@@ -212,7 +226,7 @@ impl BufferManager {
             .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
                 item.is_executed()
             });
-        debug!(
+        info!(
             "Advance signing root from {:?} to {:?}",
             cursor, self.signing_root
         );
@@ -280,7 +294,7 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
-                debug!("Advance head to {:?}", self.buffer.head_cursor());
+                info!("Advance head to {:?}", self.buffer.head_cursor());
                 return;
             }
         }
@@ -305,11 +319,12 @@ impl BufferManager {
     /// It pops everything in the buffer and if reconfig flag is set, it stops the main loop
     async fn process_reset_request(&mut self, request: ResetRequest) {
         let ResetRequest { tx, stop } = request;
-        debug!("Receive reset");
+        info!("Receive reset");
 
         self.stop = stop;
         self.reset().await;
         tx.send(sync_ack_new()).unwrap();
+        info!("Reset finishes");
     }
 
     /// If the response is successful, advance the item to Executed, otherwise panic (TODO fix).
@@ -328,13 +343,33 @@ impl BufferManager {
                 return;
             }
         };
-        debug!(
+        info!(
             "Receive executed response {}",
             executed_blocks.last().unwrap().block_info()
         );
 
+        // Handle reconfiguration timestamp reconciliation.
+        // end epoch timestamp is set to the first block that causes the reconfiguration.
+        // once it's set, any subsequent block commit info will be set to this timestamp.
+        if self.end_epoch_timestamp.get().is_none() {
+            let maybe_reconfig_timestamp = executed_blocks
+                .iter()
+                .find(|b| b.block_info().has_reconfiguration())
+                .map(|b| b.timestamp_usecs());
+            if let Some(timestamp) = maybe_reconfig_timestamp {
+                debug!("Reconfig happens, set epoch end timestamp to {}", timestamp);
+                self.end_epoch_timestamp
+                    .set(timestamp)
+                    .expect("epoch end timestamp should only be set once");
+            }
+        }
+
         let item = self.buffer.take(&current_cursor);
-        let new_item = item.advance_to_executed_or_aggregated(executed_blocks, &self.verifier);
+        let new_item = item.advance_to_executed_or_aggregated(
+            executed_blocks,
+            &self.verifier,
+            self.end_epoch_timestamp.get().cloned(),
+        );
         let aggregated = new_item.is_aggregated();
         self.buffer.set(&current_cursor, new_item);
         if aggregated {
@@ -355,7 +390,7 @@ impl BufferManager {
                 return;
             }
         };
-        debug!(
+        info!(
             "Receive signing response {}",
             commit_ledger_info.commit_info()
         );
@@ -409,7 +444,7 @@ impl BufferManager {
             }
             VerifiedEvent::CommitDecision(commit_proof) => {
                 let target_block_id = commit_proof.ledger_info().commit_info().id();
-                debug!(
+                info!(
                     "Receive commit decision {}",
                     commit_proof.ledger_info().commit_info()
                 );

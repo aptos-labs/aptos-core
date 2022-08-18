@@ -10,6 +10,7 @@ use crate::liveness::{
     },
     proposer_election::{choose_index, ProposerElection},
 };
+use aptos_bitvec::BitVec;
 use aptos_crypto::bls12381;
 use aptos_infallible::Mutex;
 use aptos_keygen::KeyGen;
@@ -42,7 +43,7 @@ impl MockHistory {
 }
 
 impl MetadataBackend for MockHistory {
-    fn get_block_metadata(&self, _target_round: Round) -> Vec<NewBlockEvent> {
+    fn get_block_metadata(&self, _target_epoch: u64, _target_round: Round) -> Vec<NewBlockEvent> {
         let start = if self.data.len() > self.window_size {
             self.data.len() - self.window_size
         } else {
@@ -79,7 +80,7 @@ impl TestBlockBuilder {
             self.epoch,
             self.round,
             self.round,
-            voters,
+            BitVec::from(voters).into(),
             proposer,
             failed_proposers,
             self.round * 3600,
@@ -94,7 +95,7 @@ fn test_aggregation_bitmap_to_voters() {
     let validators: Vec<_> = (0..4).into_iter().map(|_| Author::random()).collect();
     let bitmap = vec![true, true, false, true];
 
-    if let Ok(voters) = NewBlockEventAggregation::bitmap_to_voters(&validators, &bitmap) {
+    if let Ok(voters) = NewBlockEventAggregation::bitvec_to_voters(&validators, &bitmap.into()) {
         assert_eq!(&validators[0], voters[0]);
         assert_eq!(&validators[1], voters[1]);
         assert_eq!(&validators[3], voters[2]);
@@ -105,14 +106,18 @@ fn test_aggregation_bitmap_to_voters() {
 
 #[test]
 fn test_aggregation_bitmap_to_voters_mismatched_lengths() {
-    let validators: Vec<_> = (0..4) // size of 4
+    let validators: Vec<_> = (0..8) // size of 8 with one u8 in bitvec
         .into_iter()
         .map(|_| Author::random())
         .collect();
-    let bitmap_too_long = vec![true, true, false, true, true]; // size of 5
-    assert!(NewBlockEventAggregation::bitmap_to_voters(&validators, &bitmap_too_long).is_err());
-    let bitmap_too_short = vec![true, true, false];
-    assert!(NewBlockEventAggregation::bitmap_to_voters(&validators, &bitmap_too_short).is_err());
+    let bitmap_too_long = vec![true; 9]; // 2 bytes in bitvec
+    assert!(
+        NewBlockEventAggregation::bitvec_to_voters(&validators, &bitmap_too_long.into()).is_err()
+    );
+    let bitmap_too_short: Vec<bool> = vec![]; // 0 bytes in bitvec
+    assert!(
+        NewBlockEventAggregation::bitvec_to_voters(&validators, &bitmap_too_short.into()).is_err()
+    );
 }
 
 #[test]
@@ -451,6 +456,10 @@ impl MockDbReader {
     pub fn add_event(&self, epoch: u64, round: Round) {
         let mut idx = self.idx.lock();
         *idx += 1;
+
+        let mut votes = BitVec::with_num_bits(1);
+        votes.set(0);
+
         self.events.lock().push(EventWithVersion::new(
             *idx,
             ContractEvent::new(
@@ -461,7 +470,7 @@ impl MockDbReader {
                     epoch,
                     round,
                     round,
-                    vec![],
+                    votes.into(),
                     self.random_address,
                     vec![],
                     *self.last_timestamp.lock(),
@@ -532,7 +541,7 @@ fn backend_wrapper_test() {
 
     let mut assert_history = |round, expected_history: Vec<Round>, to_fetch| {
         let history: Vec<Round> = backend
-            .get_block_metadata(round)
+            .get_block_metadata(1, round)
             .iter()
             .map(|e| e.round())
             .collect();
@@ -596,6 +605,41 @@ fn backend_wrapper_test() {
     // Second one should know that there is nothing new.
     assert_history(14, vec![13, 12, 11], true);
     assert_history(14, vec![13, 12, 11], false);
+}
+
+#[test]
+fn backend_test_cross_epoch() {
+    let aptos_db = Arc::new(MockDbReader::new());
+    let backend = AptosDBBackend::new(3, 3, aptos_db.clone());
+
+    aptos_db.add_event(0, 1);
+    aptos_db.add_event(1, 1);
+    aptos_db.add_event(1, 2);
+    aptos_db.add_event(1, 3);
+    aptos_db.add_event(2, 1);
+    aptos_db.add_event(2, 2);
+
+    let mut fetch_count = 0;
+
+    let mut assert_history = |epoch, round, expected_history: Vec<(u64, Round)>, to_fetch| {
+        let history: Vec<(u64, Round)> = backend
+            .get_block_metadata(epoch, round)
+            .iter()
+            .map(|e| (e.epoch(), e.round()))
+            .collect();
+        assert_eq!(expected_history, history, "At round {}", round);
+        if to_fetch {
+            fetch_count += 1;
+        }
+        assert_eq!(fetch_count, aptos_db.fetched(), "At round {}", round);
+    };
+
+    assert_history(2, 2, vec![(2, 2), (2, 1), (1, 3)], true);
+    assert_history(2, 1, vec![(2, 1), (1, 3), (1, 2)], false);
+
+    aptos_db.add_event(3, 1);
+
+    assert_history(3, 2, vec![(3, 1), (2, 2), (2, 1)], true);
 }
 
 #[test]

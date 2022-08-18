@@ -1,8 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{counters::*, data_cache::StateViewCache, delta_ext::TransactionOutputExt};
+use crate::{counters::*, data_cache::StateViewCache};
 use anyhow::Result;
+use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_state_view::StateView;
 use aptos_types::{
     transaction::{SignatureCheckedTransaction, SignedTransaction, VMValidatorResult},
@@ -16,17 +17,11 @@ use crate::{
 };
 use aptos_logger::prelude::*;
 use aptos_types::{
-    access_path::AccessPath,
     block_metadata::BlockMetadata,
-    state_store::state_key::StateKey,
-    transaction::{
-        Transaction, TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
-        WriteSetPayload,
-    },
+    transaction::{Transaction, TransactionOutput, TransactionStatus, WriteSetPayload},
     write_set::WriteSet,
 };
 use rayon::prelude::*;
-use std::collections::HashSet;
 
 /// This trait describes the VM adapter's interface.
 /// TODO: bring more of the execution logic in aptos_vm into this file.
@@ -130,35 +125,6 @@ pub(crate) fn validate_signature_checked_transaction<S: MoveResolverExt, A: VMAd
     }
 }
 
-fn preload_cache(signature_verified_block: &[PreprocessedTransaction], data_view: &impl StateView) {
-    // generate a collection of addresses
-    let mut addresses_to_preload = HashSet::new();
-    for txn in signature_verified_block {
-        if let PreprocessedTransaction::UserTransaction(txn) = txn {
-            if let TransactionPayload::Script(script) = txn.payload() {
-                addresses_to_preload.insert(txn.sender());
-
-                for arg in script.args() {
-                    if let TransactionArgument::Address(address) = arg {
-                        addresses_to_preload.insert(*address);
-                    }
-                }
-            }
-        }
-    }
-
-    // This will launch a number of threads to preload the account blobs in parallel. We may
-    // want to fine tune the number of threads launched here in the future.
-    addresses_to_preload
-        .into_par_iter()
-        .map(|addr| {
-            data_view
-                .get_state_value(&StateKey::AccessPath(AccessPath::new(addr, Vec::new())))
-                .ok()?
-        })
-        .collect::<Vec<Option<Vec<u8>>>>();
-}
-
 pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
     adapter: &A,
     transactions: Vec<Transaction>,
@@ -184,12 +150,6 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
             .collect();
     }
 
-    rayon::scope(|scope| {
-        scope.spawn(|_| {
-            preload_cache(&signature_verified_block, data_cache);
-        });
-    });
-
     for (idx, txn) in signature_verified_block.into_iter().enumerate() {
         let log_context = AdapterLogSchema::new(data_cache.id(), idx);
         if should_restart {
@@ -199,13 +159,15 @@ pub(crate) fn execute_block_impl<A: VMAdapter, S: StateView>(
             debug!(log_context, "Retry after reconfiguration");
             continue;
         };
-        let (vm_status, output, sender) = adapter.execute_single_transaction(
+        let (vm_status, output_ext, sender) = adapter.execute_single_transaction(
             &txn,
             &data_cache.as_move_resolver(),
             &log_context,
         )?;
-        // TODO: apply deltas.
-        let (_, output) = output.into();
+
+        // Apply deltas.
+        let output = output_ext.into_transaction_output(&data_cache)?;
+
         if !output.status().is_discarded() {
             data_cache.push_write_set(output.write_set());
         } else {
@@ -244,7 +206,6 @@ pub enum PreprocessedTransaction {
     UserTransaction(Box<SignatureCheckedTransaction>),
     WaypointWriteSet(WriteSetPayload),
     BlockMetadata(BlockMetadata),
-    WriteSet(Box<SignatureCheckedTransaction>),
     InvalidSignature,
     StateCheckpoint,
 }
@@ -264,12 +225,7 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
                     return PreprocessedTransaction::InvalidSignature;
                 }
             };
-            match checked_txn.payload() {
-                TransactionPayload::WriteSet(_) => {
-                    PreprocessedTransaction::WriteSet(Box::new(checked_txn))
-                }
-                _ => PreprocessedTransaction::UserTransaction(Box::new(checked_txn)),
-            }
+            PreprocessedTransaction::UserTransaction(Box::new(checked_txn))
         }
         Transaction::StateCheckpoint(_) => PreprocessedTransaction::StateCheckpoint,
     }

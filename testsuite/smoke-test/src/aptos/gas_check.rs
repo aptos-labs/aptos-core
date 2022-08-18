@@ -56,7 +56,7 @@ async fn test_gas_check() {
 
     // update to allow 0 gas unit price
     let mut gas_params = AptosGasParameters::initial();
-    gas_params.txn.min_price_per_gas_unit = 0;
+    gas_params.txn.min_price_per_gas_unit = 0.into();
     let gas_schedule_blob = bcs::to_bytes(&gas_params.to_on_chain_gas_schedule())
         .expect("failed to serialize gas parameters");
 

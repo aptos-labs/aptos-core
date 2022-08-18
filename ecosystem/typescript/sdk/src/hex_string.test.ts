@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { HexString } from "./hex_string";
 
 const withoutPrefix = "007711b4d0";

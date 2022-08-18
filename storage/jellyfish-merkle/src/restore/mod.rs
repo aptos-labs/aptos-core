@@ -258,6 +258,7 @@ where
                             leaf_count: Some(internal_node.leaf_count()),
                         },
                         Node::Leaf(leaf_node) => ChildInfo::Leaf(leaf_node),
+                        Node::Null => unreachable!("Child cannot be Null"),
                     };
                     internal_info.set_child(i, child_info);
                 }
@@ -710,19 +711,35 @@ where
 struct StateValueRestore<K, V> {
     version: Version,
     db: Arc<dyn StateValueWriter<K, V>>,
+    num_items: usize,
+    total_bytes: usize,
 }
 
 impl<K: crate::Key + Hash + Eq, V: crate::Value> StateValueRestore<K, V> {
     pub fn new<D: 'static + StateValueWriter<K, V>>(db: Arc<D>, version: Version) -> Self {
-        Self { version, db }
+        Self {
+            version,
+            db,
+            num_items: 0,
+            total_bytes: 0,
+        }
     }
 
     pub fn add_chunk(&mut self, chunk: Vec<(K, V)>) -> Result<()> {
         let kv_batch = chunk
             .into_iter()
-            .map(|(k, v)| ((k, self.version), v))
+            .map(|(k, v)| {
+                self.num_items += 1;
+                self.total_bytes += k.key_size() + v.value_size();
+                ((k, self.version), Some(v))
+            })
             .collect();
         self.db.write_kv_batch(&kv_batch)
+    }
+
+    pub fn finish(self) -> Result<()> {
+        self.db
+            .write_usage(self.version, self.num_items, self.total_bytes)
     }
 }
 
@@ -778,10 +795,12 @@ impl<K: crate::Key + CryptoHash + Hash + Eq, V: crate::Value> StateSnapshotRecei
     }
 
     fn finish(self) -> Result<()> {
+        self.kv_restore.finish()?;
         self.tree_restore.finish_impl()
     }
 
     fn finish_box(self: Box<Self>) -> Result<()> {
+        self.kv_restore.finish()?;
         self.tree_restore.finish_impl()
     }
 }

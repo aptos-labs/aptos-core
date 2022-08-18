@@ -49,6 +49,7 @@ pub use script::{
 
 use crate::state_store::{state_key::StateKey, state_value::StateValue};
 use move_deps::move_core_types::vm_status::AbortLocation;
+use once_cell::sync::OnceCell;
 use std::{collections::BTreeSet, hash::Hash, ops::Deref, sync::atomic::AtomicU64};
 pub use transaction_argument::{parse_transaction_argument, TransactionArgument};
 
@@ -206,62 +207,6 @@ impl RawTransaction {
         }
     }
 
-    pub fn new_write_set(
-        sender: AccountAddress,
-        sequence_number: u64,
-        write_set: WriteSet,
-        chain_id: ChainId,
-    ) -> Self {
-        Self::new_change_set(
-            sender,
-            sequence_number,
-            ChangeSet::new(write_set, vec![]),
-            chain_id,
-        )
-    }
-
-    pub fn new_change_set(
-        sender: AccountAddress,
-        sequence_number: u64,
-        change_set: ChangeSet,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::WriteSet(WriteSetPayload::Direct(change_set)),
-            // Since write-set transactions bypass the VM, these fields aren't relevant.
-            max_gas_amount: 0,
-            gas_unit_price: 0,
-            // Write-set transactions are special and important and shouldn't expire.
-            expiration_timestamp_secs: u64::max_value(),
-            chain_id,
-        }
-    }
-
-    pub fn new_writeset_script(
-        sender: AccountAddress,
-        sequence_number: u64,
-        script: Script,
-        signer: AccountAddress,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::WriteSet(WriteSetPayload::Script {
-                execute_as: signer,
-                script,
-            }),
-            // Since write-set transactions bypass the VM, these fields aren't relevant.
-            max_gas_amount: 0,
-            gas_unit_price: 0,
-            // Write-set transactions are special and important and shouldn't expire.
-            expiration_timestamp_secs: u64::max_value(),
-            chain_id,
-        }
-    }
-
     /// Signs the given `RawTransaction`. Note that this consumes the `RawTransaction` and turns it
     /// into a `SignatureCheckedTransaction`.
     ///
@@ -339,7 +284,6 @@ impl RawTransaction {
 
     pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
         let (code, args) = match &self.payload {
-            TransactionPayload::WriteSet(_) => ("genesis".to_string(), vec![]),
             TransactionPayload::Script(script) => (
                 get_transaction_name(script.code()),
                 convert_txn_args(script.args()),
@@ -414,8 +358,6 @@ impl RawTransactionWithData {
 /// Different kinds of transactions.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TransactionPayload {
-    /// A system maintenance transaction.
-    WriteSet(WriteSetPayload),
     /// A transaction that executes code.
     Script(Script),
     /// A transaction that publishes multiple modules at the same time.
@@ -425,13 +367,6 @@ pub enum TransactionPayload {
 }
 
 impl TransactionPayload {
-    pub fn should_trigger_reconfiguration_by_default(&self) -> bool {
-        match self {
-            Self::WriteSet(ws) => ws.should_trigger_reconfiguration_by_default(),
-            Self::Script(_) | Self::ScriptFunction(_) | Self::ModuleBundle(_) => false,
-        }
-    }
-
     pub fn into_script_function(self) -> ScriptFunction {
         match self {
             Self::ScriptFunction(f) => f,
@@ -471,18 +406,21 @@ impl WriteSetPayload {
 /// **IMPORTANT:** The signature of a `SignedTransaction` is not guaranteed to be verified. For a
 /// transaction whose signature is statically guaranteed to be verified, see
 /// [`SignatureCheckedTransaction`].
-#[derive(Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SignedTransaction {
     /// The raw transaction
     raw_txn: RawTransaction,
 
     /// Public key and signature to authenticate
     authenticator: TransactionAuthenticator,
+
+    #[serde(skip)]
+    bytes: OnceCell<Vec<u8>>,
 }
 
 /// A transaction for which the signature has been verified. Created by
 /// [`SignedTransaction::check_signature`] and [`RawTransaction::sign`].
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SignatureCheckedTransaction(SignedTransaction);
 
 impl SignatureCheckedTransaction {
@@ -529,6 +467,7 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
+            bytes: OnceCell::new(),
         }
     }
 
@@ -541,6 +480,7 @@ impl SignedTransaction {
         SignedTransaction {
             raw_txn,
             authenticator,
+            bytes: OnceCell::new(),
         }
     }
 
@@ -557,6 +497,7 @@ impl SignedTransaction {
                 secondary_signer_addresses,
                 secondary_signers,
             ),
+            bytes: OnceCell::new(),
         }
     }
 
@@ -567,6 +508,7 @@ impl SignedTransaction {
         Self {
             raw_txn,
             authenticator,
+            bytes: OnceCell::new(),
         }
     }
 
@@ -607,8 +549,10 @@ impl SignedTransaction {
     }
 
     pub fn raw_txn_bytes_len(&self) -> usize {
-        bcs::to_bytes(&self.raw_txn)
-            .expect("Unable to serialize RawTransaction")
+        self.bytes
+            .get_or_init(|| {
+                bcs::to_bytes(&self.raw_txn).expect("Unable to serialize RawTransaction")
+            })
             .len()
     }
 
@@ -1099,7 +1043,7 @@ impl Display for TransactionInfo {
 pub struct TransactionToCommit {
     transaction: Transaction,
     transaction_info: TransactionInfo,
-    state_updates: HashMap<StateKey, StateValue>,
+    state_updates: HashMap<StateKey, Option<StateValue>>,
     write_set: WriteSet,
     events: Vec<ContractEvent>,
     is_reconfig: bool,
@@ -1109,7 +1053,7 @@ impl TransactionToCommit {
     pub fn new(
         transaction: Transaction,
         transaction_info: TransactionInfo,
-        state_updates: HashMap<StateKey, StateValue>,
+        state_updates: HashMap<StateKey, Option<StateValue>>,
         write_set: WriteSet,
         events: Vec<ContractEvent>,
         is_reconfig: bool,
@@ -1141,7 +1085,7 @@ impl TransactionToCommit {
         self.transaction_info = txn_info
     }
 
-    pub fn state_updates(&self) -> &HashMap<StateKey, StateValue> {
+    pub fn state_updates(&self) -> &HashMap<StateKey, Option<StateValue>> {
         &self.state_updates
     }
 

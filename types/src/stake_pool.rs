@@ -17,6 +17,7 @@ pub struct StakePool {
     initialize_validator_events: EventHandle,
     set_operator_events: EventHandle,
     add_stake_events: EventHandle,
+    reactivate_stake_events: EventHandle,
     rotate_consensus_key_events: EventHandle,
     update_network_and_fullnode_addresses_events: EventHandle,
     increase_lockup_events: EventHandle,

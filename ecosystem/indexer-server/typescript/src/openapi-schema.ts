@@ -447,8 +447,6 @@ export interface components {
       sequence_number: components["schemas"]["Uint64"];
       max_gas_amount: components["schemas"]["Uint64"];
       gas_unit_price: components["schemas"]["Uint64"];
-      /** @example XDX */
-      gas_currency_code: string;
       expiration_timestamp_secs: components["schemas"]["TimestampSec"];
       payload: components["schemas"]["TransactionPayload"];
     };

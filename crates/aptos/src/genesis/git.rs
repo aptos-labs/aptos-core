@@ -14,18 +14,27 @@ use aptos_genesis::config::Layout;
 use aptos_github_client::Client as GithubClient;
 use async_trait::async_trait;
 use clap::Parser;
+use framework::ReleaseBundle;
 use serde::{de::DeserializeOwned, Serialize};
+use std::path::Path;
 use std::{fmt::Debug, io::Read, path::PathBuf, str::FromStr};
 
-pub const LAYOUT_NAME: &str = "layout";
+pub const LAYOUT_FILE: &str = "layout.yaml";
+pub const OPERATOR_FILE: &str = "operator.yaml";
+pub const OWNER_FILE: &str = "owner.yaml";
+pub const FRAMEWORK_NAME: &str = "framework.mrb";
 
-/// Setup a shared Github repository for Genesis
+/// Setup a shared Git repository for Genesis
 ///
+/// This will setup a folder or an online Github repository to be used
+/// for Genesis.  If it's the local, it will create the folders but not
+/// set up a Git repository.
 #[derive(Parser)]
 pub struct SetupGit {
     #[clap(flatten)]
     pub(crate) git_options: GitOptions,
-    /// Path to `Layout` which defines where all the files are
+
+    /// Path to the `Layout` file which defines where all the files are
     #[clap(long, parse(from_os_str))]
     pub(crate) layout_file: PathBuf,
 }
@@ -41,10 +50,7 @@ impl CliCommand<()> for SetupGit {
 
         // Upload layout file to ensure we can read later
         let client = self.git_options.get_client()?;
-        client.put(LAYOUT_NAME, &layout)?;
-
-        // Make a place for the modules to be uploaded
-        client.create_dir("framework")?;
+        client.put(Path::new(LAYOUT_FILE), &layout)?;
 
         Ok(())
     }
@@ -77,12 +83,15 @@ pub struct GitOptions {
     /// Github repository e.g. 'aptos-labs/aptos-core'
     #[clap(long)]
     pub(crate) github_repository: Option<GithubRepo>,
+
     /// Github repository branch e.g. main
     #[clap(long, default_value = "main")]
     pub(crate) github_branch: String,
+
     /// Path to Github API token.  Token must have repo:* permissions
     #[clap(long, parse(from_os_str))]
     pub(crate) github_token_file: Option<PathBuf>,
+
     /// Path to local git repository
     #[clap(long, parse(from_os_str))]
     pub(crate) local_repository_dir: Option<PathBuf>,
@@ -138,10 +147,10 @@ impl Client {
     }
 
     /// Retrieves an object as a YAML encoded file from the appropriate storage
-    pub fn get<T: DeserializeOwned + Debug>(&self, name: &str) -> CliTypedResult<T> {
+    pub fn get<T: DeserializeOwned + Debug>(&self, path: &Path) -> CliTypedResult<T> {
         match self {
             Client::Local(local_repository_path) => {
-                let path = local_repository_path.join(format!("{}.yaml", name));
+                let path = local_repository_path.join(path);
                 let mut file = std::fs::File::open(path.as_path())
                     .map_err(|e| CliError::IO(path.display().to_string(), e))?;
 
@@ -151,18 +160,26 @@ impl Client {
                 from_yaml(&contents)
             }
             Client::Github(client) => {
-                from_base64_encoded_yaml(&client.get_file(&format!("{}.yaml", name))?)
+                from_base64_encoded_yaml(&client.get_file(&path.display().to_string())?)
             }
         }
     }
 
     /// Puts an object as a YAML encoded file to the appropriate storage
-    pub fn put<T: Serialize + ?Sized>(&self, name: &str, input: &T) -> CliTypedResult<()> {
+    pub fn put<T: Serialize + ?Sized>(&self, name: &Path, input: &T) -> CliTypedResult<()> {
         match self {
             Client::Local(local_repository_path) => {
-                self.create_dir(local_repository_path.to_str().unwrap())?;
+                let path = local_repository_path.join(name);
 
-                let path = local_repository_path.join(format!("{}.yaml", name));
+                // Create repository path and any sub-directories
+                if let Some(dir) = path.parent() {
+                    self.create_dir(dir)?;
+                } else {
+                    return Err(CliError::UnexpectedError(format!(
+                        "Path should always have a parent {}",
+                        path.display()
+                    )));
+                }
                 write_to_file(
                     path.as_path(),
                     &path.display().to_string(),
@@ -170,17 +187,17 @@ impl Client {
                 )?;
             }
             Client::Github(client) => {
-                client.put(&format!("{}.yaml", name), &to_base64_encoded_yaml(input)?)?;
+                client.put(&name.display().to_string(), &to_base64_encoded_yaml(input)?)?;
             }
         }
 
         Ok(())
     }
 
-    pub fn create_dir(&self, name: &str) -> CliTypedResult<()> {
+    pub fn create_dir(&self, dir: &Path) -> CliTypedResult<()> {
         match self {
             Client::Local(local_repository_path) => {
-                let path = local_repository_path.join(name);
+                let path = local_repository_path.join(dir);
                 create_dir_if_not_exist(path.as_path())?;
             }
             Client::Github(_) => {
@@ -191,50 +208,17 @@ impl Client {
         Ok(())
     }
 
-    /// Retrieve bytecode Move modules from a module folder
-    pub fn get_modules(&self, name: &str) -> CliTypedResult<Vec<Vec<u8>>> {
-        let mut modules = Vec::new();
-
+    /// Retrieve framework release bundle.
+    pub fn get_framework(&self) -> CliTypedResult<ReleaseBundle> {
         match self {
-            Client::Local(local_repository_path) => {
-                let module_folder = local_repository_path.join(name);
-                if !module_folder.is_dir() {
-                    return Err(CliError::UnexpectedError(format!(
-                        "{} is not a directory!",
-                        module_folder.display()
-                    )));
-                }
-
-                let files = std::fs::read_dir(module_folder.as_path())
-                    .map_err(|e| CliError::IO(module_folder.display().to_string(), e))?;
-
-                for maybe_file in files {
-                    let file = maybe_file
-                        .map_err(|e| CliError::UnexpectedError(e.to_string()))?
-                        .path();
-                    let extension = file.extension();
-
-                    // Only collect move files
-                    if file.is_file() && extension.is_some() && extension.unwrap() == "mv" {
-                        modules.push(
-                            std::fs::read(file.as_path())
-                                .map_err(|e| CliError::IO(file.display().to_string(), e))?,
-                        );
-                    }
-                }
-            }
+            Client::Local(local_repository_path) => Ok(ReleaseBundle::read(
+                local_repository_path.join(FRAMEWORK_NAME),
+            )?),
             Client::Github(client) => {
-                let files = client.get_directory(name)?;
-
-                for file in files {
-                    // Only collect .mv files
-                    if file.ends_with(".mv") {
-                        modules.push(base64::decode(client.get_file(&file)?)?)
-                    }
-                }
+                let bytes = base64::decode(client.get_file(FRAMEWORK_NAME)?)?;
+                Ok(bcs::from_bytes::<ReleaseBundle>(&bytes)?)
             }
         }
-        Ok(modules)
     }
 }
 

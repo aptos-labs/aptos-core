@@ -141,17 +141,18 @@ const config = {
                 type: "doc",
                 docId: "nodes/node-health-checker",
               },
-              {
-                label: "Staking",
-                type: "doc",
-                docId: "nodes/staking",
-              },
             ],
           },
           {
             position: "left",
-            href: "https://fullnode.devnet.aptoslabs.com/spec.html#/",
+            href: "https://fullnode.devnet.aptoslabs.com/v1/spec#/",
             label: "REST API",
+          },
+          {
+            position: "left",
+            type: "doc",
+            docId: "aptos-white-paper",
+            label: "Aptos White Paper",
           },
         ],
       },
@@ -286,6 +287,10 @@ const config = {
           {
             to: "/nodes/local-testnet/run-a-local-testnet",
             from: "/nodes/run-a-local-testnet",
+          },
+          {
+            to: "/concepts/staking",
+            from: "/nodes/staking",
           },
         ],
       },

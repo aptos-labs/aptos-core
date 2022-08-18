@@ -1,9 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{ConfigSearchMode, PromptOptions};
+pub mod analyze;
+
+use crate::common::types::{ConfigSearchMode, OptionalPoolAddressArgs, PromptOptions};
 use crate::common::utils::prompt_yes_with_override;
 use crate::config::GlobalConfig;
+use crate::node::analyze::analyze_validators::AnalyzeValidators;
+use crate::node::analyze::fetch_metadata::FetchMetadata;
 use crate::{
     common::{
         types::{
@@ -17,7 +21,7 @@ use crate::{
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{bls12381, x25519, ValidCryptoMaterialStringExt};
 use aptos_faucet::FaucetArgs;
-use aptos_genesis::config::{HostAndPort, ValidatorConfiguration};
+use aptos_genesis::config::{HostAndPort, OperatorConfiguration};
 use aptos_rest_client::Transaction;
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::chain_id::ChainId;
@@ -28,181 +32,91 @@ use hex::FromHex;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use reqwest::Url;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::{path::PathBuf, thread, time::Duration};
 use tokio::time::Instant;
 
-/// Tool for manipulating nodes
+/// Tool for operations related to nodes
 ///
+/// This tool allows you to run a local test node for testing,
+/// identify issues with nodes, and show related information.
 #[derive(Parser)]
 pub enum NodeTool {
-    AddStake(AddStake),
-    UnlockStake(UnlockStake),
-    WithdrawStake(WithdrawStake),
-    IncreaseLockup(IncreaseLockup),
-    RegisterValidatorCandidate(RegisterValidatorCandidate),
+    InitializeValidator(InitializeValidator),
     JoinValidatorSet(JoinValidatorSet),
     LeaveValidatorSet(LeaveValidatorSet),
     ShowValidatorConfig(ShowValidatorConfig),
     ShowValidatorSet(ShowValidatorSet),
     ShowValidatorStake(ShowValidatorStake),
     RunLocalTestnet(RunLocalTestnet),
+    UpdateConsensusKey(UpdateConsensusKey),
     UpdateValidatorNetworkAddresses(UpdateValidatorNetworkAddresses),
+    AnalyzeValidatorPerformance(AnalyzeValidatorPerformance),
 }
 
 impl NodeTool {
     pub async fn execute(self) -> CliResult {
         use NodeTool::*;
         match self {
-            AddStake(tool) => tool.execute_serialized().await,
-            UnlockStake(tool) => tool.execute_serialized().await,
-            WithdrawStake(tool) => tool.execute_serialized().await,
-            IncreaseLockup(tool) => tool.execute_serialized().await,
-            RegisterValidatorCandidate(tool) => tool.execute_serialized().await,
+            InitializeValidator(tool) => tool.execute_serialized().await,
             JoinValidatorSet(tool) => tool.execute_serialized().await,
             LeaveValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorSet(tool) => tool.execute_serialized().await,
             ShowValidatorStake(tool) => tool.execute_serialized().await,
             ShowValidatorConfig(tool) => tool.execute_serialized().await,
             RunLocalTestnet(tool) => tool.execute_serialized_without_logger().await,
+            UpdateConsensusKey(tool) => tool.execute_serialized().await,
             UpdateValidatorNetworkAddresses(tool) => tool.execute_serialized().await,
+            AnalyzeValidatorPerformance(tool) => tool.execute_serialized().await,
         }
     }
 }
 
-/// Stake coins for an account to the stake pool
 #[derive(Parser)]
-pub struct AddStake {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-    /// Amount of coins to add to stake
-    #[clap(long)]
-    pub amount: u64,
+pub struct OperatorConfigFileArgs {
+    /// Operator Configuration file, created from the `genesis set-validator-configuration` command
+    #[clap(long, parse(from_os_str))]
+    pub(crate) operator_config_file: Option<PathBuf>,
 }
 
-#[async_trait]
-impl CliCommand<Transaction> for AddStake {
-    fn command_name(&self) -> &'static str {
-        "AddStake"
-    }
-
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
-        self.txn_options
-            .submit_transaction(aptos_stdlib::stake_add_stake(self.amount))
-            .await
-    }
-}
-
-/// Unlock staked coins
-///
-/// Coins can only be unlocked if they no longer have an applied lockup period
-#[derive(Parser)]
-pub struct UnlockStake {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-    /// Amount of coins to unlock
-    #[clap(long)]
-    pub amount: u64,
-}
-
-#[async_trait]
-impl CliCommand<Transaction> for UnlockStake {
-    fn command_name(&self) -> &'static str {
-        "UnlockStake"
-    }
-
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
-        self.txn_options
-            .submit_transaction(aptos_stdlib::stake_unlock(self.amount))
-            .await
-    }
-}
-
-/// Withdraw all unlocked staked coins
-///
-/// Before calling `WithdrawStake`, `UnlockStake` must be called first.
-#[derive(Parser)]
-pub struct WithdrawStake {
-    #[clap(flatten)]
-    pub(crate) node_op_options: TransactionOptions,
-    /// Amount of coins to withdraw
-    #[clap(long)]
-    pub amount: u64,
-}
-
-#[async_trait]
-impl CliCommand<Transaction> for WithdrawStake {
-    fn command_name(&self) -> &'static str {
-        "WithdrawStake"
-    }
-
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
-        self.node_op_options
-            .submit_transaction(aptos_stdlib::stake_withdraw(self.amount))
-            .await
-    }
-}
-
-/// Increase lockup of all staked coins in an account
-#[derive(Parser)]
-pub struct IncreaseLockup {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-}
-
-#[async_trait]
-impl CliCommand<Transaction> for IncreaseLockup {
-    fn command_name(&self) -> &'static str {
-        "IncreaseLockup"
-    }
-
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
-        self.txn_options
-            .submit_transaction(aptos_stdlib::stake_increase_lockup())
-            .await
+impl OperatorConfigFileArgs {
+    fn load(&self) -> CliTypedResult<Option<OperatorConfiguration>> {
+        if let Some(ref file) = self.operator_config_file {
+            Ok(from_yaml(
+                &String::from_utf8(read_from_file(file)?).map_err(CliError::from)?,
+            )?)
+        } else {
+            Ok(None)
+        }
     }
 }
 
 #[derive(Parser)]
-pub struct ValidatorConfigArgs {
-    /// Validator Configuration file, created from the `genesis set-validator-configuration` command
-    #[clap(long)]
-    pub(crate) validator_config_file: Option<PathBuf>,
+pub struct ValidatorConsensusKeyArgs {
     /// Hex encoded Consensus public key
     #[clap(long, parse(try_from_str = bls12381::PublicKey::from_encoded_string))]
     pub(crate) consensus_public_key: Option<bls12381::PublicKey>,
+
     /// Hex encoded Consensus proof of possession
     #[clap(long, parse(try_from_str = bls12381::ProofOfPossession::from_encoded_string))]
     pub(crate) proof_of_possession: Option<bls12381::ProofOfPossession>,
-
-    /// Host and port pair for the validator e.g. 127.0.0.1:6180
-    #[clap(long)]
-    pub(crate) validator_host: Option<HostAndPort>,
-    /// Validator x25519 public network key
-    #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
-    pub(crate) validator_network_public_key: Option<x25519::PublicKey>,
-    /// Host and port pair for the fullnode e.g. 127.0.0.1:6180.  Optional
-    #[clap(long)]
-    pub(crate) full_node_host: Option<HostAndPort>,
-    /// Full node x25519 public network key
-    #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
-    pub(crate) full_node_network_public_key: Option<x25519::PublicKey>,
 }
 
-impl ValidatorConfigArgs {
+impl ValidatorConsensusKeyArgs {
     fn get_consensus_public_key(
         &self,
-        validator_config: &Option<ValidatorConfiguration>,
+        operator_config: &Option<OperatorConfiguration>,
     ) -> CliTypedResult<bls12381::PublicKey> {
         let consensus_public_key = if let Some(ref consensus_public_key) = self.consensus_public_key
         {
             consensus_public_key.clone()
-        } else if let Some(ref validator_config) = validator_config {
-            validator_config.consensus_public_key.clone()
+        } else if let Some(ref operator_config) = operator_config {
+            operator_config.consensus_public_key.clone()
         } else {
             return Err(CliError::CommandArgumentError(
-                "Must provide either --validator-config-file or --consensus-public-key".to_string(),
+                "Must provide either --operator-config-file or --consensus-public-key".to_string(),
             ));
         };
         Ok(consensus_public_key)
@@ -210,23 +124,44 @@ impl ValidatorConfigArgs {
 
     fn get_consensus_proof_of_possession(
         &self,
-        validator_config: &Option<ValidatorConfiguration>,
+        operator_config: &Option<OperatorConfiguration>,
     ) -> CliTypedResult<bls12381::ProofOfPossession> {
         let proof_of_possession = if let Some(ref proof_of_possession) = self.proof_of_possession {
             proof_of_possession.clone()
-        } else if let Some(ref validator_config) = validator_config {
-            validator_config.proof_of_possession.clone()
+        } else if let Some(ref operator_config) = operator_config {
+            operator_config.consensus_proof_of_possession.clone()
         } else {
             return Err(CliError::CommandArgumentError(
-                "Must provide either --validator-config-file or --proof-of-possession".to_string(),
+                "Must provide either --operator-config-file or --proof-of-possession".to_string(),
             ));
         };
         Ok(proof_of_possession)
     }
+}
 
+#[derive(Parser)]
+pub struct ValidatorNetworkAddressesArgs {
+    /// Host and port pair for the validator e.g. 127.0.0.1:6180
+    #[clap(long)]
+    pub(crate) validator_host: Option<HostAndPort>,
+
+    /// Validator x25519 public network key
+    #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
+    pub(crate) validator_network_public_key: Option<x25519::PublicKey>,
+
+    /// Host and port pair for the fullnode e.g. 127.0.0.1:6180.  Optional
+    #[clap(long)]
+    pub(crate) full_node_host: Option<HostAndPort>,
+
+    /// Full node x25519 public network key
+    #[clap(long, parse(try_from_str = x25519::PublicKey::from_encoded_string))]
+    pub(crate) full_node_network_public_key: Option<x25519::PublicKey>,
+}
+
+impl ValidatorNetworkAddressesArgs {
     fn get_network_configs(
         &self,
-        validator_config: &Option<ValidatorConfiguration>,
+        operator_config: &Option<OperatorConfiguration>,
     ) -> CliTypedResult<(
         x25519::PublicKey,
         Option<x25519::PublicKey>,
@@ -236,11 +171,11 @@ impl ValidatorConfigArgs {
         let validator_network_public_key =
             if let Some(public_key) = self.validator_network_public_key {
                 public_key
-            } else if let Some(ref validator_config) = validator_config {
-                validator_config.validator_network_public_key
+            } else if let Some(ref operator_config) = operator_config {
+                operator_config.validator_network_public_key
             } else {
                 return Err(CliError::CommandArgumentError(
-                    "Must provide either --validator-config-file or --validator-network-public-key"
+                    "Must provide either --operator-config-file or --validator-network-public-key"
                         .to_string(),
                 ));
             };
@@ -248,26 +183,26 @@ impl ValidatorConfigArgs {
         let full_node_network_public_key =
             if let Some(public_key) = self.full_node_network_public_key {
                 Some(public_key)
-            } else if let Some(ref validator_config) = validator_config {
-                validator_config.full_node_network_public_key
+            } else if let Some(ref operator_config) = operator_config {
+                operator_config.full_node_network_public_key
             } else {
                 None
             };
 
         let validator_host = if let Some(ref host) = self.validator_host {
             host.clone()
-        } else if let Some(ref validator_config) = validator_config {
-            validator_config.validator_host.clone()
+        } else if let Some(ref operator_config) = operator_config {
+            operator_config.validator_host.clone()
         } else {
             return Err(CliError::CommandArgumentError(
-                "Must provide either --validator-config-file or --validator-host".to_string(),
+                "Must provide either --operator-config-file or --validator-host".to_string(),
             ));
         };
 
         let full_node_host = if let Some(ref host) = self.full_node_host {
             Some(host.clone())
-        } else if let Some(ref validator_config) = validator_config {
-            validator_config.full_node_host.clone()
+        } else if let Some(ref operator_config) = operator_config {
+            operator_config.full_node_host.clone()
         } else {
             None
         };
@@ -279,50 +214,46 @@ impl ValidatorConfigArgs {
             full_node_host,
         ))
     }
-
-    fn read_validator_config(&self) -> CliTypedResult<Option<ValidatorConfiguration>> {
-        if let Some(ref file) = self.validator_config_file {
-            Ok(from_yaml(
-                &String::from_utf8(read_from_file(file)?).map_err(CliError::from)?,
-            )?)
-        } else {
-            Ok(None)
-        }
-    }
 }
 
+/// Register the current account as a validator node operator of it's own owned stake.
+///
+/// Use InitializeStakeOwner whenever stake owner
+/// and validator operator are different accounts.
 #[derive(Parser)]
-/// Register the current account as a Validator candidate
-pub struct RegisterValidatorCandidate {
+pub struct InitializeValidator {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-
     #[clap(flatten)]
-    pub(crate) validator_config_args: ValidatorConfigArgs,
+    pub(crate) operator_config_file_args: OperatorConfigFileArgs,
+    #[clap(flatten)]
+    pub(crate) validator_consensus_key_args: ValidatorConsensusKeyArgs,
+    #[clap(flatten)]
+    pub(crate) validator_network_addresses_args: ValidatorNetworkAddressesArgs,
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for RegisterValidatorCandidate {
+impl CliCommand<Transaction> for InitializeValidator {
     fn command_name(&self) -> &'static str {
-        "RegisterValidatorCandidate"
+        "InitializeValidator"
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
-        let validator_config = self.validator_config_args.read_validator_config()?;
+        let operator_config = self.operator_config_file_args.load()?;
         let consensus_public_key = self
-            .validator_config_args
-            .get_consensus_public_key(&validator_config)?;
+            .validator_consensus_key_args
+            .get_consensus_public_key(&operator_config)?;
         let consensus_proof_of_possession = self
-            .validator_config_args
-            .get_consensus_proof_of_possession(&validator_config)?;
+            .validator_consensus_key_args
+            .get_consensus_proof_of_possession(&operator_config)?;
         let (
             validator_network_public_key,
             full_node_network_public_key,
             validator_host,
             full_node_host,
         ) = self
-            .validator_config_args
-            .get_network_configs(&validator_config)?;
+            .validator_network_addresses_args
+            .get_network_configs(&operator_config)?;
         let validator_network_addresses =
             vec![validator_host.as_network_address(validator_network_public_key)?];
         let full_node_network_addresses =
@@ -352,17 +283,30 @@ impl CliCommand<Transaction> for RegisterValidatorCandidate {
 /// Arguments used for operator of the staking pool
 #[derive(Parser)]
 pub struct OperatorArgs {
-    /// Address of the Staking pool
-    #[clap(long)]
-    pub(crate) pool_address: Option<AccountAddress>,
+    #[clap(flatten)]
+    pub(crate) pool_address_args: OptionalPoolAddressArgs,
 }
 
 impl OperatorArgs {
-    fn address(&self, profile_options: &ProfileOptions) -> CliTypedResult<AccountAddress> {
-        if let Some(address) = self.pool_address {
+    fn address_fallback_to_profile(
+        &self,
+        profile_options: &ProfileOptions,
+    ) -> CliTypedResult<AccountAddress> {
+        if let Some(address) = self.pool_address_args.pool_address {
             Ok(address)
         } else {
             profile_options.account_address()
+        }
+    }
+
+    fn address_fallback_to_txn(
+        &self,
+        transaction_options: &TransactionOptions,
+    ) -> CliTypedResult<AccountAddress> {
+        if let Some(address) = self.pool_address_args.pool_address {
+            Ok(address)
+        } else {
+            transaction_options.sender_address()
         }
     }
 }
@@ -385,7 +329,7 @@ impl CliCommand<Transaction> for JoinValidatorSet {
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         let address = self
             .operator_args
-            .address(&self.txn_options.profile_options)?;
+            .address_fallback_to_txn(&self.txn_options)?;
 
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_join_validator_set(address))
@@ -411,7 +355,7 @@ impl CliCommand<Transaction> for LeaveValidatorSet {
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         let address = self
             .operator_args
-            .address(&self.txn_options.profile_options)?;
+            .address_fallback_to_txn(&self.txn_options)?;
 
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_leave_validator_set(address))
@@ -438,7 +382,9 @@ impl CliCommand<serde_json::Value> for ShowValidatorStake {
 
     async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
         let client = self.rest_options.client(&self.profile_options.profile)?;
-        let address = self.operator_args.address(&self.profile_options)?;
+        let address = self
+            .operator_args
+            .address_fallback_to_profile(&self.profile_options)?;
         let response = client
             .get_resource(address, "0x1::stake::StakePool")
             .await?;
@@ -465,7 +411,9 @@ impl CliCommand<serde_json::Value> for ShowValidatorConfig {
 
     async fn execute(mut self) -> CliTypedResult<serde_json::Value> {
         let client = self.rest_options.client(&self.profile_options.profile)?;
-        let address = self.operator_args.address(&self.profile_options)?;
+        let address = self
+            .operator_args
+            .address_fallback_to_profile(&self.profile_options)?;
         let response = client
             .get_resource(address, "0x1::stake::ValidatorConfig")
             .await?;
@@ -510,23 +458,29 @@ pub struct RunLocalTestnet {
     /// An overridable config template for the test node
     #[clap(long, parse(from_os_str))]
     config_path: Option<PathBuf>,
+
     /// The directory to save all files for the node
     #[clap(long, parse(from_os_str))]
     test_dir: Option<PathBuf>,
+
     /// Random seed for key generation in test mode
     #[clap(long, parse(try_from_str = FromHex::from_hex))]
     seed: Option<[u8; 32]>,
+
     /// Clean the state and start with a new chain at genesis
     #[clap(long)]
     force_restart: bool,
-    #[clap(flatten)]
-    prompt_options: PromptOptions,
+
     /// Run a faucet alongside the node
     #[clap(long)]
     with_faucet: bool,
+
     /// Port to run the faucet on
     #[clap(long, default_value = "8081")]
     faucet_port: u16,
+
+    #[clap(flatten)]
+    prompt_options: PromptOptions,
 }
 
 #[async_trait]
@@ -566,7 +520,7 @@ impl CliCommand<()> for RunLocalTestnet {
                 Some(test_dir_copy),
                 false,
                 false,
-                cached_framework_packages::module_blobs().to_vec(),
+                framework::head_release_bundle(),
                 rng,
             )
             .map_err(|err| CliError::UnexpectedError(format!("Node failed to run {}", err)))
@@ -650,17 +604,58 @@ impl CliCommand<()> for RunLocalTestnet {
     }
 }
 
+/// Update consensus key for the validator node.
+#[derive(Parser)]
+pub struct UpdateConsensusKey {
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+    #[clap(flatten)]
+    pub(crate) operator_args: OperatorArgs,
+    #[clap(flatten)]
+    pub(crate) operator_config_file_args: OperatorConfigFileArgs,
+    #[clap(flatten)]
+    pub(crate) validator_consensus_key_args: ValidatorConsensusKeyArgs,
+}
+
+#[async_trait]
+impl CliCommand<Transaction> for UpdateConsensusKey {
+    fn command_name(&self) -> &'static str {
+        "UpdateConsensusKey"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<Transaction> {
+        let address = self
+            .operator_args
+            .address_fallback_to_txn(&self.txn_options)?;
+
+        let operator_config = self.operator_config_file_args.load()?;
+        let consensus_public_key = self
+            .validator_consensus_key_args
+            .get_consensus_public_key(&operator_config)?;
+        let consensus_proof_of_possession = self
+            .validator_consensus_key_args
+            .get_consensus_proof_of_possession(&operator_config)?;
+        self.txn_options
+            .submit_transaction(aptos_stdlib::stake_rotate_consensus_key(
+                address,
+                consensus_public_key.to_bytes().to_vec(),
+                consensus_proof_of_possession.to_bytes().to_vec(),
+            ))
+            .await
+    }
+}
+
 /// Update the current validator's network and fullnode addresses
 #[derive(Parser)]
 pub struct UpdateValidatorNetworkAddresses {
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-
     #[clap(flatten)]
     pub(crate) operator_args: OperatorArgs,
-
     #[clap(flatten)]
-    pub(crate) validator_config_args: ValidatorConfigArgs,
+    pub(crate) operator_config_file_args: OperatorConfigFileArgs,
+    #[clap(flatten)]
+    pub(crate) validator_network_addresses_args: ValidatorNetworkAddressesArgs,
 }
 
 #[async_trait]
@@ -672,16 +667,16 @@ impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         let address = self
             .operator_args
-            .address(&self.txn_options.profile_options)?;
+            .address_fallback_to_txn(&self.txn_options)?;
 
-        let validator_config = self.validator_config_args.read_validator_config()?;
+        let validator_config = self.operator_config_file_args.load()?;
         let (
             validator_network_public_key,
             full_node_network_public_key,
             validator_host,
             full_node_host,
         ) = self
-            .validator_config_args
+            .validator_network_addresses_args
             .get_network_configs(&validator_config)?;
         let validator_network_addresses =
             vec![validator_host.as_network_address(validator_network_public_key)?];
@@ -705,5 +700,109 @@ impl CliCommand<Transaction> for UpdateValidatorNetworkAddresses {
                 bcs::to_bytes(&full_node_network_addresses)?,
             ))
             .await
+    }
+}
+
+/// Tool to analyze the performance of an individual validator
+#[derive(Parser)]
+pub struct AnalyzeValidatorPerformance {
+    /// First epoch to analyze
+    #[clap(long)]
+    pub start_epoch: Option<u64>,
+
+    /// Last epoch to analyze
+    #[clap(long)]
+    pub end_epoch: Option<u64>,
+
+    /// Analyze mode for the validator: [All, DetailedEpochTable, ValidatorHealthOverTime, NetworkHealthOverTime]
+    #[clap(arg_enum, long)]
+    pub(crate) analyze_mode: AnalyzeMode,
+
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
+}
+
+#[derive(PartialEq, clap::ArgEnum, Clone)]
+pub enum AnalyzeMode {
+    /// Print all other modes simultaneously
+    All,
+    /// For each epoch, print a detailed table containing performance
+    /// of each of the validators.
+    DetailedEpochTable,
+    /// For each validator, summarize it's performance in an epoch into
+    /// one of the predefined reliability buckets,
+    /// and prints it's performance across epochs.
+    ValidatorHealthOverTime,
+    /// For each epoch summarize how many validators were in
+    /// each of the reliability buckets.
+    NetworkHealthOverTime,
+}
+
+#[async_trait]
+impl CliCommand<()> for AnalyzeValidatorPerformance {
+    fn command_name(&self) -> &'static str {
+        "AnalyzeValidatorPerformance"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<()> {
+        let client = self.rest_options.client(&self.profile_options.profile)?;
+
+        let epochs =
+            FetchMetadata::fetch_new_block_events(&client, self.start_epoch, self.end_epoch)
+                .await?;
+        let mut stats = HashMap::new();
+
+        let print_detailed = self.analyze_mode == AnalyzeMode::DetailedEpochTable
+            || self.analyze_mode == AnalyzeMode::All;
+        for epoch_info in epochs {
+            let epoch_stats = AnalyzeValidators::analyze(epoch_info.blocks, &epoch_info.validators);
+            if print_detailed {
+                println!("Detailed table for epoch {}:", epoch_info.epoch);
+                AnalyzeValidators::print_detailed_epoch_table(&epoch_stats, None, true);
+            }
+            stats.insert(epoch_info.epoch, epoch_stats);
+        }
+
+        if stats.is_empty() {
+            println!("No data found for given input");
+            return Ok(());
+        }
+        let total_stats = stats
+            .iter()
+            .map(|(_k, v)| v.clone())
+            .reduce(|a, b| a + b)
+            .unwrap();
+        if print_detailed {
+            println!(
+                "Detailed table for all epochs [{}, {}]:",
+                stats.keys().min().unwrap(),
+                stats.keys().max().unwrap()
+            );
+            AnalyzeValidators::print_detailed_epoch_table(&total_stats, None, true);
+        }
+        let all_validators: Vec<_> = total_stats.validator_stats.keys().cloned().collect();
+        if self.analyze_mode == AnalyzeMode::ValidatorHealthOverTime
+            || self.analyze_mode == AnalyzeMode::All
+        {
+            println!(
+                "Validator health over epochs [{}, {}]:",
+                stats.keys().min().unwrap(),
+                stats.keys().max().unwrap()
+            );
+            AnalyzeValidators::print_validator_health_over_time(&stats, &all_validators, None);
+        }
+        if self.analyze_mode == AnalyzeMode::NetworkHealthOverTime
+            || self.analyze_mode == AnalyzeMode::All
+        {
+            println!(
+                "Network health over epochs [{}, {}]:",
+                stats.keys().min().unwrap(),
+                stats.keys().max().unwrap()
+            );
+            AnalyzeValidators::print_network_health_over_time(&stats, &all_validators);
+        }
+        Ok(())
     }
 }

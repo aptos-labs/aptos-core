@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { Serializer } from "./serializer";
 
 describe("BCS Serializer", () => {

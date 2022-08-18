@@ -14,6 +14,7 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use tokio::runtime::Runtime;
 // TODO going to remove random seed once cluster deployment supports re-run genesis
 use crate::success_criteria::SuccessCriteria;
+use framework::ReleaseBundle;
 use rand::rngs::OsRng;
 
 #[derive(Debug, StructOpt)]
@@ -170,8 +171,8 @@ impl<'cfg> ForgeConfig<'cfg> {
         self
     }
 
-    pub fn with_genesis_modules_bytes(mut self, genesis_modules: Vec<Vec<u8>>) -> Self {
-        self.genesis_config = Some(GenesisConfig::Bytes(genesis_modules));
+    pub fn with_genesis_module_bundle(mut self, bundle: ReleaseBundle) -> Self {
+        self.genesis_config = Some(GenesisConfig::Bundle(bundle));
         self
     }
 
@@ -201,7 +202,7 @@ impl<'cfg> Default for ForgeConfig<'cfg> {
             network_tests: &[],
             initial_validator_count: NonZeroUsize::new(1).unwrap(),
             initial_fullnode_count: 0,
-            initial_version: InitialVersion::Newest,
+            initial_version: InitialVersion::Oldest,
             genesis_config: None,
         }
     }

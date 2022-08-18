@@ -5,20 +5,20 @@
 module aptos_framework::bucket_table {
     use std::error;
     use std::vector;
-    use std::hash::sip_hash;
+    use aptos_std::aptos_hash::sip_hash_from_value;
     use aptos_std::table_with_length::{Self, TableWithLength};
 
     const TARGET_LOAD_PER_BUCKET: u64 = 10;
     const SPLIT_THRESHOLD: u64 = 75;
 
-    /// Not found in the table;
-    const ENOT_FOUND: u64 = 0;
-    /// Capacity should be larger than 0.
-    const EZERO_CAPACITY: u64 = 1;
-    /// Destroy non-empty hashmap.
-    const ENOT_EMPTY: u64 = 2;
+    /// Key not found in the bucket table
+    const ENOT_FOUND: u64 = 1;
+    /// Bucket table capacity must be larger than 0
+    const EZERO_CAPACITY: u64 = 2;
+    /// Cannot destroy non-empty hashmap
+    const ENOT_EMPTY: u64 = 3;
     /// Key already exists
-    const EALREADY_EXIST: u64 = 3;
+    const EALREADY_EXIST: u64 = 4;
 
     /// BucketTable entry contains both the key and value.
     struct Entry<K, V> has store {
@@ -68,7 +68,7 @@ module aptos_framework::bucket_table {
     /// Note it may not split the actual overflowed bucket.
     /// Abort if `key` already exists.
     public fun add<K, V>(map: &mut BucketTable<K, V>, key: K, value: V) {
-        let hash = sip_hash(&key);
+        let hash = sip_hash_from_value(&key);
         let index = bucket_index(map.level, map.num_buckets, hash);
         let bucket = table_with_length::borrow_mut(&mut map.buckets, index);
         let i = 0;
@@ -145,7 +145,7 @@ module aptos_framework::bucket_table {
     /// The requirement of &mut BucketTable is to bypass the borrow checker issue described in https://github.com/move-language/move/issues/95
     /// Once Table supports borrow by K, we can remove the &mut
     public fun borrow<K: copy + drop, V>(map: &mut BucketTable<K, V>, key: K): &V {
-        let index = bucket_index(map.level, map.num_buckets, sip_hash(&key));
+        let index = bucket_index(map.level, map.num_buckets, sip_hash_from_value(&key));
         let bucket = table_with_length::borrow_mut(&mut map.buckets, index);
         let i = 0;
         let len = vector::length(bucket);
@@ -162,7 +162,7 @@ module aptos_framework::bucket_table {
     /// Acquire a mutable reference to the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun borrow_mut<K: copy + drop, V>(map: &mut BucketTable<K, V>, key: K): &mut V {
-        let index = bucket_index(map.level, map.num_buckets, sip_hash(&key));
+        let index = bucket_index(map.level, map.num_buckets, sip_hash_from_value(&key));
         let bucket = table_with_length::borrow_mut(&mut map.buckets, index);
         let i = 0;
         let len = vector::length(bucket);
@@ -178,7 +178,7 @@ module aptos_framework::bucket_table {
 
     /// Returns true iff `table` contains an entry for `key`.
     public fun contains<K, V>(map: &BucketTable<K, V>, key: &K): bool {
-        let index = bucket_index(map.level, map.num_buckets, sip_hash(key));
+        let index = bucket_index(map.level, map.num_buckets, sip_hash_from_value(key));
         let bucket = table_with_length::borrow(&map.buckets, index);
         let i = 0;
         let len = vector::length(bucket);
@@ -195,7 +195,7 @@ module aptos_framework::bucket_table {
     /// Remove from `table` and return the value which `key` maps to.
     /// Aborts if there is no entry for `key`.
     public fun remove<K: drop, V>(map: &mut BucketTable<K,V>, key: &K): V {
-        let index = bucket_index(map.level, map.num_buckets, sip_hash(key));
+        let index = bucket_index(map.level, map.num_buckets, sip_hash_from_value(key));
         let bucket = table_with_length::borrow_mut(&mut map.buckets, index);
         let i = 0;
         let len = vector::length(bucket);

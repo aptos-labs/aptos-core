@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{AptosDB, ChangeSet, EventStore, LedgerPrunerManager, PrunerManager};
-use aptos_config::config::StoragePrunerConfig;
+use aptos_config::config::LedgerPrunerConfig;
 use aptos_proptest_helpers::Index;
 use aptos_temppath::TempPath;
 use aptos_types::transaction::Version;
@@ -58,18 +58,6 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
     let event_store = &aptos_db.event_store;
     let mut cs = ChangeSet::new();
     let num_versions = events.len();
-    let pruner = LedgerPrunerManager::new(
-        Arc::clone(&aptos_db.ledger_db),
-        StoragePrunerConfig {
-            enable_state_store_pruner: true,
-            enable_ledger_pruner: true,
-            state_store_prune_window: 0,
-            ledger_prune_window: 0,
-            ledger_pruning_batch_size: 1,
-            state_store_pruning_batch_size: 100,
-            user_pruning_window_offset: 0,
-        },
-    );
 
     // Write events to DB
     for (version, events_for_version) in events.iter().enumerate() {
@@ -81,6 +69,17 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
 
     // start pruning events batches of size 2 and verify transactions have been pruned from DB
     for i in (0..=num_versions).step_by(2) {
+        // Initialize a pruner in every iteration to test the min_readable_version initialization
+        // logic.
+        let pruner = LedgerPrunerManager::new(
+            Arc::clone(&aptos_db.ledger_db),
+            LedgerPrunerConfig {
+                enable: true,
+                prune_window: 0,
+                batch_size: 1,
+                user_pruning_window_offset: 0,
+            },
+        );
         pruner
             .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();

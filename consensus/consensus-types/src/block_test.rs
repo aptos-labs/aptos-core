@@ -10,6 +10,7 @@ use crate::{
     quorum_cert::QuorumCert,
     vote_data::VoteData,
 };
+use aptos_bitvec::BitVec;
 use aptos_crypto::hash::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
@@ -70,7 +71,7 @@ fn test_nil_block() {
         nil_block_qc.certified_block().id()
     );
     let nil_block_child = Block::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(),
         2,
         aptos_infallible::duration_since_epoch().as_micros() as u64,
         nil_block_qc,
@@ -88,7 +89,7 @@ fn test_block_relation() {
     // Test genesis and the next block
     let genesis_block = Block::make_genesis_block();
     let quorum_cert = certificate_for_genesis();
-    let payload = Payload::new_empty();
+    let payload = Payload::empty();
     let next_block = Block::new_proposal(
         payload.clone(),
         1,
@@ -117,7 +118,7 @@ fn test_same_qc_different_authors() {
     let signer = signers.get(0).unwrap();
     let genesis_qc = certificate_for_genesis();
     let round = 1;
-    let payload = Payload::new_empty();
+    let payload = Payload::empty();
     let current_timestamp = aptos_infallible::duration_since_epoch().as_micros() as u64;
     let block_round_1 = Block::new_proposal(
         payload.clone(),
@@ -164,7 +165,7 @@ fn test_same_qc_different_authors() {
 }
 
 #[test]
-fn test_block_metadata_bitmaps() {
+fn test_block_metadata_bitvec() {
     let num_validators = 4;
     let (signers, validator_verifier) = random_validator_verifier(num_validators, None, true);
     let validator_set = ValidatorSet::from(&validator_verifier);
@@ -176,7 +177,7 @@ fn test_block_metadata_bitmaps() {
         &ledger_info,
         Block::make_genesis_block_from_ledger_info(&ledger_info).id(),
     );
-    let payload = Payload::new_empty();
+    let payload = Payload::empty();
     let start_round = 1;
     let start_timestamp = aptos_infallible::duration_since_epoch().as_micros() as u64;
 
@@ -191,8 +192,8 @@ fn test_block_metadata_bitmaps() {
     let block_metadata_1 = block_1.new_block_metadata(&validators);
     assert_eq!(signers[0].author(), block_metadata_1.proposer());
     assert_eq!(
-        num_validators,
-        block_metadata_1.previous_block_votes().len()
+        BitVec::required_buckets(num_validators as u16),
+        block_metadata_1.previous_block_votes_bitvec().len()
     );
 
     let mut ledger_info_1 =
@@ -227,16 +228,17 @@ fn test_block_metadata_bitmaps() {
     );
     let block_metadata_2 = block_2.new_block_metadata(&validators);
     assert_eq!(signers[1].author(), block_metadata_2.proposer());
-    assert_eq!(&votes_1, block_metadata_2.previous_block_votes());
+    let raw_bytes: Vec<u8> = BitVec::from(votes_1).into();
+    assert_eq!(&raw_bytes, block_metadata_2.previous_block_votes_bitvec());
 }
 
 #[test]
-fn test_nil_block_metadata_bitmaps() {
+fn test_nil_block_metadata_bitvec() {
     let quorum_cert = certificate_for_genesis();
     let nil_block = Block::new_nil(1, quorum_cert, vec![]);
     let nil_block_metadata = nil_block.new_block_metadata(&Vec::new());
     assert_eq!(AccountAddress::ZERO, nil_block_metadata.proposer());
-    assert_eq!(0, nil_block_metadata.previous_block_votes().len());
+    assert_eq!(0, nil_block_metadata.previous_block_votes_bitvec().len());
 }
 
 #[test]
@@ -245,7 +247,7 @@ fn test_failed_authors_well_formed() {
     let other = Author::random();
     // Test genesis and the next block
     let quorum_cert = certificate_for_genesis();
-    let payload = Payload::new_empty();
+    let payload = Payload::empty();
 
     let create_block = |round: Round, failed_authors: Vec<(Round, Author)>| {
         Block::new_proposal(

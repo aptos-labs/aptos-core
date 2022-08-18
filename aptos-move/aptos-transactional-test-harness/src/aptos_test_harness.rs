@@ -12,7 +12,7 @@ use aptos_gas::{InitialGasSchedule, TransactionGasParameters};
 use aptos_state_view::StateView;
 use aptos_types::{
     access_path::AccessPath,
-    account_config::{aptos_root_address, AccountResource, CoinStoreResource},
+    account_config::{aptos_test_root_address, AccountResource, CoinStoreResource},
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::ContractEvent,
@@ -284,8 +284,8 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     let deps = vec![PackagePaths {
         name: None,
-        paths: framework::aptos::files(),
-        named_address_map: framework::aptos::named_addresses(),
+        paths: framework::head_release_bundle().files().unwrap(),
+        named_address_map: framework::named_addresses().clone(),
     }];
     let program_res = move_compiler::construct_pre_compiled_lib(
         deps,
@@ -446,10 +446,13 @@ impl<'a> AptosTestAdapter<'a> {
             Some(max_gas_amount) => max_gas_amount,
             None => {
                 if gas_unit_price == 0 {
-                    max_number_of_gas_units
+                    u64::from(max_number_of_gas_units)
                 } else {
                     let account_balance = self.fetch_account_balance(signer_addr).unwrap();
-                    std::cmp::min(max_number_of_gas_units, account_balance / gas_unit_price)
+                    std::cmp::min(
+                        u64::from(max_number_of_gas_units),
+                        account_balance / gas_unit_price,
+                    )
                 }
             }
         };
@@ -492,11 +495,11 @@ impl<'a> AptosTestAdapter<'a> {
 
     fn create_and_fund_account(&mut self, account_addr: AccountAddress, amount: u64) {
         let parameters = self
-            .fetch_transaction_parameters(&aptos_root_address(), None, None, None, None)
+            .fetch_transaction_parameters(&aptos_test_root_address(), None, None, None, None)
             .unwrap();
 
         let txn = RawTransaction::new(
-            aptos_root_address(),
+            aptos_test_root_address(),
             parameters.sequence_number,
             aptos_transaction_builder::aptos_stdlib::account_create_account(account_addr),
             parameters.max_gas_amount,
@@ -512,7 +515,7 @@ impl<'a> AptosTestAdapter<'a> {
             .expect("Failed to create an account. This should not happen.");
 
         let txn = RawTransaction::new(
-            aptos_root_address(),
+            aptos_test_root_address(),
             parameters.sequence_number + 1,
             aptos_transaction_builder::aptos_stdlib::aptos_coin_mint(account_addr, amount),
             parameters.max_gas_amount,
@@ -557,7 +560,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             None => BTreeMap::new(),
         };
 
-        let mut named_address_mapping = framework::aptos::named_addresses();
+        let mut named_address_mapping = framework::named_addresses().clone();
 
         for (name, addr) in additional_named_address_mapping.clone() {
             if named_address_mapping.contains_key(&name) {

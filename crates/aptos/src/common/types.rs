@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fmt::{Debug, Display, Formatter},
     fs::OpenOptions,
     path::{Path, PathBuf},
@@ -81,8 +81,8 @@ pub enum CliError {
     MoveCompilationError(String),
     #[error("Move unit tests failed")]
     MoveTestError,
-    #[error("Move Prover failed")]
-    MoveProverError,
+    #[error("Move Prover failed: {0}")]
+    MoveProverError(String),
     #[error("Unable to parse '{0}': error: {1}")]
     UnableToParse(&'static str, String),
     #[error("Unable to read file '{0}', error: {1}")]
@@ -103,7 +103,7 @@ impl CliError {
             CliError::IO(_, _) => "IO",
             CliError::MoveCompilationError(_) => "MoveCompilationError",
             CliError::MoveTestError => "MoveTestError",
-            CliError::MoveProverError => "MoveProverError",
+            CliError::MoveProverError(_) => "MoveProverError",
             CliError::UnableToParse(_, _) => "UnableToParse",
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
@@ -170,7 +170,7 @@ impl From<bcs::Error> for CliError {
 pub struct CliConfig {
     /// Map of profile configs
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub profiles: Option<HashMap<String, ProfileConfig>>,
+    pub profiles: Option<BTreeMap<String, ProfileConfig>>,
 }
 
 const CONFIG_FILE: &str = "config.yaml";
@@ -197,10 +197,36 @@ pub struct ProfileConfig {
     pub faucet_url: Option<String>,
 }
 
+/// ProfileConfig but without the private parts
+#[derive(Debug, Serialize)]
+pub struct ProfileSummary {
+    pub has_private_key: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key: Option<Ed25519PublicKey>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<AccountAddress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rest_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub faucet_url: Option<String>,
+}
+
+impl From<&ProfileConfig> for ProfileSummary {
+    fn from(config: &ProfileConfig) -> Self {
+        ProfileSummary {
+            has_private_key: config.private_key.is_some(),
+            public_key: config.public_key.clone(),
+            account: config.account,
+            rest_url: config.rest_url.clone(),
+            faucet_url: config.faucet_url.clone(),
+        }
+    }
+}
+
 impl Default for CliConfig {
     fn default() -> Self {
         CliConfig {
-            profiles: Some(HashMap::new()),
+            profiles: Some(BTreeMap::new()),
         }
     }
 }
@@ -319,14 +345,17 @@ impl FromStr for KeyType {
         match s.to_lowercase().as_str() {
             "ed25519" => Ok(KeyType::Ed25519),
             "x25519" => Ok(KeyType::X25519),
-            _ => Err("Invalid key type"),
+            _ => Err("Invalid key type: Must be one of [ed25519, x25519]"),
         }
     }
 }
 
 #[derive(Debug, Parser)]
 pub struct ProfileOptions {
-    /// Profile to use from config
+    /// Profile to use from the CLI config
+    ///
+    /// This will be used to override associated settings such as
+    /// the REST URL, the Faucet URL, and the private key arguments
     #[clap(long, default_value = "default")]
     pub profile: String,
 }
@@ -414,7 +443,11 @@ impl EncodingType {
 
 #[derive(Clone, Debug, Parser)]
 pub struct RngArgs {
-    /// The seed used for key generation, should be a 64 character hex string and mainly used for testing
+    /// The seed used for key generation, should be a 64 character hex string and only used for testing
+    ///
+    /// If a predictable random seed is used, the key that is produced will be insecure and easy
+    /// to reproduce.  Please do not use this unless sufficient randomness is put into the random
+    /// seed.
     #[clap(long)]
     random_seed: Option<String>,
 }
@@ -494,7 +527,7 @@ impl PromptOptions {
 /// An insertable option for use with encodings.
 #[derive(Debug, Default, Parser)]
 pub struct EncodingOptions {
-    /// Encoding of data as `base64`, `bcs`, or `hex`
+    /// Encoding of data as one of [base64, bcs, hex]
     #[clap(long, default_value_t = EncodingType::Hex)]
     pub encoding: EncodingType,
 }
@@ -548,6 +581,24 @@ impl PrivateKeyInputOptions {
             ),
             private_key_file: None,
         })
+    }
+
+    pub fn from_x25519_private_key(private_key: &x25519::PrivateKey) -> CliTypedResult<Self> {
+        Ok(PrivateKeyInputOptions {
+            private_key: Some(
+                private_key
+                    .to_encoded_string()
+                    .map_err(|err| CliError::UnexpectedError(err.to_string()))?,
+            ),
+            private_key_file: None,
+        })
+    }
+
+    pub fn from_file(file: PathBuf) -> Self {
+        PrivateKeyInputOptions {
+            private_key: None,
+            private_key_file: Some(file),
+        }
     }
 
     /// Extract private key from CLI args with fallback to config
@@ -613,7 +664,10 @@ pub trait ExtractPublicKey {
     ) -> CliTypedResult<x25519::PublicKey> {
         let key = self.extract_public_key(encoding, profile)?;
         x25519::PublicKey::from_ed25519_public_bytes(&key.to_bytes()).map_err(|err| {
-            CliError::UnexpectedError(format!("Failed to convert ed25519 to x25519 {:?}", err))
+            CliError::UnexpectedError(format!(
+                "Failed to convert ed25519 key to x25519 key {:?}",
+                err
+            ))
         })
     }
 }
@@ -658,8 +712,8 @@ impl SaveFile {
 pub struct RestOptions {
     /// URL to a fullnode on the network
     ///
-    /// Defaults to <https://fullnode.devnet.aptoslabs.com>
-    #[clap(long, parse(try_from_str))]
+    /// Defaults to <https://fullnode.devnet.aptoslabs.com/v1>
+    #[clap(long)]
     url: Option<reqwest::Url>,
 }
 
@@ -764,8 +818,7 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
         Ok(account_address_from_public_key(&public_key))
     } else {
         Err(CliError::CommandArgumentError(
-            "'--account-address' or '--profile' after using aptos init must be provided"
-                .to_string(),
+            "'--account' or '--profile' after using aptos init must be provided".to_string(),
         ))
     }
 }
@@ -805,7 +858,7 @@ pub fn load_manifest_account_arg(str: &str) -> Result<Option<AccountAddress>, Cl
         Ok(Some(account_address_from_public_key(&public_key)))
     } else {
         Err(CliError::CommandArgumentError(
-            "Invalid manifest account address".to_string(),
+            "Invalid Move manifest account address".to_string(),
         ))
     }
 }
@@ -942,7 +995,7 @@ pub struct ChangeSummary {
 
 #[derive(Debug, Default, Parser)]
 pub struct FaucetOptions {
-    /// URL for the faucet
+    /// URL for the faucet endpoint e.g. https://faucet.devnet.aptoslabs.com
     #[clap(long)]
     faucet_url: Option<reqwest::Url>,
 }
@@ -976,14 +1029,24 @@ pub const DEFAULT_GAS_UNIT_PRICE: u64 = 1;
 /// Gas price options for manipulating how to prioritize transactions
 #[derive(Debug, Eq, Parser, PartialEq)]
 pub struct GasOptions {
-    /// Amount to increase gas bid by for a transaction
+    /// Gas multiplier per unit of gas
     ///
-    /// Defaults to 1 coin per gas unit
+    /// The amount of coins used for a transaction is equal
+    /// to (gas unit price * gas used).  The gas_unit_price can
+    /// be used as a multiplier for the amount of coins willing
+    /// to be paid for a transaction.  This will prioritize the
+    /// transaction with a higher gas unit price.
     #[clap(long, default_value_t = DEFAULT_GAS_UNIT_PRICE)]
     pub gas_unit_price: u64,
-    /// Maximum gas to be used to send a transaction
+    /// Maximum amount of gas units to be used to send this transaction
     ///
-    /// Defaults to 1000 gas units
+    /// The maximum amount of gas units willing to pay for the transaction.
+    /// This is the (max gas in coins / gas unit price).
+    ///
+    /// For example if I wanted to pay a maximum of 100 coins, I may have the
+    /// max gas set to 100 if the gas unit price is 1.  If I want it to have a
+    /// gas unit price of 2, the max gas would need to be 50 to still only have
+    /// a maximum price of 100 coins.
     #[clap(long, default_value_t = DEFAULT_MAX_GAS)]
     pub max_gas: u64,
 }
@@ -1026,6 +1089,11 @@ impl TransactionOptions {
         self.rest_options.client(&self.profile_options.profile)
     }
 
+    pub fn sender_address(&self) -> CliTypedResult<AccountAddress> {
+        let sender_key = self.private_key()?;
+        Ok(account_address_from_public_key(&sender_key.public_key()))
+    }
+
     /// Submits a script function based on module name and function inputs
     pub async fn submit_script_function(
         &self,
@@ -1053,8 +1121,7 @@ impl TransactionOptions {
         let client = self.rest_client()?;
 
         // Get sender address
-        let sender_address = AuthenticationKey::ed25519(&sender_key.public_key()).derived_address();
-        let sender_address = AccountAddress::new(*sender_address);
+        let sender_address = self.sender_address()?;
 
         // Get sequence number for account
         let sequence_number = get_sequence_number(&client, sender_address).await?;
@@ -1073,4 +1140,18 @@ impl TransactionOptions {
 
         Ok(response.into_inner())
     }
+}
+
+#[derive(Parser)]
+pub struct OptionalPoolAddressArgs {
+    /// Address of the Staking pool
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) pool_address: Option<AccountAddress>,
+}
+
+#[derive(Parser)]
+pub struct PoolAddressArgs {
+    /// Address of the Staking pool
+    #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
+    pub(crate) pool_address: AccountAddress,
 }

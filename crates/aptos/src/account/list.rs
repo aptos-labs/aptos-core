@@ -44,24 +44,22 @@ impl FromStr for ListQuery {
     }
 }
 
-/// Command to list items owned by an address
+/// Command to list resources, modules, or other items owned by an address
 ///
 #[derive(Debug, Parser)]
 pub struct ListAccount {
-    #[clap(flatten)]
-    pub(crate) rest_options: RestOptions,
-
-    #[clap(flatten)]
-    pub(crate) profile_options: ProfileOptions,
-
-    /// Address of account you want to list resources/modules for
+    /// Address of the account you want to list resources/modules for
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: Option<AccountAddress>,
 
-    /// Type of items to list: resources, modules. (Defaults to 'resources').
-    /// TODO: add options like --tokens --nfts etc
+    /// Type of items to list: [balance, resources, modules]
     #[clap(long, default_value_t = ListQuery::Resources)]
     pub(crate) query: ListQuery,
+
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
 }
 
 #[async_trait]
@@ -118,7 +116,11 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
                 .map_err(map_err_func)?
                 .into_inner()
                 .iter()
-                .map(|json| json.data.clone())
+                .map(|resource| {
+                    let mut map = serde_json::Map::new();
+                    map.insert(resource.resource_type.to_string(), resource.data.clone());
+                    serde_json::Value::Object(map)
+                })
                 .collect::<Vec<serde_json::Value>>(),
         };
 

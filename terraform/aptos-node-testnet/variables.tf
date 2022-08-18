@@ -125,6 +125,16 @@ variable "testnet_addons_helm_values" {
   default     = {}
 }
 
+variable "enable_node_health_checker" {
+  description = "Enable node-health-checker"
+  default     = false
+}
+
+variable "node_health_checker_helm_values" {
+  description = "Map of values to pass to node-health-checker helm chart"
+  type        = any
+  default     = {}
+}
 
 ### EKS nodegroups
 

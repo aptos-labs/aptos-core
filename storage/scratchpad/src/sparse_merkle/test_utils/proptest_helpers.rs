@@ -15,7 +15,7 @@ use proptest::{
 };
 use std::{collections::VecDeque, sync::Arc};
 
-type TxnOutput = Vec<(HashValue, StateValue)>;
+type TxnOutput = Vec<(HashValue, Option<StateValue>)>;
 type BlockOutput = Vec<TxnOutput>;
 
 #[derive(Debug)]
@@ -33,14 +33,14 @@ pub fn arb_smt_correctness_case() -> impl Strategy<Value = Vec<Action>> {
                     // txns
                     vec(
                         // txn updates
-                        (any::<Index>(), any::<Vec<u8>>()),
-                        1..4,
+                        (any::<Index>(), any::<Option<Vec<u8>>>()),
+                        1..20,
                     ),
                     1..10,
                 ),
                 Just(vec![]),
             ],
-            1..10,
+            1..20,
         ),
     )
         .prop_map(|(keys, commit_or_execute)| {
@@ -56,7 +56,10 @@ pub fn arb_smt_correctness_case() -> impl Strategy<Value = Vec<Action>> {
                                 .map(|updates| {
                                     updates
                                         .into_iter()
-                                        .map(|(k_idx, v)| (*k_idx.get(&keys), v.to_vec().into()))
+                                        .map(|(k_idx, v)| {
+                                            let key = *k_idx.get(&keys);
+                                            (key, v.map(|v| v.into()))
+                                        })
                                         .collect()
                                 })
                                 .collect::<Vec<_>>(),
@@ -84,9 +87,14 @@ pub fn test_smt_correctness_impl(input: Vec<Action>) {
             Action::Execute(block) => {
                 let updates = block
                     .iter()
-                    .map(|txn_updates| txn_updates.iter().map(|(k, v)| (*k, v)).collect())
-                    .collect::<Vec<Vec<_>>>();
-                let updates_flat_batch = updates.iter().flatten().cloned().collect::<Vec<_>>();
+                    .map(|txn_updates| {
+                        txn_updates
+                            .iter()
+                            .map(|(k, v)| (*k, v.as_ref()))
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                let updates_flat_batch = updates.into_iter().flatten().collect::<Vec<_>>();
 
                 let committed = naive_q.front_mut().unwrap();
                 let proofs = updates_flat_batch

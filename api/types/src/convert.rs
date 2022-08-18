@@ -156,7 +156,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     ) -> Result<TransactionPayload> {
         use aptos_types::transaction::TransactionPayload::*;
         let ret = match payload {
-            WriteSet(v) => TransactionPayload::WriteSetPayload(self.try_into_write_set_payload(v)?),
             Script(s) => TransactionPayload::ScriptPayload(s.try_into()?),
             ModuleBundle(modules) => TransactionPayload::ModuleBundlePayload(ModuleBundlePayload {
                 modules: modules
@@ -262,7 +261,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     resource: typ.into(),
                 }),
             },
-            WriteOp::Value(val) => match access_path.get_path() {
+            WriteOp::Modification(val) | WriteOp::Creation(val) => match access_path.get_path() {
                 Path::Code(_) => WriteSetChange::WriteModule(WriteModule {
                     address: access_path.address.into(),
                     state_key_hash,
@@ -298,7 +297,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     data,
                 })
             }
-            WriteOp::Value(value) => {
+            WriteOp::Modification(value) | WriteOp::Creation(value) => {
                 let data =
                     self.try_write_table_item_into_decoded_table_data(handle, &key.0, &value)?;
 
@@ -531,11 +530,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     }
                     None => return Err(anyhow::anyhow!("invalid transaction script bytecode")),
                 }
-            }
-            TransactionPayload::WriteSetPayload(_) => {
-                return Err(anyhow::anyhow!(
-                    "write set transaction payload is not supported yet",
-                ))
             }
         };
         Ok(ret)

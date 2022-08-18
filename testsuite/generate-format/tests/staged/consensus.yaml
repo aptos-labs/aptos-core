@@ -25,6 +25,9 @@ AccountAuthenticator:
               TYPENAME: MultiEd25519PublicKey
           - signature:
               TYPENAME: MultiEd25519Signature
+BitVec:
+  STRUCT:
+    - inner: BYTES
 Block:
   STRUCT:
     - block_data:
@@ -64,8 +67,7 @@ BlockMetadata:
         TYPENAME: AccountAddress
     - proposer_index:
         OPTION: U32
-    - previous_block_votes:
-        SEQ: BOOL
+    - previous_block_votes_bitvec: BYTES
     - failed_proposer_indices:
         SEQ: U32
     - timestamp_usecs: U64
@@ -258,7 +260,7 @@ MultiEd25519Signature:
 MultiSignature:
   STRUCT:
     - validator_bitmask:
-        SEQ: BOOL
+        TYPENAME: BitVec
     - multi_sig:
         OPTION:
           TYPENAME: Signature
@@ -440,18 +442,14 @@ TransactionAuthenticator:
 TransactionPayload:
   ENUM:
     0:
-      WriteSet:
-        NEWTYPE:
-          TYPENAME: WriteSetPayload
-    1:
       Script:
         NEWTYPE:
           TYPENAME: Script
-    2:
+    1:
       ModuleBundle:
         NEWTYPE:
           TYPENAME: ModuleBundle
-    3:
+    2:
       ScriptFunction:
         NEWTYPE:
           TYPENAME: ScriptFunction
@@ -537,10 +535,13 @@ VoteMsg:
 WriteOp:
   ENUM:
     0:
-      Deletion: UNIT
-    1:
-      Value:
+      Creation:
         NEWTYPE: BYTES
+    1:
+      Modification:
+        NEWTYPE: BYTES
+    2:
+      Deletion: UNIT
 WriteSet:
   NEWTYPESTRUCT:
     TYPENAME: WriteSetMut

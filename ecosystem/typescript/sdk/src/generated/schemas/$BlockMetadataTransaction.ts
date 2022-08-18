@@ -61,10 +61,11 @@ export const $BlockMetadataTransaction = {
             },
             isRequired: true,
         },
-        previous_block_votes: {
+        previous_block_votes_bitvec: {
             type: 'array',
             contains: {
-                type: 'boolean',
+                type: 'number',
+                format: 'uint8',
             },
             isRequired: true,
         },

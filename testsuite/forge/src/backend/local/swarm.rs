@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::interface::system_metrics::SystemMetricsThreshold;
 use crate::{
     ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, Swarm, SwarmChaos,
     SwarmExt, Validator, Version,
@@ -18,6 +19,7 @@ use aptos_sdk::{
         PeerId,
     },
 };
+use framework::ReleaseBundle;
 use prometheus_http_query::response::PromqlResult;
 use std::{
     collections::HashMap,
@@ -102,7 +104,7 @@ impl LocalSwarm {
         init_config: Option<InitConfigFn>,
         init_genesis_config: Option<InitGenesisConfigFn>,
         dir: Option<PathBuf>,
-        genesis_modules: Option<Vec<Vec<u8>>>,
+        genesis_framework: Option<ReleaseBundle>,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
@@ -121,8 +123,7 @@ impl LocalSwarm {
         let (root_key, genesis, genesis_waypoint, validators) =
             aptos_genesis::builder::Builder::new(
                 &dir_actual,
-                genesis_modules
-                    .unwrap_or_else(|| cached_framework_packages::module_blobs().to_vec()),
+                genesis_framework.unwrap_or_else(|| framework::head_release_bundle().clone()),
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(
@@ -161,7 +162,8 @@ impl LocalSwarm {
         let mut validators = validators
             .into_iter()
             .map(|v| {
-                let node = LocalNode::new(version.to_owned(), v.name, v.dir)?;
+                let node =
+                    LocalNode::new(version.to_owned(), v.name, v.dir, v.account_private_key)?;
                 Ok((node.peer_id(), node))
             })
             .collect::<Result<HashMap<_, _>>>()?;
@@ -194,7 +196,7 @@ impl LocalSwarm {
             .collect::<Result<HashMap<_, _>>>()?;
         let root_key = ConfigKey::new(root_key);
         let root_account = LocalAccount::new(
-            aptos_sdk::types::account_config::aptos_root_address(),
+            aptos_sdk::types::account_config::aptos_test_root_address(),
             AccountKey::from_private_key(root_key.private_key()),
             0,
         );
@@ -322,6 +324,7 @@ impl LocalSwarm {
             version.to_owned(),
             fullnode_config.name,
             fullnode_config.dir,
+            None,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -349,6 +352,7 @@ impl LocalSwarm {
             version.to_owned(),
             fullnode_config.name,
             fullnode_config.dir,
+            None,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -376,11 +380,16 @@ impl LocalSwarm {
     }
 
     pub fn validators(&self) -> impl Iterator<Item = &LocalNode> {
-        self.validators.values()
+        // sort by id to keep the order stable:
+        let mut validators: Vec<&LocalNode> = self.validators.values().collect();
+        validators.sort_by_key(|v| v.name().parse::<i32>().unwrap());
+        validators.into_iter()
     }
 
     pub fn validators_mut(&mut self) -> impl Iterator<Item = &mut LocalNode> {
-        self.validators.values_mut()
+        let mut validators: Vec<&mut LocalNode> = self.validators.values_mut().collect();
+        validators.sort_by_key(|v| v.name().parse::<i32>().unwrap());
+        validators.into_iter()
     }
 
     pub fn fullnode(&self, peer_id: PeerId) -> Option<&LocalNode> {
@@ -433,7 +442,7 @@ impl Swarm for LocalSwarm {
             .map(|v| v as &mut dyn Validator)
     }
 
-    fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
+    async fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
         let version = self
             .versions
             .get(version)
@@ -538,6 +547,15 @@ impl Swarm for LocalSwarm {
         _time: Option<i64>,
         _timeout: Option<i64>,
     ) -> Result<PromqlResult> {
+        todo!()
+    }
+
+    async fn ensure_healthy_system_metrics(
+        &mut self,
+        _start_time: i64,
+        _end_time: i64,
+        _threshold: SystemMetricsThreshold,
+    ) -> Result<()> {
         todo!()
     }
 }

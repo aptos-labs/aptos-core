@@ -8,7 +8,7 @@
 # NodeUpgradeNotification.with(network_operation: @network_operation).deliver_later(current_user)
 # NodeUpgradeNotification.with(network_operation: @network_operation).deliver(current_user)
 
-class NodeUpgradeNotification < Noticed::Base
+class NodeUpgradeNotification < BaseNotification
   # Add your delivery methods
   #
   deliver_by :database

@@ -37,7 +37,9 @@ data "aws_iam_policy_document" "alb-ingress" {
       "ec2:DeleteTags",
       "ec2:DeleteSecurityGroup",
       "ec2:DescribeAccountAttributes",
+      # https://github.com/kubernetes-sigs/aws-load-balancer-controller/issues/2525
       "ec2:DescribeAddresses",
+      "ec2:DescribeAvailabilityZones",
       "ec2:DescribeInstances",
       "ec2:DescribeInstanceStatus",
       "ec2:DescribeInternetGateways",

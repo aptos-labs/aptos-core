@@ -52,12 +52,36 @@ resource "helm_release" "fullnode" {
       }
       nodeSelector = {
         "cloud.google.com/gke-nodepool" = "fullnodes"
+        "iam.gke.io/gke-metadata-server-enabled" = "true"
       }
       storage = {
         class = kubernetes_storage_class.ssd.metadata[0].name
       }
       service = {
         type = "LoadBalancer"
+      }
+      backup = {
+        # only enable backup for fullnode 0
+        enable = count.index == 0 ? var.enable_backup : false
+        config = {
+          location = "gcs"
+          gcs = {
+            bucket = google_storage_bucket.backup.name
+          }
+        }
+      }
+      restore = {
+        config = {
+          location = "gcs"
+          gcs = {
+            bucket = google_storage_bucket.backup.name
+          }
+        }
+      }
+      serviceAccount = {
+        annotations = {
+          "iam.gke.io/gcp-service-account" = google_service_account.backup.email
+        }
       }
     }),
     jsonencode(var.fullnode_helm_values),

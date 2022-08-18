@@ -7,7 +7,7 @@ use aptos_gas::NativeGasParameters;
 use aptos_state_view::StateView;
 use aptos_types::{
     account_address::AccountAddress,
-    account_config::{self, aptos_root_address},
+    account_config::{self, aptos_test_root_address},
     transaction::{ChangeSet, Script, Version},
 };
 use aptos_vm::{
@@ -78,7 +78,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
             "Reconfiguration",
             "disable_reconfiguration",
             vec![],
-            serialize_values(&vec![MoveValue::Signer(aptos_root_address())]),
+            serialize_values(&vec![MoveValue::Signer(aptos_test_root_address())]),
         )
     }
 
@@ -87,7 +87,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
             "Reconfiguration",
             "enable_reconfiguration",
             vec![],
-            serialize_values(&vec![MoveValue::Signer(aptos_root_address())]),
+            serialize_values(&vec![MoveValue::Signer(aptos_test_root_address())]),
         )
     }
     pub fn set_aptos_version(&mut self, version: Version) {
@@ -96,7 +96,7 @@ impl<'r, 'l, S: MoveResolverExt> GenesisSession<'r, 'l, S> {
             "set_version",
             vec![],
             serialize_values(&vec![
-                MoveValue::Signer(aptos_root_address()),
+                MoveValue::Signer(aptos_test_root_address()),
                 MoveValue::U64(version),
             ]),
         )

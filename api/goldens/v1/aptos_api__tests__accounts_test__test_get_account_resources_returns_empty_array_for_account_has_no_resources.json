@@ -2,7 +2,7 @@
   {
     "type": "0x1::coin::CoinInfo<0x1::aptos_coin::AptosCoin>",
     "data": {
-      "decimals": "8",
+      "decimals": 8,
       "name": "Aptos Coin",
       "supply": {
         "vec": []
@@ -49,7 +49,9 @@
       ],
       "consensus_scheme": 0,
       "pending_active": [],
-      "pending_inactive": []
+      "pending_inactive": [],
+      "total_joining_power": "0",
+      "total_voting_power": "1"
     }
   },
   {
@@ -131,7 +133,17 @@
           }
         }
       },
-      "sequence_number": "0"
+      "rotation_capability_offer": {
+        "for": {
+          "vec": []
+        }
+      },
+      "sequence_number": "0",
+      "signer_capability_offer": {
+        "for": {
+          "vec": []
+        }
+      }
     }
   },
   {
@@ -163,14 +175,6 @@
     "type": "0x1::timestamp::CurrentTimeMicroseconds",
     "data": {
       "microseconds": "0"
-    }
-  },
-  {
-    "type": "0x1::aptos_coin::Capabilities",
-    "data": {
-      "mint_cap": {
-        "dummy_field": false
-      }
     }
   },
   {
@@ -591,7 +595,7 @@
         },
         {
           "key": "txn.max_transaction_size_in_bytes",
-          "val": "8192"
+          "val": "6291456"
         },
         {
           "key": "txn.gas_unit_scaling_factor",
@@ -674,7 +678,51 @@
           "val": "1"
         },
         {
-          "key": "aptos_framework.signature.bls12381_validate_pubkey.base",
+          "key": "aptos_framework.bls12381.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bls12381.per_pubkey_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bls12381.per_pubkey_aggregate",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bls12381.per_pubkey_subgroup_check_cost",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bls12381.per_sig_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bls12381.per_sig_aggregate",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bls12381.per_sig_subgroup_check",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bls12381.per_sig_verify",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bls12381.per_pop_verify",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bls12381.per_pairing",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bls12381.per_msg_hashing",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bls12381.per_byte_hashing",
           "val": "1"
         },
         {
@@ -682,35 +730,39 @@
           "val": "1"
         },
         {
+          "key": "aptos_framework.signature.ed25519_validate_pubkey.per_pubkey_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.ed25519_validate_pubkey.per_pubkey_small_order_check",
+          "val": "1"
+        },
+        {
           "key": "aptos_framework.signature.ed25519_verify.base",
           "val": "1"
         },
         {
-          "key": "aptos_framework.signature.ed25519_verify.unit",
+          "key": "aptos_framework.signature.ed25519_verify.per_pubkey_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.ed25519_verify.per_sig_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.ed25519_verify.per_sig_strict_verify",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.ed25519_verify.per_msg_hashing_base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.ed25519_verify.per_msg_byte_hashing",
           "val": "1"
         },
         {
           "key": "aptos_framework.signature.secp256k1_ecdsa_recover.base",
-          "val": "1"
-        },
-        {
-          "key": "aptos_framework.signature.bls12381_verify_signature.base",
-          "val": "1"
-        },
-        {
-          "key": "aptos_framework.signature.bls12381_verify_signature.unit",
-          "val": "1"
-        },
-        {
-          "key": "aptos_framework.signature.bls12381_aggregate_pop_verified_pubkeys.base",
-          "val": "1"
-        },
-        {
-          "key": "aptos_framework.signature.bls12381_aggregate_pop_verified_pubkeys.per_pubkey",
-          "val": "1"
-        },
-        {
-          "key": "aptos_framework.signature.bls12381_verify_proof_of_possession.base",
           "val": "1"
         },
         {
@@ -772,7 +824,8 @@
       "minimum_stake": "0",
       "recurring_lockup_duration_secs": "86400",
       "rewards_rate": "273972",
-      "rewards_rate_denominator": "1000000000"
+      "rewards_rate_denominator": "1000000000",
+      "voting_power_increase_limit": "50"
     }
   },
   {

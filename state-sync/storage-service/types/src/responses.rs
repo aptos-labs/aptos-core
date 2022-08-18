@@ -23,6 +23,11 @@ use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use thiserror::Error;
 
+/// The version delta we'll tolerate when considering if a peer is eligible
+/// to handle an optimistic fetch for new data. This value is set assuming
+/// 5k TPS for a 5 second delay, which should be more than enough.
+pub const OPTIMISTIC_FETCH_VERSION_DELTA: u64 = 25000;
+
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
 pub enum Error {
     #[error("Data range cannot be degenerate!")]
@@ -393,10 +398,7 @@ impl DataSummary {
     /// Returns true iff the request can be serviced
     pub fn can_service(&self, request: &StorageServiceRequest) -> bool {
         match &request.data_request {
-            GetNewTransactionsWithProof(_)
-            | GetNewTransactionOutputsWithProof(_)
-            | GetServerProtocolVersion
-            | GetStorageServerSummary => true,
+            GetServerProtocolVersion | GetStorageServerSummary => true,
             GetEpochEndingLedgerInfos(request) => {
                 let desired_range =
                     match CompleteDataRange::new(request.start_epoch, request.expected_end_epoch) {
@@ -406,6 +408,12 @@ impl DataSummary {
                 self.epoch_ending_ledger_infos
                     .map(|range| range.superset_of(&desired_range))
                     .unwrap_or(false)
+            }
+            GetNewTransactionOutputsWithProof(request) => {
+                self.can_service_optimistic_request(request.known_version)
+            }
+            GetNewTransactionsWithProof(request) => {
+                self.can_service_optimistic_request(request.known_version)
             }
             GetNumberOfStatesAtVersion(version) => self
                 .states
@@ -468,6 +476,14 @@ impl DataSummary {
                 can_serve_txns && can_create_proof
             }
         }
+    }
+
+    /// Returns true iff the optimistic data request can be serviced
+    fn can_service_optimistic_request(&self, known_version: u64) -> bool {
+        self.synced_ledger_info
+            .as_ref()
+            .map(|li| (li.ledger_info().version() + OPTIMISTIC_FETCH_VERSION_DELTA) > known_version)
+            .unwrap_or(false)
     }
 }
 

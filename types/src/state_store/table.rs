@@ -10,6 +10,12 @@ use std::str::FromStr;
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub struct TableHandle(pub u128);
 
+impl TableHandle {
+    pub fn size(&self) -> usize {
+        std::mem::size_of_val(&self.0)
+    }
+}
+
 impl FromStr for TableHandle {
     type Err = ParseIntError;
 

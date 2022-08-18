@@ -66,12 +66,6 @@ impl From<u64> for U64 {
     }
 }
 
-impl From<U64> for warp::http::header::HeaderValue {
-    fn from(d: U64) -> Self {
-        d.0.into()
-    }
-}
-
 impl From<U64> for u64 {
     fn from(d: U64) -> Self {
         d.0

@@ -19,8 +19,8 @@ mod tests {
     use aptos_keygen::KeyGen;
     use aptos_rest_client::{
         aptos_api_types::{
-            AccountData, DirectWriteSet, LedgerInfo, PendingTransaction, Response,
-            TransactionPayload as TransactionPayloadData, WriteSet, WriteSetPayload,
+            AccountData, LedgerInfo, ModuleBundlePayload, PendingTransaction,
+            TransactionPayload as TransactionPayloadData,
         },
         FaucetClient,
     };
@@ -36,6 +36,7 @@ mod tests {
             LocalAccount,
         },
     };
+    use aptos_warp_webserver::Response;
     use serde::Serialize;
     use std::{
         collections::HashMap,
@@ -92,7 +93,7 @@ mod tests {
         let stub = warp::path!("accounts" / String)
             .and(warp::any().map(move || accounts_cloned_0.clone()))
             .and_then(handle_get_account)
-            .or(warp::path!("transactions" / String)
+            .or(warp::path!("transactions" / "by_hash" / String)
                 .and(warp::get())
                 .and(warp::any().map(move || last_txn_0.clone()))
                 .and_then(handle_get_transaction))
@@ -116,7 +117,8 @@ mod tests {
             chain_id,
             faucet_account,
             maximum_amount,
-        );
+        )
+        .configure_for_testing();
         (accounts, Arc::new(service))
     }
 
@@ -235,12 +237,7 @@ mod tests {
     }
 
     fn dummy_payload() -> TransactionPayloadData {
-        TransactionPayloadData::WriteSetPayload(WriteSetPayload {
-            write_set: WriteSet::DirectWriteSet(DirectWriteSet {
-                changes: Vec::new(),
-                events: Vec::new(),
-            }),
-        })
+        TransactionPayloadData::ModuleBundlePayload(ModuleBundlePayload { modules: vec![] })
     }
 
     #[derive(Clone, Debug, Serialize, PartialEq)]
@@ -480,29 +477,15 @@ mod tests {
     async fn create_account_with_client() {
         let (faucet_client, _service) = get_client().await;
         let address = get_address();
-
-        let res = tokio::task::spawn_blocking(move || faucet_client.create_account(address))
-            .await
-            .unwrap();
-        res.unwrap();
+        faucet_client.create_account(address).await.unwrap();
     }
 
     #[tokio::test]
     async fn fund_account_with_client() {
         let (faucet_client, _service) = get_client().await;
         let address = get_address();
-
-        let (res1, res2) = tokio::task::spawn_blocking(move || {
-            (
-                faucet_client.create_account(address),
-                faucet_client.fund(address, 10),
-            )
-        })
-        .await
-        .unwrap();
-
-        res1.unwrap();
-        res2.unwrap();
+        faucet_client.create_account(address).await.unwrap();
+        faucet_client.fund(address, 10).await.unwrap();
     }
 
     async fn get_client() -> (FaucetClient, JoinHandle<()>) {
@@ -511,7 +494,7 @@ mod tests {
         let (address, future) = warp::serve(routes(service)).bind_ephemeral(([127, 0, 0, 1], 0));
         let service = tokio::task::spawn(async move { future.await });
 
-        let faucet_client = FaucetClient::new(
+        let faucet_client = FaucetClient::new_for_testing(
             Url::parse(&format!("http://{}", address)).unwrap(),
             endpoint,
         );

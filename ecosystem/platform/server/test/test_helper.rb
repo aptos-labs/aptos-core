@@ -18,3 +18,23 @@ module ActiveSupport
     # Add more helper methods to be used by all tests here...
   end
 end
+
+module RemoveUploadedFiles
+  def after_teardown
+    super
+    remove_uploaded_files
+  end
+
+  private
+
+  def remove_uploaded_files
+    # Keeps the tmp/storage directory and any dotfiles inside it.
+    FileUtils.rm_rf(Dir[Rails.root.join('tmp', 'storage', '*')])
+  end
+end
+
+module ActionDispatch
+  class IntegrationTest
+    prepend RemoveUploadedFiles
+  end
+end

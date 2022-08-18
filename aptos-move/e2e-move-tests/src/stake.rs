@@ -8,15 +8,19 @@ use aptos_types::{
     on_chain_config::ValidatorSet, stake_pool::StakePool, transaction::TransactionStatus,
     validator_config::ValidatorConfig,
 };
-use cached_framework_packages::aptos_stdlib;
+use framework::aptos_stdlib;
 use language_e2e_tests::account::Account;
 use move_deps::move_core_types::parser::parse_struct_tag;
 
-pub fn setup_staking(harness: &mut MoveHarness, account: &Account, initial_stake_amount: u64) {
+pub fn setup_staking(
+    harness: &mut MoveHarness,
+    account: &Account,
+    initial_stake_amount: u64,
+) -> TransactionStatus {
     let address = *account.address();
     initialize_staking(harness, account, initial_stake_amount, address, address);
     rotate_consensus_key(harness, account, address);
-    join_validator_set(harness, account, address);
+    join_validator_set(harness, account, address)
 }
 
 pub fn initialize_staking(

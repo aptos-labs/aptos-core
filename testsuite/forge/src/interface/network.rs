@@ -1,10 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use std::time::Duration;
+
 use super::Test;
 use crate::success_criteria::SuccessCriteria;
 use crate::{CoreContext, Result, Swarm, TestReport};
-use transaction_emitter_lib::EmitJobRequest;
+use transaction_emitter_lib::{EmitJobRequest, TxnStats};
 
 /// The testing interface which defines a test written with full control over an existing network.
 /// Tests written against this interface will have access to both the Root account as well as the
@@ -46,7 +48,8 @@ impl<'t> NetworkContext<'t> {
     pub fn core(&mut self) -> &mut CoreContext {
         &mut self.core
     }
-    pub fn success_criteria(&self) -> &SuccessCriteria {
-        &self.success_criteria
+    pub fn check_for_success(&self, stats: &TxnStats, window: &Duration) -> Result<()> {
+        self.success_criteria
+            .check_for_success(stats, window, self.swarm)
     }
 }

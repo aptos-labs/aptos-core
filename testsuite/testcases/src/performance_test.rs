@@ -35,12 +35,11 @@ impl NetworkTest for PerformanceBenchmark {
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
         // ensure we meet the success criteria
-        ctx.success_criteria()
-            .check_for_success(&txn_stat, &duration)?;
+        ctx.check_for_success(&txn_stat, &duration)?;
 
         let runtime = Runtime::new().unwrap();
 
-        runtime.block_on(ctx.swarm().ensure_no_fullnode_restart())?;
+        runtime.block_on(ctx.swarm().ensure_no_validator_restart())?;
         runtime.block_on(ctx.swarm().ensure_no_fullnode_restart())?;
 
         Ok(())

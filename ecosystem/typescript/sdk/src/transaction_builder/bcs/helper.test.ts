@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { AccountAddress } from "../aptos_types";
 import { Deserializer } from "./deserializer";
 import {
