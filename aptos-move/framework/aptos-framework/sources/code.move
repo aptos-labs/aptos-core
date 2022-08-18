@@ -53,17 +53,16 @@ module aptos_framework::code {
         policy: u8
     }
 
-    /// A package is attempted to publish with module names clashing with modules published by other packages on this
-    /// address.
+    /// Package contains duplicate module names with existing modules publised in other packages on this address
     const EMODULE_NAME_CLASH: u64 = 0x1;
 
-    /// A package is attempted to upgrade which is marked as immutable.
+    /// Cannot upgrade an immutable package
     const EUPGRADE_IMMUTABLE: u64 = 0x2;
 
-    /// A package is attempted to upgrade with a weaker policy than previously.
+    /// Cannot downgrade a package's upgradability policy
     const EUPGRADE_WEAKER_POLICY: u64 = 0x3;
 
-    /// A package is attempted to upgrade but misses modules which existed before.
+    /// Cannot delete a module that was published in the same package
     const EMODULE_MISSING: u64 = 0x4;
 
     /// Whether unconditional code upgrade with no compatibility check is allowed. This

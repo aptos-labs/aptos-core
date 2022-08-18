@@ -11,10 +11,8 @@ module aptos_framework::gas_schedule {
 
     friend aptos_framework::genesis;
 
-    /// The provided gas constants were inconsistent.
-    const EGAS_CONSTANT_INCONSISTENCY: u64 = 1;
-    /// The provided gas schedule is invalid.
-    const EINVALID_GAS_SCHEDULE: u64 = 2;
+    /// The provided gas schedule bytes are empty or invalid
+    const EINVALID_GAS_SCHEDULE: u64 = 1;
 
     struct GasEntry has store, copy, drop {
         key: String,
