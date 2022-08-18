@@ -11,7 +11,7 @@ use crate::liveness::{
     proposer_election::{choose_index, ProposerElection},
 };
 use aptos_bitvec::BitVec;
-use aptos_crypto::bls12381;
+use aptos_crypto::{bls12381, HashValue};
 use aptos_infallible::Mutex;
 use aptos_keygen::KeyGen;
 use aptos_types::{
@@ -77,6 +77,7 @@ impl TestBlockBuilder {
     ) -> NewBlockEvent {
         self.round += 1 + failed_proposers.len() as u64;
         NewBlockEvent::new(
+            HashValue::random(),
             self.epoch,
             self.round,
             self.round,
@@ -467,6 +468,7 @@ impl MockDbReader {
                 *idx,
                 TypeTag::Struct(NewBlockEvent::struct_tag()),
                 bcs::to_bytes(&NewBlockEvent::new(
+                    HashValue::random(),
                     epoch,
                     round,
                     round,
