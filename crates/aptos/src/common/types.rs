@@ -894,16 +894,16 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
 /// A shortened transaction output
 #[derive(Clone, Debug, Serialize)]
 pub struct TransactionSummary {
-    transaction_hash: HashValue,
-    gas_used: Option<u64>,
-    gas_unit_price: Option<u64>,
-    pending: Option<bool>,
-    sender: Option<AccountAddress>,
-    sequence_number: Option<u64>,
-    success: Option<bool>,
-    timestamp_us: Option<u64>,
-    version: Option<u64>,
-    vm_status: Option<String>,
+    pub transaction_hash: HashValue,
+    pub gas_used: Option<u64>,
+    pub gas_unit_price: Option<u64>,
+    pub pending: Option<bool>,
+    pub sender: Option<AccountAddress>,
+    pub sequence_number: Option<u64>,
+    pub success: Option<bool>,
+    pub timestamp_us: Option<u64>,
+    pub version: Option<u64>,
+    pub vm_status: Option<String>,
 }
 
 impl From<Transaction> for TransactionSummary {
