@@ -162,8 +162,7 @@ impl LocalSwarm {
         let mut validators = validators
             .into_iter()
             .map(|v| {
-                let node =
-                    LocalNode::new(version.to_owned(), v.name, v.dir, v.account_private_key)?;
+                let node = LocalNode::new(version.to_owned(), v.name, v.dir)?;
                 Ok((node.peer_id(), node))
             })
             .collect::<Result<HashMap<_, _>>>()?;
@@ -324,7 +323,6 @@ impl LocalSwarm {
             version.to_owned(),
             fullnode_config.name,
             fullnode_config.dir,
-            None,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -352,7 +350,6 @@ impl LocalSwarm {
             version.to_owned(),
             fullnode_config.name,
             fullnode_config.dir,
-            None,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -380,16 +377,11 @@ impl LocalSwarm {
     }
 
     pub fn validators(&self) -> impl Iterator<Item = &LocalNode> {
-        // sort by id to keep the order stable:
-        let mut validators: Vec<&LocalNode> = self.validators.values().collect();
-        validators.sort_by_key(|v| v.name().parse::<i32>().unwrap());
-        validators.into_iter()
+        self.validators.values()
     }
 
     pub fn validators_mut(&mut self) -> impl Iterator<Item = &mut LocalNode> {
-        let mut validators: Vec<&mut LocalNode> = self.validators.values_mut().collect();
-        validators.sort_by_key(|v| v.name().parse::<i32>().unwrap());
-        validators.into_iter()
+        self.validators.values_mut()
     }
 
     pub fn fullnode(&self, peer_id: PeerId) -> Option<&LocalNode> {
