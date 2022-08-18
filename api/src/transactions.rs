@@ -18,7 +18,7 @@ use crate::response::{
 };
 use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
-use anyhow::Context as AnyhowContext;
+use anyhow::{anyhow, Context as AnyhowContext};
 use aptos_api_types::{
     Address, AptosErrorCode, AsConverter, EncodeSubmissionRequest, HashValue, HexEncodedBytes,
     LedgerInfo, PendingTransaction, SubmitTransactionRequest, Transaction, TransactionData,
@@ -589,6 +589,11 @@ impl TransactionsApi {
         accept_type: &AcceptType,
         request: EncodeSubmissionRequest,
     ) -> BasicResult<HexEncodedBytes> {
+        if accept_type == &AcceptType::Bcs {
+            return Err(anyhow!("BCS is not supported for encode submission"))
+                .map_err(BasicError::bad_request);
+        }
+
         let resolver = self.context.move_resolver_poem()?;
         let raw_txn: RawTransaction = resolver
             .as_converter(self.context.db.clone())
