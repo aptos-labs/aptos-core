@@ -124,11 +124,7 @@ async fn test_move_publish_flow() {
 
     // Now download the package. It will be stored in a directory PACKAGE_NAME inside move_dir.
     let _ = match cli
-        .download_package(
-            0,
-            PACKAGE_NAME.to_owned(),
-            cli.move_dir().display().to_string(),
-        )
+        .download_package(0, PACKAGE_NAME.to_owned(), cli.move_dir())
         .await
     {
         Ok(response) => response,
