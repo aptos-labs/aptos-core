@@ -11,8 +11,6 @@ class OnboardingController < ApplicationController
   before_action :set_oauth_data, except: %i[kyc_callback]
   protect_from_forgery except: :kyc_callback
 
-  layout 'it3'
-
   def email
     redirect_to it2_path if current_user.registration_completed?
   end
