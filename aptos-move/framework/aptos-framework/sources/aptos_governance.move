@@ -184,6 +184,18 @@ module aptos_framework::aptos_governance {
         );
     }
 
+    public fun get_voting_duration_secs(): u64 acquires GovernanceConfig {
+        borrow_global<GovernanceConfig>(@aptos_framework).voting_duration_secs
+    }
+
+    public fun get_min_voting_threshold(): u128 acquires GovernanceConfig {
+        borrow_global<GovernanceConfig>(@aptos_framework).min_voting_threshold
+    }
+
+    public fun get_required_proposer_stake(): u64 acquires GovernanceConfig {
+        borrow_global<GovernanceConfig>(@aptos_framework).required_proposer_stake
+    }
+
     /// Create a proposal with the backing `stake_pool`.
     /// @param execution_hash Required. This is the hash of the resolution script. When the proposal is resolved,
     /// only the exact script with matching hash can be successfully executed.

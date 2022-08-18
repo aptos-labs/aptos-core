@@ -34,7 +34,7 @@ module aptos_framework::genesis {
         chain_id: u8,
         initial_version: u64,
         consensus_config: vector<u8>,
-        epoch_interval: u64,
+        epoch_interval_microsecs: u64,
         minimum_stake: u64,
         maximum_stake: u64,
         recurring_lockup_duration_secs: u64,
@@ -85,7 +85,7 @@ module aptos_framework::genesis {
         // initialized yet.
         chain_id::initialize(&aptos_framework_account, chain_id);
         reconfiguration::initialize(&aptos_framework_account);
-        block::initialize(&aptos_framework_account, epoch_interval);
+        block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         timestamp::set_time_has_started(&aptos_framework_account);
     }
 

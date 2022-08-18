@@ -54,7 +54,7 @@ module aptos_framework::governance_proposal {
     }
 
     #[test]
-    #[expected_failure(abort_code = 65537)]
+    #[expected_failure(abort_code = 65538)]
     public fun test_metadata_hash_too_long(): GovernanceProposal {
         create_proposal(
             utf8(b""),
