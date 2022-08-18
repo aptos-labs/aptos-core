@@ -1,10 +1,10 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export const $ScriptFunctionPayload = {
+export const $EntryFunctionPayload = {
     properties: {
         function: {
-            type: 'ScriptFunctionId',
+            type: 'EntryFunctionId',
             isRequired: true,
         },
         type_arguments: {

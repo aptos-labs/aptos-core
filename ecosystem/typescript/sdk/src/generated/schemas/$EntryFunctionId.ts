@@ -1,9 +1,9 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
-export const $ScriptFunctionId = {
+export const $EntryFunctionId = {
     type: 'string',
-    description: `Script function id is string representation of a script function defined on-chain.
+    description: `Entry function id is string representation of a entry function defined on-chain.
 
     Format: \`{address}::{module name}::{function name}\`
 

@@ -18,8 +18,8 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
-        ExecutionStatus, Module as TransactionModule, RawTransaction, Script as TransactionScript,
-        ScriptFunction as TransactionScriptFunction, Transaction, TransactionOutput,
+        EntryFunction as TransactionEntryFunction, ExecutionStatus, Module as TransactionModule,
+        RawTransaction, Script as TransactionScript, Transaction, TransactionOutput,
         TransactionStatus,
     },
 };
@@ -774,7 +774,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         extra_args: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)> {
         if extra_args.script {
-            panic!("Script functions are not supported.")
+            panic!("Entry functions are not supported.")
         }
 
         if signers.len() != 1 {
@@ -800,10 +800,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             extra_args.gas_unit_price,
             gas_budget,
         )?;
-        let txn = RawTransaction::new_script_function(
+        let txn = RawTransaction::new_entry_function(
             signer,
             params.sequence_number,
-            TransactionScriptFunction::new(
+            TransactionEntryFunction::new(
                 module.clone(),
                 function.to_owned(),
                 type_args,

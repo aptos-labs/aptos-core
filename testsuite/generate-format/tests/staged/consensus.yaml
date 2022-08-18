@@ -197,6 +197,17 @@ Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
   NEWTYPESTRUCT: BYTES
+EntryFunction:
+  STRUCT:
+    - module:
+        TYPENAME: ModuleId
+    - function:
+        TYPENAME: Identifier
+    - ty_args:
+        SEQ:
+          TYPENAME: TypeTag
+    - args:
+        SEQ: BYTES
 EpochChangeProof:
   STRUCT:
     - ledger_info_with_sigs:
@@ -314,17 +325,6 @@ Script:
     - args:
         SEQ:
           TYPENAME: TransactionArgument
-ScriptFunction:
-  STRUCT:
-    - module:
-        TYPENAME: ModuleId
-    - function:
-        TYPENAME: Identifier
-    - ty_args:
-        SEQ:
-          TYPENAME: TypeTag
-    - args:
-        SEQ: BYTES
 Signature:
   NEWTYPESTRUCT: BYTES
 SignedTransaction:
@@ -450,9 +450,9 @@ TransactionPayload:
         NEWTYPE:
           TYPENAME: ModuleBundle
     2:
-      ScriptFunction:
+      EntryFunction:
         NEWTYPE:
-          TYPENAME: ScriptFunction
+          TYPENAME: EntryFunction
 TwoChainTimeout:
   STRUCT:
     - epoch: U64
