@@ -259,7 +259,7 @@ impl CliTestFramework {
         proof_of_possession: bls12381::ProofOfPossession,
         validator_host: HostAndPort,
         validator_network_public_key: x25519::PublicKey,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Transaction> {
         InitializeValidator {
             txn_options: self.transaction_options(index, None),
             operator_config_file_args: OperatorConfigFileArgs {
@@ -280,7 +280,7 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<TransactionSummary> {
+    pub async fn add_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
         AddStake {
             txn_options: self.transaction_options(index, None),
             amount,
@@ -289,11 +289,7 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn unlock_stake(
-        &self,
-        index: usize,
-        amount: u64,
-    ) -> CliTypedResult<TransactionSummary> {
+    pub async fn unlock_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
         UnlockStake {
             txn_options: self.transaction_options(index, None),
             amount,
@@ -302,11 +298,7 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn withdraw_stake(
-        &self,
-        index: usize,
-        amount: u64,
-    ) -> CliTypedResult<TransactionSummary> {
+    pub async fn withdraw_stake(&self, index: usize, amount: u64) -> CliTypedResult<Transaction> {
         WithdrawStake {
             node_op_options: self.transaction_options(index, None),
             amount,
@@ -315,7 +307,7 @@ impl CliTestFramework {
         .await
     }
 
-    pub async fn increase_lockup(&self, index: usize) -> CliTypedResult<TransactionSummary> {
+    pub async fn increase_lockup(&self, index: usize) -> CliTypedResult<Transaction> {
         IncreaseLockup {
             txn_options: self.transaction_options(index, None),
         }
@@ -327,7 +319,7 @@ impl CliTestFramework {
         &self,
         operator_index: usize,
         pool_index: Option<usize>,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Transaction> {
         JoinValidatorSet {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
@@ -340,7 +332,7 @@ impl CliTestFramework {
         &self,
         operator_index: usize,
         pool_index: Option<usize>,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Transaction> {
         LeaveValidatorSet {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
@@ -355,7 +347,7 @@ impl CliTestFramework {
         pool_index: Option<usize>,
         validator_host: HostAndPort,
         validator_network_public_key: x25519::PublicKey,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Transaction> {
         UpdateValidatorNetworkAddresses {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
@@ -395,7 +387,7 @@ impl CliTestFramework {
         pool_index: Option<usize>,
         consensus_public_key: bls12381::PublicKey,
         proof_of_possession: bls12381::ProofOfPossession,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Transaction> {
         UpdateConsensusKey {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
@@ -432,7 +424,7 @@ impl CliTestFramework {
         initial_stake_amount: u64,
         voter_index: Option<usize>,
         operator_index: Option<usize>,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Transaction> {
         InitializeStakeOwner {
             txn_options: self.transaction_options(owner_index, None),
             initial_stake_amount,
@@ -447,7 +439,7 @@ impl CliTestFramework {
         &self,
         owner_index: usize,
         operator_index: usize,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Transaction> {
         SetOperator {
             txn_options: self.transaction_options(owner_index, None),
             operator_address: self.account_id(operator_index),
@@ -460,7 +452,7 @@ impl CliTestFramework {
         &self,
         owner_index: usize,
         voter_index: usize,
-    ) -> CliTypedResult<TransactionSummary> {
+    ) -> CliTypedResult<Transaction> {
         SetDelegatedVoter {
             txn_options: self.transaction_options(owner_index, None),
             voter_address: self.account_id(voter_index),
