@@ -27,7 +27,10 @@ use aptos_logger::prelude::*;
 use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
 use aptos_types::chain_id::ChainId;
 
-use crate::constants::{ENV_TELEMETRY_SERVICE_URL, PROMETHEUS_PUSH_METRICS_FREQ_SECS};
+use crate::constants::{
+    ENV_APTOS_DISABLE_EXPERIMENTAL_PUSH_METRICS, ENV_TELEMETRY_SERVICE_URL,
+    PROMETHEUS_PUSH_METRICS_FREQ_SECS,
+};
 use crate::{
     build_information::create_build_info_telemetry_event,
     constants::{
@@ -61,6 +64,11 @@ static TELEMETRY_TOKEN: Lazy<String> = Lazy::new(|| {
 /// Returns true iff telemetry is disabled
 fn telemetry_is_disabled() -> bool {
     env::var(ENV_APTOS_DISABLE_TELEMETRY).is_ok()
+}
+
+/// Temporary flag to control enabling/disabling prometheus push metrics
+fn enable_experimental_prometheus_push_metrics() -> bool {
+    !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_EXPERIMENTAL_PUSH_METRICS).is_ok())
 }
 
 /// Starts the telemetry service and returns the execution runtime.
@@ -125,7 +133,7 @@ async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config
 
     info!("Telemetry service started!");
 
-    future::join4(
+    let stable_collection_fns = future::join3(
         // Periodically send system information
         run_function_periodically(NODE_SYS_INFO_FREQ_SECS, || {
             send_system_information(peer_id.clone(), telemetry_sender.clone())
@@ -138,12 +146,20 @@ async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config
         run_function_periodically(NODE_NETWORK_METRICS_FREQ_SECS, || {
             send_node_network_metrics(peer_id.clone(), telemetry_sender.clone())
         }),
-        // Periodically send ALL prometheus metrics (This replaces the previous core and network metrics implementation)
-        run_function_periodically(PROMETHEUS_PUSH_METRICS_FREQ_SECS, || {
-            telemetry_sender.try_push_prometheus_metrics()
-        }),
-    )
-    .await;
+    );
+
+    if enable_experimental_prometheus_push_metrics() {
+        future::join(
+            stable_collection_fns,
+            // Periodically send ALL prometheus metrics (This replaces the previous core and network metrics implementation)
+            run_function_periodically(PROMETHEUS_PUSH_METRICS_FREQ_SECS, || {
+                telemetry_sender.try_push_prometheus_metrics()
+            }),
+        )
+        .await;
+    } else {
+        stable_collection_fns.await;
+    }
 }
 
 /// Collects and sends the build information via telemetry
