@@ -69,6 +69,7 @@ members = [
     "crates/transaction-emitter-lib",
     "ecosystem/indexer",
     "ecosystem/node-checker",
+    "ecosystem/sf-indexer/aptos-sf-indexer",
     "execution/db-bootstrapper",
     "execution/executor",
     "execution/executor-benchmark",

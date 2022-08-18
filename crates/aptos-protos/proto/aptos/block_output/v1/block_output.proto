@@ -78,7 +78,7 @@ message SignatureOutput {
   bytes public_key = 5;
   bytes signature = 6;
   uint32 threshold = 7;
-  bytes bitmap = 8;
+  repeated uint32 public_key_indices = 8;
   uint32 multi_agent_index = 9;
   uint32 multi_sig_index = 10;
 }
