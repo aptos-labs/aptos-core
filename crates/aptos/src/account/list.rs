@@ -7,6 +7,7 @@ use crate::common::types::{
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
+use itertools::Itertools;
 use serde_json::json;
 use std::{
     fmt::{Display, Formatter},
@@ -114,9 +115,9 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
                 .map_err(map_err_func)?
                 .into_inner()
                 .iter()
-                .map(|resource| {
+                .map_into(|resource| {
                     let mut map = serde_json::Map::new();
-                    map.insert(resource.resource_type.to_string(), resource.data.clone());
+                    map.insert(resource.resource_type.to_string(), resource.data);
                     serde_json::Value::Object(map)
                 })
                 .collect::<Vec<serde_json::Value>>(),
