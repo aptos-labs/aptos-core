@@ -105,15 +105,15 @@ pub struct ValidatorConsensusKeyArgs {
 }
 
 impl ValidatorConsensusKeyArgs {
-    fn get_consensus_public_key(
-        &self,
-        operator_config: &Option<OperatorConfiguration>,
-    ) -> CliTypedResult<bls12381::PublicKey> {
+    fn get_consensus_public_key<'a>(
+        &'a self,
+        operator_config: &'a Option<OperatorConfiguration>,
+    ) -> CliTypedResult<&'a bls12381::PublicKey> {
         let consensus_public_key = if let Some(ref consensus_public_key) = self.consensus_public_key
         {
-            consensus_public_key.clone()
+            consensus_public_key
         } else if let Some(ref operator_config) = operator_config {
-            operator_config.consensus_public_key.clone()
+            &operator_config.consensus_public_key
         } else {
             return Err(CliError::CommandArgumentError(
                 "Must provide either --operator-config-file or --consensus-public-key".to_string(),
@@ -122,14 +122,14 @@ impl ValidatorConsensusKeyArgs {
         Ok(consensus_public_key)
     }
 
-    fn get_consensus_proof_of_possession(
-        &self,
-        operator_config: &Option<OperatorConfiguration>,
-    ) -> CliTypedResult<bls12381::ProofOfPossession> {
+    fn get_consensus_proof_of_possession<'a>(
+        &'a self,
+        operator_config: &'a Option<OperatorConfiguration>,
+    ) -> CliTypedResult<&'a bls12381::ProofOfPossession> {
         let proof_of_possession = if let Some(ref proof_of_possession) = self.proof_of_possession {
-            proof_of_possession.clone()
+            proof_of_possession
         } else if let Some(ref operator_config) = operator_config {
-            operator_config.consensus_proof_of_possession.clone()
+            &operator_config.consensus_proof_of_possession
         } else {
             return Err(CliError::CommandArgumentError(
                 "Must provide either --operator-config-file or --proof-of-possession".to_string(),
@@ -159,14 +159,14 @@ pub struct ValidatorNetworkAddressesArgs {
 }
 
 impl ValidatorNetworkAddressesArgs {
-    fn get_network_configs(
-        &self,
-        operator_config: &Option<OperatorConfiguration>,
+    fn get_network_configs<'a>(
+        &'a self,
+        operator_config: &'a Option<OperatorConfiguration>,
     ) -> CliTypedResult<(
         x25519::PublicKey,
         Option<x25519::PublicKey>,
-        HostAndPort,
-        Option<HostAndPort>,
+        &'a HostAndPort,
+        Option<&'a HostAndPort>,
     )> {
         let validator_network_public_key =
             if let Some(public_key) = self.validator_network_public_key {
@@ -190,9 +190,9 @@ impl ValidatorNetworkAddressesArgs {
             };
 
         let validator_host = if let Some(ref host) = self.validator_host {
-            host.clone()
+            host
         } else if let Some(ref operator_config) = operator_config {
-            operator_config.validator_host.clone()
+            &operator_config.validator_host
         } else {
             return Err(CliError::CommandArgumentError(
                 "Must provide either --operator-config-file or --validator-host".to_string(),
@@ -200,9 +200,9 @@ impl ValidatorNetworkAddressesArgs {
         };
 
         let full_node_host = if let Some(ref host) = self.full_node_host {
-            Some(host.clone())
+            Some(host)
         } else if let Some(ref operator_config) = operator_config {
-            operator_config.full_node_host.clone()
+            operator_config.full_node_host.as_ref()
         } else {
             None
         };
