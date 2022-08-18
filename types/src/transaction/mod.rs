@@ -974,6 +974,9 @@ pub struct TransactionInfoV0 {
     /// transaction. Depending on the protocol configuration, this can be generated periodical
     /// only, like per block.
     state_checkpoint_hash: Option<HashValue>,
+
+    /// Potentially summarizes all evicted items from state. Always `None` for now.
+    state_cemetery_hash: Option<HashValue>,
 }
 
 impl TransactionInfoV0 {
@@ -992,6 +995,7 @@ impl TransactionInfoV0 {
             event_root_hash,
             state_change_hash,
             state_checkpoint_hash,
+            state_cemetery_hash: None,
         }
     }
 
