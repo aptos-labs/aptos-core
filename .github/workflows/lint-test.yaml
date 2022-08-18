@@ -167,8 +167,6 @@ jobs:
       - uses: taiki-e/install-action@v1.5.6
         with:
           tool: nextest
-      # TODO: Add rosetta:test_block separately, as it is the only test not working in release mode, until that is fixed 
-      - run: cargo test --package smoke-test --lib -- rosetta::test_block --exact --ignored
       # prebuild node binary, so that tests don't start before node is built.
       # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
       - run: cargo build --bin=aptos-node --features=failpoints --release && LOCAL_SWARM_NODE_RELEASE=1 cargo nextest run --release --profile ci --package smoke-test --test-threads 6 --retries 3
@@ -192,4 +190,25 @@ jobs:
             /tmp/.tmp*
             !/tmp/.tmp*/**/db/
           retention-days: 1
+
+  # TODO: Add rosetta:test_block separately, as it is the only test not working in release mode, until that is fixed 
+  rust-rosetta-smmoke-test:
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/rust-setup
+      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - uses: taiki-e/install-action@v1.5.6
+        with:
+          tool: nextest
+      - run: cargo test --package smoke-test --lib -- rosetta::test_block --exact --ignored
+        env:
+          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+
+      - uses: ./.github/actions/upload-test-results
+        with:
+          BUILDPULSE_ACCESS_KEY_ID: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
+          BUILDPULSE_SECRET_ACCESS_KEY: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          SUITE: rust-rosetta
 
