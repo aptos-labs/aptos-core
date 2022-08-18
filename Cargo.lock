@@ -541,6 +541,54 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-fh-stream"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-api-test-context",
+ "aptos-api-types",
+ "aptos-bitvec",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-genesis",
+ "aptos-global-constants",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics-core",
+ "aptos-proptest-helpers",
+ "aptos-protos",
+ "aptos-sdk",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptosdb",
+ "base64 0.13.0",
+ "bytes 1.2.1",
+ "executor",
+ "executor-types",
+ "fail 0.5.0",
+ "framework",
+ "futures",
+ "goldenfile",
+ "hex",
+ "hyper 0.14.20",
+ "mempool-notifications",
+ "move-deps",
+ "once_cell",
+ "prost",
+ "rand 0.7.3",
+ "regex",
+ "serde 1.0.141",
+ "serde_json",
+ "storage-interface",
+ "tokio 1.19.2",
+ "vm-validator",
+ "warp",
+]
+
+[[package]]
 name = "aptos-fuzz"
 version = "0.1.0"
 dependencies = [
@@ -809,12 +857,12 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-data-client",
+ "aptos-fh-stream",
  "aptos-genesis",
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",
  "aptos-secure-storage",
- "aptos-sf-stream",
  "aptos-state-view",
  "aptos-telemetry",
  "aptos-temppath",
@@ -1138,54 +1186,6 @@ dependencies = [
  "serde 1.0.141",
  "serde_json",
  "thiserror",
-]
-
-[[package]]
-name = "aptos-sf-stream"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-api",
- "aptos-api-test-context",
- "aptos-api-types",
- "aptos-bitvec",
- "aptos-config",
- "aptos-crypto",
- "aptos-genesis",
- "aptos-global-constants",
- "aptos-logger",
- "aptos-mempool",
- "aptos-metrics-core",
- "aptos-proptest-helpers",
- "aptos-protos",
- "aptos-sdk",
- "aptos-secure-storage",
- "aptos-temppath",
- "aptos-types",
- "aptos-vm",
- "aptosdb",
- "base64 0.13.0",
- "bytes 1.2.1",
- "executor",
- "executor-types",
- "fail 0.5.0",
- "framework",
- "futures",
- "goldenfile",
- "hex",
- "hyper 0.14.20",
- "mempool-notifications",
- "move-deps",
- "once_cell",
- "prost",
- "rand 0.7.3",
- "regex",
- "serde 1.0.141",
- "serde_json",
- "storage-interface",
- "tokio 1.19.2",
- "vm-validator",
- "warp",
 ]
 
 [[package]]

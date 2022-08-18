@@ -132,7 +132,7 @@ pub fn convert_move_resource(move_resource: &MoveResource) -> extractor::MoveRes
 pub fn convert_move_module_bytecode(mmb: &MoveModuleBytecode) -> extractor::MoveModuleBytecode {
     let abi = mmb.clone().try_parse_abi().map_or_else(
         |e| {
-            warn!("[sf-stream] Could not decode MoveModuleBytecode ABI: {}", e);
+            warn!("[fh-stream] Could not decode MoveModuleBytecode ABI: {}", e);
             None
         },
         |mmb| mmb.abi.map(|move_module| convert_move_module(&move_module)),
