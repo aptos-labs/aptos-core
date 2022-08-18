@@ -29,6 +29,9 @@ message Block {
   // Transactions holds all transactions that happened in the Block, which is transactions that happened starting with (and including)
   // a `BlockMetadataTransaction`, and every other transaction up to (but excluding) the next `BlockMetadataTransaction`
   repeated Transaction transactions = 3;
+
+  // ID of the chain to ensure that we're not indexing multiple chains in the same pipeline
+  uint32 chain_id = 4;
 }
 
 // Transaction as it happened on the chain, there are 4 types of transactions:
