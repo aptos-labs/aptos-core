@@ -17,10 +17,10 @@ module aptos_framework::fast_coin {
 }
 
 #[test_only]
-module aptos_framework::supply_tests {
+module aptos_framework::coin_supply_tests {
     use aptos_framework::aggregator_factory;
     use aptos_framework::fast_coin::{Self, FastCoin};
-    use aptos_framework::supply;
+    use aptos_framework::coin_supply;
     use 0x123::slow_coin::{Self, SlowCoin};
 
     #[test(aptos_account = @aptos_framework, other_account = @0x123)]
@@ -31,35 +31,35 @@ module aptos_framework::supply_tests {
         aggregator_factory::initialize_aggregator_factory(&aptos_account);
 
         // Coins from Aptos account should be parallelizable.
-        let fast_supply = supply::new<FastCoin>();
+        let fast_supply = coin_supply::new<FastCoin>();
         // TODO: uncomment once excution is supported.
         // assert!(supply::is_parallelizable(&fast_supply), 0);
 
-        supply::add(&mut fast_supply, 100);
-        supply::sub(&mut fast_supply, 50);
-        supply::add(&mut fast_supply, 950);
-        assert!(supply::read(&fast_supply) == 1000, 0);
+        coin_supply::add(&mut fast_supply, 100);
+        coin_supply::sub(&mut fast_supply, 50);
+        coin_supply::add(&mut fast_supply, 950);
+        assert!(coin_supply::read(&fast_supply) == 1000, 0);
 
         // Coins from all other accounts shouldn't be parallelizable.
-        let slow_supply = supply::new<SlowCoin>();
-        assert!(!supply::is_parallelizable(&slow_supply), 0);
+        let slow_supply = coin_supply::new<SlowCoin>();
+        assert!(!coin_supply::is_parallelizable(&slow_supply), 0);
 
-        supply::add(&mut slow_supply, 100);
-        supply::sub(&mut slow_supply, 50);
-        supply::add(&mut slow_supply, 950);
-        assert!(supply::read(&slow_supply) == 1000, 0);
+        coin_supply::add(&mut slow_supply, 100);
+        coin_supply::sub(&mut slow_supply, 50);
+        coin_supply::add(&mut slow_supply, 950);
+        assert!(coin_supply::read(&slow_supply) == 1000, 0);
 
         // But if we upgrade, we should be able to get the parallelism.
-        supply::upgrade(&mut slow_supply);
+        coin_supply::upgrade(&mut slow_supply);
         // TODO: uncomment once excution is supported.
-        // assert!(supply::is_parallelizable(&slow_supply), 0);
+        // assert!(coin_supply::is_parallelizable(&slow_supply), 0);
 
-        supply::add(&mut slow_supply, 100);
-        supply::sub(&mut slow_supply, 50);
-        supply::add(&mut slow_supply, 950);
-        assert!(supply::read(&slow_supply) == 2000, 0);
+        coin_supply::add(&mut slow_supply, 100);
+        coin_supply::sub(&mut slow_supply, 50);
+        coin_supply::add(&mut slow_supply, 950);
+        assert!(coin_supply::read(&slow_supply) == 2000, 0);
 
-        supply::drop_unchecked(fast_supply);
-        supply::drop_unchecked(slow_supply);
+        coin_supply::drop_unchecked(fast_supply);
+        coin_supply::drop_unchecked(slow_supply);
     }
 }

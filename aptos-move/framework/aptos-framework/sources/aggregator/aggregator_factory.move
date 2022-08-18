@@ -48,6 +48,9 @@ module aptos_framework::aggregator_factory {
     /// When aggregator feature is not supported (raised by native code).
     const ENOT_SUPPORTED: u64 = 3;
 
+    /// When aggregator factory is not published yet.
+    const EAGGREGATOR_FACTORY_NOT_FOUND: u64 = 4;
+
     /// Struct that creates aggregators.
     struct AggregatorFactory has key {
         phantom_table: Table<u128, u128>,
@@ -73,6 +76,11 @@ module aptos_framework::aggregator_factory {
 
     /// Creates a new aggregator instance which overflows on exceeding a `limit`.
     public(friend) fun create_aggregator(limit: u128): Aggregator acquires AggregatorFactory {
+        assert!(
+            exists<AggregatorFactory>(@aptos_framework),
+            error::not_found(EAGGREGATOR_FACTORY_NOT_FOUND)
+        );
+
         let aggregator_factory = borrow_global_mut<AggregatorFactory>(@aptos_framework);
         new_aggregator(aggregator_factory, limit)
     }
