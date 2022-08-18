@@ -7,6 +7,7 @@ use crate::{
     task::{ExecutionStatus, ExecutorTask, ModulePath, Transaction, TransactionOutput},
     txn_last_input_output::{ReadDescriptor, TxnLastInputOutput},
 };
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_infallible::Mutex;
 use aptos_types::write_set::DeserializeU128;
 use mvhashmap::{Error as MVError, MVHashMap, Output};
@@ -36,6 +37,19 @@ pub struct MVHashMapView<'a, K, V> {
     captured_reads: Mutex<Vec<ReadDescriptor<K>>>,
 }
 
+/// A struct which describes the result of the read from the proxy. The client
+/// can interpret these types to further resolve the reads.
+pub enum Read<V> {
+    // Successful read of a value.
+    Value(Arc<V>),
+    // Similar to above, but the value was aggregated and is an integer.
+    U128(u128),
+    // Read failed while resolving a delta.
+    Unresolved(DeltaOp),
+    // Read did not return anything.
+    None,
+}
+
 impl<
         'a,
         K: ModulePath + PartialOrd + Send + Clone + Hash + Eq,
@@ -49,7 +63,7 @@ impl<
     }
 
     /// Captures a read from the VM execution.
-    pub fn read(&self, key: &K) -> Option<Arc<V>> {
+    pub fn read(&self, key: &K) -> Read<V> {
         use MVError::*;
         use Output::*;
 
@@ -57,26 +71,32 @@ impl<
             match self.versioned_map.read(key, self.txn_idx) {
                 Ok(Version(version, v)) => {
                     let (txn_idx, incarnation) = version;
-                    self.captured_reads.lock().push(ReadDescriptor::from(
-                        key.clone(),
-                        txn_idx,
-                        incarnation,
-                    ));
-                    return Some(v);
+                    self.captured_reads
+                        .lock()
+                        .push(ReadDescriptor::from_version(
+                            key.clone(),
+                            txn_idx,
+                            incarnation,
+                        ));
+                    return Read::Value(v);
                 }
-                Ok(Resolved(_)) => {
-                    // TODO: fill when I add a descrptor kind.
-                    return None;
+                Ok(Resolved(value)) => {
+                    self.captured_reads
+                        .lock()
+                        .push(ReadDescriptor::from_resolved(key.clone(), value));
+                    return Read::U128(value);
                 }
                 Err(NotFound) => {
                     self.captured_reads
                         .lock()
                         .push(ReadDescriptor::from_storage(key.clone()));
-                    return None;
+                    return Read::None;
                 }
-                Err(Unresolved(_)) => {
-                    // TODO: fill when I add a descrptor kind.
-                    return None;
+                Err(Unresolved(delta)) => {
+                    self.captured_reads
+                        .lock()
+                        .push(ReadDescriptor::from_unresolved(key.clone(), delta));
+                    return Read::Unresolved(delta);
                 }
                 Err(Dependency(dep_idx)) => {
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
@@ -234,11 +254,9 @@ where
         let valid = read_set.iter().all(|r| {
             match versioned_data_cache.read(r.path(), idx_to_validate) {
                 Ok(Version(version, _)) => r.validate_version(version),
-                // TODO: fill when I add a descrptor kind.
-                Ok(Resolved(_)) => true,
+                Ok(Resolved(value)) => r.validate_resolved(value),
                 Err(Dependency(_)) => false, // Dependency implies a validation failure.
-                // TODO: fill when I add a descrptor kind.
-                Err(Unresolved(_)) => true,
+                Err(Unresolved(delta)) => r.validate_unresolved(delta),
                 Err(NotFound) => r.validate_storage(),
             }
         });

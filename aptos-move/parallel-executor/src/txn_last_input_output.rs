@@ -6,6 +6,7 @@ use crate::{
     scheduler::{Incarnation, TxnIndex, Version},
     task::{ExecutionStatus, ModulePath, Transaction, TransactionOutput},
 };
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::access_path::AccessPath;
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
@@ -21,13 +22,18 @@ use std::{
 type TxnInput<K> = Vec<ReadDescriptor<K>>;
 type TxnOutput<T, E> = ExecutionStatus<T, Error<E>>;
 
-// If an entry was read from the multi-version data-structure, then kind is
-// MVHashMap(txn_idx, incarnation), with transaction index and incarnation number
-// of the execution associated with the write of the entry. Otherwise, if the read
-// occured from storage, and kind is set to Storage.
+/// Information about the read which is used by validation.
 #[derive(Clone, PartialEq)]
 enum ReadKind {
-    MVHashMap(TxnIndex, Incarnation),
+    /// Read returned a value from the multi-version data-structure, with index
+    /// and incarnation number of the execution associated with the write of
+    /// that entry.
+    Version(TxnIndex, Incarnation),
+    /// Read resolved a delta.
+    Resolved(u128),
+    /// Read returned a delta and needs to go to storage.
+    Unresolved(DeltaOp),
+    /// Read occurred from storage.
     Storage,
 }
 
@@ -39,10 +45,24 @@ pub struct ReadDescriptor<K> {
 }
 
 impl<K: ModulePath> ReadDescriptor<K> {
-    pub fn from(access_path: K, txn_idx: TxnIndex, incarnation: Incarnation) -> Self {
+    pub fn from_version(access_path: K, txn_idx: TxnIndex, incarnation: Incarnation) -> Self {
         Self {
             access_path,
-            kind: ReadKind::MVHashMap(txn_idx, incarnation),
+            kind: ReadKind::Version(txn_idx, incarnation),
+        }
+    }
+
+    pub fn from_resolved(access_path: K, value: u128) -> Self {
+        Self {
+            access_path,
+            kind: ReadKind::Resolved(value),
+        }
+    }
+
+    pub fn from_unresolved(access_path: K, delta: DeltaOp) -> Self {
+        Self {
+            access_path,
+            kind: ReadKind::Unresolved(delta),
         }
     }
 
@@ -64,7 +84,17 @@ impl<K: ModulePath> ReadDescriptor<K> {
     // Does the read descriptor describe a read from MVHashMap w. a specified version.
     pub fn validate_version(&self, version: Version) -> bool {
         let (txn_idx, incarnation) = version;
-        self.kind == ReadKind::MVHashMap(txn_idx, incarnation)
+        self.kind == ReadKind::Version(txn_idx, incarnation)
+    }
+
+    // Does the read descriptor describe a read from MVHashMap w. a resolved delta.
+    pub fn validate_resolved(&self, value: u128) -> bool {
+        self.kind == ReadKind::Resolved(value)
+    }
+
+    // Does the read descriptor describe a read from MVHashMap w. an unresolved delta.
+    pub fn validate_unresolved(&self, delta: DeltaOp) -> bool {
+        self.kind == ReadKind::Unresolved(delta)
     }
 
     // Does the read descriptor describe a read from storage.

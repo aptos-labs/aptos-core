@@ -3,7 +3,7 @@
 
 use crate::{
     errors::{Error, Result},
-    executor::MVHashMapView,
+    executor::{MVHashMapView, Read},
     task::{
         ExecutionStatus, ExecutorTask, ModulePath, Transaction as TransactionType,
         TransactionOutput,
@@ -291,7 +291,13 @@ where
                 // Reads
                 let mut reads_result = vec![];
                 for k in reads[read_idx].iter() {
-                    reads_result.push(view.read(k).map(|v| (*v).clone()));
+                    reads_result.push(match view.read(k) {
+                        // TODO: support additional 2 variants.
+                        Read::Value(v) => Some((*v).clone()),
+                        Read::U128(_) => unimplemented!("u128 not supported"),
+                        Read::Unresolved(_) => unimplemented!("unresolved not supported"),
+                        Read::None => None,
+                    });
                 }
                 ExecutionStatus::Success(Output(writes[write_idx].clone(), reads_result))
             }
