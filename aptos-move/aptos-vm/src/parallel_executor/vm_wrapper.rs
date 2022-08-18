@@ -66,11 +66,8 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosVMWrapper<'a, S> {
             .vm
             .execute_single_transaction(txn, &versioned_view, &log_context)
         {
-            Ok((vm_status, output, sender)) => {
-                // TODO: pass deltas to `AptosTransactionOutput` once we support parallel execution.
-                let (_, output) = output.into();
-
-                if output.status().is_discarded() {
+            Ok((vm_status, output_ext, sender)) => {
+                if output_ext.txn_output().status().is_discarded() {
                     match sender {
                         Some(s) => trace!(
                             log_context,
@@ -83,10 +80,10 @@ impl<'a, S: 'a + StateView> ExecutorTask for AptosVMWrapper<'a, S> {
                         }
                     };
                 }
-                if AptosVM::should_restart_execution(&output) {
-                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(output))
+                if AptosVM::should_restart_execution(output_ext.txn_output()) {
+                    ExecutionStatus::SkipRest(AptosTransactionOutput::new(output_ext))
                 } else {
-                    ExecutionStatus::Success(AptosTransactionOutput::new(output))
+                    ExecutionStatus::Success(AptosTransactionOutput::new(output_ext))
                 }
             }
             Err(err) => ExecutionStatus::Abort(err),

@@ -9,6 +9,7 @@ use crate::{
     aptos_vm::AptosVM,
     parallel_executor::vm_wrapper::AptosVMWrapper,
 };
+use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_parallel_executor::{
     errors::Error,
     executor::ParallelTransactionExecutor,
@@ -29,13 +30,13 @@ impl PTransaction for PreprocessedTransaction {
 }
 
 // Wrapper to avoid orphan rule
-pub(crate) struct AptosTransactionOutput(TransactionOutput);
+pub(crate) struct AptosTransactionOutput(TransactionOutputExt);
 
 impl AptosTransactionOutput {
-    pub fn new(output: TransactionOutput) -> Self {
+    pub fn new(output: TransactionOutputExt) -> Self {
         Self(output)
     }
-    pub fn into(self) -> TransactionOutput {
+    pub fn into(self) -> TransactionOutputExt {
         self.0
     }
 }
@@ -44,17 +45,17 @@ impl PTransactionOutput for AptosTransactionOutput {
     type T = PreprocessedTransaction;
 
     fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
-        self.0.write_set().iter().cloned().collect()
+        self.0.txn_output().write_set().iter().cloned().collect()
     }
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self {
-        Self(TransactionOutput::new(
+        Self(TransactionOutputExt::from(TransactionOutput::new(
             WriteSet::default(),
             vec![],
             0,
             TransactionStatus::Retry,
-        ))
+        )))
     }
 }
 
@@ -82,7 +83,9 @@ impl ParallelAptosVM {
             Ok(results) => Ok((
                 results
                     .into_iter()
+                    // TODO: figure out how to collect inputs here (2 lines below).
                     .map(AptosTransactionOutput::into)
+                    .map(|e| e.into().1)
                     .collect(),
                 None,
             )),
