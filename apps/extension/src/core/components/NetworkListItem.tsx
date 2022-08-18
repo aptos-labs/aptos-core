@@ -123,7 +123,7 @@ export default function NetworkListItem(props: NetworkListItemProps) {
         py={3}
       >
         <HStack w="100%" justifyContent="space-between">
-          <VStack alignItems="flex-start">
+          <VStack alignItems="flex-start" overflow="hidden">
             <HStack>
               <Circle bg={isNodeAvailable ? 'green.300' : 'red.400'} size={2} as="span" />
               <Text fontSize="md" fontWeight={600}>
@@ -135,7 +135,14 @@ export default function NetworkListItem(props: NetworkListItemProps) {
                   : null
               }
             </HStack>
-            <Text fontSize="md" fontWeight={400}>
+            <Text
+              fontSize="md"
+              fontWeight={400}
+              w="100%"
+              whiteSpace="nowrap"
+              overflow="hidden"
+              textOverflow="ellipsis"
+            >
               {network.nodeUrl}
             </Text>
           </VStack>
