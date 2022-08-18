@@ -166,7 +166,7 @@ class TransactionPayload:
             self.variant = TransactionPayload.SCRIPT
         elif isinstance(payload, ModuleBundle):
             self.variant = TransactionPayload.MODULE_BUNDLE
-        elif isinstance(payload, ScriptFunction):
+        elif isinstance(payload, EntryFunction):
             self.variant = TransactionPayload.SCRIPT_FUNCTION
         else:
             raise Exception("Invalid type")
@@ -188,7 +188,7 @@ class TransactionPayload:
         elif variant == TransactionPayload.MODULE_BUNDLE:
             payload = ModuleBundle.deserialize(deserializer)
         elif variant == TransactionPayload.SCRIPT_FUNCTION:
-            payload = ScriptFunction.deserialize(deserializer)
+            payload = EntryFunction.deserialize(deserializer)
         else:
             raise Exception("Invalid type")
 
@@ -221,7 +221,7 @@ class Script:
         raise NotImplementedError
 
 
-class ScriptFunction:
+class EntryFunction:
     module: ModuleId
     function: str
     ty_args: List[TypeTag]
@@ -235,7 +235,7 @@ class ScriptFunction:
         self.ty_args = ty_args
         self.args = args
 
-    def __eq__(self, other: ScriptFunction) -> bool:
+    def __eq__(self, other: EntryFunction) -> bool:
         return (
             self.module == other.module
             and self.function == other.function
@@ -251,20 +251,20 @@ class ScriptFunction:
         function: str,
         ty_args: List[TypeTag],
         args: List[TransactionArgument],
-    ) -> ScriptFunction:
+    ) -> EntryFunction:
         module_id = ModuleId.from_str(module)
 
         byte_args = []
         for arg in args:
             byte_args.append(arg.encode())
-        return ScriptFunction(module_id, function, ty_args, byte_args)
+        return EntryFunction(module_id, function, ty_args, byte_args)
 
-    def deserialize(deserializer: Deserializer) -> ScriptFunction:
+    def deserialize(deserializer: Deserializer) -> EntryFunction:
         module = ModuleId.deserialize(deserializer)
         function = deserializer.str()
         ty_args = deserializer.sequence(TypeTag.deserialize)
         args = deserializer.sequence(Deserializer.bytes)
-        return ScriptFunction(module, function, ty_args, args)
+        return EntryFunction(module, function, ty_args, args)
 
     def serialize(self, serializer: Serializer):
         self.module.serialize(serializer)
@@ -373,7 +373,7 @@ class SignedTransaction:
 
 
 class Test(unittest.TestCase):
-    def test_script_function(self):
+    def test_entry_function(self):
         private_key = ed25519.PrivateKey.random()
         public_key = private_key.public_key()
         account_address = AccountAddress.from_key(public_key)
@@ -387,7 +387,7 @@ class Test(unittest.TestCase):
             TransactionArgument(5000, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x1::coin",
             "transfer",
             [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
@@ -411,7 +411,7 @@ class Test(unittest.TestCase):
         signed_transaction = SignedTransaction(raw_transaction, authenticator)
         self.assertTrue(signed_transaction.verify())
 
-    def test_script_function_with_corpus(self):
+    def test_entry_function_with_corpus(self):
         # Define common inputs
         sender_key_input = (
             "9bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f"
@@ -442,7 +442,7 @@ class Test(unittest.TestCase):
             TransactionArgument(amount_input, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x1::coin",
             "transfer",
             [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
@@ -483,7 +483,7 @@ class Test(unittest.TestCase):
             signed_transaction_generated,
         )
 
-    def test_script_function_multi_agent_with_corpus(self):
+    def test_entry_function_multi_agent_with_corpus(self):
         # Define common inputs
         sender_key_input = (
             "9bf49a6a0755f953811fce125f2683d50429c3bb49e074147e0089a52eae155f"
@@ -515,7 +515,7 @@ class Test(unittest.TestCase):
             TransactionArgument(1, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token",
             "direct_transfer_script",
             [],

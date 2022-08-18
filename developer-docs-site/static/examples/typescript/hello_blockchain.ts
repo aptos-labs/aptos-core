@@ -60,8 +60,8 @@ async function getMessage(contractAddress: HexString, accountAddress: MaybeHexSt
 //:!:>section_3
 /**  Potentially initialize and set the resource Message::MessageHolder::message */
 async function setMessage(contractAddress: HexString, accountFrom: AptosAccount, message: string): Promise<string> {
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       `${contractAddress.toString()}::message`,
       "set_message",
       [],

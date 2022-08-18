@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::{
-    AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, Event, GenesisPayload,
-    MoveAbility, MoveFunction, MoveFunctionGenericTypeParam, MoveFunctionVisibility, MoveModule,
-    MoveModuleBytecode, MoveModuleId, MoveResource, MoveScriptBytecode, MoveStruct,
-    MoveStructField, MoveStructTag, MoveType, MultiEd25519Signature, ScriptFunctionId,
-    ScriptPayload, Transaction, TransactionInfo, TransactionPayload, TransactionSignature,
-    WriteSet, WriteSetChange,
+    AccountSignature, DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, Event,
+    GenesisPayload, MoveAbility, MoveFunction, MoveFunctionGenericTypeParam,
+    MoveFunctionVisibility, MoveModule, MoveModuleBytecode, MoveModuleId, MoveResource,
+    MoveScriptBytecode, MoveStruct, MoveStructField, MoveStructTag, MoveType,
+    MultiEd25519Signature, ScriptPayload, Transaction, TransactionInfo, TransactionPayload,
+    TransactionSignature, WriteSet, WriteSetChange,
 };
 use aptos_bitvec::BitVec;
 use aptos_logger::warn;
@@ -143,23 +143,23 @@ pub fn convert_move_module_bytecode(mmb: &MoveModuleBytecode) -> extractor::Move
     }
 }
 
-pub fn convert_script_function_id(
-    script_function_id: &ScriptFunctionId,
-) -> extractor::ScriptFunctionId {
-    extractor::ScriptFunctionId {
-        module: Some(convert_move_module_id(&script_function_id.module)),
-        name: script_function_id.name.to_string(),
+pub fn convert_entry_function_id(
+    entry_function_id: &EntryFunctionId,
+) -> extractor::EntryFunctionId {
+    extractor::EntryFunctionId {
+        module: Some(convert_move_module_id(&entry_function_id.module)),
+        name: entry_function_id.name.to_string(),
     }
 }
 
 pub fn convert_transaction_payload(payload: &TransactionPayload) -> extractor::TransactionPayload {
     match payload {
-        TransactionPayload::ScriptFunctionPayload(sfp) => extractor::TransactionPayload {
-            r#type: extractor::transaction_payload::Type::ScriptFunctionPayload as i32,
+        TransactionPayload::EntryFunctionPayload(sfp) => extractor::TransactionPayload {
+            r#type: extractor::transaction_payload::Type::EntryFunctionPayload as i32,
             payload: Some(
-                extractor::transaction_payload::Payload::ScriptFunctionPayload(
-                    extractor::ScriptFunctionPayload {
-                        function: Some(convert_script_function_id(&sfp.function)),
+                extractor::transaction_payload::Payload::EntryFunctionPayload(
+                    extractor::EntryFunctionPayload {
+                        function: Some(convert_entry_function_id(&sfp.function)),
                         type_arguments: sfp.type_arguments.iter().map(convert_move_type).collect(),
                         arguments: sfp
                             .arguments

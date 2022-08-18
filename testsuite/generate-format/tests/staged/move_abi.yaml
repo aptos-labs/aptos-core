@@ -24,10 +24,10 @@ ScriptABI:
         NEWTYPE:
           TYPENAME: TransactionScriptABI
     1:
-      ScriptFunction:
+      EntryFunction:
         NEWTYPE:
-          TYPENAME: ScriptFunctionABI
-ScriptFunctionABI:
+          TYPENAME: EntryFunctionABI
+EntryFunctionABI:
   STRUCT:
     - name: STR
     - module_name:

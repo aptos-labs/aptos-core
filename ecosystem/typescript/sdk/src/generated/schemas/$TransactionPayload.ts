@@ -4,7 +4,7 @@
 export const $TransactionPayload = {
     type: 'one-of',
     contains: [{
-        type: 'TransactionPayload_ScriptFunctionPayload',
+        type: 'TransactionPayload_EntryFunctionPayload',
     }, {
         type: 'TransactionPayload_ScriptPayload',
     }, {

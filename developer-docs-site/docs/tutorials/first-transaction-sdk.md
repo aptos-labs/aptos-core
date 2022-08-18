@@ -165,7 +165,7 @@ def bcs_transfer(
         TransactionArgument(amount, Serializer.u64),
     ]
 
-    payload = ScriptFunction.natural(
+    payload = EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
@@ -179,7 +179,7 @@ def bcs_transfer(
 ```
 
 Breaking the above down into pieces:<br/>
-(1) `transfer` internally is a `ScriptFunction` or an entry function in Move that is directly callable.<br/>
+(1) `transfer` internally is a `EntryFunction` or an entry function in Move that is directly callable.<br/>
 (2) The Move function is stored on the coin module: `0x1::coin`.<br/>
 (3) Because the Coin module can be used by other coins, the transfer must explicitly use a `TypeTag` to define which coin to transfer.<br/>
 (4) The transaction arguments must be placed into `TransactionArgument`s with type specifiers (`Serializer.{type}`), that will serialize the value into the appropriate type at transaction generation time.

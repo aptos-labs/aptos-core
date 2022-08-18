@@ -18,8 +18,8 @@ const NUMBER_MAX: number = 9007199254740991;
 const client = new AptosClient(NODE_URL);
 /** Creates a new collection within the specified account */
 async function createCollection(account: AptosAccount, name: string, description: string, uri: string) {
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x3::token",
       "create_collection_script",
       [],
@@ -67,8 +67,8 @@ async function createToken(
   const serializer = new BCS.Serializer();
   serializer.serializeU32AsUleb128(0);
 
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x3::token",
       "create_token_script",
       [],
@@ -120,8 +120,8 @@ async function offerToken(
   token_name: string,
   amount: number,
 ) {
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x3::token_transfers",
       "offer_script",
       [],
@@ -165,8 +165,8 @@ async function claimToken(
   collection_name: string,
   token_name: string,
 ) {
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x3::token_transfers",
       "claim_script",
       [],
@@ -207,8 +207,8 @@ async function cancelTokenOffer(
   creator: HexString,
   token_creation_num: number,
 ) {
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x3::token_transfers",
       "cancel_offer_script",
       [],

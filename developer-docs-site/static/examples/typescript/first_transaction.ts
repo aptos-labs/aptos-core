@@ -58,8 +58,8 @@ export async function accountBalance(accountAddress: MaybeHexString): Promise<nu
 async function transfer(accountFrom: AptosAccount, recipient: MaybeHexString, amount: number): Promise<string> {
   const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       "0x1::coin",
       "transfer",
       [token],

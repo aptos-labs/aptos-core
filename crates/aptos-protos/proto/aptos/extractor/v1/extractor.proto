@@ -230,15 +230,15 @@ message TransactionPayload {
   Type type = 1;
 
   oneof payload {
-    ScriptFunctionPayload script_function_payload = 2;
+    EntryFunctionPayload entry_function_payload = 2;
     ScriptPayload script_payload = 3;
     ModuleBundlePayload module_bundle_payload = 4;
     WriteSetPayload write_set_payload = 5;
   }
 }
 
-message ScriptFunctionPayload {
-  ScriptFunctionId function = 1;
+message EntryFunctionPayload {
+  EntryFunctionId function = 1;
   repeated MoveType type_arguments = 2;
   repeated string arguments = 3;
 }
@@ -348,7 +348,7 @@ message WriteSetPayload {
   WriteSet write_set = 1;
 }
 
-message ScriptFunctionId {
+message EntryFunctionId {
   MoveModuleId module = 1;
   string name = 2;
 }

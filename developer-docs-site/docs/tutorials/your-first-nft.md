@@ -127,7 +127,7 @@ public(script) fun create_collection_script (
 )
 ```
 
-These script functions can be called via the REST API. See below: 
+These entry functions can be called via the REST API. See below: 
 
 <Tabs>
 <TabItem value="typescript" label="Typescript" default>
@@ -152,7 +152,7 @@ Under construction.
 
 ### Creating a token
 
-Tokens can be created after collection creation. To do so, the token must specify the same `collection` as specified as the name of a previously created collection `name`. The Move script function is:
+Tokens can be created after collection creation. To do so, the token must specify the same `collection` as specified as the name of a previously created collection `name`. The Move entry function is:
 
 ```rust
 public entry fun create_token_script(
@@ -180,7 +180,7 @@ public entry fun create_token_script(
 - The `token_mutate_setting` describes whether a field is `TokenData` is mutable.
 - The `property_keys`, `property_values` and `property_types` are the property key value pairs that can be stored, read and write on-chain.
 
-These script functions can be called via the REST API. See below:
+These entry functions can be called via the REST API. See below:
 
 <Tabs>
 <TabItem value="typescript" label="Typescript" default>
@@ -236,7 +236,7 @@ Under construction.
 
 #### Offering the token
 
-The following Move script function in `Token` supports transferring a token to another account, effectively registering that the other account can claim the token:
+The following Move entry function in `Token` supports transferring a token to another account, effectively registering that the other account can claim the token:
 
 ```rust
 public entry fun offer_script(
@@ -273,7 +273,7 @@ Under construction.
 
 #### Claiming the token
 
-The following Move script function in `SimpleToken` supports receiving a token provided by the previous function, effectively claiming a token:
+The following Move entry function in `SimpleToken` supports receiving a token provided by the previous function, effectively claiming a token:
 
 ```rust
 public entry fun claim_script(

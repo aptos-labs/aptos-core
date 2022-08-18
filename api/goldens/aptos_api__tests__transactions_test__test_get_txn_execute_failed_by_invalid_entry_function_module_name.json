@@ -46,7 +46,7 @@
   "gas_unit_price": "0",
   "expiration_timestamp_secs": "18446744073709551615",
   "payload": {
-    "function": "0x1222::Coin::transfer",
+    "function": "0x1::CoinInvalid::transfer",
     "type_arguments": [
       "0x1::aptos_coin::AptosCoin"
     ],
@@ -54,11 +54,11 @@
       "0x00000000000000000000000000000000000000000000000000000000000000dd",
       "0x0100000000000000"
     ],
-    "type": "script_function_payload"
+    "type": "entry_function_payload"
   },
   "signature": {
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x0607e8c7524c32ba89772e0ca634078e127ef253e28a1ae92d4c9d30cef521d7e6181cc5e36c42c53139b08e9abf774c315cba798ce87aa433932bdd5b382303",
+    "signature": "0xce0f038aee667085097ae3bf9c6da94272a902e20ec63fee415777ebebab03d7463d9426bf9033c6327be504e1aaeb87e244cfd028936204935bde99d4d59c09",
     "type": "ed25519_signature"
   },
   "events": [],

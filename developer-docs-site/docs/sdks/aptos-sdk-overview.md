@@ -82,7 +82,7 @@ A subset of BCS standards implemented in Typescript.
 
 The transaction builder contains the Typescript types for constructing the transaction payloads. The transaction builder within the Typescript SDK supports the following transaction payloads:
 
-1. ScriptFunction
+1. EntryFunction
 2. Script
 3. ModuleBundle
 
@@ -127,14 +127,14 @@ An example of an e2e test for submitting a BCS transaction can be found [here](h
 
 There are a total of three test vectors. Each covers one type of transaction payload.
 
-- [ScriptFunction vector](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_script_function_payload.json)
+- [EntryFunction vector](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_entry_function_payload.json)
 - [Script vector](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_script_payload.json)
 - [ModuleBundle vector](https://github.com/aptos-labs/aptos-core/blob/main/api/goldens/aptos_api__tests__transaction_vector_test__test_module_payload.json)
 
 Vector items are self-explanatory. However, special serialization method is used to save space and avoid data overflow. Details are described below:
 
 - All account address are hex-coded.
-- `args` in ScriptFunction is hex-coded.
+- `args` in EntryFunction is hex-coded.
 - U64 and U128 numbers are serialized as string literals to avoid data truncation.
 - U8 is serialized as a number (not a string).
 - `code` in Script and ModuleBundle are hex-coded.

@@ -84,20 +84,20 @@ The `publish` command publishes a Move module to a designated account (**Alice**
 The default value is the maximum coins available at the sender account.
 :::
 
-### Run module script functions
+### Run module entry functions
 
 ```rust
 //# run --signers Alice [--args x"68656C6C6F20776F726C64"] [--type-args "0x1::aptos_coin::AptosCoin"] [--expiration 1658432810] [--sequence-number 1] [--gas-price 1] [--show-events] -- Alice::first_module::function_name
 ```
 
-The `run` command runs a module script function by sending a transaction. 
+The `run` command runs a module entry function by sending a transaction. 
 
 In the above example:
 
 - `--signers` specify who signs and sends the transaction.
 - `Alice::first_module::function_name` is the fully qualified Move module function name.
-- `--args` specify the arguments to pass to the script function.
-- `--type-args` specify the type arguments if the script function is a generic function.
+- `--args` specify the arguments to pass to the entry function.
+- `--type-args` specify the type arguments if the entry function is a generic function.
 - `--expiration` transaction expiration time.
 - `--sequence-number` account sequence number.
 - `--gas-price` gas unit price.

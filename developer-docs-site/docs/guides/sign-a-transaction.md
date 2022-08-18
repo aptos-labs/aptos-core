@@ -68,7 +68,7 @@ A raw transaction consists of the following fields:
 
 * **sender** (Address): Account address of the sender.
 * **sequence_number** (uint64): Sequence number of this transaction. This must match the sequence number stored in the sender's account at the time the transaction executes.
-* **payload**: Instructions for the Aptos Blockchain, including publishing a module, execute a script function or execute a script payload.
+* **payload**: Instructions for the Aptos Blockchain, including publishing a module, execute a entry function or execute a script payload.
 * **max_gas_amount** (uint64): Maximum total gas to spend for this transaction. The account must have more than this gas or the transaction will be discarded during validation.
 * **gas_unit_price** (uint64): Price to be paid per gas unit. During execution the `total_gas_amount`, calculated as: `total_gas_amount = total_gas_units_consumed * gas_unit_price`, must not exceed `max_gas_amount` or the transaction will abort during the execution. `total_gas_units_consumed` represents the total units of gas consumed when executing the transaction.
 * **expiration_timestamp_secs** (uint64): The blockchain timestamp at which the blockchain would discard this transaction.
@@ -164,7 +164,7 @@ interface MultisigAuthenticator {
 
 ### Step 1. Creating a RawTransaction
 
-The below example assumes the transaction has a script function payload.
+The below example assumes the transaction has a entry function payload.
 
 ```typescript
 
@@ -178,7 +178,7 @@ interface ModuleId {
   name: string
 }
 
-interface ScriptFunction {
+interface EntryFunction {
   module: ModuleId,
   function: string,
   ty_args: string[],
@@ -188,7 +188,7 @@ interface ScriptFunction {
 interface RawTransaction {
   sender: AccountAddress,
   sequence_number: number,
-  payload: ScriptFunction,
+  payload: EntryFunction,
   max_gas_amount: number,
   gas_unit_price: number,
   expiration_timestamp_secs: number,
@@ -196,7 +196,7 @@ interface RawTransaction {
 }
 
 function createRawTransaction(): RawTransaction {
-  const payload: ScriptFunction = {
+  const payload: EntryFunction = {
     module: {
       address: hexToAccountAddress("0x01"),
       name: "AptosCoin"

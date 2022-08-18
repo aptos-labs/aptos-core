@@ -88,8 +88,8 @@ test(
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -146,8 +146,8 @@ test(
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -262,8 +262,8 @@ test(
     await checkAptosCoin();
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -356,8 +356,8 @@ test(
     let aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x3::token",
         "direct_transfer_script",
         [],
