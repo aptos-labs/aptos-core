@@ -4,6 +4,7 @@
 //! This file defines the state merkle snapshot committer running in background thread.
 
 use crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema;
+use crate::metrics::LATEST_SNAPSHOT_VERSION;
 use crate::state_store::buffered_state::CommitMessage;
 use crate::state_store::StateDb;
 use crate::version_data::{VersionData, VersionDataSchema};
@@ -68,6 +69,11 @@ impl StateMerkleBatchCommitter {
                         root_hash = root_hash,
                         "State snapshot committed."
                     );
+                    let current_version = state_delta
+                        .current_version
+                        .expect("Current version should not be None");
+                    LATEST_SNAPSHOT_VERSION.set(current_version as i64);
+
                     self.check_state_item_count_consistency(state_delta.current_version.unwrap())
                         .unwrap_or_else(|e| warn!("{}", e));
                 }
