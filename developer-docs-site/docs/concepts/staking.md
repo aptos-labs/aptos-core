@@ -9,16 +9,20 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 ## Concept
 
+:::tip
+We strongly recommend reading the consensus section of the [Life of a Transaction](/guides/basics-life-of-txn#consensus) before proceeding further. 
+:::
+
 Staking drives the consensus while securing the blockchain network. Staking is both a requirement imposed on a validator and an incentive that aligns the validator’s interests with the security of the blockchain network. Below is a brief conceptual look at staking in general. 
 
-Nodes of a special type, called validator nodes, distributed across the blockchain network, vote for the blocks to be included in the blockchain. In this way, the validators determine the next state of the blockchain. This is how distributed consensus is achieved in the authority-less world of blockchains. 
+Nodes of a special type, called validator nodes, distributed across the blockchain network, vote for the blocks to be included in the blockchain. In this way, the validators determine the next state of the blockchain. This is how distributed consensus is achieved in the permission-less world of blockchains. 
 
 However, when a validator node acquires a very large amount of the blockchain coins, it gives the validator the power to threaten the security of the blockchain network, for example, by approving a fraudulent transaction. 
 
 Staking is a requirement imposed on a validator in a way that solves two distinct problems in one stroke: 
 
-1. A validator is required to temporarily place into an “escrow” account (i.e., stake) large amounts of their coin to be able to participate in consensus. This stake is the validator’s expression of integrity and a promise not to threaten the security of the blockchain. 
-2. In exchange for locking up such significant amounts of coin into the “escrow” account, the validator is rewarded in proportion to the staked coins. This stake-and-reward scheme ensures the integrity of the consensus and discourages this validator from turning into a rogue validator. 
+1. A validator expresses their integrity, and their promise not to threaten the security of the blockchain, by placing large amounts of their utility coin into escrow for the duration of the staking process. The validator is required to do this to participate in the consensus.
+2. In exchange for a successful staking, the validator is rewarded. The reward is based on the proportion of the staked coins, on the validator's participation and the activity of the network. This stake-and-reward scheme ensures the integrity of the consensus and discourages this validator from turning into a rogue validator. 
 3. For any other rogue validator, this increases the costs of attacking the network, because the rogue validator will have to acquire coins considerably exceeding the maximum staked coins. This cost is usually prohibitively high and hence this ensures the security of the blockchain network.
 
 The rest of this document presents how staking works on the Aptos blockchain.
