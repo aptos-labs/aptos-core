@@ -197,7 +197,7 @@ fn parse_single_signature(
         public_key: s.public_key.clone(),
         signature: s.signature.clone(),
         threshold: 1,
-        bitmap: Vec::default(),
+        public_key_indices: Vec::default(),
         multi_agent_index,
         multi_sig_index: 0,
     }
@@ -216,17 +216,17 @@ fn parse_multi_signature(
     if let Some(addr) = override_address {
         signer = addr;
     }
-    for (index, key) in s.public_keys.iter().enumerate() {
-        let signature = s.signatures.get(index).unwrap();
+    for (index, signature) in s.signatures.iter().enumerate() {
+        let public_key = s.public_keys.get(s.public_key_indices.clone()[index] as usize).unwrap().clone();
         signatures.push(SignatureOutput {
             version: info.version,
             signer: signer.clone(),
             is_sender_primary,
             signature_type: get_signature_type(SignatureType::MultiEd25519),
-            public_key: key.clone(),
+            public_key,
             signature: signature.clone(),
             threshold: s.threshold,
-            bitmap: s.bitmap.clone(),
+            public_key_indices: s.public_key_indices.clone(),
             multi_agent_index,
             multi_sig_index: index as u32,
         });
