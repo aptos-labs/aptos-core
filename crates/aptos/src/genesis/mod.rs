@@ -297,7 +297,7 @@ fn get_config(client: &Client, user: &str) -> CliTypedResult<ValidatorConfigurat
         consensus_public_key,
         proof_of_possession: consensus_proof_of_possession,
         validator_network_public_key,
-        validator_host: operator_config.validator_host.clone(),
+        validator_host: operator_config.validator_host,
         full_node_network_public_key,
         full_node_host: operator_config.full_node_host,
         stake_amount,
