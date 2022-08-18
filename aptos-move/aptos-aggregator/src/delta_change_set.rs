@@ -43,7 +43,7 @@ pub enum DeltaUpdate {
 
 impl DeltaOp {
     /// Creates a new delta op.
-    pub fn new(max_positive: u128, min_negative: u128, limit: u128, update: DeltaUpdate) -> Self {
+    pub fn new(update: DeltaUpdate, limit: u128, max_positive: u128, min_negative: u128) -> Self {
         Self {
             max_positive,
             min_negative,
@@ -58,7 +58,7 @@ impl DeltaOp {
     }
 
     /// Returns the result of delta application to `base` or error if
-    /// postcondition is not satisfied. Delta op is not validated.
+    /// postcondition is not satisfied.
     pub fn apply_to(&self, base: u128) -> PartialVMResult<u128> {
         // First, validate if delta op can be applied to `base`. Note that
         // this is possible if the values observed during execution didn't
@@ -227,11 +227,11 @@ mod tests {
     use std::collections::HashMap;
 
     fn addition(value: u128, limit: u128) -> DeltaOp {
-        DeltaOp::new(0, 0, limit, DeltaUpdate::Plus(value))
+        DeltaOp::new(DeltaUpdate::Plus(value), limit, 0, 0)
     }
 
     fn subtraction(value: u128, limit: u128) -> DeltaOp {
-        DeltaOp::new(0, 0, limit, DeltaUpdate::Minus(value))
+        DeltaOp::new(DeltaUpdate::Minus(value), limit, 0, 0)
     }
 
     #[test]

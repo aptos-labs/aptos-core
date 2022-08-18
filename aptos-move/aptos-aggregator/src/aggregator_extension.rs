@@ -82,8 +82,8 @@ impl AggregatorID {
 ///
 /// Clearly, +X succeeds if +A and -B succeed. Therefore each delta
 /// validation consists of:
-///   1. check +A didn not overflow
-///   2. check -A didn nott drop below zero
+///   1. check +A did not overflow
+///   2. check -A did not drop below zero
 /// Checking +X is irrelevant since +A >= +X.
 ///
 /// TODO: while we support tracking of the history, it is not yet fully used on
@@ -245,10 +245,6 @@ impl Aggregator {
                     let value_from_storage = deserialize(&bytes);
 
                     // Sanity checks.
-                    debug_assert!(
-                        self.state != AggregatorState::Data,
-                        "resolving aggregator with a known value"
-                    );
                     debug_assert!(
                         self.history.is_some(),
                         "resolving aggregator with no history"
@@ -421,14 +417,14 @@ impl<'a> NativeAggregatorContext<'a> {
                     let history = history.unwrap();
                     let plus = DeltaUpdate::Plus(value);
                     let delta_op =
-                        DeltaOp::new(history.max_positive, history.min_negative, limit, plus);
+                        DeltaOp::new(plus, limit, history.max_positive, history.min_negative);
                     AggregatorChange::Merge(delta_op)
                 }
                 AggregatorState::NegativeDelta => {
                     let history = history.unwrap();
                     let minus = DeltaUpdate::Minus(value);
                     let delta_op =
-                        DeltaOp::new(history.max_positive, history.min_negative, limit, minus);
+                        DeltaOp::new(minus, limit, history.max_positive, history.min_negative);
                     AggregatorChange::Merge(delta_op)
                 }
             };
