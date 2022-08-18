@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::MVHashMap;
+use aptos_types::write_set::DeserializeU128;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -26,7 +27,15 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
     Value(V),
 }
 
-struct Baseline<K, V>(HashMap<K, BTreeMap<usize, Option<V>>>);
+struct Value<V>(Option<V>);
+
+impl<V> DeserializeU128 for Value<V> {
+    fn deserialize(&self) -> Option<u128> {
+        Some(0)
+    }
+}
+
+struct Baseline<K, V>(HashMap<K, BTreeMap<usize, Value<V>>>);
 
 impl<K, V> Baseline<K, V>
 where
@@ -34,11 +43,11 @@ where
     V: Clone + Debug + PartialEq,
 {
     pub fn new(txns: &[(K, Operator<V>)]) -> Self {
-        let mut baseline: HashMap<K, BTreeMap<usize, Option<V>>> = HashMap::new();
+        let mut baseline: HashMap<K, BTreeMap<usize, Value<V>>> = HashMap::new();
         for (idx, (k, op)) in txns.iter().enumerate() {
             let value_to_update = match op {
-                Operator::Insert(v) => Some(v.clone()),
-                Operator::Remove => None,
+                Operator::Insert(v) => Value(Some(v.clone())),
+                Operator::Remove => Value(None),
                 Operator::Read => continue,
             };
 
@@ -57,8 +66,8 @@ where
             .and_then(|tree| tree.range(..version).last())
         {
             None => ExpectedOutput::NotInMap,
-            Some((_, Some(v))) => ExpectedOutput::Value(v.clone()),
-            Some((_, None)) => ExpectedOutput::Deleted,
+            Some((_, Value(Some(v)))) => ExpectedOutput::Value(v.clone()),
+            Some((_, Value(None))) => ExpectedOutput::Deleted,
         }
     }
 }
@@ -85,7 +94,7 @@ where
         .collect::<Vec<_>>();
 
     let baseline = Baseline::new(transactions.as_slice());
-    let map = MVHashMap::<K, Option<V>>::new();
+    let map = MVHashMap::<K, Value<V>>::new();
 
     // make ESTIMATE placeholders for all versions to be written.
     // allows to test that correct values appear at the end of concurrent execution.
@@ -98,7 +107,7 @@ where
         })
         .collect::<Vec<_>>();
     for (key, idx) in versions_to_write {
-        map.write(&key, (idx, 0), None);
+        map.write(&key, (idx, 0), Value(None));
         map.mark_estimate(&key, idx);
     }
 
@@ -123,7 +132,7 @@ where
                             match map.read(key, idx) {
                                 Ok((_, v)) => {
                                     match &*v {
-                                        Some(w) => {
+                                        Value(Some(w)) => {
                                             assert_eq!(
                                                 baseline,
                                                 ExpectedOutput::Value(w.clone()),
@@ -131,7 +140,7 @@ where
                                                 idx
                                             );
                                         }
-                                        None => {
+                                        Value(None) => {
                                             assert_eq!(
                                                 baseline,
                                                 ExpectedOutput::Deleted,
@@ -156,10 +165,10 @@ where
                         }
                     }
                     Operator::Remove => {
-                        map.write(key, (idx, 1), None);
+                        map.write(key, (idx, 1), Value(None));
                     }
                     Operator::Insert(v) => {
-                        map.write(key, (idx, 1), Some(v.clone()));
+                        map.write(key, (idx, 1), Value(Some(v.clone())));
                     }
                 }
             })

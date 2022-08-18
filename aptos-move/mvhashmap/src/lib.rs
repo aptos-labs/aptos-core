@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_types::write_set::DeserializeU128;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -64,7 +65,7 @@ pub struct MVHashMap<K, V> {
     data: DashMap<K, BTreeMap<TxnIndex, CachePadded<WriteCell<V>>>>,
 }
 
-impl<K: Hash + Clone + Eq, V> MVHashMap<K, V> {
+impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
     pub fn new() -> MVHashMap<K, V> {
         MVHashMap {
             data: DashMap::new(),
@@ -120,6 +121,7 @@ impl<K: Hash + Clone + Eq, V> MVHashMap<K, V> {
                         Err(Some(*idx))
                     } else {
                         debug_assert!(flag == FLAG_DONE);
+
                         // The entry is populated, return its contents.
                         let write_version = (*idx, write_cell.incarnation);
                         Ok((write_version, write_cell.data.clone()))

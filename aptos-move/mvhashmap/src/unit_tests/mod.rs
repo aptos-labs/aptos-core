@@ -5,13 +5,22 @@ use super::*;
 
 mod proptest_types;
 
+#[derive(Debug, PartialEq)]
+struct Value(Vec<usize>);
+
+impl DeserializeU128 for Value {
+    fn deserialize(&self) -> Option<u128> {
+        Some(0)
+    }
+}
+
 // Generate a Vec deterministically based on txn_idx and incarnation.
-fn value_for(txn_idx: usize, incarnation: usize) -> Vec<usize> {
-    vec![txn_idx * 5, txn_idx + incarnation, incarnation * 5]
+fn value_for(txn_idx: usize, incarnation: usize) -> Value {
+    Value(vec![txn_idx * 5, txn_idx + incarnation, incarnation * 5])
 }
 
 // Generate the value_for txn_idx and incarnation in arc.
-fn arc_value_for(txn_idx: usize, incarnation: usize) -> Arc<Vec<usize>> {
+fn arc_value_for(txn_idx: usize, incarnation: usize) -> Arc<Value> {
     // Generate a Vec deterministically based on txn_idx and incarnation.
     Arc::new(value_for(txn_idx, incarnation))
 }
