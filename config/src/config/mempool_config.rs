@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::config::MAX_APPLICATION_MESSAGE_SIZE;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -15,6 +16,7 @@ pub struct MempoolConfig {
     pub shared_mempool_ack_timeout_ms: u64,
     pub shared_mempool_backoff_interval_ms: u64,
     pub shared_mempool_batch_size: usize,
+    pub shared_mempool_max_batch_bytes: u64,
     pub shared_mempool_max_concurrent_inbound_syncs: usize,
     pub shared_mempool_tick_interval_ms: u64,
     pub system_transaction_timeout_secs: u64,
@@ -28,6 +30,7 @@ impl Default for MempoolConfig {
             shared_mempool_tick_interval_ms: 50,
             shared_mempool_backoff_interval_ms: 30_000,
             shared_mempool_batch_size: 100,
+            shared_mempool_max_batch_bytes: MAX_APPLICATION_MESSAGE_SIZE as u64,
             shared_mempool_ack_timeout_ms: 2_000,
             shared_mempool_max_concurrent_inbound_syncs: 4,
             max_broadcasts_per_peer: 1,

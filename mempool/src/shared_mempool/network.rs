@@ -59,12 +59,12 @@ pub enum MempoolSyncMsg {
     /// Broadcast request issued by the sender.
     BroadcastTransactionsRequest {
         /// Unique id of sync request. Can be used by sender for rebroadcast analysis
-        request_id: Vec<u8>,
+        request_id: BatchId,
         transactions: Vec<SignedTransaction>,
     },
     /// Broadcast ack issued by the receiver.
     BroadcastTransactionsResponse {
-        request_id: Vec<u8>,
+        request_id: BatchId,
         /// Retry signal from recipient if there are txns in corresponding broadcast
         /// that were rejected from mempool but may succeed on resend.
         retry: bool,
@@ -126,17 +126,11 @@ impl ApplicationNetworkSender<MempoolSyncMsg> for MempoolNetworkSender {
 
     async fn send_rpc(
         &self,
-        recipient: PeerId,
-        req_msg: MempoolSyncMsg,
-        timeout: Duration,
+        _recipient: PeerId,
+        _req_msg: MempoolSyncMsg,
+        _timeout: Duration,
     ) -> Result<MempoolSyncMsg, RpcError> {
-        fail_point!("mempool::send_to", |_| {
-            Err(anyhow::anyhow!("Injected error in mempool::send_rpc").into())
-        });
-        let protocol = ProtocolId::MempoolRpc;
-        self.inner
-            .send_rpc(recipient, protocol, req_msg, timeout)
-            .await
+        unimplemented!("Shared mempool only supports direct send messages!");
     }
 }
 
@@ -270,18 +264,11 @@ impl MempoolNetworkInterface {
     pub fn process_broadcast_ack(
         &self,
         peer: PeerNetworkId,
-        request_id_bytes: Vec<u8>,
+        batch_id: BatchId,
         retry: bool,
         backoff: bool,
         timestamp: SystemTime,
     ) {
-        let batch_id = if let Ok(id) = bcs::from_bytes::<BatchId>(&request_id_bytes) {
-            id
-        } else {
-            counters::invalid_ack_inc(peer.network_id(), counters::INVALID_REQUEST_ID);
-            return;
-        };
-
         let mut sync_states = self.sync_states.write_lock();
 
         let sync_state = if let Some(state) = sync_states.get_mut(&peer) {
@@ -466,7 +453,7 @@ impl MempoolNetworkInterface {
         transactions: Vec<SignedTransaction>,
     ) -> Result<(), BroadcastError> {
         let request = MempoolSyncMsg::BroadcastTransactionsRequest {
-            request_id: bcs::to_bytes(&batch_id).expect("failed BCS serialization of batch ID"),
+            request_id: batch_id,
             transactions,
         };
 

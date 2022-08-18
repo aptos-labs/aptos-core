@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::event::EventHandle;
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum AccountSequenceInfo {
     Sequential(u64),
     CRSN { min_nonce: u64, size: u64 },
