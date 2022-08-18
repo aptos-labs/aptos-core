@@ -18,6 +18,7 @@ pub const RAW_BYTES: &str = "raw_bytes";
 #[derive(Clone, Debug)]
 pub enum CompressionClient {
     Consensus,
+    Mempool,
     StateSync,
 }
 
@@ -26,6 +27,7 @@ impl CompressionClient {
     pub fn get_label(&self) -> &'static str {
         match self {
             Self::Consensus => "consensus",
+            Self::Mempool => "mempool",
             Self::StateSync => "state_sync",
         }
     }
