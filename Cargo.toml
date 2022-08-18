@@ -51,7 +51,6 @@ members = [
     "crates/aptos-retrier",
     "crates/aptos-rosetta",
     "crates/aptos-rosetta-cli",
-    "crates/aptos-runtime",
     "crates/aptos-telemetry",
     "crates/aptos-telemetry-service",
     "crates/aptos-temppath",

@@ -15,7 +15,6 @@ use anyhow::Context as AnyhowContext;
 use aptos_config::config::NodeConfig;
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
-use aptos_runtime::instrumented_runtime::instrument_tokio_runtime;
 use aptos_types::chain_id::ChainId;
 use poem::{
     http::{header, Method},
@@ -42,7 +41,6 @@ pub fn bootstrap(
         .build()
         .context("[api] failed to create runtime")?;
 
-    instrument_tokio_runtime(&runtime, "api");
     let context = Context::new(chain_id, db, mp_sender, config.clone());
 
     attach_poem_to_runtime(runtime.handle(), context, config, false)
