@@ -167,6 +167,7 @@ dependencies = [
  "async-trait",
  "base64 0.13.0",
  "bcs",
+ "cached-packages",
  "clap 3.2.16",
  "clap_complete",
  "dirs 4.0.0",
@@ -296,6 +297,7 @@ dependencies = [
  "async-trait",
  "bcs",
  "bytes 1.2.1",
+ "cached-packages",
  "executor",
  "executor-types",
  "fail 0.5.0",
@@ -611,6 +613,7 @@ dependencies = [
  "aptos-vm",
  "aptosdb",
  "bcs",
+ "cached-packages",
  "consensus-types",
  "executor",
  "framework",
@@ -821,6 +824,7 @@ dependencies = [
  "aptosdb",
  "backup-service",
  "bcs",
+ "cached-packages",
  "clap 3.2.16",
  "consensus",
  "consensus-notifications",
@@ -1076,6 +1080,7 @@ dependencies = [
  "anyhow",
  "aptos-types",
  "bcs",
+ "cached-packages",
  "framework",
  "heck 0.3.3",
  "move-deps",
@@ -1308,7 +1313,7 @@ version = "0.0.3"
 dependencies = [
  "aptos-types",
  "bcs",
- "framework",
+ "cached-packages",
  "move-deps",
  "once_cell",
  "proptest",
@@ -1328,6 +1333,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs",
+ "cached-packages",
  "clap 3.2.16",
  "datatest-stable",
  "framework",
@@ -1459,6 +1465,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs",
+ "cached-packages",
  "framework",
  "handlebars",
  "move-deps",
@@ -2199,6 +2206,21 @@ name = "cache-padded"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1db59621ec70f09c5e9b597b220c7a2b43611f4710dc03ceb8748637775692c"
+
+[[package]]
+name = "cached-packages"
+version = "0.1.0"
+dependencies = [
+ "aptos-types",
+ "bcs",
+ "framework",
+ "include_dir 0.7.2",
+ "move-deps",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "tempfile",
+]
 
 [[package]]
 name = "cassowary"
@@ -3307,6 +3329,7 @@ dependencies = [
  "aptos-vm",
  "aptos-writeset-generator",
  "bcs",
+ "cached-packages",
  "framework",
  "itertools",
  "language-e2e-tests",
@@ -3716,6 +3739,7 @@ dependencies = [
  "aptos-secure-storage",
  "aptos-transaction-builder",
  "async-trait",
+ "cached-packages",
  "either",
  "framework",
  "futures",
@@ -3751,6 +3775,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "async-trait",
+ "cached-packages",
  "forge",
  "framework",
  "structopt 0.3.26",
@@ -4620,6 +4645,7 @@ version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "482a2e29200b7eed25d7fdbd14423326760b7f6658d21a4cf12d55a50713c69f"
 dependencies = [
+ "glob",
  "include_dir_macros",
 ]
 
@@ -4983,6 +5009,7 @@ dependencies = [
  "aptos-vm",
  "aptos-writeset-generator",
  "bcs",
+ "cached-packages",
  "framework",
  "goldenfile",
  "hex",
@@ -5012,6 +5039,7 @@ dependencies = [
  "aptos-vm",
  "aptos-writeset-generator",
  "bcs",
+ "cached-packages",
  "framework",
  "itertools",
  "language-e2e-tests",
@@ -8820,6 +8848,7 @@ dependencies = [
  "backup-cli",
  "base64 0.13.0",
  "bcs",
+ "cached-packages",
  "consensus",
  "diesel",
  "forge",
@@ -10235,6 +10264,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs",
+ "cached-packages",
  "framework",
  "move-deps",
  "once_cell",

@@ -190,7 +190,7 @@ impl FakeExecutor {
     /// initialization done.
     pub fn stdlib_only_genesis() -> Self {
         let mut genesis = Self::no_genesis();
-        for (bytes, module) in framework::head_release_bundle().code_and_compiled_modules() {
+        for (bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules() {
             let id = module.self_id();
             genesis.add_module(&id, bytes.to_vec());
         }

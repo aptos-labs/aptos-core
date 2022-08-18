@@ -284,7 +284,7 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     let deps = vec![PackagePaths {
         name: None,
-        paths: framework::head_release_bundle().files().unwrap(),
+        paths: cached_packages::head_release_bundle().files().unwrap(),
         named_address_map: framework::named_addresses().clone(),
     }];
     let program_res = move_compiler::construct_pre_compiled_lib(

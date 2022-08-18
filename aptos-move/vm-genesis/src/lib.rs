@@ -411,8 +411,8 @@ pub enum GenesisOptions {
 /// Generate an artificial genesis `ChangeSet` for testing
 pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) -> ChangeSet {
     let framework = match genesis_options {
-        GenesisOptions::Compiled => framework::head_release_bundle(),
-        GenesisOptions::Fresh => framework::devnet_release_bundle(),
+        GenesisOptions::Compiled => cached_packages::head_release_bundle(),
+        GenesisOptions::Fresh => cached_packages::devnet_release_bundle(),
     };
 
     generate_test_genesis(framework, Some(1)).0
@@ -421,8 +421,8 @@ pub fn generate_genesis_change_set_for_testing(genesis_options: GenesisOptions) 
 /// Generate a genesis `ChangeSet` for mainnet
 pub fn generate_genesis_change_set_for_mainnet(genesis_options: GenesisOptions) -> ChangeSet {
     let framework = match genesis_options {
-        GenesisOptions::Compiled => framework::head_release_bundle(),
-        GenesisOptions::Fresh => framework::devnet_release_bundle(),
+        GenesisOptions::Compiled => cached_packages::head_release_bundle(),
+        GenesisOptions::Fresh => cached_packages::devnet_release_bundle(),
     };
 
     generate_mainnet_genesis(framework, Some(1)).0
@@ -436,7 +436,7 @@ pub fn test_genesis_transaction() -> Transaction {
 pub fn test_genesis_change_set_and_validators(
     count: Option<usize>,
 ) -> (ChangeSet, Vec<TestValidator>) {
-    generate_test_genesis(framework::head_release_bundle(), count)
+    generate_test_genesis(cached_packages::head_release_bundle(), count)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -579,7 +579,8 @@ pub fn generate_mainnet_genesis(
 pub fn test_genesis_module_publishing() {
     // create a state view for move_vm
     let mut state_view = GenesisStateView::new();
-    for (module_bytes, module) in framework::head_release_bundle().code_and_compiled_modules() {
+    for (module_bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules()
+    {
         state_view.add_module(&module.self_id(), module_bytes);
     }
     let data_cache = StateViewCache::new(&state_view).into_move_resolver();
@@ -587,5 +588,5 @@ pub fn test_genesis_module_publishing() {
     let move_vm = MoveVmExt::new(NativeGasParameters::zeros()).unwrap();
     let id1 = HashValue::zero();
     let mut session = move_vm.new_session(&data_cache, SessionId::genesis(id1));
-    publish_framework(&mut session, framework::head_release_bundle());
+    publish_framework(&mut session, cached_packages::head_release_bundle());
 }

@@ -32,7 +32,7 @@ module aptos_framework::code {
         manifest: String,
         /// The list of modules installed by this package.
         modules: vector<ModuleMetadata>,
-        /// Error map, in BCS.
+        /// Error map, in BCS
         error_map: vector<u8>,
         /// ABIs, in BCS
         abis: vector<vector<u8>>

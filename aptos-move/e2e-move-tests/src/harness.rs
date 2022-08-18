@@ -9,7 +9,7 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
-use framework::aptos_stdlib;
+use cached_packages::aptos_stdlib;
 use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{
     account::{Account, AccountData},

@@ -123,7 +123,7 @@ impl LocalSwarm {
         let (root_key, genesis, genesis_waypoint, validators) =
             aptos_genesis::builder::Builder::new(
                 &dir_actual,
-                genesis_framework.unwrap_or_else(|| framework::head_release_bundle().clone()),
+                genesis_framework.unwrap_or_else(|| cached_packages::head_release_bundle().clone()),
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(

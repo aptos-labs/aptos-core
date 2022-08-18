@@ -12,7 +12,7 @@ use move_deps::move_core_types::language_storage::ModuleId;
 /// Given the module ID and the abort code raised from that module, returns the
 /// human-readable explanation of that abort if possible.
 pub fn get_explanation(module_id: &ModuleId, abort_code: u64) -> Option<ErrorDescription> {
-    framework::head_release_bundle()
+    cached_packages::head_release_bundle()
         .error_mapping()
         .get_explanation(module_id, abort_code & 0xffff)
 }
