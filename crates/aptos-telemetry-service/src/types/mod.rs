@@ -32,3 +32,15 @@ pub mod common {
         }
     }
 }
+
+pub mod humio {
+    use std::collections::HashMap;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Deserialize, Serialize, Clone, Debug)]
+    pub struct UnstructuredLog {
+        pub fields: HashMap<String, String>,
+        pub tags: HashMap<String, String>,
+        pub messages: Vec<String>,
+    }
+}
