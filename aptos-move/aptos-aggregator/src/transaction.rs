@@ -6,6 +6,7 @@ use aptos_state_view::StateView;
 use aptos_types::{
     transaction::{ChangeSet, TransactionOutput},
     vm_status::VMStatus,
+    write_set::WriteSet,
 };
 
 /// Extension of `ChangeSet` that also holds deltas.
@@ -61,14 +62,14 @@ impl TransactionOutputExt {
     pub fn into_transaction_output(
         self,
         state_view: &impl StateView,
-    ) -> Result<TransactionOutput, VMStatus> {
+    ) -> Result<(TransactionOutput, Option<WriteSet>), VMStatus> {
         let (delta_change_set, txn_output) = self.into();
 
         // First, check if output of transaction should be discarded or delta
         // change set is empty. In both cases, we do not need to apply any
         // deltas and can return immediately.
         if txn_output.status().is_discarded() || delta_change_set.is_empty() {
-            return Ok(txn_output);
+            return Ok((txn_output, None));
         }
 
         match delta_change_set.try_into_write_set_mut(state_view) {
@@ -88,7 +89,7 @@ impl TransactionOutputExt {
                 // We expect to have only a few delta changes, so add them to
                 // the write set of the transaction.
                 let mut write_set_mut = write_set.into_mut();
-                write_set_mut.append(&mut materialized_deltas);
+                write_set_mut.append(&mut materialized_deltas.clone());
 
                 let output = TransactionOutput::new(
                     write_set_mut.freeze().unwrap(),
@@ -97,7 +98,7 @@ impl TransactionOutputExt {
                     status,
                 );
 
-                Ok(output)
+                Ok((output, Some(materialized_deltas.freeze().unwrap())))
             }
         }
     }

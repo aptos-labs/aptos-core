@@ -125,6 +125,15 @@ impl<
                         None => continue,
                     }
                 }
+                Err(DeltaApplicationFailure) => {
+                    // Delta application failure currently should never happen. Here, we assume it
+                    // happened because of speculation and return 0 to the Move-VM. Validation will
+                    // ensure the transaction re-executes if 0 wasn't the right number.
+                    self.captured_reads
+                        .lock()
+                        .push(ReadDescriptor::from_delta_application_failure(key.clone()));
+                    return Read::U128(0);
+                }
             };
         }
     }
@@ -258,6 +267,7 @@ where
                 Err(Dependency(_)) => false, // Dependency implies a validation failure.
                 Err(Unresolved(delta)) => r.validate_unresolved(delta),
                 Err(NotFound) => r.validate_storage(),
+                Err(DeltaApplicationFailure) => r.validate_delta_application_failure(),
             }
         });
 
@@ -326,6 +336,7 @@ where
         }
     }
 
+    // <S: StateView>
     pub fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,

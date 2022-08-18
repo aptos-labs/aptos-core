@@ -13,7 +13,10 @@ use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutput
 use aptos_parallel_executor::{
     errors::Error,
     executor::ParallelTransactionExecutor,
-    task::{Transaction as PTransaction, TransactionOutput as PTransactionOutput},
+    task::{
+        DataCache as PDataCache, Transaction as PTransaction,
+        TransactionOutput as PTransactionOutput,
+    },
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -84,15 +87,30 @@ impl ParallelAptosVM {
         )
         .execute_transactions_parallel(state_view, signature_verified_block)
         {
-            Ok(results) => Ok((
-                results
-                    .into_iter()
-                    // TODO: figure out how to collect inputs here (2 lines below).
-                    .map(AptosTransactionOutput::into)
-                    .map(|e| e.into().1)
-                    .collect(),
-                None,
-            )),
+            Ok(results) => {
+                // TODO: with more deltas, do this in parallel, and together with parallel
+                // execution's output processing. (Note: need to make DataCache trait
+                // to avoid circular dependencies).
+                let data_cache = StateViewCache::new(state_view);
+                Ok((
+                    results
+                        .into_iter()
+                        .map(|out| {
+                            let output_ext = AptosTransactionOutput::into(out);
+                            let (output, delta_writes) =
+                                output_ext.into_transaction_output(&data_cache);
+
+                            if !output.status().is_discarded() {
+                                data_cache.push_write_set(
+                                    delta_writes.expect("Expected materialized delta writeset"),
+                                );
+                            }
+                            output
+                        })
+                        .collect(),
+                    None,
+                ))
+            }
             Err(err @ Error::ModulePathReadWrite) => {
                 let output = AptosVM::execute_block_and_keep_vm_status(transactions, state_view)?;
                 Ok((

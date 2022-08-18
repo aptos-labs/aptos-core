@@ -83,6 +83,8 @@ pub enum Error {
     Unresolved(DeltaOp),
     /// A dependency on other transaction has been found during the read.
     Dependency(TxnIndex),
+    /// Delta application failed, txn execution should fail.
+    DeltaApplicationFailure,
 }
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
@@ -167,16 +169,16 @@ impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
                                     Some(delta) => {
                                         // Read hit a write during traversal. We need
                                         // to deserialize the value of the write and
-                                        // apply the aggregated delta.
-                                        // TODO: we do not support error at the moment,
-                                        // so if delta application fails, we panic.
+                                        // apply the aggregated delta. If Delta application
+                                        // fails, we return a corresponding error, so that
+                                        // the speculative execution can also fail.
                                         let value = data
                                             .deserialize()
                                             .expect("cannot deserialize into u128");
-                                        let result = delta.apply_to(value).expect(
-                                            "delta application fails but it shouldn't haves",
-                                        );
-                                        return Ok(Resolved(result));
+                                        return delta
+                                            .apply_to(value)
+                                            .map_err(|_| DeltaApplicationFailure)
+                                            .map(|result| Resolved(result));
                                     }
                                     None => {
                                         // Read hit a write without any traversal
@@ -192,16 +194,14 @@ impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
                                     Some(other_delta) => {
                                         // Read hit a delta during traversing the
                                         // block and aggregating other deltas. Merge
-                                        // two deltas together.
-                                        // TODO: merging deltas can also result in
-                                        // error. Once again, there is nothing we can
-                                        // do at the moment, so panic if this happens.
+                                        // two deltas together. If Delta application
+                                        // fails, we return a corresponding error, so that
+                                        // the speculative execution can also fail.
 
                                         // TODO: We need a function:
-                                        //   delta.merge(other_delta)
+                                        //   delta.merge(other_delta) and match on it.
                                         // Wait until other PR lands to reuse that. For
                                         // now place anything.
-
                                         // LINE BELOW MAKES NO SENSE!
                                         other_delta.apply_to(0);
                                     }
