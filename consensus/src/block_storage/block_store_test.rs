@@ -15,7 +15,7 @@ use aptos_types::{
 use consensus_types::{
     block::{
         block_test_utils::{
-            self, certificate_for_genesis, placeholder_certificate_for_block,
+            self, certificate_for_genesis, gen_test_certificate, placeholder_certificate_for_block,
             placeholder_ledger_info,
         },
         Block,
@@ -300,7 +300,7 @@ async fn test_insert_vote() {
         let vote_res = pending_votes.insert_vote(&vote, &validator_verifier);
 
         // first vote of an author is accepted
-        assert_eq!(vote_res, VoteReceptionResult::VoteAdded(i as u64));
+        assert_eq!(vote_res, VoteReceptionResult::VoteAdded(i as u128));
         // filter out duplicates
         assert_eq!(
             pending_votes.insert_vote(&vote, &validator_verifier),
@@ -347,7 +347,7 @@ async fn test_illegal_timestamp() {
     let block_store = build_empty_tree();
     let genesis = block_store.ordered_root();
     let block_with_illegal_timestamp = Block::new_proposal(
-        Payload::new_empty(),
+        Payload::empty(),
         0,
         // This timestamp is illegal, it is the same as genesis
         genesis.timestamp_usecs(),
@@ -425,4 +425,55 @@ async fn test_need_fetch_for_qc() {
         block_store.need_fetch_for_quorum_cert(duplicate_qc.as_ref()),
         NeedFetchResult::QCAlreadyExist,
     );
+}
+
+#[tokio::test]
+async fn test_need_sync_for_ledger_info() {
+    let mut inserter = TreeInserter::default();
+    let block_store = inserter.block_store();
+
+    let mut prev = block_store.ordered_root();
+    for i in 1..=30 {
+        prev = inserter.insert_block(&prev, i, None).await;
+    }
+    inserter
+        .insert_block(
+            &prev,
+            31,
+            Some(prev.block().gen_block_info(HashValue::zero(), 1, None)),
+        )
+        .await;
+    assert_eq!(block_store.ordered_root().round(), 30);
+    assert_eq!(block_store.commit_root().round(), 0);
+
+    let create_ledger_info = |round: u64| {
+        let future_block = inserter.create_block_with_qc(
+            certificate_for_genesis(),
+            1,
+            round,
+            Payload::empty(),
+            vec![],
+        );
+        gen_test_certificate(
+            &[inserter.signer().clone()],
+            future_block.gen_block_info(HashValue::zero(), 0, None),
+            future_block.quorum_cert().parent_block().clone(),
+            Some(future_block.gen_block_info(HashValue::zero(), 0, None)),
+        )
+        .ledger_info()
+        .clone()
+    };
+    let ordered_round_too_far =
+        block_store.ordered_root().round() + block_store.back_pressure_limit + 1;
+    let ordered_too_far = create_ledger_info(ordered_round_too_far);
+    assert!(block_store.need_sync_for_ledger_info(&ordered_too_far));
+
+    let committed_round_too_far =
+        block_store.commit_root().round() + block_store.back_pressure_limit * 2 + 1;
+    let committed_too_far = create_ledger_info(committed_round_too_far);
+    assert!(block_store.need_sync_for_ledger_info(&committed_too_far));
+
+    let round_not_too_far = block_store.commit_root().round() + block_store.back_pressure_limit + 1;
+    let not_too_far = create_ledger_info(round_not_too_far);
+    assert!(!block_store.need_sync_for_ledger_info(&not_too_far));
 }

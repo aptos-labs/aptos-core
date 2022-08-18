@@ -10,6 +10,7 @@ use aptos_config::config::NetworkConfig;
 use aptos_config::network_id::NetworkId;
 use aptos_config::{config::NodeConfig, keys::ConfigKey};
 use aptos_genesis::builder::{FullnodeNodeConfig, InitConfigFn, InitGenesisConfigFn};
+use aptos_logger::{info, warn};
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
     types::{
@@ -17,6 +18,7 @@ use aptos_sdk::{
         PeerId,
     },
 };
+use framework::ReleaseBundle;
 use prometheus_http_query::response::PromqlResult;
 use std::{
     collections::HashMap,
@@ -101,12 +103,12 @@ impl LocalSwarm {
         init_config: Option<InitConfigFn>,
         init_genesis_config: Option<InitGenesisConfigFn>,
         dir: Option<PathBuf>,
-        genesis_modules: Option<Vec<Vec<u8>>>,
+        genesis_framework: Option<ReleaseBundle>,
     ) -> Result<LocalSwarm>
     where
         R: ::rand::RngCore + ::rand::CryptoRng,
     {
-        println!("Building a new swarm");
+        info!("Building a new swarm");
         let dir_actual = if let Some(dir_) = dir {
             if dir_.exists() {
                 fs::remove_dir_all(&dir_)?;
@@ -120,8 +122,7 @@ impl LocalSwarm {
         let (root_key, genesis, genesis_waypoint, validators) =
             aptos_genesis::builder::Builder::new(
                 &dir_actual,
-                genesis_modules
-                    .unwrap_or_else(|| cached_framework_packages::module_blobs().to_vec()),
+                genesis_framework.unwrap_or_else(|| framework::head_release_bundle().clone()),
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(
@@ -131,6 +132,10 @@ impl LocalSwarm {
                     if number_of_validators.get() == 1 {
                         // this delays empty block by (30-1) * 30ms
                         config.consensus.quorum_store_poll_count = 30;
+                        config
+                            .state_sync
+                            .state_sync_driver
+                            .max_connection_deadline_secs = 1;
                     }
 
                     if let Some(init_config) = &init_config {
@@ -156,7 +161,8 @@ impl LocalSwarm {
         let mut validators = validators
             .into_iter()
             .map(|v| {
-                let node = LocalNode::new(version.to_owned(), v.name, v.dir)?;
+                let node =
+                    LocalNode::new(version.to_owned(), v.name, v.dir, v.account_private_key)?;
                 Ok((node.peer_id(), node))
             })
             .collect::<Result<HashMap<_, _>>>()?;
@@ -189,7 +195,7 @@ impl LocalSwarm {
             .collect::<Result<HashMap<_, _>>>()?;
         let root_key = ConfigKey::new(root_key);
         let root_account = LocalAccount::new(
-            aptos_sdk::types::account_config::aptos_root_address(),
+            aptos_sdk::types::account_config::aptos_test_root_address(),
             AccountKey::from_private_key(root_key.private_key()),
             0,
         );
@@ -222,7 +228,7 @@ impl LocalSwarm {
         }
 
         self.wait_all_alive(Duration::from_secs(60)).await?;
-        println!("Swarm launched successfully.");
+        info!("Swarm launched successfully.");
         Ok(())
     }
 
@@ -232,7 +238,7 @@ impl LocalSwarm {
         self.wait_for_startup().await?;
         self.wait_for_connectivity(deadline).await?;
         self.liveness_check(deadline).await?;
-        println!("Swarm alive.");
+        info!("Swarm alive.");
         Ok(())
     }
 
@@ -240,7 +246,7 @@ impl LocalSwarm {
         let num_attempts = 10;
         let mut done = vec![false; self.validators.len()];
         for i in 0..num_attempts {
-            println!("Wait for startup attempt: {} of {}", i, num_attempts);
+            info!("Wait for startup attempt: {} of {}", i, num_attempts);
             for (node, done) in self.validators.values_mut().zip(done.iter_mut()) {
                 if *done {
                     continue;
@@ -263,7 +269,7 @@ impl LocalSwarm {
                         ));
                     }
                     Err(HealthCheckError::Failure(e)) => {
-                        println!("health check failure: {}", e);
+                        warn!("health check failure: {}", e);
                         break;
                     }
                 }
@@ -317,6 +323,7 @@ impl LocalSwarm {
             version.to_owned(),
             fullnode_config.name,
             fullnode_config.dir,
+            None,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -344,6 +351,7 @@ impl LocalSwarm {
             version.to_owned(),
             fullnode_config.name,
             fullnode_config.dir,
+            None,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -371,11 +379,16 @@ impl LocalSwarm {
     }
 
     pub fn validators(&self) -> impl Iterator<Item = &LocalNode> {
-        self.validators.values()
+        // sort by id to keep the order stable:
+        let mut validators: Vec<&LocalNode> = self.validators.values().collect();
+        validators.sort_by_key(|v| v.name().parse::<i32>().unwrap());
+        validators.into_iter()
     }
 
     pub fn validators_mut(&mut self) -> impl Iterator<Item = &mut LocalNode> {
-        self.validators.values_mut()
+        let mut validators: Vec<&mut LocalNode> = self.validators.values_mut().collect();
+        validators.sort_by_key(|v| v.name().parse::<i32>().unwrap());
+        validators.into_iter()
     }
 
     pub fn fullnode(&self, peer_id: PeerId) -> Option<&LocalNode> {
@@ -428,7 +441,7 @@ impl Swarm for LocalSwarm {
             .map(|v| v as &mut dyn Validator)
     }
 
-    fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
+    async fn upgrade_validator(&mut self, id: PeerId, version: &Version) -> Result<()> {
         let version = self
             .versions
             .get(version)
@@ -516,6 +529,14 @@ impl Swarm for LocalSwarm {
     }
 
     fn remove_chaos(&mut self, _chaos: SwarmChaos) -> Result<()> {
+        todo!()
+    }
+
+    async fn ensure_no_validator_restart(&mut self) -> Result<()> {
+        todo!()
+    }
+
+    async fn ensure_no_fullnode_restart(&mut self) -> Result<()> {
         todo!()
     }
 

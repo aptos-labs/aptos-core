@@ -186,7 +186,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", operation_id=~\"$endpoint\", status=~\"$status\"}[$interval]))",
+          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=~\"$status\"}[$interval]))",
           "instant": false,
           "interval": "",
           "legendFormat": "{{operation_id}}",
@@ -272,7 +272,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "histogram_quantile(0.90, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", operation_id=~\"$endpoint\"}[$interval])))",
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])))",
           "format": "time_series",
           "interval": "",
           "legendFormat": "p90",
@@ -280,7 +280,7 @@
         },
         {
           "exemplar": true,
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", operation_id=~\"$endpoint\"}[$interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])))",
           "hide": false,
           "interval": "",
           "legendFormat": "p99",
@@ -288,7 +288,7 @@
         },
         {
           "exemplar": true,
-          "expr": "histogram_quantile(1, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\", operation_id=~\"$endpoint\"}[$interval])))",
+          "expr": "histogram_quantile(1, sum by (le) (rate(aptos_api_requests_bucket{chain_name=~\"$chain_name\", namespace=~\"$namespace\"}[$interval])))",
           "hide": false,
           "interval": "",
           "legendFormat": "p100",
@@ -374,7 +374,7 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", operation_id=~\"$endpoint\", status=\"500\"}[$interval]))",
+          "expr": "sum by (operation_id) (rate(aptos_api_requests_count{chain_name=~\"$chain_name\", namespace=~\"$namespace\", role=~\"$role\", kubernetes_pod_name=~\"$kubernetes_pod_name\", status=\"500\"}[$interval]))",
           "interval": "",
           "legendFormat": "",
           "refId": "A"
@@ -539,7 +539,7 @@
         "type": "query"
       },
       {
-        "allValue": null,
+        "allValue": ".*",
         "current": {
           "selected": true,
           "text": [

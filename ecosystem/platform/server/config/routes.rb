@@ -58,7 +58,7 @@ Rails.application.routes.draw do
   get 'health', to: 'health#health'
 
   # IT3
-  resource :it3, only: %i[show]
+  resource :it3, only: %i[show update]
   resources :it3_profiles, except: %i[index destroy]
   resources :it3_surveys, except: %i[index destroy]
 
@@ -69,6 +69,9 @@ Rails.application.routes.draw do
   # IT1
   get 'it1', to: 'leaderboard#it1'
   get 'it2', to: 'leaderboard#it2'
+
+  # Projects
+  resources :projects
 
   # Static pages
   get 'community', to: 'static_page#community'

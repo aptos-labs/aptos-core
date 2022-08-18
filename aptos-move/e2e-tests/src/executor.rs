@@ -11,11 +11,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::data_store::GENESIS_CHANGE_SET_MAINNET;
 use crate::{
     account::{Account, AccountData},
     data_store::{FakeDataStore, GENESIS_CHANGE_SET, GENESIS_CHANGE_SET_FRESH},
     golden_outputs::GoldenOutputs,
 };
+use aptos_bitvec::BitVec;
 use aptos_crypto::HashValue;
 use aptos_gas::NativeGasParameters;
 use aptos_keygen::KeyGen;
@@ -41,6 +43,7 @@ use aptos_vm::{
     parallel_executor::ParallelAptosVM,
     AptosVM, VMExecutor, VMValidator,
 };
+use framework::ReleaseBundle;
 use move_deps::{
     move_core_types::{
         account_address::AccountAddress,
@@ -117,6 +120,11 @@ impl FakeExecutor {
         Self::from_genesis(GENESIS_CHANGE_SET_FRESH.clone().write_set())
     }
 
+    /// Creates an executor using the mainnet genesis.
+    pub fn from_mainnet_genesis() -> Self {
+        Self::from_genesis(GENESIS_CHANGE_SET_MAINNET.clone().write_set())
+    }
+
     /// Creates an executor in which no genesis state has been applied yet.
     pub fn no_genesis() -> Self {
         FakeExecutor {
@@ -182,19 +190,16 @@ impl FakeExecutor {
     /// initialization done.
     pub fn stdlib_only_genesis() -> Self {
         let mut genesis = Self::no_genesis();
-        let blobs = cached_framework_packages::module_blobs();
-        let modules = cached_framework_packages::modules();
-        assert!(blobs.len() == modules.len());
-        for (module, bytes) in modules.iter().zip(blobs) {
+        for (bytes, module) in framework::head_release_bundle().code_and_compiled_modules() {
             let id = module.self_id();
             genesis.add_module(&id, bytes.to_vec());
         }
         genesis
     }
 
-    /// Creates fresh genesis from the stdlib modules passed in.
-    pub fn custom_genesis(genesis_modules: &[Vec<u8>], validator_accounts: Option<usize>) -> Self {
-        let genesis = vm_genesis::generate_test_genesis(genesis_modules, validator_accounts);
+    /// Creates fresh genesis from the framework passed in.
+    pub fn custom_genesis(framework: &ReleaseBundle, validator_accounts: Option<usize>) -> Self {
+        let genesis = vm_genesis::generate_test_genesis(framework, validator_accounts);
         Self::from_genesis(genesis.0.write_set())
     }
 
@@ -450,7 +455,7 @@ impl FakeExecutor {
             0,
             *validator_set.payload().next().unwrap().account_address(),
             proposer_index,
-            vec![false; validator_set.payload().count()],
+            BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             failed_proposer_indices,
             self.block_time,
         );

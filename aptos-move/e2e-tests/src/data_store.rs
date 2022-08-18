@@ -16,7 +16,10 @@ use move_deps::move_core_types::language_storage::ModuleId;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use vm_genesis::{generate_genesis_change_set_for_testing, GenesisOptions};
+use vm_genesis::{
+    generate_genesis_change_set_for_mainnet, generate_genesis_change_set_for_testing,
+    GenesisOptions,
+};
 
 /// Dummy genesis ChangeSet for testing
 pub static GENESIS_CHANGE_SET: Lazy<ChangeSet> =
@@ -24,6 +27,9 @@ pub static GENESIS_CHANGE_SET: Lazy<ChangeSet> =
 
 pub static GENESIS_CHANGE_SET_FRESH: Lazy<ChangeSet> =
     Lazy::new(|| generate_genesis_change_set_for_testing(GenesisOptions::Fresh));
+
+pub static GENESIS_CHANGE_SET_MAINNET: Lazy<ChangeSet> =
+    Lazy::new(|| generate_genesis_change_set_for_mainnet(GenesisOptions::Fresh));
 
 /// An in-memory implementation of [`StateView`] and [`RemoteCache`] for the VM.
 ///
@@ -44,7 +50,7 @@ impl FakeDataStore {
     pub fn add_write_set(&mut self, write_set: &WriteSet) {
         for (state_key, write_op) in write_set {
             match write_op {
-                WriteOp::Value(blob) => {
+                WriteOp::Modification(blob) | WriteOp::Creation(blob) => {
                     self.set(state_key.clone(), blob.clone());
                 }
                 WriteOp::Deletion => {

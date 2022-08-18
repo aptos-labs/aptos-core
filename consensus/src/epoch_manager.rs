@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::monitor;
 use crate::{
     block_storage::BlockStore,
     commit_notifier::CommitNotifier,
@@ -15,8 +14,8 @@ use crate::{
     liveness::{
         cached_proposer_election::CachedProposerElection,
         leader_reputation::{
-            ActiveInactiveHeuristic, AptosDBBackend, LeaderReputation, ProposerAndVoterHeuristic,
-            ReputationHeuristic,
+            extract_epoch_to_proposers, AptosDBBackend, LeaderReputation,
+            ProposerAndVoterHeuristic, ReputationHeuristic,
         },
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
@@ -26,6 +25,7 @@ use crate::{
     },
     logging::{LogEvent, LogSchema},
     metrics_safety_rules::MetricsSafetyRules,
+    monitor,
     network::{IncomingBlockRetrievalRequest, NetworkReceivers, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkSender},
     payload_manager::QuorumStoreClient,
@@ -65,10 +65,12 @@ use futures::{
     },
     SinkExt, StreamExt,
 };
+use itertools::Itertools;
 use network::protocols::network::{ApplicationNetworkSender, Event};
 use safety_rules::SafetyRulesManager;
 use std::{
     cmp::Ordering,
+    collections::HashMap,
     mem::{discriminant, Discriminant},
     sync::Arc,
     time::Duration,
@@ -205,24 +207,12 @@ impl EpochManager {
                 Box::new(RotatingProposer::new(vec![proposer], *contiguous_rounds))
             }
             ProposerElectionType::LeaderReputation(leader_reputation_type) => {
-                let (heuristic, window_size, weight_by_voting_power) = match &leader_reputation_type
-                {
-                    LeaderReputationType::ActiveInactive(active_inactive_config) => {
-                        let window_size = proposers.len()
-                            * active_inactive_config.window_num_validators_multiplier;
-                        let heuristic: Box<dyn ReputationHeuristic> =
-                            Box::new(ActiveInactiveHeuristic::new(
-                                self.author,
-                                active_inactive_config.active_weight,
-                                active_inactive_config.inactive_weight,
-                                window_size,
-                            ));
-                        (
-                            heuristic,
-                            window_size,
-                            active_inactive_config.weight_by_voting_power,
-                        )
-                    }
+                let (
+                    heuristic,
+                    window_size,
+                    weight_by_voting_power,
+                    use_history_from_previous_epoch_max_count,
+                ) = match &leader_reputation_type {
                     LeaderReputationType::ProposerAndVoter(proposer_and_voter_config) => {
                         let proposer_window_size = proposers.len()
                             * proposer_and_voter_config.proposer_window_num_validators_multiplier;
@@ -242,16 +232,18 @@ impl EpochManager {
                             heuristic,
                             std::cmp::max(proposer_window_size, voter_window_size),
                             proposer_and_voter_config.weight_by_voting_power,
+                            proposer_and_voter_config.use_history_from_previous_epoch_max_count,
                         )
                     }
                 };
 
+                let seek_len = onchain_config.leader_reputation_exclude_round() as usize
+                    + onchain_config.max_failed_authors_to_store()
+                    + PROPSER_ROUND_BEHIND_STORAGE_BUFFER;
+
                 let backend = Box::new(AptosDBBackend::new(
-                    epoch_state.epoch,
                     window_size,
-                    onchain_config.leader_reputation_exclude_round() as usize
-                        + onchain_config.max_failed_authors_to_store()
-                        + PROPSER_ROUND_BEHIND_STORAGE_BUFFER,
+                    seek_len,
                     self.storage.aptos_db(),
                 ));
                 let voting_powers: Vec<_> = if weight_by_voting_power {
@@ -263,9 +255,43 @@ impl EpochManager {
                     vec![1; proposers.len()]
                 };
 
+                // First block (after genesis) is epoch=1, so that is the first epoch we consider. (Genesis is epoch=0)
+                let first_epoch_to_consider = std::cmp::max(
+                    1,
+                    epoch_state
+                        .epoch
+                        .saturating_sub(use_history_from_previous_epoch_max_count as u64),
+                );
+                // If we are considering beyond the current epoch, we need to fetch validators for those epochs
+                let epoch_to_proposers = if epoch_state.epoch > first_epoch_to_consider {
+                    self.storage
+                        .aptos_db()
+                        .get_epoch_ending_ledger_infos(first_epoch_to_consider - 1, epoch_state.epoch)
+                        .and_then(|proof| {
+                            ensure!(proof.ledger_info_with_sigs.len() as u64 == (epoch_state.epoch - (first_epoch_to_consider - 1)));
+                            extract_epoch_to_proposers(proof, epoch_state.epoch, &proposers, (window_size + seek_len) as u64)
+                        })
+                        .unwrap_or_else(|err| {
+                            error!("Couldn't create leader reputation with history across epochs, {:?}", err);
+                            HashMap::from([(epoch_state.epoch, proposers)])
+                        })
+                } else {
+                    HashMap::from([(epoch_state.epoch, proposers)])
+                };
+
+                info!(
+                    "Starting epoch {}: proposers across epochs for leader election: {:?}",
+                    epoch_state.epoch,
+                    epoch_to_proposers
+                        .iter()
+                        .map(|(epoch, proposers)| (epoch, proposers.len()))
+                        .sorted()
+                        .collect::<Vec<_>>()
+                );
+
                 let proposer_election = Box::new(LeaderReputation::new(
                     epoch_state.epoch,
-                    proposers,
+                    epoch_to_proposers,
                     voting_powers,
                     backend,
                     heuristic,
@@ -358,7 +384,7 @@ impl EpochManager {
         let ledger_info = proof
             .verify(self.epoch_state())
             .context("[EpochManager] Invalid EpochChangeProof")?;
-        debug!(
+        info!(
             LogSchema::new(LogEvent::NewEpoch).epoch(ledger_info.ledger_info().next_block_epoch()),
             "Received verified epoch change",
         );

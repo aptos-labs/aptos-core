@@ -27,7 +27,7 @@ use move_deps::{
     move_ir_compiler::Compiler,
 };
 
-pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 262144;
+pub const MAX_TRANSACTION_SIZE_IN_BYTES: u64 = 6 * 1024 * 1024;
 
 #[test]
 fn verify_signature() {
@@ -720,8 +720,9 @@ fn good_module_uses_bad(
         address,
     );
 
+    let framework_modules = framework::head_release_bundle().compiled_modules();
     let compiler = Compiler {
-        deps: cached_framework_packages::modules()
+        deps: framework_modules
             .iter()
             .chain(std::iter::once(&bad_dep))
             .collect(),

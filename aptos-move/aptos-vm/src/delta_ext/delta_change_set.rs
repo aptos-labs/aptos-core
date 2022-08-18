@@ -62,7 +62,7 @@ impl DeltaOp {
                                     .finish(Location::Module(AGGREGATOR_MODULE.clone()))
                                     .into_vm_status()
                             })
-                            .map(|result| WriteOp::Value(serialize(&result)))
+                            .map(|result| WriteOp::Modification(serialize(&result)))
                     }
                     // Something is wrong, the value to which we apply delta should
                     // always exist. Guard anyway.
@@ -256,10 +256,10 @@ mod tests {
         let sub_op = subtraction(100);
 
         let add_result = add_op.try_into_write_op(&state_view, &*KEY);
-        assert_ok_eq!(add_result, WriteOp::Value(serialize(&200)));
+        assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
 
         let sub_result = sub_op.try_into_write_op(&state_view, &*KEY);
-        assert_ok_eq!(sub_result, WriteOp::Value(serialize(&0)));
+        assert_ok_eq!(sub_result, WriteOp::Modification(serialize(&0)));
     }
 
     #[test]

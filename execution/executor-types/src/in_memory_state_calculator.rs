@@ -41,7 +41,7 @@ pub struct InMemoryStateCalculator {
     // This makes sure all in-mem nodes seen while proofs were fetched stays in mem during the
     // calculation
     _frozen_base: FrozenSparseMerkleTree<StateValue>,
-    state_cache: HashMap<StateKey, StateValue>,
+    state_cache: HashMap<StateKey, Option<StateValue>>,
     proof_reader: ProofReader,
 
     checkpoint: SparseMerkleTree<StateValue>,
@@ -52,8 +52,8 @@ pub struct InMemoryStateCalculator {
     latest: FrozenSparseMerkleTree<StateValue>,
 
     next_version: Version,
-    updates_between_checkpoint_and_latest: HashMap<StateKey, StateValue>,
-    updates_after_latest: HashMap<StateKey, StateValue>,
+    updates_between_checkpoint_and_latest: HashMap<StateKey, Option<StateValue>>,
+    updates_after_latest: HashMap<StateKey, Option<StateValue>>,
 }
 
 impl InMemoryStateCalculator {
@@ -89,7 +89,7 @@ impl InMemoryStateCalculator {
         to_keep: &[(Transaction, ParsedTransactionOutput)],
         new_epoch: bool,
     ) -> Result<(
-        Vec<HashMap<StateKey, StateValue>>,
+        Vec<HashMap<StateKey, Option<StateValue>>>,
         Vec<Option<HashValue>>,
         StateDelta,
         Option<EpochState>,
@@ -123,7 +123,7 @@ impl InMemoryStateCalculator {
         &mut self,
         txn: &Transaction,
         txn_output: &ParsedTransactionOutput,
-    ) -> Result<(HashMap<StateKey, StateValue>, Option<HashValue>)> {
+    ) -> Result<(HashMap<StateKey, Option<StateValue>>, Option<HashValue>)> {
         let updated_state_kvs = process_write_set(
             Some(txn),
             &mut self.state_cache,
@@ -151,7 +151,7 @@ impl InMemoryStateCalculator {
         let smt_updates: Vec<_> = self
             .updates_after_latest
             .iter()
-            .map(|(key, value)| (key.hash(), value))
+            .map(|(key, value)| (key.hash(), value.as_ref()))
             .collect();
         let new_checkpoint = self.latest.batch_update(smt_updates, &self.proof_reader)?;
         let root_hash = new_checkpoint.root_hash();
@@ -185,7 +185,7 @@ impl InMemoryStateCalculator {
         let smt_updates: Vec<_> = self
             .updates_after_latest
             .iter()
-            .map(|(key, value)| (key.hash(), value))
+            .map(|(key, value)| (key.hash(), value.as_ref()))
             .collect();
         let latest = self.latest.batch_update(smt_updates, &self.proof_reader)?;
 
@@ -200,14 +200,20 @@ impl InMemoryStateCalculator {
             self.updates_between_checkpoint_and_latest,
         );
 
-        Ok((result_state, self.state_cache))
+        Ok((
+            result_state,
+            self.state_cache
+                .into_iter()
+                .filter_map(|(k, v_opt)| v_opt.map(|v| (k, v)))
+                .collect(),
+        ))
     }
 
     pub fn calculate_for_write_sets_after_snapshot(
         mut self,
         last_checkpoint_index: Option<usize>,
         write_sets: &[WriteSet],
-    ) -> Result<(Option<HashMap<StateKey, StateValue>>, StateDelta)> {
+    ) -> Result<(Option<HashMap<StateKey, Option<StateValue>>>, StateDelta)> {
         let idx_after_last_checkpoint = last_checkpoint_index.map_or(0, |idx| idx + 1);
         let updates_before_last_checkpoint = if idx_after_last_checkpoint != 0 {
             for write_set in write_sets[0..idx_after_last_checkpoint].iter() {
@@ -238,9 +244,9 @@ impl InMemoryStateCalculator {
 // Returns all state key-value pair touched.
 pub fn process_write_set(
     transaction: Option<&Transaction>,
-    state_cache: &mut HashMap<StateKey, StateValue>,
+    state_cache: &mut HashMap<StateKey, Option<StateValue>>,
     write_set: WriteSet,
-) -> Result<HashMap<StateKey, StateValue>> {
+) -> Result<HashMap<StateKey, Option<StateValue>>> {
     // Find all keys this transaction touches while processing each write op.
     write_set
         .into_iter()
@@ -252,13 +258,15 @@ pub fn process_write_set(
 
 fn process_state_key_write_op(
     transaction: Option<&Transaction>,
-    state_cache: &mut HashMap<StateKey, StateValue>,
+    state_cache: &mut HashMap<StateKey, Option<StateValue>>,
     state_key: StateKey,
     write_op: WriteOp,
-) -> Result<(StateKey, StateValue)> {
+) -> Result<(StateKey, Option<StateValue>)> {
     let state_value = match write_op {
-        WriteOp::Value(new_value) => StateValue::from(new_value),
-        WriteOp::Deletion => StateValue::empty(),
+        WriteOp::Modification(new_value) | WriteOp::Creation(new_value) => {
+            Some(StateValue::from(new_value))
+        }
+        WriteOp::Deletion => None,
     };
     match state_cache.entry(state_key.clone()) {
         hash_map::Entry::Occupied(mut entry) => {

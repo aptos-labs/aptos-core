@@ -19,6 +19,7 @@ const sidebars = {
     "index",
     "whats-new-in-docs",
     "guides/getting-started",
+
     {
       type: "category",
       label: "Aptos Quickstarts",
@@ -26,6 +27,7 @@ const sidebars = {
       collapsible: true,
       collapsed: true,
       items: [
+        "tutorials/first-transaction-sdk",
         "tutorials/first-transaction",
         "tutorials/first-move-module",
         "tutorials/first-dapp",
@@ -61,7 +63,7 @@ const sidebars = {
         "guides/sign-a-transaction",
         "guides/interacting-with-the-blockchain",
         "guides/building-wallet-extension",
-        "guides/guide-for-system-integrators",
+        "guides/system-integrators-guide",
         "guides/local-testnet-dev-flow",
         {
           type: "category",
@@ -157,15 +159,8 @@ const sidebars = {
       link: { type: "doc", id: "cli-tools/aptos-cli-tool/index" },
       items: ["cli-tools/aptos-cli-tool/install-aptos-cli", "cli-tools/aptos-cli-tool/use-aptos-cli"],
     },
-    {
-      type: "category",
-      label: "API",
-      collapsible: true,
-      collapsed: true,
-      link: { type: "doc", id: "api/index" },
-      items: ["api/index"],
-    },
     "reference/telemetry",
+    "aptos-white-paper",
     "reference/glossary",
   ],
 };

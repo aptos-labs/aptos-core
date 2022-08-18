@@ -3,8 +3,9 @@
 
 use crate::{
     executor::ParallelTransactionExecutor,
-    proptest_types::types::{ExpectedOutput, Task, Transaction},
+    proptest_types::types::{ExpectedOutput, KeyType, Task, Transaction},
     scheduler::{Scheduler, SchedulerTask, TaskGuard},
+    task::ModulePath,
 };
 use rand::random;
 use std::{
@@ -15,7 +16,7 @@ use std::{
 
 fn run_and_assert<K, V>(transactions: Vec<Transaction<K, V>>)
 where
-    K: PartialOrd + Send + Sync + Clone + Hash + Eq + 'static,
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + Eq + 'static,
 {
     let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
@@ -39,8 +40,8 @@ fn cycle_transactions() {
         for _ in 0..WRITES_PER_KEY {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
-                reads: vec![vec![key]],
-                writes: vec![vec![(key, random::<u64>())]],
+                reads: vec![vec![KeyType(key, false)]],
+                writes: vec![vec![(KeyType(key, false), random::<u64>())]],
             })
         }
     }
@@ -53,7 +54,9 @@ const TXN_PER_BLOCK: u64 = 100;
 #[test]
 fn one_reads_all_barrier() {
     let mut transactions = vec![];
-    let keys: Vec<_> = (0..TXN_PER_BLOCK).map(|_| random::<[u8; 32]>()).collect();
+    let keys: Vec<KeyType<_>> = (0..TXN_PER_BLOCK)
+        .map(|_| KeyType(random::<[u8; 32]>(), false))
+        .collect();
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
             transactions.push(Transaction::Write {
@@ -75,7 +78,9 @@ fn one_reads_all_barrier() {
 #[test]
 fn one_writes_all_barrier() {
     let mut transactions = vec![];
-    let keys: Vec<_> = (0..TXN_PER_BLOCK).map(|_| random::<[u8; 32]>()).collect();
+    let keys: Vec<KeyType<_>> = (0..TXN_PER_BLOCK)
+        .map(|_| KeyType(random::<[u8; 32]>(), false))
+        .collect();
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
             transactions.push(Transaction::Write {
@@ -100,7 +105,9 @@ fn one_writes_all_barrier() {
 #[test]
 fn early_aborts() {
     let mut transactions = vec![];
-    let keys: Vec<_> = (0..TXN_PER_BLOCK).map(|_| random::<[u8; 32]>()).collect();
+    let keys: Vec<_> = (0..TXN_PER_BLOCK)
+        .map(|_| KeyType(random::<[u8; 32]>(), false))
+        .collect();
 
     for _ in 0..NUM_BLOCKS {
         for key in &keys {
@@ -119,7 +126,9 @@ fn early_aborts() {
 #[test]
 fn early_skips() {
     let mut transactions = vec![];
-    let keys: Vec<_> = (0..TXN_PER_BLOCK).map(|_| random::<[u8; 32]>()).collect();
+    let keys: Vec<_> = (0..TXN_PER_BLOCK)
+        .map(|_| KeyType(random::<[u8; 32]>(), false))
+        .collect();
 
     for _ in 0..NUM_BLOCKS {
         for key in &keys {

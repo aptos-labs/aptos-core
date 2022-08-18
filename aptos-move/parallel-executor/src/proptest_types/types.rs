@@ -4,14 +4,20 @@
 use crate::{
     errors::{Error, Result},
     executor::MVHashMapView,
-    task::{ExecutionStatus, ExecutorTask, Transaction as TransactionType, TransactionOutput},
+    task::{
+        ExecutionStatus, ExecutorTask, ModulePath, Transaction as TransactionType,
+        TransactionOutput,
+    },
 };
+use aptos_types::{access_path::AccessPath, account_address::AccountAddress};
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
+use std::collections::hash_map::DefaultHasher;
 use std::{
     collections::{BTreeSet, HashMap},
+    convert::TryInto,
     fmt::Debug,
-    hash::Hash,
+    hash::{Hash, Hasher},
     marker::PhantomData,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -22,6 +28,36 @@ use std::{
 ///////////////////////////////////////////////////////////////////////////
 // Generation of transactions
 ///////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Copy, Hash, Debug, PartialEq, PartialOrd, Eq)]
+pub struct KeyType<K: Hash + Clone + Debug + PartialOrd + Eq>(
+    /// Wrapping the types used for testing to add ModulePath trait implementation (below).
+    pub K,
+    /// The bool field determines for testing purposes, whether the key will be interpreted
+    /// as a module access path. In this case, if a module path is both read and written
+    /// during parallel execution, Error::ModulePathReadWrite must be returned and the
+    /// block execution must fall back to the sequential execution.
+    pub bool,
+);
+
+impl<K: Hash + Clone + Debug + Eq + PartialOrd> ModulePath for KeyType<K> {
+    fn module_path(&self) -> Option<AccessPath> {
+        // Since K is generic, use its hash to assign addresses.
+        let mut hasher = DefaultHasher::new();
+        self.0.hash(&mut hasher);
+        let mut hashed_address = vec![1u8; AccountAddress::LENGTH - 8];
+        hashed_address.extend_from_slice(&hasher.finish().to_ne_bytes());
+
+        if self.1 {
+            Some(AccessPath {
+                address: AccountAddress::new(hashed_address.try_into().unwrap()),
+                path: b"/foo/b".to_vec(),
+            })
+        } else {
+            None
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub struct TransactionGenParams {
@@ -96,42 +132,89 @@ impl Default for TransactionGenParams {
 }
 
 impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
-    pub fn materialize<K: Clone + Eq + Ord>(self, universe: &[K]) -> Transaction<K, V> {
-        let mut keys_modified = BTreeSet::new();
-        let mut writes = vec![];
-
-        for modified in self.keys_modified.into_iter() {
-            let mut incarnation_writes: Vec<(K, V)> = vec![];
-            for (idx, value) in modified.into_iter() {
-                let key = universe[idx.index(universe.len())].clone();
+    fn writes_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
+        universe: &[K],
+        gen: Vec<Vec<(Index, V)>>,
+        module_write_fn: &dyn Fn(usize) -> bool,
+    ) -> Vec<Vec<(KeyType<K>, V)>> {
+        let mut ret = vec![];
+        for write_gen in gen.into_iter() {
+            let mut keys_modified = BTreeSet::new();
+            let mut incarnation_writes: Vec<(KeyType<K>, V)> = vec![];
+            for (idx, value) in write_gen.into_iter() {
+                let i = idx.index(universe.len());
+                let key = universe[i].clone();
                 if !keys_modified.contains(&key) {
                     keys_modified.insert(key.clone());
-                    incarnation_writes.push((key, value.clone()));
+                    incarnation_writes.push((KeyType(key, module_write_fn(i)), value.clone()));
                 }
             }
-            writes.push(incarnation_writes);
+            ret.push(incarnation_writes);
         }
+        ret
+    }
+
+    fn reads_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
+        universe: &[K],
+        gen: Vec<Vec<Index>>,
+        module_read_fn: &dyn Fn(usize) -> bool,
+    ) -> Vec<Vec<KeyType<K>>> {
+        let mut ret = vec![];
+        for read_gen in gen.into_iter() {
+            let mut incarnation_reads: Vec<KeyType<K>> = vec![];
+            for idx in read_gen.into_iter() {
+                let i = idx.index(universe.len());
+                let key = universe[i].clone();
+                incarnation_reads.push(KeyType(key, module_read_fn(i)));
+            }
+            ret.push(incarnation_reads);
+        }
+        ret
+    }
+
+    pub fn materialize<K: Clone + Hash + Debug + Eq + Ord>(
+        self,
+        universe: &[K],
+        // Are writes and reads module access (same access path).
+        module_access: (bool, bool),
+    ) -> Transaction<KeyType<K>, V> {
+        Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            writes: Self::writes_from_gen(universe, self.keys_modified, &|_| -> bool {
+                module_access.0
+            }),
+            reads: Self::reads_from_gen(universe, self.keys_read, &|_| -> bool { module_access.1 }),
+        }
+    }
+
+    pub fn materialize_disjoint_module_rw<K: Clone + Hash + Debug + Eq + Ord>(
+        self,
+        universe: &[K],
+        // keys generated with indices from read_threshold to write_threshold will be
+        // treated as module access only in reads. keys generated with indices from
+        // write threshold to universe.len() will be treated as module access only in
+        // writes. This way there will be module accesses but no intersection.
+        read_threshold: usize,
+        write_threshold: usize,
+    ) -> Transaction<KeyType<K>, V> {
+        assert!(read_threshold < universe.len());
+        assert!(write_threshold > read_threshold);
+        assert!(write_threshold < universe.len());
+
+        let is_module_write = |i| -> bool { i >= write_threshold };
+        let is_module_read = |i| -> bool { i >= read_threshold && i < write_threshold };
 
         Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
-            writes,
-            reads: self
-                .keys_read
-                .into_iter()
-                .map(|keys_read| {
-                    keys_read
-                        .into_iter()
-                        .map(|k| universe[k.index(universe.len())].clone())
-                        .collect()
-                })
-                .collect(),
+            writes: Self::writes_from_gen(universe, self.keys_modified, &is_module_write),
+            reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
         }
     }
 }
 
 impl<K, V> TransactionType for Transaction<K, V>
 where
-    K: PartialOrd + Send + Sync + Clone + Hash + Eq + 'static,
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + 'static,
 {
     type Key = K;
@@ -152,7 +235,7 @@ impl<K, V> Task<K, V> {
 
 impl<K, V> ExecutorTask for Task<K, V>
 where
-    K: PartialOrd + Send + Sync + Clone + Hash + Eq + 'static,
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + 'static,
 {
     type T = Transaction<K, V>;
@@ -196,11 +279,12 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct Output<K, V>(Vec<(K, V)>, Vec<Option<V>>);
 
 impl<K, V> TransactionOutput for Output<K, V>
 where
-    K: PartialOrd + Send + Sync + Clone + Hash + Eq + 'static,
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
     V: Send + Sync + Debug + Clone + 'static,
 {
     type T = Transaction<K, V>;

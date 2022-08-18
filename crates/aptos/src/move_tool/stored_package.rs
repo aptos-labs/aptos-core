@@ -4,9 +4,14 @@
 use anyhow::bail;
 use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
-use framework::natives::code::{ModuleMetadata, PackageMetadata, PackageRegistry, UpgradePolicy};
+use aptos_types::transaction::ScriptABI;
+use framework::natives::code::{
+    ModuleMetadata, PackageMetadata, PackageRegistry, PackageRegistryJson, UpgradePolicy,
+};
+use framework::unzip_metadata;
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
+use serde_bytes::ByteBuf;
 use std::fs;
 use std::path::PathBuf;
 
@@ -32,12 +37,13 @@ impl CachedPackageRegistry {
     /// Creates a new registry.
     pub async fn create(url: Url, addr: AccountAddress) -> anyhow::Result<Self> {
         let client = Client::new(url);
-        Ok(Self {
-            inner: client
-                .get_resource::<PackageRegistry>(addr, "0x1::code::PackageRegistry")
-                .await?
-                .into_inner(),
-        })
+        // Need to use a different type to deserialize JSON
+        let from_json = client
+            .get_resource::<PackageRegistryJson>(addr, "0x1::code::PackageRegistry")
+            .await?
+            .into_inner();
+        let inner = bcs::from_bytes::<PackageRegistry>(&bcs::to_bytes(&from_json)?)?;
+        Ok(Self { inner })
     }
 
     /// Returns the list of packages in this registry by name.
@@ -85,6 +91,10 @@ impl<'a> CachedPackageMetadata<'a> {
         self.metadata.upgrade_policy
     }
 
+    pub fn upgrade_number(&self) -> u64 {
+        self.metadata.upgrade_number
+    }
+
     pub fn build_info(&self) -> &str {
         &self.metadata.build_info
     }
@@ -95,6 +105,10 @@ impl<'a> CachedPackageMetadata<'a> {
 
     pub fn error_map_raw(&self) -> &[u8] {
         &self.metadata.error_map
+    }
+
+    pub fn abis(&self) -> &[ByteBuf] {
+        self.metadata.abis.as_slice()
     }
 
     pub fn module_names(&self) -> Vec<String> {
@@ -130,18 +144,29 @@ impl<'a> CachedPackageMetadata<'a> {
         let sources_dir = path.join(CompiledPackageLayout::Sources.path());
         fs::create_dir_all(&sources_dir)?;
         for module in &self.metadata.modules {
-            fs::write(
-                sources_dir.join(format!("{}.move", module.name)),
-                &module.source,
-            )?;
+            let source = std::str::from_utf8(&unzip_metadata(&module.source)?)?.to_string();
+            fs::write(sources_dir.join(format!("{}.move", module.name)), source)?;
         }
         if with_derived_artifacts {
             let abis_dir = path.join(CompiledPackageLayout::CompiledABIs.path());
-            fs::create_dir_all(&abis_dir)?;
+            for abi_blob in &self.metadata.abis {
+                let abi = bcs::from_bytes::<ScriptABI>(abi_blob.as_slice())?;
+                let path = match abi {
+                    ScriptABI::TransactionScript(abi) => {
+                        PathBuf::from(format!("{}.abi", abi.name()))
+                    }
+                    ScriptABI::ScriptFunction(abi) => {
+                        PathBuf::from(abi.module_name().name().as_str())
+                            .join(format!("{}.abi", abi.name()))
+                    }
+                };
+                let dest = abis_dir.join(path);
+                fs::create_dir_all(&dest.parent().unwrap())?;
+                fs::write(dest, abi_blob)?
+            }
             let source_map_dir = path.join(CompiledPackageLayout::SourceMaps.path());
             fs::create_dir_all(&source_map_dir)?;
             for module in &self.metadata.modules {
-                fs::write(abis_dir.join(format!("{}.abi", module.name)), &module.abi)?;
                 fs::write(
                     source_map_dir.join(format!("{}.mvsm", module.name)),
                     &module.source_map,
@@ -157,15 +182,11 @@ impl<'a> CachedModuleMetadata<'a> {
         &self.metadata.name
     }
 
-    pub fn source(&self) -> &str {
+    pub fn zipped_source(&self) -> &[u8] {
         &self.metadata.source
     }
 
-    pub fn abi_raw(&self) -> &[u8] {
-        &self.metadata.abi
-    }
-
-    pub fn source_map_raw(&self) -> &[u8] {
+    pub fn zipped_source_map_raw(&self) -> &[u8] {
         &self.metadata.source_map
     }
 }

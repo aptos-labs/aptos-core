@@ -19,37 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  rust-unit:
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') 
-    runs-on: high-perf-docker
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
-      - uses: ./.github/actions/rust-setup
-      - run: rustup component add llvm-tools-preview
-      - uses: taiki-e/install-action@v1.5.6
-        with:
-          tool: nextest,cargo-llvm-cov
-      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      # NOTE: due to some bug in llvm-cov the argument order between llvm-cov and nextest needs to flipped around: https://github.com/taiki-e/cargo-llvm-cov/issues/151
-      - run: cargo llvm-cov --profile ci --workspace --exclude smoke-test --exclude testcases --no-fail-fast nextest --workspace --exclude smoke-test --exclude testcases --lcov --output-path lcov.info
-        env:
-          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: lcov.info
-          fail_ci_if_error: true
-
-      - uses: ./.github/actions/upload-test-results
-        with:
-          BUILDPULSE_ACCESS_KEY_ID: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
-          BUILDPULSE_SECRET_ACCESS_KEY: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
-          DD_API_KEY: ${{ secrets.DD_API_KEY }}
-          SUITE: rust-unit-coverage
-
-  rust-smoke:
+  rust-unit-coverage:
     if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')
     runs-on: high-perf-docker
     steps:
@@ -62,12 +32,41 @@ jobs:
         with:
           tool: nextest,cargo-llvm-cov
       - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
-      # --test-threads is intentionally set to reduce resource contention in ci jobs. Increasing this, increases job failures and retries.
-      # NOTE: due to some bug in llvm-cov the argument order between llvm-cov and nextest needs to flipped around: https://github.com/taiki-e/cargo-llvm-cov/issues/151
-      - run: cargo llvm-cov --package smoke-test --no-fail-fast --lcov --output-path lcov.info
+      - run: cargo llvm-cov --ignore-run-fail --workspace --exclude smoke-test --exclude testcases --lcov --jobs 32 --output-path lcov.info
         env:
           INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
       - name: Upload coverage to Codecov
+        if: "!cancelled()"
+        uses: codecov/codecov-action@v3
+        with:
+          files: lcov.info
+          fail_ci_if_error: true
+
+      - uses: ./.github/actions/upload-test-results
+        with:
+          BUILDPULSE_ACCESS_KEY_ID: ${{ secrets.BUILDPULSE_ACCESS_KEY_ID }}
+          BUILDPULSE_SECRET_ACCESS_KEY: ${{ secrets.BUILDPULSE_SECRET_ACCESS_KEY }}
+          DD_API_KEY: ${{ secrets.DD_API_KEY }}
+          SUITE: rust-unit-coverage
+
+  rust-smoke-coverage:
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage')
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+      - uses: ./.github/actions/rust-setup
+      - run: rustup component add llvm-tools-preview
+      - uses: taiki-e/install-action@v1.5.6
+        with:
+          tool: nextest,cargo-llvm-cov
+      - run: docker run --detach -p 5432:5432 cimg/postgres:14.2
+      - run: cargo llvm-cov --ignore-run-fail --package smoke-test --lcov --output-path lcov.info
+        env:
+          INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
+      - name: Upload coverage to Codecov
+        if: "!cancelled()"
         uses: codecov/codecov-action@v3
         with:
           files: lcov.info

@@ -1,0 +1,39 @@
+<div class="bg-white h-full">
+  <div class="max-w-screen-2xl mx-auto">
+    <%= link_to 'Back to all projects', projects_path %>
+
+    <div class="flex gap-16">
+      <img src="<%= url_for(@project.thumbnail) %>" class="h-32 w-32">
+
+      <div class="max-w-prose">
+        <h2 class="font-display leading-none text-2xl"><%= @project.title %></h2>
+        <p><%= @project.short_description %></p>
+        <div class="flex gap-8">
+          <% if @project.github_url %>
+            <a href="<%= @project.github_url %>" title="View on GitHub" class="text-white bg-neutral-700 px-8 py-2">
+              <%= render IconComponent.new(:github, size: :medium) %>
+            </a>
+          <% end %>
+        </div>
+        <img src="<%= url_for(@project.screenshots.first) %>" alt="Project screenshot">
+        <div class="prose">
+          <%= sanitize @project.full_description %>
+        </div>
+        <div class="flex gap-8">
+          <% @project.categories.each do |category| %>
+            <%= content_tag :a, category.title, href: '#TODO' %>
+          <% end %>
+        </div>
+        <div class="flex gap-8">
+          <% @project.members.public.each do |user| %>
+            <%= content_tag :a, user.username, href: '#TODO' %>
+          <% end %>
+        </div>
+      </div>
+
+      <div>
+        <a href="<%= @project.website_url %>">Go to website</a>
+      </div>
+    </div>
+  </div>
+</div>

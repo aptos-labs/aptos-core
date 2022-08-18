@@ -22,9 +22,8 @@ A [signed transaction](/reference/glossary#transaction) on the blockchain contai
   - A Move module and function name or a move bytecode transaction script.
   - An optional list of inputs to the script. For a peer-to-peer transaction, these inputs contain the recipient's information and the amount transferred to them.
   - An optional list of Move bytecode modules to publish.
-- **Gas price** (in specified currency/gas units): This is the amount the sender is willing to pay per unit of [gas](/reference/glossary#gas) to execute the transaction. [Gas](basics-gas-txn-fee.md) is a way to pay for computation and storage. A gas unit is an abstract measurement of computation with no inherent real-world value.
+- **Gas price** (in specified gas units): This is the amount the sender is willing to pay per unit of [gas](/reference/glossary#gas) to execute the transaction. [Gas](basics-gas-txn-fee.md) is a way to pay for computation and storage. A gas unit is an abstract measurement of computation with no inherent real-world value.
 - **Maximum gas amount**: The [maximum gas amount](/reference/glossary#maximum-gas-amount) is the maximum gas units the transaction is allowed to consume.
-- **Gas currency code**: The currency code used to pay for gas.
 - **Sequence number**: This is an unsigned integer that must be equal to the sender's account [sequence number](/reference/glossary#sequence-number) at the time of execution.
 - **Expiration time**: A timestamp after which the transaction ceases to be valid (i.e., expires).
 

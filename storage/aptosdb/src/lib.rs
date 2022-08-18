@@ -47,11 +47,9 @@ use crate::{
     ledger_store::LedgerStore,
     metrics::{
         API_LATENCY_SECONDS, COMMITTED_TXNS, LATEST_TXN_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH,
-        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, STATE_ITEM_COUNT,
+        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES,
     },
-    pruner::db_pruner::DBPruner,
-    pruner::pruner_manager::PrunerManager,
-    pruner::utils,
+    pruner::{pruner_manager::PrunerManager, utils},
     schema::*,
     state_store::StateStore,
     system_store::SystemStore,
@@ -59,23 +57,22 @@ use crate::{
 };
 use anyhow::{bail, ensure, Result};
 use aptos_config::config::{
-    RocksdbConfig, RocksdbConfigs, StoragePrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
-    TARGET_SNAPSHOT_SIZE,
+    PrunerConfig, RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
 };
 use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
-use aptos_types::account_config::{new_block_event_key, NewBlockEvent};
-use aptos_types::state_store::table::{TableHandle, TableInfo};
+use aptos_rocksdb_options::gen_rocksdb_options;
 use aptos_types::{
     account_address::AccountAddress,
+    account_config::{new_block_event_key, NewBlockEvent},
     contract_event::EventWithVersion,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
     proof::{
-        accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProof,
+        accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
         TransactionInfoListWithProof,
     },
     state_proof::StateProof,
@@ -83,6 +80,7 @@ use aptos_types::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
         state_value::{StateValue, StateValueChunkWithProof},
+        table::{TableHandle, TableInfo},
     },
     transaction::{
         AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
@@ -96,7 +94,6 @@ use aptosdb_indexer::Indexer;
 use itertools::zip_eq;
 use move_deps::move_resource_viewer::MoveValueAnnotator;
 use once_cell::sync::Lazy;
-use schemadb::db_options::gen_rocksdb_options;
 use schemadb::DB;
 use std::{
     collections::HashMap,
@@ -108,13 +105,13 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::pruner::ledger_pruner_manager::LedgerPrunerManager;
-use crate::pruner::ledger_store::ledger_store_pruner::LedgerPruner;
-use crate::pruner::state_pruner_manager::StatePrunerManager;
-use crate::pruner::state_store::StateStorePruner;
-use storage_interface::state_view::DbStateView;
+use crate::pruner::{
+    ledger_pruner_manager::LedgerPrunerManager, ledger_store::ledger_store_pruner::LedgerPruner,
+    state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
+};
 use storage_interface::{
-    state_delta::StateDelta, DbReader, DbWriter, ExecutedTrees, Order, StateSnapshotReceiver,
+    state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
+    StateSnapshotReceiver,
 };
 
 pub const LEDGER_DB_NAME: &str = "ledger_db";
@@ -276,16 +273,20 @@ impl AptosDB {
     fn new_with_dbs(
         ledger_rocksdb: DB,
         state_merkle_rocksdb: DB,
-        storage_pruner_config: StoragePrunerConfig,
+        pruner_config: PrunerConfig,
         target_snapshot_size: usize,
         hack_for_tests: bool,
     ) -> Self {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
         let arc_state_merkle_rocksdb = Arc::new(state_merkle_rocksdb);
-        let state_pruner =
-            StatePrunerManager::new(Arc::clone(&arc_state_merkle_rocksdb), storage_pruner_config);
-        let ledger_pruner =
-            LedgerPrunerManager::new(Arc::clone(&arc_ledger_rocksdb), storage_pruner_config);
+        let state_pruner = StatePrunerManager::new(
+            Arc::clone(&arc_state_merkle_rocksdb),
+            pruner_config.state_merkle_pruner_config,
+        );
+        let ledger_pruner = LedgerPrunerManager::new(
+            Arc::clone(&arc_ledger_rocksdb),
+            pruner_config.ledger_pruner_config,
+        );
 
         AptosDB {
             ledger_db: Arc::clone(&arc_ledger_rocksdb),
@@ -314,13 +315,13 @@ impl AptosDB {
     pub fn open<P: AsRef<Path> + Clone>(
         db_root_path: P,
         readonly: bool,
-        storage_pruner_config: StoragePrunerConfig,
+        pruner_config: PrunerConfig,
         rocksdb_configs: RocksdbConfigs,
         enable_indexer: bool,
         target_snapshot_size: usize,
     ) -> Result<Self> {
         ensure!(
-            storage_pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
+            pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
             "Do not set prune_window when opening readonly.",
         );
 
@@ -363,7 +364,7 @@ impl AptosDB {
         let mut myself = Self::new_with_dbs(
             ledger_db,
             state_merkle_db,
-            storage_pruner_config,
+            pruner_config,
             target_snapshot_size,
             readonly,
         );
@@ -792,9 +793,11 @@ impl AptosDB {
         Ok(())
     }
 
-    fn wake_pruner(&self, latest_version: Version) {
-        self.state_pruner.maybe_wake_pruner(latest_version);
-        self.ledger_pruner.maybe_wake_pruner(latest_version);
+    fn set_pruner_target_version(&self, latest_version: Version) {
+        self.state_pruner
+            .maybe_set_pruner_target_db_version(latest_version);
+        self.ledger_pruner
+            .maybe_set_pruner_target_db_version(latest_version);
     }
 
     fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
@@ -986,6 +989,13 @@ impl DbReader for AptosDB {
         })
     }
 
+    /// Get the first version that will likely not be pruned soon
+    fn get_first_viable_txn_version(&self) -> Result<Version> {
+        gauged_api("get_first_viable_txn_version", || {
+            Ok(self.ledger_pruner.get_min_viable_version())
+        })
+    }
+
     /// Get the first version that write set starts existent.
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
         gauged_api("get_first_write_set_version", || {
@@ -1135,29 +1145,29 @@ impl DbReader for AptosDB {
     }
 
     /// Returns the proof of the given state key and version.
-    fn get_state_proof_by_version(
+    fn get_state_proof_by_version_ext(
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> Result<SparseMerkleProof> {
+    ) -> Result<SparseMerkleProofExt> {
         gauged_api("get_proof_by_version", || {
             error_if_version_is_pruned(&self.state_pruner, "State", version)?;
 
             self.state_store
-                .get_state_proof_by_version(state_key, version)
+                .get_state_proof_by_version_ext(state_key, version)
         })
     }
 
-    fn get_state_value_with_proof_by_version(
+    fn get_state_value_with_proof_by_version_ext(
         &self,
         state_store_key: &StateKey,
         version: Version,
-    ) -> Result<(Option<StateValue>, SparseMerkleProof)> {
-        gauged_api("get_state_value_with_proof_by_version", || {
+    ) -> Result<(Option<StateValue>, SparseMerkleProofExt)> {
+        gauged_api("get_state_value_with_proof_by_version_ext", || {
             error_if_version_is_pruned(&self.state_pruner, "State", version)?;
 
             self.state_store
-                .get_state_value_with_proof_by_version(state_store_key, version)
+                .get_state_value_with_proof_by_version_ext(state_store_key, version)
         })
     }
 
@@ -1202,7 +1212,26 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_block_info(&self, version: Version) -> Result<(Version, Version, NewBlockEvent)> {
+    fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
+        gauged_api("get_next_block_event", || {
+            if let Some((block_version, _, _)) = self
+                .event_store
+                .lookup_event_at_or_after_version(&new_block_event_key(), version)?
+            {
+                self.event_store.get_block_metadata(block_version)
+            } else {
+                bail!(
+                    "Failed to find a block event at or after version {}",
+                    version
+                )
+            }
+        })
+    }
+
+    fn get_block_info_by_version(
+        &self,
+        version: Version,
+    ) -> Result<(Version, Version, NewBlockEvent)> {
         gauged_api("get_block_info", || {
             let latest_li = self.get_latest_ledger_info()?;
             let committed_version = latest_li.ledger_info().version();
@@ -1355,16 +1384,6 @@ impl DbReader for AptosDB {
 }
 
 impl DbWriter for AptosDB {
-    fn save_ledger_infos(&self, ledger_infos: &[LedgerInfoWithSignatures]) -> Result<()> {
-        gauged_api("save_ledger_infos", || {
-            restore_utils::save_ledger_infos(
-                self.ledger_db.clone(),
-                self.ledger_store.clone(),
-                ledger_infos,
-            )
-        })
-    }
-
     /// `first_version` is the version of the first transaction in `txns_to_commit`.
     /// When `ledger_info_with_sigs` is provided, verify that the transaction accumulator root hash
     /// it carries is generated after the `txns_to_commit` are applied.
@@ -1492,14 +1511,8 @@ impl DbWriter for AptosDB {
                 counters
                     .expect("Counters should be bumped with transactions being saved.")
                     .bump_op_counters();
-                // -1 for "not fully migrated", -2 for "error on get_account_count()"
-                STATE_ITEM_COUNT.set(
-                    self.state_store
-                        .get_value_count(last_version)
-                        .map_or(-1, |c| c as i64),
-                );
 
-                self.wake_pruner(last_version);
+                self.set_pruner_target_version(last_version);
             }
 
             // Once everything is successfully persisted, update the latest in-memory ledger info.
@@ -1536,6 +1549,7 @@ impl DbWriter for AptosDB {
         &self,
         version: Version,
         output_with_proof: TransactionOutputListWithProof,
+        ledger_infos: &[LedgerInfoWithSignatures],
     ) -> Result<()> {
         gauged_api("finalize_state_snapshot", || {
             // Ensure the output with proof only contains a single transaction output and info
@@ -1552,6 +1566,9 @@ impl DbWriter for AptosDB {
                 num_transaction_infos
             );
 
+            // TODO(joshlind): include confirm_or_save_frozen_subtrees in the change set
+            // bundle below.
+
             // Update the merkle accumulator using the given proof
             let frozen_subtrees = output_with_proof
                 .proof
@@ -1561,9 +1578,13 @@ impl DbWriter for AptosDB {
                 self.ledger_db.clone(),
                 version,
                 frozen_subtrees,
+                None,
             )?;
 
-            // Insert the target transactions, outputs, infos and events into the database
+            // Create a single change set for all further write operations
+            let mut change_set = ChangeSet::new();
+
+            // Save the target transactions, outputs, infos and events
             let (transactions, outputs): (Vec<Transaction>, Vec<TransactionOutput>) =
                 output_with_proof
                     .transactions_and_outputs
@@ -1584,38 +1605,33 @@ impl DbWriter for AptosDB {
                 &transactions,
                 &transaction_infos,
                 &events,
+                Some(&mut change_set),
             )?;
             restore_utils::save_transaction_outputs(
                 self.ledger_db.clone(),
                 self.transaction_store.clone(),
                 version,
                 outputs,
+                Some(&mut change_set),
             )?;
+
+            // Save the epoch ending ledger infos
+            restore_utils::save_ledger_infos(
+                self.ledger_db.clone(),
+                self.ledger_store.clone(),
+                ledger_infos,
+                Some(&mut change_set),
+            )?;
+
+            // Delete the genesis transaction
+            StateMerklePruner::prune_genesis(self.state_merkle_db.clone(), &mut change_set)?;
+            LedgerPruner::prune_genesis(self.ledger_db.clone(), &mut change_set)?;
+
+            // Apply the change set writes to the database (atomically) and update in-memory state
+            self.ledger_db.clone().write_schemas(change_set.batch)?;
+            restore_utils::update_latest_ledger_info(self.ledger_store.clone(), ledger_infos)?;
             self.state_store.reset();
-            Ok(())
-        })
-    }
 
-    fn delete_genesis(&self) -> Result<()> {
-        gauged_api("delete_genesis", || {
-            // Execute each pruner to clean up the genesis state
-            let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive).
-            let max_version = 1; // We should only really be pruning at a single version.
-
-            // Create all the db pruners
-            let state_pruner = StateStorePruner::new(Arc::clone(&self.state_merkle_db));
-            let ledger_pruner = LedgerPruner::new(
-                Arc::clone(&self.ledger_db),
-                Arc::new(TransactionStore::new(Arc::clone(&self.ledger_db))),
-                Arc::new(EventStore::new(Arc::clone(&self.ledger_db))),
-                Arc::new(LedgerStore::new(Arc::clone(&self.ledger_db))),
-            );
-
-            state_pruner.set_target_version(target_version);
-            state_pruner.prune(max_version)?;
-
-            ledger_pruner.set_target_version(target_version);
-            ledger_pruner.prune(max_version)?;
             Ok(())
         })
     }

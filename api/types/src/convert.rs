@@ -262,7 +262,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     resource: typ.into(),
                 }),
             },
-            WriteOp::Value(val) => match access_path.get_path() {
+            WriteOp::Modification(val) | WriteOp::Creation(val) => match access_path.get_path() {
                 Path::Code(_) => WriteSetChange::WriteModule(WriteModule {
                     address: access_path.address.into(),
                     state_key_hash,
@@ -298,7 +298,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     data,
                 })
             }
-            WriteOp::Value(value) => {
+            WriteOp::Modification(value) | WriteOp::Creation(value) => {
                 let data =
                     self.try_write_table_item_into_decoded_table_data(handle, &key.0, &value)?;
 

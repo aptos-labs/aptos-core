@@ -1,4 +1,0 @@
-{
-  "code": 400,
-  "message": "Request body deserialize error: deserialize Move type failed, invalid type: boolean `true`, expected a string at line 1 column 319"
-}

@@ -11,7 +11,6 @@ use crate::{
     move_vm_ext::{MoveResolverExt, MoveVmExt, SessionExt, SessionId},
     transaction_metadata::TransactionMetadata,
 };
-use aptos_crypto::HashValue;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule, NativeGasParameters};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
@@ -238,26 +237,25 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let chain_specific_info = self.chain_info();
-        let gas_currency = vec![];
         let txn_sequence_number = txn_data.sequence_number();
-        let txn_public_key = txn_data.authentication_key_preimage().to_vec();
+        let txn_authentication_key = txn_data.authentication_key().to_vec();
         let txn_gas_price = txn_data.gas_unit_price().get();
         let txn_max_gas_units = txn_data.max_gas_amount();
         let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
         let chain_id = txn_data.chain_id();
         let mut gas_meter = UnmeteredGasMeter;
-        let secondary_public_key_hashes: Vec<MoveValue> = txn_data
-            .secondary_authentication_key_preimages
+        let secondary_auth_keys: Vec<MoveValue> = txn_data
+            .secondary_authentication_keys
             .iter()
-            .map(|preimage| MoveValue::vector_u8(HashValue::sha3_256_of(preimage).to_vec()))
+            .map(|auth_key| MoveValue::vector_u8(auth_key.to_vec()))
             .collect();
         let args = if self.get_version()? >= APTOS_VERSION_3 && txn_data.is_multi_agent() {
             vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(txn_sequence_number),
-                MoveValue::vector_u8(txn_public_key),
+                MoveValue::vector_u8(txn_authentication_key),
                 MoveValue::vector_address(txn_data.secondary_signers()),
-                MoveValue::Vector(secondary_public_key_hashes),
+                MoveValue::Vector(secondary_auth_keys),
                 MoveValue::U64(txn_gas_price),
                 MoveValue::U64(txn_max_gas_units),
                 MoveValue::U64(txn_expiration_timestamp_secs),
@@ -267,7 +265,7 @@ impl AptosVMImpl {
             vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(txn_sequence_number),
-                MoveValue::vector_u8(txn_public_key),
+                MoveValue::vector_u8(txn_authentication_key),
                 MoveValue::U64(txn_gas_price),
                 MoveValue::U64(txn_max_gas_units),
                 MoveValue::U64(txn_expiration_timestamp_secs),
@@ -285,7 +283,8 @@ impl AptosVMImpl {
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 prologue_function_name,
-                gas_currency,
+                // TODO: Deprecate this once we remove gas currency on the Move side.
+                vec![],
                 serialize_values(&args),
                 &mut gas_meter,
             )
@@ -303,9 +302,9 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let chain_specific_info = self.chain_info();
-        let gas_currency = vec![];
+
         let txn_sequence_number = txn_data.sequence_number();
-        let txn_public_key = txn_data.authentication_key_preimage().to_vec();
+        let txn_authentication_key = txn_data.authentication_key();
         let txn_gas_price = txn_data.gas_unit_price().get();
         let txn_max_gas_units = txn_data.max_gas_amount();
         let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
@@ -315,11 +314,12 @@ impl AptosVMImpl {
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 &chain_specific_info.module_prologue_name,
-                gas_currency,
+                // TODO: Deprecate this once we remove gas currency on the Move side.
+                vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(txn_sequence_number),
-                    MoveValue::vector_u8(txn_public_key),
+                    MoveValue::vector_u8(txn_authentication_key.to_vec()),
                     MoveValue::U64(txn_gas_price),
                     MoveValue::U64(txn_max_gas_units),
                     MoveValue::U64(txn_expiration_timestamp_secs),
@@ -347,7 +347,6 @@ impl AptosVMImpl {
             ))
         });
 
-        let gas_currency = vec![];
         let chain_specific_info = self.chain_info();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -356,7 +355,8 @@ impl AptosVMImpl {
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 &chain_specific_info.user_epilogue_name,
-                gas_currency,
+                // TODO: Deprecate this once we remove gas currency on the Move side.
+                vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(txn_sequence_number),
@@ -380,7 +380,6 @@ impl AptosVMImpl {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
-        let gas_currency = vec![];
         let chain_specific_info = self.chain_info();
         let txn_sequence_number = txn_data.sequence_number();
         let txn_gas_price = txn_data.gas_unit_price().get();
@@ -389,7 +388,8 @@ impl AptosVMImpl {
             .execute_function_bypass_visibility(
                 &chain_specific_info.module_id(),
                 &chain_specific_info.user_epilogue_name,
-                gas_currency,
+                // TODO: Deprecate this once we remove gas currency on the Move side.
+                vec![],
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(txn_sequence_number),
@@ -419,7 +419,7 @@ impl AptosVMImpl {
         log_context: &AdapterLogSchema,
     ) -> Result<(), VMStatus> {
         let txn_sequence_number = txn_data.sequence_number();
-        let txn_public_key = txn_data.authentication_key_preimage().to_vec();
+        let txn_auth_key = txn_data.authentication_key().to_vec();
         let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
         let chain_id = txn_data.chain_id();
         let chain_specific_info = self.chain_info();
@@ -433,7 +433,7 @@ impl AptosVMImpl {
                 serialize_values(&vec![
                     MoveValue::Signer(txn_data.sender),
                     MoveValue::U64(txn_sequence_number),
-                    MoveValue::vector_u8(txn_public_key),
+                    MoveValue::vector_u8(txn_auth_key),
                     MoveValue::U64(txn_expiration_timestamp_secs),
                     MoveValue::U8(chain_id.id()),
                 ]),

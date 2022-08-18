@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metadata_storage::PersistentMetadataStorage;
 use crate::{
     error::Error,
     notification_handlers::{
@@ -23,6 +24,7 @@ use crate::{
 use anyhow::format_err;
 use aptos_config::config::StateSyncDriverConfig;
 use aptos_infallible::{Mutex, RwLock};
+use aptos_types::transaction::{TransactionOutputListWithProof, Version};
 use aptos_types::{
     ledger_info::LedgerInfoWithSignatures, on_chain_config::ON_CHAIN_CONFIG_REGISTRY,
 };
@@ -32,7 +34,7 @@ use event_notifications::EventSubscriptionService;
 use executor_types::ChunkCommitNotification;
 use futures::StreamExt;
 use mempool_notifications::MempoolNotificationListener;
-use mockall::predicate::{always, eq};
+use mockall::predicate::always;
 use std::{sync::Arc, time::Duration};
 use storage_interface::DbReaderWriter;
 use tokio::task::JoinHandle;
@@ -232,57 +234,6 @@ async fn test_execute_transactions_error() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_initialize_state_synchronizer() {
-    // Create test data
-    let target_ledger_info = create_epoch_ending_ledger_info();
-    let output_list_with_proof = create_output_list_with_proof();
-
-    // Setup the mock snapshot receiver
-    let mut snapshot_receiver = create_mock_receiver();
-    snapshot_receiver
-        .expect_add_chunk()
-        .with(always(), always())
-        .returning(|_, _| Ok(()));
-
-    // Setup the mock db writer
-    let mut db_writer = create_mock_db_writer();
-    db_writer
-        .expect_get_state_snapshot_receiver()
-        .with(
-            eq(target_ledger_info.ledger_info().version()),
-            eq(output_list_with_proof.proof.transaction_infos[0]
-                .ensure_state_checkpoint_hash()
-                .unwrap()),
-        )
-        .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
-
-    // Create the storage synchronizer
-    let (mut commit_listener, _, _, _, mut storage_synchronizer, _, _) =
-        create_storage_synchronizer(
-            create_mock_executor(),
-            create_mock_reader_writer(None, Some(db_writer)),
-        );
-
-    // Initialize the state synchronizer
-    let _ = storage_synchronizer
-        .initialize_state_synchronizer(
-            vec![target_ledger_info.clone()],
-            target_ledger_info,
-            output_list_with_proof,
-        )
-        .unwrap();
-
-    // Save a state chunk and verify we get a commit notification
-    storage_synchronizer
-        .save_state_values(0, create_state_value_chunk_with_proof(false))
-        .unwrap();
-    assert_matches!(
-        commit_listener.select_next_some().await,
-        CommitNotification::CommittedStates(_)
-    );
-}
-
-#[tokio::test(flavor = "multi_thread")]
 #[should_panic]
 async fn test_initialize_state_synchronizer_missing_info() {
     // Create test data that is missing transaction infos
@@ -365,21 +316,21 @@ async fn test_save_states_completion() {
         .expect_get_state_snapshot_receiver()
         .with(always(), always())
         .return_once(move |_, _| Ok(Box::new(snapshot_receiver)));
-    db_writer
-        .expect_finalize_state_snapshot()
-        .with(
-            eq(target_ledger_info.ledger_info().version()),
-            eq(output_list_with_proof.clone()),
-        )
-        .returning(|_, _| Ok(()));
+    let target_ledger_info_clone = target_ledger_info.clone();
+    let output_list_with_proof_clone = output_list_with_proof.clone();
     let epoch_change_proofs_clone = epoch_change_proofs.clone();
     db_writer
-        .expect_save_ledger_infos()
-        .withf(move |ledger_infos: &[LedgerInfoWithSignatures]| {
-            ledger_infos == epoch_change_proofs_clone
-        })
-        .returning(|_| Ok(()));
-    db_writer.expect_delete_genesis().returning(|| Ok(()));
+        .expect_finalize_state_snapshot()
+        .withf(
+            move |version: &Version,
+                  output_with_proof: &TransactionOutputListWithProof,
+                  ledger_infos: &[LedgerInfoWithSignatures]| {
+                version == &target_ledger_info_clone.ledger_info().version()
+                    && output_with_proof == &output_list_with_proof_clone
+                    && ledger_infos == epoch_change_proofs_clone
+            },
+        )
+        .returning(|_, _, _| Ok(()));
 
     // Create the storage synchronizer
     let (mut commit_listener, _, _, _, mut storage_synchronizer, _, _) =
@@ -403,13 +354,10 @@ async fn test_save_states_completion() {
         )
         .unwrap();
 
-    // Save a state chunk and verify we get a commit notification
+    // Save multiple state chunks (including the last chunk)
     storage_synchronizer
         .save_state_values(0, create_state_value_chunk_with_proof(false))
         .unwrap();
-    verify_state_commit_notification(&mut commit_listener, false, None).await;
-
-    // Save a state chunk that is the last chunk
     storage_synchronizer
         .save_state_values(1, create_state_value_chunk_with_proof(true))
         .unwrap();
@@ -420,10 +368,10 @@ async fn test_save_states_completion() {
         events: vec![expected_event.clone()],
         transactions: vec![expected_transaction.clone()],
     };
-    verify_state_commit_notification(
+
+    verify_snapshot_commit_notification(
         &mut commit_listener,
-        true,
-        Some(expected_committed_transactions.clone()),
+        expected_committed_transactions.clone(),
     )
     .await;
 
@@ -464,10 +412,10 @@ async fn test_save_states_dropped_error_listener() {
         )
         .unwrap();
 
-    // Save a state chunk
+    // Save the last state chunk
     let notification_id = 0;
     storage_synchronizer
-        .save_state_values(notification_id, create_state_value_chunk_with_proof(false))
+        .save_state_values(notification_id, create_state_value_chunk_with_proof(true))
         .unwrap();
 
     // The handler should panic as the commit listener was dropped
@@ -536,7 +484,7 @@ fn create_storage_synchronizer(
     ErrorNotificationListener,
     Arc<Mutex<EventSubscriptionService>>,
     MempoolNotificationListener,
-    StorageSynchronizer<MockChunkExecutor>,
+    StorageSynchronizer<MockChunkExecutor, PersistentMetadataStorage>,
     JoinHandle<()>,
     JoinHandle<()>,
 ) {
@@ -558,6 +506,10 @@ fn create_storage_synchronizer(
         mempool_notifications::new_mempool_notifier_listener_pair();
     let mempool_notification_handler = MempoolNotificationHandler::new(mempool_notification_sender);
 
+    // Create the metadata storage
+    let db_path = aptos_temppath::TempPath::new();
+    let metadata_storage = PersistentMetadataStorage::new(db_path.path());
+
     // Create the storage synchronizer
     let (storage_synchronizer, executor_handle, committer_handle) = StorageSynchronizer::new(
         StateSyncDriverConfig::default(),
@@ -566,6 +518,7 @@ fn create_storage_synchronizer(
         error_notification_sender,
         event_subscription_service.clone(),
         mempool_notification_handler,
+        metadata_storage,
         mock_reader_writer,
         None,
     );
@@ -581,17 +534,15 @@ fn create_storage_synchronizer(
     )
 }
 
-/// Verifies that the expected state commit notification is received by the listener
-async fn verify_state_commit_notification(
+/// Verifies that the expected snapshot commit notification is received by the listener
+async fn verify_snapshot_commit_notification(
     commit_listener: &mut CommitNotificationListener,
-    expected_all_synced: bool,
-    expected_committed_transactions: Option<CommittedTransactions>,
+    expected_committed_transactions: CommittedTransactions,
 ) {
-    let CommitNotification::CommittedStates(committed_states) =
+    let CommitNotification::CommittedStateSnapshot(committed_snapshot) =
         commit_listener.select_next_some().await;
-    assert_eq!(committed_states.all_states_synced, expected_all_synced);
     assert_eq!(
-        committed_states.committed_transaction,
+        committed_snapshot.committed_transaction,
         expected_committed_transactions
     );
 }
@@ -609,7 +560,9 @@ async fn verify_error_notification(
 /// Verifies that no pending data remains in the storage synchronizer.
 /// Note: due to asynchronous execution, we might need to wait some
 /// time for the pipelines to drain.
-fn verify_no_pending_data(storage_synchronizer: &StorageSynchronizer<MockChunkExecutor>) {
+fn verify_no_pending_data(
+    storage_synchronizer: &StorageSynchronizer<MockChunkExecutor, PersistentMetadataStorage>,
+) {
     let max_drain_time_secs = 10;
     for _ in 0..max_drain_time_secs {
         if !storage_synchronizer.pending_storage_data() {

@@ -3,7 +3,7 @@
 
 use aptos_crypto::HashValue;
 use aptos_types::{
-    proof::SparseMerkleProof,
+    proof::SparseMerkleProofExt,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::Version,
 };
@@ -16,8 +16,8 @@ pub trait ProofFetcher: Sync + Send {
         &self,
         state_key: &StateKey,
         version: Version,
-    ) -> anyhow::Result<(Option<StateValue>, Option<SparseMerkleProof>)>;
+    ) -> anyhow::Result<(Option<StateValue>, Option<SparseMerkleProofExt>)>;
 
     /// API to return all the proofs fetched by the proof fetcher so far.
-    fn get_proof_cache(&self) -> HashMap<HashValue, SparseMerkleProof>;
+    fn get_proof_cache(&self) -> HashMap<HashValue, SparseMerkleProofExt>;
 }

@@ -64,7 +64,7 @@ impl<'a, S: StateView> StateViewCache<'a, S> {
     pub(crate) fn push_write_set(&mut self, write_set: &WriteSet) {
         for (ref ap, ref write_op) in write_set.iter() {
             match write_op {
-                WriteOp::Value(blob) => {
+                WriteOp::Modification(blob) | WriteOp::Creation(blob) => {
                     self.data_map.insert(ap.clone(), Some(blob.clone()));
                 }
                 WriteOp::Deletion => {

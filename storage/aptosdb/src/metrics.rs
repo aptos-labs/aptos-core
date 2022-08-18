@@ -51,10 +51,14 @@ pub static NEXT_BLOCK_EPOCH: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static STATE_ITEM_COUNT: Lazy<IntGauge> = Lazy::new(|| {
+pub static STATE_ITEMS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!("aptos_storage_state_items", "Total number of state items.").unwrap()
+});
+
+pub static TOTAL_STATE_BYTES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
-        "aptos_storage_state_item_count",
-        "Total number of entries in the StateDB at the latest version."
+        "aptos_storage_total_state_bytes",
+        "Total size in bytes of all state items."
     )
     .unwrap()
 });

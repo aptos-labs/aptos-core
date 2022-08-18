@@ -13,6 +13,7 @@
 !**/Cargo.lock
 !**/*.mv
 !**/*.rs
+!**/*.mrb
 !config/src/config/test_data
 !aptos-move/framework/
 !api/doc/

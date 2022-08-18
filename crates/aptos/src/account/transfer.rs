@@ -9,8 +9,8 @@ use aptos_rest_client::{
 };
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
-use cached_framework_packages::aptos_stdlib;
 use clap::Parser;
+use framework::aptos_stdlib;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
@@ -18,9 +18,6 @@ use std::collections::BTreeMap;
 ///
 #[derive(Debug, Parser)]
 pub struct TransferCoins {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-
     /// Address of account you want to send coins to
     #[clap(long, parse(try_from_str = crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
@@ -28,6 +25,9 @@ pub struct TransferCoins {
     /// Amount of coins to transfer
     #[clap(long)]
     pub(crate) amount: u64,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 #[async_trait]
@@ -44,10 +44,7 @@ impl CliCommand<TransferSummary> for TransferCoins {
     }
 }
 
-const SUPPORTED_COINS: [&str; 2] = [
-    "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
-    "0x1::coin::CoinStore<0x1::aptoscoin::AptosCoin>",
-];
+const SUPPORTED_COINS: [&str; 1] = ["0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"];
 
 /// A shortened transaction output
 #[derive(Clone, Debug, Serialize)]

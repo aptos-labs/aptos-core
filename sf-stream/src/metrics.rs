@@ -11,3 +11,11 @@ pub static TRANSACTIONS_SENT: Lazy<IntCounter> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static BLOCKS_SENT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_sf_stream_blocks_sent_count",
+        "Blocks converted and printed out to stdout, picked up by the StreamingFast indexer",
+    )
+    .unwrap()
+});

@@ -33,7 +33,7 @@ impl<'a, S: StateView> StateView for VersionedView<'a, S> {
     fn get_state_value(&self, state_key: &StateKey) -> anyhow::Result<Option<Vec<u8>>> {
         match self.hashmap_view.read(state_key) {
             Some(v) => Ok(match v.as_ref() {
-                WriteOp::Value(w) => Some(w.clone()),
+                WriteOp::Modification(w) | WriteOp::Creation(w) => Some(w.clone()),
                 WriteOp::Deletion => None,
             }),
             None => self.base_view.get_state_value(state_key),

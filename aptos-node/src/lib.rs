@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 
 use anyhow::anyhow;
-use aptos_api::runtime::bootstrap as bootstrap_api;
+use aptos_api::bootstrap as bootstrap_api;
 use aptos_config::{
     config::{
         AptosDataClientConfig, BaseConfig, DataStreamingServiceConfig, NetworkConfig, NodeConfig,
@@ -16,6 +16,7 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Level};
+use aptos_runtime::instrumented_runtime::instrument_tokio_runtime;
 use aptos_sf_stream::runtime::bootstrap as bootstrap_sf_stream;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
@@ -35,6 +36,7 @@ use data_streaming_service::{
 };
 use event_notifications::EventSubscriptionService;
 use executor::{chunk_executor::ChunkExecutor, db_bootstrapper::maybe_bootstrap};
+use framework::ReleaseBundle;
 use futures::channel::mpsc::channel;
 use hex::FromHex;
 use mempool_notifications::MempoolNotificationSender;
@@ -43,6 +45,7 @@ use network_builder::builder::NetworkBuilder;
 use rand::{rngs::StdRng, SeedableRng};
 use state_sync_driver::driver_factory::DriverFactory;
 use state_sync_driver::driver_factory::StateSyncRuntimes;
+use state_sync_driver::metadata_storage::PersistentMetadataStorage;
 use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
@@ -92,11 +95,9 @@ pub struct AptosNodeArgs {
     #[clap(long, requires("test"))]
     random_ports: bool,
 
-    /// Paths to Aptos framework module blobs to be included in genesis.
-    ///
-    /// Can be both files and directories
+    /// Paths to the Aptos framework release package to be used for genesis.
     #[clap(long, requires("test"))]
-    genesis_modules: Option<Vec<PathBuf>>,
+    genesis_framework: Option<PathBuf>,
 
     /// Enable lazy mode
     ///
@@ -114,17 +115,17 @@ impl AptosNodeArgs {
                 .seed
                 .map(StdRng::from_seed)
                 .unwrap_or_else(StdRng::from_entropy);
-            let genesis_modules = if let Some(module_paths) = self.genesis_modules {
-                framework::load_modules_from_paths(&module_paths)
+            let genesis_framework = if let Some(path) = self.genesis_framework {
+                ReleaseBundle::read(path).unwrap()
             } else {
-                cached_framework_packages::module_blobs().to_vec()
+                framework::head_release_bundle().clone()
             };
             load_test_environment(
                 self.config,
                 self.test_dir,
                 self.random_ports,
                 self.lazy,
-                genesis_modules,
+                &genesis_framework,
                 rng,
             )
             .expect("Test mode should start correctly");
@@ -206,7 +207,7 @@ pub fn load_test_environment<R>(
     test_dir: Option<PathBuf>,
     random_ports: bool,
     lazy: bool,
-    genesis_modules: Vec<Vec<u8>>,
+    framework: &ReleaseBundle,
     rng: R,
 ) -> anyhow::Result<()>
 where
@@ -252,7 +253,7 @@ where
         }
 
         // Build genesis and validator node
-        let builder = aptos_genesis::builder::Builder::new(&test_dir, genesis_modules)?
+        let builder = aptos_genesis::builder::Builder::new(&test_dir, framework.clone())?
             .with_init_config(Some(Arc::new(move |_, config, _| {
                 *config = template.clone();
             })))
@@ -353,8 +354,9 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
         aptos_data_client.clone(),
     )?;
 
-    // Create the chunk executor
+    // Create the chunk executor and persistent storage
     let chunk_executor = Arc::new(ChunkExecutor::<AptosVM>::new(db_rw.clone()));
+    let metadata_storage = PersistentMetadataStorage::new(&node_config.storage.dir());
 
     // Create the state sync driver factory
     let state_sync = DriverFactory::create_and_spawn_driver(
@@ -364,6 +366,7 @@ fn create_state_sync_runtimes<M: MempoolNotificationSender + 'static>(
         db_rw,
         chunk_executor,
         mempool_notifier,
+        metadata_storage,
         consensus_listener,
         event_subscription_service,
         aptos_data_client,
@@ -395,6 +398,7 @@ fn setup_data_streaming_service(
         .enable_all()
         .build()
         .map_err(|err| anyhow!("Failed to create data streaming service {}", err))?;
+    instrument_tokio_runtime(&streaming_service_runtime, "data-streaming-service");
     streaming_service_runtime.spawn(data_streaming_service.start_service());
 
     Ok((streaming_service_client, streaming_service_runtime))
@@ -419,6 +423,8 @@ fn setup_aptos_data_client(
         .enable_all()
         .build()
         .map_err(|err| anyhow!("Failed to create aptos data client {}", err))?;
+
+    instrument_tokio_runtime(&aptos_data_client_runtime, "aptos-data-client");
 
     // Create the data client and spawn the data poller
     let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
@@ -445,6 +451,8 @@ fn setup_state_sync_storage_service(
         .enable_all()
         .build()
         .map_err(|err| anyhow!("Failed to start state sync storage service {}", err))?;
+
+    instrument_tokio_runtime(&storage_service_runtime, "storage-service-server");
 
     // Spawn all state sync storage service servers on the same runtime
     let storage_reader = StorageReader::new(config, Arc::clone(&db_rw.reader));
@@ -564,6 +572,8 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
                 err
             )
         })?;
+
+        instrument_tokio_runtime(&runtime, "network");
 
         // Entering here gives us a runtime to instantiate all the pieces of the builder
         let _enter = runtime.enter();
@@ -718,10 +728,8 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
     }
 
     // Create the telemetry service
-    let telemetry_runtime = aptos_telemetry::service::start_telemetry_service(
-        node_config.clone(),
-        chain_id.to_string(),
-    );
+    let telemetry_runtime =
+        aptos_telemetry::service::start_telemetry_service(node_config.clone(), chain_id);
 
     Ok(AptosHandle {
         _api: api_runtime,

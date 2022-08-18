@@ -7,7 +7,10 @@ module aptos_framework::governance_proposal {
     use std::string::{String, length, utf8};
     use std::error;
 
-    const ETOO_LONG: u64 = 1;
+    ///Metadata location cannot be longer than 256 chars
+    const EMETADATA_LOCATION_TOO_LONG: u64 = 1;
+    /// Metadata hash cannot be longer than 256 chars
+    const EMETADATA_HASH_TOO_LONG: u64 = 2;
 
     struct GovernanceProposal has store, drop {
         // Location where metadata such as the proposal's execution script content, description, etc. are hosted.
@@ -22,8 +25,8 @@ module aptos_framework::governance_proposal {
         metadata_location: String,
         metadata_hash: String,
     ): GovernanceProposal {
-        assert!(length(&metadata_location) <= 256, error::invalid_argument(ETOO_LONG));
-        assert!(length(&metadata_hash) <= 256, error::invalid_argument(ETOO_LONG));
+        assert!(length(&metadata_location) <= 256, error::invalid_argument(EMETADATA_LOCATION_TOO_LONG));
+        assert!(length(&metadata_hash) <= 256, error::invalid_argument(EMETADATA_HASH_TOO_LONG));
 
         GovernanceProposal {
             metadata_location,

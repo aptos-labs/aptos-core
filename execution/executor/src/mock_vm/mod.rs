@@ -251,14 +251,14 @@ fn gen_genesis_writeset() -> WriteSet {
     let validator_set_ap = access_path_for_config(ValidatorSet::CONFIG_ID);
     write_set.push((
         StateKey::AccessPath(validator_set_ap),
-        WriteOp::Value(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
+        WriteOp::Modification(bcs::to_bytes(&ValidatorSet::new(vec![])).unwrap()),
     ));
     write_set.push((
         StateKey::AccessPath(AccessPath::new(
             CORE_CODE_ADDRESS,
             ConfigurationResource::resource_path(),
         )),
-        WriteOp::Value(bcs::to_bytes(&ConfigurationResource::default()).unwrap()),
+        WriteOp::Modification(bcs::to_bytes(&ConfigurationResource::default()).unwrap()),
     ));
     write_set
         .freeze()
@@ -269,11 +269,11 @@ fn gen_mint_writeset(sender: AccountAddress, balance: u64, seqnum: u64) -> Write
     let mut write_set = WriteSetMut::default();
     write_set.push((
         StateKey::AccessPath(balance_ap(sender)),
-        WriteOp::Value(balance.to_le_bytes().to_vec()),
+        WriteOp::Modification(balance.to_le_bytes().to_vec()),
     ));
     write_set.push((
         StateKey::AccessPath(seqnum_ap(sender)),
-        WriteOp::Value(seqnum.to_le_bytes().to_vec()),
+        WriteOp::Modification(seqnum.to_le_bytes().to_vec()),
     ));
     write_set.freeze().expect("mint writeset should be valid")
 }
@@ -288,15 +288,15 @@ fn gen_payment_writeset(
     let mut write_set = WriteSetMut::default();
     write_set.push((
         StateKey::AccessPath(balance_ap(sender)),
-        WriteOp::Value(sender_balance.to_le_bytes().to_vec()),
+        WriteOp::Modification(sender_balance.to_le_bytes().to_vec()),
     ));
     write_set.push((
         StateKey::AccessPath(seqnum_ap(sender)),
-        WriteOp::Value(sender_seqnum.to_le_bytes().to_vec()),
+        WriteOp::Modification(sender_seqnum.to_le_bytes().to_vec()),
     ));
     write_set.push((
         StateKey::AccessPath(balance_ap(recipient)),
-        WriteOp::Value(recipient_balance.to_le_bytes().to_vec()),
+        WriteOp::Modification(recipient_balance.to_le_bytes().to_vec()),
     ));
     write_set
         .freeze()

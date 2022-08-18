@@ -1,3 +1,6 @@
+// Copyright (c) Aptos
+// SPDX-License-Identifier: Apache-2.0
+
 import { HexString } from "../hex_string";
 import {
   TypeTag,
@@ -263,6 +266,20 @@ export function serializeArg(argVal: any, argType: TypeTag, serializer: Serializ
     serializer.serializeU32AsUleb128(argVal.length);
 
     argVal.forEach((arg) => serializeArg(arg, argType.value, serializer));
+    return;
+  }
+
+  if (argType instanceof TypeTagStruct) {
+    const { address, module_name: moduleName, name } = (argType as TypeTagStruct).value;
+    if (
+      `${HexString.fromUint8Array(address.address).toShortString()}::${moduleName.value}::${name.value}` !==
+      "0x1::string::String"
+    ) {
+      throw new Error("The only supported struct arg is of type 0x1::string::String");
+    }
+    assertType(argVal, ["string"]);
+
+    serializer.serializeStr(argVal);
     return;
   }
   throw new Error("Unsupported arg type.");

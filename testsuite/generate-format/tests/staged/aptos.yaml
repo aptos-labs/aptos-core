@@ -35,8 +35,7 @@ BlockMetadata:
         TYPENAME: AccountAddress
     - proposer_index:
         OPTION: U32
-    - previous_block_votes:
-        SEQ: BOOL
+    - previous_block_votes_bitvec: BYTES
     - failed_proposer_indices:
         SEQ: U32
     - timestamp_usecs: U64
@@ -269,10 +268,13 @@ TypeTag:
 WriteOp:
   ENUM:
     0:
-      Deletion: UNIT
-    1:
-      Value:
+      Creation:
         NEWTYPE: BYTES
+    1:
+      Modification:
+        NEWTYPE: BYTES
+    2:
+      Deletion: UNIT
 WriteSet:
   NEWTYPESTRUCT:
     TYPENAME: WriteSetMut

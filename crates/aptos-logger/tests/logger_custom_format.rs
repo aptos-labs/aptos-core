@@ -14,6 +14,9 @@ impl Writer for VecWriter {
     fn write(&self, log: String) {
         self.logs.write().push(log)
     }
+    fn write_buferred(&mut self, log: String) {
+        self.write(log);
+    }
 }
 
 #[test]

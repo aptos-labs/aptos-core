@@ -1,23 +1,22 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos::{
-    common::types::MovePackageDir,
-    move_tool::{BuiltPackage, MemberId},
-};
+use crate::AptosPackageHooks;
+use aptos::move_tool::MemberId;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     state_store::state_key::StateKey,
     transaction::{ScriptFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
-use cached_framework_packages::aptos_stdlib;
-use framework::natives::code::UpgradePolicy;
+use framework::aptos_stdlib;
+use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
 };
 use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
+use move_deps::move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
 use serde::de::DeserializeOwned;
 use std::collections::BTreeMap;
@@ -48,8 +47,16 @@ pub struct MoveHarness {
 impl MoveHarness {
     /// Creates a new harness.
     pub fn new() -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor: FakeExecutor::from_fresh_genesis(),
+            txn_seq_no: BTreeMap::default(),
+        }
+    }
+
+    pub fn new_mainnet() -> Self {
+        Self {
+            executor: FakeExecutor::from_mainnet_genesis(),
             txn_seq_no: BTreeMap::default(),
         }
     }
@@ -66,11 +73,16 @@ impl MoveHarness {
     pub fn new_account_at(&mut self, addr: AccountAddress) -> Account {
         // The below will use the genesis keypair but that should be fine.
         let acc = Account::new_genesis_account(addr);
-        // APTOS has 8 decimals so this is only 1000 coins.
-        let data = AccountData::with_account(acc, 100_000_000_000, 10);
-        self.txn_seq_no.insert(addr, 10);
+        // Mint the account 10M Aptos coins (with 8 decimals).
+        let data = AccountData::with_account(acc, 1_000_000_000_000_000, 10);
         self.executor.add_account_data(&data);
+        self.txn_seq_no.insert(addr, 10);
         data.account().clone()
+    }
+
+    /// Gets the account where the Aptos framework is installed (0x1).
+    pub fn aptos_framework_account(&mut self) -> Account {
+        self.new_account_at(AccountAddress::ONE)
     }
 
     /// Runs a signed transaction. On success, applies the write set.
@@ -161,17 +173,12 @@ impl MoveHarness {
 
     /// Creates a transaction which publishes the Move Package found at the given path on behalf
     /// of the given account.
-    pub fn create_publish_package(
-        &mut self,
-        account: &Account,
-        path: &Path,
-        upgrade_policy: UpgradePolicy,
-    ) -> SignedTransaction {
-        let package = BuiltPackage::build(MovePackageDir::new(path.to_owned()), true, false)
+    pub fn create_publish_package(&mut self, account: &Account, path: &Path) -> SignedTransaction {
+        let package = BuiltPackage::build(path.to_owned(), BuildOptions::default())
             .expect("building package must succeed");
         let code = package.extract_code();
         let metadata = package
-            .extract_metadata(upgrade_policy)
+            .extract_metadata()
             .expect("extracting package metadata must succeed");
         self.create_transaction_payload(
             account,
@@ -183,13 +190,8 @@ impl MoveHarness {
     }
 
     /// Runs transaction which publishes the Move Package.
-    pub fn publish_package(
-        &mut self,
-        account: &Account,
-        path: &Path,
-        upgrade_policy: UpgradePolicy,
-    ) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path, upgrade_policy);
+    pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
+        let txn = self.create_publish_package(account, path);
         self.run(txn)
     }
 
@@ -200,7 +202,7 @@ impl MoveHarness {
     }
 
     pub fn new_epoch(&mut self) {
-        self.fast_forward(3600);
+        self.fast_forward(7200);
         self.executor.new_block()
     }
 

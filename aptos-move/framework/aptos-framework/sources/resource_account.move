@@ -42,7 +42,8 @@ module aptos_framework::resource_account {
     use aptos_framework::account;
     use aptos_std::simple_map::{Self, SimpleMap};
 
-    const ECONTAINER_NOT_PUBLISHED: u64 = 0;
+    /// Container resource not found in account
+    const ECONTAINER_NOT_PUBLISHED: u64 = 1;
 
     struct Container has key {
         store: SimpleMap<address, account::SignerCapability>,

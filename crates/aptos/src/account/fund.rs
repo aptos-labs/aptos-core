@@ -16,34 +16,36 @@ use clap::Parser;
 
 /// Command to fund an account with tokens from a faucet
 ///
+/// If the account doesn't exist, it will create it when funding it from the faucet
 #[derive(Debug, Parser)]
-pub struct FundAccount {
-    #[clap(flatten)]
-    pub(crate) profile_options: ProfileOptions,
-    /// Address to create account for
+pub struct FundWithFaucet {
+    /// Address to fund
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
-    #[clap(flatten)]
-    pub(crate) faucet_options: FaucetOptions,
+
     /// Coins to fund when using the faucet
     #[clap(long, default_value_t = DEFAULT_FUNDED_COINS)]
-    pub(crate) num_coins: u64,
-    /// if passed, rest endpoint to wait for transaction to complete
+    pub(crate) amount: u64,
+
+    #[clap(flatten)]
+    pub(crate) faucet_options: FaucetOptions,
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
 }
 
 #[async_trait]
-impl CliCommand<String> for FundAccount {
+impl CliCommand<String> for FundWithFaucet {
     fn command_name(&self) -> &'static str {
-        "FundAccount"
+        "FundWithFaucet"
     }
 
     async fn execute(self) -> CliTypedResult<String> {
         let hashes = fund_account(
             self.faucet_options
                 .faucet_url(&self.profile_options.profile)?,
-            self.num_coins,
+            self.amount,
             self.account,
         )
         .await?;
@@ -58,7 +60,7 @@ impl CliCommand<String> for FundAccount {
         }
         return Ok(format!(
             "Added {} coins to account {}",
-            self.num_coins, self.account
+            self.amount, self.account
         ));
     }
 }

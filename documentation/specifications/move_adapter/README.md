@@ -109,10 +109,6 @@ pub struct RawTransaction {
     /// Price to be paid per gas unit.
     gas_unit_price: u64,
 
-    /// The currency code, e.g., "XDX", used to pay for gas. The `max_gas_amount`
-    /// and `gas_unit_price` values refer to units of this currency.
-    gas_currency_code: String,
-
     /// Expiration timestamp for this transaction, represented
     /// as seconds from the Unix Epoch. If the current blockchain timestamp
     /// is greater than or equal to this time, then the transaction is
@@ -248,20 +244,6 @@ successful, this value is returned as the `governance_role` field of the
 `VMValidatorResult` so that the client can choose to prioritize governance
 transactions.
 
-* Check that the `gas_currency_code` in the `RawTransaction` is a name composed
-of uppercase ASCII alphanumeric characters where the first character is a letter. If
-not, validation will fail with an `INVALID_GAS_SPECIFIER` status code. Note
-that this check does not ensure that the name corresponds to a currency
-recognized by the Aptos Framework.
-
-* Normalize the `gas_unit_price` from the `RawTransaction` to the Aptos (XDX)
-currency. If the validation is successful, the normalized gas price is
-returned as the `score` field of the `VMValidatorResult` for use in
-prioritizing the transaction. The normalization is calculated using the
-`to_xdx_exchange_rate` field of the on-chain `CurrencyInfo` for the specified
-gas currency. This can fail with a status code of
-`CURRENCY_INFO_DOES_NOT_EXIST` if the exchange rate cannot be retrieved.
-
 * If the transaction payload is a `ScriptFunction`, check if the on-chain
 Aptos Version number is 2 or later. For version 1, validation will fail with
 a `FEATURE_UNDER_GATING` status code.
@@ -363,11 +345,8 @@ account. If not, validation fails with an `INVALID_AUTH_KEY` status code.
 
 * The transaction sender must be able to pay the maximum transaction fee. The
 maximum fee is the product of the transaction's `max_gas_amount` and
-`gas_unit_price` fields. If the maximum fee is non-zero, the coin specified
-by the transaction's `gas_currency_code` must have been registered as a valid
-gas currency (via the `TransactionFee` module), or else validation will fail
-with a `BAD_TRANSACTION_FEE_CURRENCY` status. If the sender's account balance
-for the gas currency is less than the maximum fee, validation fails with an
+`gas_unit_price` fields. If the sender's account balance
+for the Aptos coin is less than the maximum fee, validation fails with an
 `INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE` status code. For `WriteSet`
 transactions, the maximum fee is treated as zero, regardless of the gas
 parameters specified in the transaction.
