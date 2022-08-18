@@ -163,11 +163,13 @@ module aptos_framework::aptos_governance {
     /// Update the governance configurations. This can only be called as part of resolving a proposal in this same
     /// AptosGovernance.
     public fun update_governance_config(
-        _proposal: GovernanceProposal,
+        aptos_framework: &signer,
         min_voting_threshold: u128,
         required_proposer_stake: u64,
         voting_duration_secs: u64,
     ) acquires GovernanceConfig, GovernanceEvents {
+        system_addresses::assert_aptos_framework(aptos_framework);
+
         let governance_config = borrow_global_mut<GovernanceConfig>(@aptos_framework);
         governance_config.voting_duration_secs = voting_duration_secs;
         governance_config.min_voting_threshold = min_voting_threshold;
@@ -368,7 +370,8 @@ module aptos_framework::aptos_governance {
     }
 
     /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
-    public fun reconfigure(_proposal: &GovernanceProposal) {
+    public fun reconfigure(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
         reconfiguration::reconfigure();
     }
 
@@ -532,5 +535,25 @@ module aptos_framework::aptos_governance {
         stake::create_stake_pool(no_voter, coin::mint(5, &mint_cap), coin::mint(5, &mint_cap), 10000);
         coin::destroy_mint_cap<AptosCoin>(mint_cap);
         coin::destroy_burn_cap<AptosCoin>(burn_cap);
+    }
+
+    #[test(aptos_framework = @aptos_framework)]
+    public entry fun test_update_governance_config(
+        aptos_framework: signer) acquires GovernanceConfig, GovernanceEvents {
+        initialize(&aptos_framework, 1, 2, 3);
+        update_governance_config(&aptos_framework, 10, 20, 30);
+
+        let config = borrow_global<GovernanceConfig>(@aptos_framework);
+        assert!(config.min_voting_threshold == 10, 0);
+        assert!(config.required_proposer_stake == 20, 1);
+        assert!(config.voting_duration_secs == 30, 3);
+    }
+
+    #[test(account = @0x123)]
+    #[expected_failure(abort_code = 0x50003)]
+    public entry fun test_update_governance_config_unauthorized_should_fail(
+        account: signer) acquires GovernanceConfig, GovernanceEvents {
+        initialize(&account, 1, 2, 3);
+        update_governance_config(&account, 10, 20, 30);
     }
 }
