@@ -7,7 +7,7 @@ module aptos_framework::governance_proposal {
     use std::string::{String, length, utf8};
     use std::error;
 
-    ///Metadata location cannot be longer than 256 chars
+    /// Metadata location cannot be longer than 256 chars
     const EMETADATA_LOCATION_TOO_LONG: u64 = 1;
     /// Metadata hash cannot be longer than 256 chars
     const EMETADATA_HASH_TOO_LONG: u64 = 2;
