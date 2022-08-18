@@ -6,7 +6,7 @@ use move_deps::move_core_types;
 use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use std::{fmt, str::FromStr};
 
-#[derive(Clone, Debug, PartialEq, Copy)]
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Address(AccountAddress);
 
 impl Address {
