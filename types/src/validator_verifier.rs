@@ -196,8 +196,7 @@ impl ValidatorVerifier {
     pub fn aggregate_signatures(
         &self,
         partial_signatures: &PartialSignatures,
-    ) -> Result<(AggregateSignature, PublicKey), VerifyError> {
-        let mut pub_keys = vec![];
+    ) -> Result<AggregateSignature, VerifyError> {
         let mut sigs = vec![];
         let mut masks = BitVec::with_num_bits(self.len() as u16);
         for (addr, sig) in partial_signatures.signatures() {
@@ -206,45 +205,13 @@ impl ValidatorVerifier {
                 .get(addr)
                 .ok_or(VerifyError::UnknownAuthor)?;
             masks.set(index as u16);
-            pub_keys.push(self.validator_infos[index].public_key());
             sigs.push(sig.clone());
         }
         // Perform an optimistic aggregation of the signatures without verification.
         let aggregated_sig = bls12381::Signature::aggregate(sigs)
             .map_err(|_| VerifyError::FailedToAggregateSignature)?;
 
-        let aggregated_key =
-            PublicKey::aggregate(pub_keys).map_err(|_| VerifyError::FailedToAggregatePubKey)?;
-        Ok((
-            AggregateSignature::new(masks, Some(aggregated_sig)),
-            aggregated_key,
-        ))
-    }
-
-    pub fn generate_multi_signature<T: CryptoHash + Serialize>(
-        &self,
-        partial_signatures: &PartialSignatures,
-        message: &T,
-    ) -> Result<AggregateSignature, VerifyError> {
-        let (aggregated_sig, aggregated_key) = self.aggregate_signatures(partial_signatures)?;
-        // Verify the multi-signature. Please note that the verification is not really needed here
-        // because we already verify signatures from validators individually, This is just good to have for now.
-        // but will be needed once we support optimistic aggregation of signatures.
-        aggregated_sig
-            .sig()
-            .as_ref()
-            .expect("Failed to get multi signature")
-            .verify(message, &aggregated_key)
-            .map_err(|_| VerifyError::FailedToVerifyMultiSignature)?;
-        Ok(aggregated_sig)
-    }
-
-    pub fn generate_aggregate_signature(
-        &self,
-        partial_signatures: &PartialSignatures,
-    ) -> Result<AggregateSignature, VerifyError> {
-        let (aggregated_sig, _aggregated_key) = self.aggregate_signatures(partial_signatures)?;
-        Ok(aggregated_sig)
+        Ok(AggregateSignature::new(masks, Some(aggregated_sig)))
     }
 
     /// This function will successfully return when at least quorum_size signatures of known authors
@@ -294,7 +261,7 @@ impl ValidatorVerifier {
         Ok(())
     }
 
-    pub fn verify_aggregated_signatures<T: CryptoHash + Serialize>(
+    pub fn verify_aggregate_signatures<T: CryptoHash + Serialize>(
         &self,
         messages: &[&T],
         aggregated_signature: &AggregateSignature,
@@ -625,7 +592,7 @@ mod tests {
         let mut partial_sig = PartialSignatures::empty();
         partial_sig.add_signature(unknown_validator_signer.author(), unknown_signature);
 
-        let (multi_sig, _) = unknown_validator
+        let multi_sig = unknown_validator
             .aggregate_signatures(&partial_sig)
             .unwrap();
 
@@ -704,8 +671,7 @@ mod tests {
 
         let mut aggregated_signature = validator_verifier
             .aggregate_signatures(&partial_signature)
-            .unwrap()
-            .0;
+            .unwrap();
         assert_eq!(
             aggregated_signature.get_voters_bitvec().num_buckets(),
             BitVec::required_buckets(validator_verifier.validator_infos.len() as u16)
@@ -734,8 +700,7 @@ mod tests {
         }
         aggregated_signature = validator_verifier
             .aggregate_signatures(&partial_signature)
-            .unwrap()
-            .0;
+            .unwrap();
         assert_eq!(
             aggregated_signature.get_voters_bitvec().num_buckets(),
             BitVec::required_buckets(validator_verifier.validator_infos.len() as u16)
@@ -762,8 +727,7 @@ mod tests {
         }
         aggregated_signature = validator_verifier
             .aggregate_signatures(&partial_signature)
-            .unwrap()
-            .0;
+            .unwrap();
         assert_eq!(
             aggregated_signature.get_voters_bitvec().num_buckets(),
             BitVec::required_buckets(validator_verifier.validator_infos.len() as u16)
@@ -816,8 +780,7 @@ mod tests {
 
         let mut aggregated_signature = validator_verifier
             .aggregate_signatures(&partial_signature)
-            .unwrap()
-            .0;
+            .unwrap();
 
         // Check against all signatures (6 voting power); this will pass.
         assert_eq!(
@@ -844,8 +807,7 @@ mod tests {
 
         aggregated_signature = validator_verifier
             .aggregate_signatures(&partial_signature)
-            .unwrap()
-            .0;
+            .unwrap();
 
         assert_eq!(
             validator_verifier.verify_multi_signatures(&dummy_struct, &aggregated_signature),
@@ -868,8 +830,7 @@ mod tests {
         }
         aggregated_signature = validator_verifier
             .aggregate_signatures(&partial_signature)
-            .unwrap()
-            .0;
+            .unwrap();
         assert_eq!(
             validator_verifier.verify_multi_signatures(&dummy_struct, &aggregated_signature),
             Err(VerifyError::TooLittleVotingPower {

@@ -102,7 +102,7 @@ pub struct TimeoutSigningRepr {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct TwoChainTimeoutCertificate {
     timeout: TwoChainTimeout,
-    signatures_with_rounds: AggregatedSignatureWithRounds,
+    signatures_with_rounds: AggregateSignatureWithRounds,
 }
 
 impl Display for TwoChainTimeoutCertificate {
@@ -122,7 +122,7 @@ impl TwoChainTimeoutCertificate {
     pub fn new(timeout: TwoChainTimeout) -> Self {
         Self {
             timeout,
-            signatures_with_rounds: AggregatedSignatureWithRounds::empty(),
+            signatures_with_rounds: AggregateSignatureWithRounds::empty(),
         }
     }
     /// Verifies the signatures for each validator, the signature is on the TimeoutSigningRepr where the
@@ -150,9 +150,9 @@ impl TwoChainTimeoutCertificate {
             })
             .collect();
         let timeout_messages_ref: Vec<_> = timeout_messages.iter().collect();
-        validators.verify_aggregated_signatures(
+        validators.verify_aggregate_signatures(
             &timeout_messages_ref,
-            self.signatures_with_rounds.aggregated_sig(),
+            self.signatures_with_rounds.sig(),
         )?;
         let signed_hqc = self
             .signatures_with_rounds
@@ -184,7 +184,7 @@ impl TwoChainTimeoutCertificate {
         self.timeout.hqc_round()
     }
 
-    pub fn signatures_with_rounds(&self) -> &AggregatedSignatureWithRounds {
+    pub fn signatures_with_rounds(&self) -> &AggregateSignatureWithRounds {
         &self.signatures_with_rounds
     }
 }
@@ -249,7 +249,7 @@ impl TwoChainTimeoutWithPartialSignatures {
         self.signatures.add_signature(author, hqc_round, signature);
     }
 
-    /// Aggregates the partial signature into `TwoChainTimeoutWithSignatures`. This is done when we
+    /// Aggregates the partial signature into `TwoChainTimeoutCertificate`. This is done when we
     /// have quorum voting power in the partial signature.
     pub fn aggregate_signatures(
         &self,
@@ -258,10 +258,10 @@ impl TwoChainTimeoutWithPartialSignatures {
         let (partial_sig, ordered_rounds) = self
             .signatures
             .get_partial_sig_with_rounds(verifier.address_to_validator_index());
-        let aggregated_sig = verifier.generate_aggregate_signature(&partial_sig)?;
+        let aggregated_sig = verifier.aggregate_signatures(&partial_sig)?;
         Ok(TwoChainTimeoutCertificate {
             timeout: self.timeout.clone(),
-            signatures_with_rounds: AggregatedSignatureWithRounds::new(
+            signatures_with_rounds: AggregateSignatureWithRounds::new(
                 aggregated_sig,
                 ordered_rounds,
             ),
@@ -337,23 +337,20 @@ impl PartialSignaturesWithRound {
 /// first entry in the rounds corresponds to validator address with the first bitmask set in the
 /// aggregated signature and so on. The ordering is crucial for verification of the timeout messages.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct AggregatedSignatureWithRounds {
-    aggregated_sig: AggregateSignature,
+pub struct AggregateSignatureWithRounds {
+    sig: AggregateSignature,
     rounds: Vec<Round>,
 }
 
-impl AggregatedSignatureWithRounds {
-    pub fn new(aggregated_sig: AggregateSignature, rounds: Vec<Round>) -> Self {
-        assert_eq!(aggregated_sig.get_num_voters(), rounds.len());
-        Self {
-            aggregated_sig,
-            rounds,
-        }
+impl AggregateSignatureWithRounds {
+    pub fn new(sig: AggregateSignature, rounds: Vec<Round>) -> Self {
+        assert_eq!(sig.get_num_voters(), rounds.len());
+        Self { sig, rounds }
     }
 
     pub fn empty() -> Self {
         Self {
-            aggregated_sig: AggregateSignature::empty(),
+            sig: AggregateSignature::empty(),
             rounds: vec![],
         }
     }
@@ -362,23 +359,22 @@ impl AggregatedSignatureWithRounds {
         &self,
         ordered_validator_addresses: &[AccountAddress],
     ) -> Vec<AccountAddress> {
-        self.aggregated_sig
-            .get_voter_addresses(ordered_validator_addresses)
+        self.sig.get_voter_addresses(ordered_validator_addresses)
     }
 
     pub fn get_voters_and_rounds(
         &self,
         ordered_validator_addresses: &[AccountAddress],
     ) -> Vec<(AccountAddress, Round)> {
-        self.aggregated_sig
+        self.sig
             .get_voter_addresses(ordered_validator_addresses)
             .into_iter()
             .zip(self.rounds.clone())
             .collect()
     }
 
-    pub fn aggregated_sig(&self) -> &AggregateSignature {
-        &self.aggregated_sig
+    pub fn sig(&self) -> &AggregateSignature {
+        &self.sig
     }
 
     pub fn rounds(&self) -> &Vec<Round> {

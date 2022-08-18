@@ -177,7 +177,7 @@ mod tests {
             );
 
             let aggregated_signature = current_verifier
-                .generate_multi_signature(&partial_signatures, &ledger_info)
+                .aggregate_signatures(&partial_signatures)
                 .unwrap();
 
             valid_ledger_info.push(LedgerInfoWithSignatures::new(

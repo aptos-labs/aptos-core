@@ -601,8 +601,7 @@ impl Arbitrary for LedgerInfoWithSignatures {
                     ledger_info,
                     validator_verifier
                         .aggregate_signatures(&partial_sig)
-                        .unwrap()
-                        .0,
+                        .unwrap(),
                 )
             })
             .boxed()
