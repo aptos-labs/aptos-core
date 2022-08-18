@@ -1,7 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::StateMerklePrunerConfig;
+use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
+use proptest::{prelude::*, proptest};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -14,9 +15,10 @@ use storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 
 use crate::pruner::state_pruner_worker::StatePrunerWorker;
 use crate::stale_node_index::StaleNodeIndexSchema;
+use crate::test_helper::{arb_state_kv_sets, update_store};
 use crate::{
-    change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB, PrunerManager,
-    StatePrunerManager,
+    change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB, LedgerPrunerManager,
+    PrunerManager, StatePrunerManager,
 };
 
 fn put_value_set(
@@ -357,5 +359,62 @@ fn test_worker_quit_eagerly() {
         verify_state_in_store(state_store, key.clone(), Some(&value0), 0);
         verify_state_in_store(state_store, key.clone(), Some(&value1), 1);
         verify_state_in_store(state_store, key, Some(&value2), 2);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+
+    #[test]
+    fn test_state_value_pruner(
+        input in arb_state_kv_sets(10, 5, 5),
+    ) {
+        verify_state_value_pruner(input);
+    }
+}
+
+fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp_dir);
+    let store = &db.state_store;
+
+    let mut version = 0;
+    let mut current_state_values = HashMap::new();
+    let pruner = LedgerPrunerManager::new(
+        Arc::clone(&db.ledger_db),
+        Arc::clone(store),
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
+            user_pruning_window_offset: 0,
+        },
+    );
+    for batch in inputs {
+        update_store(store, batch.clone().into_iter(), version);
+        for (k, v) in batch.iter() {
+            if let Some(old_v_opt) = current_state_values.insert(k.clone(), v.clone()) {
+                pruner
+                    .wake_and_wait_pruner(version as u64 /* latest_version */)
+                    .unwrap();
+                if version > 0 {
+                    verify_state_value(vec![(k, &old_v_opt)].into_iter(), version - 1, store, true);
+                }
+            }
+            verify_state_value(current_state_values.iter(), version, store, false);
+            version += 1;
+        }
+    }
+}
+
+fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a Option<StateValue>)>>(
+    kvs: I,
+    version: Version,
+    state_store: &Arc<StateStore>,
+    pruned: bool,
+) {
+    for (k, v) in kvs {
+        let v_from_db = state_store.get_state_value_by_version(k, version).unwrap();
+        assert_eq!(&v_from_db, if pruned { &None } else { v });
     }
 }

@@ -678,7 +678,7 @@ where
     /// Finishes the restoration process. This tells the code that there is no more account,
     /// otherwise we can not freeze the rightmost leaf and its ancestors.
     fn finish_impl(mut self) -> Result<()> {
-        // Deal with the special case when the entire tree has a single leaf.
+        // Deal with the special case when the entire tree has a single leaf or null node.
         if self.partial_nodes.len() == 1 {
             let mut num_children = 0;
             let mut leaf = None;
@@ -691,14 +691,24 @@ where
                 }
             }
 
-            if num_children == 1 {
-                if let Some(node) = leaf {
+            match num_children {
+                0 => {
                     let node_key = NodeKey::new_empty_path(self.version);
                     assert!(self.frozen_nodes.is_empty());
-                    self.frozen_nodes.insert(node_key, node.into());
+                    self.frozen_nodes.insert(node_key, Node::Null);
                     self.store.write_node_batch(&self.frozen_nodes)?;
                     return Ok(());
                 }
+                1 => {
+                    if let Some(node) = leaf {
+                        let node_key = NodeKey::new_empty_path(self.version);
+                        assert!(self.frozen_nodes.is_empty());
+                        self.frozen_nodes.insert(node_key, node.into());
+                        self.store.write_node_batch(&self.frozen_nodes)?;
+                        return Ok(());
+                    }
+                }
+                _ => (),
             }
         }
 
