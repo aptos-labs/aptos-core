@@ -2859,14 +2859,12 @@ components:
       - $ref: '#/components/schemas/TransactionPayload_ScriptFunctionPayload'
       - $ref: '#/components/schemas/TransactionPayload_ScriptPayload'
       - $ref: '#/components/schemas/TransactionPayload_ModuleBundlePayload'
-      - $ref: '#/components/schemas/TransactionPayload_WriteSetPayload'
       discriminator:
         propertyName: type
         mapping:
           script_function_payload: '#/components/schemas/TransactionPayload_ScriptFunctionPayload'
           script_payload: '#/components/schemas/TransactionPayload_ScriptPayload'
           module_bundle_payload: '#/components/schemas/TransactionPayload_ModuleBundlePayload'
-          write_set_payload: '#/components/schemas/TransactionPayload_WriteSetPayload'
     TransactionPayload_ModuleBundlePayload:
       allOf:
       - type: object
@@ -2897,16 +2895,6 @@ components:
             type: string
             example: script_payload
       - $ref: '#/components/schemas/ScriptPayload'
-    TransactionPayload_WriteSetPayload:
-      allOf:
-      - type: object
-        required:
-        - type
-        properties:
-          type:
-            type: string
-            example: write_set_payload
-      - $ref: '#/components/schemas/WriteSetPayload'
     TransactionSignature:
       type: object
       oneOf:

@@ -26,4 +26,3 @@ mod rotate_key;
 mod scripts;
 mod transaction_fuzzer;
 mod verify_txn;
-mod writeset_builder;

@@ -476,7 +476,6 @@ pub enum TransactionPayload {
     ScriptFunctionPayload(ScriptFunctionPayload),
     ScriptPayload(ScriptPayload),
     ModuleBundlePayload(ModuleBundlePayload),
-    WriteSetPayload(WriteSetPayload),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]

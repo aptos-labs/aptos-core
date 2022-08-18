@@ -15,7 +15,7 @@
   },
   "signature": {
     "public_key": "0x14418f867a0bd6d42abb2daa50cd68a5a869ce208282481f57504f630510d0d3",
-    "signature": "0x38eebd8c3cdabfa70a4b55701c7b2be90cd0699b279a1394e18b43068f67f0a971dfce486f0f1b140b7bd8651b2f88ac95d36fdf0335ed89b77973c179b6040e",
+    "signature": "0x3d9ad7a6c36835ebe99b440ae3d6d39da70ee1cc144f18702726f2f0109b50c227a6227d062c8e3eb8c5defb9f810e73b07c8c63beeec5affa512638c8136a00",
     "type": "ed25519_signature"
   }
 }

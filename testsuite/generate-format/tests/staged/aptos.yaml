@@ -228,18 +228,14 @@ TransactionAuthenticator:
 TransactionPayload:
   ENUM:
     0:
-      WriteSet:
-        NEWTYPE:
-          TYPENAME: WriteSetPayload
-    1:
       Script:
         NEWTYPE:
           TYPENAME: Script
-    2:
+    1:
       ModuleBundle:
         NEWTYPE:
           TYPENAME: ModuleBundle
-    3:
+    2:
       ScriptFunction:
         NEWTYPE:
           TYPENAME: ScriptFunction
