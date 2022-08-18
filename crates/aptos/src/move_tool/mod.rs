@@ -130,7 +130,6 @@ impl CliCommand<()> for InitPackage {
         let package_dir = dir_default_to_current(self.package_dir.clone())?;
         let addresses = self
             .named_addresses
-            .clone()
             .into_iter()
             .map(|(key, value)| (key, value.account_address.into()))
             .collect();
@@ -529,7 +528,7 @@ impl CliCommand<&'static str> for DownloadPackage {
         }
         let package_path = path.join(package.name());
         package
-            .save_package_to_disk(package_path.clone(), true)
+            .save_package_to_disk(package_path.as_path(), true)
             .map_err(|e| CliError::UnexpectedError(format!("cannot save package: {}", e)))?;
         println!(
             "saved package with {} module(s) to `{}`",
@@ -677,13 +676,13 @@ impl CliCommand<TransactionSummary> for RunFunction {
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let args: Vec<Vec<u8>> = self
             .args
-            .iter()
-            .map(|arg_with_type| arg_with_type.arg.clone())
+            .into_iter()
+            .map(|arg_with_type| arg_with_type.arg)
             .collect();
         let mut type_args: Vec<TypeTag> = Vec::new();
 
         // These TypeArgs are used for generics
-        for type_arg in self.type_args.iter().cloned() {
+        for type_arg in self.type_args.into_iter() {
             let type_tag = TypeTag::try_from(type_arg)
                 .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
             type_args.push(type_tag)
@@ -691,8 +690,8 @@ impl CliCommand<TransactionSummary> for RunFunction {
 
         self.txn_options
             .submit_transaction(TransactionPayload::EntryFunction(EntryFunction::new(
-                self.function_id.module_id.clone(),
-                self.function_id.member_id.clone(),
+                self.function_id.module_id,
+                self.function_id.member_id,
                 type_args,
                 args,
             )))

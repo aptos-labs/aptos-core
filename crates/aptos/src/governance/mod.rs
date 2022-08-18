@@ -113,11 +113,11 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
 
         if let Transaction::UserTransaction(inner) = txn {
             // Find event with proposal id
-            let proposal_id = if let Some(event) = inner.events.iter().find(|event| {
+            let proposal_id = if let Some(event) = inner.events.into_iter().find(|event| {
                 event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
             }) {
-                let data: CreateProposalEvent = serde_json::from_value(event.data.clone())
-                    .map_err(|_| {
+                let data: CreateProposalEvent =
+                    serde_json::from_value(event.data).map_err(|_| {
                         CliError::UnexpectedError(
                             "Failed to parse Proposal event to get ProposalId".to_string(),
                         )
@@ -452,7 +452,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
         let mut type_args: Vec<TypeTag> = Vec::new();
 
         // These TypeArgs are used for generics
-        for type_arg in self.type_args.iter().cloned() {
+        for type_arg in self.type_args.into_iter() {
             let type_tag = TypeTag::try_from(type_arg)
                 .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
             type_args.push(type_tag)

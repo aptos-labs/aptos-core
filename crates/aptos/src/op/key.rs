@@ -212,7 +212,7 @@ impl SaveKey {
 
     /// Saves a key to a file encoded in a string
     pub fn save_key<Key: PrivateKey + ValidCryptoMaterial>(
-        &self,
+        self,
         key: &Key,
         key_name: &'static str,
     ) -> CliTypedResult<HashMap<&'static str, PathBuf>> {
@@ -229,7 +229,7 @@ impl SaveKey {
         write_to_file(&public_key_file, key_name, &encoded_public_key)?;
 
         let mut map = HashMap::new();
-        map.insert("PrivateKey Path", self.file_options.output_file.clone());
+        map.insert("PrivateKey Path", self.file_options.output_file);
         map.insert("PublicKey Path", public_key_file);
         Ok(map)
     }
