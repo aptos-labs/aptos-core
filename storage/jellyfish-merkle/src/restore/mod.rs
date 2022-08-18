@@ -258,6 +258,7 @@ where
                             leaf_count: Some(internal_node.leaf_count()),
                         },
                         Node::Leaf(leaf_node) => ChildInfo::Leaf(leaf_node),
+                        Node::Null => unreachable!("Child cannot be Null"),
                     };
                     internal_info.set_child(i, child_info);
                 }

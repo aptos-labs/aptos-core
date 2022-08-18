@@ -58,13 +58,14 @@ fn test_insert_to_empty_tree() {
         .is_none());
 
     db.write_tree_update_batch(batch).unwrap();
-
     assert_eq!(tree.get(key, 0).unwrap().unwrap(), value_hash);
 
-    // We don't support empty tree.
-    assert!(tree
+    let (empty_root_hash, batch) = tree
         .put_value_set_test(vec![(key, None)], 1 /* version */)
-        .is_err());
+        .unwrap();
+    db.write_tree_update_batch(batch).unwrap();
+    assert_eq!(tree.get(key, 1).unwrap(), None);
+    assert_eq!(empty_root_hash, *SPARSE_MERKLE_PLACEHOLDER_HASH);
 }
 
 #[test]
@@ -523,6 +524,17 @@ fn test_deletion() {
     assert_eq!(db.num_nodes(), 9 /* 8 + 1 */);
     db.purge_stale_nodes(idx).unwrap();
     assert_eq!(db.num_nodes(), 1);
+
+    idx += 1;
+    // Delete key2
+    let (root, batch) = tree
+        .put_value_set_test(vec![(key2, None)], idx as Version)
+        .unwrap();
+    db.write_tree_update_batch(batch).unwrap();
+    assert_eq!(db.num_nodes(), 2 /* 1 + 1 */);
+    db.purge_stale_nodes(idx).unwrap();
+    assert_eq!(db.num_nodes(), 1);
+    assert_eq!(root, *SPARSE_MERKLE_PLACEHOLDER_HASH);
 }
 
 #[test]

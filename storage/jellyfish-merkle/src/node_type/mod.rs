@@ -143,6 +143,7 @@ impl NodeKey {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum NodeType {
     Leaf,
+    Null,
     /// A internal node that haven't been finished the leaf count migration, i.e. None or not all
     /// of the children leaf counts are known.
     Internal {
@@ -196,6 +197,7 @@ impl Child {
         match self.node_type {
             NodeType::Leaf => 1,
             NodeType::Internal { leaf_count } => leaf_count,
+            NodeType::Null => unreachable!("Child cannot be Null"),
         }
     }
 }
@@ -346,6 +348,7 @@ impl InternalNode {
                 NodeType::Internal { leaf_count } => {
                     serialize_u64_varint(leaf_count as u64, binary);
                 }
+                NodeType::Null => unreachable!("Child cannot be Null"),
             };
             existence_bitmap &= !(1 << next_child);
         }
@@ -518,6 +521,7 @@ impl InternalNode {
                     Node::Leaf(leaf_node) => {
                         NodeInProof::Leaf(SparseMerkleLeafNode::from(leaf_node))
                     }
+                    Node::Null => unreachable!("Child cannot be Null"),
                 }
             } else {
                 NodeInProof::Other(only_child.hash)
@@ -695,6 +699,7 @@ impl<K> From<LeafNode<K>> for SparseMerkleLeafNode {
 enum NodeTag {
     Leaf = 1,
     Internal = 2,
+    Null = 3,
 }
 
 /// The concrete node type of [`JellyfishMerkleTree`](crate::JellyfishMerkleTree).
@@ -704,6 +709,8 @@ pub enum Node<K> {
     Internal(InternalNode),
     /// A wrapper of [`LeafNode`].
     Leaf(LeafNode<K>),
+    /// Represents empty tree only
+    Null,
 }
 
 impl<K> From<InternalNode> for Node<K> {
@@ -755,6 +762,7 @@ where
             // internal node will never have a child of Node::Null.
             Self::Leaf(_) => NodeType::Leaf,
             Self::Internal(n) => n.node_type(),
+            Self::Null => NodeType::Null,
         }
     }
 
@@ -763,6 +771,7 @@ where
         match self {
             Node::Leaf(_) => 1,
             Node::Internal(internal_node) => internal_node.leaf_count,
+            Node::Null => 0,
         }
     }
 
@@ -781,6 +790,9 @@ where
                 out.extend(bcs::to_bytes(&leaf_node)?);
                 APTOS_JELLYFISH_LEAF_ENCODED_BYTES.inc_by(out.len() as u64);
             }
+            Node::Null => {
+                out.push(NodeTag::Null as u8);
+            }
         }
         Ok(out)
     }
@@ -790,6 +802,7 @@ where
         match self {
             Node::Internal(internal_node) => internal_node.hash(),
             Node::Leaf(leaf_node) => leaf_node.hash(),
+            Node::Null => *SPARSE_MERKLE_PLACEHOLDER_HASH,
         }
     }
 
@@ -803,6 +816,7 @@ where
         match node_tag {
             Some(NodeTag::Internal) => Ok(Node::Internal(InternalNode::deserialize(&val[1..])?)),
             Some(NodeTag::Leaf) => Ok(Node::Leaf(bcs::from_bytes(&val[1..])?)),
+            Some(NodeTag::Null) => Ok(Node::Null),
             None => Err(NodeDecodeError::UnknownTag { unknown_tag: tag }.into()),
         }
     }
