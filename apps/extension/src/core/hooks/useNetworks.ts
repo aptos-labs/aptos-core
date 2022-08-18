@@ -85,8 +85,6 @@ export default function useNetworks() {
   const addNetwork = async (network: Network) => {
     const newCustomNetworks = { ...customNetworks, [network.name]: network };
     await setCustomNetworks(newCustomNetworks);
-    await setActiveNetworkName(network.name);
-    await sendProviderEvent(ProviderEvent.NETWORK_CHANGED);
   };
 
   const removeNetwork = async (networkName: string) => {

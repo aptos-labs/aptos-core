@@ -13,6 +13,7 @@ import {
   FormLabel,
   Grid,
   Input,
+  Spinner,
   Text,
   useColorMode,
   VStack,
@@ -23,6 +24,9 @@ import { ChevronLeftIcon } from '@chakra-ui/icons';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import useGlobalStateContext, { defaultNetworks, DefaultNetworks } from 'core/hooks/useGlobalState';
+import { useNodeStatus } from 'core/queries/network';
+import useDebounce from 'core/hooks/useDebounce';
+import { addNetworkToast } from 'core/components/Toast';
 
 interface AddNetworkFormData {
   faucetUrl?: string,
@@ -45,23 +49,46 @@ const referenceNetwork = defaultNetworks[DefaultNetworks.Devnet];
 
 export default function AddNetwork() {
   const { colorMode } = useColorMode();
-  const { addNetwork, networks } = useGlobalStateContext();
+  const {
+    addNetwork,
+    networks,
+    switchNetwork,
+  } = useGlobalStateContext();
   const navigate = useNavigate();
   const {
     formState: { errors, isValid },
     handleSubmit,
     register,
+    watch,
   } = useForm<AddNetworkFormData>({
     mode: 'onChange',
   });
 
-  const uniqueNameValidator = {
+  // Make sure to check node status only when format is right
+  const shouldCheckNodeStatus = errors.nodeUrl === undefined;
+  const debouncedNodeUrl = useDebounce(watch('nodeUrl'), 300);
+  const {
+    isLoading: isNodeStatusLoading,
+    isNodeAvailable,
+  } = useNodeStatus(debouncedNodeUrl, {
+    enabled: shouldCheckNodeStatus,
+    refetchInterval: 5000,
+  });
+
+  const nameValidators = {
+    ...requiredValidator,
+    maxLength: {
+      message: 'Name is too long',
+      value: 30,
+    },
     validate: {
       unique: (name: string) => !networks || !(name in networks),
     },
   };
 
-  const uniqueNetworkValidator = {
+  const nodeUrlValidators = {
+    ...requiredValidator,
+    ...urlValidator,
     validate: {
       unique: (nodeUrl: string) => !networks || !Object.values(networks)
         .some((n) => n.nodeUrl === nodeUrl),
@@ -74,12 +101,19 @@ export default function AddNetwork() {
     nodeUrl,
   }, event) => {
     event?.preventDefault();
+    const shouldSwitch = isNodeAvailable === true;
     const network = {
       faucetUrl: faucetUrl || undefined,
       name,
       nodeUrl,
     };
+
     await addNetwork(network);
+    if (shouldSwitch) {
+      await switchNetwork(network.name);
+    }
+
+    addNetworkToast(shouldSwitch ? network.name : undefined);
     navigate(Routes.network.path);
   };
 
@@ -117,11 +151,11 @@ export default function AddNetwork() {
           <Box width="100%" height="100%" px={4}>
             <form onSubmit={handleSubmit(onSubmit)}>
               <VStack spacing={4} px={4} pt={4}>
-                <FormControl isInvalid={errors.name !== undefined}>
+                <FormControl isRequired isInvalid={errors.name !== undefined}>
                   <FormLabel>Name</FormLabel>
                   <Input
                     placeholder="Custom network"
-                    {...register('name', { ...requiredValidator, ...uniqueNameValidator })}
+                    {...register('name', nameValidators)}
                   />
                   <FormErrorMessage>
                     {
@@ -131,15 +165,11 @@ export default function AddNetwork() {
                     }
                   </FormErrorMessage>
                 </FormControl>
-                <FormControl isInvalid={errors.nodeUrl !== undefined}>
+                <FormControl isRequired isInvalid={errors.nodeUrl !== undefined}>
                   <FormLabel>Node URL</FormLabel>
                   <Input
                     placeholder={referenceNetwork.nodeUrl}
-                    {...register('nodeUrl', {
-                      ...requiredValidator,
-                      ...urlValidator,
-                      ...uniqueNetworkValidator,
-                    })}
+                    {...register('nodeUrl', nodeUrlValidators)}
                   />
                   <FormErrorMessage>
                     {
@@ -147,7 +177,16 @@ export default function AddNetwork() {
                         ? 'A network with this nodeUrl already exists'
                         : errors.nodeUrl?.message
                     }
+
                   </FormErrorMessage>
+                  {
+                    !errors.nodeUrl ? (
+                      <Box mt={2} fontSize="sm" lineHeight="normal">
+                        { isNodeStatusLoading ? <Spinner size="sm" /> : null }
+                        { isNodeAvailable === false ? <Text color="yellow.500">Node is not available</Text> : null }
+                      </Box>
+                    ) : null
+                  }
                 </FormControl>
                 <FormControl isInvalid={errors.faucetUrl !== undefined}>
                   <FormLabel>Faucet URL (optional)</FormLabel>

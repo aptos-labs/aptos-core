@@ -8,6 +8,7 @@ import {
   Circle,
   HStack,
   Modal,
+  ModalBody,
   ModalCloseButton,
   ModalContent,
   ModalFooter,
@@ -40,9 +41,14 @@ function ConfirmationModal(props: ConfirmationModalProps) {
       <ModalOverlay />
       <ModalContent>
         <ModalHeader>
-          {`Are you sure you want to delete network ${name}?`}
+          Remove network
         </ModalHeader>
         <ModalCloseButton />
+        <ModalBody>
+          { 'Are you sure you want to remove ' }
+          <Text fontWeight="bold" as="span">{ name }</Text>
+          ?
+        </ModalBody>
         <ModalFooter>
           <Button colorScheme="red" mr={3} onClick={onConfirm}>
             Yes
