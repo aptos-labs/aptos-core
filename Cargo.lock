@@ -203,6 +203,7 @@ dependencies = [
  "aptos-mempool",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
+ "aptos-runtime",
  "aptos-sdk",
  "aptos-secure-storage",
  "aptos-state-view",
@@ -784,6 +785,7 @@ dependencies = [
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",
+ "aptos-runtime",
  "aptos-secure-storage",
  "aptos-sf-stream",
  "aptos-state-view",
@@ -989,6 +991,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-node",
  "aptos-rest-client",
+ "aptos-runtime",
  "aptos-sdk",
  "aptos-transaction-builder",
  "aptos-types",
@@ -1028,6 +1031,16 @@ dependencies = [
  "serde_json",
  "tokio 1.19.2",
  "url",
+]
+
+[[package]]
+name = "aptos-runtime"
+version = "0.1.0"
+dependencies = [
+ "aptos-metrics-core",
+ "once_cell",
+ "tokio 1.19.2",
+ "tokio-metrics",
 ]
 
 [[package]]
@@ -2458,6 +2471,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-runtime",
  "aptos-secure-storage",
  "aptos-temppath",
  "aptos-types",
@@ -9356,6 +9370,17 @@ dependencies = [
  "proc-macro2 1.0.42",
  "quote 1.0.20",
  "syn 1.0.98",
+]
+
+[[package]]
+name = "tokio-metrics"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bcb585a0069b53171684e22d5255984ec30d1c7304fd0a4a9a603ffd8c765cdd"
+dependencies = [
+ "futures-util",
+ "pin-project-lite 0.2.9",
+ "tokio 1.19.2",
 ]
 
 [[package]]

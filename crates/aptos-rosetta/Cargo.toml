@@ -17,6 +17,7 @@ aptos-logger = { path = "../aptos-logger" }
 aptos-metrics-core = { path = "../aptos-metrics-core" }
 aptos-node = { path = "../../aptos-node" }
 aptos-rest-client = { path = "../aptos-rest-client" }
+aptos-runtime = { path = "../../crates/aptos-runtime" }
 aptos-sdk = { path = "../../sdk" }
 aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
