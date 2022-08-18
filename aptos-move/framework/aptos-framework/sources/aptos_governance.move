@@ -35,13 +35,13 @@ module aptos_framework::aptos_governance {
     const EINSUFFICIENT_PROPOSER_STAKE: u64 = 1;
     /// This account is not the designated voter of the specified stake pool
     const ENOT_DELEGATED_VOTER: u64 = 2;
-    /// The specified stake pool does not have a sufficient remaining lockup to create a proposal or vote
+    /// The specified stake pool does not have long enough remaining lockup to create a proposal or vote
     const EINSUFFICIENT_STAKE_LOCKUP: u64 = 3;
     /// The specified stake pool has already been used to vote on the same proposal
     const EALREADY_VOTED: u64 = 4;
     /// The specified stake pool must be part of the validator set
     const ENO_VOTING_POWER: u64 = 5;
-    /// Proposal cannot be resolved yet and thus the script hash cannot be added to the approved list
+    /// Proposal is not ready to be resolved. Waiting on time or votes
     const EPROPOSAL_NOT_RESOLVABLE_YET: u64 = 6;
     /// Proposal's script hash has already been added to the approved list
     const ESCRIPT_HASH_ALREADY_ADDED: u64 = 7;
