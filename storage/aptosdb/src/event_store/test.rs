@@ -258,6 +258,7 @@ fn test_index_get_impl(event_batches: Vec<Vec<ContractEvent>>) {
 
 prop_compose! {
     fn arb_new_block_events()(
+        id in any::<HashValue>(),
         address in any::<AccountAddress>(),
         mut version in 1..10000u64,
         mut timestamp in 0..1000000u64, // initial timestamp
@@ -274,6 +275,7 @@ prop_compose! {
             version += v;
             timestamp += t;
             let new_block_event = NewBlockEvent::new(
+                id,
                 0, // epoch
                 seq, // round
                 seq, // height
