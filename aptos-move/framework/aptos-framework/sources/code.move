@@ -17,7 +17,7 @@ module aptos_framework::code {
         packages: vector<PackageMetadata>,
     }
 
-    /// Metadata for a package.
+    /// Metadata for a package. All byte blobs are represented as base64-of-gzipped-bytes
     struct PackageMetadata has store, copy, drop {
         /// Name of this package.
         name: String,
@@ -32,20 +32,20 @@ module aptos_framework::code {
         manifest: String,
         /// The list of modules installed by this package.
         modules: vector<ModuleMetadata>,
-        /// Error map, in BCS
-        error_map: vector<u8>,
-        /// ABIs, in BCS
-        abis: vector<vector<u8>>
+        /// Error map, in compressed BCS
+        error_map: String,
+        /// ABIs, in compressed BCS
+        abis: vector<String>
     }
 
     /// Metadata about a module in a package.
     struct ModuleMetadata has store, copy, drop {
         /// Name of the module.
         name: String,
-        /// Source text, in gzipped form.
-        source: vector<u8>,
-        /// Source map, in internal encoding, and then gziped.
-        source_map: vector<u8>,
+        /// Source text, in compressed ascii.
+        source: String,
+        /// Source map, in compressed BCS.
+        source_map: String
     }
 
     /// Describes an upgrade policy
