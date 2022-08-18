@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::AptosPackageHooks;
 use aptos::move_tool::MemberId;
 use aptos_types::{
     access_path::AccessPath,
@@ -9,13 +10,13 @@ use aptos_types::{
     transaction::{ScriptFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
 use framework::aptos_stdlib;
-use framework::natives::code::UpgradePolicy;
 use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{
     account::{Account, AccountData},
     executor::FakeExecutor,
 };
 use move_deps::move_core_types::language_storage::{ResourceKey, StructTag, TypeTag};
+use move_deps::move_package::package_hooks::register_package_hooks;
 use project_root::get_project_root;
 use serde::de::DeserializeOwned;
 use std::collections::BTreeMap;
@@ -46,6 +47,7 @@ pub struct MoveHarness {
 impl MoveHarness {
     /// Creates a new harness.
     pub fn new() -> Self {
+        register_package_hooks(Box::new(AptosPackageHooks {}));
         Self {
             executor: FakeExecutor::from_fresh_genesis(),
             txn_seq_no: BTreeMap::default(),
@@ -171,17 +173,12 @@ impl MoveHarness {
 
     /// Creates a transaction which publishes the Move Package found at the given path on behalf
     /// of the given account.
-    pub fn create_publish_package(
-        &mut self,
-        account: &Account,
-        path: &Path,
-        upgrade_policy: UpgradePolicy,
-    ) -> SignedTransaction {
+    pub fn create_publish_package(&mut self, account: &Account, path: &Path) -> SignedTransaction {
         let package = BuiltPackage::build(path.to_owned(), BuildOptions::default())
             .expect("building package must succeed");
         let code = package.extract_code();
         let metadata = package
-            .extract_metadata(upgrade_policy)
+            .extract_metadata()
             .expect("extracting package metadata must succeed");
         self.create_transaction_payload(
             account,
@@ -193,13 +190,8 @@ impl MoveHarness {
     }
 
     /// Runs transaction which publishes the Move Package.
-    pub fn publish_package(
-        &mut self,
-        account: &Account,
-        path: &Path,
-        upgrade_policy: UpgradePolicy,
-    ) -> TransactionStatus {
-        let txn = self.create_publish_package(account, path, upgrade_policy);
+    pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
+        let txn = self.create_publish_package(account, path);
         self.run(txn)
     }
 

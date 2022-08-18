@@ -181,6 +181,7 @@ dependencies = [
  "regex",
  "reqwest 0.11.11",
  "serde 1.0.143",
+ "serde_bytes",
  "serde_json",
  "serde_yaml 0.8.26",
  "short-hex-str",
@@ -922,11 +923,9 @@ name = "aptos-protos"
 version = "0.1.0"
 dependencies = [
  "bytes 1.2.1",
- "chrono",
  "pbjson",
  "prost 0.10.4",
  "serde 1.0.143",
- "serde_json",
 ]
 
 [[package]]
@@ -1127,6 +1126,7 @@ dependencies = [
  "aptos-api",
  "aptos-api-test-context",
  "aptos-api-types",
+ "aptos-bitvec",
  "aptos-config",
  "aptos-crypto",
  "aptos-genesis",
@@ -1297,27 +1297,6 @@ dependencies = [
  "once_cell",
  "proptest",
  "proptest-derive",
-]
-
-[[package]]
-name = "aptos-transaction-replay"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-gas",
- "aptos-resource-viewer",
- "aptos-state-view",
- "aptos-types",
- "aptos-validator-interface",
- "aptos-vm",
- "aptosdb",
- "bcs",
- "difference",
- "framework",
- "hex",
- "move-deps",
- "structopt 0.3.26",
- "vm-genesis",
 ]
 
 [[package]]
@@ -3297,6 +3276,7 @@ checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
 name = "e2e-move-tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos",
  "aptos-crypto",
  "aptos-keygen",
@@ -3769,10 +3749,10 @@ dependencies = [
  "better_any",
  "clap 3.2.17",
  "curve25519-dalek",
- "flate2",
  "include_dir 0.7.2",
  "libsecp256k1",
  "log",
+ "miniz_oxide",
  "move-deps",
  "once_cell",
  "proptest",
@@ -3976,19 +3956,6 @@ checksum = "bff49e947297f3312447abdca79f45f4738097cc82b06e72054d2223f601f1b9"
 dependencies = [
  "typenum",
  "version_check",
-]
-
-[[package]]
-name = "genesis-viewer"
-version = "0.1.0"
-dependencies = [
- "aptos-resource-viewer",
- "aptos-types",
- "aptos-vm",
- "framework",
- "move-deps",
- "structopt 0.3.26",
- "vm-genesis",
 ]
 
 [[package]]
@@ -8911,6 +8878,7 @@ name = "storage-service-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-bitvec",
  "aptos-config",
  "aptos-crypto",
  "aptos-infallible",
@@ -8929,6 +8897,7 @@ dependencies = [
  "move-deps",
  "network",
  "once_cell",
+ "rand 0.7.3",
  "serde 1.0.143",
  "storage-interface",
  "storage-service-types",

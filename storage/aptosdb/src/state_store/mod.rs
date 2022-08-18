@@ -16,6 +16,7 @@ use aptos_logger::info;
 use aptos_state_view::StateViewId;
 #[cfg(test)]
 use aptos_types::nibble::nibble_path::NibblePath;
+use aptos_types::state_store::state_value::StaleStateValueIndex;
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
@@ -35,6 +36,7 @@ use storage_interface::{
 };
 
 use crate::metrics::{STATE_ITEMS, TOTAL_STATE_BYTES};
+use crate::stale_state_value_index::StaleStateValueIndexSchema;
 use crate::state_store::buffered_state::BufferedState;
 use crate::version_data::{VersionData, VersionDataSchema};
 use crate::{
@@ -96,7 +98,7 @@ impl DbReader for StateDb {
             .transpose()
     }
 
-    /// Get the lastest state value of the given key up to the given version. Only used for testing for now
+    /// Get the latest state value of the given key up to the given version. Only used for testing for now
     /// but should replace the `get_value_with_proof_by_version` call for VM execution if just fetch the
     /// value without proof.
     fn get_state_value_by_version(
@@ -104,15 +106,9 @@ impl DbReader for StateDb {
         state_key: &StateKey,
         version: Version,
     ) -> Result<Option<StateValue>> {
-        let mut read_opts = ReadOptions::default();
-        // We want `None` if the state_key changes in iteration.
-        read_opts.set_prefix_same_as_start(true);
-        let mut iter = self.ledger_db.iter::<StateValueSchema>(read_opts)?;
-        iter.seek(&(state_key.clone(), version))?;
-        Ok(iter
-            .next()
-            .transpose()?
-            .and_then(|(_, state_value)| (state_value)))
+        Ok(self
+            .get_state_value_with_version_by_version(state_key, version)?
+            .map(|(_, value)| value))
     }
 
     /// Returns the proof of the given state key and version.
@@ -143,6 +139,26 @@ impl DbReader for StateDb {
             },
             proof,
         ))
+    }
+}
+
+impl StateDb {
+    /// Get the latest state value and the its corresponding version when its of the given key up
+    /// to the given version.
+    pub fn get_state_value_with_version_by_version(
+        &self,
+        state_key: &StateKey,
+        version: Version,
+    ) -> Result<Option<(Version, StateValue)>> {
+        let mut read_opts = ReadOptions::default();
+        // We want `None` if the state_key changes in iteration.
+        read_opts.set_prefix_same_as_start(true);
+        let mut iter = self.ledger_db.iter::<StateValueSchema>(read_opts)?;
+        iter.seek(&(state_key.clone(), version))?;
+        Ok(iter
+            .next()
+            .transpose()?
+            .and_then(|((_, version), value_opt)| value_opt.map(|value| (version, value))))
     }
 }
 
@@ -419,7 +435,7 @@ impl StateStore {
         first_version: Version,
         cs: &mut ChangeSet,
     ) -> Result<()> {
-        self.put_total_state_bytes(&value_state_sets, first_version, cs)?;
+        self.put_stats_and_indices(&value_state_sets, first_version, cs)?;
 
         let kv_batch = value_state_sets
             .iter()
@@ -445,7 +461,16 @@ impl StateStore {
         })
     }
 
-    pub fn put_total_state_bytes(
+    /// Put storage usage stats and State key and value indices into the batch.
+    /// The state KV indices will be generated as follows:
+    /// 1. A deletion at current version is always coupled with stale index for the tombstone with
+    /// `stale_since_version` equal to the version, to ensure tombstone is cleared from db after
+    /// pruner processes the current version.
+    /// 2. An update at current version will first try to find the corresponding old value, if it
+    /// exists, a stale index of that old value will be added. Otherwise, it's a no-op. Because
+    /// non-existence means either the key never shows up or it got deleted. Neither case needs
+    /// extra stale index as 1 cover the latter case.
+    pub fn put_stats_and_indices(
         &self,
         value_state_sets: &[&HashMap<StateKey, Option<StateValue>>],
         first_version: Version,
@@ -459,7 +484,7 @@ impl StateStore {
             self.get_usage(first_version.checked_sub(1))?;
 
         let base_version = first_version.checked_sub(1);
-        let mut cache = HashMap::<StateKey, Option<StateValue>>::new();
+        let mut cache = HashMap::<StateKey, (Version, Option<StateValue>)>::new();
 
         // calculate total state size in bytes
         for (idx, kvs) in value_state_sets.iter().enumerate() {
@@ -469,21 +494,42 @@ impl StateStore {
                 if let Some(value) = value {
                     state_items += 1;
                     total_state_bytes += key.size() + value.size();
+                } else {
+                    // stale index of the tombstone at current version.
+                    cs.batch.put::<StaleStateValueIndexSchema>(
+                        &StaleStateValueIndex {
+                            stale_since_version: version,
+                            version,
+                            state_key: key.clone(),
+                        },
+                        &(),
+                    )?;
                 }
 
                 if version > 0 {
-                    let old_value_opt =
-                        if let Some(old_value_opt) = cache.insert(key.clone(), value.clone()) {
-                            old_value_opt
-                        } else if let Some(base_version) = base_version {
-                            self.get_state_value_by_version(key, base_version)?
-                        } else {
-                            None
-                        };
+                    let old_version_and_value_opt = if let Some((old_version, old_value_opt)) =
+                        cache.insert(key.clone(), (version, value.clone()))
+                    {
+                        old_value_opt.map(|value| (old_version, value))
+                    } else if let Some(base_version) = base_version {
+                        self.state_db
+                            .get_state_value_with_version_by_version(key, base_version)?
+                    } else {
+                        None
+                    };
 
-                    if let Some(old_value) = old_value_opt {
+                    if let Some((old_version, old_value)) = old_version_and_value_opt {
                         state_items -= 1;
                         total_state_bytes -= key.size() + old_value.size();
+                        // stale index of the old value at its version.
+                        cs.batch.put::<StaleStateValueIndexSchema>(
+                            &StaleStateValueIndex {
+                                stale_since_version: version,
+                                version: old_version,
+                                state_key: key.clone(),
+                            },
+                            &(),
+                        )?;
                     }
                 }
             }

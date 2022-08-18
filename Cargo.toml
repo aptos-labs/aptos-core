@@ -17,12 +17,10 @@ members = [
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
-    "aptos-move/genesis-viewer",
     "aptos-move/move-deps",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/parallel-executor",
-    "aptos-move/transaction-replay",
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
     "aptos-node",
@@ -121,14 +119,16 @@ members = [
     "vm-validator",
 ]
 
+exclude =[
+    "ecosystem/sf-indexer/aptos-substreams",
+]
+
 # NOTE: default-members is the complete list of binaries that form the "production Aptos codebase". These members should
 # never include crates that require fuzzing features or test features. These are the crates we want built with no extra
 # test-only code included.
 #
 # For more, see the "Conditional compilation for tests" section in documentation/coding_guidelines.md.
 default-members = [
-    "aptos-move/genesis-viewer",
-    "aptos-move/transaction-replay",
     "aptos-node",
     "consensus/safety-rules",
     "crates/aptos",

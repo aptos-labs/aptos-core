@@ -12,14 +12,16 @@ module aptos_framework::aptos_coin {
 
     friend aptos_framework::genesis;
 
-    /// Error codes
+    /// Account does not have mint capability
     const ENO_CAPABILITIES: u64 = 1;
+    /// Mint capability has already been delegated to this specified address
     const EALREADY_DELEGATED: u64 = 2;
+    /// Cannot find delegation of mint capability to this account
     const EDELEGATION_NOT_FOUND: u64 = 3;
 
     struct AptosCoin has key { }
 
-    struct Capabilities has key {
+    struct MintCapStore has key {
         mint_cap: MintCapability<AptosCoin>,
     }
 
@@ -47,7 +49,7 @@ module aptos_framework::aptos_coin {
 
         // Aptos framework needs mint cap to mint coins to initial validators. This will be revoked once the validators
         // have been initialized.
-        move_to(aptos_framework, Capabilities { mint_cap });
+        move_to(aptos_framework, MintCapStore { mint_cap });
 
         coin::destroy_freeze_cap(freeze_cap);
         (burn_cap, mint_cap)
@@ -55,9 +57,9 @@ module aptos_framework::aptos_coin {
 
     /// Only called during genesis to destroy the aptos framework account's mint capability once all initial validators
     /// and accounts have been initialized during genesis.
-    public(friend) fun destroy_mint_cap(aptos_framework: &signer) acquires Capabilities {
+    public(friend) fun destroy_mint_cap(aptos_framework: &signer) acquires MintCapStore {
         system_addresses::assert_aptos_framework(aptos_framework);
-        let Capabilities { mint_cap } = move_from<Capabilities>(@aptos_framework);
+        let MintCapStore { mint_cap } = move_from<MintCapStore>(@aptos_framework);
         coin::destroy_mint_cap(mint_cap);
     }
 
@@ -78,7 +80,7 @@ module aptos_framework::aptos_coin {
         );
         coin::deposit<AptosCoin>(signer::address_of(core_resources), coins);
 
-        move_to(core_resources, Capabilities { mint_cap });
+        move_to(core_resources, MintCapStore { mint_cap });
         move_to(core_resources, Delegations { inner: vector::empty() });
     }
 
@@ -88,16 +90,16 @@ module aptos_framework::aptos_coin {
         account: &signer,
         dst_addr: address,
         amount: u64,
-    ) acquires Capabilities {
+    ) acquires MintCapStore {
         let account_addr = signer::address_of(account);
 
         assert!(
-            exists<Capabilities>(account_addr),
+            exists<MintCapStore>(account_addr),
             error::not_found(ENO_CAPABILITIES),
         );
 
-        let capabilities = borrow_global<Capabilities>(account_addr);
-        let coins_minted = coin::mint<AptosCoin>(amount, &capabilities.mint_cap);
+        let mint_cap = &borrow_global<MintCapStore>(account_addr).mint_cap;
+        let coins_minted = coin::mint<AptosCoin>(amount, mint_cap);
         coin::deposit<AptosCoin>(dst_addr, coins_minted);
     }
 
@@ -117,7 +119,7 @@ module aptos_framework::aptos_coin {
 
     /// Only callable in tests and testnets where the core resources account exists.
     /// Claim the delegated mint capability and destroy the delegated token.
-    public entry fun claim_mint_capability(account: &signer) acquires Delegations, Capabilities {
+    public entry fun claim_mint_capability(account: &signer) acquires Delegations, MintCapStore {
         let maybe_index = find_delegation(signer::address_of(account));
         assert!(option::is_some(&maybe_index), EDELEGATION_NOT_FOUND);
         let idx = *option::borrow(&maybe_index);
@@ -125,8 +127,8 @@ module aptos_framework::aptos_coin {
         let DelegatedMintCapability { to: _ } = vector::swap_remove(delegations, idx);
 
         // Make a copy of mint cap and give it to the specified account.
-        let mint_cap = borrow_global<Capabilities>(@core_resources).mint_cap;
-        move_to(account, Capabilities { mint_cap });
+        let mint_cap = borrow_global<MintCapStore>(@core_resources).mint_cap;
+        move_to(account, MintCapStore { mint_cap });
     }
 
     fun find_delegation(addr: address): Option<u64> acquires Delegations {

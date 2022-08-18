@@ -33,6 +33,7 @@ pub const FRAMEWORK_NAME: &str = "framework.mrb";
 pub struct SetupGit {
     #[clap(flatten)]
     pub(crate) git_options: GitOptions,
+
     /// Path to the `Layout` file which defines where all the files are
     #[clap(long, parse(from_os_str))]
     pub(crate) layout_file: PathBuf,
@@ -82,12 +83,15 @@ pub struct GitOptions {
     /// Github repository e.g. 'aptos-labs/aptos-core'
     #[clap(long)]
     pub(crate) github_repository: Option<GithubRepo>,
+
     /// Github repository branch e.g. main
     #[clap(long, default_value = "main")]
     pub(crate) github_branch: String,
+
     /// Path to Github API token.  Token must have repo:* permissions
     #[clap(long, parse(from_os_str))]
     pub(crate) github_token_file: Option<PathBuf>,
+
     /// Path to local git repository
     #[clap(long, parse(from_os_str))]
     pub(crate) local_repository_dir: Option<PathBuf>,
@@ -165,9 +169,17 @@ impl Client {
     pub fn put<T: Serialize + ?Sized>(&self, name: &Path, input: &T) -> CliTypedResult<()> {
         match self {
             Client::Local(local_repository_path) => {
-                self.create_dir(local_repository_path.as_path())?;
-
                 let path = local_repository_path.join(name);
+
+                // Create repository path and any sub-directories
+                if let Some(dir) = path.parent() {
+                    self.create_dir(dir)?;
+                } else {
+                    return Err(CliError::UnexpectedError(format!(
+                        "Path should always have a parent {}",
+                        path.display()
+                    )));
+                }
                 write_to_file(
                     path.as_path(),
                     &path.display().to_string(),

@@ -9,6 +9,7 @@ use aptos_api_types::{
     ScriptPayload, Transaction, TransactionInfo, TransactionPayload, TransactionSignature,
     WriteSet, WriteSetChange,
 };
+use aptos_bitvec::BitVec;
 use aptos_logger::warn;
 use aptos_protos::extractor::v1 as extractor;
 use aptos_protos::util::timestamp;
@@ -497,11 +498,15 @@ pub fn convert_ed25519_signature(sig: &Ed25519Signature) -> extractor::Ed25519Si
 pub fn convert_multi_ed25519_signature(
     sig: &MultiEd25519Signature,
 ) -> extractor::MultiEd25519Signature {
+    let public_key_indices: Vec<usize> = BitVec::from(sig.bitmap.0.clone()).iter_ones().collect();
     extractor::MultiEd25519Signature {
         public_keys: sig.public_keys.iter().map(|pk| pk.0.clone()).collect(),
         signatures: sig.signatures.iter().map(|sig| sig.0.clone()).collect(),
         threshold: sig.threshold as u32,
-        bitmap: sig.bitmap.0.clone(),
+        public_key_indices: public_key_indices
+            .iter()
+            .map(|index| *index as u32)
+            .collect(),
     }
 }
 

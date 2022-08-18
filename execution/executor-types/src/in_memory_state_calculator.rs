@@ -263,7 +263,9 @@ fn process_state_key_write_op(
     write_op: WriteOp,
 ) -> Result<(StateKey, Option<StateValue>)> {
     let state_value = match write_op {
-        WriteOp::Value(new_value) => Some(StateValue::from(new_value)),
+        WriteOp::Modification(new_value) | WriteOp::Creation(new_value) => {
+            Some(StateValue::from(new_value))
+        }
         WriteOp::Deletion => None,
     };
     match state_cache.entry(state_key.clone()) {

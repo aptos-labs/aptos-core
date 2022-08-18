@@ -105,6 +105,7 @@ pub struct GenerateKey {
     /// Key type to generate. Must be one of [x25519, ed25519]
     #[clap(long, default_value_t = KeyType::Ed25519)]
     pub(crate) key_type: KeyType,
+
     #[clap(flatten)]
     pub rng_args: RngArgs,
     #[clap(flatten)]

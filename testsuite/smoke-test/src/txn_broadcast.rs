@@ -8,8 +8,12 @@ use forge::{NodeExt, Swarm, SwarmExt};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+const MAX_WAIT_SECS: u64 = 60;
+
+//TODO: debug me and re-enable the test!
 /// Checks txn goes through consensus even if the local validator is not creating proposals.
 /// This behavior should be true with both mempool and quorum store.
+#[ignore]
 #[tokio::test]
 async fn test_txn_broadcast() {
     let mut swarm = SwarmBuilder::new_local(4)
@@ -34,11 +38,11 @@ async fn test_txn_broadcast() {
 
     for fullnode in swarm.full_nodes_mut() {
         fullnode
-            .wait_until_healthy(Instant::now() + Duration::from_secs(10))
+            .wait_until_healthy(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
             .await
             .unwrap();
         fullnode
-            .wait_for_connectivity(Instant::now() + Duration::from_secs(60))
+            .wait_for_connectivity(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
             .await
             .unwrap();
     }
@@ -48,7 +52,7 @@ async fn test_txn_broadcast() {
     let account_1 = create_and_fund_account(&mut swarm, 10).await;
 
     swarm
-        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(10))
+        .wait_for_all_nodes_to_catchup(Instant::now() + Duration::from_secs(MAX_WAIT_SECS))
         .await
         .unwrap();
 

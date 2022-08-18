@@ -48,12 +48,6 @@ impl FromStr for ListQuery {
 ///
 #[derive(Debug, Parser)]
 pub struct ListAccount {
-    #[clap(flatten)]
-    pub(crate) rest_options: RestOptions,
-
-    #[clap(flatten)]
-    pub(crate) profile_options: ProfileOptions,
-
     /// Address of the account you want to list resources/modules for
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: Option<AccountAddress>,
@@ -61,6 +55,11 @@ pub struct ListAccount {
     /// Type of items to list: [balance, resources, modules]
     #[clap(long, default_value_t = ListQuery::Resources)]
     pub(crate) query: ListQuery,
+
+    #[clap(flatten)]
+    pub(crate) rest_options: RestOptions,
+    #[clap(flatten)]
+    pub(crate) profile_options: ProfileOptions,
 }
 
 #[async_trait]

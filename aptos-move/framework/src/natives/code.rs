@@ -16,7 +16,8 @@ use move_deps::{
         loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
     },
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_bytes::ByteBuf;
 use smallvec::smallvec;
 use std::collections::{BTreeSet, VecDeque};
 use std::fmt;
@@ -39,7 +40,7 @@ pub struct PackageMetadata {
     pub upgrade_policy: UpgradePolicy,
     /// The numbers of times this module has been upgraded. Also serves as the on-chain version.
     /// This field will be automatically assigned on successful upgrade.
-    pub upgrade_counter: u64,
+    pub upgrade_number: u64,
     /// Build info, in BuildInfo.yaml format
     pub build_info: String,
     /// The package manifest, in the Move.toml format.
@@ -50,7 +51,7 @@ pub struct PackageMetadata {
     #[serde(with = "serde_bytes")]
     pub error_map: Vec<u8>,
     /// ABIs, in BCS encoding
-    pub abis: Vec<Vec<u8>>,
+    pub abis: Vec<ByteBuf>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -71,7 +72,7 @@ pub struct UpgradePolicy {
 }
 
 impl UpgradePolicy {
-    pub fn no_compat() -> Self {
+    pub fn arbitrary() -> Self {
         UpgradePolicy { policy: 0 }
     }
     pub fn compat() -> Self {
@@ -86,7 +87,7 @@ impl FromStr for UpgradePolicy {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "arbitrary" => Ok(UpgradePolicy::no_compat()),
+            "arbitrary" => Ok(UpgradePolicy::arbitrary()),
             "compatible" => Ok(UpgradePolicy::compat()),
             "immutable" => Ok(UpgradePolicy::immutable()),
             _ => bail!("unknown policy"),
@@ -102,6 +103,54 @@ impl fmt::Display for UpgradePolicy {
             _ => "immutable",
         })
     }
+}
+
+// ========================================================================================
+// Duplication for JSON
+
+// For JSON we need attributes on fields which aren't compatible with BCS, therefore we
+// need to duplicate the definitions...
+
+fn deserialize_from_string<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: FromStr,
+    <T as FromStr>::Err: std::fmt::Display,
+{
+    use serde::de::Error;
+
+    let s = <String>::deserialize(deserializer)?;
+    s.parse::<T>().map_err(D::Error::custom)
+}
+
+/// The package registry at the given address.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct PackageRegistryJson {
+    pub packages: Vec<PackageMetadataJson>,
+}
+
+/// The PackageMetadata type.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+pub struct PackageMetadataJson {
+    pub name: String,
+    pub upgrade_policy: UpgradePolicy,
+    #[serde(deserialize_with = "deserialize_from_string")]
+    pub upgrade_number: u64,
+    pub build_info: String,
+    pub manifest: String,
+    pub modules: Vec<ModuleMetadataJson>,
+    #[serde(with = "serde_bytes")]
+    pub error_map: Vec<u8>,
+    pub abis: Vec<ByteBuf>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ModuleMetadataJson {
+    pub name: String,
+    #[serde(with = "serde_bytes")]
+    pub source: Vec<u8>,
+    #[serde(with = "serde_bytes")]
+    pub source_map: Vec<u8>,
 }
 
 // ========================================================================================

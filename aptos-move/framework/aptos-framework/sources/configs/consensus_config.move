@@ -13,7 +13,7 @@ module aptos_framework::consensus_config {
         config: vector<u8>,
     }
 
-    /// On chain config specified is invalid.
+    /// The provided on chain config bytes are empty or invalid
     const EINVALID_CONFIG: u64 = 1;
 
     /// Publishes the ConsensusConfig config.

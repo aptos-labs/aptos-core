@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::keys::PublicIdentity;
 use crate::{
     config::ValidatorConfiguration,
     keys::{generate_key_objects, PrivateIdentity},
@@ -38,6 +39,7 @@ use std::{
 const VALIDATOR_IDENTITY: &str = "validator-identity.yaml";
 const VFN_IDENTITY: &str = "vfn-identity.yaml";
 const PRIVATE_IDENTITY: &str = "private-identity.yaml";
+const PUBLIC_IDENTITY: &str = "public-identity.yaml";
 const CONFIG_FILE: &str = "node.yaml";
 const GENESIS_BLOB: &str = "genesis.blob";
 
@@ -47,6 +49,7 @@ pub struct ValidatorNodeConfig {
     pub name: String,
     pub config: NodeConfig,
     pub dir: PathBuf,
+    pub account_private_key: Option<Ed25519PrivateKey>,
     pub genesis_stake_amount: u64,
 }
 
@@ -67,6 +70,7 @@ impl ValidatorNodeConfig {
             name,
             config,
             dir,
+            account_private_key: None,
             genesis_stake_amount,
         })
     }
@@ -74,7 +78,8 @@ impl ValidatorNodeConfig {
     /// Initializes keys and identities for a validator config
     /// TODO: Put this all in storage rather than files?
     fn init_keys(&mut self, seed: Option<[u8; 32]>) -> anyhow::Result<()> {
-        self.get_key_objects(seed)?;
+        let (validator_identity, _, _, _) = self.get_key_objects(seed)?;
+        self.account_private_key = validator_identity.account_private_key;
 
         // Init network identity
         let validator_network = self.config.validator_network.as_mut().unwrap();
@@ -88,21 +93,24 @@ impl ValidatorNodeConfig {
     pub fn get_key_objects(
         &self,
         seed: Option<[u8; 32]>,
-    ) -> anyhow::Result<(IdentityBlob, IdentityBlob, PrivateIdentity)> {
+    ) -> anyhow::Result<(IdentityBlob, IdentityBlob, PrivateIdentity, PublicIdentity)> {
         let dir = &self.dir;
         let val_identity_file = dir.join(VALIDATOR_IDENTITY);
         let vfn_identity_file = dir.join(VFN_IDENTITY);
         let private_identity_file = dir.join(PRIVATE_IDENTITY);
+        let public_identity_file = dir.join(PUBLIC_IDENTITY);
 
         // If they all already exist, use them, otherwise generate new ones and overwrite
         if val_identity_file.exists()
             && vfn_identity_file.exists()
             && private_identity_file.exists()
+            && public_identity_file.exists()
         {
             Ok((
                 read_yaml(val_identity_file.as_path())?,
                 read_yaml(vfn_identity_file.as_path())?,
                 read_yaml(private_identity_file.as_path())?,
+                read_yaml(public_identity_file.as_path())?,
             ))
         } else {
             let mut key_generator = if let Some(seed) = seed {
@@ -111,14 +119,20 @@ impl ValidatorNodeConfig {
                 KeyGen::from_os_rng()
             };
 
-            let (validator_identity, vfn_identity, private_identity) =
+            let (validator_identity, vfn_identity, private_identity, public_identity) =
                 generate_key_objects(&mut key_generator)?;
 
             // Write identities in files
             write_yaml(val_identity_file.as_path(), &validator_identity)?;
             write_yaml(vfn_identity_file.as_path(), &vfn_identity)?;
             write_yaml(private_identity_file.as_path(), &private_identity)?;
-            Ok((validator_identity, vfn_identity, private_identity))
+            write_yaml(public_identity_file.as_path(), &public_identity)?;
+            Ok((
+                validator_identity,
+                vfn_identity,
+                private_identity,
+                public_identity,
+            ))
         }
     }
 
@@ -149,7 +163,7 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
     type Error = anyhow::Error;
 
     fn try_from(config: &ValidatorNodeConfig) -> Result<Self, Self::Error> {
-        let (_, _, private_identity) = config.get_key_objects(None)?;
+        let (_, _, private_identity, _) = config.get_key_objects(None)?;
         let validator_host = (&config
             .config
             .validator_network
@@ -168,12 +182,16 @@ impl TryFrom<&ValidatorNodeConfig> for ValidatorConfiguration {
                 .try_into()?,
         );
         Ok(ValidatorConfiguration {
-            account_address: private_identity.account_address,
+            owner_account_address: private_identity.account_address,
+            owner_account_public_key: private_identity.account_private_key.public_key(),
+            operator_account_address: private_identity.account_address,
+            operator_account_public_key: private_identity.account_private_key.public_key(),
+            voter_account_address: private_identity.account_address,
+            voter_account_public_key: private_identity.account_private_key.public_key(),
             consensus_public_key: private_identity.consensus_private_key.public_key(),
             proof_of_possession: bls12381::ProofOfPossession::create(
                 &private_identity.consensus_private_key,
             ),
-            account_public_key: private_identity.account_private_key.public_key(),
             validator_network_public_key: private_identity
                 .validator_network_private_key
                 .public_key(),

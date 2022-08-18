@@ -12,8 +12,9 @@ module aptos_framework::version {
         major: u64,
     }
 
-    /// Tried to set an invalid major version for the VM. Major versions must be strictly increasing
+    /// Specified major version number must be greater than current version number.
     const EINVALID_MAJOR_VERSION_NUMBER: u64 = 1;
+    /// Account is not authorized to make this change.
     const ENOT_AUTHORIZED: u64 = 2;
 
     /// Only called during genesis.

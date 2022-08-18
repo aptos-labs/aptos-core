@@ -16,12 +16,13 @@ use crate::common::types::{
 };
 use crate::common::utils::write_to_file;
 use crate::move_tool::{
-    ArgWithType, CompilePackage, InitPackage, MemberId, PublishPackage, RunFunction, TestPackage,
+    ArgWithType, CompilePackage, IncludedArtifacts, InitPackage, MemberId, PublishPackage,
+    RunFunction, TestPackage,
 };
 use crate::node::{
     AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
-    LeaveValidatorSet, OperatorArgs, ShowValidatorConfig, ShowValidatorSet, ShowValidatorStake,
-    UpdateConsensusKey, UpdateValidatorNetworkAddresses, ValidatorConfigFileArgs,
+    LeaveValidatorSet, OperatorArgs, OperatorConfigFileArgs, ShowValidatorConfig, ShowValidatorSet,
+    ShowValidatorStake, UpdateConsensusKey, UpdateValidatorNetworkAddresses,
     ValidatorConsensusKeyArgs, ValidatorNetworkAddressesArgs,
 };
 use crate::op::key::{ExtractPeer, GenerateKey, SaveKey};
@@ -42,7 +43,6 @@ use aptos_types::{
     on_chain_config::ConsensusScheme, validator_config::ValidatorConfig,
     validator_info::ValidatorInfo,
 };
-use framework::natives::code::UpgradePolicy;
 use reqwest::Url;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -169,7 +169,7 @@ impl CliTestFramework {
             profile_options: Default::default(),
             account: self.account_id(index),
             faucet_options: self.faucet_options(),
-            num_coins: amount.unwrap_or(DEFAULT_FUNDED_COINS),
+            amount: amount.unwrap_or(DEFAULT_FUNDED_COINS),
             rest_options: self.rest_options(),
         }
         .execute()
@@ -262,8 +262,8 @@ impl CliTestFramework {
     ) -> CliTypedResult<Transaction> {
         InitializeValidator {
             txn_options: self.transaction_options(index, None),
-            validator_config_file_args: ValidatorConfigFileArgs {
-                validator_config_file: None,
+            operator_config_file_args: OperatorConfigFileArgs {
+                operator_config_file: None,
             },
             validator_consensus_key_args: ValidatorConsensusKeyArgs {
                 consensus_public_key: Some(consensus_public_key),
@@ -351,8 +351,8 @@ impl CliTestFramework {
         UpdateValidatorNetworkAddresses {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
-            validator_config_file_args: ValidatorConfigFileArgs {
-                validator_config_file: None,
+            operator_config_file_args: OperatorConfigFileArgs {
+                operator_config_file: None,
             },
             validator_network_addresses_args: ValidatorNetworkAddressesArgs {
                 validator_host: Some(validator_host),
@@ -391,8 +391,8 @@ impl CliTestFramework {
         UpdateConsensusKey {
             txn_options: self.transaction_options(operator_index, None),
             operator_args: self.operator_args(pool_index),
-            validator_config_file_args: ValidatorConfigFileArgs {
-                validator_config_file: None,
+            operator_config_file_args: OperatorConfigFileArgs {
+                operator_config_file: None,
             },
             validator_consensus_key_args: ValidatorConsensusKeyArgs {
                 consensus_public_key: Some(consensus_public_key),
@@ -662,13 +662,13 @@ impl CliTestFramework {
         gas_options: Option<GasOptions>,
         account_strs: BTreeMap<&str, &str>,
         legacy_flow: bool,
-        upgrade_policy: Option<UpgradePolicy>,
     ) -> CliTypedResult<TransactionSummary> {
         PublishPackage {
             move_options: self.move_options(account_strs),
             txn_options: self.transaction_options(index, gas_options),
             legacy_flow,
-            upgrade_policy,
+            override_size_check: false,
+            included_artifacts: IncludedArtifacts::All,
         }
         .execute()
         .await
@@ -769,9 +769,7 @@ impl CliTestFramework {
     fn operator_args(&self, pool_index: Option<usize>) -> OperatorArgs {
         OperatorArgs {
             pool_address_args: OptionalPoolAddressArgs {
-                pool_address: pool_index.map(|idx| AccountAddressWrapper {
-                    account_address: self.account_id(idx),
-                }),
+                pool_address: pool_index.map(|idx| self.account_id(idx)),
             },
         }
     }

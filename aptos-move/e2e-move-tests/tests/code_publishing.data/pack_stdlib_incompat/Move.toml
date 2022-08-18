@@ -1,0 +1,10 @@
+[package]
+name = "MoveStdlib"
+version = "1.5.0"
+upgrade_policy = "compatible"
+
+[addresses]
+std = "0x1"
+
+[dev-addresses]
+std = "0x1"

@@ -60,19 +60,20 @@ impl GovernanceTool {
 /// Submit proposal to other validators to be proposed on
 #[derive(Parser)]
 pub struct SubmitProposal {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-    #[clap(flatten)]
-    pub(crate) pool_address_args: PoolAddressArgs,
     /// Execution hash of the script to be voted on
     #[clap(long, parse(try_from_str = read_hex_hash))]
     pub(crate) execution_hash: HashValue,
+
     /// Code location of the script to be voted on
     #[clap(long)]
     pub(crate) metadata_url: Url,
 
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+    #[clap(flatten)]
+    pub(crate) pool_address_args: PoolAddressArgs,
 }
 
 #[async_trait]
@@ -113,9 +114,22 @@ impl CliCommand<Transaction> for SubmitProposal {
                 err
             ))
         })?;
+        Url::parse(&metadata.source_code_url).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Source code URL {} is invalid {}",
+                metadata.source_code_url, err
+            ))
+        })?;
+        Url::parse(&metadata.discussion_url).map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Discussion URL {} is invalid {}",
+                metadata.discussion_url, err
+            ))
+        })?;
+
         let metadata_hash = HashValue::sha3_256_of(&bytes);
 
-        println!("{}", metadata);
+        println!("{}, Hash: {}", metadata, metadata_hash);
         prompt_yes_with_override("Do you want to submit this proposal?", self.prompt_options)?;
 
         self.txn_options
@@ -125,10 +139,10 @@ impl CliCommand<Transaction> for SubmitProposal {
                 "create_proposal",
                 vec![],
                 vec![
-                    bcs::to_bytes(&self.pool_address_args.pool_address())?,
-                    bcs::to_bytes(&self.execution_hash)?,
+                    bcs::to_bytes(&self.pool_address_args.pool_address)?,
+                    bcs::to_bytes(&self.execution_hash.to_hex())?,
                     bcs::to_bytes(&self.metadata_url.to_string())?,
-                    bcs::to_bytes(&metadata_hash)?,
+                    bcs::to_bytes(&metadata_hash.to_hex())?,
                 ],
             )
             .await
@@ -142,18 +156,20 @@ fn read_hex_hash(str: &str) -> CliTypedResult<HashValue> {
 
 #[derive(Parser)]
 pub struct SubmitVote {
+    /// Id of proposal to vote on
+    #[clap(long)]
+    pub(crate) proposal_id: u64,
+
+    /// Vote choice. True for yes. False for no.
+    #[clap(long)]
+    pub(crate) should_pass: bool,
+
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) pool_address_args: PoolAddressArgs,
-    /// Id of proposal to vote on
-    #[clap(long)]
-    pub(crate) proposal_id: u64,
-    /// Vote choice. True for yes. False for no.
-    #[clap(long)]
-    pub(crate) should_pass: bool,
-    #[clap(flatten)]
-    pub(crate) prompt_options: PromptOptions,
 }
 
 #[async_trait]
@@ -177,7 +193,7 @@ impl CliCommand<Transaction> for SubmitVote {
                 "vote",
                 vec![],
                 vec![
-                    bcs::to_bytes(&self.pool_address_args.pool_address())?,
+                    bcs::to_bytes(&self.pool_address_args.pool_address)?,
                     bcs::to_bytes(&self.proposal_id)?,
                     bcs::to_bytes(&self.should_pass)?,
                 ],
@@ -190,16 +206,16 @@ impl CliCommand<Transaction> for SubmitVote {
 pub struct ProposalMetadata {
     title: String,
     description: String,
-    script_url: String,
-    script_hash: String,
+    source_code_url: String,
+    discussion_url: String,
 }
 
 impl std::fmt::Display for ProposalMetadata {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Proposal:\n\tTitle:{}\n\tDescription:{}\n\tScript URL:{}\n\tScript hash:{}",
-            self.title, self.description, self.script_url, self.script_hash
+            "Proposal:\n\tTitle:{}\n\tDescription:{}\n\tSource code URL:{}\n\tDiscussion URL:{}",
+            self.title, self.description, self.source_code_url, self.discussion_url
         )
     }
 }
@@ -270,9 +286,6 @@ impl CliCommand<ScriptHash> for PrepareProposal {
 
 #[derive(Parser)]
 pub struct ExecuteProposal {
-    #[clap(flatten)]
-    pub(crate) txn_options: TransactionOptions,
-
     /// Path to the compiled script file
     #[clap(long, parse(from_os_str))]
     pub path: PathBuf,
@@ -282,11 +295,15 @@ pub struct ExecuteProposal {
     /// Example: `0x01 0x02 0x03`
     #[clap(long, multiple_values = true)]
     pub(crate) args: Vec<ArgWithType>,
+
     /// TypeTag arguments separated by spaces.
     ///
     /// Example: `u8 u64 u128 bool address vector true false signer`
     #[clap(long, multiple_values = true)]
     pub(crate) type_args: Vec<MoveType>,
+
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
 }
 
 impl TryFrom<&ArgWithType> for TransactionArgument {

@@ -33,16 +33,17 @@ module aptos_framework::block {
         time_microseconds: u64,
     }
 
-    /// The `BlockResource` resource is in an invalid state
-    const EBLOCK_METADATA: u64 = 1;
-    /// An invalid signer was provided. Expected the signer to be the VM or a Validator.
-    const EVM_OR_VALIDATOR: u64 = 2;
-    const EINVALID_EPOCH_INTERVAL: u64 = 3;
+    /// The number of new block events does not equal the current block height.
+    const ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT: u64 = 1;
+    /// An invalid proposer was provided. Expected the proposer to be the VM or an active validator.
+    const EINVALID_PROPOSER: u64 = 2;
+    /// Epoch interval cannot be 0.
+    const EZERO_EPOCH_INTERVAL: u64 = 3;
 
     /// This can only be called during Genesis.
     public(friend) fun initialize(account: &signer, epoch_interval: u64) {
         system_addresses::assert_aptos_framework(account);
-        assert!(epoch_interval > 0, error::invalid_argument(EINVALID_EPOCH_INTERVAL));
+        assert!(epoch_interval > 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
 
         move_to<BlockResource>(
             account,
@@ -61,7 +62,7 @@ module aptos_framework::block {
         new_epoch_interval: u64,
     ) acquires BlockResource {
         system_addresses::assert_aptos_framework(aptos_framework);
-        assert!(new_epoch_interval > 0, error::invalid_argument(EINVALID_EPOCH_INTERVAL));
+        assert!(new_epoch_interval > 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
 
         let block_metadata = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata.epoch_interval = new_epoch_interval;
@@ -86,7 +87,7 @@ module aptos_framework::block {
         // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
         assert!(
             proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
-            error::permission_denied(EVM_OR_VALIDATOR)
+            error::permission_denied(EINVALID_PROPOSER),
         );
 
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
@@ -120,7 +121,10 @@ module aptos_framework::block {
     /// Emit the event and update height and global timestamp
     fun emit_new_block_event(vm: &signer, event_handle: &mut EventHandle<NewBlockEvent>, new_block_event: NewBlockEvent) {
         timestamp::update_global_time(vm, new_block_event.proposer, new_block_event.time_microseconds);
-        assert!(event::counter(event_handle) == new_block_event.height, error::invalid_argument(EBLOCK_METADATA));
+        assert!(
+            event::counter(event_handle) == new_block_event.height,
+            error::invalid_argument(ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT),
+        );
         event::emit_event<NewBlockEvent>(event_handle, new_block_event);
     }
 

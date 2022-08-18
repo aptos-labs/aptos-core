@@ -25,7 +25,7 @@ module aptos_framework::code {
         upgrade_policy: UpgradePolicy,
         /// The numbers of times this module has been upgraded. Also serves as the on-chain version.
         /// This field will be automatically assigned on successful upgrade.
-        upgrade_counter: u64,
+        upgrade_number: u64,
         /// The BuildInfo, in the BuildInfo.yaml format.
         build_info: String,
         /// The package manifest, in the Move.toml format.
@@ -53,17 +53,16 @@ module aptos_framework::code {
         policy: u8
     }
 
-    /// A package is attempted to publish with module names clashing with modules published by other packages on this
-    /// address.
+    /// Package contains duplicate module names with existing modules publised in other packages on this address
     const EMODULE_NAME_CLASH: u64 = 0x1;
 
-    /// A package is attempted to upgrade which is marked as immutable.
+    /// Cannot upgrade an immutable package
     const EUPGRADE_IMMUTABLE: u64 = 0x2;
 
-    /// A package is attempted to upgrade with a weaker policy than previously.
+    /// Cannot downgrade a package's upgradability policy
     const EUPGRADE_WEAKER_POLICY: u64 = 0x3;
 
-    /// A package is attempted to upgrade but misses modules which existed before.
+    /// Cannot delete a module that was published in the same package
     const EMODULE_MISSING: u64 = 0x4;
 
     /// Whether unconditional code upgrade with no compatibility check is allowed. This
@@ -117,11 +116,11 @@ module aptos_framework::code {
         let len = vector::length(packages);
         let index = len;
         let i = 0;
-        let upgrade_counter = 0;
+        let upgrade_number = 0;
         while (i < len) {
             let old = vector::borrow(packages, i);
             if (old.name == pack.name) {
-                upgrade_counter = old.upgrade_counter + 1;
+                upgrade_number = old.upgrade_number + 1;
                 check_upgradability(old, &pack, &module_names);
                 index = i;
             } else {
@@ -131,7 +130,7 @@ module aptos_framework::code {
         };
 
         // Assign the upgrade counter.
-        *&mut pack.upgrade_counter = upgrade_counter;
+        *&mut pack.upgrade_number = upgrade_number;
 
         // Update registry
         if (index < len) {

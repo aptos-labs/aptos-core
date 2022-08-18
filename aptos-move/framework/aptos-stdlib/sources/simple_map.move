@@ -10,8 +10,10 @@ module aptos_std::simple_map {
     use std::vector;
     use aptos_std::comparator;
 
-    const EKEY_ALREADY_EXISTS: u64 = 0;
-    const EKEY_NOT_FOUND: u64 = 1;
+    /// Map key already exists
+    const EKEY_ALREADY_EXISTS: u64 = 1;
+    /// Map key is not found
+    const EKEY_NOT_FOUND: u64 = 2;
 
     struct SimpleMap<Key, Value> has copy, drop, store {
         data: vector<Element<Key, Value>>,

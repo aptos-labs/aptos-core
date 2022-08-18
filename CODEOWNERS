@@ -1,8 +1,10 @@
+# **Please** keep this file ordered alphabetically by directory paths!
+/aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush
+/aptos-move/framework/src/natives/cryptography/ @alinush
 # Owners for the `/developer-docs-site` directory and all its subdirectories.
 /developer-docs-site/ @davidiw @rajkaramchedu
-# Owners for the `/crates/aptos-crypto` directory and all its subdirectories.
+# Owners for the `/crates/aptos-crypto*` directories
 /crates/aptos-crypto/ @alinush
-# Owners for the `/crates/aptos-crypto-derive` directory and all its subdirectories.
 /crates/aptos-crypto-derive/ @alinush
 # Owners for the `/api` directory and all its subdirectories. And other API related crates
 /api/ @banool @gregnazario

@@ -17,10 +17,6 @@ module aptos_framework::genesis {
     use aptos_framework::staking_config;
     use aptos_framework::version;
 
-    /// Invalid epoch duration.
-    const EINVALID_EPOCH_DURATION: u64 = 1;
-    const EINVALID_ADDRESSES: u64 = 2;
-
     struct ValidatorConfiguration has copy, drop {
         owner_address: address,
         operator_address: address,
@@ -64,6 +60,8 @@ module aptos_framework::genesis {
             b"epilogue",
             b"writeset_epilogue",
         );
+
+        account::create_address_map(&aptos_framework_account);
 
         // Give the decentralized on-chain governance control over the core framework account.
         aptos_governance::store_signer_cap(&aptos_framework_account, @aptos_framework, framework_signer_cap);

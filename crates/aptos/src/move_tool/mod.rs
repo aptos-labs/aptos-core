@@ -32,7 +32,6 @@ use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
-use framework::natives::code::UpgradePolicy;
 use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
 use move_deps::move_cli::base::test::UnitTestResult;
@@ -332,11 +331,82 @@ pub struct PublishPackage {
     /// Whether to use the legacy publishing flow. This will be soon removed.
     #[clap(long)]
     pub(crate) legacy_flow: bool,
-    /// The upgrade policy used for the published package. One of
-    /// `arbitrary`, `compatible`, or `immutable`. Defaults to `compatible`.
+    /// Whether to override the check for maximal size of published data.
     #[clap(long)]
-    pub(crate) upgrade_policy: Option<UpgradePolicy>,
+    pub(crate) override_size_check: bool,
+    /// What artifacts to include in the package. This can be one of `none`, `sparse`, and
+    /// `all`. `none` is the most compact form and does not allow to reconstruct a source
+    /// package from chain; `sparse` is the minimal set of artifacts needed to reconstruct
+    /// a source package; `all` includes all available artifacts. The choice of included
+    /// artifacts heavily influences the size and therefore gas cost of publishing: `none`
+    /// is the size of bytecode alone; `sparse` is roughly 2 times as much; and `all` 3-4
+    /// as much.
+    #[clap(long, default_value_t = IncludedArtifacts::Sparse)]
+    pub(crate) included_artifacts: IncludedArtifacts,
 }
+
+#[derive(ArgEnum, Clone, Copy, Debug)]
+pub enum IncludedArtifacts {
+    None,
+    Sparse,
+    All,
+}
+
+impl Display for IncludedArtifacts {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        use IncludedArtifacts::*;
+        match self {
+            None => f.write_str("none"),
+            Sparse => f.write_str("sparse"),
+            All => f.write_str("all"),
+        }
+    }
+}
+
+impl FromStr for IncludedArtifacts {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use IncludedArtifacts::*;
+        match s {
+            "none" => Ok(None),
+            "sparse" => Ok(Sparse),
+            "all" => Ok(All),
+            _ => Err("unknown variant"),
+        }
+    }
+}
+
+impl IncludedArtifacts {
+    fn build_options(self, named_addresses: BTreeMap<String, AccountAddress>) -> BuildOptions {
+        use IncludedArtifacts::*;
+        match self {
+            None => BuildOptions {
+                with_srcs: false,
+                with_abis: false,
+                with_source_maps: false,
+                with_error_map: false,
+                named_addresses,
+            },
+            Sparse => BuildOptions {
+                with_srcs: true,
+                with_abis: false,
+                with_source_maps: false,
+                with_error_map: false,
+                named_addresses,
+            },
+            All => BuildOptions {
+                with_srcs: true,
+                with_abis: true,
+                with_source_maps: true,
+                with_error_map: true,
+                named_addresses,
+            },
+        }
+    }
+}
+
+pub const MAX_PUBLISH_PACKAGE_SIZE: usize = 60_000;
 
 #[async_trait]
 impl CliCommand<TransactionSummary> for PublishPackage {
@@ -349,22 +419,14 @@ impl CliCommand<TransactionSummary> for PublishPackage {
             move_options,
             txn_options,
             legacy_flow,
-            upgrade_policy,
+            override_size_check,
+            included_artifacts,
         } = self;
         let package_path = move_options.get_package_path()?;
-        let options = BuildOptions {
-            named_addresses: move_options.named_addresses(),
-            ..BuildOptions::default()
-        };
+        let options = included_artifacts.build_options(move_options.named_addresses());
         let package = BuiltPackage::build(package_path, options)?;
         let compiled_units = package.extract_code();
         if legacy_flow {
-            if upgrade_policy.is_some() {
-                return Err(CliError::CommandArgumentError(
-                    "`--upgrade-policy` can only be used without the `--legacy-flow` option"
-                        .to_owned(),
-                ));
-            }
             // Send the compiled module using a module bundle
             txn_options
                 .submit_transaction(TransactionPayload::ModuleBundle(ModuleBundle::new(
@@ -374,12 +436,21 @@ impl CliCommand<TransactionSummary> for PublishPackage {
                 .map(TransactionSummary::from)
         } else {
             // Send the compiled module and metadata using the code::publish_package_txn.
-            let metadata =
-                package.extract_metadata(upgrade_policy.unwrap_or_else(UpgradePolicy::compat))?;
+            let metadata = package.extract_metadata()?;
             let payload = aptos_transaction_builder::aptos_stdlib::code_publish_package_txn(
                 bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
                 compiled_units,
             );
+            let size = bcs::serialized_size(&payload)?;
+            if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+                return Err(CliError::UnexpectedError(format!(
+                    "The package is larger than {}k ({}k)! To lower the size \
+                you may want to include less artifacts via `--included_artifacts`. \
+                You can also override this check with `--override-size-check",
+                    MAX_PUBLISH_PACKAGE_SIZE / 1000,
+                    size / 1000
+                )));
+            }
             txn_options
                 .submit_transaction(payload)
                 .await
@@ -491,6 +562,7 @@ impl CliCommand<&'static str> for ListPackage {
                     let data = registry.get_package(name).await?;
                     println!("package {}", data.name());
                     println!("  upgrade_policy: {}", data.upgrade_policy());
+                    println!("  upgrade_number: {}", data.upgrade_number());
                     println!("  modules: {}", data.module_names().into_iter().join(", "));
                     println!(
                         "  build_info:\n    {}",
