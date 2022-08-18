@@ -8,6 +8,7 @@ use crate::{
     state_store::{state_key::StateKey, state_value::StateValue},
 };
 use anyhow::{anyhow, Error, Result};
+use move_deps::move_core_types::language_storage::ModuleId;
 use move_deps::move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, move_resource::MoveResource,
 };
@@ -60,10 +61,10 @@ impl AccountState {
     }
 
     /// Into an iterator over the module values stored under this account
-    pub fn into_modules(self) -> impl Iterator<Item = Vec<u8>> {
+    pub fn into_modules(self) -> impl Iterator<Item = (ModuleId, Vec<u8>)> {
         self.data.into_iter().filter_map(|(k, v)| {
             match Path::try_from(&k).expect("Invalid access path") {
-                Path::Code(_) => Some(v),
+                Path::Code(module) => Some((module, v)),
                 Path::Resource(_) => None,
             }
         })
