@@ -68,9 +68,8 @@ impl InboundStreamBuffer {
     }
 
     pub fn new_stream(&mut self, header: StreamHeader) -> anyhow::Result<()> {
-        let old = self.stream.replace(InboundStream::new(header)?);
-        if let Some(stream) = old {
-            bail!("Discard existing stream {}", stream.request_id)
+        if let Some(old) = self.stream.replace(InboundStream::new(header)?) {
+            bail!("Discard existing stream {}", old.request_id)
         } else {
             Ok(())
         }

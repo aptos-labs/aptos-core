@@ -910,7 +910,7 @@ fn peers_send_multiplex() {
     let test = async move {
         let msg_a = Message {
             protocol_id: PROTOCOL,
-            mdata: Bytes::from(vec![0; MAX_FRAME_SIZE * 2]), // stream message
+            mdata: Bytes::from(vec![0; MAX_MESSAGE_SIZE]), // stream message
         };
         let msg_b = Message {
             protocol_id: PROTOCOL,

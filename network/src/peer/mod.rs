@@ -345,8 +345,6 @@ where
                         network_context,
                         remote_peer_id.short_str(),
                     );
-                    // this will end the multiplex task too because send will fail
-                    break;
                 }
             }
             info!(
@@ -411,7 +409,6 @@ where
                                 network_context,
                                 remote_peer_id.short_str(),
                             );
-                            break;
                         }
                     },
                     _ = close_rx => {
