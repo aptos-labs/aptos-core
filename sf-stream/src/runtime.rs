@@ -98,8 +98,9 @@ impl SfStreamer {
     }
 
     pub async fn start(&mut self) {
+        // Format is FIRE INIT aptos-node <PACKAGE_VERSION> <MAJOR_VERSION> <MINOR_VERSION> <CHAIN_ID>
         println!(
-            "\nFIRE INIT aptos-node {} aptos 0 0 chain_id {}",
+            "\nFIRE INIT aptos-node {} aptos 0 0 {}",
             env!("CARGO_PKG_VERSION"),
             self.context.chain_id().id(),
         );
