@@ -17,19 +17,16 @@ function Activity() {
   const { activeAccountAddress } = useGlobalStateContext();
   const {
     data: transactions,
-    isFetching,
+    isLoading,
   } = useCoinTransferTransactions(activeAccountAddress);
 
-  const sortedTxns = !isFetching
-    ? transactions?.sort((a, b) => Number(b.version) - Number(a.version))
-    : undefined;
-
+  const sortedTxns = transactions?.sort((a, b) => Number(b.version) - Number(a.version));
   return (
     <AuthLayout routePath={PageRoutes.activity.path}>
       <WalletLayout>
         <VStack width="100%" paddingTop={8} px={4} alignItems="start">
           <Heading fontSize="xl" mb={4}>Activity</Heading>
-          <TransactionList transactions={sortedTxns} />
+          <TransactionList transactions={sortedTxns} isLoading={isLoading} />
         </VStack>
       </WalletLayout>
     </AuthLayout>

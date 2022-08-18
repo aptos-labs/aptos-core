@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   Center,
@@ -26,16 +26,24 @@ function NoActivity() {
 }
 
 interface TransactionListProps {
-  transactions?: UserTransaction[],
+  isLoading?: boolean,
+  transactions?: UserTransaction[]
 }
 
-export function TransactionList({ transactions }: TransactionListProps) {
+export function TransactionList({
+  isLoading,
+  transactions,
+}: TransactionListProps) {
+  const children = useMemo(
+    () => ((transactions && transactions.length > 0)
+      ? transactions.map((t) => <ActivityItem key={t.hash} transaction={t} />)
+      : <NoActivity />),
+    [transactions],
+  );
+
   return (
     <VStack w="100%" spacing={3}>
-      { !transactions && <Spinner /> }
-      { transactions && transactions.length > 0
-        ? transactions.map((t) => <ActivityItem key={t.hash} transaction={t} />)
-        : <NoActivity /> }
+      { isLoading ? <Spinner /> : children }
     </VStack>
   );
 }

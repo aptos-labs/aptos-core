@@ -5,9 +5,9 @@ import React from 'react';
 import {
   Badge,
   Box,
-  Button,
+  Button, Center,
   Heading,
-  HStack,
+  HStack, Spinner,
   Text,
   Tooltip,
   VStack,
@@ -44,7 +44,7 @@ function TransactionBody() {
   const txn = useTransactionDetails(version ? Number(version) : undefined);
   const userAddress = activeAccountAddress
     && HexString.ensure(activeAccountAddress).toShortString();
-  const explorerAddress = `https://explorer.devnet.aptos.dev/txn/${txn?.version}`;
+  const explorerAddress = `https://explorer.devnet.aptos.dev/txn/${version}`;
 
   function clickableAddress(address: MaybeHexString) {
     return address === userAddress
@@ -58,7 +58,7 @@ function TransactionBody() {
       );
   }
 
-  return txn && (
+  return (
     <VStack
       w="100%"
       paddingTop={8}
@@ -80,42 +80,54 @@ function TransactionBody() {
       >
         View on explorer
       </Button>
-      <DetailItem label="From">
-        { clickableAddress(txn.sender) }
-      </DetailItem>
-      <DetailItem label="To">
-        { clickableAddress(txn.recipient) }
-      </DetailItem>
-      <DetailItem label="Amount">
-        <Text>{ `${txn.amount} ${txn.coinName}` }</Text>
-      </DetailItem>
-      <DetailItem label="Version">
-        <Text>{ txn.version }</Text>
-      </DetailItem>
-      <DetailItem label="Hash">
-        <Copyable prompt="Copy full hash" value={txn.hash}>
-          <Badge fontSize="sm" textTransform="lowercase">
-            { collapseHexString(txn.hash) }
-          </Badge>
-        </Copyable>
-      </DetailItem>
-      <DetailItem label="Timestamp">
-        <Copyable prompt="Copy timestamp" value={txn.timestamp}>
-          <Badge fontSize="sm" textTransform="none">
-            { txn.fullDatetime }
-          </Badge>
-        </Copyable>
-      </DetailItem>
-      <DetailItem label="Status">
-        <Tooltip label={txn.vm_status}>
-          <Box color={txn.success ? 'green.400' : 'red.400'}>
-            { txn.success ? <FaRegCheckCircle /> : <FaRegTimesCircle /> }
-          </Box>
-        </Tooltip>
-      </DetailItem>
-      <DetailItem label="Gas used">
-        <Text>{ txn.gas_used }</Text>
-      </DetailItem>
+      {
+        !txn
+          ? (
+            <Center h="100%">
+              <Spinner size="xl" />
+            </Center>
+          )
+          : (
+            <>
+              <DetailItem label="From">
+                { clickableAddress(txn.sender) }
+              </DetailItem>
+              <DetailItem label="To">
+                { clickableAddress(txn.recipient) }
+              </DetailItem>
+              <DetailItem label="Amount">
+                <Text>{ `${txn.amount} ${txn.coinName}` }</Text>
+              </DetailItem>
+              <DetailItem label="Version">
+                <Text>{ txn.version }</Text>
+              </DetailItem>
+              <DetailItem label="Hash">
+                <Copyable prompt="Copy full hash" value={txn.hash}>
+                  <Badge fontSize="sm" textTransform="lowercase">
+                    { collapseHexString(txn.hash) }
+                  </Badge>
+                </Copyable>
+              </DetailItem>
+              <DetailItem label="Timestamp">
+                <Copyable prompt="Copy timestamp" value={txn.timestamp}>
+                  <Badge fontSize="sm" textTransform="none">
+                    { txn.fullDatetime }
+                  </Badge>
+                </Copyable>
+              </DetailItem>
+              <DetailItem label="Status">
+                <Tooltip label={txn.vm_status}>
+                  <Box color={txn.success ? 'green.400' : 'red.400'}>
+                    { txn.success ? <FaRegCheckCircle /> : <FaRegTimesCircle /> }
+                  </Box>
+                </Tooltip>
+              </DetailItem>
+              <DetailItem label="Gas used">
+                <Text>{ txn.gasUsed }</Text>
+              </DetailItem>
+            </>
+          )
+      }
     </VStack>
   );
 }

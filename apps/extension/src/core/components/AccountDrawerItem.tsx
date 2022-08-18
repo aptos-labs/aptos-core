@@ -14,7 +14,9 @@ import {
   ModalContent,
   ModalFooter,
   ModalHeader,
-  ModalOverlay, ModalProps,
+  ModalOverlay,
+  ModalProps,
+  Spinner,
   Text,
   useColorMode,
   useDisclosure,
@@ -91,7 +93,12 @@ function AccountDrawerItem(
   } = useAccountLatestTransactionTimestamp(address, {
     refetchInterval: 4000,
   });
-  const { data: coinBalance } = useAccountCoinBalance(address, { refetchInterval: 4000 });
+  const {
+    data: coinBalance,
+    isLoading: isBalanceLoading,
+  } = useAccountCoinBalance(address, {
+    refetchInterval: 4000,
+  });
   const coinBalanceString = (coinBalance && coinBalance > 1e6)
     ? `~${numeral(coinBalance).format('0.0a')}`
     : numeral(coinBalance).format('0,0');
@@ -153,7 +160,11 @@ function AccountDrawerItem(
             divider={<span>&nbsp;&nbsp;&bull;&nbsp;&nbsp;</span>}
           >
             <Text noOfLines={1} fontSize="sm">
-              {`Balance: ${coinBalanceString} APT`}
+              Balance:
+              &nbsp;
+              { isBalanceLoading ? <Spinner size="xs" thickness="1px" as="span" /> : coinBalanceString }
+              &nbsp;
+              APT
             </Text>
             <Text noOfLines={1} fontSize="sm">
               {
@@ -166,8 +177,9 @@ function AccountDrawerItem(
         </Grid>
       </Box>
     </Box>
-  ), [getInputProps, getCheckboxProps, colorMode, isChecked, walletAddressFormatted,
-    onOpen, isOpen, onClose, address, coinBalanceString, latestTransactionTimestamp, onRemove]);
+  ), [getInputProps, getCheckboxProps, colorMode, isChecked,
+    walletAddressFormatted, isOpen, onClose, address, isBalanceLoading,
+    coinBalanceString, latestTransactionTimestamp, onOpen, onRemove]);
 }
 
 export default AccountDrawerItem;

@@ -85,7 +85,7 @@ export function ActivityItem({ transaction }: ActivityItemProps) {
 
   const typedPayload = transaction.payload as ScriptFunctionPayload;
   const [recipient, amount]: string[] = typedPayload.arguments;
-  const coinName = typedPayload.type_arguments[0].split('::').pop();
+  const coinName = typedPayload.type_arguments[0]?.split('::').pop();
   const formattedCoinName = useMemo(() => formatCoinName(coinName), [coinName]);
 
   const myAddress = aptosAccount!.address().toShortString();

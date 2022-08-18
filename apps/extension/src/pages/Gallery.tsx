@@ -7,6 +7,7 @@ import {
   Grid,
   Heading,
   SimpleGrid,
+  Spinner,
   Text,
   useColorMode,
   VStack,
@@ -25,6 +26,7 @@ function Gallery() {
   const { colorMode } = useColorMode();
   const {
     data: galleryItems,
+    isLoading,
   } = useGalleryItems();
 
   return (
@@ -37,30 +39,38 @@ function Gallery() {
               <CreateNFTDrawer />
             </Flex>
           </Grid>
-          <Flex alignItems="flex-start" width="100%">
-            <Heading fontWeight={500} fontSize="md">Created by you</Heading>
-          </Flex>
-          <SimpleGrid w="100%" columns={2} spacing={2}>
-            {
-            (galleryItems && galleryItems.length > 0)
-              ? (
-                galleryItems?.map((item) => (
-                  <GalleryItem
-                    id={item.id}
-                    key={`${item.name}`}
-                    imageSrc={item.metadata?.image || 'https://www.publicdomainpictures.net/pictures/280000/nahled/not-found-image-15383864787lu.jpg'}
-                  />
-                ))
-              )
+          {
+            isLoading
+              ? <Center pt={4}><Spinner size="lg" /></Center>
               : (
-                <SquareBox borderWidth="1px" borderRadius=".5rem" borderColor={secondaryBorderColor[colorMode]}>
-                  <Center height="100%" p={4}>
-                    <Text fontSize="md" textAlign="center">No collectibles yet!</Text>
-                  </Center>
-                </SquareBox>
+                <>
+                  <Flex alignItems="flex-start" width="100%">
+                    <Heading fontWeight={500} fontSize="md">Created by you</Heading>
+                  </Flex>
+                  <SimpleGrid w="100%" columns={2} spacing={2}>
+                    {
+                      (galleryItems && galleryItems!.length > 0)
+                        ? (
+                          galleryItems?.map((item) => (
+                            <GalleryItem
+                              id={item.id}
+                              key={`${item.name}`}
+                              imageSrc={item.metadata?.image || 'https://www.publicdomainpictures.net/pictures/280000/nahled/not-found-image-15383864787lu.jpg'}
+                            />
+                          ))
+                        )
+                        : (
+                          <SquareBox borderWidth="1px" borderRadius=".5rem" borderColor={secondaryBorderColor[colorMode]}>
+                            <Center height="100%" p={4}>
+                              <Text fontSize="md" textAlign="center">No collectibles yet!</Text>
+                            </Center>
+                          </SquareBox>
+                        )
+                    }
+                  </SimpleGrid>
+                </>
               )
           }
-          </SimpleGrid>
         </VStack>
       </WalletLayout>
     </AuthLayout>

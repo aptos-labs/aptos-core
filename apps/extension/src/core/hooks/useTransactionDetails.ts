@@ -7,6 +7,7 @@ import numeral from 'numeral';
 
 export const formatCoinName = (coinName: string | undefined) => {
   switch (coinName) {
+    case undefined:
     case 'AptosCoin':
       return 'APT';
     default:
@@ -32,17 +33,16 @@ export default function useTransactionDetails(version?: number) {
   const payload = txn.payload as ScriptFunctionPayload;
   const recipient = payload.arguments[0] as string;
   const amount = numeral(Number(payload.arguments[1])).format('0,0');
-  const defaultCoinName = payload.type_arguments[0].split('::').pop();
+  const defaultCoinName = payload.type_arguments[0]?.split('::').pop();
   const coinName = formatCoinName(defaultCoinName);
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  const gas_used = numeral(txn.gas_used).format('0,0');
+  const gasUsed = numeral(txn.gas_used).format('0,0');
 
   return {
     amount,
     coinName,
     fullDatetime,
+    gasUsed,
     recipient,
     ...txn,
-    gas_used,
   };
 }

@@ -5,6 +5,7 @@ import { AptosClient, MaybeHexString } from 'aptos';
 import { useQuery, useQueryClient, UseQueryOptions } from 'react-query';
 import { aptosCoinStoreStructTag } from 'core/constants';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
+import { ApiError } from 'aptos/dist/generated';
 
 export interface GetAccountResourcesProps {
   address?: MaybeHexString;
@@ -76,7 +77,12 @@ export function useAccountCoinBalance(
     [accountQueryKeys.getAccountCoinBalance, address],
     async () => aptosClient!.getAccountResource(address!, aptosCoinStoreStructTag)
       .then((res: any) => Number(res.data.coin.value))
-      .catch(() => 0),
+      .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          return 0;
+        }
+        throw err;
+      }),
     {
       enabled: Boolean(address),
       ...options,
