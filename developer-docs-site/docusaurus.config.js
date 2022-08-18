@@ -141,11 +141,6 @@ const config = {
                 type: "doc",
                 docId: "nodes/node-health-checker",
               },
-              {
-                label: "Staking",
-                type: "doc",
-                docId: "nodes/staking",
-              },
             ],
           },
           {
@@ -292,6 +287,10 @@ const config = {
           {
             to: "/nodes/local-testnet/run-a-local-testnet",
             from: "/nodes/run-a-local-testnet",
+          },
+          {
+            to: "/concepts/staking",
+            from: "/nodes/staking",
           },
         ],
       },

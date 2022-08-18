@@ -5,7 +5,11 @@ slug: "whats-new-in-docs"
 
 # Whats New in Docs
 
-# 11 August 2022
+## 16 August 2022
+
+- A new tutorial showing how to create, submit and verify [your first transaction using the Python SDK](/tutorials/your-first-transaction-sdk) is posted.
+
+## 11 August 2022
 
 - The [Aptos White Paper](aptos-white-paper) is released.
 
