@@ -33,7 +33,7 @@ impl Default for RocksdbConfigs {
         Self {
             ledger_db_config: RocksdbConfig {
                 // Allow db to close old sst files, saving memory.
-                max_open_files: 5000,
+                max_open_files: 1000,
                 // For now we set the max total WAL size to be 1G. This config can be useful when column
                 // families are updated at non-uniform frequencies.
                 max_total_wal_size: 1u64 << 30,
@@ -43,7 +43,7 @@ impl Default for RocksdbConfigs {
             },
             state_merkle_db_config: RocksdbConfig {
                 // Allow db to close old sst files, saving memory.
-                max_open_files: 5000,
+                max_open_files: 1000,
                 // For now we set the max total WAL size to be 1G. This config can be useful when column
                 // families are updated at non-uniform frequencies.
                 max_total_wal_size: 1u64 << 30,
