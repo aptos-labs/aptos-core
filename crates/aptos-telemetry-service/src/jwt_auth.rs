@@ -68,7 +68,7 @@ pub async fn authorize_jwt(
         Ok(claims)
     } else {
         Err(reject::custom(ServiceError::new(
-            StatusCode::FORBIDDEN,
+            StatusCode::UNAUTHORIZED,
             "invalid claim".into(),
         )))
     }
