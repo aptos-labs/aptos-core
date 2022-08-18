@@ -4,6 +4,7 @@
 pub mod aptos;
 pub mod error;
 pub mod faucet;
+
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
@@ -419,7 +420,15 @@ impl Client {
         limit: Option<u16>,
     ) -> Result<Response<Vec<VersionedNewBlockEvent>>> {
         #[derive(Clone, Debug, Serialize, Deserialize)]
+        pub struct BlockId {
+            #[serde(deserialize_with = "deserialize_from_string")]
+            low: u128,
+            #[serde(deserialize_with = "deserialize_from_string")]
+            high: u128,
+        }
+        #[derive(Clone, Debug, Serialize, Deserialize)]
         pub struct NewBlockEventResponse {
+            id: BlockId,
             #[serde(deserialize_with = "deserialize_from_string")]
             epoch: u64,
             #[serde(deserialize_with = "deserialize_from_string")]
@@ -453,8 +462,11 @@ impl Client {
                     serde_json::from_value::<NewBlockEventResponse>(event.data)
                         .map_err(|e| anyhow!(e))
                         .and_then(|e| {
+                            let mut raw_bytes = e.id.low.to_le_bytes().to_vec();
+                            raw_bytes.append(&mut e.id.high.to_le_bytes().to_vec());
                             Ok(VersionedNewBlockEvent {
                                 event: NewBlockEvent::new(
+                                    HashValue::from_slice(raw_bytes)?,
                                     e.epoch,
                                     e.round,
                                     e.height,

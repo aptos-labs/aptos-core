@@ -70,6 +70,10 @@
           "epoch": "0",
           "failed_proposer_indices": [],
           "height": "1",
+          "id": {
+            "high": "44867518937664683910420312596687572060",
+            "low": "2791876110695916617903004309989527630"
+          },
           "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
