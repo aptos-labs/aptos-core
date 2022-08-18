@@ -70,24 +70,6 @@ impl Arbitrary for WriteOp {
     type Strategy = BoxedStrategy<Self>;
 }
 
-impl WriteSet {
-    fn genesis_strategy() -> impl Strategy<Value = Self> {
-        vec((any::<AccessPath>(), WriteOp::value_strategy()), 0..64).prop_map(|write_set| {
-            let write_set_mut = WriteSetMut::new(
-                write_set
-                    .iter()
-                    .map(|(access_path, write_op)| {
-                        (StateKey::AccessPath(access_path.clone()), write_op.clone())
-                    })
-                    .collect(),
-            );
-            write_set_mut
-                .freeze()
-                .expect("generated write sets should always be valid")
-        })
-    }
-}
-
 impl Arbitrary for WriteSetPayload {
     type Parameters = ();
     fn arbitrary_with(_args: ()) -> Self::Strategy {
@@ -408,17 +390,6 @@ fn new_raw_transaction(
             expiration_time_secs,
             chain_id,
         ),
-        TransactionPayload::WriteSet(WriteSetPayload::Direct(write_set)) => {
-            // It's a bit unfortunate that max_gas_amount etc is generated but
-            // not used, but it isn't a huge deal.
-            RawTransaction::new_change_set(sender, sequence_number, write_set, chain_id)
-        }
-        TransactionPayload::WriteSet(WriteSetPayload::Script {
-            execute_as: signer,
-            script,
-        }) => {
-            RawTransaction::new_writeset_script(sender, sequence_number, script, signer, chain_id)
-        }
     }
 }
 
@@ -444,18 +415,6 @@ impl SignatureCheckedTransaction {
         keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
     ) -> impl Strategy<Value = Self> {
         Self::strategy_impl(keypair_strategy, TransactionPayload::module_strategy())
-    }
-
-    pub fn write_set_strategy(
-        keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
-    ) -> impl Strategy<Value = Self> {
-        Self::strategy_impl(keypair_strategy, TransactionPayload::write_set_strategy())
-    }
-
-    pub fn genesis_strategy(
-        keypair_strategy: impl Strategy<Value = KeyPair<Ed25519PrivateKey, Ed25519PublicKey>>,
-    ) -> impl Strategy<Value = Self> {
-        Self::strategy_impl(keypair_strategy, TransactionPayload::genesis_strategy())
     }
 
     fn strategy_impl(
@@ -537,19 +496,6 @@ impl TransactionPayload {
         any::<Module>()
             .prop_map(|module| TransactionPayload::ModuleBundle(ModuleBundle::from(module)))
     }
-
-    pub fn write_set_strategy() -> impl Strategy<Value = Self> {
-        any::<WriteSet>().prop_map(|ws| {
-            TransactionPayload::WriteSet(WriteSetPayload::Direct(ChangeSet::new(ws, vec![])))
-        })
-    }
-
-    /// Similar to `write_set_strategy` except generates a valid write set for the genesis block.
-    pub fn genesis_strategy() -> impl Strategy<Value = Self> {
-        WriteSet::genesis_strategy().prop_map(|ws| {
-            TransactionPayload::WriteSet(WriteSetPayload::Direct(ChangeSet::new(ws, vec![])))
-        })
-    }
 }
 
 prop_compose! {
@@ -582,7 +528,6 @@ impl Arbitrary for TransactionPayload {
         prop_oneof![
             4 => Self::script_strategy(),
             1 => Self::module_strategy(),
-            1 => Self::write_set_strategy(),
         ]
         .boxed()
     }

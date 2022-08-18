@@ -36,7 +36,7 @@ use aptos_types::{
         WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
-    write_set::{WriteSet, WriteSetMut},
+    write_set::WriteSet,
 };
 use fail::fail_point;
 use framework::natives::code::PublishRequest;
@@ -60,7 +60,6 @@ use once_cell::sync::OnceCell;
 use std::collections::BTreeSet;
 use std::{
     cmp::min,
-    collections::HashSet,
     convert::{AsMut, AsRef},
     sync::Arc,
 };
@@ -279,7 +278,7 @@ impl AptosVM {
                         gas_meter,
                     )
                 }
-                TransactionPayload::ModuleBundle(_) | TransactionPayload::WriteSet(_) => {
+                TransactionPayload::ModuleBundle(_) => {
                     return Err(VMStatus::Error(StatusCode::UNREACHABLE));
                 }
             }
@@ -510,9 +509,6 @@ impl AptosVM {
             TransactionPayload::ModuleBundle(m) => {
                 self.execute_modules(session, &mut gas_meter, &txn_data, m, log_context)
             }
-            TransactionPayload::WriteSet(_) => {
-                return discard_error_vm_status(VMStatus::Error(StatusCode::UNREACHABLE));
-            }
         };
 
         let gas_usage = txn_data
@@ -706,143 +702,6 @@ impl AptosVM {
         Ok((VMStatus::Executed, output))
     }
 
-    pub(crate) fn process_writeset_transaction<S: MoveResolverExt + StateView>(
-        &self,
-        storage: &S,
-        txn: &SignatureCheckedTransaction,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
-        fail_point!("move_adapter::process_writeset_transaction", |_| {
-            Err(VMStatus::Error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            ))
-        });
-
-        // Revalidate the transaction.
-        let mut session = self.0.new_session(storage, SessionId::txn(txn));
-        if let Err(e) = validate_signature_checked_transaction::<S, Self>(
-            self,
-            &mut session,
-            txn,
-            false,
-            log_context,
-        ) {
-            return Ok(discard_error_vm_status(e));
-        };
-        self.execute_writeset_transaction(
-            storage,
-            match txn.payload() {
-                TransactionPayload::WriteSet(writeset_payload) => writeset_payload,
-                TransactionPayload::ModuleBundle(_)
-                | TransactionPayload::Script(_)
-                | TransactionPayload::ScriptFunction(_) => {
-                    log_context.alert();
-                    error!(*log_context, "[aptos_vm] UNREACHABLE");
-                    return Ok(discard_error_vm_status(VMStatus::Error(
-                        StatusCode::UNREACHABLE,
-                    )));
-                }
-            },
-            TransactionMetadata::new(txn),
-            log_context,
-        )
-    }
-
-    pub fn execute_writeset_transaction<S: MoveResolverExt + StateView>(
-        &self,
-        storage: &S,
-        writeset_payload: &WriteSetPayload,
-        txn_data: TransactionMetadata,
-        log_context: &AdapterLogSchema,
-    ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
-        let change_set = match self.execute_writeset(
-            storage,
-            writeset_payload,
-            Some(txn_data.sender()),
-            SessionId::txn_meta(&txn_data),
-        ) {
-            Ok(change_set) => change_set,
-            Err(e) => return e,
-        };
-
-        // Run the epilogue function.
-        let mut session = self.0.new_session(storage, SessionId::txn_meta(&txn_data));
-        self.0.run_writeset_epilogue(
-            &mut session,
-            &txn_data,
-            writeset_payload.should_trigger_reconfiguration_by_default(),
-            log_context,
-        )?;
-
-        if let Err(e) = self.read_writeset(storage, change_set.write_set()) {
-            // Any error at this point would be an invalid writeset
-            return Ok((e, discard_error_output(StatusCode::INVALID_WRITE_SET)));
-        };
-
-        let session_out = session.finish().map_err(|e| e.into_vm_status())?;
-        let (epilogue_writeset, epilogue_events) =
-            session_out.into_change_set(&mut ())?.into_inner();
-
-        // Make sure epilogue WriteSet doesn't intersect with the writeset in TransactionPayload.
-        if !epilogue_writeset
-            .iter()
-            .map(|(ap, _)| ap)
-            .collect::<HashSet<_>>()
-            .is_disjoint(
-                &change_set
-                    .write_set()
-                    .iter()
-                    .map(|(ap, _)| ap)
-                    .collect::<HashSet<_>>(),
-            )
-        {
-            let vm_status = VMStatus::Error(StatusCode::INVALID_WRITE_SET);
-            return Ok(discard_error_vm_status(vm_status));
-        }
-        if !epilogue_events
-            .iter()
-            .map(|event| event.key())
-            .collect::<HashSet<_>>()
-            .is_disjoint(
-                &change_set
-                    .events()
-                    .iter()
-                    .map(|event| event.key())
-                    .collect::<HashSet<_>>(),
-            )
-        {
-            let vm_status = VMStatus::Error(StatusCode::INVALID_WRITE_SET);
-            return Ok(discard_error_vm_status(vm_status));
-        }
-
-        let write_set = WriteSetMut::new(
-            epilogue_writeset
-                .iter()
-                .chain(change_set.write_set().iter())
-                .cloned()
-                .collect(),
-        )
-        .freeze()
-        .map_err(|_| VMStatus::Error(StatusCode::INVALID_WRITE_SET))?;
-        let events = change_set
-            .events()
-            .iter()
-            .chain(epilogue_events.iter())
-            .cloned()
-            .collect();
-        SYSTEM_TRANSACTIONS_EXECUTED.inc();
-
-        Ok((
-            VMStatus::Executed,
-            TransactionOutputExt::from(TransactionOutput::new(
-                write_set,
-                events,
-                0,
-                TransactionStatus::Keep(ExecutionStatus::Success),
-            )),
-        ))
-    }
-
     /// Alternate form of 'execute_block' that keeps the vm_status before it goes into the
     /// `TransactionOutput`
     pub fn execute_block_and_keep_vm_status(
@@ -888,9 +747,6 @@ impl AptosVM {
             TransactionPayload::ModuleBundle(_module) => {
                 self.0.check_gas(txn_data, log_context)?;
                 self.0.run_module_prologue(session, txn_data, log_context)
-            }
-            TransactionPayload::WriteSet(_cs) => {
-                self.0.run_writeset_prologue(session, txn_data, log_context)
             }
         }
     }
@@ -1031,11 +887,6 @@ impl VMAdapter for AptosVM {
                 }
                 (vm_status, output, Some(sender))
             }
-            PreprocessedTransaction::WriteSet(txn) => {
-                let (vm_status, output) =
-                    self.process_writeset_transaction(data_cache, txn, log_context)?;
-                (vm_status, output, Some("write_set".to_string()))
-            }
             PreprocessedTransaction::InvalidSignature => {
                 let (vm_status, output) =
                     discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE));
@@ -1127,9 +978,6 @@ impl AptosSimulationVM {
             TransactionPayload::ModuleBundle(m) => {
                 self.0
                     .execute_modules(session, &mut gas_meter, &txn_data, m, log_context)
-            }
-            TransactionPayload::WriteSet(_) => {
-                return discard_error_vm_status(VMStatus::Error(StatusCode::UNREACHABLE));
             }
         };
 

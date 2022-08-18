@@ -190,14 +190,6 @@ pub fn convert_transaction_payload(payload: &TransactionPayload) -> extractor::T
                 ),
             ),
         },
-        TransactionPayload::WriteSetPayload(wsp) => extractor::TransactionPayload {
-            r#type: extractor::transaction_payload::Type::WriteSetPayload as i32,
-            payload: Some(extractor::transaction_payload::Payload::WriteSetPayload(
-                extractor::WriteSetPayload {
-                    write_set: Some(convert_write_set(&wsp.write_set)),
-                },
-            )),
-        },
     }
 }
 

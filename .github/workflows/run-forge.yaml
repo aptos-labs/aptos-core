@@ -76,7 +76,7 @@ jobs:
         with:
           python-version: '3.9'
       - name: Install python deps
-        if: env.FORGE_ENABLED == 'true'
+        if: ${{ env.FORGE_ENABLED == 'true' && env.WRAPPER_KILLSWITCH == 'false' }}
         run: pip3 install -r testsuite/requirements.txt
       - name: Set kubectl context
         if: env.FORGE_ENABLED == 'true'

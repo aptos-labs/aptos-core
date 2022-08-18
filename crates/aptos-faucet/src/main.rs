@@ -19,8 +19,8 @@ mod tests {
     use aptos_keygen::KeyGen;
     use aptos_rest_client::{
         aptos_api_types::{
-            AccountData, DirectWriteSet, LedgerInfo, PendingTransaction,
-            TransactionPayload as TransactionPayloadData, WriteSet, WriteSetPayload,
+            AccountData, LedgerInfo, ModuleBundlePayload, PendingTransaction,
+            TransactionPayload as TransactionPayloadData,
         },
         FaucetClient,
     };
@@ -237,12 +237,7 @@ mod tests {
     }
 
     fn dummy_payload() -> TransactionPayloadData {
-        TransactionPayloadData::WriteSetPayload(WriteSetPayload {
-            write_set: WriteSet::DirectWriteSet(DirectWriteSet {
-                changes: Vec::new(),
-                events: Vec::new(),
-            }),
-        })
+        TransactionPayloadData::ModuleBundlePayload(ModuleBundlePayload { modules: vec![] })
     }
 
     #[derive(Clone, Debug, Serialize, PartialEq)]

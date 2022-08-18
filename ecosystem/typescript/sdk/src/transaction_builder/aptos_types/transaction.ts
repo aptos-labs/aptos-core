@@ -364,26 +364,14 @@ export abstract class TransactionPayload {
     const index = deserializer.deserializeUleb128AsU32();
     switch (index) {
       case 0:
-        return TransactionPayloadWriteSet.load(deserializer);
-      case 1:
         return TransactionPayloadScript.load(deserializer);
-      case 2:
+      case 1:
         return TransactionPayloadModuleBundle.load(deserializer);
-      case 3:
+      case 2:
         return TransactionPayloadScriptFunction.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionPayload: ${index}`);
     }
-  }
-}
-
-export class TransactionPayloadWriteSet extends TransactionPayload {
-  serialize(serializer: Serializer): void {
-    throw new Error("Not implemented");
-  }
-
-  static load(deserializer: Deserializer): TransactionPayloadWriteSet {
-    throw new Error("Not implemented");
   }
 }
 
@@ -393,7 +381,7 @@ export class TransactionPayloadScript extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(1);
+    serializer.serializeU32AsUleb128(0);
     this.value.serialize(serializer);
   }
 
@@ -409,7 +397,7 @@ export class TransactionPayloadModuleBundle extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(2);
+    serializer.serializeU32AsUleb128(1);
     this.value.serialize(serializer);
   }
 
@@ -425,7 +413,7 @@ export class TransactionPayloadScriptFunction extends TransactionPayload {
   }
 
   serialize(serializer: Serializer): void {
-    serializer.serializeU32AsUleb128(3);
+    serializer.serializeU32AsUleb128(2);
     this.value.serialize(serializer);
   }
 

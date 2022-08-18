@@ -47,7 +47,6 @@ impl TransactionMetadata {
                 TransactionPayload::Script(s) => HashValue::sha3_256_of(s.code()).to_vec(),
                 TransactionPayload::ScriptFunction(_) => vec![],
                 TransactionPayload::ModuleBundle(_) => vec![],
-                TransactionPayload::WriteSet(_) => vec![],
             },
         }
     }

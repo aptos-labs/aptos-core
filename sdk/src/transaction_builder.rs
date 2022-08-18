@@ -12,8 +12,7 @@ use aptos_crypto::ed25519::Ed25519PublicKey;
 
 pub use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::transaction::{
-    authenticator::AuthenticationKeyPreimage, ChangeSet, ModuleBundle, Script, ScriptFunction,
-    WriteSetPayload,
+    authenticator::AuthenticationKeyPreimage, ModuleBundle, Script, ScriptFunction,
 };
 
 pub struct TransactionBuilder {
@@ -117,12 +116,6 @@ impl TransactionFactory {
     pub fn module(&self, code: Vec<u8>) -> TransactionBuilder {
         self.payload(TransactionPayload::ModuleBundle(ModuleBundle::singleton(
             code,
-        )))
-    }
-
-    pub fn change_set(&self, change_set: ChangeSet) -> TransactionBuilder {
-        self.payload(TransactionPayload::WriteSet(WriteSetPayload::Direct(
-            change_set,
         )))
     }
 
