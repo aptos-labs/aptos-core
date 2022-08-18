@@ -421,10 +421,10 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_17_185306) do
   add_foreign_key "it3_surveys", "users"
   add_foreign_key "nfts", "nft_offers"
   add_foreign_key "nfts", "users"
+  add_foreign_key "notification_preferences", "users"
   add_foreign_key "project_categories", "categories"
   add_foreign_key "project_categories", "projects"
   add_foreign_key "project_members", "projects"
   add_foreign_key "project_members", "users"
   add_foreign_key "projects", "users"
-  add_foreign_key "notification_preferences", "users"
 end

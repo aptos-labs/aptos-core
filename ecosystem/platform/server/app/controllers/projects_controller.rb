@@ -4,20 +4,31 @@
 # SPDX-License-Identifier: Apache-2.0
 
 class ProjectsController < ApplicationController
-  before_action :authenticate_user!
   before_action :ensure_projects_enabled!
-  before_action :ensure_confirmed!
+  before_action :authenticate_user!, except: %i[index show]
+  before_action :ensure_confirmed!, except: %i[index show]
   respond_to :html
 
   # GET /projects
   def index
-    @projects = Project.where(public: true).all
+    @categories = Category.all.index_by(&:id)
+    @projects = Project.where(public: true).includes(:project_categories)
+
+    selected_category = params[:category]&.to_i
+    @projects = @projects.filter_by_category(selected_category) if selected_category
+
+    @groups = @projects.each_with_object({}) do |project, groups|
+      project.project_categories.each do |project_category|
+        (groups[project_category.category_id] ||= []) << project
+      end
+    end
+    @groups.delete_if { |category_id| category_id != selected_category } if selected_category
   end
 
   # GET /projects/1
   def show
     @project = Project.find(params[:id])
-    head :forbidden if @project.user_id != current_user.id && !@project.public
+    head :forbidden if @project.user_id != current_user&.id && !@project.public
   end
 
   # GET /projects/new
@@ -85,7 +96,7 @@ class ProjectsController < ApplicationController
     params.require(:project).permit(:title, :short_description, :full_description, :website_url, :github_url,
                                     :discord_url, :twitter_url, :telegram_url, :linkedin_url, :thumbnail,
                                     :youtube_url, :public,
-                                    project_categories_attributes: %i[id category_id],
+                                    category_ids: [],
                                     project_members_attributes: %i[id user_id role public],
                                     screenshots: [])
   end

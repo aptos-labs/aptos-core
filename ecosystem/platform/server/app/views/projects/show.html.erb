@@ -21,7 +21,7 @@
         </div>
         <div class="flex gap-8">
           <% @project.categories.each do |category| %>
-            <%= content_tag :a, category.title, href: '#TODO' %>
+            <%= content_tag :a, category.title, href: projects_path(category: category.id) %>
           <% end %>
         </div>
         <div class="flex gap-8">
