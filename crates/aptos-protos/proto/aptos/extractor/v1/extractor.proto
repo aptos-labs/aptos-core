@@ -27,8 +27,11 @@ message Block {
   uint64 height = 2;
 
   // Transactions holds all transactions that happened in the Block, which is transactions that happened starting with (and including)
-  // a `BlockMetadataTransaction`, and every other transaction up to (but excluding) the next `BlockMetadataTransaction`
+  // a `BlockMetadataTransaction`, and every other transaction up to (but excluding) the next `BlockMetadataTransaction`.
   repeated Transaction transactions = 3;
+
+  // Chain ID informs us which chain we're trying to index, this is important to ensure that we're not mixing chains within a single pipeline.
+  uint32 chain_id = 4;
 }
 
 // Transaction as it happened on the chain, there are 4 types of transactions:
