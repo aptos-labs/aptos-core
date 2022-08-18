@@ -16,7 +16,6 @@ use aptos_config::{
 use aptos_data_client::aptosnet::AptosNetDataClient;
 use aptos_infallible::RwLock;
 use aptos_logger::{prelude::*, Level};
-use aptos_runtime::instrumented_runtime::instrument_tokio_runtime;
 use aptos_sf_stream::runtime::bootstrap as bootstrap_sf_stream;
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_time_service::TimeService;
@@ -398,7 +397,6 @@ fn setup_data_streaming_service(
         .enable_all()
         .build()
         .map_err(|err| anyhow!("Failed to create data streaming service {}", err))?;
-    instrument_tokio_runtime(&streaming_service_runtime, "data-streaming-service");
     streaming_service_runtime.spawn(data_streaming_service.start_service());
 
     Ok((streaming_service_client, streaming_service_runtime))
@@ -423,8 +421,6 @@ fn setup_aptos_data_client(
         .enable_all()
         .build()
         .map_err(|err| anyhow!("Failed to create aptos data client {}", err))?;
-
-    instrument_tokio_runtime(&aptos_data_client_runtime, "aptos-data-client");
 
     // Create the data client and spawn the data poller
     let (aptos_data_client, data_summary_poller) = AptosNetDataClient::new(
@@ -451,8 +447,6 @@ fn setup_state_sync_storage_service(
         .enable_all()
         .build()
         .map_err(|err| anyhow!("Failed to start state sync storage service {}", err))?;
-
-    instrument_tokio_runtime(&storage_service_runtime, "storage-service-server");
 
     // Spawn all state sync storage service servers on the same runtime
     let storage_reader = StorageReader::new(config, Arc::clone(&db_rw.reader));
@@ -572,8 +566,6 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
                 err
             )
         })?;
-
-        instrument_tokio_runtime(&runtime, "network");
 
         // Entering here gives us a runtime to instantiate all the pieces of the builder
         let _enter = runtime.enter();

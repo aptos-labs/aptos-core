@@ -13,7 +13,6 @@ use crate::{
 };
 use aptos_config::config::ApiConfig;
 use aptos_logger::debug;
-use aptos_runtime::instrumented_runtime::instrument_tokio_runtime;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::chain_id::ChainId;
 use aptos_warp_webserver::WebServer;
@@ -86,8 +85,6 @@ pub fn bootstrap(
         .enable_all()
         .build()
         .expect("[rosetta] failed to create runtime");
-
-    instrument_tokio_runtime(&runtime, "rosetta");
 
     debug!("Starting up Rosetta server with {:?}", api_config);
 
