@@ -3134,6 +3134,34 @@
           }
         }
       },
+      "EntryFunctionId": {
+        "type": "string",
+        "description": "Entry function id is string representation of a entry function defined on-chain.\n\nFormat: `{address}::{module name}::{function name}`\n\nBoth `module name` and `function name` are case-sensitive.\n",
+        "example": "0x1::aptos_coin::transfer"
+      },
+      "EntryFunctionPayload": {
+        "type": "object",
+        "required": [
+          "function",
+          "type_arguments",
+          "arguments"
+        ],
+        "properties": {
+          "function": {
+            "$ref": "#/components/schemas/EntryFunctionId"
+          },
+          "type_arguments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MoveType"
+            }
+          },
+          "arguments": {
+            "type": "array",
+            "items": {}
+          }
+        }
+      },
       "Event": {
         "type": "object",
         "required": [
@@ -3708,34 +3736,6 @@
           "full_node"
         ]
       },
-      "ScriptFunctionId": {
-        "type": "string",
-        "description": "Script function id is string representation of a script function defined on-chain.\n\nFormat: `{address}::{module name}::{function name}`\n\nBoth `module name` and `function name` are case-sensitive.\n",
-        "example": "0x1::aptos_coin::transfer"
-      },
-      "ScriptFunctionPayload": {
-        "type": "object",
-        "required": [
-          "function",
-          "type_arguments",
-          "arguments"
-        ],
-        "properties": {
-          "function": {
-            "$ref": "#/components/schemas/ScriptFunctionId"
-          },
-          "type_arguments": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MoveType"
-            }
-          },
-          "arguments": {
-            "type": "array",
-            "items": {}
-          }
-        }
-      },
       "ScriptPayload": {
         "type": "object",
         "required": [
@@ -3910,7 +3910,7 @@
         "type": "object",
         "oneOf": [
           {
-            "$ref": "#/components/schemas/TransactionPayload_ScriptFunctionPayload"
+            "$ref": "#/components/schemas/TransactionPayload_EntryFunctionPayload"
           },
           {
             "$ref": "#/components/schemas/TransactionPayload_ScriptPayload"
@@ -3922,11 +3922,30 @@
         "discriminator": {
           "propertyName": "type",
           "mapping": {
-            "script_function_payload": "#/components/schemas/TransactionPayload_ScriptFunctionPayload",
+            "entry_function_payload": "#/components/schemas/TransactionPayload_EntryFunctionPayload",
             "script_payload": "#/components/schemas/TransactionPayload_ScriptPayload",
             "module_bundle_payload": "#/components/schemas/TransactionPayload_ModuleBundlePayload"
           }
         }
+      },
+      "TransactionPayload_EntryFunctionPayload": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "entry_function_payload"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/EntryFunctionPayload"
+          }
+        ]
       },
       "TransactionPayload_ModuleBundlePayload": {
         "allOf": [
@@ -3944,25 +3963,6 @@
           },
           {
             "$ref": "#/components/schemas/ModuleBundlePayload"
-          }
-        ]
-      },
-      "TransactionPayload_ScriptFunctionPayload": {
-        "allOf": [
-          {
-            "type": "object",
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "type": "string",
-                "example": "script_function_payload"
-              }
-            }
-          },
-          {
-            "$ref": "#/components/schemas/ScriptFunctionPayload"
           }
         ]
       },

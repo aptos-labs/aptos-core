@@ -190,7 +190,7 @@ async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
 
     ctx.api_publish_module(account, module.try_into().unwrap())
         .await;
-    ctx.api_execute_script_function(
+    ctx.api_execute_entry_function(
         account,
         "TableTestData",
         "make_test_tables",

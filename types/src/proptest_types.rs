@@ -381,7 +381,7 @@ fn new_raw_transaction(
             expiration_time_secs,
             chain_id,
         ),
-        TransactionPayload::ScriptFunction(script_fn) => RawTransaction::new_script_function(
+        TransactionPayload::EntryFunction(script_fn) => RawTransaction::new_entry_function(
             sender,
             sequence_number,
             script_fn,

@@ -43,7 +43,7 @@ mod transaction_argument;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use script::{
-    ArgumentABI, Script, ScriptABI, ScriptFunction, ScriptFunctionABI, TransactionScriptABI,
+    ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,
     TypeArgumentABI,
 };
 
@@ -136,13 +136,13 @@ impl RawTransaction {
         }
     }
 
-    /// Create a new `RawTransaction` with a script function.
+    /// Create a new `RawTransaction` with a entry function.
     ///
     /// A script transaction contains only code to execute. No publishing is allowed in scripts.
-    pub fn new_script_function(
+    pub fn new_entry_function(
         sender: AccountAddress,
         sequence_number: u64,
-        script_function: ScriptFunction,
+        entry_function: EntryFunction,
         max_gas_amount: u64,
         gas_unit_price: u64,
         expiration_timestamp_secs: u64,
@@ -151,7 +151,7 @@ impl RawTransaction {
         RawTransaction {
             sender,
             sequence_number,
-            payload: TransactionPayload::ScriptFunction(script_function),
+            payload: TransactionPayload::EntryFunction(entry_function),
             max_gas_amount,
             gas_unit_price,
             expiration_timestamp_secs,
@@ -288,7 +288,7 @@ impl RawTransaction {
                 get_transaction_name(script.code()),
                 convert_txn_args(script.args()),
             ),
-            TransactionPayload::ScriptFunction(script_fn) => (
+            TransactionPayload::EntryFunction(script_fn) => (
                 format!("{}::{}", script_fn.module(), script_fn.function()),
                 script_fn.args().to_vec(),
             ),
@@ -362,15 +362,15 @@ pub enum TransactionPayload {
     Script(Script),
     /// A transaction that publishes multiple modules at the same time.
     ModuleBundle(ModuleBundle),
-    /// A transaction that executes an existing script function published on-chain.
-    ScriptFunction(ScriptFunction),
+    /// A transaction that executes an existing entry function published on-chain.
+    EntryFunction(EntryFunction),
 }
 
 impl TransactionPayload {
-    pub fn into_script_function(self) -> ScriptFunction {
+    pub fn into_entry_function(self) -> EntryFunction {
         match self {
-            Self::ScriptFunction(f) => f,
-            payload => panic!("Expected ScriptFunction(_) payload, found: {:#?}", payload),
+            Self::EntryFunction(f) => f,
+            payload => panic!("Expected EntryFunction(_) payload, found: {:#?}", payload),
         }
     }
 }

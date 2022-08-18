@@ -377,7 +377,7 @@ impl TestContext {
             .unwrap()
     }
 
-    pub async fn api_execute_script_function(
+    pub async fn api_execute_entry_function(
         &mut self,
         account: &mut LocalAccount,
         module: &str,
@@ -388,7 +388,7 @@ impl TestContext {
         self.api_execute_txn(
             account,
             json!({
-                "type": "script_function_payload",
+                "type": "entry_function_payload",
                 "function": format!(
                     "{}::{}::{}",
                     account.address().to_hex_literal(),

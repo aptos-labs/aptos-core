@@ -5,7 +5,7 @@ module aptos_framework::coins {
     use aptos_framework::account;
     use aptos_framework::coin;
 
-    /// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
+    /// Entry function to register to receive a specific `CoinType`. An account that wants to hold a coin type
     /// has to explicitly registers to do so. The register creates a special `CoinStore`
     /// to hold the specified `CoinType`.
     public entry fun register<CoinType>(account: &signer) {

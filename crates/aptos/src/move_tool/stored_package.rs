@@ -4,7 +4,7 @@
 use anyhow::bail;
 use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::ScriptABI;
+use aptos_types::transaction::EntryABI;
 use framework::natives::code::{
     ModuleMetadata, PackageMetadata, PackageRegistry, PackageRegistryJson, UpgradePolicy,
 };
@@ -150,12 +150,12 @@ impl<'a> CachedPackageMetadata<'a> {
         if with_derived_artifacts {
             let abis_dir = path.join(CompiledPackageLayout::CompiledABIs.path());
             for abi_blob in &self.metadata.abis {
-                let abi = bcs::from_bytes::<ScriptABI>(abi_blob.as_slice())?;
+                let abi = bcs::from_bytes::<EntryABI>(abi_blob.as_slice())?;
                 let path = match abi {
-                    ScriptABI::TransactionScript(abi) => {
+                    EntryABI::TransactionScript(abi) => {
                         PathBuf::from(format!("{}.abi", abi.name()))
                     }
-                    ScriptABI::ScriptFunction(abi) => {
+                    EntryABI::EntryFunction(abi) => {
                         PathBuf::from(abi.module_name().name().as_str())
                             .join(format!("{}.abi", abi.name()))
                     }
