@@ -15,7 +15,7 @@ use move_deps::{
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
 
-/// Abort code when from_bytes fails (0x03 == INVALID_ARGUMENT)
+/// Abort code when from_bytes fails (0x01 == INVALID_ARGUMENT)
 const EFROM_BYTES: u64 = 0x01_0001;
 
 /// Used to pass gas parameters into native functions.
