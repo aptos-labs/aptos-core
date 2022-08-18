@@ -41,15 +41,15 @@ module aptos_framework::block {
     const EZERO_EPOCH_INTERVAL: u64 = 3;
 
     /// This can only be called during Genesis.
-    public(friend) fun initialize(account: &signer, epoch_interval: u64) {
+    public(friend) fun initialize(account: &signer, epoch_interval_microsecs: u64) {
         system_addresses::assert_aptos_framework(account);
-        assert!(epoch_interval > 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
+        assert!(epoch_interval_microsecs > 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
 
         move_to<BlockResource>(
             account,
             BlockResource {
                 height: 0,
-                epoch_interval,
+                epoch_interval: epoch_interval_microsecs,
                 new_block_events: event::new_event_handle<Self::NewBlockEvent>(account),
             }
         );
@@ -57,7 +57,7 @@ module aptos_framework::block {
 
     /// Update the epoch interval.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
-    public fun update_epoch_interval(
+    public fun update_epoch_interval_microsecs(
         aptos_framework: &signer,
         new_epoch_interval: u64,
     ) acquires BlockResource {
@@ -66,6 +66,11 @@ module aptos_framework::block {
 
         let block_metadata = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata.epoch_interval = new_epoch_interval;
+    }
+
+    /// Return epoch interval in seconds.
+    public fun get_epoch_interval_secs(): u64 acquires BlockResource {
+        borrow_global<BlockResource>(@aptos_framework).epoch_interval / 1000000
     }
 
     /// Set the metadata for the current block.
@@ -151,7 +156,7 @@ module aptos_framework::block {
     public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockResource {
         initialize(&aptos_framework, 1);
         assert!(borrow_global<BlockResource>(@aptos_framework).epoch_interval == 1, 0);
-        update_epoch_interval(&aptos_framework, 2);
+        update_epoch_interval_microsecs(&aptos_framework, 2);
         assert!(borrow_global<BlockResource>(@aptos_framework).epoch_interval == 2, 1);
     }
 
@@ -162,6 +167,6 @@ module aptos_framework::block {
         account: signer,
     ) acquires BlockResource {
         initialize(&aptos_framework, 1);
-        update_epoch_interval(&account, 2);
+        update_epoch_interval_microsecs(&account, 2);
     }
 }
