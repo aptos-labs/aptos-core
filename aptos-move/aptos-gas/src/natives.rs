@@ -11,7 +11,7 @@ macro_rules! expand_get {
         {
             #[cfg(feature = "testing")]
             fn assign(params: &mut $param_ty, gas_schedule: &std::collections::BTreeMap<String, u64>) -> Option<()> {
-                params $(.$field)+ = gas_schedule.get(&format!("{}.{}", $package_name, $key)).cloned()?;
+                params $(.$field)+ = gas_schedule.get(&format!("{}.{}", $package_name, $key)).cloned()?.into();
                 Some(())
             }
 
@@ -24,7 +24,7 @@ macro_rules! expand_get {
         }
     };
     ($(.$field: ident)+, $key: literal, $initial_val: expr, $param_ty: ty, $package_name: literal, $params: ident, $gas_schedule: ident) => {
-        $params $(.$field)+ = $gas_schedule.get(&format!("{}.{}", $package_name, $key)).cloned()?;
+        $params $(.$field)+ = $gas_schedule.get(&format!("{}.{}", $package_name, $key)).cloned()?.into();
     }
 }
 
@@ -33,7 +33,7 @@ macro_rules! expand_set {
         {
             #[cfg(feature = "testing")]
             fn assign(params: &mut $param_ty)  {
-                params $(.$field)+ = $initial_val;
+                params $(.$field)+ = $initial_val.into();
             }
 
             #[cfg(not(feature = "testing"))]
@@ -44,17 +44,17 @@ macro_rules! expand_set {
         }
     };
     ($(.$field: ident)+, $key: literal, $initial_val: expr, $param_ty: ty, $package_name: literal, $params: ident) => {
-        $params $(.$field)+ = $initial_val
+        $params $(.$field)+ = $initial_val.into()
     };
 }
 
 macro_rules! expand_kv {
     (test_only $(.$field: ident)+, $key: literal, $initial_val: expr, $self: ident) => {
         #[cfg(feature = "testing")]
-        ($key, $self $(.$field)+)
+        ($key, u64::from($self $(.$field)+))
     };
     ($(.$field: ident)+, $key: literal, $initial_val: expr, $self: ident) => {
-        ($key, $self $(.$field)+)
+        ($key, u64::from($self $(.$field)+))
     }
 }
 
@@ -139,7 +139,6 @@ macro_rules! define_gas_parameters_for_natives {
         fn all_parameters_mapped() {
             let total = format!("{:?}", &<$param_ty>::zeros()).matches(": 0").count();
             let mapped = [$(crate::natives::extract_key!($($t)*)),*].len() $(+ $allow_unmapped)?;
-
             if mapped != total {
                 panic!("only {} out of the {} entries are mapped", mapped, total)
             }

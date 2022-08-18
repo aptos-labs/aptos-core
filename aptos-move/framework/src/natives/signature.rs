@@ -6,6 +6,7 @@ use aptos_crypto::{ed25519, traits::*};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
+    move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
     move_vm_runtime::native_functions::{NativeContext, NativeFunction},
     move_vm_types::{
         loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
@@ -24,9 +25,9 @@ use std::{collections::VecDeque, convert::TryFrom};
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct Ed25519ValidatePubkeyGasParameters {
-    pub base_cost: u64,
-    pub per_pubkey_deserialize_cost: u64,
-    pub per_pubkey_small_order_check_cost: u64,
+    pub base_cost: InternalGas,
+    pub per_pubkey_deserialize_cost: InternalGas,
+    pub per_pubkey_small_order_check_cost: InternalGas,
 }
 
 fn native_ed25519_validate_pubkey(
@@ -80,12 +81,12 @@ fn native_ed25519_validate_pubkey(
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct Ed25519VerifyGasParameters {
-    pub base_cost: u64,
-    pub per_pubkey_deserialize_cost: u64,
-    pub per_sig_deserialize_cost: u64,
-    pub per_sig_strict_verify_cost: u64,
-    pub per_msg_hashing_base_cost: u64,
-    pub per_msg_byte_hashing_cost: u64, // signature verification involves signing |msg| bytes
+    pub base_cost: InternalGas,
+    pub per_pubkey_deserialize_cost: InternalGas,
+    pub per_sig_deserialize_cost: InternalGas,
+    pub per_sig_strict_verify_cost: InternalGas,
+    pub per_msg_hashing_base_cost: InternalGas,
+    pub per_msg_byte_hashing_cost: InternalGasPerByte, // signature verification involves signing |msg| bytes
 }
 fn native_ed25519_verify(
     gas_params: &Ed25519VerifyGasParameters,
@@ -121,7 +122,7 @@ fn native_ed25519_verify(
     // NOTE(Gas): hashing the message to the group and a size-2 multi-scalar multiplication
     cost += gas_params.per_sig_strict_verify_cost
         + gas_params.per_msg_hashing_base_cost
-        + gas_params.per_msg_byte_hashing_cost * msg.len() as u64;
+        + gas_params.per_msg_byte_hashing_cost * NumBytes::new(msg.len() as u64);
 
     let verify_result = sig.verify_arbitrary_msg(msg.as_slice(), &pk).is_ok();
     Ok(NativeResult::ok(
@@ -138,7 +139,7 @@ fn native_ed25519_verify(
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct Secp256k1ECDSARecoverGasParameters {
-    pub base_cost: u64,
+    pub base_cost: InternalGas,
 }
 
 fn native_secp256k1_ecdsa_recover(

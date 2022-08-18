@@ -6,6 +6,7 @@ use crate::{counters::CRITICAL_ERRORS, create_access_path, logging::AdapterLogSc
 #[allow(unused_imports)]
 use anyhow::format_err;
 use anyhow::Error;
+use aptos_gas::InternalGas;
 use aptos_logger::prelude::*;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
@@ -162,8 +163,13 @@ impl<'a, S: StateView> TableResolver for RemoteStorage<'a, S> {
         self.get_state_value(&StateKey::table_item((*handle).into(), key.to_vec()))
     }
 
-    fn operation_cost(&self, _op: TableOperation, _key_size: usize, _val_size: usize) -> u64 {
-        1
+    fn operation_cost(
+        &self,
+        _op: TableOperation,
+        _key_size: usize,
+        _val_size: usize,
+    ) -> InternalGas {
+        1.into()
     }
 }
 
@@ -238,7 +244,7 @@ impl<S: StateView> TableResolver for RemoteStorageOwned<S> {
         self.as_move_resolver().resolve_table_entry(handle, key)
     }
 
-    fn operation_cost(&self, op: TableOperation, key_size: usize, val_size: usize) -> u64 {
+    fn operation_cost(&self, op: TableOperation, key_size: usize, val_size: usize) -> InternalGas {
         self.as_move_resolver()
             .operation_cost(op, key_size, val_size)
     }

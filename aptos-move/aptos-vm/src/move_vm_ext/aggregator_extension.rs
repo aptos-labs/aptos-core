@@ -351,9 +351,9 @@ fn native_new_aggregator(
     let id = AggregatorID::new(handle, key);
     aggregator_data.create_new_aggregator(id, limit);
 
-    // TODO: charge gas properly.
+    // TODO(Gas): charge gas properly.
     Ok(NativeResult::ok(
-        0,
+        0.into(),
         smallvec![Value::struct_(Struct::pack(vec![
             Value::u128(handle),
             Value::u128(key),
@@ -387,8 +387,8 @@ fn native_add(
 
     aggregator.add(value)?;
 
-    // TODO: charge gas properly.
-    Ok(NativeResult::ok(0, smallvec![]))
+    // TODO(Gas): charge gas properly.
+    Ok(NativeResult::ok(0.into(), smallvec![]))
 }
 
 /// Move signature:
@@ -416,9 +416,9 @@ fn native_read(
     // Materialize the value.
     aggregator.materialize(aggregator_context, &id)?;
 
-    // TODO: charge gas properly.
+    // TODO(Gas): charge gas properly.
     Ok(NativeResult::ok(
-        0,
+        0.into(),
         smallvec![Value::u128(aggregator.value)],
     ))
 }
@@ -453,8 +453,8 @@ fn native_sub(
     aggregator.materialize(aggregator_context, &id)?;
     aggregator.sub(value)?;
 
-    // TODO: charge gas properly.
-    Ok(NativeResult::ok(0, smallvec![]))
+    // TODO(Gas): charge gas properly.
+    Ok(NativeResult::ok(0.into(), smallvec![]))
 }
 
 /// Move signature:
@@ -481,8 +481,8 @@ fn native_destroy(
     let id = AggregatorID::new(handle, key);
     aggregator_data.remove_aggregator(id);
 
-    // TODO: charge gas properly.
-    Ok(NativeResult::ok(0, smallvec![]))
+    // TODO(Gas): charge gas properly.
+    Ok(NativeResult::ok(0.into(), smallvec![]))
 }
 
 // ================================ Utilities ================================
@@ -563,6 +563,7 @@ fn not_supported_error() -> PartialVMError {
 #[cfg(test)]
 mod test {
     use super::*;
+    use aptos_gas::InternalGas;
     use aptos_state_view::StateView;
     use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
     use claim::{assert_err, assert_matches, assert_ok};
@@ -606,8 +607,13 @@ mod test {
             self.get_state_value(&state_key)
         }
 
-        fn operation_cost(&self, _op: TableOperation, _key_size: usize, _val_size: usize) -> u64 {
-            1
+        fn operation_cost(
+            &self,
+            _op: TableOperation,
+            _key_size: usize,
+            _val_size: usize,
+        ) -> InternalGas {
+            1.into()
         }
     }
 
