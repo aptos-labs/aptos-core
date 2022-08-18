@@ -5,6 +5,7 @@ use aptos::common::types::account_address_from_public_key;
 use aptos_crypto::PrivateKey;
 use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_transaction_builder::aptos_stdlib;
+use aptos_types::account_address::AccountAddress;
 use aptos_types::account_config::{AccountResource, CORE_CODE_ADDRESS};
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use forge::Swarm;
@@ -99,4 +100,23 @@ async fn test_bcs() {
         .unwrap();
     let account_resource: AccountResource = bcs::from_bytes(bytes).unwrap();
     assert_eq!(0, account_resource.sequence_number());
+
+    // Check Modules align
+    let modules = client
+        .get_account_modules(AccountAddress::ONE)
+        .await
+        .unwrap()
+        .into_inner();
+    let bcs_modules = client
+        .get_account_modules_bcs(AccountAddress::ONE)
+        .await
+        .unwrap()
+        .into_inner();
+
+    assert_eq!(modules.len(), bcs_modules.len());
+    let (module_id, _) = modules.iter().next().unwrap();
+    assert_eq!(
+        &modules.get(module_id).unwrap().bytecode.0,
+        bcs_modules.get(module_id).unwrap()
+    );
 }

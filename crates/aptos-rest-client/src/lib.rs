@@ -23,7 +23,7 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::mime_types::BCS_OUTPUT_NEW;
 use aptos_api_types::{
     mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, HexEncodedBytes,
-    VersionedEvent,
+    MoveModuleId, VersionedEvent,
 };
 use aptos_crypto::HashValue;
 use aptos_types::account_config::AccountResource;
@@ -394,11 +394,20 @@ impl Client {
     pub async fn get_account_modules(
         &self,
         address: AccountAddress,
-    ) -> Result<Response<Vec<MoveModuleBytecode>>> {
+    ) -> Result<Response<BTreeMap<MoveModuleId, MoveModuleBytecode>>> {
         let url = self.build_path(&format!("accounts/{}/modules", address))?;
 
         let response = self.inner.get(url).send().await?;
         self.json(response).await
+    }
+
+    pub async fn get_account_modules_bcs(
+        &self,
+        address: AccountAddress,
+    ) -> Result<Response<BTreeMap<MoveModuleId, Vec<u8>>>> {
+        let url = self.build_path(&format!("accounts/{}/modules", address))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
     pub async fn get_account_events(

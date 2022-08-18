@@ -12,7 +12,7 @@ use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     AccountData, Address, AptosErrorCode, AsConverter, LedgerInfo, MoveModuleBytecode,
-    MoveResource, MoveStructTag, TransactionId, U64,
+    MoveModuleId, MoveResource, MoveStructTag, TransactionId, U64,
 };
 use aptos_types::access_path::AccessPath;
 use aptos_types::account_config::AccountResource;
@@ -102,7 +102,7 @@ impl AccountsApi {
         accept_type: AcceptType,
         address: Path<Address>,
         ledger_version: Query<Option<U64>>,
-    ) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
+    ) -> BasicResultWith404<BTreeMap<MoveModuleId, MoveModuleBytecode>> {
         fail_point_poem("endpoint_get_account_modules")?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
         account.modules(&accept_type)
@@ -212,13 +212,17 @@ impl Account {
         }
     }
 
-    pub fn modules(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
+    pub fn modules(
+        self,
+        accept_type: &AcceptType,
+    ) -> BasicResultWith404<BTreeMap<MoveModuleId, MoveModuleBytecode>> {
         let modules = self.account_state()?.into_modules();
         match accept_type {
             AcceptType::Json => {
-                let mut converted_modules = Vec::new();
-                for module in modules {
-                    converted_modules.push(
+                let mut converted_modules = BTreeMap::new();
+                for (module_id, module) in modules {
+                    converted_modules.insert(
+                        module_id.into(),
                         MoveModuleBytecode::new(module)
                             .try_parse_abi()
                             .context("Failed to parse move module ABI")
@@ -233,7 +237,9 @@ impl Account {
                 ))
             }
             AcceptType::Bcs => {
-                let modules: Vec<_> = modules.collect();
+                let modules: BTreeMap<MoveModuleId, Vec<u8>> = modules
+                    .map(|(key, value)| (key.into(), value.to_vec()))
+                    .collect();
                 BasicResponse::try_from_bcs((
                     modules,
                     &self.latest_ledger_info,
