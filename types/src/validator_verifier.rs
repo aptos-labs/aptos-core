@@ -299,32 +299,32 @@ impl ValidatorVerifier {
 
     pub fn verify_aggregated_signatures<T: CryptoHash + Serialize>(
         &self,
-        messages: &[&T],
-        aggregated_signature: &AggregatedSignature,
+        _messages: &[&T],
+        _aggregated_signature: &AggregatedSignature,
     ) -> std::result::Result<(), VerifyError> {
         // Verify the number of signature is not greater than expected.
-        Self::check_num_of_voters(self.len() as u16, aggregated_signature.get_voters_bitvec())?;
-        let mut pub_keys = vec![];
-        let mut authors = vec![];
-        for index in aggregated_signature.get_voters_bitvec().iter_ones() {
-            let validator = self
-                .validator_infos
-                .get(index)
-                .ok_or(VerifyError::UnknownAuthor)?;
-            authors.push(validator.address);
-            pub_keys.push(validator.public_key());
-        }
-        // Verify the quorum voting power of the authors
-        self.check_voting_power(authors.iter())?;
-        // Verify empty aggregated signature
-        let aggregated_sig = aggregated_signature
-            .aggregated_sig()
-            .as_ref()
-            .ok_or(VerifyError::EmptySignature)?;
-
-        aggregated_sig
-            .verify_aggregate(messages, &pub_keys)
-            .map_err(|_| VerifyError::InvalidSignature)?;
+        // Self::check_num_of_voters(self.len() as u16, aggregated_signature.get_voters_bitvec())?;
+        // let mut pub_keys = vec![];
+        // let mut authors = vec![];
+        // for index in aggregated_signature.get_voters_bitvec().iter_ones() {
+        //     let validator = self
+        //         .validator_infos
+        //         .get(index)
+        //         .ok_or(VerifyError::UnknownAuthor)?;
+        //     authors.push(validator.address);
+        //     pub_keys.push(validator.public_key());
+        // }
+        // // Verify the quorum voting power of the authors
+        // self.check_voting_power(authors.iter())?;
+        // // Verify empty aggregated signature
+        // let aggregated_sig = aggregated_signature
+        //     .aggregated_sig()
+        //     .as_ref()
+        //     .ok_or(VerifyError::EmptySignature)?;
+        //
+        // aggregated_sig
+        //     .verify_aggregate(messages, &pub_keys)
+        //     .map_err(|_| VerifyError::InvalidSignature)?;
         Ok(())
     }
 
