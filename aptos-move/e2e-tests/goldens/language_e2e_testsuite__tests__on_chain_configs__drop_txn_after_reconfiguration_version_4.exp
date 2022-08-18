@@ -26,7 +26,7 @@ Ok(
                 },
             ),
             events: [
-                ContractEvent { key: EventKey { creation_number: 2, account_address: 0000000000000000000000000000000000000000000000000000000000000001 }, index: 1, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("block"), name: Identifier("NewBlockEvent"), type_params: [] }), event_data: "0000000000000000000000000000000001000000000000000100d1126ce48bd65fb72190dbd9a6eaa65ba973f1e1664ac0cfba4db1d071fd0c36000100000000000000" },
+                ContractEvent { key: EventKey { creation_number: 2, account_address: 0000000000000000000000000000000000000000000000000000000000000001 }, index: 1, type: Struct(StructTag { address: 0000000000000000000000000000000000000000000000000000000000000001, module: Identifier("block"), name: Identifier("NewBlockEvent"), type_params: [] }), event_data: "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000100d1126ce48bd65fb72190dbd9a6eaa65ba973f1e1664ac0cfba4db1d071fd0c36000100000000000000" },
             ],
             gas_used: 0,
             status: Keep(
