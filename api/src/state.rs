@@ -9,7 +9,7 @@ use crate::response::{
     BasicResultWith404, InternalError, NotFoundError,
 };
 use crate::ApiTags;
-use anyhow::Context as AnyhowContext;
+use anyhow::{anyhow, Context as AnyhowContext};
 use aptos_api_types::{
     Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag, MoveValue,
     TableItemRequest, TransactionId, U128, U64,
@@ -150,6 +150,12 @@ impl StateApi {
         resource_type: MoveStructTag,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveResource> {
+        // TODO: Determine what is needed to deserialize the storage type
+        if accept_type == &AcceptType::Bcs {
+            return Err(anyhow!("BCS is not supported for get resource"))
+                .map_err(BasicErrorWith404::bad_request);
+        }
+
         let resource_type: StructTag = resource_type
             .try_into()
             .context("Failed to parse given resource type")
@@ -186,6 +192,11 @@ impl StateApi {
         name: IdentifierWrapper,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveModuleBytecode> {
+        // TODO: Determine what is needed to deserialize the storage type
+        if accept_type == &AcceptType::Bcs {
+            return Err(anyhow!("BCS is not supported for get module"))
+                .map_err(BasicErrorWith404::bad_request);
+        }
         let module_id = ModuleId::new(address.into(), name.into());
         let access_path = AccessPath::code_access_path(module_id.clone());
         let state_key = StateKey::AccessPath(access_path);
@@ -216,6 +227,11 @@ impl StateApi {
         table_item_request: TableItemRequest,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveValue> {
+        // TODO: Determine what is needed to deserialize the storage type
+        if accept_type == &AcceptType::Bcs {
+            return Err(anyhow!("BCS is not supported for get table item"))
+                .map_err(BasicErrorWith404::bad_request);
+        }
         let key_type = table_item_request
             .key_type
             .try_into()
