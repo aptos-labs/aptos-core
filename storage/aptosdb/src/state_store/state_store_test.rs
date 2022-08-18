@@ -1,11 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use proptest::{
-    collection::{hash_map, vec},
-    prelude::*,
-    sample::Index,
-};
+use proptest::{collection::hash_map, prelude::*};
 
 use aptos_jellyfish_merkle::{restore::StateSnapshotRestore, TreeReader};
 use aptos_temppath::TempPath;
@@ -14,6 +10,7 @@ use aptos_types::{
 };
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver};
 
+use crate::test_helper::{arb_state_kv_sets, update_store};
 use crate::{pruner::state_store::StateMerklePruner, AptosDB};
 
 use super::*;
@@ -48,7 +45,7 @@ fn prune_stale_indices(
     limit: usize,
 ) -> Version {
     state_pruner
-        .prune_state_store(
+        .prune_state_merkle(
             min_readable_version,
             target_min_readable_version,
             limit,
@@ -770,20 +767,7 @@ proptest! {
 
     #[test]
     fn test_get_usage(
-        input in (
-            vec(any::<StateKey>(), 10),
-            vec(vec((any::<Index>(), any::<StateValue>()), 1..5), 1..5)
-        ).prop_map(|(keys, input)| {
-            input
-            .into_iter()
-            .map(|kvs|
-                kvs
-                .into_iter()
-                .map(|(idx, value)| (idx.get(&keys).clone(), value))
-                .collect::<Vec<_>>()
-            )
-            .collect::<Vec<_>>()
-        }),
+        input in arb_state_kv_sets(10, 5, 5)
     ) {
         let tmp_dir = TempPath::new();
         let db = AptosDB::new_for_test(&tmp_dir);
@@ -839,32 +823,5 @@ proptest! {
 
 // Initializes the state store by inserting one key at each version.
 fn init_store(store: &StateStore, input: impl Iterator<Item = (StateKey, StateValue)>) {
-    update_store(store, input, 0);
-}
-
-fn update_store(
-    store: &StateStore,
-    input: impl Iterator<Item = (StateKey, StateValue)>,
-    first_version: Version,
-) -> HashValue {
-    let mut root_hash = *SPARSE_MERKLE_PLACEHOLDER_HASH;
-    for (i, (key, value)) in input.enumerate() {
-        let value_state_set = vec![(key, Some(value))].into_iter().collect();
-        let jmt_updates = jmt_updates(&value_state_set);
-        let version = first_version + i as Version;
-        root_hash = store
-            .merklize_value_set(
-                jmt_update_refs(&jmt_updates),
-                None,
-                version,
-                version.checked_sub(1),
-            )
-            .unwrap();
-        let mut cs = ChangeSet::new();
-        store
-            .put_value_sets(vec![&value_state_set], version, &mut cs)
-            .unwrap();
-        store.ledger_db.write_schemas(cs.batch).unwrap();
-    }
-    root_hash
+    update_store(store, input.into_iter().map(|(k, v)| (k, Some(v))), 0);
 }

@@ -55,6 +55,7 @@ fn verify_write_set_pruner(write_sets: Vec<WriteSet>) {
 
     let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
+        Arc::clone(&aptos_db.state_store),
         LedgerPrunerConfig {
             enable: true,
             prune_window: 0,
@@ -101,6 +102,7 @@ fn verify_txn_store_pruner(
 
     let pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
+        Arc::clone(&aptos_db.state_store),
         LedgerPrunerConfig {
             enable: true,
             prune_window: 0,

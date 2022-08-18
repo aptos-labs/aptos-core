@@ -59,7 +59,7 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * 2;
 
 #[derive(Debug)]
-pub(crate) struct StateDb {
+pub struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
 }
@@ -648,6 +648,28 @@ impl StateStore {
             version,
             expected_root_hash,
         )?))
+    }
+
+    /// Prune the stale state value schema generated between a range of version in (begin, end]
+    pub fn prune_state_values(
+        &self,
+        begin: Version,
+        end: Version,
+        db_batch: &mut SchemaBatch,
+    ) -> Result<()> {
+        let mut iter = self
+            .state_db
+            .ledger_db
+            .iter::<StaleStateValueIndexSchema>(ReadOptions::default())?;
+        iter.seek(&begin)?;
+        while let Some(item) = iter.next() {
+            let (index, _) = item?;
+            if index.stale_since_version > end {
+                break;
+            }
+            db_batch.delete::<StateValueSchema>(&(index.state_key, index.version))?;
+        }
+        Ok(())
     }
 }
 
