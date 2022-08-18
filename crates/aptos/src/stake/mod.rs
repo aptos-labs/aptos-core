@@ -172,7 +172,7 @@ impl CliCommand<Transaction> for InitializeStakeOwner {
     async fn execute(mut self) -> CliTypedResult<Transaction> {
         let owner_address = self.txn_options.sender_address()?;
         self.txn_options
-            .submit_transaction(aptos_stdlib::stake_initialize_owner_only(
+            .submit_transaction(aptos_stdlib::stake_initialize_stake_owner(
                 self.initial_stake_amount,
                 self.operator_address.unwrap_or(owner_address),
                 self.voter_address.unwrap_or(owner_address),

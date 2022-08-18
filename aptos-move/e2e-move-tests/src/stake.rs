@@ -32,7 +32,7 @@ pub fn initialize_staking(
 ) -> TransactionStatus {
     harness.run_transaction_payload(
         account,
-        aptos_stdlib::stake_initialize_owner_only(
+        aptos_stdlib::stake_initialize_stake_owner(
             initial_stake_amount,
             operator_address,
             voter_address,

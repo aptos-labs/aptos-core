@@ -169,7 +169,7 @@ pub enum EntryFunctionCall {
     /// except it leaves the ValidatorConfig to be set by another entity.
     /// Note: this triggers setting the operator and owner, set it to the account's address
     /// to set later.
-    StakeInitializeOwnerOnly {
+    StakeInitializeStakeOwner {
         initial_stake_amount: u64,
         operator: AccountAddress,
         voter: AccountAddress,
@@ -317,11 +317,11 @@ impl EntryFunctionCall {
             } => resource_account_create_resource_account(seed, optional_auth_key),
             StakeAddStake { amount } => stake_add_stake(amount),
             StakeIncreaseLockup {} => stake_increase_lockup(),
-            StakeInitializeOwnerOnly {
+            StakeInitializeStakeOwner {
                 initial_stake_amount,
                 operator,
                 voter,
-            } => stake_initialize_owner_only(initial_stake_amount, operator, voter),
+            } => stake_initialize_stake_owner(initial_stake_amount, operator, voter),
             StakeInitializeValidator {
                 consensus_pubkey,
                 proof_of_possession,
@@ -778,7 +778,7 @@ pub fn stake_increase_lockup() -> TransactionPayload {
 /// except it leaves the ValidatorConfig to be set by another entity.
 /// Note: this triggers setting the operator and owner, set it to the account's address
 /// to set later.
-pub fn stake_initialize_owner_only(
+pub fn stake_initialize_stake_owner(
     initial_stake_amount: u64,
     operator: AccountAddress,
     voter: AccountAddress,
@@ -791,7 +791,7 @@ pub fn stake_initialize_owner_only(
             ]),
             ident_str!("stake").to_owned(),
         ),
-        ident_str!("initialize_owner_only").to_owned(),
+        ident_str!("initialize_stake_owner").to_owned(),
         vec![],
         vec![
             bcs::to_bytes(&initial_stake_amount).unwrap(),
@@ -1241,9 +1241,9 @@ mod decoder {
         }
     }
 
-    pub fn stake_initialize_owner_only(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+    pub fn stake_initialize_stake_owner(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::StakeInitializeOwnerOnly {
+            Some(EntryFunctionCall::StakeInitializeStakeOwner {
                 initial_stake_amount: bcs::from_bytes(script.args().get(0)?).ok()?,
                 operator: bcs::from_bytes(script.args().get(1)?).ok()?,
                 voter: bcs::from_bytes(script.args().get(2)?).ok()?,
@@ -1466,8 +1466,8 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::stake_increase_lockup),
         );
         map.insert(
-            "stake_initialize_owner_only".to_string(),
-            Box::new(decoder::stake_initialize_owner_only),
+            "stake_initialize_stake_owner".to_string(),
+            Box::new(decoder::stake_initialize_stake_owner),
         );
         map.insert(
             "stake_initialize_validator".to_string(),
