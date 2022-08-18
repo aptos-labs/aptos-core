@@ -176,7 +176,7 @@ async fn test_account_balance() {
         )
         .await
         .unwrap();
-    account_1_balance -= TRANSFER_AMOUNT + response.gas_used * response.gas_unit_price;
+    account_1_balance -= TRANSFER_AMOUNT + response.transaction_summary.total_gas();
     account_2_balance += TRANSFER_AMOUNT;
     account_has_balance(&rosetta_client, chain_id, account_1, account_1_balance, 1)
         .await
@@ -297,7 +297,7 @@ async fn test_block() {
         .await
         .expect("Should transfer coins");
     let final_block_to_check = rest_client
-        .get_block_info(summary.version)
+        .get_block_info(summary.transaction_summary.version.unwrap())
         .await
         .expect("Should be able to get block info for completed txns");
     let final_block_height = final_block_to_check.into_inner().block_height.0 + 2;

@@ -894,16 +894,33 @@ pub trait CliCommand<T: Serialize + Send>: Sized + Send {
 /// A shortened transaction output
 #[derive(Clone, Debug, Serialize)]
 pub struct TransactionSummary {
-    transaction_hash: HashValue,
-    gas_used: Option<u64>,
-    gas_unit_price: Option<u64>,
-    pending: Option<bool>,
-    sender: Option<AccountAddress>,
-    sequence_number: Option<u64>,
-    success: Option<bool>,
-    timestamp_us: Option<u64>,
-    version: Option<u64>,
-    vm_status: Option<String>,
+    pub transaction_hash: HashValue,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_used: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_unit_price: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pending: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sender: Option<AccountAddress>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sequence_number: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub success: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timestamp_us: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vm_status: Option<String>,
+}
+
+impl TransactionSummary {
+    pub fn total_gas(&self) -> u64 {
+        self.gas_unit_price
+            .unwrap()
+            .saturating_mul(self.gas_used.unwrap())
+    }
 }
 
 impl From<Transaction> for TransactionSummary {

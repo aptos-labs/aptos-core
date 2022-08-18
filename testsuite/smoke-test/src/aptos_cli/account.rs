@@ -32,7 +32,7 @@ async fn test_account_flow() {
         .await
         .unwrap();
     let expected_sender_amount =
-        DEFAULT_FUNDED_COINS - (response.gas_used * response.gas_unit_price) - transfer_amount;
+        DEFAULT_FUNDED_COINS - (response.transaction_summary.total_gas()) - transfer_amount;
     let expected_receiver_amount = DEFAULT_FUNDED_COINS + transfer_amount;
 
     // transfer_coins already waits for transaction to be committed

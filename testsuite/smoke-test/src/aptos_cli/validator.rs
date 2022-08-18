@@ -3,12 +3,12 @@
 
 use crate::smoke_test_environment::SwarmBuilder;
 use crate::test_utils::reconfig;
+use aptos::common::types::TransactionSummary;
 use aptos::{account::create::DEFAULT_FUNDED_COINS, test::CliTestFramework};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_crypto::{bls12381, x25519};
 use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
-use aptos_rest_client::Transaction;
 use aptos_types::network_address::DnsName;
 use forge::{NodeExt, Swarm};
 use std::convert::TryFrom;
@@ -388,7 +388,8 @@ async fn test_owner_create_and_delegate_flow() {
         .transfer_coins(owner_cli_index, voter_cli_index, voter_initial_coins, None)
         .await
         .unwrap()
-        .gas_used;
+        .transaction_summary
+        .total_gas();
     owner_gas += cli
         .transfer_coins(
             owner_cli_index,
@@ -398,7 +399,8 @@ async fn test_owner_create_and_delegate_flow() {
         )
         .await
         .unwrap()
-        .gas_used;
+        .transaction_summary
+        .total_gas();
 
     cli.assert_account_balance_now(
         owner_cli_index,
@@ -645,6 +647,6 @@ async fn get_validator_state(cli: &CliTestFramework, pool_index: usize) -> Valid
     ValidatorState::NONE
 }
 
-fn get_gas(transaction: Transaction) -> u64 {
-    *transaction.transaction_info().unwrap().gas_used.inner()
+fn get_gas(transaction: TransactionSummary) -> u64 {
+    transaction.total_gas()
 }

@@ -3,6 +3,7 @@
 
 use std::time::SystemTime;
 
+use crate::account::transfer::TransferSummary;
 use crate::{
     account::create::DEFAULT_FUNDED_COINS,
     common::{
@@ -36,12 +37,12 @@ pub struct FundWithFaucet {
 }
 
 #[async_trait]
-impl CliCommand<String> for FundWithFaucet {
+impl CliCommand<TransferSummary> for FundWithFaucet {
     fn command_name(&self) -> &'static str {
         "FundWithFaucet"
     }
 
-    async fn execute(self) -> CliTypedResult<String> {
+    async fn execute(self) -> CliTypedResult<TransferSummary> {
         let hashes = fund_account(
             self.faucet_options
                 .faucet_url(&self.profile_options.profile)?,
@@ -55,12 +56,23 @@ impl CliCommand<String> for FundWithFaucet {
             .as_secs()
             + 10;
         let client = self.rest_options.client(&self.profile_options.profile)?;
+
+        let mut txns = Vec::new();
         for hash in hashes {
-            client.wait_for_transaction_by_hash(hash, sys_time).await?;
+            txns.push(TransferSummary::from(
+                client
+                    .wait_for_transaction_by_hash(hash, sys_time)
+                    .await?
+                    .into_inner(),
+            ));
         }
-        return Ok(format!(
-            "Added {} coins to account {}",
-            self.amount, self.account
-        ));
+
+        if let Some(txn) = txns.pop() {
+            Ok(txn)
+        } else {
+            Err(CliError::UnexpectedError(
+                "Failed to fund from faucet".to_string(),
+            ))
+        }
     }
 }
