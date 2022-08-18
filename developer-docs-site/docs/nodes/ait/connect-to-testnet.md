@@ -10,7 +10,7 @@ Do this only if you received the confirmation email from Aptos team for your eli
 
 ## Bootstrapping validator node
 
-Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode. AIT2 network Chain ID is 41.
+Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode. AIT3 network Chain ID is 43.
 
 ### Using source code
 
@@ -31,7 +31,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 ### Using Terraform
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
-- Update `chain_id` to 41.
+- Update `chain_id` to 43.
 - Update your docker image to use tag `testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6/images/sha256-5a97797af8dea7465ac011fec3fac11c0d4cdb42f3883292a6e0ed3e27be4b51?context=explore)
 - Close metrics port and REST API port for validator (you can leave it open for fullnode), add the helm values in your `main.tf ` file, for example:
     ```
@@ -58,26 +58,28 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
     kubectl create secret generic ${WORKSPACE}-aptos-node-0-genesis-e2 \
         --from-file=genesis.blob=genesis.blob \
         --from-file=waypoint.txt=waypoint.txt \
-        --from-file=validator-identity.yaml=validator-identity.yaml \
-        --from-file=validator-full-node-identity.yaml=validator-full-node-identity.yaml
+        --from-file=validator-identity.yaml=keys/validator-identity.yaml \
+        --from-file=validator-full-node-identity.yaml=keys/validator-full-node-identity.yaml
     ```
 
 ## Joining Validator Set
 
-All the selected validator node will be receiving sufficient amount of test coin (100,100,000) airdrop from Aptos Labs team to stake their node. The coin airdrop will happen in batches to make sure we don't have too many nodes joining at the same time, please check your balance before exeucting those steps. You can see your balance on explorer: `https://explorer.devnet.aptos.dev/account/<Your-Account-Address>?network=ait2`
+All the selected participant will get Aptos coin airdrop into their owner account, once received the token you should initialize a staking pool and set your operator account. The step below is to setup the validator node, and join the validator set.
 
 1. Initialize Aptos CLI
 
     ```
-    aptos init --profile ait2 \
-    --private-key <account_private_key> \
-    --rest-url http://ait2.aptosdev.com \
+    aptos init --profile ait3-operator \
+    --private-key <operator_account_private_key> \
+    --rest-url http://ait3.aptosdev.com \
     --skip-faucet
     ```
     
-    Note: `account_private_key` can be found in the `private-keys.yaml` file.
+    Note: `account_private_key` can be found in the `private-keys.yaml` file under `~/$WORKSPACE/keys` folder.
 
-2. Check your validator account balance
+2. Check your validator account balance, make sure you have some coins to pay gas. (If not, transfer some coin to this account from your owner account) 
+
+    You can check on the explorer `https://explorer.devnet.aptos.dev/account/<account-address>?network=ait3` or use the CLI
 
     ```
     aptos account list --profile ait2
@@ -87,54 +89,48 @@ All the selected validator node will be receiving sufficient amount of test coin
     
     ```
     "coin": {
-        "value": "100100000"
+        "value": "5000"
       }
     ```
 
-3. Register validator candidate on chain
+3. Update validator network addresses on chain
 
     ```
-    aptos node register-validator-candidate \
-    --profile ait2 \
-    --validator-config-file aptosbot.yaml
+    aptos node update-validator-network-addresses  \
+      --pool-address <owner-address> \
+      --validator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
+      --profile ait3-operator
     ```
 
-    Replace `aptosbot.yaml` with your validator node config file.
-
-4. Add stake to your validator node
+4. Update validator consensus key on chain
 
     ```
-    aptos node add-stake --amount 100000000 --profile ait2
+    aptos node update-consensus-key  \
+      --pool-address <owner-address> \
+      --validator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
+      --profile ait3-operator
     ```
 
-    Please don't add too much stake to make sure you still have sufficient token to pay gas fee.
-
-5. Set lockup time for your stake. Longer lockup time will result in more staking reward. Minimal lockup time is 24 hours, and maximal is 5 days.
+5. Join validator set
 
     ```
-    aptos node increase-lockup \
-    --profile ait2 \
-    --lockup-duration 72h
+    aptos node join-validator-set \
+      --pool-address <owner-address> \
+      --profile ait3-operator
     ```
 
-6. Join validator set
+    ValidatorSet will be updated at every epoch change, which is **once every 2 hours**. You will only see your node joining the validator set in next epoch. Both Validator and fullnode will start syncing once your validator is in the validator set.
+
+6. Check validator set
 
     ```
-    aptos node join-validator-set --profile ait2
-    ```
-
-    ValidatorSet will be updated at every epoch change, which is **once every hour**. You will only see your node joining the validator set in next epoch. Both Validator and fullnode will start syncing once your validator is in the validator set.
-
-7. Check validator set
-
-    ```
-    aptos node show-validator-set --profile ait2 | jq -r '.Result.pending_active' | grep <account_address>
+    aptos node show-validator-set --profile ait3-operator | jq -r '.Result.pending_active' | grep <account_address>
     ```
     
     You should be able to see your validator node in "pending_active" list. And when the next epoch change happens, the node will be moved into "active_validators" list. This should happen within one hour from the completion of previous step. During this time, you might see errors like "No connected AptosNet peers", which is normal.
     
     ```
-    aptos node show-validator-set --profile ait2 | jq -r '.Result.active_validators' | grep <account_address>
+    aptos node show-validator-set --profile ait3-operator | jq -r '.Result.active_validators' | grep <account_address>
     ```
 
 
@@ -181,19 +177,5 @@ A node can choose to leave validator set at anytime, or it would happen automati
 1. Leave validator set (will take effect in next epoch)
 
     ```
-    aptos node leave-validator-set --profile ait2
+    aptos node leave-validator-set --profile ait3-operator
     ```
-
-2. Unlock the stake amount as you want. (will take effect in next epoch)
-
-    ```
-    aptos node unlock-stake --amount 100000000 --profile ait2
-    ```
-
-3. Withdraw stake back to your account. (This will withdraw all the unlocked stake from your validator staking pool)
-
-    ```
-    aptos node withdraw-stake --profile ait2
-    ```
-
-4. Once you're done withdrawing your fund, now you can safely shutdown the node, following the doc [here](https://aptos.dev/nodes/ait/additional-doc#shutdown-nodes-for-incentivized-testnet)
