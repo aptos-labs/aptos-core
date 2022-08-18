@@ -6,6 +6,7 @@
 mod aptos;
 
 pub use aptos::*;
+use std::io::{Read, Write};
 
 mod built_package;
 pub use built_package::*;
@@ -17,9 +18,9 @@ pub use release_builder::*;
 mod release_bundle;
 pub use release_bundle::*;
 
-use anyhow::bail;
-use miniz_oxide::deflate::compress_to_vec;
-use miniz_oxide::inflate::decompress_to_vec;
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use std::path::PathBuf;
 
 pub fn path_in_crate<S>(relative: S) -> PathBuf
@@ -34,13 +35,16 @@ pub(crate) fn path_relative_to_crate(path: PathBuf) -> PathBuf {
     path.strip_prefix(crate_path).unwrap_or(&path).to_path_buf()
 }
 
-pub fn zip_metadata(data: &[u8]) -> anyhow::Result<Vec<u8>> {
-    Ok(compress_to_vec(data, 10))
+pub fn zip_metadata(data: &[u8]) -> anyhow::Result<String> {
+    let mut e = GzEncoder::new(Vec::new(), Compression::best());
+    e.write_all(data)?;
+    Ok(base64::encode(e.finish()?))
 }
 
-pub fn unzip_metadata(data: &[u8]) -> anyhow::Result<Vec<u8>> {
-    match decompress_to_vec(data) {
-        Ok(r) => Ok(r),
-        Err(e) => bail!("decompression error: {:?}", e),
-    }
+pub fn unzip_metadata(data: &str) -> anyhow::Result<Vec<u8>> {
+    let bytes = base64::decode(data)?;
+    let mut d = GzDecoder::new(bytes.as_slice());
+    let mut res = vec![];
+    d.read_to_end(&mut res)?;
+    Ok(res)
 }

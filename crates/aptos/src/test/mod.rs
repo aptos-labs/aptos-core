@@ -16,8 +16,8 @@ use crate::common::types::{
 };
 use crate::common::utils::write_to_file;
 use crate::move_tool::{
-    ArgWithType, CompilePackage, IncludedArtifacts, InitPackage, MemberId, PublishPackage,
-    RunFunction, TestPackage,
+    ArgWithType, CompilePackage, DownloadPackage, IncludedArtifacts, InitPackage, MemberId,
+    PublishPackage, RunFunction, TestPackage,
 };
 use crate::node::{
     AnalyzeMode, AnalyzeValidatorPerformance, InitializeValidator, JoinValidatorSet,
@@ -669,6 +669,23 @@ impl CliTestFramework {
             legacy_flow,
             override_size_check: false,
             included_artifacts: IncludedArtifacts::All,
+        }
+        .execute()
+        .await
+    }
+
+    pub async fn download_package(
+        &self,
+        index: usize,
+        package: String,
+        target: String,
+    ) -> CliTypedResult<&'static str> {
+        DownloadPackage {
+            rest_options: self.rest_options(),
+            profile_options: Default::default(),
+            account: self.account_id(index),
+            package,
+            target: Some(target),
         }
         .execute()
         .await

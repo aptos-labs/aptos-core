@@ -18,7 +18,6 @@ use move_deps::{
     },
 };
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_bytes::ByteBuf;
 use smallvec::smallvec;
 use std::collections::{BTreeSet, VecDeque};
 use std::fmt;
@@ -32,7 +31,7 @@ pub struct PackageRegistry {
     pub packages: Vec<PackageMetadata>,
 }
 
-/// The PackageMetadata type.
+/// The PackageMetadata type. All blobs are encoded as base64-gzipped.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct PackageMetadata {
     /// Name of this package.
@@ -48,23 +47,20 @@ pub struct PackageMetadata {
     pub manifest: String,
     /// The list of modules installed by this package.
     pub modules: Vec<ModuleMetadata>,
-    /// Error map, in BCS
-    #[serde(with = "serde_bytes")]
-    pub error_map: Vec<u8>,
-    /// ABIs, in BCS encoding
-    pub abis: Vec<ByteBuf>,
+    /// Error map, in compressed BCS
+    pub error_map: String,
+    /// ABIs, in compressed BCS
+    pub abis: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModuleMetadata {
     /// Name of the module.
     pub name: String,
-    /// Source text if available, in gzipped form.
-    #[serde(with = "serde_bytes")]
-    pub source: Vec<u8>,
-    /// Source map, in BCS encoding, then gzipped.
-    #[serde(with = "serde_bytes")]
-    pub source_map: Vec<u8>,
+    /// Source text if available, in compressed form.
+    pub source: String,
+    /// Source map, in BCS encoding, in compressed form.
+    pub source_map: String,
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -140,9 +136,8 @@ pub struct PackageMetadataJson {
     pub build_info: String,
     pub manifest: String,
     pub modules: Vec<ModuleMetadata>,
-    #[serde(with = "serde_bytes")]
-    pub error_map: Vec<u8>,
-    pub abis: Vec<ByteBuf>,
+    pub error_map: String,
+    pub abis: Vec<String>,
 }
 
 // ========================================================================================
