@@ -43,11 +43,16 @@ pub enum EntryFunctionCall {
         new_auth_key: Vec<u8>,
     },
 
+    /// Rotates the authentication key and records a mapping on chain from the new authentication key to the originating
+    /// address of the account. To authorize the rotation, a signature under the old public key on a `RotationProofChallenge`
+    /// is given in `current_sig`. To ensure the account owner knows the secret key corresponding to the new public key
+    /// in `new_pubkey`, a proof-of-knowledge is given in `new_sig` (i.e., a signature under the new public key on the
+    /// same `RotationProofChallenge` struct).
     AccountRotateAuthenticationKeyEd25519 {
-        rotation_proof_current_signature: Vec<u8>,
-        rotation_proof_next_signature: Vec<u8>,
-        current_public_key: Vec<u8>,
-        new_public_key: Vec<u8>,
+        curr_sig_bytes: Vec<u8>,
+        new_sig_bytes: Vec<u8>,
+        curr_pk_bytes: Vec<u8>,
+        new_pk_bytes: Vec<u8>,
     },
 
     AccountTransfer {
@@ -249,15 +254,15 @@ impl EntryFunctionCall {
                 account_rotate_authentication_key(new_auth_key)
             }
             AccountRotateAuthenticationKeyEd25519 {
-                rotation_proof_current_signature,
-                rotation_proof_next_signature,
-                current_public_key,
-                new_public_key,
+                curr_sig_bytes,
+                new_sig_bytes,
+                curr_pk_bytes,
+                new_pk_bytes,
             } => account_rotate_authentication_key_ed25519(
-                rotation_proof_current_signature,
-                rotation_proof_next_signature,
-                current_public_key,
-                new_public_key,
+                curr_sig_bytes,
+                new_sig_bytes,
+                curr_pk_bytes,
+                new_pk_bytes,
             ),
             AccountTransfer { to, amount } => account_transfer(to, amount),
             AptosCoinClaimMintCapability {} => aptos_coin_claim_mint_capability(),
@@ -405,11 +410,16 @@ pub fn account_rotate_authentication_key(new_auth_key: Vec<u8>) -> TransactionPa
     ))
 }
 
+/// Rotates the authentication key and records a mapping on chain from the new authentication key to the originating
+/// address of the account. To authorize the rotation, a signature under the old public key on a `RotationProofChallenge`
+/// is given in `current_sig`. To ensure the account owner knows the secret key corresponding to the new public key
+/// in `new_pubkey`, a proof-of-knowledge is given in `new_sig` (i.e., a signature under the new public key on the
+/// same `RotationProofChallenge` struct).
 pub fn account_rotate_authentication_key_ed25519(
-    rotation_proof_current_signature: Vec<u8>,
-    rotation_proof_next_signature: Vec<u8>,
-    current_public_key: Vec<u8>,
-    new_public_key: Vec<u8>,
+    curr_sig_bytes: Vec<u8>,
+    new_sig_bytes: Vec<u8>,
+    curr_pk_bytes: Vec<u8>,
+    new_pk_bytes: Vec<u8>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -422,10 +432,10 @@ pub fn account_rotate_authentication_key_ed25519(
         ident_str!("rotate_authentication_key_ed25519").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&rotation_proof_current_signature).unwrap(),
-            bcs::to_bytes(&rotation_proof_next_signature).unwrap(),
-            bcs::to_bytes(&current_public_key).unwrap(),
-            bcs::to_bytes(&new_public_key).unwrap(),
+            bcs::to_bytes(&curr_sig_bytes).unwrap(),
+            bcs::to_bytes(&new_sig_bytes).unwrap(),
+            bcs::to_bytes(&curr_pk_bytes).unwrap(),
+            bcs::to_bytes(&new_pk_bytes).unwrap(),
         ],
     ))
 }
@@ -1027,10 +1037,10 @@ mod decoder {
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AccountRotateAuthenticationKeyEd25519 {
-                rotation_proof_current_signature: bcs::from_bytes(script.args().get(0)?).ok()?,
-                rotation_proof_next_signature: bcs::from_bytes(script.args().get(1)?).ok()?,
-                current_public_key: bcs::from_bytes(script.args().get(2)?).ok()?,
-                new_public_key: bcs::from_bytes(script.args().get(3)?).ok()?,
+                curr_sig_bytes: bcs::from_bytes(script.args().get(0)?).ok()?,
+                new_sig_bytes: bcs::from_bytes(script.args().get(1)?).ok()?,
+                curr_pk_bytes: bcs::from_bytes(script.args().get(2)?).ok()?,
+                new_pk_bytes: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
             None

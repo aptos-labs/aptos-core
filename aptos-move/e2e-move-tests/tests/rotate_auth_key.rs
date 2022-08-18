@@ -15,12 +15,12 @@ use move_deps::move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
 
 // This struct includes TypeInfo (account_address, module_name, and struct_name)
-// and RotationProof-specific information (sequence_number, originator, current_auth_key, and new_public_key)
-// Since the struct RotationProof is defined in "0x1::account::RotationProof",
-// we will be passing in "0x1" to `account_address`, "account" to `module_name`, and "RotationProof" to `struct_name`
+// and RotationProofChallenge-specific information (sequence_number, originator, current_auth_key, and new_public_key)
+// Since the struct RotationProofChallenge is defined in "0x1::account::RotationProofChallenge",
+// we will be passing in "0x1" to `account_address`, "account" to `module_name`, and "RotationProofChallenge" to `struct_name`
 // Originator refers to the user's address
 #[derive(Serialize, Deserialize)]
-struct RotationProof {
+struct RotationProofChallenge {
     account_address: AccountAddress,
     module_name: String,
     struct_name: String,
@@ -41,12 +41,12 @@ fn rotate_auth_key() {
     let new_public_key = new_private_key.public_key();
     let new_auth_key = AuthenticationKey::ed25519(&new_public_key);
 
-    // create an instance of RotationProof that includes information about the current account
+    // create an instance of RotationProofChallenge that includes information about the current account
     // and the new public key
-    let rotation_proof = RotationProof {
+    let rotation_proof = RotationProofChallenge {
         account_address: CORE_CODE_ADDRESS,
         module_name: String::from("account"),
-        struct_name: String::from("RotationProof"),
+        struct_name: String::from("RotationProofChallenge"),
         sequence_number: 10,
         originator: *account1.address(),
         current_auth_key: AccountAddress::from_bytes(&account1.auth_key()).unwrap(),
