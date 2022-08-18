@@ -213,22 +213,34 @@ impl Account {
     }
 
     pub fn modules(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
-        let mut modules = Vec::new();
-        for module in self.account_state()?.into_modules() {
-            modules.push(
-                MoveModuleBytecode::new(module)
-                    .try_parse_abi()
-                    .context("Failed to parse move module ABI")
-                    .map_err(BasicErrorWith404::internal)
-                    .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?,
-            );
+        let modules = self.account_state()?.into_modules();
+        match accept_type {
+            AcceptType::Json => {
+                let mut converted_modules = Vec::new();
+                for module in modules {
+                    converted_modules.push(
+                        MoveModuleBytecode::new(module)
+                            .try_parse_abi()
+                            .context("Failed to parse move module ABI")
+                            .map_err(BasicErrorWith404::internal)
+                            .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?,
+                    );
+                }
+                BasicResponse::try_from_json((
+                    converted_modules,
+                    &self.latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            }
+            AcceptType::Bcs => {
+                let modules: Vec<_> = modules.collect();
+                BasicResponse::try_from_bcs((
+                    modules,
+                    &self.latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            }
         }
-        BasicResponse::try_from_rust_value((
-            modules,
-            &self.latest_ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
     }
 
     // Helpers for processing account state.
