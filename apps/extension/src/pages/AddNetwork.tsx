@@ -55,9 +55,16 @@ export default function AddNetwork() {
     mode: 'onChange',
   });
 
-  const existingNetworkValidator = {
+  const uniqueNameValidator = {
     validate: {
-      exists: (name: string) => !(name in networks!),
+      unique: (name: string) => !networks || !(name in networks),
+    },
+  };
+
+  const uniqueNetworkValidator = {
+    validate: {
+      unique: (nodeUrl: string) => !networks || !Object.values(networks)
+        .some((n) => n.nodeUrl === nodeUrl),
     },
   };
 
@@ -114,11 +121,11 @@ export default function AddNetwork() {
                   <FormLabel>Name</FormLabel>
                   <Input
                     placeholder="Custom network"
-                    {...register('name', { ...requiredValidator, ...existingNetworkValidator })}
+                    {...register('name', { ...requiredValidator, ...uniqueNameValidator })}
                   />
                   <FormErrorMessage>
                     {
-                      errors.name?.type === 'exists'
+                      errors.name?.type === 'unique'
                         ? 'A network with this name already exists'
                         : errors.name?.message
                     }
@@ -128,9 +135,19 @@ export default function AddNetwork() {
                   <FormLabel>Node URL</FormLabel>
                   <Input
                     placeholder={referenceNetwork.nodeUrl}
-                    {...register('nodeUrl', { ...requiredValidator, ...urlValidator })}
+                    {...register('nodeUrl', {
+                      ...requiredValidator,
+                      ...urlValidator,
+                      ...uniqueNetworkValidator,
+                    })}
                   />
-                  <FormErrorMessage>{ errors.nodeUrl?.message }</FormErrorMessage>
+                  <FormErrorMessage>
+                    {
+                      errors.nodeUrl?.type === 'unique'
+                        ? 'A network with this nodeUrl already exists'
+                        : errors.nodeUrl?.message
+                    }
+                  </FormErrorMessage>
                 </FormControl>
                 <FormControl isInvalid={errors.faucetUrl !== undefined}>
                   <FormLabel>Faucet URL (optional)</FormLabel>
