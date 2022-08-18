@@ -164,12 +164,18 @@ impl Account {
             .map_err(BasicErrorWith404::internal)?;
         let account_data: AccountData = account_resource.into();
 
-        BasicResponse::try_from_rust_value((
-            account_data,
-            &self.latest_ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+        match accept_type {
+            AcceptType::Json => BasicResponse::try_from_json((
+                account_data,
+                &self.latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+            AcceptType::Bcs => BasicResponse::try_from_encoded((
+                state_value,
+                &self.latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+        }
     }
 
     pub fn resources(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveResource>> {
