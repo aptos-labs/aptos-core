@@ -1,7 +1,9 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_change_set::{addition, deserialize, serialize, subtraction, DeltaOp};
+use crate::delta_change_set::{
+    addition, deserialize, serialize, subtraction, DeltaOp, DeltaUpdate,
+};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
@@ -188,6 +190,11 @@ impl Aggregator {
                 if self.value >= value {
                     self.value = subtraction(self.value, value)?;
                 } else {
+                    // Check that we can subtract in general: we don't want to
+                    // allow -10000 when limit is 10.
+                    // TODO: maybe `subtraction` should also know about the limit?
+                    subtraction(self.limit, value)?;
+
                     self.value = subtraction(value, self.value)?;
                     self.state = AggregatorState::NegativeDelta;
                 }
@@ -405,17 +412,23 @@ impl<'a> NativeAggregatorContext<'a> {
                 value,
                 state,
                 limit,
-                ..
+                history,
             } = aggregator;
 
             let change = match state {
                 AggregatorState::Data => AggregatorChange::Write(value),
                 AggregatorState::PositiveDelta => {
-                    let delta_op = DeltaOp::Addition { value, limit };
+                    let history = history.unwrap();
+                    let plus = DeltaUpdate::Plus(value);
+                    let delta_op =
+                        DeltaOp::new(history.max_positive, history.min_negative, limit, plus);
                     AggregatorChange::Merge(delta_op)
                 }
                 AggregatorState::NegativeDelta => {
-                    let delta_op = DeltaOp::Subtraction { value };
+                    let history = history.unwrap();
+                    let minus = DeltaUpdate::Minus(value);
+                    let delta_op =
+                        DeltaOp::new(history.max_positive, history.min_negative, limit, minus);
                     AggregatorChange::Merge(delta_op)
                 }
             };
@@ -793,7 +806,7 @@ mod test {
         aggregator_data.get_aggregator(test_id(200), 200);
         aggregator_data.get_aggregator(test_id(500), 500);
         aggregator_data.get_aggregator(test_id(600), 600);
-        aggregator_data.get_aggregator(test_id(600), 700);
+        aggregator_data.get_aggregator(test_id(700), 700);
 
         aggregator_data.remove_aggregator(test_id(100));
         aggregator_data.remove_aggregator(test_id(300));
@@ -818,20 +831,8 @@ mod test {
         assert!(!changes.contains_key(&test_id(300)));
         assert_matches!(changes.get(&test_id(400)).unwrap(), Write(0));
         assert_matches!(changes.get(&test_id(500)).unwrap(), Delete);
-        assert_matches!(
-            changes.get(&test_id(600)).unwrap(),
-            Merge(DeltaOp::Addition {
-                value: 0,
-                limit: 600
-            })
-        );
-        assert_matches!(
-            changes.get(&test_id(700)).unwrap(),
-            Merge(DeltaOp::Addition {
-                value: 0,
-                limit: 700
-            })
-        );
+        assert!(changes.contains_key(&test_id(600)));
+        assert!(changes.contains_key(&test_id(700)));
         assert_matches!(changes.get(&test_id(800)).unwrap(), Delete);
     }
 

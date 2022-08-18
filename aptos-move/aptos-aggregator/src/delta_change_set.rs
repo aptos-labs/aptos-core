@@ -20,22 +20,57 @@ const EADD_OVERFLOW: u64 = 0x02_0001;
 /// When `Subtraction` operation goes below zero.
 const ESUB_UNDERFLOW: u64 = 0x02_0002;
 
-/// Specifies different delta partial function specifications.
+/// Represents an update from aggregator's operation.
 #[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub enum DeltaOp {
-    /// Addition of `value` which overflows on `limit`.
-    Addition { value: u128, limit: u128 },
-    /// Subtraction of `value` which cannot go below zero.
-    Subtraction { value: u128 },
+pub struct DeltaOp {
+    /// Maximum positive delta seen during execution.
+    max_positive: u128,
+    /// Smallest negative delta seen during execution.
+    min_negative: u128,
+    /// Postcondition: delta overflows on exceeding this limit or going below
+    /// zero.
+    limit: u128,
+    /// Delta whoch is the result of the execution.
+    update: DeltaUpdate,
+}
+
+/// Different delta functions.
+#[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub enum DeltaUpdate {
+    Plus(u128),
+    Minus(u128),
 }
 
 impl DeltaOp {
+    /// Creates a new delta op.
+    pub fn new(max_positive: u128, min_negative: u128, limit: u128, update: DeltaUpdate) -> Self {
+        Self {
+            max_positive,
+            min_negative,
+            limit,
+            update,
+        }
+    }
+
+    /// Returns the kind of update for the delta op.
+    pub fn get_update(&self) -> DeltaUpdate {
+        self.update
+    }
+
     /// Returns the result of delta application to `base` or error if
-    /// postcondition is not satisfied.
+    /// postcondition is not satisfied. Delta op is not validated.
     pub fn apply_to(&self, base: u128) -> PartialVMResult<u128> {
-        match self {
-            DeltaOp::Addition { value, limit } => addition(base, *value, *limit),
-            DeltaOp::Subtraction { value } => subtraction(base, *value),
+        // First, validate if delta op can be applied to `base`. Note that
+        // this is possible if the values observed during execution didn't
+        // overflow or dropped below zero. The check can be emulated by actually
+        // doing addition and subtraction.
+        addition(base, self.max_positive, self.limit)?;
+        subtraction(base, self.min_negative)?;
+
+        // If delta has been sucessfully validated, apply the update.
+        match self.update {
+            DeltaUpdate::Plus(value) => addition(base, value, self.limit),
+            DeltaUpdate::Minus(value) => subtraction(base, value),
         }
     }
 
@@ -106,11 +141,11 @@ fn abort_error(message: impl ToString, code: u64) -> PartialVMError {
 
 impl std::fmt::Debug for DeltaOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DeltaOp::Addition { value, limit } => {
-                write!(f, "+{} ensures result <= {}", value, limit)
+        match self.update {
+            DeltaUpdate::Plus(value) => {
+                write!(f, "+{} ensures result <= {}", value, self.limit)
             }
-            DeltaOp::Subtraction { value } => {
+            DeltaUpdate::Minus(value) => {
                 write!(f, "-{} ensures 0 <= result", value)
             }
         }
@@ -192,11 +227,11 @@ mod tests {
     use std::collections::HashMap;
 
     fn addition(value: u128, limit: u128) -> DeltaOp {
-        DeltaOp::Addition { value, limit }
+        DeltaOp::new(0, 0, limit, DeltaUpdate::Plus(value))
     }
 
-    fn subtraction(value: u128) -> DeltaOp {
-        DeltaOp::Subtraction { value }
+    fn subtraction(value: u128, limit: u128) -> DeltaOp {
+        DeltaOp::new(0, 0, limit, DeltaUpdate::Minus(value))
     }
 
     #[test]
@@ -211,7 +246,7 @@ mod tests {
 
     #[test]
     fn test_delta_subtraction() {
-        let sub5 = subtraction(5);
+        let sub5 = subtraction(5, 100);
         assert_err!(sub5.apply_to(0));
         assert_err!(sub5.apply_to(1));
 
@@ -253,7 +288,7 @@ mod tests {
 
         // Both addition and subtraction should succeed!
         let add_op = addition(100, 200);
-        let sub_op = subtraction(100);
+        let sub_op = subtraction(100, 200);
 
         let add_result = add_op.try_into_write_op(&state_view, &*KEY);
         assert_ok_eq!(add_result, WriteOp::Modification(serialize(&200)));
@@ -269,7 +304,7 @@ mod tests {
 
         // Both addition and subtraction should fail!
         let add_op = addition(15, 100);
-        let sub_op = subtraction(101);
+        let sub_op = subtraction(101, 1000);
 
         assert_matches!(
             add_op.try_into_write_op(&state_view, &*KEY),
