@@ -58,6 +58,20 @@ jobs:
       # Pre release has chaos applied
       FORGE_TEST_SUITE: chaos
       POST_TO_SLACK: true
+  # Run a faster chaos forge to quickly surface correctness failures
+  run-forge-compat:
+    uses: ./.github/workflows/run-forge.yaml
+    secrets: inherit
+    with:
+      FORGE_NAMESPACE: forge-compat
+      FORGE_CLUSTER_NAME: aptos-forge-2
+      # Run for 5 minutes
+      FORGE_RUNNER_DURATION_SECS: 300
+      # We expect slightly lower tps on longer timeline
+      FORGE_RUNNER_TPS_THRESHOLD: 5000
+      # This will upgrade from devnet to the latest main
+      FORGE_TEST_SUITE: compat
+      POST_TO_SLACK: true
   # Example new forge nightly test, simply add this block below to schedule your own forge job
   # run-forge-example:
   #   uses: ./.github/workflows/run-forge.yaml
