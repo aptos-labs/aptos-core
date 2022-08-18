@@ -1,13 +1,30 @@
 /// This module contains logic for upgradable and parallelizable coin supply
-/// tracking in Move.
-module aptos_framework::supply {
+/// tracking in Move. It is a seprate module in order to hide aggregator from
+/// the coin.
+///
+///  +--------+     +---------------+     +-----------------------+
+///  |  coin  | --> |  coin_supply  | --> |  optional_aggregator  |
+///  +--------+     +---------------+     +-----------------------+
+///                                         coin doesn't know
+///                                         this exists!
+///
+/// This is not u128, and is intnded to be used from `coin` module only. Thus,
+/// only `coin` is allowed to create or upgrade the supply struct.
+///
+/// `Supply` is stored within `CoinInfo` and is updated when coins are minted
+/// or burnt. In addition, one can get the coin supply in existence by calling
+/// `coin::supply<CoinType>()` that uses API from this module under the hood.
+module aptos_framework::coin_supply {
     use aptos_framework::optional_aggregator::{Self, OptionalAggregator};
     use aptos_framework::system_addresses;
     use aptos_std::type_info;
 
-    #[test_only]
-    friend aptos_framework::supply_tests;
+    friend aptos_framework::coin;
 
+    #[test_only]
+    friend aptos_framework::coin_supply_tests;
+
+    /// Maximum possible coin supply.
     const MAX_U128: u128 = 340282366920938463463374607431768211455;
 
     /// Tracks supply of coins of type `CoinType` in the system.
@@ -25,7 +42,7 @@ module aptos_framework::supply {
     fun new_from_address<CoinType>(addr: address): Supply<CoinType> {
         if (system_addresses::is_aptos_framework_address(addr)) {
             Supply {
-                // TODO: change to true once execution is working.
+                // TODO: set to true once execution is working.
                 inner: optional_aggregator::new(MAX_U128, /*parallelizable=*/false),
             }
         } else {
@@ -36,7 +53,7 @@ module aptos_framework::supply {
     }
 
     /// Upgardes non-parallelizable supply to parallelizable. The owner of supply
-    /// is responsible for calling this function.
+    /// (i.e. the coin) is responsible for calling this function.
     public(friend) fun upgrade<CoinType>(supply: &mut Supply<CoinType>) {
         if (!optional_aggregator::is_parallelizable(&supply.inner)) {
             optional_aggregator::switch(&mut supply.inner);
@@ -44,17 +61,17 @@ module aptos_framework::supply {
     }
 
     /// Adds `amount` to total supply of `CoinType`. Called when minting coins.
-    public(friend) fun add<CoinType>(supply: &mut Supply<CoinType>, amount: u128) {
+    public fun add<CoinType>(supply: &mut Supply<CoinType>, amount: u128) {
         optional_aggregator::add(&mut supply.inner, amount);
     }
 
     /// Subtracts `amount` from total supply of `CoinType`. Called when burning coins.
-    public(friend) fun sub<CoinType>(supply: &mut Supply<CoinType>, amount: u128) {
+    public fun sub<CoinType>(supply: &mut Supply<CoinType>, amount: u128) {
         optional_aggregator::sub(&mut supply.inner, amount);
     }
 
     /// Returns the total supply of `CoinType` in existence.
-    public(friend) fun read<CoinType>(supply: &Supply<CoinType>): u128 {
+    public fun read<CoinType>(supply: &Supply<CoinType>): u128 {
         optional_aggregator::read(&supply.inner)
     }
 

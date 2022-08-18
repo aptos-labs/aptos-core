@@ -103,6 +103,12 @@ pub enum ScriptFunctionCall {
         amount: u64,
     },
 
+    /// Upgrade total supply to use a parallelizable implementation if it is
+    /// available.
+    CoinUpgradeCoinSupply {
+        coin_type: TypeTag,
+    },
+
     /// Script function to register to receive a specific `CoinType`. An account that wants to hold a coin type
     /// has to explicitly registers to do so. The register creates a special `CoinStore`
     /// to hold the specified `CoinType`.
@@ -288,6 +294,7 @@ impl ScriptFunctionCall {
                 to,
                 amount,
             } => coin_transfer(coin_type, to, amount),
+            CoinUpgradeCoinSupply { coin_type } => coin_upgrade_coin_supply(coin_type),
             CoinsRegister { coin_type } => coins_register(coin_type),
             GasScheduleSetGasSchedule { gas_schedule_blob } => {
                 gas_schedule_set_gas_schedule(gas_schedule_blob)
@@ -587,6 +594,23 @@ pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> Tra
         ident_str!("transfer").to_owned(),
         vec![coin_type],
         vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
+    ))
+}
+
+/// Upgrade total supply to use a parallelizable implementation if it is
+/// available.
+pub fn coin_upgrade_coin_supply(coin_type: TypeTag) -> TransactionPayload {
+    TransactionPayload::ScriptFunction(ScriptFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("upgrade_coin_supply").to_owned(),
+        vec![coin_type],
+        vec![],
     ))
 }
 
@@ -1131,6 +1155,16 @@ mod decoder {
         }
     }
 
+    pub fn coin_upgrade_coin_supply(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
+        if let TransactionPayload::ScriptFunction(script) = payload {
+            Some(ScriptFunctionCall::CoinUpgradeCoinSupply {
+                coin_type: script.ty_args().get(0)?.clone(),
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn coins_register(payload: &TransactionPayload) -> Option<ScriptFunctionCall> {
         if let TransactionPayload::ScriptFunction(script) = payload {
             Some(ScriptFunctionCall::CoinsRegister {
@@ -1418,6 +1452,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<ScriptFunctionDecoderM
         map.insert(
             "coin_transfer".to_string(),
             Box::new(decoder::coin_transfer),
+        );
+        map.insert(
+            "coin_upgrade_coin_supply".to_string(),
+            Box::new(decoder::coin_upgrade_coin_supply),
         );
         map.insert(
             "coins_register".to_string(),
