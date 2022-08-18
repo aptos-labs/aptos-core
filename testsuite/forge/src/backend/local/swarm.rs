@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::interface::system_metrics::SystemMetricsThreshold;
 use crate::{
     ChainInfo, FullNode, HealthCheckError, LocalNode, LocalVersion, Node, Swarm, SwarmChaos,
     SwarmExt, Validator, Version,
@@ -546,6 +547,15 @@ impl Swarm for LocalSwarm {
         _time: Option<i64>,
         _timeout: Option<i64>,
     ) -> Result<PromqlResult> {
+        todo!()
+    }
+
+    async fn ensure_healthy_system_metrics(
+        &mut self,
+        _start_time: i64,
+        _end_time: i64,
+        _threshold: SystemMetricsThreshold,
+    ) -> Result<()> {
         todo!()
     }
 }

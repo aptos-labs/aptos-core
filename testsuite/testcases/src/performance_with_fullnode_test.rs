@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::generate_traffic;
+use forge::system_metrics::{MetricsThreshold, SystemMetricsThreshold};
 use forge::{NetworkContext, NetworkTest, Result, Test};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::runtime::Runtime;
 
 pub struct PerformanceBenchmarkWithFN;
 
@@ -23,11 +26,34 @@ impl NetworkTest for PerformanceBenchmarkWithFN {
             .collect::<Vec<_>>();
 
         // Generate some traffic
+        let start_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
         let txn_stat = generate_traffic(ctx, &all_fullnodes, duration, 1)?;
         ctx.report
             .report_txn_stats(self.name().to_string(), &txn_stat, duration);
         // ensure we meet the success criteria
         ctx.check_for_success(&txn_stat, &duration)?;
+        let end_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs();
+
+        let runtime = Runtime::new().unwrap();
+
+        runtime.block_on(ctx.swarm().ensure_no_validator_restart())?;
+        runtime.block_on(ctx.swarm().ensure_no_fullnode_restart())?;
+
+        // Threshold of more than 12 CPU cores for 30% of the time
+        let cpu_threshold = MetricsThreshold::new(12, 30);
+        // Threshold of more than 3 GB of memory for 30% of the time
+        let memory_threshold = MetricsThreshold::new(3 * 1024 * 1024 * 1024, 30);
+        runtime.block_on(ctx.swarm().ensure_healthy_system_metrics(
+            start_timestamp as i64,
+            end_timestamp as i64,
+            SystemMetricsThreshold::new(cpu_threshold, memory_threshold),
+        ))?;
 
         Ok(())
     }

@@ -18,6 +18,8 @@ pub use chaos::*;
 mod node;
 pub use node::*;
 mod chain_info;
+pub mod system_metrics;
+
 pub use chain_info::*;
 use framework::ReleaseBundle;
 
