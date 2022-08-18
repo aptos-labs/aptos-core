@@ -46,8 +46,12 @@ impl CachedPackageRegistry {
     }
 
     /// Returns the list of packages in this registry by name.
-    pub fn package_names(&self) -> Vec<String> {
-        self.inner.packages.iter().map(|p| p.name.clone()).collect()
+    pub fn package_names(&self) -> Vec<&str> {
+        self.inner
+            .packages
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect()
     }
 
     /// Finds the metadata for the given module in the registry by its unique name.
@@ -110,11 +114,11 @@ impl<'a> CachedPackageMetadata<'a> {
         self.metadata.abis.as_slice()
     }
 
-    pub fn module_names(&self) -> Vec<String> {
+    pub fn module_names(&self) -> Vec<&str> {
         self.metadata
             .modules
             .iter()
-            .map(|s| s.name.clone())
+            .map(|s| s.name.as_str())
             .collect()
     }
 
