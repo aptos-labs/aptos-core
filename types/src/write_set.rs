@@ -40,6 +40,21 @@ impl WriteOp {
     }
 }
 
+pub trait DeserializeU128 {
+    fn deserialize(&self) -> Option<u128>;
+}
+
+impl DeserializeU128 for WriteOp {
+    fn deserialize(&self) -> Option<u128> {
+        match self {
+            WriteOp::Creation(v) | WriteOp::Modification(v) => {
+                bcs::from_bytes(v).expect("unexpected deserialization error in WriteOp")
+            }
+            WriteOp::Deletion => None,
+        }
+    }
+}
+
 impl std::fmt::Debug for WriteOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

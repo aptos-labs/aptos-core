@@ -9,7 +9,9 @@ use crate::{
         TransactionOutput,
     },
 };
-use aptos_types::{access_path::AccessPath, account_address::AccountAddress};
+use aptos_types::{
+    access_path::AccessPath, account_address::AccountAddress, write_set::DeserializeU128,
+};
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::collections::hash_map::DefaultHasher;
@@ -59,6 +61,25 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd> ModulePath for KeyType<K> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
+pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
+    /// Wrapping the types used for testing to add DeserializeU128 trait implementation (below).
+    pub V,
+);
+
+impl<V: Into<Vec<u8>> + Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary>
+    DeserializeU128 for ValueType<V>
+{
+    fn deserialize(&self) -> Option<u128> {
+        let v: Vec<u8> = self.0.clone().into();
+        if v.is_empty() {
+            None
+        } else {
+            Some(v[0] as u128)
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct TransactionGenParams {
     /// Each transaction's write-set consists of between 1 and write_size-1 many writes.
@@ -74,7 +95,7 @@ pub struct TransactionGenParams {
 
 #[derive(Arbitrary, Debug, Clone)]
 #[proptest(params = "TransactionGenParams")]
-pub struct TransactionGen<V: Arbitrary + Debug + 'static + Clone> {
+pub struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + 'static> {
     /// Generate keys and values for possible write-sets based on above transaction gen parameters.
     #[proptest(
         strategy = "vec(vec((any::<Index>(), any::<V>()), 1..params.write_size), 1..params.read_write_alternatives)"
@@ -131,22 +152,23 @@ impl Default for TransactionGenParams {
     }
 }
 
-impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
+impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq> TransactionGen<V> {
     fn writes_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
         universe: &[K],
         gen: Vec<Vec<(Index, V)>>,
         module_write_fn: &dyn Fn(usize) -> bool,
-    ) -> Vec<Vec<(KeyType<K>, V)>> {
+    ) -> Vec<Vec<(KeyType<K>, ValueType<V>)>> {
         let mut ret = vec![];
         for write_gen in gen.into_iter() {
             let mut keys_modified = BTreeSet::new();
-            let mut incarnation_writes: Vec<(KeyType<K>, V)> = vec![];
+            let mut incarnation_writes: Vec<(KeyType<K>, ValueType<V>)> = vec![];
             for (idx, value) in write_gen.into_iter() {
                 let i = idx.index(universe.len());
                 let key = universe[i].clone();
                 if !keys_modified.contains(&key) {
                     keys_modified.insert(key.clone());
-                    incarnation_writes.push((KeyType(key, module_write_fn(i)), value.clone()));
+                    incarnation_writes
+                        .push((KeyType(key, module_write_fn(i)), ValueType(value.clone())));
                 }
             }
             ret.push(incarnation_writes);
@@ -177,7 +199,7 @@ impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
         universe: &[K],
         // Are writes and reads module access (same access path).
         module_access: (bool, bool),
-    ) -> Transaction<KeyType<K>, V> {
+    ) -> Transaction<KeyType<K>, ValueType<V>> {
         Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
             writes: Self::writes_from_gen(universe, self.keys_modified, &|_| -> bool {
@@ -196,7 +218,7 @@ impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
         // writes. This way there will be module accesses but no intersection.
         read_threshold: usize,
         write_threshold: usize,
-    ) -> Transaction<KeyType<K>, V> {
+    ) -> Transaction<KeyType<K>, ValueType<V>> {
         assert!(read_threshold < universe.len());
         assert!(write_threshold > read_threshold);
         assert!(write_threshold < universe.len());
@@ -215,7 +237,7 @@ impl<V: Arbitrary + Debug + Clone> TransactionGen<V> {
 impl<K, V> TransactionType for Transaction<K, V>
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + 'static,
+    V: Send + Sync + Debug + Clone + DeserializeU128 + 'static,
 {
     type Key = K;
     type Value = V;
@@ -236,7 +258,7 @@ impl<K, V> Task<K, V> {
 impl<K, V> ExecutorTask for Task<K, V>
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + 'static,
+    V: Send + Sync + Debug + Clone + DeserializeU128 + 'static,
 {
     type T = Transaction<K, V>;
     type Output = Output<K, V>;
@@ -285,7 +307,7 @@ pub struct Output<K, V>(Vec<(K, V)>, Vec<Option<V>>);
 impl<K, V> TransactionOutput for Output<K, V>
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + 'static,
+    V: Send + Sync + Debug + Clone + DeserializeU128 + 'static,
 {
     type T = Transaction<K, V>;
 
