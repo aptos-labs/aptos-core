@@ -156,7 +156,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
     ) -> Result<TransactionPayload> {
         use aptos_types::transaction::TransactionPayload::*;
         let ret = match payload {
-            WriteSet(v) => TransactionPayload::WriteSetPayload(self.try_into_write_set_payload(v)?),
             Script(s) => TransactionPayload::ScriptPayload(s.try_into()?),
             ModuleBundle(modules) => TransactionPayload::ModuleBundlePayload(ModuleBundlePayload {
                 modules: modules
@@ -531,11 +530,6 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     }
                     None => return Err(anyhow::anyhow!("invalid transaction script bytecode")),
                 }
-            }
-            TransactionPayload::WriteSetPayload(_) => {
-                return Err(anyhow::anyhow!(
-                    "write set transaction payload is not supported yet",
-                ))
             }
         };
         Ok(ret)

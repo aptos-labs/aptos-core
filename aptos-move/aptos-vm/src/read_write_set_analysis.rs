@@ -181,10 +181,10 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
                 self.concretize_secondary_indexes(metadata_access, concretize)
             }
             PreprocessedTransaction::InvalidSignature => Ok((vec![], vec![])),
-            PreprocessedTransaction::WriteSet(_) | PreprocessedTransaction::WaypointWriteSet(_) => {
+            PreprocessedTransaction::StateCheckpoint => Ok((vec![], vec![])),
+            PreprocessedTransaction::WaypointWriteSet(_) => {
                 bail!("Unsupported writeset transaction")
             }
-            PreprocessedTransaction::StateCheckpoint => Ok((vec![], vec![])),
         }
     }
 

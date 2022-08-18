@@ -321,7 +321,7 @@ fn create_transaction_chunks(
 fn test_noop_block_after_reconfiguration() {
     let executor = TestExecutor::new();
     let mut parent_block_id = executor.committed_block_id();
-    let first_txn = encode_reconfiguration_transaction(gen_address(1));
+    let first_txn = encode_reconfiguration_transaction();
     let first_block_id = gen_block_id(1);
     let output1 = executor
         .execute_block((first_block_id, vec![first_txn]), parent_block_id)
@@ -619,7 +619,7 @@ proptest! {
             let block_id = gen_block_id(1);
             let mut block = TestBlock::new(num_user_txns, 10, block_id);
             let num_txns = block.txns.len() as LeafCount;
-            block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction(gen_address(reconfig_txn_index));
+            block.txns[reconfig_txn_index as usize] = encode_reconfiguration_transaction();
             let executor = TestExecutor::new();
 
             let parent_block_id = executor.committed_block_id();

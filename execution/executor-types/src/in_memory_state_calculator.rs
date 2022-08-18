@@ -16,7 +16,7 @@ use aptos_types::{
     event::EventKey,
     on_chain_config,
     state_store::{state_key::StateKey, state_value::StateValue},
-    transaction::{Transaction, TransactionPayload, Version},
+    transaction::{Transaction, Version},
     write_set::{WriteOp, WriteSet},
 };
 use scratchpad::{FrozenSparseMerkleTree, SparseMerkleTree};
@@ -288,17 +288,9 @@ fn ensure_txn_valid_for_vacant_entry(transaction: &Transaction) -> Result<()> {
     // maybe other writeset transactions).
     match transaction {
         Transaction::GenesisTransaction(_) => (),
-        Transaction::BlockMetadata(_) => {
+        Transaction::BlockMetadata(_) | Transaction::UserTransaction(_) => {
             bail!("Write set should be a subset of read set.")
         }
-        Transaction::UserTransaction(txn) => match txn.payload() {
-            TransactionPayload::ModuleBundle(_)
-            | TransactionPayload::Script(_)
-            | TransactionPayload::ScriptFunction(_) => {
-                bail!("Write set should be a subset of read set.")
-            }
-            TransactionPayload::WriteSet(_) => (),
-        },
         Transaction::StateCheckpoint(_) => {}
     }
     Ok(())

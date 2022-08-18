@@ -10,21 +10,18 @@ use aptos_crypto::{
 };
 use aptos_sdk::types::LocalAccount;
 use aptos_types::{
-    access_path::{AccessPath, Path},
     account_address::AccountAddress,
     transaction::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
-        ChangeSet, Script, ScriptFunction, SignedTransaction,
+        Script, ScriptFunction, SignedTransaction,
     },
     utility_coin::APTOS_COIN_TYPE,
-    write_set::{WriteOp, WriteSetMut},
 };
 
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_types::state_store::state_key::StateKey;
 use move_deps::move_core_types::{
     identifier::Identifier,
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{ModuleId, TypeTag},
 };
 use poem_openapi::types::ParseFromJSON;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
@@ -171,54 +168,6 @@ async fn test_get_transactions_output_user_transaction_with_module_payload() {
             ]
         }),
     )
-}
-
-// writeset not supported
-#[ignore]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_transactions_output_user_transaction_with_write_set_payload() {
-    let mut context = new_test_context(current_function_name!());
-    let mut root_account = context.root_account();
-    let code_address = AccountAddress::from_hex_literal("0x1").unwrap();
-    let txn = root_account.sign_with_transaction_builder(
-        context.transaction_factory().change_set(ChangeSet::new(
-            WriteSetMut::new(vec![
-                (
-                    StateKey::AccessPath(AccessPath::new(
-                        code_address,
-                        bcs::to_bytes(&Path::Code(ModuleId::new(
-                            code_address,
-                            Identifier::new("Account").unwrap(),
-                        )))
-                        .unwrap(),
-                    )),
-                    WriteOp::Deletion,
-                ),
-                (
-                    StateKey::AccessPath(AccessPath::new(
-                        context.root_account().address(),
-                        bcs::to_bytes(&Path::Resource(StructTag {
-                            address: code_address,
-                            module: Identifier::new("coin").unwrap(),
-                            name: Identifier::new("CoinStore").unwrap(),
-                            type_params: vec![APTOS_COIN_TYPE.clone()],
-                        }))
-                        .unwrap(),
-                    )),
-                    WriteOp::Deletion,
-                ),
-            ])
-            .freeze()
-            .unwrap(),
-            vec![],
-        )),
-    );
-    context.commit_block(&vec![txn.clone()]).await;
-
-    let txns = context.get("/transactions?start=2").await;
-    assert_eq!(1, txns.as_array().unwrap().len());
-
-    context.check_golden_output(txns);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -549,85 +498,6 @@ async fn test_signing_message_with_module_payload() {
     test_signing_message_with_payload(context, txn, payload).await;
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_signing_message_with_write_set_payload() {
-    // This test is created for testing error message for now.
-    // Update test when write_set_payload is supported
-    let context = new_test_context(current_function_name!());
-    let mut root_account = context.root_account();
-    let code_address = AccountAddress::from_hex_literal("0x1").unwrap();
-    let txn = root_account.sign_with_transaction_builder(
-        context
-            .transaction_factory()
-            .change_set(ChangeSet::new(
-                WriteSetMut::new(vec![
-                    (
-                        StateKey::AccessPath(AccessPath::new(
-                            code_address,
-                            bcs::to_bytes(&Path::Code(ModuleId::new(
-                                code_address,
-                                Identifier::new("Account").unwrap(),
-                            )))
-                            .unwrap(),
-                        )),
-                        WriteOp::Deletion,
-                    ),
-                    (
-                        StateKey::AccessPath(AccessPath::new(
-                            context.root_account().address(),
-                            bcs::to_bytes(&Path::Resource(StructTag {
-                                address: code_address,
-                                module: Identifier::new("coin").unwrap(),
-                                name: Identifier::new("CoinStore").unwrap(),
-                                type_params: vec![APTOS_COIN_TYPE.clone()],
-                            }))
-                            .unwrap(),
-                        )),
-                        WriteOp::Deletion,
-                    ),
-                ])
-                .freeze()
-                .unwrap(),
-                vec![],
-            ))
-            .expiration_timestamp_secs(u64::MAX),
-    );
-    let payload = json!({
-        "type": "write_set_payload",
-        "write_set": {
-            "type": "direct_write_set",
-            "changes": [
-                {
-                    "type": "delete_module",
-                    "address": "0x1",
-                    "module": "0x1::account"
-                },
-                {
-                    "type": "delete_resource",
-                    "address": "0xb1e55ed",
-                    "resource": "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>"
-                }
-            ],
-            "events": []
-        }
-    });
-
-    let sender = context.root_account();
-    let body = json!({
-        "sender": sender.address().to_hex_literal(),
-        "sequence_number": sender.sequence_number().to_string(),
-        "gas_unit_price": txn.gas_unit_price().to_string(),
-        "max_gas_amount": txn.max_gas_amount().to_string(),
-        "expiration_timestamp_secs": txn.expiration_timestamp_secs().to_string(),
-        "payload": payload,
-    });
-
-    context
-        .expect_status_code(400)
-        .post("/transactions/encode_submission", body)
-        .await;
-}
-
 async fn test_signing_message_with_payload(
     mut context: TestContext,
     txn: SignedTransaction,
@@ -807,37 +677,6 @@ async fn test_get_txn_execute_failed_by_invalid_script_payload_bytecode() {
             .expiration_timestamp_secs(u64::MAX),
     );
     test_transaction_vm_status(context, txn, false).await
-}
-
-#[ignore]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_write_set_payload() {
-    let context = new_test_context(current_function_name!());
-
-    let invalid_bytecode = hex::decode("a11ceb0b030000").unwrap();
-    let mut root_account = context.root_account();
-    let code_address = AccountAddress::from_hex_literal("0x1").unwrap();
-    let txn = root_account.sign_with_transaction_builder(
-        context.transaction_factory().change_set(ChangeSet::new(
-            WriteSetMut::new(vec![(
-                StateKey::AccessPath(AccessPath::new(
-                    code_address,
-                    bcs::to_bytes(&Path::Code(ModuleId::new(
-                        code_address,
-                        Identifier::new("Account").unwrap(),
-                    )))
-                    .unwrap(),
-                )),
-                WriteOp::Modification(invalid_bytecode),
-            )])
-            .freeze()
-            .unwrap(),
-            vec![],
-        )),
-    );
-
-    // should fail, but VM executed successfully, need investigate, but out of API scope
-    test_transaction_vm_status(context, txn, true).await
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

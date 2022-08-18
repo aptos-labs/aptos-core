@@ -5477,9 +5477,6 @@ impl serde::Serialize for TransactionPayload {
                 transaction_payload::Payload::ModuleBundlePayload(v) => {
                     struct_ser.serialize_field("moduleBundlePayload", v)?;
                 }
-                transaction_payload::Payload::WriteSetPayload(v) => {
-                    struct_ser.serialize_field("writeSetPayload", v)?;
-                }
             }
         }
         struct_ser.end()
@@ -5496,7 +5493,6 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             "scriptFunctionPayload",
             "scriptPayload",
             "moduleBundlePayload",
-            "writeSetPayload",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -5505,7 +5501,6 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             ScriptFunctionPayload,
             ScriptPayload,
             ModuleBundlePayload,
-            WriteSetPayload,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -5534,7 +5529,6 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             "scriptFunctionPayload" => Ok(GeneratedField::ScriptFunctionPayload),
                             "scriptPayload" => Ok(GeneratedField::ScriptPayload),
                             "moduleBundlePayload" => Ok(GeneratedField::ModuleBundlePayload),
-                            "writeSetPayload" => Ok(GeneratedField::WriteSetPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -5592,14 +5586,6 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                                 map.next_value()?,
                             ));
                         }
-                        GeneratedField::WriteSetPayload => {
-                            if payload__.is_some() {
-                                return Err(serde::de::Error::duplicate_field("writeSetPayload"));
-                            }
-                            payload__ = Some(transaction_payload::Payload::WriteSetPayload(
-                                map.next_value()?,
-                            ));
-                        }
                     }
                 }
                 Ok(TransactionPayload {
@@ -5625,7 +5611,6 @@ impl serde::Serialize for transaction_payload::Type {
             Self::ScriptFunctionPayload => "SCRIPT_FUNCTION_PAYLOAD",
             Self::ScriptPayload => "SCRIPT_PAYLOAD",
             Self::ModuleBundlePayload => "MODULE_BUNDLE_PAYLOAD",
-            Self::WriteSetPayload => "WRITE_SET_PAYLOAD",
         };
         serializer.serialize_str(variant)
     }
@@ -5640,7 +5625,6 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
             "SCRIPT_FUNCTION_PAYLOAD",
             "SCRIPT_PAYLOAD",
             "MODULE_BUNDLE_PAYLOAD",
-            "WRITE_SET_PAYLOAD",
         ];
 
         struct GeneratedVisitor;
@@ -5688,7 +5672,6 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
                     }
                     "SCRIPT_PAYLOAD" => Ok(transaction_payload::Type::ScriptPayload),
                     "MODULE_BUNDLE_PAYLOAD" => Ok(transaction_payload::Type::ModuleBundlePayload),
-                    "WRITE_SET_PAYLOAD" => Ok(transaction_payload::Type::WriteSetPayload),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }

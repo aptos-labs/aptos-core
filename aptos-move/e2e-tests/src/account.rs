@@ -15,7 +15,7 @@ use aptos_types::{
     state_store::state_key::StateKey,
     transaction::{
         authenticator::AuthenticationKey, Module, ModuleBundle, RawTransaction, Script,
-        ScriptFunction, SignedTransaction, TransactionPayload, WriteSetPayload,
+        ScriptFunction, SignedTransaction, TransactionPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -217,11 +217,6 @@ impl TransactionBuilder {
 
     pub fn module(mut self, m: Module) -> Self {
         self.program = Some(TransactionPayload::ModuleBundle(ModuleBundle::from(m)));
-        self
-    }
-
-    pub fn write_set(mut self, w: WriteSetPayload) -> Self {
-        self.program = Some(TransactionPayload::WriteSet(w));
         self
     }
 

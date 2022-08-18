@@ -368,7 +368,6 @@ pub mod transaction_payload {
         ScriptFunctionPayload = 0,
         ScriptPayload = 1,
         ModuleBundlePayload = 2,
-        WriteSetPayload = 3,
     }
     impl Type {
         /// String value of the enum field names used in the ProtoBuf definition.
@@ -380,7 +379,6 @@ pub mod transaction_payload {
                 Type::ScriptFunctionPayload => "SCRIPT_FUNCTION_PAYLOAD",
                 Type::ScriptPayload => "SCRIPT_PAYLOAD",
                 Type::ModuleBundlePayload => "MODULE_BUNDLE_PAYLOAD",
-                Type::WriteSetPayload => "WRITE_SET_PAYLOAD",
             }
         }
     }
@@ -392,8 +390,6 @@ pub mod transaction_payload {
         ScriptPayload(super::ScriptPayload),
         #[prost(message, tag = "4")]
         ModuleBundlePayload(super::ModuleBundlePayload),
-        #[prost(message, tag = "5")]
-        WriteSetPayload(super::WriteSetPayload),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]

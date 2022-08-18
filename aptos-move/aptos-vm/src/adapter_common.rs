@@ -18,9 +18,7 @@ use crate::{
 use aptos_logger::prelude::*;
 use aptos_types::{
     block_metadata::BlockMetadata,
-    transaction::{
-        Transaction, TransactionOutput, TransactionPayload, TransactionStatus, WriteSetPayload,
-    },
+    transaction::{Transaction, TransactionOutput, TransactionStatus, WriteSetPayload},
     write_set::WriteSet,
 };
 use rayon::prelude::*;
@@ -208,7 +206,6 @@ pub enum PreprocessedTransaction {
     UserTransaction(Box<SignatureCheckedTransaction>),
     WaypointWriteSet(WriteSetPayload),
     BlockMetadata(BlockMetadata),
-    WriteSet(Box<SignatureCheckedTransaction>),
     InvalidSignature,
     StateCheckpoint,
 }
@@ -228,12 +225,7 @@ pub(crate) fn preprocess_transaction<A: VMAdapter>(txn: Transaction) -> Preproce
                     return PreprocessedTransaction::InvalidSignature;
                 }
             };
-            match checked_txn.payload() {
-                TransactionPayload::WriteSet(_) => {
-                    PreprocessedTransaction::WriteSet(Box::new(checked_txn))
-                }
-                _ => PreprocessedTransaction::UserTransaction(Box::new(checked_txn)),
-            }
+            PreprocessedTransaction::UserTransaction(Box::new(checked_txn))
         }
         Transaction::StateCheckpoint(_) => PreprocessedTransaction::StateCheckpoint,
     }
