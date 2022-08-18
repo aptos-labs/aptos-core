@@ -4,8 +4,8 @@
 use std::{convert::Infallible, sync::Arc};
 
 use crate::{
-    clients::VictoriaMetricsClient, validator_cache::ValidatorSetCache, GCPBigQueryConfig,
-    TelemetryServiceConfig,
+    clients::victoria_metrics_api::Client as MetricsClient, validator_cache::ValidatorSetCache,
+    GCPBigQueryConfig, TelemetryServiceConfig,
 };
 use aptos_crypto::noise;
 use gcp_bigquery_client::Client as BQClient;
@@ -20,7 +20,7 @@ pub struct Context {
     pub gcp_bq_client: Option<BQClient>,
     pub gcp_bq_config: GCPBigQueryConfig,
 
-    pub victoria_metrics_client: Option<VictoriaMetricsClient>,
+    pub victoria_metrics_client: Option<MetricsClient>,
 
     pub jwt_encoding_key: EncodingKey,
     pub jwt_decoding_key: DecodingKey,
@@ -31,7 +31,7 @@ impl Context {
         config: &TelemetryServiceConfig,
         validator_cache: ValidatorSetCache,
         gcp_bigquery_client: Option<BQClient>,
-        victoria_metrics_client: Option<VictoriaMetricsClient>,
+        victoria_metrics_client: Option<MetricsClient>,
     ) -> Self {
         let private_key = config.server_private_key.private_key();
         Self {

@@ -9,7 +9,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time;
 use url::Url;
 
-use crate::{clients::AptosAPIRestClient, TelemetryServiceConfig};
+use crate::{clients::aptos_api::RestClient, TelemetryServiceConfig};
 
 pub type EpochNum = u64;
 pub type ValidatorSetCache = Arc<RwLock<HashMap<ChainId, (EpochNum, PeerSet)>>>;
@@ -44,7 +44,7 @@ impl ValidatorSetCacheUpdater {
 
     pub async fn update(&self) {
         for (chain_id, url) in self.query_addresses.iter() {
-            let client = AptosAPIRestClient::new(Url::parse(url).unwrap());
+            let client = RestClient::new(Url::parse(url).unwrap());
             let validators = client.validator_set_validator_addresses().await;
             match validators {
                 Ok((validators, state)) => {
