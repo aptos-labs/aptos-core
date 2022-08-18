@@ -60,7 +60,7 @@
 /// ====================
 /// Users are encouraged to use "cheap" operations (e.g. additions) to exploit the
 /// parallelism in execution.
-module aptos_std::aggregator {
+module aptos_framework::aggregator {
 
     /// When the value of aggregator (actual or accumulated) overflows (raised
     /// by native code).
@@ -77,6 +77,11 @@ module aptos_std::aggregator {
         handle: u128,
         key: u128,
         limit: u128,
+    }
+
+    /// Returns `limit` exceeding which aggregator overflows.
+    public fun limit(aggregator: &Aggregator): u128 {
+        aggregator.limit
     }
 
     /// Adds `value` to aggregator. Aborts on overflowing the limit.
