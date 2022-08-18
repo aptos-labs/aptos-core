@@ -6,16 +6,16 @@ use once_cell::sync::Lazy;
 
 pub static TRANSACTIONS_SENT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "aptos_sf_stream_transactions_sent_count",
-        "Transactions converted and printed out to stdout, picked up by the StreamingFast indexer",
+        "aptos_fh_stream_transactions_sent_count",
+        "Transactions converted and printed out to stdout, picked up by the StreamingFast Firehose indexer",
     )
     .unwrap()
 });
 
 pub static BLOCKS_SENT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "aptos_sf_stream_blocks_sent_count",
-        "Blocks converted and printed out to stdout, picked up by the StreamingFast indexer",
+        "aptos_fh_stream_blocks_sent_count",
+        "Blocks converted and printed out to stdout, picked up by the StreamingFast Firehose indexer",
     )
     .unwrap()
 });

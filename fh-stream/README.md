@@ -1,6 +1,6 @@
 # API
 
-This module provides a StreamingFast Streamer for pushing protobuf data from the Aptos Blockchain
+This module provides a StreamingFast Firehose Streamer for pushing protobuf data from the Aptos Blockchain
 
 ## Overview
 
@@ -36,14 +36,14 @@ cargo test --test "forge" "api::"
 
 ## Aptos Node Operation
 
-The Aptos node generates the following default SF-Stream configuration:
+The Aptos node generates the following default Firehose-Stream configuration:
 
 ```
-sf_stream:
+firehose_stream:
   enabled: false
 ```
 
-When `sf_stream.enabled` is set to `true`, the SF-Stream will be enabled, and transactions will be streamed to stdout.
+When `firehose_stream.enabled` is set to `true`, the Firehose-Stream will be enabled, and transactions will be streamed to stdout.
 
 ## Installing Protobuf Compiler
 
@@ -71,17 +71,24 @@ Install it with:
 See the [installation instructions here](https://docs.buf.build/installation).
 
 ### Build proto
+
 cargo build
 
 ## Testing
+
 ### Connect to Firehose
+
 To test with firehose, we need to build aptos-node
-   ```
-   cd ../aptos-node
-   cargo install --path .
-   ```
-   If necessary, set path to aptos-node
-   ```
-   export PATH={path to directory containing aptos-core repo}:$PATH
-   ```
+
+```
+cd ../aptos-node
+cargo install --path .
+```
+
+If necessary, set path to aptos-node
+
+```
+export PATH={path to directory containing aptos-core repo}:$PATH
+```
+
 Then follow instructions in https://github.com/streamingfast/firehose-aptos
