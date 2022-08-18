@@ -107,7 +107,7 @@ pub struct InitPackage {
 
     /// Named addresses for the move binary
     ///
-    /// Example: alice=0x1234, bob=0x5678
+    /// Example: alice=0x1234,bob=0x5678
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
     #[clap(long, parse(try_from_str = crate::common::utils::parse_map), default_value = "")]
@@ -223,7 +223,10 @@ impl CliCommand<Vec<String>> for CompilePackage {
     }
 }
 
-/// Run Move unit tests against a package path
+/// Runs Move unit tests for a package
+///
+/// This will run Move unit tests against a package with debug mode
+/// turned on.  Note, that move code warnings currently block tests from running.
 #[derive(Parser)]
 pub struct TestPackage {
     /// A filter string to determine which unit tests to run
@@ -261,7 +264,6 @@ impl CliCommand<&'static str> for TestPackage {
         )
         .map_err(|err| CliError::UnexpectedError(err.to_string()))?;
 
-        // TODO: commit back up to the move repo
         match result {
             UnitTestResult::Success => Ok("Success"),
             UnitTestResult::Failure => Err(CliError::MoveTestError),
@@ -289,7 +291,10 @@ impl CliCommand<()> for TransactionalTestOpts {
     }
 }
 
-/// Prove the Move package at the package path
+/// Proves the Move package
+///
+/// This is a tool for formal verification of a Move package using
+/// the Move prover
 #[derive(Parser)]
 pub struct ProvePackage {
     /// A filter string to determine which files to verify
@@ -343,7 +348,7 @@ pub(crate) fn compile_move(
         .map_err(|err| CliError::MoveCompilationError(format!("{:#}", err)))
 }
 
-/// Publishes the modules in a Move package
+/// Publishes the modules in a Move package to the Aptos blockchain
 #[derive(Parser)]
 pub struct PublishPackage {
     /// Whether to use the legacy publishing flow. This will be soon removed.
@@ -484,20 +489,23 @@ impl CliCommand<TransactionSummary> for PublishPackage {
     }
 }
 
-/// Downloads a package and stores it in a directory named after the package.
+/// Downloads a package and stores it in a directory named after the package
+///
+/// This lets you retrieve packages directly from the blockchain for inspection
+/// and use as a local dependency in testing.
 #[derive(Parser)]
 pub struct DownloadPackage {
-    /// Address of the account.
+    /// Address of the account containing the package
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
-    /// Name of the package.
+    /// Name of the package
     #[clap(long)]
     package: String,
 
-    /// Where to store the downloaded packages. Defaults to the current directory.
-    #[clap(long)]
-    target: Option<String>,
+    /// Directory to store downloaded package. Defaults to the current directory.
+    #[clap(long, parse(from_os_str))]
+    output_dir: Option<PathBuf>,
 
     #[clap(flatten)]
     rest_options: RestOptions,
@@ -514,35 +522,33 @@ impl CliCommand<&'static str> for DownloadPackage {
     async fn execute(self) -> CliTypedResult<&'static str> {
         let url = self.rest_options.url(&self.profile_options.profile)?;
         let registry = CachedPackageRegistry::create(url, self.account).await?;
-        let path = if let Some(p) = self.target {
-            PathBuf::from(p)
-        } else {
-            PathBuf::from(".")
-        };
+        let output_dir = dir_default_to_current(self.output_dir)?;
+
         let package = registry
             .get_package(self.package)
             .await
             .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
-        let package_path = path.join(package.name());
+        let package_path = output_dir.join(package.name());
         package
             .save_package_to_disk(package_path.clone(), true)
-            .map_err(|e| CliError::UnexpectedError(format!("cannot save package: {}", e)))?;
+            .map_err(|e| CliError::UnexpectedError(format!("Failed to save package: {}", e)))?;
         println!(
-            "saved package with {} module(s) to `{}`",
+            "Saved package with {} module(s) to `{}`",
             package.module_names().len(),
             package_path.display()
         );
-        Ok("download succeeded")
+        Ok("Download succeeded")
     }
 }
 
-/// Lists information about packages and modules.
+/// Lists information about packages and modules on-chain
 #[derive(Parser)]
 pub struct ListPackage {
-    /// Address of the account.
+    /// Address of the account onchain
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
+    /// Type of resources to query
     #[clap(long, default_value_t = ListQuery::Packages)]
     query: ListQuery,
 
@@ -559,10 +565,9 @@ pub enum ListQuery {
 
 impl Display for ListQuery {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
+        f.write_str(match self {
             ListQuery::Packages => "packages",
-        };
-        write!(f, "{}", str)
+        })
     }
 }
 
