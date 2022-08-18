@@ -32,9 +32,9 @@ AggregateSignature:
     - sig:
         OPTION:
           TYPENAME: Signature
-AggregatedSignatureWithRounds:
+AggregateSignatureWithRounds:
   STRUCT:
-    - aggregated_sig:
+    - sig:
         TYPENAME: AggregateSignature
     - rounds:
         SEQ: U64
@@ -468,7 +468,7 @@ TwoChainTimeoutCertificate:
     - timeout:
         TYPENAME: TwoChainTimeout
     - signatures_with_rounds:
-        TYPENAME: AggregatedSignatureWithRounds
+        TYPENAME: AggregateSignatureWithRounds
 TypeTag:
   ENUM:
     0:
