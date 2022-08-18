@@ -83,9 +83,9 @@ async fn test_block_transactions_work() {
                 .as_ref()
                 .unwrap()
                 .r#type(),
-            PayloadType::ScriptFunctionPayload
+            PayloadType::EntryFunctionPayload
         );
-        if let Payload::ScriptFunctionPayload(payload) = txn
+        if let Payload::EntryFunctionPayload(payload) = txn
             .request
             .as_ref()
             .unwrap()

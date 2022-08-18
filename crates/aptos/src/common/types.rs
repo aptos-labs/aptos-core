@@ -30,7 +30,7 @@ use aptos_sdk::{
     types::LocalAccount,
 };
 use aptos_types::transaction::{
-    authenticator::AuthenticationKey, ScriptFunction, TransactionPayload,
+    authenticator::AuthenticationKey, EntryFunction, TransactionPayload,
 };
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
@@ -1108,7 +1108,7 @@ impl TransactionOptions {
         type_args: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
     ) -> CliTypedResult<Transaction> {
-        let txn = TransactionPayload::ScriptFunction(ScriptFunction::new(
+        let txn = TransactionPayload::EntryFunction(EntryFunction::new(
             ModuleId::new(address, ident_str!(module).to_owned()),
             ident_str!(function).to_owned(),
             type_args,

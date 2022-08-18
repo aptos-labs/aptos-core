@@ -14,7 +14,7 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{
         authenticator::{AuthenticationKey, TransactionAuthenticator},
-        ChangeSet, Script, ScriptFunction, SignedTransaction,
+        ChangeSet, EntryFunction, Script, SignedTransaction,
     },
     utility_coin::APTOS_COIN_TYPE,
     write_set::{WriteOp, WriteSetMut},
@@ -114,7 +114,7 @@ async fn test_get_transactions_param_limit_exceeds_limit() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_transactions_output_user_transaction_with_script_function_payload() {
+async fn test_get_transactions_output_user_transaction_with_entry_function_payload() {
     let mut context = new_test_context(current_function_name!());
     let account = context.gen_account();
     let txn = context.create_user_account(&account);
@@ -512,12 +512,12 @@ async fn test_get_pending_transaction_by_hash() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_signing_message_with_script_function_payload() {
+async fn test_signing_message_with_entry_function_payload() {
     let mut context = new_test_context(current_function_name!());
     let account = context.gen_account();
     let txn = context.create_user_account(&account);
     let payload = json!({
-        "type": "script_function_payload",
+        "type": "entry_function_payload",
         "function": "0x1::account::create_account",
         "type_arguments": [],
         "arguments": [
@@ -841,10 +841,10 @@ async fn test_get_txn_execute_failed_by_invalid_write_set_payload() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_script_function_address() {
+async fn test_get_txn_execute_failed_by_invalid_entry_function_address() {
     let context = new_test_context(current_function_name!());
     let account = context.root_account();
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         account,
         "0x1222",
@@ -860,10 +860,10 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_address() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_script_function_module_name() {
+async fn test_get_txn_execute_failed_by_invalid_entry_function_module_name() {
     let context = new_test_context(current_function_name!());
     let account = context.root_account();
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         account,
         "0x1",
@@ -879,10 +879,10 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_module_name() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_script_function_name() {
+async fn test_get_txn_execute_failed_by_invalid_entry_function_name() {
     let context = new_test_context(current_function_name!());
     let account = context.root_account();
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         account,
         "0x1",
@@ -898,10 +898,10 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_name() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_invalid_script_function_arguments() {
+async fn test_get_txn_execute_failed_by_invalid_entry_function_arguments() {
     let context = new_test_context(current_function_name!());
     let account = context.root_account();
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         account,
         "0x1",
@@ -917,10 +917,10 @@ async fn test_get_txn_execute_failed_by_invalid_script_function_arguments() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_missing_script_function_arguments() {
+async fn test_get_txn_execute_failed_by_missing_entry_function_arguments() {
     let context = new_test_context(current_function_name!());
     let account = context.root_account();
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         account,
         "0x1",
@@ -936,14 +936,14 @@ async fn test_get_txn_execute_failed_by_missing_script_function_arguments() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_script_function_validation() {
+async fn test_get_txn_execute_failed_by_entry_function_validation() {
     let mut context = new_test_context(current_function_name!());
     let account = context.gen_account();
     context
         .commit_block(&vec![context.create_user_account(&account)])
         .await;
 
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         account,
         "0x1",
@@ -960,7 +960,7 @@ async fn test_get_txn_execute_failed_by_script_function_validation() {
 
 #[ignore] // re-enable after cleaning after compiled code
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_txn_execute_failed_by_script_function_execution_failure() {
+async fn test_get_txn_execute_failed_by_entry_function_execution_failure() {
     let mut context = new_test_context(current_function_name!());
 
     // address 0xA550C18 {
@@ -973,14 +973,14 @@ async fn test_get_txn_execute_failed_by_script_function_execution_failure() {
     //         }
     //     }
     // }
-    let hello_script_fun = hex::decode("a11ceb0b030000000601000203020a050c01070d12081f100c2f24000000010000000002000000000548656c6c6f0568656c6c6f05776f726c640000000000000000000000000a550c180002000000021101020100000000050601000000000000000600000000000000001a010200").unwrap();
+    let hello_entry_fun = hex::decode("a11ceb0b030000000601000203020a050c01070d12081f100c2f24000000010000000002000000000548656c6c6f0568656c6c6f05776f726c640000000000000000000000000a550c180002000000021101020100000000050601000000000000000600000000000000001a010200").unwrap();
     let mut root_account = context.root_account();
     let module_txn = root_account
-        .sign_with_transaction_builder(context.transaction_factory().module(hello_script_fun));
+        .sign_with_transaction_builder(context.transaction_factory().module(hello_entry_fun));
 
     context.commit_block(&vec![module_txn]).await;
 
-    test_get_txn_execute_failed_by_invalid_script_function(
+    test_get_txn_execute_failed_by_invalid_entry_function(
         context,
         root_account,
         "0xA550C18",
@@ -1015,7 +1015,7 @@ async fn test_get_txn_execute_failed_by_script_execution_failure() {
     test_transaction_vm_status(context, txn, false).await
 }
 
-async fn test_get_txn_execute_failed_by_invalid_script_function(
+async fn test_get_txn_execute_failed_by_invalid_entry_function(
     context: TestContext,
     mut account: LocalAccount,
     address: &str,
@@ -1027,7 +1027,7 @@ async fn test_get_txn_execute_failed_by_invalid_script_function(
     let txn = account.sign_with_transaction_builder(
         context
             .transaction_factory()
-            .script_function(ScriptFunction::new(
+            .entry_function(EntryFunction::new(
                 ModuleId::new(
                     AccountAddress::from_hex_literal(address).unwrap(),
                     Identifier::new(module_id).unwrap(),
