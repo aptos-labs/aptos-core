@@ -5,7 +5,10 @@ import { AptosClient, BCS } from 'aptos';
 import fetchAdapter from '@vespaiach/axios-fetch-adapter';
 import axios from 'axios';
 import { sign } from 'tweetnacl';
-import { MessageMethod, PermissionType } from '../core/types/dappTypes';
+import {
+  MessageMethod, Permission, warningPrompt,
+} from '../core/types/dappTypes';
+import PromptPresenter from '../core/utils/promptPresenter';
 import {
   getBackgroundAptosAccountState,
   getBackgroundNetwork,
@@ -71,7 +74,7 @@ async function getNetwork(sendResponse) {
 
 async function connect(publicAccount, sendResponse) {
   if (await Permissions.requestPermissions(
-    PermissionType.CONNECT,
+    Permission.CONNECT,
     await getCurrentDomain(),
     publicAccount.address,
   )) {
@@ -100,7 +103,7 @@ async function signAndSubmitTransaction(client, publicAccount, transaction, send
   }
 
   const permission = await Permissions.requestPermissions(
-    PermissionType.SIGN_AND_SUBMIT_TRANSACTION,
+    Permission.SIGN_AND_SUBMIT_TRANSACTION,
     await getCurrentDomain(),
     publicAccount.address,
   );
@@ -129,7 +132,7 @@ async function signTransactionAndSendResponse(client, publicAccount, transaction
   }
 
   const permission = await Permissions.requestPermissions(
-    PermissionType.SIGN_TRANSACTION,
+    Permission.SIGN_TRANSACTION,
     await getCurrentDomain(),
     publicAccount.address,
   );
@@ -157,7 +160,7 @@ async function signMessage(publicAccount, message, sendResponse) {
   }
 
   const permission = await Permissions.requestPermissions(
-    PermissionType.SIGN_MESSAGE,
+    Permission.SIGN_MESSAGE,
     await getCurrentDomain(),
     publicAccount.address,
   );
@@ -183,10 +186,22 @@ async function signMessage(publicAccount, message, sendResponse) {
   }
 }
 
+function shouldShowNoAccountsPrompt(method) {
+  switch (method) {
+    case MessageMethod.CONNECT:
+      return true;
+    default:
+      return false;
+  }
+}
+
 async function handleDappRequest(request, sendResponse) {
   const publicAccount = await getBackgroundCurrentPublicAccount();
   const network = await getBackgroundNetwork();
   if (!publicAccount) {
+    if (shouldShowNoAccountsPrompt(request.method)) {
+      PromptPresenter.promptUser(warningPrompt());
+    }
     sendResponse({ error: DappErrorType.NO_ACCOUNTS });
     return;
   }

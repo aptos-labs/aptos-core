@@ -12,12 +12,38 @@ export const MessageMethod = Object.freeze({
   SIGN_TRANSACTION: 'signTransaction',
 } as const);
 
-export const PermissionType = Object.freeze({
-  CONNECT: 'connect',
-  SIGN_AND_SUBMIT_TRANSACTION: 'signAndSubmitTransaction',
-  SIGN_MESSAGE: 'signMessage',
-  SIGN_TRANSACTION: 'signTransaction',
-} as const);
+export enum Permission {
+  CONNECT = 'connect',
+  SIGN_AND_SUBMIT_TRANSACTION = 'signAndSubmitTransaction',
+  SIGN_MESSAGE = 'signMessage',
+  SIGN_TRANSACTION = 'signTransaction',
+}
+
+export interface PermissionPromptType {
+  kind: 'permission'
+  permission: Permission
+}
+
+export interface WarningPromptType {
+  kind: 'warning'
+  warning: 'noAccounts' // we may add more in the future
+}
+
+export type PromptType = PermissionPromptType | WarningPromptType;
+
+export function warningPrompt(): WarningPromptType {
+  return {
+    kind: 'warning',
+    warning: 'noAccounts',
+  };
+}
+
+export function permissionPrompt(permission: Permission): PermissionPromptType {
+  return {
+    kind: 'permission',
+    permission,
+  };
+}
 
 export const PromptMessage = Object.freeze({
   APPROVED: 'approved',
@@ -28,6 +54,6 @@ export const PromptMessage = Object.freeze({
 export interface PromptInfo {
   domain: string | undefined;
   imageURI: string | undefined;
-  promptType: string;
+  promptType: PromptType;
   title: string | undefined;
 }

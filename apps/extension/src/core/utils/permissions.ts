@@ -2,98 +2,34 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import Browser from 'core/utils/browser';
-import { PromptInfo, PermissionType, PromptMessage } from 'core/types/dappTypes';
+import { Permission, permissionPrompt } from 'core/types/dappTypes';
+import PromptPresenter from 'core/utils/promptPresenter';
 
 const PERMISSIONS_STORAGE_KEY = 'aptosWalletPermissions';
-const PROMPT_HEIGHT = 600;
-const PROMPT_WIDTH = 375;
 
 export default class Permissions {
-  static async getCurrentTab(): Promise<chrome.tabs.Tab> {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    return tabs[0];
-  }
-
-  static isPromptActive(): Promise<boolean> {
-    const { id } = chrome.runtime;
-    return new Promise((resolve) => {
-      chrome.tabs.query({}, (tabs) => {
-        const foundTab = tabs.find((tab) => tab.url?.includes(id));
-        resolve(foundTab !== undefined);
-      });
-    });
-  }
-
-  static async promptUser(permission: string): Promise<boolean> {
-    const isPromptActive = await this.isPromptActive();
-    if (isPromptActive) {
-      return false;
-    }
-    const { favIconUrl, title, url } = await this.getCurrentTab();
-    chrome.windows.getCurrent(async (window) => {
-      const left = (window.left ?? 0) + (window.width ?? 0) - PROMPT_WIDTH;
-      const { top } = window;
-      await chrome.windows.create({
-        height: PROMPT_HEIGHT,
-        left,
-        top,
-        type: 'popup',
-        url: 'prompt.html',
-        width: PROMPT_WIDTH,
-      });
-    });
-    return new Promise((resolve) => {
-      chrome.runtime.onMessage.addListener(function handler(request, sender, sendResponse) {
-        switch (request) {
-          case PromptMessage.LOADED:
-            // eslint-disable-next-line no-case-declarations
-            const info: PromptInfo = {
-              domain: url ? new URL(url).hostname : undefined,
-              imageURI: favIconUrl,
-              promptType: permission,
-              title,
-            };
-            sendResponse(info);
-            break;
-          case PromptMessage.APPROVED:
-            resolve(true);
-            chrome.runtime.onMessage.removeListener(handler);
-            sendResponse();
-            break;
-          case PromptMessage.REJECTED:
-            resolve(false);
-            chrome.runtime.onMessage.removeListener(handler);
-            sendResponse();
-            break;
-          default:
-            break;
-        }
-      });
-    });
-  }
-
   public static async requestPermissions(
-    permission: string,
+    permission: Permission,
     domain: string,
     address: string,
   ): Promise<boolean> {
     switch (permission) {
-      case PermissionType.CONNECT:
+      case Permission.CONNECT:
         if (await this.isDomainAllowed(domain, address)) {
           return true;
         }
-        if (await this.promptUser(permission)) {
+        if (await PromptPresenter.promptUser(permissionPrompt(permission))) {
           await this.addDomain(domain, address);
           return true;
         }
         return false;
-      case PermissionType.SIGN_AND_SUBMIT_TRANSACTION:
-      case PermissionType.SIGN_TRANSACTION:
-      case PermissionType.SIGN_MESSAGE:
+      case Permission.SIGN_AND_SUBMIT_TRANSACTION:
+      case Permission.SIGN_TRANSACTION:
+      case Permission.SIGN_MESSAGE:
         if (!await this.isDomainAllowed(domain, address)) {
           return false;
         }
-        return this.promptUser(permission);
+        return PromptPresenter.promptUser(permissionPrompt(permission));
       default:
         return false;
     }
