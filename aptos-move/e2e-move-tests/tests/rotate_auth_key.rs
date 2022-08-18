@@ -9,8 +9,8 @@ use aptos_types::{
     transaction::authenticator::AuthenticationKey,
 };
 
+use cached_packages::aptos_stdlib;
 use e2e_move_tests::{assert_success, enable_golden, MoveHarness};
-use framework::aptos_stdlib;
 use move_deps::move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
 

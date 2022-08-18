@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::account_address::AccountAddress;
+use cached_packages::aptos_stdlib;
 use e2e_move_tests::{
     assert_abort, assert_success, enable_golden, get_stake_pool, get_validator_config,
     get_validator_set, initialize_staking, join_validator_set, leave_validator_set,
     rotate_consensus_key, setup_staking, unlock_stake, withdraw_stake, MoveHarness,
 };
-use framework::aptos_stdlib;
 use move_deps::move_core_types::language_storage::CORE_CODE_ADDRESS;
 
 #[test]

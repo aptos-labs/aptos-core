@@ -16,7 +16,7 @@ proptest-derive = { version = "0.3.0", optional = true }
 
 aptos-types = { path = "../../types" }
 
-framework = { path = "../../aptos-move/framework" }
+cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 move-deps = { path = "../../aptos-move/move-deps", features = ["address32"] }
 
 [dev-dependencies]
@@ -27,4 +27,4 @@ move-deps = { path = "../../aptos-move/move-deps", features = ["address32", "fuz
 
 [features]
 default = []
-fuzzing = ["proptest-derive", "framework/fuzzing", "move-deps/fuzzing"]
+fuzzing = ["proptest-derive", "cached-packages/fuzzing", "move-deps/fuzzing"]

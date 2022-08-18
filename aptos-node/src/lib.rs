@@ -117,7 +117,7 @@ impl AptosNodeArgs {
             let genesis_framework = if let Some(path) = self.genesis_framework {
                 ReleaseBundle::read(path).unwrap()
             } else {
-                framework::head_release_bundle().clone()
+                cached_packages::head_release_bundle().clone()
             };
             load_test_environment(
                 self.config,

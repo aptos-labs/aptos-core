@@ -10,7 +10,7 @@ pub fn test_config() -> (NodeConfig, Ed25519PrivateKey) {
     let path = TempPath::new();
     path.create_as_dir().unwrap();
     let (root_key, _genesis, _genesis_waypoint, validators) =
-        crate::builder::Builder::new(path.path(), framework::head_release_bundle().clone())
+        crate::builder::Builder::new(path.path(), cached_packages::head_release_bundle().clone())
             .unwrap()
             .build(StdRng::from_seed([0; 32]))
             .unwrap();
