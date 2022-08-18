@@ -8,6 +8,7 @@ use crate::{
     txn_last_input_output::{ReadDescriptor, TxnLastInputOutput},
 };
 use aptos_infallible::Mutex;
+use aptos_types::write_set::DeserializeU128;
 use mvhashmap::MVHashMap;
 use num_cpus;
 use once_cell::sync::Lazy;
@@ -35,8 +36,11 @@ pub struct MVHashMapView<'a, K, V> {
     captured_reads: Mutex<Vec<ReadDescriptor<K>>>,
 }
 
-impl<'a, K: ModulePath + PartialOrd + Send + Clone + Hash + Eq, V: Send + Sync>
-    MVHashMapView<'a, K, V>
+impl<
+        'a,
+        K: ModulePath + PartialOrd + Send + Clone + Hash + Eq,
+        V: DeserializeU128 + Send + Sync,
+    > MVHashMapView<'a, K, V>
 {
     /// Drains the captured reads.
     pub fn take_reads(&self) -> Vec<ReadDescriptor<K>> {
