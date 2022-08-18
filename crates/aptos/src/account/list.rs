@@ -12,6 +12,7 @@ use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
+use itertools::Itertools;
 
 #[derive(ArgEnum, Clone, Copy, Debug)]
 pub enum ListQuery {
@@ -105,8 +106,7 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
                 .await
                 .map_err(map_err_func)?
                 .into_inner()
-                .iter()
-                .cloned()
+                .into_iter()
                 .map(|module| module.try_parse_abi().unwrap())
                 .map(|module| json!(module))
                 .collect::<Vec<serde_json::Value>>(),
@@ -116,9 +116,9 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
                 .map_err(map_err_func)?
                 .into_inner()
                 .iter()
-                .map(|resource| {
+                .map_into(|resource| {
                     let mut map = serde_json::Map::new();
-                    map.insert(resource.resource_type.to_string(), resource.data.clone());
+                    map.insert(resource.resource_type.to_string(), resource.data);
                     serde_json::Value::Object(map)
                 })
                 .collect::<Vec<serde_json::Value>>(),
