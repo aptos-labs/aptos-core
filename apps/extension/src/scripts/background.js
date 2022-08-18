@@ -15,7 +15,7 @@ import {
   getBackgroundCurrentPublicAccount,
 } from '../core/utils/account';
 import Permissions from '../core/utils/permissions';
-import { DappErrorType } from '../core/types/errors';
+import { DappErrorType, TransactionError } from '../core/types/errors';
 
 // The fetch adapter is necessary to use axios from a service worker
 axios.defaults.adapter = fetchAdapter;
@@ -68,7 +68,7 @@ async function getNetwork(sendResponse) {
     const network = await getBackgroundNetwork();
     sendResponse(network.name);
   } catch (error) {
-    sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
+    sendResponse({ data: error, error: DappErrorType.INTERNAL_ERROR });
   }
 }
 
@@ -122,7 +122,7 @@ async function signAndSubmitTransaction(client, publicAccount, transaction, send
     const response = await client.submitTransaction(signedTransaction);
     sendResponse(response);
   } catch (error) {
-    sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
+    sendResponse(TransactionError(error));
   }
 }
 
@@ -150,7 +150,7 @@ async function signTransactionAndSendResponse(client, publicAccount, transaction
     const signedTransaction = await signTransaction(client, account, transaction);
     sendResponse({ signedTransaction });
   } catch (error) {
-    sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
+    sendResponse(TransactionError(error));
   }
 }
 
@@ -182,7 +182,7 @@ async function signMessage(publicAccount, message, sendResponse) {
     const signedMessage = Buffer.from(signature).toString('hex');
     sendResponse({ signedMessage });
   } catch (error) {
-    sendResponse({ data: error, error: DappErrorType.TRANSACTION_FAILURE });
+    sendResponse({ error });
   }
 }
 

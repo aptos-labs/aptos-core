@@ -60,7 +60,7 @@ function App() {
   };
 
   const onSubmitTransactionClick = async () => {
-    if (!isSubmittingTransaction && address) {
+    if (!isSubmittingTransaction) {
       setIsSubmittingTransaction(true);
       try {
         const pendingTransaction = await window.aptos.signAndSubmitTransaction(transaction);
@@ -73,7 +73,7 @@ function App() {
   };
 
   const onSignTransactionClick = async () => {
-    if (!isSubmittingTransaction && address) {
+    if (!isSubmittingTransaction) {
       setIsSigningTransaction(true);
       try {
         const signedTransaction = await window.aptos.signTransaction(transaction);

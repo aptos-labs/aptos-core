@@ -17,16 +17,26 @@ class ExtendableError extends Error {
 export class DappError extends ExtendableError {
   code: number;
 
-  constructor(code: number, message: string) {
+  constructor(code: number, name: string, message: string) {
     super(message);
+    this.name = name;
     this.code = code;
   }
 }
 
 export const DappErrorType = Object.freeze({
-  NO_ACCOUNTS: new DappError(4000, 'No accounts found'),
-  TRANSACTION_FAILURE: new DappError(-30000, 'Transaction failed'),
-  UNAUTHORIZED: new DappError(4100, 'The requested method and/or account has not been authorized by the user.'),
-  UNSUPPORRTED: new DappError(4200, 'The provider does not support the requested method.'),
-  USER_REJECTION: new DappError(4001, 'The user rejected the request'),
+  INTERNAL_ERROR: new DappError(-30001, 'Internal Error', 'Internal Error'),
+  NO_ACCOUNTS: new DappError(4000, 'No Accounts', 'No accounts found'),
+  UNAUTHORIZED: new DappError(4100, 'Unauthorized', 'The requested method and/or account has not been authorized by the user.'),
+  UNSUPPORRTED: new DappError(4200, 'Unsupoorted', 'The provider does not support the requested method.'),
+  USER_REJECTION: new DappError(4001, 'Rejected', 'The user rejected the request'),
 });
+
+export function TransactionError(error: Error): DappError {
+  let message = 'Transaction failed';
+  const anyError = error as any;
+  if (anyError.body && anyError.body.message) {
+    message = anyError.body.message;
+  }
+  return new DappError(-30000, 'Transaction Failed', message);
+}
