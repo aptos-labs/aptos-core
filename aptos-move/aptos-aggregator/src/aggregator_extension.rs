@@ -66,25 +66,25 @@ impl AggregatorID {
 /// failed. Most importantly, it allows commutativity of adds/subs. Example:
 ///
 ///
-///     This graph shows how delta of aggregator changed during a single
-///     transaction execution:
+/// This graph shows how delta of aggregator changed during a single transaction
+/// execution:
 ///
-///     +A ===========================================>
-///                ||
-///              ||||                               +X
-///             |||||  ||||||                    ||||
-///          |||||||||||||||||||||||||          |||||
-///     +0 ===========================================> time
-///                           ||||||
-///                             ||
-///                             ||
-///     -B ===========================================>
+/// +A ===========================================>
+///            ||
+///          ||||                               +X
+///         |||||  ||||||                    ||||
+///      |||||||||||||||||||||||||          |||||
+/// +0 ===========================================> time
+///                       ||||||
+///                         ||
+///                         ||
+/// -B ===========================================>
 ///
-///     Clearly, +X succeeds if +A and -B succeed. Therefore each delta
-///     validation consists of:
-///         1. check +A didn't overflow
-///         2. check -A didn't drop below zero
-///     Checking +X is irrelevant since +A >= +X.
+/// Clearly, +X succeeds if +A and -B succeed. Therefore each delta
+/// validation consists of:
+///   1. check +A didn not overflow
+///   2. check -A didn nott drop below zero
+/// Checking +X is irrelevant since +A >= +X.
 ///
 /// TODO: while we support tracking of the history, it is not yet fully used on
 /// executor side because we don't know how to throw errors.
