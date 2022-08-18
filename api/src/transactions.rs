@@ -88,7 +88,7 @@ impl TransactionsApi {
         start: Query<Option<U64>>,
         limit: Query<Option<u16>>,
     ) -> BasicResultWith404<Vec<Transaction>> {
-        fail_point_poem("endppoint_get_transactions")?;
+        fail_point_poem("endpoint_get_transactions")?;
         let page = Page::new(start.0.map(|v| v.0), limit.0);
         self.list(&accept_type, page)
     }
