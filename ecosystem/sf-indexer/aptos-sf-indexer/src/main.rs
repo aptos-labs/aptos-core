@@ -8,7 +8,9 @@
 #![forbid(unsafe_code)]
 
 use aptos_logger::{error, info};
-use aptos_sf_indexer::indexer::substream_processor::SubstreamProcessor;
+use aptos_sf_indexer::indexer::substream_processor::{
+    get_start_block, run_migrations, SubstreamProcessor,
+};
 use aptos_sf_indexer::proto;
 
 use anyhow::{format_err, Context, Error};
@@ -26,14 +28,21 @@ use std::{env, sync::Arc};
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 struct IndexerArgs {
+    // URL of the firehose gRPC endpoint
     #[clap(long)]
     endpoint_url: String,
 
+    // Relative location of the substream wasm file (.spkg)
     #[clap(long)]
     package_file: String,
 
+    // Substream module name
     #[clap(long)]
     module_name: String,
+
+    /// If set, don't run any migrations
+    #[clap(long)]
+    skip_migrations: bool,
 }
 
 #[tokio::main]
@@ -50,6 +59,10 @@ async fn main() -> Result<(), Error> {
     let conn_pool = new_db_pool(&database_url).unwrap();
     info!("Created the connection pool... ");
 
+    if !args.skip_migrations {
+        run_migrations(&conn_pool);
+    }
+
     let token_env = env::var("SUBSTREAMS_API_TOKEN").unwrap_or("".to_string());
     let mut token: Option<String> = None;
     if token_env.len() > 0 {
@@ -59,14 +72,11 @@ async fn main() -> Result<(), Error> {
     let endpoint = Arc::new(SubstreamsEndpoint::new(&endpoint_url, token).await?);
 
     info!("Created substream endpoint");
-    let start_block = BlockOutputSubstreamProcessor::get_max_block_without_error(
-        &conn_pool,
-        &substream_module_name,
-    )
-    .unwrap_or_else(|| {
-        info!("Could not fetch max block so starting from block 0");
-        0
-    });
+    let start_block = get_start_block(&conn_pool, &substream_module_name)
+        .unwrap_or_else(|| {
+            info!("Could not fetch max block so starting from block 0");
+            0
+        });
     info!("Starting stream from block {}", start_block);
 
     let mut stream = SubstreamsStream::new(

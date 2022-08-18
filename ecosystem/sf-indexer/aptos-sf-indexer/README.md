@@ -11,6 +11,9 @@
 
 # Local Development
 
+### Run Firehose
+TBD
+
 ### Installation Guide (for apple silicon)
 1. `brew install libpq` ([this is a postgres C API library](https://formulae.brew.sh/formula/libpq)). Also perform all export commands post-installation
 2. `brew install postgres`
@@ -18,12 +21,14 @@
 4. `/opt/homebrew/bin/createuser -s postgres`
 5. Ensure you're able to do: `psql postgres`
 6. `cargo install diesel_cli --no-default-features --features postgres`
-7. `diesel migration run --database-url postgresql://localhost/postgres`
+7. `DATABASE_URL=postgresql://localhost/postgres diesel migration run`
 8. Start indexer
 ```bash
-DATABASE_URL=postgres://postgres@localhost:5432/aptos_indexer cargo run -- --endpoint-url http://localhost:18015 --package-file ../aptos-substreams/aptos-substreams-v0.0.1.spkg --module-name block_to_block_output
+DATABASE_URL=postgres://postgres@localhost:5432/postgres  cargo run -- --endpoint-url http://localhost:18015 --package-file ../aptos-substreams/aptos-substreams-v0.0.1.spkg --module-name block_to_block_output
 ```
 
+### Creating/editing substreams
+TBD
 
 ### Optional PgAdmin4
 1. Complete Installation Guide above
@@ -49,7 +54,6 @@ Username: postgres
 > - Diesel uses the `DATABASE_URL` env var to connect to the database.
 > - Diesel CLI can be installed via cargo, e.g., `cargo install diesel_cli --no-default-features --features postgres`.
 > - `diesel migration run` sets up the database and runs all available migrations.
-> - Aptos tests use the `INDEXER_DATABASE_URL` env var. It needs to be set for the relevant tests to run.
 > - Postgres can be [installed and run via brew](https://wiki.postgresql.org/wiki/Homebrew).
 
 ## Adding new tables / Updating tables with Diesel

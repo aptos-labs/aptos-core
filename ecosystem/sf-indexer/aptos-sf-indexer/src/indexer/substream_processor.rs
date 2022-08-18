@@ -12,14 +12,17 @@ use crate::{
     proto::BlockScopedData,
     schema,
 };
+use aptos_logger::info;
 use async_trait::async_trait;
 use diesel::{
     sql_query,
     sql_types::{BigInt, Text},
     RunQueryDsl,
 };
-use schema::indexer_states::{self, dsl};
+use schema::indexer_states;
 use std::fmt::Debug;
+
+diesel_migrations::embed_migrations!();
 
 /// The `SubstreamProcessor` processes the output from a substream specific to the server instance
 #[async_trait]
@@ -140,80 +143,95 @@ pub trait SubstreamProcessor: Send + Sync + Debug {
             &conn,
             diesel::insert_into(indexer_states::table)
                 .values(psm)
-                .on_conflict((dsl::substream_module, dsl::block_height))
+                .on_conflict((
+                    indexer_states::dsl::substream_module,
+                    indexer_states::dsl::block_height,
+                ))
                 .do_update()
                 .set(psm),
         )
         .expect("Error updating Processor Status!");
     }
+}
 
-    /// Gets the highest block for this `SubstreamProcessor` from the DB
-    /// This is so we know where to resume from on restarts.
-    /// If a block has any unprocessed transactions, we will restart processing the entire block.
-    fn get_max_block_without_error(pool: &PgDbPool, substream_module_name: &String) -> Option<i64> {
-        let conn = Self::get_conn(pool);
-        let sql = "
-            WITH boundaries AS 
-            (
-                SELECT
-                    MAX(block_height) AS MAX_V,
-                    MIN(block_height) AS MIN_V 
-                FROM
-                    indexer_states 
-                WHERE
-                    substream_module = $1 
-                    AND success = TRUE 
-            ),
-            gap AS 
-            (
-                SELECT
-                    MIN(block_height) + 1 AS maybe_gap 
-                FROM
-                    (
-                        SELECT
-                            block_height,
-                            LEAD(block_height) OVER ( 
-                        ORDER BY
-                            block_height ASC) AS next_block_height 
-                        FROM
-                            indexer_states,
-                            boundaries 
-                        WHERE
-                            substream_module = $1 
-                            AND success = TRUE 
-                            AND block_height >= MAX_V - 1000000 
-                    ) a 
-                WHERE
-                    block_height + 1 <> next_block_height
-            )
+pub fn run_migrations(pool: &PgDbPool) {
+    info!("Running migrations...");
+    embedded_migrations::run_with_output(
+        &pool.get().expect("Could not get connection for migrations"),
+        &mut std::io::stdout(),
+    )
+    .expect("migrations failed!");
+    info!("Migrations complete!");
+}
+
+/// Gets the highest block for this `SubstreamProcessor` from the DB
+/// This is so we know where to resume from on restarts.
+/// If a block has any unprocessed transactions, we will restart processing the entire block.
+pub fn get_start_block(pool: &PgDbPool, substream_module_name: &String) -> Option<i64> {
+    let conn = pool
+        .get()
+        .expect("Could not get connection for checking starting block");
+    let sql = "
+        WITH boundaries AS 
+        (
             SELECT
-                CASE
-                    WHEN
-                        MIN_V <> 0 
-                    THEN
-                        0 
-                    ELSE
-                        COALESCE(maybe_gap, MAX_V + 1) 
-                END
-                AS block_height 
+                MAX(block_height) AS MAX_V,
+                MIN(block_height) AS MIN_V 
             FROM
-                gap, boundaries
-            ";
-        #[derive(Debug, QueryableByName)]
-        pub struct Gap {
-            #[sql_type = "BigInt"]
-            pub block_height: i64,
-        }
-        let res: Vec<Option<Gap>> = sql_query(sql)
-            .bind::<Text, _>(substream_module_name)
-            .get_results(&conn)
-            .unwrap();
-        match res.first() {
+                indexer_states 
+            WHERE
+                substream_module = $1 
+                AND success = TRUE 
+        ),
+        gap AS 
+        (
+            SELECT
+                MIN(block_height) + 1 AS maybe_gap 
+            FROM
+                (
+                    SELECT
+                        block_height,
+                        LEAD(block_height) OVER ( 
+                    ORDER BY
+                        block_height ASC) AS next_block_height 
+                    FROM
+                        indexer_states,
+                        boundaries 
+                    WHERE
+                        substream_module = $1 
+                        AND success = TRUE 
+                        AND block_height >= MAX_V - 1000000 
+                ) a 
+            WHERE
+                block_height + 1 <> next_block_height
+        )
+        SELECT
+            CASE
+                WHEN
+                    MIN_V <> 0 
+                THEN
+                    0 
+                ELSE
+                    COALESCE(maybe_gap, MAX_V + 1) 
+            END
+            AS block_height 
+        FROM
+            gap, boundaries
+        ";
+    #[derive(Debug, QueryableByName)]
+    pub struct Gap {
+        #[sql_type = "BigInt"]
+        pub block_height: i64,
+    }
+    let res: Vec<Option<Gap>> = sql_query(sql)
+        .bind::<Text, _>(substream_module_name)
+        .get_results(&conn)
+        .unwrap();
+    match res.first() {
+        None => None,
+        Some(gap) => match gap {
+            Some(gap) => Some(gap.block_height),
             None => None,
-            Some(gap) => match gap {
-                Some(gap) => Some(gap.block_height),
-                None => None,
-            },
-        }
+        },
     }
 }
