@@ -15,7 +15,7 @@ module aptos_framework::aptos_governance {
     use std::error;
     use std::option;
     use std::signer;
-    use std::string::utf8;
+    use std::string::{Self, String, utf8};
 
     use aptos_std::event::{Self, EventHandle};
     use aptos_std::simple_map::{Self, SimpleMap};
@@ -47,9 +47,17 @@ module aptos_framework::aptos_governance {
     const ESCRIPT_HASH_ALREADY_ADDED: u64 = 7;
     /// The proposal has not been resolved yet
     const EPROPOSAL_NOT_RESOLVED_YET: u64 = 8;
+    /// Metadata location cannot be longer than 256 chars
+    const EMETADATA_LOCATION_TOO_LONG: u64 = 9;
+    /// Metadata hash cannot be longer than 256 chars
+    const EMETADATA_HASH_TOO_LONG: u64 = 10;
 
     /// This matches the same enum const in voting. We have to duplicate it as Move doesn't have support for enums yet.
     const PROPOSAL_STATE_SUCCEEDED: u64 = 1;
+
+    /// Proposal metadata attribute keys.
+    const METADATA_LOCATION_KEY: vector<u8> = b"metadata_location";
+    const METADATA_HASH_KEY: vector<u8> = b"metadata_hash";
 
     /// Store the SignerCapabilities of accounts under the on-chain governance's control.
     struct GovernanceResponsbility has key {
@@ -93,8 +101,7 @@ module aptos_framework::aptos_governance {
         stake_pool: address,
         proposal_id: u64,
         execution_hash: vector<u8>,
-        metadata_location: vector<u8>,
-        metadata_hash: vector<u8>,
+        proposal_metadata: SimpleMap<String, vector<u8>>,
     }
 
     /// Event emitted when there's a vote on a proposa;
@@ -227,6 +234,9 @@ module aptos_framework::aptos_governance {
             error::invalid_argument(EINSUFFICIENT_STAKE_LOCKUP),
         );
 
+        // Create and validate proposal metadata.
+        let proposal_metadata = create_proposal_metadata(metadata_location, metadata_hash);
+
         // We want to allow early resolution of proposals if more than 50% of the total supply of the network coins
         // has voted. This doesn't take into subsequent inflation/deflation (rewards are issued every epoch and gas fees
         // are burnt after every transaction), but inflation/delation is very unlikely to have a major impact on total
@@ -242,14 +252,12 @@ module aptos_framework::aptos_governance {
         let proposal_id = voting::create_proposal(
             proposer_address,
             @aptos_framework,
-            governance_proposal::create_proposal(
-                utf8(metadata_location),
-                utf8(metadata_hash),
-            ),
+            governance_proposal::create_proposal(),
             execution_hash,
             governance_config.min_voting_threshold,
             proposal_expiration,
             early_resolution_vote_threshold,
+            proposal_metadata,
         );
 
         let events = borrow_global_mut<GovernanceEvents>(@aptos_framework);
@@ -260,8 +268,7 @@ module aptos_framework::aptos_governance {
                 proposer: proposer_address,
                 stake_pool,
                 execution_hash,
-                metadata_location,
-                metadata_hash,
+                proposal_metadata,
             },
         );
     }
@@ -362,6 +369,12 @@ module aptos_framework::aptos_governance {
         };
     }
 
+    /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
+    public fun reconfigure(aptos_framework: &signer) {
+        system_addresses::assert_aptos_framework(aptos_framework);
+        reconfiguration::reconfigure();
+    }
+
     /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
     fun get_signer(_proposal: GovernanceProposal, signer_address: address): signer acquires GovernanceResponsbility {
         let governance_responsibility = borrow_global<GovernanceResponsbility>(@aptos_framework);
@@ -369,10 +382,14 @@ module aptos_framework::aptos_governance {
         create_signer_with_capability(signer_cap)
     }
 
-    /// Force reconfigure. To be called at the end of a proposal that alters on-chain configs.
-    public fun reconfigure(aptos_framework: &signer) {
-        system_addresses::assert_aptos_framework(aptos_framework);
-        reconfiguration::reconfigure();
+    fun create_proposal_metadata(metadata_location: vector<u8>, metadata_hash: vector<u8>): SimpleMap<String, vector<u8>> {
+        assert!(string::length(&utf8(metadata_location)) <= 256, error::invalid_argument(EMETADATA_LOCATION_TOO_LONG));
+        assert!(string::length(&utf8(metadata_hash)) <= 256, error::invalid_argument(EMETADATA_HASH_TOO_LONG));
+
+        let metadata = simple_map::create<String, vector<u8>>();
+        simple_map::add(&mut metadata, utf8(METADATA_LOCATION_KEY), metadata_location);
+        simple_map::add(&mut metadata, utf8(METADATA_HASH_KEY), metadata_hash);
+        metadata
     }
 
     #[test_only]
