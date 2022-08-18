@@ -14,4 +14,17 @@ module aptos_std::aptos_hash {
         // TODO: temporary mockup.
         pragma opaque;
     }
+
+    struct HashValue has copy, drop, store{
+        low: u128,
+        high: u128,
+    }
+
+    public fun new_hash_value(low: u128, high: u128): HashValue {
+        HashValue {
+            low,
+            high,
+        }
+    }
+
 }

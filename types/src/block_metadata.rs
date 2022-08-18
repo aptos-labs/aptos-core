@@ -4,6 +4,7 @@
 use aptos_crypto::HashValue;
 use move_deps::move_core_types::{account_address::AccountAddress, value::MoveValue};
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
 
 /// Struct that will be persisted on chain to store the information of the current block.
 ///
@@ -54,8 +55,12 @@ impl BlockMetadata {
     }
 
     pub fn get_prologue_move_args(self, signer: AccountAddress) -> Vec<MoveValue> {
+        let bytes = self.id.to_vec();
+        let low = u128::from_le_bytes(bytes[0..16].try_into().unwrap());
+        let high = u128::from_le_bytes(bytes[16..32].try_into().unwrap());
         vec![
             MoveValue::Signer(signer),
+            MoveValue::Vector(vec![MoveValue::U128(low), MoveValue::U128(high)]),
             MoveValue::U64(self.epoch),
             MoveValue::U64(self.round),
             MoveValue::Address(self.proposer),

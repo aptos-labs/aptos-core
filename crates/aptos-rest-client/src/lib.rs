@@ -4,7 +4,9 @@
 pub mod aptos;
 pub mod error;
 pub mod faucet;
+
 pub use faucet::FaucetClient;
+use std::str::FromStr;
 pub mod response;
 pub use response::Response;
 pub mod state;
@@ -420,6 +422,7 @@ impl Client {
     ) -> Result<Response<Vec<VersionedNewBlockEvent>>> {
         #[derive(Clone, Debug, Serialize, Deserialize)]
         pub struct NewBlockEventResponse {
+            id: String,
             #[serde(deserialize_with = "deserialize_from_string")]
             epoch: u64,
             #[serde(deserialize_with = "deserialize_from_string")]
@@ -455,6 +458,7 @@ impl Client {
                         .and_then(|e| {
                             Ok(VersionedNewBlockEvent {
                                 event: NewBlockEvent::new(
+                                    aptos_api_types::HashValue::from_str(&e.id)?.into(),
                                     e.epoch,
                                     e.round,
                                     e.height,
