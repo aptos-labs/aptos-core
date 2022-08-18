@@ -686,14 +686,14 @@ impl CliTestFramework {
         &self,
         index: usize,
         package: String,
-        target: String,
+        output_dir: PathBuf,
     ) -> CliTypedResult<&'static str> {
         DownloadPackage {
             rest_options: self.rest_options(),
             profile_options: Default::default(),
             account: self.account_id(index),
             package,
-            target: Some(target),
+            output_dir: Some(output_dir),
         }
         .execute()
         .await
