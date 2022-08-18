@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_ext::{addition, deserialize, serialize, subtraction, DeltaOp};
+use crate::delta_change_set::{addition, deserialize, serialize, subtraction, DeltaOp};
 use aptos_crypto::hash::DefaultHasher;
 use aptos_types::vm_status::StatusCode;
 use better_any::{Tid, TidAble};
@@ -563,11 +563,12 @@ fn not_supported_error() -> PartialVMError {
 #[cfg(test)]
 mod test {
     use super::*;
-    use aptos_gas::InternalGas;
     use aptos_state_view::StateView;
     use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
     use claim::{assert_err, assert_matches, assert_ok};
-    use move_deps::move_table_extension::TableOperation;
+    use move_deps::{
+        move_core_types::gas_algebra::InternalGas, move_table_extension::TableOperation,
+    };
     use once_cell::sync::Lazy;
     use std::collections::HashMap;
 
