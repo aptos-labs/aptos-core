@@ -9,7 +9,7 @@ use crate::{
 };
 use aptos_infallible::Mutex;
 use aptos_types::write_set::DeserializeU128;
-use mvhashmap::MVHashMap;
+use mvhashmap::{Error as MVError, MVHashMap, Output};
 use num_cpus;
 use once_cell::sync::Lazy;
 use std::{collections::HashSet, hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
@@ -50,9 +50,12 @@ impl<
 
     /// Captures a read from the VM execution.
     pub fn read(&self, key: &K) -> Option<Arc<V>> {
+        use MVError::*;
+        use Output::*;
+
         loop {
             match self.versioned_map.read(key, self.txn_idx) {
-                Ok((version, v)) => {
+                Ok(Version(version, v)) => {
                     let (txn_idx, incarnation) = version;
                     self.captured_reads.lock().push(ReadDescriptor::from(
                         key.clone(),
@@ -61,13 +64,21 @@ impl<
                     ));
                     return Some(v);
                 }
-                Err(None) => {
+                Ok(Resolved(_)) => {
+                    // TODO: fill when I add a descrptor kind.
+                    return None;
+                }
+                Err(NotFound) => {
                     self.captured_reads
                         .lock()
                         .push(ReadDescriptor::from_storage(key.clone()));
                     return None;
                 }
-                Err(Some(dep_idx)) => {
+                Err(Unresolved(_)) => {
+                    // TODO: fill when I add a descrptor kind.
+                    return None;
+                }
+                Err(Dependency(dep_idx)) => {
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
                     match self.scheduler.wait_for_dependency(self.txn_idx, dep_idx) {
                         Some(dep_condition) => {
@@ -212,6 +223,9 @@ where
         versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
         scheduler: &'a Scheduler,
     ) -> SchedulerTask<'a> {
+        use MVError::*;
+        use Output::*;
+
         let (idx_to_validate, incarnation) = version_to_validate;
         let read_set = last_input_output
             .read_set(idx_to_validate)
@@ -219,9 +233,13 @@ where
 
         let valid = read_set.iter().all(|r| {
             match versioned_data_cache.read(r.path(), idx_to_validate) {
-                Ok((version, _)) => r.validate_version(version),
-                Err(Some(_)) => false, // Dependency implies a validation failure.
-                Err(None) => r.validate_storage(),
+                Ok(Version(version, _)) => r.validate_version(version),
+                // TODO: fill when I add a descrptor kind.
+                Ok(Resolved(_)) => true,
+                Err(Dependency(_)) => false, // Dependency implies a validation failure.
+                // TODO: fill when I add a descrptor kind.
+                Err(Unresolved(_)) => true,
+                Err(NotFound) => r.validate_storage(),
             }
         });
 

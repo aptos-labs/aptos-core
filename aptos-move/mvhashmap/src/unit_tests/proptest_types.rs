@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::MVHashMap;
+use super::{Error, MVHashMap, Output};
 use aptos_types::write_set::DeserializeU128;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
@@ -126,11 +126,14 @@ where
                 let key = &transactions[idx].0;
                 match &transactions[idx].1 {
                     Operator::Read => {
+                        use Error::*;
+                        use Output::*;
+
                         let baseline = baseline.get(key, idx);
                         let mut retry_attempts = 0;
                         loop {
                             match map.read(key, idx) {
-                                Ok((_, v)) => {
+                                Ok(Version(_, v)) => {
                                     match &*v {
                                         Value(Some(w)) => {
                                             assert_eq!(
@@ -151,11 +154,17 @@ where
                                     }
                                     break;
                                 }
-                                Err(None) => {
+                                Ok(Resolved(_)) => {
+                                    // TODO: support this case.
+                                }
+                                Err(NotFound) => {
                                     assert_eq!(baseline, ExpectedOutput::NotInMap, "{:?}", idx);
                                     break;
                                 }
-                                Err(Some(_i)) => (),
+                                Err(Unresolved(_)) => {
+                                    // TODO: support this case.
+                                }
+                                Err(Dependency(_i)) => (),
                             }
                             retry_attempts += 1;
                             if retry_attempts > DEFAULT_TIMEOUT {

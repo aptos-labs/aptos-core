@@ -10,9 +10,11 @@ publish = false
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0.57"
 crossbeam = "0.8.1"
 dashmap = "5.2.0"
 
+aptos-aggregator = { path = "../aptos-aggregator" }
 aptos-types = { path = "../../types" }
 
 [dev-dependencies]
