@@ -1030,6 +1030,7 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "bcs",
+ "bytes 1.2.1",
  "hex",
  "move-deps",
  "poem-openapi",

@@ -19,17 +19,20 @@ pub use types::{Account, Resource};
 
 use crate::aptos::{AptosVersion, Balance};
 use anyhow::{anyhow, Result};
+use aptos_api_types::mime_types::BCS_OUTPUT_NEW;
 use aptos_api_types::{
     mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, HexEncodedBytes,
     VersionedEvent,
 };
 use aptos_crypto::HashValue;
+use aptos_types::account_config::AccountResource;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{NewBlockEvent, CORE_CODE_ADDRESS},
     transaction::SignedTransaction,
 };
 use poem_openapi::types::ParseFromJSON;
+use reqwest::header::ACCEPT;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -505,6 +508,15 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_account_bcs(
+        &self,
+        address: AccountAddress,
+    ) -> Result<Response<AccountResource>> {
+        let url = self.build_path(&format!("accounts/{}", address))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn set_failpoint(&self, name: String, actions: String) -> Result<String> {
         let mut base = self.build_path("set_failpoint")?;
         let url = base
@@ -565,6 +577,17 @@ impl Client {
 
     async fn get<T: DeserializeOwned>(&self, url: Url) -> Result<Response<T>> {
         self.json(self.inner.get(url).send().await?).await
+    }
+
+    async fn get_bcs(&self, url: Url) -> Result<Response<bytes::Bytes>> {
+        let response = self
+            .inner
+            .get(url)
+            .header(ACCEPT, BCS_OUTPUT_NEW)
+            .send()
+            .await?;
+        let (response, state) = self.check_response(response).await?;
+        Ok(Response::new(response.bytes().await?, state))
     }
 }
 
