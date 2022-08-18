@@ -111,7 +111,7 @@ where
 /// Spawns the dedicated telemetry service that operates periodically
 async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config: NodeConfig) {
     let telemetry_svc_url =
-        env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or(TELEMETRY_SERVICE_URL.into());
+        env::var(ENV_TELEMETRY_SERVICE_URL).unwrap_or_else(|_| TELEMETRY_SERVICE_URL.into());
 
     let telemetry_sender = TelemetrySender::new(telemetry_svc_url, chain_id, &node_config);
 

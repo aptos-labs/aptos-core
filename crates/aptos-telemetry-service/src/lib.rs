@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use warp::{Filter, Reply};
 
 use crate::{
-    clients::VictoriaMetricsClient,
+    clients::victoria_metrics_api::Client as MetricsClient,
     context::Context,
     index::routes,
     validator_cache::{ValidatorSetCache, ValidatorSetCacheUpdater},
@@ -64,7 +64,7 @@ impl AptosTelemetryServiceArgs {
         )
         .await;
 
-        let victoria_metrics_client = VictoriaMetricsClient::new(
+        let victoria_metrics_client = MetricsClient::new(
             Url::parse(&config.victoria_metrics_base_url)
                 .expect("base url must be provided for victoria metrics"),
             config.victoria_metrics_token.clone(),
