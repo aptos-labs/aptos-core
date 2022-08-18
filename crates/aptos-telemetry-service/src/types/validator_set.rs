@@ -23,6 +23,9 @@ impl ValidatorConfig {
     pub fn validator_network_addresses(&self) -> Result<Vec<NetworkAddress>, bcs::Error> {
         bcs::from_bytes(&self.network_addresses)
     }
+    pub fn fullnode_network_addresses(&self) -> Result<Vec<NetworkAddress>, bcs::Error> {
+        bcs::from_bytes(&self.fullnode_addresses)
+    }
 }
 
 /// Consensus information per validator, stored in ValidatorSet.
