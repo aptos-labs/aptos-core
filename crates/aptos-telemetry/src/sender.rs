@@ -16,7 +16,7 @@ use aptos_telemetry_service::types::{
 };
 use aptos_types::{chain_id::ChainId, PeerId};
 use flate2::{write::GzEncoder, Compression};
-use reqwest::StatusCode;
+use reqwest::{RequestBuilder, Response, StatusCode};
 use std::{io::Write, sync::Arc};
 use tokio_retry::{
     strategy::{jitter, ExponentialBackoff},
@@ -59,6 +59,30 @@ impl TelemetrySender {
         }
     }
 
+    // sends an authenticated request to the telemetry service, automatically adding an auth token
+    // This function does not work with streaming bodies at the moment and will panic if you try so.
+    pub async fn send_authenticated_request(
+        &self,
+        request_builder: RequestBuilder,
+    ) -> Result<Response, anyhow::Error> {
+        let token = self.get_auth_token().await?;
+
+        let mut response = request_builder
+            .try_clone()
+            .expect("Could not clone request_builder")
+            .bearer_auth(token)
+            .send()
+            .await?;
+        // do 1 retry if the first attempt failed
+        if response.status() == StatusCode::UNAUTHORIZED {
+            // looks like request failed due to auth error. Let's get a new a fresh token. If this fails again we'll just return the error.
+            self.reset_token();
+            let token = self.get_auth_token().await?;
+            response = request_builder.bearer_auth(token).send().await?;
+        }
+        Ok(response)
+    }
+
     pub(crate) async fn push_prometheus_metrics(&self) -> Result<(), anyhow::Error> {
         debug!("Sending Prometheus Metrics");
 
@@ -72,19 +96,19 @@ impl TelemetrySender {
         let compressed_bytes = gzip_encoder.finish()?;
 
         let response = self
-            .client
-            .post(format!("{}/push-metrics", self.base_url))
-            .header("Content-Encoding", "gzip")
-            .bearer_auth(token)
-            .body(compressed_bytes)
-            .send()
+            .send_authenticated_request(
+                self.client
+                    .post(format!("{}/push-metrics", self.base_url))
+                    .header("Content-Encoding", "gzip")
+                    .bearer_auth(token)
+                    .body(compressed_bytes),
+            )
             .await;
 
         match response {
             Err(e) => Err(anyhow!("Prometheus Metrics push failed: {}", e)),
             Ok(response) => {
                 if response.status().is_success() {
-                    debug!("Prometheus Metrics pushed successfully.");
                     Ok(())
                 } else {
                     Err(anyhow!(

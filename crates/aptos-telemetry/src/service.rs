@@ -97,14 +97,14 @@ fn fetch_peer_id(node_config: &NodeConfig) -> String {
     }
 }
 
-async fn spawn_periodic_background_task<Fut>(interval_seconds: u64, task_fn: impl Fn() -> Fut)
+async fn run_function_periodically<Fut>(interval_seconds: u64, function_to_run: impl Fn() -> Fut)
 where
     Fut: Future<Output = ()>,
 {
     let mut interval = time::interval(Duration::from_secs(interval_seconds));
     loop {
         interval.tick().await;
-        task_fn().await;
+        function_to_run().await;
     }
 }
 
@@ -127,19 +127,19 @@ async fn spawn_telemetry_service(peer_id: String, chain_id: ChainId, node_config
 
     future::join4(
         // Periodically send system information
-        spawn_periodic_background_task(NODE_SYS_INFO_FREQ_SECS, || {
+        run_function_periodically(NODE_SYS_INFO_FREQ_SECS, || {
             send_system_information(peer_id.clone(), telemetry_sender.clone())
         }),
         // Periodically send node core metrics
-        spawn_periodic_background_task(NODE_CORE_METRICS_FREQ_SECS, || {
+        run_function_periodically(NODE_CORE_METRICS_FREQ_SECS, || {
             send_node_core_metrics(peer_id.clone(), &node_config, telemetry_sender.clone())
         }),
         // Periodically send node network metrics
-        spawn_periodic_background_task(NODE_NETWORK_METRICS_FREQ_SECS, || {
+        run_function_periodically(NODE_NETWORK_METRICS_FREQ_SECS, || {
             send_node_network_metrics(peer_id.clone(), telemetry_sender.clone())
         }),
         // Periodically send ALL prometheus metrics (This replaces the previous core and network metrics implementation)
-        spawn_periodic_background_task(PROMETHEUS_PUSH_METRICS_FREQ_SECS, || {
+        run_function_periodically(PROMETHEUS_PUSH_METRICS_FREQ_SECS, || {
             telemetry_sender.try_push_prometheus_metrics()
         }),
     )
