@@ -301,7 +301,7 @@ export type RemoteABIBuilderConfig = Partial<Omit<ABIBuilderConfig, "sender">> &
 };
 
 interface AptosClientInterface {
-  getAccountModules: (arg0: string) => Promise<Gen.MoveModuleBytecode[]>;
+  getAccountModules: (accountAddress: MaybeHexString) => Promise<Gen.MoveModuleBytecode[]>;
   getAccount: (accountAddress: MaybeHexString) => Promise<Gen.AccountData>;
   getChainId: () => Promise<number>;
 }
@@ -320,7 +320,7 @@ export class TransactionBuilderRemoteABI {
   // Cache for 10 minutes
   @MemoizeExpiring(10 * 60 * 1000)
   async fetchABI(addr: string) {
-    const modules = await this.aptosClient.getAccountModules(HexString.ensure(addr).hex());
+    const modules = await this.aptosClient.getAccountModules(addr);
     const abis = modules
       .map((module) => module.abi)
       .flatMap((abi) =>
@@ -370,12 +370,12 @@ export class TransactionBuilderRemoteABI {
 
     const funcAbi = abiMap.get(func);
 
-    // Remove all `signer` and `&signer` from arugment list because the Move VM injects those arugments. Clients do not
-    // need to care about those args. `signer` and `&signer` are required be in the front of the arugment list. But we
-    // just loop through all arguments and filter out `singer` and `&signer`.
+    // Remove all `signer` and `&signer` from argument list because the Move VM injects those arguments. Clients do not
+    // need to care about those args. `signer` and `&signer` are required be in the front of the argument list. But we
+    // just loop through all arguments and filter out `signer` and `&signer`.
     const originalArgs = funcAbi.params.filter((param) => param !== "signer" && param !== "&signer");
 
-    // Convert string arugments to TypeArgumentABI
+    // Convert string arguments to TypeArgumentABI
     const typeArgABIs = originalArgs.map((arg, i) => new ArgumentABI(`var${i}`, new TypeTagParser(arg).parseTypeTag()));
 
     const scriptFunctionABI = new ScriptFunctionABI(
