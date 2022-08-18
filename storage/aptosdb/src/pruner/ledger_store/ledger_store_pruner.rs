@@ -1,5 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
+use crate::pruner::pruner_metadata::{PrunerMetadata, PrunerTag};
+use crate::pruner_metadata::PrunerMetadataSchema;
 use crate::{
     metrics::PRUNER_LEAST_READABLE_VERSION,
     pruner::{
@@ -11,11 +13,10 @@ use crate::{
             transaction_store_pruner::TransactionStorePruner, write_set_pruner::WriteSetPruner,
         },
     },
-    transaction::TransactionSchema,
     utils, ChangeSet, EventStore, LedgerStore, TransactionStore,
 };
 use aptos_types::transaction::{AtomicVersion, Version};
-use schemadb::{ReadOptions, SchemaBatch, DB};
+use schemadb::{SchemaBatch, DB};
 use std::sync::{atomic::Ordering, Arc};
 
 pub const LEDGER_PRUNER_NAME: &str = "ledger_pruner";
@@ -46,7 +47,10 @@ impl DBPruner for LedgerPruner {
         // Collect the schema batch writes
         let mut db_batch = SchemaBatch::new();
         let current_target_version = self.prune_inner(max_versions, &mut db_batch)?;
-
+        db_batch.put::<PrunerMetadataSchema>(
+            &PrunerTag::LedgerPruner,
+            &PrunerMetadata::LatestVersion(current_target_version),
+        )?;
         // Commit all the changes to DB atomically
         self.db.write_schemas(db_batch)?;
 
@@ -58,10 +62,12 @@ impl DBPruner for LedgerPruner {
     }
 
     fn initialize_min_readable_version(&self) -> anyhow::Result<Version> {
-        let mut iter = self.db.iter::<TransactionSchema>(ReadOptions::default())?;
-        iter.seek_to_first();
-        let version = iter.next().transpose()?.map_or(0, |(version, _)| version);
-        Ok(version)
+        Ok(self
+            .db
+            .get::<PrunerMetadataSchema>(&PrunerTag::LedgerPruner)?
+            .map_or(0, |pruned_until_version| match pruned_until_version {
+                PrunerMetadata::LatestVersion(version) => version,
+            }))
     }
 
     fn min_readable_version(&self) -> Version {

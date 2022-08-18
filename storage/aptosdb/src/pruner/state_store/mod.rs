@@ -1,6 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::pruner::pruner_metadata::{PrunerMetadata, PrunerTag};
+use crate::pruner_metadata::PrunerMetadataSchema;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, metrics::PRUNER_LEAST_READABLE_VERSION,
     pruner::db_pruner::DBPruner, stale_node_index::StaleNodeIndexSchema, utils, ChangeSet,
@@ -24,7 +26,8 @@ pub const STATE_MERKLE_PRUNER_NAME: &str = "state_merkle_pruner";
 #[derive(Debug)]
 /// Responsible for pruning the state tree.
 pub struct StateMerklePruner {
-    db: Arc<DB>,
+    /// State DB.
+    state_merkle_db: Arc<DB>,
     /// Keeps track of the target version that the pruner needs to achieve.
     target_version: AtomicVersion,
     min_readable_version: AtomicVersion,
@@ -60,16 +63,12 @@ impl DBPruner for StateMerklePruner {
     }
 
     fn initialize_min_readable_version(&self) -> Result<Version> {
-        let mut iter = self
-            .db
-            .iter::<StaleNodeIndexSchema>(ReadOptions::default())?;
-        iter.seek_to_first();
-        Ok(iter.next().transpose()?.map_or(0, |(index, _)| {
-            index
-                .stale_since_version
-                .checked_sub(1)
-                .expect("Nothing is stale since version 0.")
-        }))
+        Ok(self
+            .state_merkle_db
+            .get::<PrunerMetadataSchema>(&PrunerTag::StateMerklePruner)?
+            .map_or(0, |pruned_until_version| match pruned_until_version {
+                PrunerMetadata::LatestVersion(version) => version,
+            }))
     }
 
     fn min_readable_version(&self) -> Version {
@@ -106,9 +105,9 @@ impl DBPruner for StateMerklePruner {
 }
 
 impl StateMerklePruner {
-    pub fn new(db: Arc<DB>) -> Self {
+    pub fn new(state_merkle_db: Arc<DB>) -> Self {
         let pruner = StateMerklePruner {
-            db,
+            state_merkle_db,
             target_version: AtomicVersion::new(0),
             min_readable_version: AtomicVersion::new(0),
             pruned_to_the_end_of_target_version: AtomicBool::new(false),
@@ -137,6 +136,9 @@ impl StateMerklePruner {
         Ok(())
     }
 
+    // If the existing schema batch is not none, this function only adds items need to be
+    // deleted to the schema batch and the caller is responsible for committing the schema batches
+    // to the DB.
     pub fn prune_state_store(
         &self,
         min_readable_version: Version,
@@ -172,8 +174,13 @@ impl StateMerklePruner {
                     batch.delete::<StaleNodeIndexSchema>(&index)
                 })?;
 
-                // Delete the stale node indices.
-                self.db.write_schemas(batch)?;
+                batch.put::<PrunerMetadataSchema>(
+                    &PrunerTag::StateMerklePruner,
+                    &PrunerMetadata::LatestVersion(new_min_readable_version),
+                )?;
+
+                // Commit to DB.
+                self.state_merkle_db.write_schemas(batch)?;
             }
 
             // TODO(zcc): recording progress after writing schemas might provide wrong answers to
@@ -194,7 +201,7 @@ impl StateMerklePruner {
     ) -> Result<(Vec<StaleNodeIndex>, bool)> {
         let mut indices = Vec::new();
         let mut iter = self
-            .db
+            .state_merkle_db
             .iter::<StaleNodeIndexSchema>(ReadOptions::default())?;
         iter.seek(&start_version)?;
 
