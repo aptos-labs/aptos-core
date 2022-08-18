@@ -137,8 +137,6 @@ pub async fn query_prometheus_system_metrics(
 
 #[cfg(test)]
 mod tests {
-    use crate::prometheus::get_prometheus_client;
-    use prometheus_http_query::Error as PrometheusError;
 
     use super::*;
     #[tokio::test]
