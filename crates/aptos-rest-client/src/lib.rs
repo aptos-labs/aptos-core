@@ -4,7 +4,9 @@
 pub mod aptos;
 pub mod error;
 pub mod faucet;
+
 pub use faucet::FaucetClient;
+use std::collections::BTreeMap;
 pub mod response;
 pub use response::Response;
 pub mod state;
@@ -30,6 +32,7 @@ use aptos_types::{
     account_config::{NewBlockEvent, CORE_CODE_ADDRESS},
     transaction::SignedTransaction,
 };
+use move_deps::move_core_types::language_storage::StructTag;
 use poem_openapi::types::ParseFromJSON;
 use reqwest::header::ACCEPT;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
@@ -316,6 +319,15 @@ impl Client {
         let response = self.inner.get(url).send().await?;
 
         self.json(response).await
+    }
+
+    pub async fn get_account_resources_bcs(
+        &self,
+        address: AccountAddress,
+    ) -> Result<Response<BTreeMap<StructTag, Vec<u8>>>> {
+        let url = self.build_path(&format!("accounts/{}/resources", address))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
     pub async fn get_account_resources_at_version(

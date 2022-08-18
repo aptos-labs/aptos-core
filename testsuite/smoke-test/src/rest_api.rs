@@ -3,11 +3,13 @@
 
 use aptos::common::types::account_address_from_public_key;
 use aptos_crypto::PrivateKey;
+use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_transaction_builder::aptos_stdlib;
-use aptos_types::account_config::CORE_CODE_ADDRESS;
+use aptos_types::account_config::{AccountResource, CORE_CODE_ADDRESS};
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use forge::Swarm;
 use std::convert::TryFrom;
+use std::str::FromStr;
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;
 
@@ -84,5 +86,17 @@ async fn test_bcs() {
     let onchain_auth_key =
         AuthenticationKey::try_from(account_resource.authentication_key()).unwrap();
     assert_eq!(expected_auth_key, onchain_auth_key);
+    assert_eq!(0, account_resource.sequence_number());
+
+    // Check get resources
+    let resources = client
+        .get_account_resources_bcs(account)
+        .await
+        .unwrap()
+        .into_inner();
+    let bytes = resources
+        .get(&StructTag::from_str("0x1::account::Account").unwrap())
+        .unwrap();
+    let account_resource: AccountResource = bcs::from_bytes(bytes).unwrap();
     assert_eq!(0, account_resource.sequence_number());
 }
