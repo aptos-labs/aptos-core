@@ -728,7 +728,7 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
                 format!("[]{}", Self::quote_type(type_tag))
             }
             Struct(struct_tag) => match struct_tag {
-                tag if tag == Lazy::force(&str_tag) => "[]byte".into(),
+                tag if tag == Lazy::force(&str_tag) => "Bytes".into(),
                 _ => common::type_not_allowed(type_tag),
             },
             Signer => common::type_not_allowed(type_tag),
@@ -774,12 +774,12 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
             U128 => Some("U128"),
             Address => None,
             Vector(type_tag) => match type_tag.as_ref() {
-                U8 => Some("[]byte"),
+                U8 => Some("Bytes"),
                 type_tag => Self::bcs_primitive_type_name(type_tag).and(None),
                 // _ => common::type_not_allowed(type_tag),
             },
             Struct(struct_tag) => match struct_tag {
-                tag if tag == Lazy::force(&str_tag) => Some("[]byte"),
+                tag if tag == Lazy::force(&str_tag) => Some("Bytes"),
                 _ => common::type_not_allowed(type_tag),
             },
             Signer => common::type_not_allowed(type_tag),
