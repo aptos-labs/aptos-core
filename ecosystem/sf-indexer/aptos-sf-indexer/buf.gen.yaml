@@ -1,0 +1,13 @@
+version: v1
+plugins:
+  - name: prost
+    out: src/pb
+
+  - remote: tonic
+    out: src/pb
+
+  - name: prost-crate
+    out: src/pb
+    strategy: all
+    opt:
+      - no_features
