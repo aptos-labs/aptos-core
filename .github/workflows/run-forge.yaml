@@ -75,9 +75,6 @@ jobs:
         if: env.FORGE_ENABLED == 'true'
         with:
           python-version: '3.9'
-      - name: Install python deps
-        if: env.FORGE_ENABLED == 'true'
-        run: pip3 install -r testsuite/requirements.txt
       - name: Set kubectl context
         if: env.FORGE_ENABLED == 'true'
         run: aws eks update-kubeconfig --name $FORGE_CLUSTER_NAME
