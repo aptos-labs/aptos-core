@@ -9,6 +9,7 @@ use crate::{
         TransactionOutput,
     },
 };
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, write_set::DeserializeU128,
 };
@@ -319,6 +320,11 @@ where
 
     fn get_writes(&self) -> Vec<(K, V)> {
         self.0.clone()
+    }
+
+    fn get_deltas(&self) -> Vec<(K, DeltaOp)> {
+        // TODO: adapt this for tests.
+        vec![]
     }
 
     fn skip_output() -> Self {

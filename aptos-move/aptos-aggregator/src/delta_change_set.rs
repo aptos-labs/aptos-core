@@ -153,6 +153,11 @@ impl DeltaChangeSet {
     }
 
     #[inline]
+    pub fn iter(&self) -> ::std::slice::Iter<'_, (StateKey, DeltaOp)> {
+        self.into_iter()
+    }
+
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.delta_change_set.is_empty()
     }
@@ -172,6 +177,15 @@ impl DeltaChangeSet {
 
         // All deltas are applied successfully.
         Ok(WriteSetMut::new(materialized_write_set))
+    }
+}
+
+impl<'a> IntoIterator for &'a DeltaChangeSet {
+    type Item = &'a (StateKey, DeltaOp);
+    type IntoIter = ::std::slice::Iter<'a, (StateKey, DeltaOp)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.delta_change_set.iter()
     }
 }
 

@@ -9,7 +9,7 @@ use crate::{
     aptos_vm::AptosVM,
     parallel_executor::vm_wrapper::AptosVMWrapper,
 };
-use aptos_aggregator::transaction::TransactionOutputExt;
+use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
 use aptos_parallel_executor::{
     errors::Error,
     executor::ParallelTransactionExecutor,
@@ -46,6 +46,10 @@ impl PTransactionOutput for AptosTransactionOutput {
 
     fn get_writes(&self) -> Vec<(StateKey, WriteOp)> {
         self.0.txn_output().write_set().iter().cloned().collect()
+    }
+
+    fn get_deltas(&self) -> Vec<(StateKey, DeltaOp)> {
+        self.0.delta_change_set().iter().cloned().collect()
     }
 
     /// Execution output for transactions that comes after SkipRest signal.
