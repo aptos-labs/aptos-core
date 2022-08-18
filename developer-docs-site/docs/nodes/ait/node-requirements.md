@@ -5,19 +5,19 @@ slug: "node-requirements"
 
 # Node Requirements
 
-Follow the requirements specified in this document to make your AIT-2 Validator and FullNode deployment hassle-free.
+Follow the requirements specified in this document to make your AIT-3 Validator and FullNode deployment hassle-free.
 
 ## Validator and FullNode
 
-- For the AIT-2, we require that you run the Validator. We recommend that optionally you run a FullNode also. However, a FullNode is not required.
+- For the AIT-3, we require that you run the Validator. We recommend that optionally you run a FullNode also. However, a FullNode is not required. 
 - If you run FullNode also, then we strongly recommend that you run the Validator and the FullNode on two separate and independent machines. Make sure that these machines are well-provisioned and isolated from each other. Guaranteeing the resource isolation between the Validator and the FullNode will help ensure smooth deployment of these nodes.
 - For best availability and stability, **we recommend that you deploy your node on the cloud**. We have provided Terraform support for deploying the node on three cloud providers: GCP, AWS and Azure. See [Validators](/nodes/validator-node/validators).
 - Make sure that you open the network ports prior to the date the AIT goes live. See [Networking configuration requirements](#networking-requirements).
-- Make sure that you close these ports after either being accepted or rejected for the AIT-2.
+- Make sure that you close these ports after either being accepted or rejected for the AIT.
 
 ## Validator node in test mode
 
-You must run a Validator node in the test mode to be eligible for AIT-2. This is a method Aptos Labs uses to verify that a node operator can successfully start a Validator node and configure it properly with the Aptos network identity.
+You must run a Validator node in the test mode to be eligible for AIT-3. This is a method Aptos Labs uses to verify that a node operator can successfully start a Validator node and configure it properly with the Aptos network identity. 
 
 In test mode, you will be running a local network with one single node, and it should be functioning like a normal blockchain.
 
