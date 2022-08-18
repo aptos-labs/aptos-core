@@ -1,5 +1,6 @@
 module aptos_framework::state_storage {
 
+    use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
     use std::error;
 
@@ -10,6 +11,12 @@ module aptos_framework::state_storage {
     const EEPOCH_ZERO: u64 = 1;
 
     struct StateStorageUsage has copy, drop, key, store {
+        epoch: u64,
+        items: u64,
+        bytes: u64,
+    }
+
+    struct Usage_ {
         items: u64,
         bytes: u64,
     }
@@ -23,17 +30,30 @@ module aptos_framework::state_storage {
         move_to(account, StateStorageUsage {
             items: 0,
             bytes: 0,
+            epoch: 0,
         });
     }
 
-    public(friend) fun on_epoch_begin() acquires StateStorageUsage {
-        *borrow_global_mut<StateStorageUsage>(@aptos_framework)
-            = get_state_storage_usage_only_at_epoch_beginning()
+    public(friend) fun on_new_block() acquires StateStorageUsage {
+        let epoch = reconfiguration::current_epoch();
+        let usage = borrow_global_mut<StateStorageUsage>(@aptos_framework);
+        if (epoch != usage.epoch) {
+            let Usage_ {
+                items,
+                bytes,
+            } = get_state_storage_usage_only_at_epoch_beginning();
+
+            *usage = StateStorageUsage {
+                items,
+                bytes,
+                epoch,
+            }
+        }
     }
 
     /// Warning: the result returned is based on the base state view held by the
     /// VM for the entire block or chunk of transactions, it's only deterministic
     /// if called from the first transaction of the block because the execution layer
     /// guarantees a fresh state view then.
-    native fun get_state_storage_usage_only_at_epoch_beginning(): StateStorageUsage;
+    native fun get_state_storage_usage_only_at_epoch_beginning(): Usage_;
 }
