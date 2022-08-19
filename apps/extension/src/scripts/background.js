@@ -56,8 +56,9 @@ function rejectRequest(sendResponse) {
 
 // Aptos dApp methods
 
-function getAccountAddress(publicAccount, sendResponse) {
-  if (!checkConnected(publicAccount.address, sendResponse)) {
+async function getAccountAddress(publicAccount, sendResponse) {
+  const connected = await checkConnected(publicAccount.address, sendResponse);
+  if (!connected) {
     return;
   }
   sendResponse(publicAccount);
@@ -78,7 +79,7 @@ async function connect(publicAccount, sendResponse) {
     await getCurrentDomain(),
     publicAccount.address,
   )) {
-    getAccountAddress(publicAccount, sendResponse);
+    await getAccountAddress(publicAccount, sendResponse);
   } else {
     rejectRequest(sendResponse);
   }
@@ -98,7 +99,8 @@ async function isConnected(address, sendResponse) {
 }
 
 async function signAndSubmitTransaction(client, publicAccount, transaction, sendResponse) {
-  if (!checkConnected(publicAccount.address, sendResponse)) {
+  const connected = await checkConnected(publicAccount.address, sendResponse);
+  if (!connected) {
     return;
   }
 
@@ -127,7 +129,8 @@ async function signAndSubmitTransaction(client, publicAccount, transaction, send
 }
 
 async function signTransactionAndSendResponse(client, publicAccount, transaction, sendResponse) {
-  if (!checkConnected(publicAccount.address, sendResponse)) {
+  const connected = await checkConnected(publicAccount.address, sendResponse);
+  if (!connected) {
     return;
   }
 
@@ -155,7 +158,8 @@ async function signTransactionAndSendResponse(client, publicAccount, transaction
 }
 
 async function signMessage(publicAccount, message, sendResponse) {
-  if (!checkConnected(publicAccount.address, sendResponse)) {
+  const connected = await checkConnected(publicAccount.address, sendResponse);
+  if (!connected) {
     return;
   }
 
@@ -200,7 +204,7 @@ async function handleDappRequest(request, sendResponse) {
   const network = await getBackgroundNetwork();
   if (!publicAccount) {
     if (shouldShowNoAccountsPrompt(request.method)) {
-      PromptPresenter.promptUser(warningPrompt());
+      await PromptPresenter.promptUser(warningPrompt());
     }
     sendResponse({ error: DappErrorType.NO_ACCOUNTS });
     return;
@@ -209,28 +213,33 @@ async function handleDappRequest(request, sendResponse) {
   const client = new AptosClient(network.nodeUrl);
   switch (request.method) {
     case MessageMethod.CONNECT:
-      connect(publicAccount, sendResponse);
+      await connect(publicAccount, sendResponse);
       break;
     case MessageMethod.DISCONNECT:
-      disconnect(publicAccount.address, sendResponse);
+      await disconnect(publicAccount.address, sendResponse);
       break;
     case MessageMethod.IS_CONNECTED:
-      isConnected(publicAccount.address, sendResponse);
+      await isConnected(publicAccount.address, sendResponse);
       break;
     case MessageMethod.GET_ACCOUNT_ADDRESS:
-      getAccountAddress(publicAccount, sendResponse);
+      await getAccountAddress(publicAccount, sendResponse);
       break;
     case MessageMethod.GET_NETWORK:
-      getNetwork(sendResponse);
+      await getNetwork(sendResponse);
       break;
     case MessageMethod.SIGN_AND_SUBMIT_TRANSACTION:
-      signAndSubmitTransaction(client, publicAccount, request.args.transaction, sendResponse);
+      await signAndSubmitTransaction(client, publicAccount, request.args.transaction, sendResponse);
       break;
     case MessageMethod.SIGN_TRANSACTION:
-      signTransactionAndSendResponse(client, publicAccount, request.args.transaction, sendResponse);
+      await signTransactionAndSendResponse(
+        client,
+        publicAccount,
+        request.args.transaction,
+        sendResponse,
+      );
       break;
     case MessageMethod.SIGN_MESSAGE:
-      signMessage(publicAccount, request.args.message, sendResponse);
+      await signMessage(publicAccount, request.args.message, sendResponse);
       break;
     default:
       // method not supported
