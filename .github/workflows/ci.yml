@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: 
+      - main
+  pull_request:
+
+env:
+  go_version: 1.17
+
+jobs:
+
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{steps.setup_work.outputs.matrix}}
+      workload: ${{steps.set_blks_per_chunk.outputs.blks_per_chunk}}
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
+    - id: setup_work 
+      env:
+          START_INDEX: 100
+          BLKS_PER_CHUNK: 500
+      run: echo "::set-output name=matrix::$(.github/workflows/script/setup.sh)"
+    - id: set_blks_per_chunk
+      run: echo "::set-output name=blks_per_chunk::40000"
+
+  rosetta-validation:
+    runs-on: ubuntu-latest
+    needs: setup
+    strategy:
+      matrix: 
+        range: ${{fromJson(needs.setup.outputs.matrix)}}
+    steps:
+    - run: |
+          echo ${{ matrix.range }}
+    - uses: actions/checkout@v2
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
+    - name: run check:data on mainnet
+      env:
+        START_INDEX: ${{ matrix.range }}
+        COUNT: ${{ needs.setup.outputs.workload }}
+      run: .github/workflows/script/cli.sh
