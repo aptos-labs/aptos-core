@@ -23,8 +23,8 @@ _All dates and times shown are for Pacific Time, year 2022._
 
 - **August 19:** Registration starts. Node and identity verification begins.
 - **August 26:** Registration ends.
-- **August 27:** Notification for selection result will be send out.
-- **August 30:** AIT3 becomes live.
+- **August 27:** Notification of the selection results sent out.
+- **August 30:** AIT-3 becomes live.
 - **September 9:** AIT-3 concludes.
 
 :::
