@@ -632,7 +632,7 @@ impl Client {
     pub async fn get_account_modules(
         &self,
         address: AccountAddress,
-    ) -> Result<Response<BTreeMap<MoveModuleId, MoveModuleBytecode>>> {
+    ) -> Result<Response<Vec<MoveModuleBytecode>>> {
         let url = self.build_path(&format!("accounts/{}/modules", address))?;
 
         let response = self.inner.get(url).send().await?;
