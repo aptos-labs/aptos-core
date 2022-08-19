@@ -23,11 +23,13 @@ mod db_options;
 mod event_store;
 mod ledger_counters;
 mod ledger_store;
+mod lru_node_cache;
 mod pruner;
 mod state_merkle_db;
 mod state_store;
 mod system_store;
 mod transaction_store;
+mod versioned_node_cache;
 
 #[cfg(test)]
 mod aptosdb_test;
@@ -56,9 +58,12 @@ use crate::{
     transaction_store::TransactionStore,
 };
 use anyhow::{bail, ensure, Result};
+#[cfg(any(test, feature = "fuzzing"))]
+use aptos_config::config::DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD;
 use aptos_config::config::{
     PrunerConfig, RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
 };
+
 use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
@@ -276,6 +281,7 @@ impl AptosDB {
         state_merkle_rocksdb: DB,
         pruner_config: PrunerConfig,
         target_snapshot_size: usize,
+        max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
         let arc_ledger_rocksdb = Arc::new(ledger_rocksdb);
@@ -288,6 +294,7 @@ impl AptosDB {
             Arc::clone(&arc_ledger_rocksdb),
             Arc::clone(&arc_state_merkle_rocksdb),
             target_snapshot_size,
+            max_nodes_per_lru_cache_shard,
             hack_for_tests,
         ));
         let ledger_pruner = LedgerPrunerManager::new(
@@ -322,6 +329,7 @@ impl AptosDB {
         rocksdb_configs: RocksdbConfigs,
         enable_indexer: bool,
         target_snapshot_size: usize,
+        max_num_nodes_per_lru_cache_shard: usize,
     ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -369,6 +377,7 @@ impl AptosDB {
             state_merkle_db,
             pruner_config,
             target_snapshot_size,
+            max_num_nodes_per_lru_cache_shard,
             readonly,
         );
 
@@ -458,6 +467,7 @@ impl AptosDB {
             )?,
             NO_OP_STORAGE_PRUNER_CONFIG,
             TARGET_SNAPSHOT_SIZE,
+            0,
             true,
         ))
     }
@@ -467,6 +477,7 @@ impl AptosDB {
         db_root_path: P,
         readonly: bool,
         target_snapshot_size: usize,
+        max_num_nodes_per_lru_cache_shard: usize,
         enable_indexer: bool,
     ) -> Self {
         Self::open(
@@ -476,6 +487,7 @@ impl AptosDB {
             RocksdbConfigs::default(),
             enable_indexer,
             target_snapshot_size,
+            max_num_nodes_per_lru_cache_shard,
         )
         .expect("Unable to open AptosDB")
     }
@@ -483,13 +495,31 @@ impl AptosDB {
     /// This opens db in non-readonly mode, without the pruner.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_for_test<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false, TARGET_SNAPSHOT_SIZE, false)
+        Self::new_without_pruner(
+            db_root_path,
+            false,
+            TARGET_SNAPSHOT_SIZE,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            false,
+        )
+    }
+
+    /// This opens db in non-readonly mode, without the pruner and cache.
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn new_for_test_no_cache<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
+        Self::new_without_pruner(db_root_path, false, TARGET_SNAPSHOT_SIZE, 0, false)
     }
 
     /// This opens db in non-readonly mode, without the pruner, and with the indexer
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_for_test_with_indexer<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, false, TARGET_SNAPSHOT_SIZE, true)
+        Self::new_without_pruner(
+            db_root_path,
+            false,
+            TARGET_SNAPSHOT_SIZE,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            true,
+        )
     }
 
     /// This opens db in non-readonly mode, without the pruner.
@@ -498,13 +528,25 @@ impl AptosDB {
         db_root_path: P,
         target_snapshot_size: usize,
     ) -> Self {
-        Self::new_without_pruner(db_root_path, false, target_snapshot_size, false)
+        Self::new_without_pruner(
+            db_root_path,
+            false,
+            target_snapshot_size,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            false,
+        )
     }
 
     /// This opens db in non-readonly mode, without the pruner.
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_readonly_for_test<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        Self::new_without_pruner(db_root_path, true, TARGET_SNAPSHOT_SIZE, false)
+        Self::new_without_pruner(
+            db_root_path,
+            true,
+            TARGET_SNAPSHOT_SIZE,
+            DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+            false,
+        )
     }
 
     /// This gets the current buffered_state in StateStore.

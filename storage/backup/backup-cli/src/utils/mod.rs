@@ -12,7 +12,8 @@ pub mod test_utils;
 
 use anyhow::{anyhow, Result};
 use aptos_config::config::{
-    RocksdbConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
+    RocksdbConfig, RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::duration_since_epoch;
@@ -219,6 +220,7 @@ impl TryFrom<GlobalRestoreOpt> for GlobalRestoreOptions {
                 opt.rocksdb_opt.into(),
                 false,
                 TARGET_SNAPSHOT_SIZE,
+                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             )?)
             .get_restore_handler();
             RestoreRunMode::Restore { restore_handler }

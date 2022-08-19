@@ -13,33 +13,32 @@ use aptos_jellyfish_merkle::{
     iterator::JellyfishMerkleIterator, restore::StateSnapshotRestore, StateValueWriter,
 };
 use aptos_logger::info;
-use aptos_state_view::state_storage_usage::StateStorageUsage;
-use aptos_state_view::StateViewId;
-use aptos_types::state_store::state_value::StaleStateValueIndex;
+use aptos_state_view::{state_storage_usage::StateStorageUsage, StateViewId};
 use aptos_types::{
     proof::{definition::LeafCount, SparseMerkleProofExt, SparseMerkleRangeProof},
     state_store::{
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
-        state_value::{StateValue, StateValueChunkWithProof},
+        state_value::{StaleStateValueIndex, StateValue, StateValueChunkWithProof},
     },
     transaction::Version,
 };
 use executor_types::in_memory_state_calculator::InMemoryStateCalculator;
 use schemadb::{ReadOptions, SchemaBatch, DB};
-use std::ops::Deref;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 use storage_interface::{
     cached_state_view::CachedStateView, state_delta::StateDelta,
     sync_proof_fetcher::SyncProofFetcher, DbReader, StateSnapshotReceiver,
 };
 
-use crate::metrics::{STATE_ITEMS, TOTAL_STATE_BYTES};
-use crate::stale_state_value_index::StaleStateValueIndexSchema;
-use crate::state_store::buffered_state::BufferedState;
-use crate::version_data::{VersionData, VersionDataSchema};
 use crate::{
-    change_set::ChangeSet, schema::state_value::StateValueSchema, state_merkle_db::StateMerkleDb,
+    change_set::ChangeSet,
+    metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
+    schema::state_value::StateValueSchema,
+    stale_state_value_index::StaleStateValueIndexSchema,
+    state_merkle_db::StateMerkleDb,
+    state_store::buffered_state::BufferedState,
+    version_data::{VersionData, VersionDataSchema},
     AptosDbError, LedgerStore, TransactionStore, OTHER_TIMERS_SECONDS,
 };
 
@@ -239,9 +238,13 @@ impl StateStore {
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
         target_snapshot_size: usize,
+        max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
     ) -> Self {
-        let state_merkle_db = Arc::new(StateMerkleDb::new(state_merkle_db));
+        let state_merkle_db = Arc::new(StateMerkleDb::new(
+            state_merkle_db,
+            max_nodes_per_lru_cache_shard,
+        ));
         let state_db = Arc::new(StateDb {
             ledger_db,
             state_merkle_db,
