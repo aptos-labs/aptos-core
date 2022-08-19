@@ -1927,8 +1927,7 @@ fn create_state_keys_and_values(
     // Create the requested keys and values
     (0..num_keys_and_values)
         .map(|_| {
-            let mut state_value = StateValue::default();
-            state_value.bytes = random_bytes.clone();
+            let state_value = StateValue::new(random_bytes.clone());
             (StateKey::Raw(vec![]), state_value)
         })
         .collect()
