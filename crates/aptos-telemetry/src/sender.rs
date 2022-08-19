@@ -433,4 +433,37 @@ mod tests {
             1
         );
     }
+
+    #[tokio::test]
+    async fn test_push_prometheus_metrics() {
+        metrics::increment_telemetry_service_successes("test-event");
+
+        let scraped_metrics = prometheus::TextEncoder::new()
+            .encode_to_string(&aptos_metrics_core::gather())
+            .unwrap();
+
+        let mut gzip_encoder = GzEncoder::new(Vec::new(), Compression::default());
+        gzip_encoder.write_all(scraped_metrics.as_bytes()).unwrap();
+        let expected_compressed_bytes = gzip_encoder.finish().unwrap();
+
+        let server = MockServer::start();
+        let mock = server.mock(|when, then| {
+            when.method("POST")
+                .header("Authorization", "Bearer SECRET_JWT_TOKEN")
+                .path("/push-metrics")
+                .body(String::from_utf8_lossy(&expected_compressed_bytes));
+            then.status(200);
+        });
+
+        let node_config = NodeConfig::default();
+        let client = TelemetrySender::new(server.base_url(), ChainId::default(), &node_config);
+        {
+            *client.auth_context.token.write() = Some("SECRET_JWT_TOKEN".into());
+        }
+
+        let result = client.push_prometheus_metrics().await;
+
+        mock.assert();
+        assert!(result.is_ok());
+    }
 }
