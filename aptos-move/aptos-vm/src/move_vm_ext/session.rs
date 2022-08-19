@@ -5,7 +5,13 @@ use crate::{
     access_path_cache::AccessPathCache, move_vm_ext::MoveResolverExt,
     transaction_metadata::TransactionMetadata,
 };
-use aptos_aggregator::{delta_change_set::DeltaChangeSet, transaction::ChangeSetExt};
+use aptos_aggregator::{
+    aggregator_extension::{
+        AggregatorChange, AggregatorChangeSet, AggregatorID, NativeAggregatorContext,
+    },
+    delta_change_set::{serialize, DeltaChangeSet},
+    transaction::ChangeSetExt,
+};
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_types::{
@@ -203,7 +209,7 @@ impl SessionOutput {
 
             match change {
                 AggregatorChange::Write(value) => {
-                    let write_op = WriteOp::Value(serialize(&value));
+                    let write_op = WriteOp::Modification(serialize(&value));
                     write_set_mut.push((state_key, write_op));
                 }
                 AggregatorChange::Merge(delta_op) => delta_change_set.push((state_key, delta_op)),
