@@ -7,8 +7,7 @@ module aptos_framework::genesis {
     use aptos_framework::aptos_governance;
     use aptos_framework::block;
     use aptos_framework::chain_id;
-    use aptos_framework::coin_supply_config;
-    use aptos_framework::coin::MintCapability;
+    use aptos_framework::coin::{Self, MintCapability};
     use aptos_framework::coins;
     use aptos_framework::consensus_config;
     use aptos_framework::gas_schedule;
@@ -87,7 +86,7 @@ module aptos_framework::genesis {
         // Ensure we can create aggregators for supply, but not enable it for common
         // use just yet.
         aggregator_factory::initialize_aggregator_factory(&aptos_framework_account);
-        coin_supply_config::initialize(&aptos_framework_account);
+        coin::initialize_supply_config(&aptos_framework_account);
 
         // This needs to be called at the very end because earlier initializations might rely on timestamp not being
         // initialized yet.

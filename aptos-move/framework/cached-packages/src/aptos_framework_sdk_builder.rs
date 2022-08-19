@@ -110,7 +110,7 @@ pub enum EntryFunctionCall {
 
     /// Upgrade total supply to use a parallelizable implementation if it is
     /// available.
-    CoinUpgradeCoinSupply {
+    CoinUpgradeSupply {
         coin_type: TypeTag,
     },
 
@@ -299,7 +299,7 @@ impl EntryFunctionCall {
                 to,
                 amount,
             } => coin_transfer(coin_type, to, amount),
-            CoinUpgradeCoinSupply { coin_type } => coin_upgrade_coin_supply(coin_type),
+            CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
             CoinsRegister { coin_type } => coins_register(coin_type),
             GasScheduleSetGasSchedule { gas_schedule_blob } => {
                 gas_schedule_set_gas_schedule(gas_schedule_blob)
@@ -609,7 +609,7 @@ pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> Tra
 
 /// Upgrade total supply to use a parallelizable implementation if it is
 /// available.
-pub fn coin_upgrade_coin_supply(coin_type: TypeTag) -> TransactionPayload {
+pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -618,7 +618,7 @@ pub fn coin_upgrade_coin_supply(coin_type: TypeTag) -> TransactionPayload {
             ]),
             ident_str!("coin").to_owned(),
         ),
-        ident_str!("upgrade_coin_supply").to_owned(),
+        ident_str!("upgrade_supply").to_owned(),
         vec![coin_type],
         vec![],
     ))
@@ -1165,9 +1165,9 @@ mod decoder {
         }
     }
 
-    pub fn coin_upgrade_coin_supply(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+    pub fn coin_upgrade_supply(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::CoinUpgradeCoinSupply {
+            Some(EntryFunctionCall::CoinUpgradeSupply {
                 coin_type: script.ty_args().get(0)?.clone(),
             })
         } else {
@@ -1464,8 +1464,8 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::coin_transfer),
         );
         map.insert(
-            "coin_upgrade_coin_supply".to_string(),
-            Box::new(decoder::coin_upgrade_coin_supply),
+            "coin_upgrade_supply".to_string(),
+            Box::new(decoder::coin_upgrade_supply),
         );
         map.insert(
             "coins_register".to_string(),

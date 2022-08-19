@@ -7,7 +7,7 @@ module aptos_framework::optional_aggregator {
     use aptos_framework::aggregator_factory;
     use aptos_framework::aggregator::{Self, Aggregator};
 
-    friend aptos_framework::coin_supply;
+    friend aptos_framework::coin;
 
     // These error codes are produced by `Aggregator` and used by `Integer` for
     // consistency.
