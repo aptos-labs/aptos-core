@@ -5,7 +5,6 @@
 
 use crate::transaction_accumulator::TransactionAccumulatorSchema;
 use crate::{
-    change_set::ChangeSet,
     errors::AptosDbError,
     schema::{
         transaction::TransactionSchema, transaction_by_account::TransactionByAccountSchema,
@@ -193,17 +192,16 @@ impl TransactionStore {
         &self,
         version: Version,
         transaction: &Transaction,
-        cs: &mut ChangeSet,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
         if let Transaction::UserTransaction(txn) = transaction {
-            cs.batch.put::<TransactionByAccountSchema>(
+            batch.put::<TransactionByAccountSchema>(
                 &(txn.sender(), txn.sequence_number()),
                 &version,
             )?;
         }
-        cs.batch
-            .put::<TransactionByHashSchema>(&transaction.hash(), &version)?;
-        cs.batch.put::<TransactionSchema>(&version, transaction)?;
+        batch.put::<TransactionByHashSchema>(&transaction.hash(), &version)?;
+        batch.put::<TransactionSchema>(&version, transaction)?;
 
         Ok(())
     }
@@ -259,9 +257,9 @@ impl TransactionStore {
         &self,
         version: Version,
         write_set: &WriteSet,
-        cs: &mut ChangeSet,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
-        cs.batch.put::<WriteSetSchema>(&version, write_set)
+        batch.put::<WriteSetSchema>(&version, write_set)
     }
 
     /// Prune the transaction by hash store given a list of transaction
