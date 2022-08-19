@@ -36,6 +36,8 @@ enum ReadKind {
     Unresolved(DeltaOp),
     /// Read occurred from storage.
     Storage,
+    /// Read triggered a delta application failure.
+    DeltaApplicationFailure,
 }
 
 #[derive(Clone)]
@@ -74,6 +76,13 @@ impl<K: ModulePath> ReadDescriptor<K> {
         }
     }
 
+    pub fn from_delta_application_failure(access_path: K) -> Self {
+        Self {
+            access_path,
+            kind: ReadKind::DeltaApplicationFailure,
+        }
+    }
+
     fn module_path(&self) -> Option<AccessPath> {
         self.access_path.module_path()
     }
@@ -101,6 +110,11 @@ impl<K: ModulePath> ReadDescriptor<K> {
     // Does the read descriptor describe a read from storage.
     pub fn validate_storage(&self) -> bool {
         self.kind == ReadKind::Storage
+    }
+
+    // Does the read descriptor describe to a read with a delta application failure.
+    pub fn validate_delta_application_failure(&self) -> bool {
+        self.kind == ReadKind::DeltaApplicationFailure
     }
 }
 

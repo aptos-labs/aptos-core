@@ -245,21 +245,22 @@ fn publishing_fixed_params() {
         Transaction::Write {
             incarnation,
             reads,
-            writes,
+            writes_and_deltas,
         } => {
-            let mut new_writes = vec![];
-            for incarnation_writes in writes {
+            let mut new_writes_and_deltas = vec![];
+            for (incarnation_writes, incarnation_deltas) in writes_and_deltas {
                 assert!(!incarnation_writes.is_empty());
                 let val = incarnation_writes[0].1.clone();
                 let insert_idx = indices[1].index(incarnation_writes.len());
                 incarnation_writes.insert(insert_idx, (KeyType(universe[42], true), val));
-                new_writes.push(incarnation_writes.clone());
+                new_writes_and_deltas
+                    .push((incarnation_writes.clone(), incarnation_deltas.clone()));
             }
 
             Transaction::Write {
                 incarnation: incarnation.clone(),
                 reads: reads.clone(),
-                writes: new_writes,
+                writes_and_deltas: new_writes_and_deltas,
             }
         }
         _ => {
@@ -281,7 +282,7 @@ fn publishing_fixed_params() {
         Transaction::Write {
             incarnation,
             reads,
-            writes,
+            writes_and_deltas,
         } => {
             let mut new_reads = vec![];
             for incarnation_reads in reads {
@@ -294,7 +295,7 @@ fn publishing_fixed_params() {
             Transaction::Write {
                 incarnation: incarnation.clone(),
                 reads: new_reads,
-                writes: writes.clone(),
+                writes_and_deltas: writes_and_deltas.clone(),
             }
         }
         _ => {
