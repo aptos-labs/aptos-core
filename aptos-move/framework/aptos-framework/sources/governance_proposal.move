@@ -4,61 +4,20 @@
 module aptos_framework::governance_proposal {
     friend aptos_framework::aptos_governance;
 
-    use std::string::{String, length, utf8};
-    use std::error;
-
-    /// Metadata location cannot be longer than 256 chars
-    const EMETADATA_LOCATION_TOO_LONG: u64 = 1;
-    /// Metadata hash cannot be longer than 256 chars
-    const EMETADATA_HASH_TOO_LONG: u64 = 2;
-
-    struct GovernanceProposal has store, drop {
-        // Location where metadata such as the proposal's execution script content, description, etc. are hosted.
-        metadata_location: String,
-        // The hash of the metadata to allow easy verification when a user votes that the metadata hosted at a url is
-        // correct.
-        metadata_hash: String,
-    }
+    struct GovernanceProposal has store, drop {}
 
     /// Create and return a GovernanceProposal resource. Can only be called by AptosGovernance
-    public(friend) fun create_proposal(
-        metadata_location: String,
-        metadata_hash: String,
-    ): GovernanceProposal {
-        assert!(length(&metadata_location) <= 256, error::invalid_argument(EMETADATA_LOCATION_TOO_LONG));
-        assert!(length(&metadata_hash) <= 256, error::invalid_argument(EMETADATA_HASH_TOO_LONG));
-
-        GovernanceProposal {
-            metadata_location,
-            metadata_hash,
-        }
+    public(friend) fun create_proposal(): GovernanceProposal {
+        GovernanceProposal {}
     }
 
     /// Useful for AptosGovernance to create an empty proposal as proof.
     public(friend) fun create_empty_proposal(): GovernanceProposal {
-        create_proposal(utf8(b""), utf8(b""))
+        create_proposal()
     }
 
     #[test_only]
     public fun create_test_proposal(): GovernanceProposal {
         create_empty_proposal()
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 65537)]
-    public fun test_metadata_url_too_long(): GovernanceProposal {
-        create_proposal(
-            utf8(b"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789"),
-            utf8(b""),
-        )
-    }
-
-    #[test]
-    #[expected_failure(abort_code = 65538)]
-    public fun test_metadata_hash_too_long(): GovernanceProposal {
-        create_proposal(
-            utf8(b""),
-            utf8(b"123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789"),
-        )
     }
 }
