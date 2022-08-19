@@ -6,9 +6,7 @@ use crate::{
     transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::{
-    aggregator_extension::{
-        AggregatorChange, AggregatorChangeSet, AggregatorID, NativeAggregatorContext,
-    },
+    aggregator_extension::AggregatorID,
     delta_change_set::{serialize, DeltaChangeSet},
     transaction::ChangeSetExt,
 };
@@ -21,7 +19,10 @@ use aptos_types::{
     transaction::{ChangeSet, SignatureCheckedTransaction},
     write_set::{WriteOp, WriteSetMut},
 };
-use framework::natives::code::{NativeCodeContext, PublishRequest};
+use framework::natives::{
+    aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
+    code::{NativeCodeContext, PublishRequest},
+};
 use move_deps::{
     move_binary_format::errors::{Location, VMResult},
     move_core_types::{

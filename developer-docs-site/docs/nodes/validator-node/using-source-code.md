@@ -127,10 +127,12 @@ With your development environment ready, now you can start to setup your Validat
 
   Please make sure you use the same root public key as shown in the example and same chain ID, those config will be used during registration to verify your node.
 
-10. Copy the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
+10. Build and copy the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
 
     ```
-    cp ~/aptos-core/testnet/aptos-move/framework/releases/head.mrb ~/$WORKSPACE/framework.mrb
+    cd ~/aptos-core
+    cargo run --package framework -- release
+    cp head.mrb ~/$WORKSPACE/framework.mrb
     ```
 
 11. Compile genesis blob and waypoint

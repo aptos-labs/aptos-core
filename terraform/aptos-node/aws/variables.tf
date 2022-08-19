@@ -142,7 +142,7 @@ variable "helm_enable_validator" {
 
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
-  default     = "t4g.medium"
+  default     = "t3.medium"
 }
 
 variable "utility_instance_num" {

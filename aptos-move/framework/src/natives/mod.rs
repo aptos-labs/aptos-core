@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod account;
+pub mod aggregator_natives;
 pub mod code;
 pub mod cryptography;
 pub mod event;
@@ -12,6 +13,7 @@ pub mod transaction_context;
 pub mod type_info;
 pub mod util;
 
+use aggregator_natives::{aggregator, aggregator_factory};
 use cryptography::ed25519;
 use move_deps::{
     move_core_types::{account_address::AccountAddress, identifier::Identifier},
@@ -38,6 +40,8 @@ pub struct GasParameters {
     pub code: code::GasParameters,
     pub event: event::GasParameters,
     pub state_storage: state_storage::GasParameters,
+    pub aggregator: aggregator::GasParameters,
+    pub aggregator_factory: aggregator_factory::GasParameters,
 }
 
 impl GasParameters {
@@ -116,6 +120,15 @@ impl GasParameters {
                     base_cost: 0.into(),
                 },
             },
+            aggregator: aggregator::GasParameters {
+                add: aggregator::AddGasParameters { base: 0.into() },
+                read: aggregator::ReadGasParameters { base: 0.into() },
+                sub: aggregator::SubGasParameters { base: 0.into() },
+                destroy: aggregator::DestroyGasParameters { base: 0.into() },
+            },
+            aggregator_factory: aggregator_factory::GasParameters {
+                new_aggregator: aggregator_factory::NewAggregatorGasParameters { base: 0.into() },
+            },
         }
     }
 }
@@ -156,6 +169,11 @@ pub fn all_natives(
     add_natives_from_module!(
         "state_storage",
         state_storage::make_all(gas_params.state_storage)
+    );
+    add_natives_from_module!("aggregator", aggregator::make_all(gas_params.aggregator));
+    add_natives_from_module!(
+        "aggregator_factory",
+        aggregator_factory::make_all(gas_params.aggregator_factory)
     );
 
     make_table_from_iter(framework_addr, natives)
