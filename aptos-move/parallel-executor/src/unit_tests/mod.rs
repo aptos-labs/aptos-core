@@ -46,7 +46,7 @@ fn cycle_transactions() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![KeyType(key, false)]],
-                writes: vec![vec![(KeyType(key, false), random_value())]],
+                writes_and_deltas: vec![(vec![(KeyType(key, false), random_value())], vec![])],
             })
         }
     }
@@ -67,14 +67,14 @@ fn one_reads_all_barrier() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
-                writes: vec![vec![(*key, random_value())]],
+                writes_and_deltas: vec![(vec![(*key, random_value())], vec![])],
             })
         }
         // One transaction reading the write results of every prior transactions in the block.
         transactions.push(Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
             reads: vec![keys.clone()],
-            writes: vec![vec![]],
+            writes_and_deltas: vec![(vec![], vec![])],
         })
     }
     run_and_assert(transactions)
@@ -91,17 +91,19 @@ fn one_writes_all_barrier() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
-                writes: vec![vec![(*key, random_value())]],
+                writes_and_deltas: vec![(vec![(*key, random_value())], vec![])],
             })
         }
         // One transaction writing to the write results of every prior transactions in the block.
         transactions.push(Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
             reads: vec![keys.clone()],
-            writes: vec![keys
-                .iter()
-                .map(|key| (*key, random_value()))
-                .collect::<Vec<_>>()],
+            writes_and_deltas: vec![(
+                keys.iter()
+                    .map(|key| (*key, random_value()))
+                    .collect::<Vec<_>>(),
+                vec![],
+            )],
         })
     }
     run_and_assert(transactions)
@@ -119,7 +121,7 @@ fn early_aborts() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
-                writes: vec![vec![(*key, random_value())]],
+                writes_and_deltas: vec![(vec![(*key, random_value())], vec![])],
             })
         }
         // One transaction that triggers an abort
@@ -140,7 +142,7 @@ fn early_skips() {
             transactions.push(Transaction::Write {
                 incarnation: Arc::new(AtomicUsize::new(0)),
                 reads: vec![vec![*key]],
-                writes: vec![vec![(*key, random_value())]],
+                writes_and_deltas: vec![(vec![(*key, random_value())], vec![])],
             })
         }
         // One transaction that triggers an abort

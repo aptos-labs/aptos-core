@@ -84,7 +84,7 @@ impl TransactionOutputExt {
                 // handling quite challenging.
                 panic!("something terrible happened when applying aggregator deltas");
             }
-            Ok(mut materialized_deltas) => {
+            Ok(materialized_deltas) => {
                 let (write_set, events, gas_used, status) = txn_output.unpack();
                 // We expect to have only a few delta changes, so add them to
                 // the write set of the transaction.

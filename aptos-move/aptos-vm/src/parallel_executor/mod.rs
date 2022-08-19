@@ -7,6 +7,7 @@ mod vm_wrapper;
 use crate::{
     adapter_common::{preprocess_transaction, PreprocessedTransaction},
     aptos_vm::AptosVM,
+    data_cache::StateViewCache,
     parallel_executor::vm_wrapper::AptosVMWrapper,
 };
 use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutputExt};
