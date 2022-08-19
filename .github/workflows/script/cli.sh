@@ -13,8 +13,8 @@ nohup docker/rosetta/docker-build-rosetta.sh  > /dev/null 2>&1 &
 # Build data path for node & files
 mkdir -p data
 
-# Download node config (and fix the paths)
-curl -s https://raw.githubusercontent.com/aptos-labs/aptos-core/rosetta-stable/config/src/config/test_data/public_full_node.yaml 2> /dev/null | sed 's/\.\//\/opt\/aptos\//g' > data/fullnode.yaml
+# Cp node config (and fix the paths)
+cp config/src/config/test_data/public_full_node.yaml data/fullnode.yaml
 
 # Download waypoint and genesis necessary to start a node
 curl -s -o data/genesis.blob https://rosetta.aptosdev.com/genesis.blob

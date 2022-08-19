@@ -13,7 +13,6 @@ jobs:
 
   setup:
     runs-on: ubuntu-latest
-    container: node:14.16
     outputs:
       matrix: ${{steps.setup_work.outputs.matrix}}
       workload: ${{steps.set_blks_per_chunk.outputs.blks_per_chunk}}
@@ -33,7 +32,6 @@ jobs:
 
   rosetta-validation:
     runs-on: ubuntu-latest
-    container: node:14.16
     needs: setup
     strategy:
       matrix: 
@@ -46,6 +44,14 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: 1.17
+
+#     - run: nohup ./docker/rosetta/docker-build-rosetta.sh && \
+# mkdir -p data && \
+# cp config/src/config/test_data/public_full_node.yaml data/fullnode.yaml && \
+# curl -o data/genesis.blob https://devnet.aptoslabs.com/genesis.blob && \
+# curl -o data/waypoint.txt https://devnet.aptoslabs.com/waypoint.txt && \
+# docker run -p 8082:8082 --rm -v $(pwd)/data:/opt/aptos/data aptos-core:rosetta-latest online --config /opt/aptos/data/fullnode.yaml > /dev/null 2>&1 &
+    
     - name: run check:data on mainnet
       env:
         START_INDEX: ${{ matrix.range }}
