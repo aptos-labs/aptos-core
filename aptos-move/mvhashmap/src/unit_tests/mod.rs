@@ -10,7 +10,8 @@ struct Value(Vec<usize>);
 
 impl DeserializeU128 for Value {
     fn deserialize(&self) -> Option<u128> {
-        Some(0)
+        let value = self.0.clone().into_iter().reduce(|a, b| a + b)?;
+        Some(value as u128)
     }
 }
 
@@ -25,6 +26,26 @@ fn arc_value_for(txn_idx: usize, incarnation: usize) -> Arc<Value> {
     Arc::new(value_for(txn_idx, incarnation))
 }
 
+// Convert value for txn_idx and incarnation into u128.
+fn u128_for(txn_idx: usize, incarnation: usize) -> u128 {
+    value_for(txn_idx, incarnation).deserialize().unwrap()
+}
+
+// Generate determinitc additions.
+fn add_for(txn_idx: usize, limit: u128) -> DeltaOp {
+    DeltaOp::Addition {
+        value: txn_idx as u128,
+        limit,
+    }
+}
+
+// Generate determinitc subtractions.
+fn sub_for(txn_idx: usize) -> DeltaOp {
+    DeltaOp::Subtraction {
+        value: txn_idx as u128,
+    }
+}
+
 #[test]
 fn create_write_read_placeholder_struct() {
     use MVHashMapError::*;
@@ -36,14 +57,14 @@ fn create_write_read_placeholder_struct() {
 
     let mvtbl = MVHashMap::new();
 
-    // Reads that should go the the DB return Err(None)
+    // Reads that should go the the DB return Err(NotFound)
     let r_db = mvtbl.read(&ap1, 5);
     assert_eq!(Err(NotFound), r_db);
 
     // Write by txn 10.
     mvtbl.add_write(&ap1, (10, 1), value_for(10, 1));
 
-    // Reads that should go the the DB return Err(None)
+    // Reads that should go the the DB return Err(NotFound)
     let r_db = mvtbl.read(&ap1, 9);
     assert_eq!(Err(NotFound), r_db);
     // Reads return entries from smaller txns, not txn 10.
@@ -54,13 +75,22 @@ fn create_write_read_placeholder_struct() {
     let r_10 = mvtbl.read(&ap1, 15);
     assert_eq!(Ok(Version((10, 1), arc_value_for(10, 1))), r_10);
 
+    // More deltas.
+    mvtbl.add_delta(&ap1, 11, add_for(11, 1000));
+    mvtbl.add_delta(&ap1, 12, add_for(12, 1000));
+    mvtbl.add_delta(&ap1, 13, sub_for(13));
+
+    // Reads have to go traverse deltas until a write is found.
+    let r_sum = mvtbl.read(&ap1, 14);
+    assert_eq!(Ok(Resolved(u128_for(10, 1) + 11 + 12 - 13)), r_sum);
+
     // More writes.
     mvtbl.add_write(&ap1, (12, 0), value_for(12, 0));
     mvtbl.add_write(&ap1, (8, 3), value_for(8, 3));
 
     // Verify reads.
     let r_12 = mvtbl.read(&ap1, 15);
-    assert_eq!(Ok(Version((12, 0), arc_value_for(12, 0))), r_12);
+    assert_eq!(Ok(Resolved(u128_for(12, 0) - 13)), r_12);
     let r_10 = mvtbl.read(&ap1, 11);
     assert_eq!(Ok(Version((10, 1), arc_value_for(10, 1))), r_10);
     let r_8 = mvtbl.read(&ap1, 10);
@@ -72,6 +102,10 @@ fn create_write_read_placeholder_struct() {
     // Read for txn 11 must observe a dependency.
     let r_10 = mvtbl.read(&ap1, 11);
     assert_eq!(Err(Dependency(10)), r_10);
+
+    // Read for txn 12 must observe a dependency when resolving deltas at txn 11.
+    let r_11 = mvtbl.read(&ap1, 12);
+    assert_eq!(Err(Dependency(10)), r_11);
 
     // Delete the entry written by 10, write to a different ap.
     mvtbl.delete(&ap1, 10);
@@ -96,7 +130,10 @@ fn create_write_read_placeholder_struct() {
 
     // Reads from ap1 and ap3 go to db.
     let r_db = mvtbl.read(&ap1, 30);
-    assert_eq!(Err(NotFound), r_db);
+    assert_eq!(
+        Err(Unresolved(DeltaOp::Subtraction { value: 13 - 11 })),
+        r_db
+    );
     let r_db = mvtbl.read(&ap3, 30);
     assert_eq!(Err(NotFound), r_db);
 

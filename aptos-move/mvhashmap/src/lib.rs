@@ -126,7 +126,13 @@ impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
 
         // Assert that the previous entry for txn_idx, if present, had lower incarnation.
         assert!(prev_entry
-            .map(|entry| matches!(entry.cell, EntryCell::Write(i, _) if i < incarnation))
+            .map(|entry| -> bool {
+                if let EntryCell::Write(i, _) = entry.cell {
+                    i < incarnation
+                } else {
+                    true
+                }
+            })
             .unwrap_or(true));
     }
 
@@ -208,7 +214,7 @@ impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
                             }
                             EntryCell::Delta(delta) => {
                                 match aggregator.as_mut() {
-                                    Some(other_delta) => {
+                                    Some(accumulator) => {
                                         // Read hit a delta during traversing the
                                         // block and aggregating other deltas. Merge
                                         // two deltas together.
@@ -216,13 +222,12 @@ impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
                                         // error. Once again, there is nothing we can
                                         // do at the moment, so panic if this happens.
 
-                                        // TODO: We need a function:
-                                        //   delta.merge(other_delta)
-                                        // Wait until other PR lands to reuse that. For
-                                        // now place anything.
-
-                                        // LINE BELOW MAKES NO SENSE!
-                                        other_delta.apply_to(0);
+                                        // TODO (PR 3149): Make sure we match on error.
+                                        let new_delta =
+                                            accumulator.merge_with(delta.clone()).expect(
+                                                "delta application failed but it shouldn't have",
+                                            );
+                                        *accumulator = new_delta;
                                     }
                                     None => {
                                         // Read hit a delta value and has to
