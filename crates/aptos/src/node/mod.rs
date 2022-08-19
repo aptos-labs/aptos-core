@@ -481,6 +481,10 @@ pub struct RunLocalTestnet {
 
     #[clap(flatten)]
     prompt_options: PromptOptions,
+
+    /// Disable the delegation of minting to a dedicated account
+    #[clap(long)]
+    do_not_delegate: bool,
 }
 
 #[async_trait]
@@ -586,7 +590,7 @@ impl CliCommand<()> for RunLocalTestnet {
                 mint_account_address: None,
                 chain_id: ChainId::test(),
                 maximum_amount: None,
-                do_not_delegate: false,
+                do_not_delegate: self.do_not_delegate,
             }
             .run()
             .await;
