@@ -80,6 +80,8 @@ spec:
         env:
         - name: RUST_LOG
           value: {{ .rust_log }}
+        - name: MALLOC_CONF
+          value: "prof:true,lg_prof_interval:34,lg_prof_sample:19"
         - name: RUST_LOG_REMOTE
           value: {{ .rust_log_remote }}
         {{- if .remoteLogAddress }}
