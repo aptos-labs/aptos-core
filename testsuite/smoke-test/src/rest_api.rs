@@ -1,13 +1,14 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_rest_client::aptos_api_types::TransactionData;
 use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::account_config::{AccountResource, CORE_CODE_ADDRESS};
 use aptos_types::transaction::authenticator::AuthenticationKey;
-use aptos_types::transaction::Transaction;
+use aptos_types::transaction::{SignedTransaction, Transaction};
 use forge::Swarm;
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -201,4 +202,26 @@ async fn test_bcs() {
             bcs_txn.info.transaction_hash()
         );
     }
+
+    // Test simulation of a transaction should be the same in BCS & JSON
+    let transaction_factory = info.transaction_factory();
+    let transfer_txn = transaction_factory
+        .transfer(other_local_account.address(), 500)
+        .sender(local_account.address())
+        .sequence_number(local_account.sequence_number())
+        .build();
+    let signed_txn = SignedTransaction::new(
+        transfer_txn,
+        local_account.public_key().clone(),
+        Ed25519Signature::dummy_signature(),
+    );
+
+    let json_txns = client.simulate(&signed_txn).await.unwrap().into_inner();
+    let json_txn = json_txns.first().unwrap();
+
+    let bcs_txn = client.simulate_bcs(&signed_txn).await.unwrap().into_inner();
+    assert_eq!(
+        aptos_crypto::HashValue::from(json_txn.info.hash),
+        bcs_txn.info.transaction_hash()
+    );
 }

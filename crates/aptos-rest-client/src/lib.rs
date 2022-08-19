@@ -23,7 +23,7 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::mime_types::BCS_OUTPUT_NEW;
 use aptos_api_types::{
     mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, HexEncodedBytes,
-    MoveModuleId, TransactionData, TransactionOnChainData, VersionedEvent,
+    MoveModuleId, TransactionData, TransactionOnChainData, UserTransaction, VersionedEvent,
 };
 use aptos_crypto::HashValue;
 use aptos_types::account_config::AccountResource;
@@ -165,6 +165,44 @@ impl Client {
         });
 
         Ok(response)
+    }
+
+    pub async fn simulate(
+        &self,
+        txn: &SignedTransaction,
+    ) -> Result<Response<Vec<UserTransaction>>> {
+        let txn_payload = bcs::to_bytes(txn)?;
+        let url = self.build_path("transactions/simulate")?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        self.json(response).await
+    }
+
+    pub async fn simulate_bcs(
+        &self,
+        txn: &SignedTransaction,
+    ) -> Result<Response<TransactionOnChainData>> {
+        let txn_payload = bcs::to_bytes(txn)?;
+        let url = self.build_path("transactions/simulate")?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(ACCEPT, BCS_OUTPUT_NEW)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }
 
     pub async fn submit(&self, txn: &SignedTransaction) -> Result<Response<PendingTransaction>> {
