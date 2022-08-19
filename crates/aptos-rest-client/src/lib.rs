@@ -368,7 +368,7 @@ impl Client {
         version: u64,
     ) -> Result<Response<Option<Resource>>> {
         let url = self.build_path(&format!(
-            "accounts/{}/resource/{}?version={}",
+            "accounts/{}/resource/{}?ledger_version={}",
             address, resource_type, version
         ))?;
 
