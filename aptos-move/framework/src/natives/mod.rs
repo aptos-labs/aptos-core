@@ -44,77 +44,71 @@ impl GasParameters {
     pub fn zeros() -> Self {
         Self {
             account: account::GasParameters {
-                create_address: account::CreateAddressGasParameters {
-                    base_cost: 0.into(),
-                },
-                create_signer: account::CreateSignerGasParameters {
-                    base_cost: 0.into(),
-                },
+                create_address: account::CreateAddressGasParameters { base: 0.into() },
+                create_signer: account::CreateSignerGasParameters { base: 0.into() },
             },
             bls12381: cryptography::bls12381::GasParameters {
-                base_cost: 0.into(),
-                per_pubkey_deserialize_cost: 0.into(),
-                per_pubkey_aggregate_cost: 0.into(),
-                per_pubkey_subgroup_check_cost: 0.into(),
-                per_sig_deserialize_cost: 0.into(),
-                per_sig_aggregate_cost: 0.into(),
-                per_sig_subgroup_check_cost: 0.into(),
-                per_sig_verify_cost: 0.into(),
-                per_pop_verify_cost: 0.into(),
-                per_pairing_cost: 0.into(),
-                per_msg_hashing_cost: 0.into(),
-                per_byte_hashing_cost: 0.into(),
+                base: 0.into(),
+                per_pubkey_deserialize: 0.into(),
+                per_pubkey_aggregate: 0.into(),
+                per_pubkey_subgroup_check: 0.into(),
+                per_sig_deserialize: 0.into(),
+                per_sig_aggregate: 0.into(),
+                per_sig_subgroup_check: 0.into(),
+                per_sig_verify: 0.into(),
+                per_pop_verify: 0.into(),
+                per_pairing: 0.into(),
+                per_msg_hashing: 0.into(),
+                per_byte_hashing: 0.into(),
             },
             ed25519: cryptography::ed25519::GasParameters {
-                base_cost: 0.into(),
-                per_pubkey_deserialize_cost: 0.into(),
-                per_pubkey_small_order_check_cost: 0.into(),
-                per_sig_deserialize_cost: 0.into(),
-                per_sig_strict_verify_cost: 0.into(),
-                per_msg_hashing_base_cost: 0.into(),
-                per_msg_byte_hashing_cost: 0.into(),
+                base: 0.into(),
+                per_pubkey_deserialize: 0.into(),
+                per_pubkey_small_order_check: 0.into(),
+                per_sig_deserialize: 0.into(),
+                per_sig_strict_verify: 0.into(),
+                per_msg_hashing_base: 0.into(),
+                per_msg_byte_hashing: 0.into(),
             },
             secp256k1: cryptography::secp256k1::GasParameters {
-                base_cost: 0.into(),
-                ecdsa_recover_cost: 0.into(),
+                base: 0.into(),
+                ecdsa_recover: 0.into(),
             },
             hash: hash::GasParameters {
                 sip_hash: hash::SipHashGasParameters {
-                    base_cost: 0.into(),
-                    unit_cost: 0.into(),
+                    base: 0.into(),
+                    per_byte: 0.into(),
                 },
             },
             type_info: type_info::GasParameters {
                 type_of: type_info::TypeOfGasParameters {
-                    base_cost: 0.into(),
-                    unit_cost: 0.into(),
+                    base: 0.into(),
+                    per_abstract_memory_unit: 0.into(),
                 },
                 type_name: type_info::TypeNameGasParameters {
-                    base_cost: 0.into(),
-                    unit_cost: 0.into(),
+                    base: 0.into(),
+                    per_abstract_memory_unit: 0.into(),
                 },
             },
             util: util::GasParameters {
                 from_bytes: util::FromBytesGasParameters {
-                    base_cost: 0.into(),
-                    unit_cost: 0.into(),
+                    base: 0.into(),
+                    per_byte: 0.into(),
                 },
             },
             transaction_context: transaction_context::GasParameters {
-                get_script_hash: transaction_context::GetScriptHashGasParameters {
-                    base_cost: 0.into(),
-                },
+                get_script_hash: transaction_context::GetScriptHashGasParameters { base: 0.into() },
             },
             code: code::GasParameters {
                 request_publish: code::RequestPublishGasParameters {
-                    base_cost: 0.into(),
-                    unit_cost: 0.into(),
+                    base: 0.into(),
+                    per_byte: 0.into(),
                 },
             },
             event: event::GasParameters {
                 write_to_event_store: event::WriteToEventStoreGasParameters {
-                    base_cost: 0.into(),
-                    unit_cost: 0.into(),
+                    base: 0.into(),
+                    per_abstract_memory_unit: 0.into(),
                 },
             },
             state_storage: state_storage::GasParameters {
