@@ -3,7 +3,7 @@
 
 import { AptosClient } from 'aptos';
 import { useQuery, UseQueryOptions } from 'react-query';
-import { ScriptFunctionPayload, UserTransaction } from 'aptos/dist/generated';
+import { EntryFunctionPayload, UserTransaction } from 'aptos/dist/generated';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
 import { accountNamespace, coinNamespace } from 'core/constants';
 
@@ -26,7 +26,7 @@ export async function getUserTransactions(aptosClient: AptosClient, address: str
     .filter((t) => t.success);
 }
 
-export async function getScriptFunctionTransactions(
+export async function getEntryFunctionTransactions(
   aptosClient: AptosClient,
   address: string,
   functionName: string | string[],
@@ -34,8 +34,8 @@ export async function getScriptFunctionTransactions(
   const transactions = await getUserTransactions(aptosClient, address);
   const functionNames = Array.isArray(functionName) ? functionName : [functionName];
   return transactions
-    .filter((t) => t.payload.type === 'script_function_payload'
-      && functionNames.indexOf((t.payload as ScriptFunctionPayload).function) >= 0);
+    .filter((t) => t.payload.type === 'entry_function_payload'
+      && functionNames.indexOf((t.payload as EntryFunctionPayload).function) >= 0);
 }
 
 // region Use transactions
@@ -64,7 +64,7 @@ export function useCoinTransferTransactions(
 
   return useQuery<UserTransaction[]>(
     [transactionQueryKeys.getCoinTransferTransactions, address],
-    async () => getScriptFunctionTransactions(
+    async () => getEntryFunctionTransactions(
       aptosClient!,
       address!,
       [`${coinNamespace}::transfer`, `${accountNamespace}::transfer`],

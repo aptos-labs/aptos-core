@@ -13,7 +13,7 @@ import {
 } from '@chakra-ui/react';
 import { HiDownload } from '@react-icons/all-files/hi/HiDownload';
 import { BsArrowUpRight } from '@react-icons/all-files/bs/BsArrowUpRight';
-import { UserTransaction, ScriptFunctionPayload } from 'aptos/dist/generated';
+import { UserTransaction, EntryFunctionPayload } from 'aptos/dist/generated';
 import ChakraLink from 'core/components/ChakraLink';
 import { collapseHexString } from 'core/utils/hex';
 import {
@@ -83,7 +83,7 @@ export function ActivityItem({ transaction }: ActivityItemProps) {
   const { colorMode } = useColorMode();
   const { aptosAccount } = useGlobalStateContext();
 
-  const typedPayload = transaction.payload as ScriptFunctionPayload;
+  const typedPayload = transaction.payload as EntryFunctionPayload;
   const [recipient, amount]: string[] = typedPayload.arguments;
   const coinName = typedPayload.type_arguments[0]?.split('::').pop();
   const formattedCoinName = useMemo(() => formatCoinName(coinName), [coinName]);

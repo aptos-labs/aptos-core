@@ -13,7 +13,7 @@ import AuthLayout from 'core/layouts/AuthLayout';
 import { Routes as PageRoutes } from 'core/routes';
 import { useParams } from 'react-router-dom';
 import { useCoinTransferTransactions } from 'core/queries/transaction';
-import { UserTransaction, ScriptFunctionPayload } from 'aptos/dist/generated';
+import { UserTransaction, EntryFunctionPayload } from 'aptos/dist/generated';
 import { MaybeHexString } from 'aptos';
 import GraceHopperBoringAvatar from 'core/components/BoringAvatar';
 import Copyable from 'core/components/Copyable';
@@ -23,7 +23,7 @@ import useGlobalStateContext from 'core/hooks/useGlobalState';
 
 function filterByRecipient(recipient: MaybeHexString) {
   return (txn: UserTransaction) => {
-    const payload = txn.payload as ScriptFunctionPayload;
+    const payload = txn.payload as EntryFunctionPayload;
     return (payload.arguments[0] as string) === recipient;
   };
 }

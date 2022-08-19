@@ -23,7 +23,7 @@ export type Networks = Record<string, Network>;
 
 const defaultCustomNetworks: Networks = {
   [DefaultNetworks.Localhost]: {
-    faucetUrl: 'http://localhost:8081',
+    faucetUrl: 'http://localhost:80',
     name: DefaultNetworks.Localhost,
     nodeUrl: 'http://localhost:8080',
   },

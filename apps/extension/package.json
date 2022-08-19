@@ -18,7 +18,7 @@
     "@zxcvbn-ts/core": "^2.0.3",
     "@zxcvbn-ts/language-common": "^2.0.1",
     "@zxcvbn-ts/language-en": "^2.0.1",
-    "aptos": "^1.3.6",
+    "aptos": "^1.3.7",
     "axios": "^0.27.2",
     "bs58": "^5.0.0",
     "buffer": "^6.0.3",

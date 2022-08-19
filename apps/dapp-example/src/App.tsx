@@ -13,7 +13,7 @@ function App() {
   const transaction = {
     arguments: [address, '717'],
     function: '0x1::coin::transfer',
-    type: 'script_function_payload',
+    type: 'entry_function_payload',
     type_arguments: ['0x1::aptos_coin::AptosCoin'],
   };
 

@@ -11,9 +11,9 @@ import { validStorageUris } from 'core/constants';
 import { MetadataJson } from 'core/types/tokenMetadata';
 import { useCallback } from 'react';
 import { getTokenIdDictFromString, TokenId } from 'core/utils/token';
-import { ScriptFunctionPayload } from 'aptos/dist/generated';
+import { EntryFunctionPayload } from 'aptos/dist/generated';
 import {
-  getScriptFunctionTransactions,
+  getEntryFunctionTransactions,
 } from 'core/queries/transaction';
 import useGlobalStateContext from 'core/hooks/useGlobalState';
 
@@ -41,7 +41,7 @@ export function useGalleryItems(
   const { activeAccountAddress, aptosClient } = useGlobalStateContext();
 
   async function getGalleryItems() {
-    const createTokenTxns = await getScriptFunctionTransactions(
+    const createTokenTxns = await getEntryFunctionTransactions(
       aptosClient!,
       activeAccountAddress!,
       '0x3::token::create_token_script',
@@ -50,7 +50,7 @@ export function useGalleryItems(
     const collectionDict: CollectionDict = {};
 
     await Promise.all(createTokenTxns.map(async (txn) => {
-      const payload = txn.payload as ScriptFunctionPayload;
+      const payload = txn.payload as EntryFunctionPayload;
 
       // TODO: do we need to go through HexString to deserialize the parameters?
       const creator = txn.sender;

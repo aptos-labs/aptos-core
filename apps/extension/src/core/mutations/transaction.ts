@@ -14,7 +14,7 @@ import { useMutation, useQuery, useQueryClient } from 'react-query';
 import {
   ApiError,
   AptosError,
-  ScriptFunctionPayload,
+  EntryFunctionPayload,
   UserTransaction,
 } from 'aptos/dist/generated';
 import { useChainId } from 'core/queries/network';
@@ -158,7 +158,7 @@ export function useCoinTransferTransaction() {
         ? coinEvents.TRANSFER_APTOS_COIN
         : coinEvents.ERROR_TRANSFER_APTOS_COIN;
 
-      const payload = txn.payload as ScriptFunctionPayload;
+      const payload = txn.payload as EntryFunctionPayload;
       const coinType = payload.type_arguments[0];
 
       const params = {

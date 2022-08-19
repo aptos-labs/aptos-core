@@ -12,10 +12,10 @@ import { accountNamespace, aptosCoinStructTag, coinNamespace } from 'core/consta
 const {
   AccountAddress,
   ChainId,
+  EntryFunction,
   RawTransaction,
-  ScriptFunction,
   StructTag,
-  TransactionPayloadScriptFunction,
+  TransactionPayloadEntryFunction,
   TypeTagStruct,
 } = TxnBuilderTypes;
 
@@ -71,8 +71,8 @@ export function buildCoinTransferPayload(recipient: MaybeHexString, amount: bigi
     BCS.bcsSerializeUint64(BigInt(amount)),
   ];
 
-  const scriptFunction = ScriptFunction.natural(coinNamespace, 'transfer', typeArgs, encodedArgs);
-  return new TransactionPayloadScriptFunction(scriptFunction);
+  const entryFunction = EntryFunction.natural(coinNamespace, 'transfer', typeArgs, encodedArgs);
+  return new TransactionPayloadEntryFunction(entryFunction);
 }
 
 /**
@@ -84,8 +84,8 @@ export function buildCreateAccountPayload(address: MaybeHexString) {
     BCS.bcsToBytes(AccountAddress.fromHex(address)),
   ];
 
-  const scriptFunction = ScriptFunction.natural(accountNamespace, 'create_account', [], encodedArgs);
-  return new TransactionPayloadScriptFunction(scriptFunction);
+  const entryFunction = EntryFunction.natural(accountNamespace, 'create_account', [], encodedArgs);
+  return new TransactionPayloadEntryFunction(entryFunction);
 }
 
 /**
@@ -101,6 +101,6 @@ export function buildAccountTransferPayload(recipient: MaybeHexString, amount: b
     BCS.bcsSerializeUint64(BigInt(amount)),
   ];
 
-  const scriptFunction = ScriptFunction.natural(accountNamespace, 'transfer', [], encodedArgs);
-  return new TransactionPayloadScriptFunction(scriptFunction);
+  const entryFunction = EntryFunction.natural(accountNamespace, 'transfer', [], encodedArgs);
+  return new TransactionPayloadEntryFunction(entryFunction);
 }
