@@ -27,8 +27,8 @@ fn arc_value_for(txn_idx: usize, incarnation: usize) -> Arc<Value> {
 
 #[test]
 fn create_write_read_placeholder_struct() {
-    use Error::*;
-    use Output::*;
+    use MVHashMapError::*;
+    use MVHashMapOutput::*;
 
     let ap1 = b"/foo/b".to_vec();
     let ap2 = b"/foo/c".to_vec();
@@ -41,7 +41,7 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Err(NotFound), r_db);
 
     // Write by txn 10.
-    mvtbl.write(&ap1, (10, 1), value_for(10, 1));
+    mvtbl.add_write(&ap1, (10, 1), value_for(10, 1));
 
     // Reads that should go the the DB return Err(None)
     let r_db = mvtbl.read(&ap1, 9);
@@ -55,8 +55,8 @@ fn create_write_read_placeholder_struct() {
     assert_eq!(Ok(Version((10, 1), arc_value_for(10, 1))), r_10);
 
     // More writes.
-    mvtbl.write(&ap1, (12, 0), value_for(12, 0));
-    mvtbl.write(&ap1, (8, 3), value_for(8, 3));
+    mvtbl.add_write(&ap1, (12, 0), value_for(12, 0));
+    mvtbl.add_write(&ap1, (8, 3), value_for(8, 3));
 
     // Verify reads.
     let r_12 = mvtbl.read(&ap1, 15);
@@ -75,15 +75,15 @@ fn create_write_read_placeholder_struct() {
 
     // Delete the entry written by 10, write to a different ap.
     mvtbl.delete(&ap1, 10);
-    mvtbl.write(&ap2, (10, 2), value_for(10, 2));
+    mvtbl.add_write(&ap2, (10, 2), value_for(10, 2));
 
     // Read by txn 11 no longer observes entry from txn 10.
     let r_8 = mvtbl.read(&ap1, 11);
     assert_eq!(Ok(Version((8, 3), arc_value_for(8, 3))), r_8);
 
     // Reads, writes for ap2 and ap3.
-    mvtbl.write(&ap2, (5, 0), value_for(5, 0));
-    mvtbl.write(&ap3, (20, 4), value_for(20, 4));
+    mvtbl.add_write(&ap2, (5, 0), value_for(5, 0));
+    mvtbl.add_write(&ap3, (20, 4), value_for(20, 4));
     let r_5 = mvtbl.read(&ap2, 10);
     assert_eq!(Ok(Version((5, 0), arc_value_for(5, 0))), r_5);
     let r_20 = mvtbl.read(&ap3, 21);

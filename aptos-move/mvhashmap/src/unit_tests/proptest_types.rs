@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{Error, MVHashMap, Output};
+use super::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_types::write_set::DeserializeU128;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
@@ -107,7 +107,7 @@ where
         })
         .collect::<Vec<_>>();
     for (key, idx) in versions_to_write {
-        map.write(&key, (idx, 0), Value(None));
+        map.add_write(&key, (idx, 0), Value(None));
         map.mark_estimate(&key, idx);
     }
 
@@ -126,8 +126,8 @@ where
                 let key = &transactions[idx].0;
                 match &transactions[idx].1 {
                     Operator::Read => {
-                        use Error::*;
-                        use Output::*;
+                        use MVHashMapError::*;
+                        use MVHashMapOutput::*;
 
                         let baseline = baseline.get(key, idx);
                         let mut retry_attempts = 0;
@@ -174,10 +174,10 @@ where
                         }
                     }
                     Operator::Remove => {
-                        map.write(key, (idx, 1), Value(None));
+                        map.add_write(key, (idx, 1), Value(None));
                     }
                     Operator::Insert(v) => {
-                        map.write(key, (idx, 1), Value(Some(v.clone())));
+                        map.add_write(key, (idx, 1), Value(Some(v.clone())));
                     }
                 }
             })
