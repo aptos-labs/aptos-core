@@ -36,4 +36,6 @@
 nohup apt-get update > /dev/null 2>&1 &
 nohup apt-get -y install jq > /dev/null 2>&1 &
 
+sleep 100
+
 echo $(seq $START_INDEX $BLKS_PER_CHUNK 112419 | jq -cnR '[inputs | select(length>0)]')
