@@ -1,8 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::transaction::{ExecutionStatus, TransactionStatus};
+use cached_packages::aptos_stdlib;
 use language_e2e_tests::{
     gas_costs::TXN_RESERVED, test_with_different_versions, versioning::CURRENT_RELEASE_VERSIONS,
 };

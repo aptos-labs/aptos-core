@@ -47,8 +47,6 @@ pub struct PackageMetadata {
     pub manifest: String,
     /// The list of modules installed by this package.
     pub modules: Vec<ModuleMetadata>,
-    /// Error map, in compressed BCS
-    pub error_map: String,
     /// ABIs, in compressed BCS
     pub abis: Vec<String>,
 }
@@ -136,7 +134,6 @@ pub struct PackageMetadataJson {
     pub build_info: String,
     pub manifest: String,
     pub modules: Vec<ModuleMetadata>,
-    pub error_map: String,
     pub abis: Vec<String>,
 }
 

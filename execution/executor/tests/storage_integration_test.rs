@@ -3,7 +3,6 @@
 
 use aptos_crypto::{hash::CryptoHash, PrivateKey};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_config::{aptos_test_root_address, AccountResource, CORE_CODE_ADDRESS},
@@ -14,6 +13,7 @@ use aptos_types::{
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
 };
+use cached_packages::aptos_stdlib;
 use executor_test_helpers::{
     gen_block_id, gen_ledger_info_with_sigs, get_test_signed_transaction,
     integration_test_impl::{

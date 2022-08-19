@@ -6,7 +6,6 @@
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
 use aptos_state_view::account_with_state_view::AsAccountWithStateView;
 use aptos_temppath::TempPath;
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
@@ -28,6 +27,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
+use cached_packages::aptos_stdlib;
 use executor::{
     block_executor::BlockExecutor,
     db_bootstrapper::{generate_waypoint, maybe_bootstrap},
