@@ -98,9 +98,11 @@ impl FirehoseStreamer {
     }
 
     pub async fn start(&mut self) {
+        // Format is FIRE INIT aptos-node <PACKAGE_VERSION> <MAJOR_VERSION> <MINOR_VERSION> <CHAIN_ID>
         println!(
-            "FIRE INIT aptos-node {} aptos 0 0",
-            env!("CARGO_PKG_VERSION")
+            "\nFIRE INIT aptos-node {} aptos 0 0 {}",
+            env!("CARGO_PKG_VERSION"),
+            self.context.chain_id().id(),
         );
         loop {
             self.convert_next_block().await;
@@ -140,7 +142,7 @@ impl FirehoseStreamer {
         // We are validating the block as we convert and print each transactions. The rules are as follows:
         // 1. first (and only first) transaction is a block metadata or genesis 2. versions are monotonically increasing 3. start and end versions match block boundaries
         // Retry if the block is not valid. Panic if there's anything wrong with encoding a transaction.
-        println!("FIRE BLOCK_START {}", self.current_block_height);
+        println!("\nFIRE BLOCK_START {}", self.current_block_height);
 
         let transactions = match self.context.get_transactions(
             block_start_version,
@@ -217,7 +219,7 @@ impl FirehoseStreamer {
             return vec![];
         }
 
-        println!("FIRE BLOCK_END {}", self.current_block_height);
+        println!("\nFIRE BLOCK_END {}", self.current_block_height);
         metrics::BLOCKS_SENT.inc();
         self.current_block_height += 1;
         result
@@ -240,7 +242,7 @@ impl FirehoseStreamer {
                 transaction
             )
         });
-        println!("FIRE TRX {}", base64::encode(buf));
+        println!("\nFIRE TRX {}", base64::encode(buf));
         metrics::TRANSACTIONS_SENT.inc();
     }
 }
