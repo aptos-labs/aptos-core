@@ -574,25 +574,31 @@ impl TransactionsApi {
             changes: output.write_set().clone(),
         };
 
-        let transactions = self.render_transactions(vec![simulated_txn])?;
+        match accept_type {
+            AcceptType::Json => {
+                let transactions = self.render_transactions(vec![simulated_txn])?;
 
-        // Users can only make requests to simulate UserTransactions, so unpack
-        // the Vec<Transaction> into Vec<UserTransaction>.
-        let mut user_transactions = Vec::new();
-        for transaction in transactions.into_iter() {
-            match transaction {
-                Transaction::UserTransaction(user_txn) => user_transactions.push(*user_txn),
-                _ => return Err(SubmitTransactionError::internal_str(
-                    "Simulation unexpectedly resulted in something other than a UserTransaction",
-                )),
+                // Users can only make requests to simulate UserTransactions, so unpack
+                // the Vec<Transaction> into Vec<UserTransaction>.
+                let mut user_transactions = Vec::new();
+                for transaction in transactions.into_iter() {
+                    match transaction {
+                        Transaction::UserTransaction(user_txn) => user_transactions.push(*user_txn),
+                        _ => return Err(SubmitTransactionError::internal_str(
+                            "Simulation unexpectedly resulted in something other than a UserTransaction",
+                        )),
+                    }
+                }
+                BasicResponse::try_from_json((
+                    user_transactions,
+                    &ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            }
+            AcceptType::Bcs => {
+                BasicResponse::try_from_bcs((simulated_txn, &ledger_info, BasicResponseStatus::Ok))
             }
         }
-        BasicResponse::try_from_rust_value((
-            user_transactions,
-            &ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
     }
 
     pub fn get_signing_message(
