@@ -40,16 +40,14 @@ impl WriteOp {
     }
 }
 
-pub trait DeserializeU128 {
-    fn deserialize(&self) -> Option<u128>;
+pub trait TransactionWrite {
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>>;
 }
 
-impl DeserializeU128 for WriteOp {
-    fn deserialize(&self) -> Option<u128> {
+impl TransactionWrite for WriteOp {
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
         match self {
-            WriteOp::Creation(v) | WriteOp::Modification(v) => {
-                bcs::from_bytes(v).expect("unexpected deserialization error in WriteOp")
-            }
+            WriteOp::Creation(v) | WriteOp::Modification(v) => Some(v.clone()),
             WriteOp::Deletion => None,
         }
     }

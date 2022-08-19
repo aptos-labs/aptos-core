@@ -9,7 +9,7 @@ use crate::{
 };
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_infallible::Mutex;
-use aptos_types::write_set::DeserializeU128;
+use aptos_types::write_set::TransactionWrite;
 use mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use num_cpus;
 use once_cell::sync::Lazy;
@@ -53,7 +53,7 @@ pub enum ReadResult<V> {
 impl<
         'a,
         K: ModulePath + PartialOrd + Send + Clone + Hash + Eq,
-        V: DeserializeU128 + Send + Sync,
+        V: TransactionWrite + Send + Sync,
     > MVHashMapView<'a, K, V>
 {
     /// Drains the captured reads.

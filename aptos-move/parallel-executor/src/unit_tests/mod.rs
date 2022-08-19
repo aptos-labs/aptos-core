@@ -7,7 +7,7 @@ use crate::{
     scheduler::{Scheduler, SchedulerTask, TaskGuard},
     task::ModulePath,
 };
-use aptos_types::write_set::DeserializeU128;
+use aptos_types::write_set::TransactionWrite;
 use rand::random;
 use std::{
     fmt::Debug,
@@ -18,7 +18,7 @@ use std::{
 fn run_and_assert<K, V>(transactions: Vec<Transaction<K, V>>)
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + Eq + DeserializeU128 + 'static,
+    V: Send + Sync + Debug + Clone + Eq + TransactionWrite + 'static,
 {
     let output = ParallelTransactionExecutor::<Transaction<K, V>, Task<K, V>>::new(num_cpus::get())
         .execute_transactions_parallel((), transactions.clone());

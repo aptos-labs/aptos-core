@@ -11,7 +11,7 @@ use crate::{
 };
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::{
-    access_path::AccessPath, account_address::AccountAddress, write_set::DeserializeU128,
+    access_path::AccessPath, account_address::AccountAddress, write_set::TransactionWrite,
 };
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -71,20 +71,25 @@ impl<K: Hash + Clone + Debug + Eq + PartialOrd> ModulePath for KeyType<K> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Arbitrary)]
 pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
-    /// Wrapping the types used for testing to add DeserializeU128 trait implementation (below).
+    /// Wrapping the types used for testing to add TransactionWrite trait implementation (below).
     pub V,
 );
 
-impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> DeserializeU128
+impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> TransactionWrite
     for ValueType<V>
 {
-    fn deserialize(&self) -> Option<u128> {
-        let v: Vec<u8> = self.0.clone().into();
-        if v.len() < 16 {
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+        Some(self.0.clone().into())
+    }
+}
+
+impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> ValueType<V> {
+    fn _extract_u128(&self) -> Option<u128> {
+        let v = self.extract_raw_bytes().unwrap();
+        if v.is_empty() {
             None
         } else {
-            let bytes = v[0..16].try_into().unwrap();
-            Some(u128::from_be_bytes(bytes))
+            Some(v[0] as u128)
         }
     }
 }
@@ -266,7 +271,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq> TransactionGen<V> {
 impl<K, V> TransactionType for Transaction<K, V>
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + DeserializeU128 + 'static,
+    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Key = K;
     type Value = V;
@@ -287,7 +292,7 @@ impl<K, V> Task<K, V> {
 impl<K, V> ExecutorTask for Task<K, V>
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + DeserializeU128 + 'static,
+    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type T = Transaction<K, V>;
     type Output = Output<K, V>;
@@ -355,7 +360,7 @@ pub struct Output<K, V>(
 impl<K, V> TransactionOutput for Output<K, V>
 where
     K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + DeserializeU128 + 'static,
+    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type T = Transaction<K, V>;
 
