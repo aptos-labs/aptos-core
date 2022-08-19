@@ -150,12 +150,6 @@ impl StateApi {
         resource_type: MoveStructTag,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveResource> {
-        // TODO: Determine what is needed to deserialize the storage type
-        if accept_type == &AcceptType::Bcs {
-            return Err(anyhow!("BCS is not supported for get resource"))
-                .map_err(BasicErrorWith404::bad_request);
-        }
-
         let resource_type: StructTag = resource_type
             .try_into()
             .context("Failed to parse given resource type")
@@ -170,19 +164,21 @@ impl StateApi {
             .map_err(BasicErrorWith404::internal)?
             .ok_or_else(|| build_not_found("Resource", resource_key, ledger_version))?;
 
-        let resource = state_view
-            .as_move_resolver()
-            .as_converter(self.context.db.clone())
-            .try_into_resource(&resource_type, &bytes)
-            .context("Failed to deserialize resource data retrieved from DB")
-            .map_err(BasicErrorWith404::internal)?;
+        match accept_type {
+            AcceptType::Json => {
+                let resource = state_view
+                    .as_move_resolver()
+                    .as_converter(self.context.db.clone())
+                    .try_into_resource(&resource_type, &bytes)
+                    .context("Failed to deserialize resource data retrieved from DB")
+                    .map_err(BasicErrorWith404::internal)?;
 
-        BasicResponse::try_from_rust_value((
-            resource,
-            &ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+                BasicResponse::try_from_json((resource, &ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => {
+                BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 
     pub fn module(
