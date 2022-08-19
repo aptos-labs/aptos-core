@@ -92,6 +92,7 @@ impl<
                         .push(ReadDescriptor::from_storage(key.clone()));
                     return ReadResult::None;
                 }
+                Err(DeltaApplicationFailure) => todo!(),
                 Err(Unresolved(delta)) => {
                     self.captured_reads
                         .lock()
@@ -269,6 +270,7 @@ where
                 Err(Dependency(_)) => false, // Dependency implies a validation failure.
                 Err(Unresolved(delta)) => r.validate_unresolved(delta),
                 Err(NotFound) => r.validate_storage(),
+                Err(DeltaApplicationFailure) => todo!(),
             }
         });
 
