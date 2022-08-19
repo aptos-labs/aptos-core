@@ -271,7 +271,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
             self.aptos_data_client.clone(),
             pending_client_response.clone(),
         );
-        self.spawned_tasks.push(join_handle);
+        // self.spawned_tasks.push(join_handle);
 
         pending_client_response
     }
