@@ -77,7 +77,7 @@ impl TestBlockBuilder {
     ) -> NewBlockEvent {
         self.round += 1 + failed_proposers.len() as u64;
         NewBlockEvent::new(
-            HashValue::random(),
+            AccountAddress::random(),
             self.epoch,
             self.round,
             self.round,
@@ -468,7 +468,7 @@ impl MockDbReader {
                 *idx,
                 TypeTag::Struct(NewBlockEvent::struct_tag()),
                 bcs::to_bytes(&NewBlockEvent::new(
-                    HashValue::random(),
+                    AccountAddress::random(),
                     epoch,
                     round,
                     round,

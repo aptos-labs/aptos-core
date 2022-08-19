@@ -4,7 +4,6 @@ module aptos_framework::block {
     use std::vector;
     use std::option;
     use aptos_std::event::{Self, EventHandle};
-    use aptos_std::crypto_hash::{Self, HashValue};
 
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
@@ -26,7 +25,7 @@ module aptos_framework::block {
 
     /// Should be in-sync with NewBlockEvent rust struct in new_block.rs
     struct NewBlockEvent has drop, store {
-        id: HashValue,
+        hash: address,
         epoch: u64,
         round: u64,
         height: u64,
@@ -81,7 +80,7 @@ module aptos_framework::block {
     /// The runtime always runs this before executing the transactions in a block.
     fun block_prologue(
         vm: signer,
-        id: vector<u128>,
+        hash: address,
         epoch: u64,
         round: u64,
         proposer: address,
@@ -107,10 +106,9 @@ module aptos_framework::block {
 
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
-        let id = crypto_hash::new_hash_value(*vector::borrow(&id, 0), *vector::borrow(&id, 1));
 
         let new_block_event = NewBlockEvent {
-            id,
+            hash,
             epoch,
             round,
             height: block_metadata_ref.height,
@@ -150,12 +148,12 @@ module aptos_framework::block {
     /// reconfiguration event.
     fun emit_genesis_block_event(vm: signer) acquires BlockResource {
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
-        let genesis_id = crypto_hash::new_hash_value(0 ,0);
+        let genesis_id = @0x0;
         emit_new_block_event(
             &vm,
             &mut block_metadata_ref.new_block_events,
             NewBlockEvent {
-                id: genesis_id,
+                hash: genesis_id,
                 epoch: 0,
                 round: 0,
                 height: 0,
