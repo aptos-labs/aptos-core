@@ -6,15 +6,13 @@ use crate::natives::util::make_native_from_func;
 use aptos_types::vm_status::StatusCode;
 use curve25519_dalek::scalar::Scalar;
 use move_deps::move_binary_format::errors::{PartialVMError, PartialVMResult};
-use move_deps::move_core_types::gas_algebra::{InternalGas, InternalGasPerArg, InternalGasPerByte};
+use move_deps::move_core_types::gas_algebra::{InternalGasPerArg, InternalGasPerByte};
 use move_deps::move_vm_types::values::{Reference, StructRef, Value};
 use move_deps::{move_vm_runtime::native_functions::NativeFunction, move_vm_types::pop_arg};
 use std::collections::VecDeque;
 
 #[derive(Debug, Clone)]
 pub struct GasParameters {
-    pub base: InternalGas,
-
     pub basepoint_mul: InternalGasPerArg,
     pub basepoint_double_mul: InternalGasPerArg,
 
@@ -27,6 +25,7 @@ pub struct GasParameters {
     pub point_mul: InternalGasPerArg,
     pub point_neg: InternalGasPerArg,
     pub point_sub: InternalGasPerArg,
+    pub point_parse_arg: InternalGasPerArg,
 
     pub sha512_per_byte: InternalGasPerByte,
     pub sha512_per_hash: InternalGasPerArg,
@@ -41,6 +40,7 @@ pub struct GasParameters {
     pub scalar_mul: InternalGasPerArg,
     pub scalar_neg: InternalGasPerArg,
     pub scalar_sub: InternalGasPerArg,
+    pub scalar_parse_arg: InternalGasPerArg,
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {

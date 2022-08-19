@@ -103,18 +103,11 @@ impl PointStore {
     ) -> (&mut RistrettoPoint, &mut RistrettoPoint) {
         use std::cmp::Ordering;
 
-        // println!("orig a: {a}");
-        // println!("orig b: {b}");
-
         let (sw, a, b) = match Ord::cmp(&a, &b) {
             Ordering::Less => (false, a.0 as usize, b.0 as usize),
             Ordering::Greater => (true, b.0 as usize, a.0 as usize),
             Ordering::Equal => panic!("attempted to exclusive-borrow one element twice"),
         };
-
-        // println!("a: {a}");
-        // println!("b: {b}");
-        // println!("b - a + 1: {}", b - a + 1);
 
         let (left, right) = self.points.split_at_mut(a + 1);
         let (a_ref, b_ref) = (&mut left[a], &mut right[b - (a + 1)]);
@@ -169,11 +162,9 @@ pub(crate) fn native_point_identity(
     assert_eq!(ty_args.len(), 0);
     assert_eq!(args.len(), 0);
 
-    let cost = gas_params.base + gas_params.point_identity * NumArgs::one();
-
+    let cost = gas_params.point_identity * NumArgs::one();
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
-
     let result_handle = point_data.add_point(RistrettoPoint::identity());
 
     Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
@@ -188,10 +179,8 @@ pub(crate) fn native_point_is_canonical(
     assert_eq!(_ty_args.len(), 0);
     assert_eq!(args.len(), 1);
 
-    let mut cost = gas_params.base;
-
     let bytes = pop_arg!(args, Vec<u8>);
-
+    let mut cost = InternalGas::zero();
     let opt_point = gas_params.decompress_maybe_non_canonical_point_bytes(&mut cost, bytes);
 
     Ok(NativeResult::ok(
@@ -211,10 +200,8 @@ pub(crate) fn native_point_decompress(
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
-
-    let mut cost = gas_params.base;
-
     let bytes = pop_arg!(args, Vec<u8>);
+    let mut cost = InternalGas::zero();
 
     let point = match gas_params.decompress_maybe_non_canonical_point_bytes(&mut cost, bytes) {
         Some(point) => point,
@@ -246,14 +233,10 @@ pub(crate) fn native_point_compress(
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 0);
     assert_eq!(args.len(), 1);
-
-    let cost = gas_params.base + gas_params.point_compress * NumArgs::one();
-
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let point_data = point_context.point_data.borrow();
-
     let handle = get_point_handle(&pop_arg!(args, StructRef))?;
-
+    let cost = gas_params.point_compress * NumArgs::one();
     let point = point_data.get_point(&handle);
 
     Ok(NativeResult::ok(
@@ -271,14 +254,13 @@ pub(crate) fn native_point_mul(
     assert_eq!(ty_args.len(), 0);
     assert_eq!(args.len(), 3);
 
-    let cost = gas_params.base + gas_params.point_mul * NumArgs::one();
-
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
 
     let in_place = pop_arg!(args, bool);
     let scalar = pop_scalar_from_bytes(&mut args)?;
     let point_handle = get_point_handle(&pop_arg!(args, StructRef))?;
+    let cost = gas_params.point_mul * NumArgs::one();
 
     // Compute result = a * point (or a = a * point) and return a RistrettoPointHandle
     let result_handle = match in_place {
@@ -304,13 +286,12 @@ pub(crate) fn native_point_equals(
     assert_eq!(ty_args.len(), 0);
     assert_eq!(args.len(), 2);
 
-    let cost = gas_params.base + gas_params.point_equals * NumArgs::one();
-
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let point_data = point_context.point_data.borrow_mut();
 
     let b_handle = get_point_handle(&pop_arg!(args, StructRef))?;
     let a_handle = get_point_handle(&pop_arg!(args, StructRef))?;
+    let cost = gas_params.point_equals * NumArgs::one();
 
     let a = point_data.get_point(&a_handle);
     let b = point_data.get_point(&b_handle);
@@ -328,13 +309,12 @@ pub(crate) fn native_point_neg(
     assert_eq!(ty_args.len(), 0);
     assert_eq!(args.len(), 2);
 
-    let cost = gas_params.base + gas_params.point_neg * NumArgs::one();
-
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
 
     let in_place = pop_arg!(args, bool);
     let point_handle = get_point_handle(&pop_arg!(args, StructRef))?;
+    let cost = gas_params.point_neg * NumArgs::one();
 
     // Compute result = - point (or point = -point) and return a RistrettoPointHandle
     let result_handle = match in_place {
@@ -361,14 +341,13 @@ pub(crate) fn native_point_add(
     assert_eq!(ty_args.len(), 0);
     assert_eq!(args.len(), 3);
 
-    let cost = gas_params.base + gas_params.point_add * NumArgs::one();
-
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
 
     let in_place = pop_arg!(args, bool);
     let b_handle = get_point_handle(&pop_arg!(args, StructRef))?;
     let a_handle = get_point_handle(&pop_arg!(args, StructRef))?;
+    let cost = gas_params.point_add * NumArgs::one();
 
     // Compute result = a + b (or a = a + b) and return a RistrettoPointHandle
     let result_handle = match in_place {
@@ -403,14 +382,13 @@ pub(crate) fn native_point_sub(
     assert_eq!(ty_args.len(), 0);
     assert_eq!(args.len(), 3);
 
-    let cost = gas_params.base + gas_params.point_sub * NumArgs::one();
-
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
 
     let in_place = pop_arg!(args, bool);
     let b_handle = get_point_handle(&pop_arg!(args, StructRef))?;
     let a_handle = get_point_handle(&pop_arg!(args, StructRef))?;
+    let cost = gas_params.point_sub * NumArgs::one();
 
     // Compute result = a - b (or a = a - b) and return a RistrettoPointHandle
     let result_handle = match in_place {
@@ -445,18 +423,14 @@ pub(crate) fn native_basepoint_mul(
     assert_eq!(ty_args.len(), 0);
     assert_eq!(args.len(), 1);
 
-    let cost = gas_params.base + gas_params.basepoint_mul * NumArgs::one();
-
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
 
     let a = pop_scalar_from_bytes(&mut args)?;
 
+    let cost = gas_params.basepoint_mul * NumArgs::one();
     let basepoint = RISTRETTO_BASEPOINT_TABLE;
-
     let result = basepoint.mul(&a);
-
-    // Compute result = a * BASEPOINT and return a RistrettoPointHandle
     let result_handle = point_data.add_point(result);
 
     Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
@@ -472,8 +446,6 @@ pub(crate) fn native_basepoint_double_mul(
     assert_eq!(ty_args.len(), 0);
     assert_eq!(args.len(), 3);
 
-    let cost = gas_params.base + gas_params.basepoint_double_mul * NumArgs::one();
-
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
 
@@ -481,9 +453,9 @@ pub(crate) fn native_basepoint_double_mul(
     let A_handle = pop_ristretto_handle(&mut args)?;
     let a = pop_scalar_from_bytes(&mut args)?;
 
-    let A_ref = point_data.get_point(&A_handle);
-
     // Compute result = a * A + b * BASEPOINT and return a RistrettoPointHandle
+    let cost = gas_params.basepoint_double_mul * NumArgs::one();
+    let A_ref = point_data.get_point(&A_handle);
     let result = RistrettoPoint::vartime_double_scalar_mul_basepoint(&a, A_ref, &b);
     let result_handle = point_data.add_point(result);
 
@@ -504,8 +476,7 @@ pub(crate) fn native_new_point_from_sha512(
 
     let bytes = pop_arg!(args, Vec<u8>);
 
-    let cost = gas_params.base
-        + gas_params.point_from_64_uniform_bytes * NumArgs::one()
+    let cost = gas_params.point_from_64_uniform_bytes * NumArgs::one()
         + gas_params.sha512_per_hash * NumArgs::one()
         + gas_params.sha512_per_byte * NumBytes::new(bytes.len() as u64);
 
@@ -527,9 +498,7 @@ pub(crate) fn native_new_point_from_64_uniform_bytes(
     let mut point_data = point_context.point_data.borrow_mut();
 
     let slice = pop_64_byte_slice(&mut args)?;
-
-    let cost = gas_params.base + gas_params.point_from_64_uniform_bytes * NumArgs::one();
-
+    let cost = gas_params.point_from_64_uniform_bytes * NumArgs::one();
     let result_handle = point_data.add_point(RistrettoPoint::from_uniform_bytes(&slice));
 
     Ok(NativeResult::ok(cost, smallvec![Value::u64(result_handle)]))
@@ -546,8 +515,6 @@ pub(crate) fn native_multi_scalar_mul(
 
     let point_context = context.extensions().get::<NativeRistrettoPointContext>();
     let mut point_data = point_context.point_data.borrow_mut();
-
-    let mut cost = gas_params.base;
 
     let scalar_type = ty_args.pop().unwrap();
     let point_type = ty_args.pop().unwrap();
@@ -581,8 +548,9 @@ pub(crate) fn native_multi_scalar_mul(
     //  1. Strauss, when n <= 190, see https://www.jstor.org/stable/2310929
     //  2. Pippinger, when n > 190, which roughly requires O(n / log_2 n) scalar multiplications
     // For simplicity, we estimate the complexity as O(n / log_2 n)
-    cost += gas_params.point_mul
-        * NumArgs::new((num as f64 / f64::log2(num as f64)).ceil() as u64);
+    let cost = gas_params.scalar_parse_arg * NumArgs::new(num as u64)
+        + gas_params.point_parse_arg * NumArgs::new(num as u64)
+        + gas_params.point_mul * NumArgs::new((num as f64 / f64::log2(num as f64)).ceil() as u64);
 
     let result_handle = point_data.add_point(result);
 

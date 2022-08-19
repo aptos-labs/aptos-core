@@ -76,7 +76,6 @@ impl GasParameters {
                 ecdsa_recover: 0.into(),
             },
             ristretto255: cryptography::ristretto255::GasParameters {
-                base: 0.into(),
                 basepoint_mul: 0.into(),
                 basepoint_double_mul: 0.into(),
                 point_add: 0.into(),
@@ -100,6 +99,8 @@ impl GasParameters {
                 sha512_per_byte: 0.into(),
                 sha512_per_hash: 0.into(),
                 scalar_sub: 0.into(),
+                point_parse_arg: 0.into(),
+                scalar_parse_arg: 0.into(),
             },
             hash: hash::GasParameters {
                 sip_hash: hash::SipHashGasParameters {

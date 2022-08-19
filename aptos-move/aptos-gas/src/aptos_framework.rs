@@ -36,8 +36,6 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.secp256k1.base, "secp256k1.base", 1],
     [.secp256k1.ecdsa_recover, "secp256k1.ecdsa_recover", 1],
 
-    [.ristretto255.base, "ristretto255.base", 1],
-
     [.ristretto255.basepoint_mul, "ristretto255.basepoint_mul", 1],
     [.ristretto255.basepoint_double_mul, "ristretto255.basepoint_double_mul", 1],
 
@@ -50,6 +48,8 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.point_mul, "ristretto255.point_mul", 1],
     [.ristretto255.point_neg, "ristretto255.point_neg", 1],
     [.ristretto255.point_sub, "ristretto255.point_sub", 1],
+    [.ristretto255.point_parse_arg, "ristretto255.point_parse_arg", 1],
+
 
     // TODO(Alin): These SHA512 gas costs could be unified with the costs in our future SHA512 module
     // (assuming same implementation complexity, which might not be the case
@@ -66,6 +66,7 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.ristretto255.scalar_mul, "ristretto255.scalar_mul", 1],
     [.ristretto255.scalar_neg, "ristretto255.scalar_neg", 1],
     [.ristretto255.scalar_sub, "ristretto255.scalar_sub", 1],
+    [.ristretto255.scalar_parse_arg, "ristretto255.scalar_parse_arg", 1],
 
     [.hash.sip_hash.base, "hash.sip_hash.base", 1],
     [.hash.sip_hash.per_byte, "hash.sip_hash.per_byte", 1],

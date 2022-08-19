@@ -27,7 +27,7 @@ pub(crate) fn native_scalar_is_canonical(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let mut cost = gas_params.base;
+    let cost = gas_params.scalar_is_canonical * NumArgs::one();
 
     let bytes = pop_arg!(arguments, Vec<u8>);
     if bytes.len() != 32 {
@@ -37,7 +37,6 @@ pub(crate) fn native_scalar_is_canonical(
     let bytes_slice = <[u8; 32]>::try_from(bytes).unwrap();
 
     let s = Scalar::from_canonical_bytes(bytes_slice);
-    cost += gas_params.scalar_is_canonical * NumArgs::one();
 
     // TODO: Speed up this implementation using bit testing on 'bytes'?
     Ok(NativeResult::ok(cost, smallvec![Value::bool(s.is_some())]))
@@ -52,15 +51,11 @@ pub(crate) fn native_scalar_invert(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let mut cost = gas_params.base;
+    let cost = gas_params.scalar_invert * NumArgs::one();
 
     let s = pop_scalar_from_bytes(&mut arguments)?;
 
-    // We'd like to ensure all Move Scalar types are canonical scalars reduced modulo \ell
-    debug_assert!(s.is_canonical());
-
     // Invert and return
-    cost += gas_params.scalar_invert * NumArgs::one();
     Ok(NativeResult::ok(
         cost,
         smallvec![Value::vector_u8(s.invert().to_bytes().to_vec())],
@@ -76,11 +71,8 @@ pub(crate) fn native_scalar_from_sha512(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let mut cost = gas_params.base;
-
     let bytes = pop_arg!(arguments, Vec<u8>);
-
-    cost += gas_params.scalar_uniform_from_64_bytes * NumArgs::one()
+    let cost = gas_params.scalar_uniform_from_64_bytes * NumArgs::one()
         + gas_params.sha512_per_hash * NumArgs::one()
         + gas_params.sha512_per_byte * NumBytes::new(bytes.len() as u64);
     let s = Scalar::hash_from_bytes::<Sha512>(bytes.as_slice());
@@ -100,16 +92,11 @@ pub(crate) fn native_scalar_mul(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 2);
 
-    let mut cost = gas_params.base;
+    let cost = gas_params.scalar_mul * NumArgs::one();
 
     let b = pop_scalar_from_bytes(&mut arguments)?;
     let a = pop_scalar_from_bytes(&mut arguments)?;
 
-    // We'd like to ensure all Move Scalar types are canonical scalars reduced modulo \ell
-    debug_assert!(a.is_canonical());
-    debug_assert!(b.is_canonical());
-
-    cost += gas_params.scalar_mul * NumArgs::one();
     let s = a.mul(b);
 
     Ok(NativeResult::ok(
@@ -127,16 +114,11 @@ pub(crate) fn native_scalar_add(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 2);
 
-    let mut cost = gas_params.base;
+    let cost = gas_params.scalar_add * NumArgs::one();
 
     let b = pop_scalar_from_bytes(&mut arguments)?;
     let a = pop_scalar_from_bytes(&mut arguments)?;
 
-    // We'd like to ensure all Move Scalar types are canonical scalars reduced modulo \ell
-    debug_assert!(a.is_canonical());
-    debug_assert!(b.is_canonical());
-
-    cost += gas_params.scalar_add * NumArgs::one();
     let s = a.add(b);
 
     Ok(NativeResult::ok(
@@ -154,16 +136,11 @@ pub(crate) fn native_scalar_sub(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 2);
 
-    let mut cost = gas_params.base;
+    let cost = gas_params.scalar_sub * NumArgs::one();
 
     let b = pop_scalar_from_bytes(&mut arguments)?;
     let a = pop_scalar_from_bytes(&mut arguments)?;
 
-    // We'd like to ensure all Move Scalar types are canonical scalars reduced modulo \ell
-    debug_assert!(a.is_canonical());
-    debug_assert!(b.is_canonical());
-
-    cost += gas_params.scalar_sub * NumArgs::one();
     let s = a.sub(b);
 
     Ok(NativeResult::ok(
@@ -181,14 +158,9 @@ pub(crate) fn native_scalar_neg(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let mut cost = gas_params.base;
-
     let a = pop_scalar_from_bytes(&mut arguments)?;
 
-    // We'd like to ensure all Move Scalar types are canonical scalars reduced modulo \ell
-    debug_assert!(a.is_canonical());
-
-    cost += gas_params.scalar_neg * NumArgs::one();
+    let cost = gas_params.scalar_neg * NumArgs::one();
     let s = a.neg();
 
     Ok(NativeResult::ok(
@@ -206,11 +178,8 @@ pub(crate) fn native_scalar_from_u64(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let mut cost = gas_params.base;
-
     let num = pop_arg!(arguments, u64);
-
-    cost += gas_params.scalar_from_u64 * NumArgs::one();
+    let cost = gas_params.scalar_from_u64 * NumArgs::one();
     let s = Scalar::from(num);
 
     Ok(NativeResult::ok(
@@ -228,11 +197,8 @@ pub(crate) fn native_scalar_from_u128(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let mut cost = gas_params.base;
-
     let num = pop_arg!(arguments, u128);
-
-    cost += gas_params.scalar_from_u128 * NumArgs::one();
+    let cost = gas_params.scalar_from_u128 * NumArgs::one();
     let s = Scalar::from(num);
 
     Ok(NativeResult::ok(
@@ -250,11 +216,8 @@ pub(crate) fn native_scalar_reduced_from_32_bytes(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let mut cost = gas_params.base;
-
     let bytes_slice = pop_32_byte_slice(&mut arguments)?;
-
-    cost += gas_params.scalar_reduced_from_32_bytes * NumArgs::one();
+    let cost = gas_params.scalar_reduced_from_32_bytes * NumArgs::one();
     let s = Scalar::from_bytes_mod_order(bytes_slice);
 
     Ok(NativeResult::ok(
@@ -272,11 +235,8 @@ pub(crate) fn native_scalar_uniform_from_64_bytes(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    let mut cost = gas_params.base;
-
     let bytes_slice = pop_64_byte_slice(&mut args)?;
-
-    cost += gas_params.scalar_uniform_from_64_bytes * NumArgs::one();
+    let cost = gas_params.scalar_uniform_from_64_bytes * NumArgs::one();
     let s = Scalar::from_bytes_mod_order_wide(&bytes_slice);
 
     Ok(NativeResult::ok(

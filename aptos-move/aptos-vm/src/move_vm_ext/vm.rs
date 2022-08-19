@@ -7,8 +7,8 @@ use crate::{
 };
 use aptos_aggregator::aggregator_extension::NativeAggregatorContext;
 use aptos_gas::NativeGasParameters;
-use framework::natives::state_storage::NativeStateStorageContext;
 use framework::natives::cryptography::ristretto255_point::NativeRistrettoPointContext;
+use framework::natives::state_storage::NativeStateStorageContext;
 use framework::natives::{code::NativeCodeContext, transaction_context::NativeTransactionContext};
 use move_deps::{
     move_binary_format::errors::VMResult,
