@@ -490,20 +490,26 @@ impl TransactionsApi {
             .context("Mempool failed to initially evaluate submitted transaction")
             .map_err(SubmitTransactionError::internal)?;
         match mempool_status.code {
-            MempoolStatusCode::Accepted => {
-                let resolver = self.context.move_resolver_poem()?;
-                let pending_txn = resolver
-                    .as_converter(self.context.db.clone())
-                    .try_into_pending_transaction_poem(txn)
-                    .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
-                    .map_err(SubmitTransactionError::internal)?;
-                SubmitTransactionResponse::try_from_rust_value((
-                    pending_txn,
+            MempoolStatusCode::Accepted => match accept_type {
+                AcceptType::Json => {
+                    let resolver = self.context.move_resolver_poem()?;
+                    let pending_txn = resolver
+                            .as_converter(self.context.db.clone())
+                            .try_into_pending_transaction_poem(txn)
+                            .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
+                            .map_err(SubmitTransactionError::internal)?;
+                    SubmitTransactionResponse::try_from_json((
+                        pending_txn,
+                        &ledger_info,
+                        SubmitTransactionResponseStatus::Accepted,
+                    ))
+                }
+                AcceptType::Bcs => SubmitTransactionResponse::try_from_bcs((
+                    (),
                     &ledger_info,
                     SubmitTransactionResponseStatus::Accepted,
-                    accept_type,
-                ))
-            }
+                )),
+            },
             MempoolStatusCode::MempoolIsFull => Err(
                 SubmitTransactionError::insufficient_storage_str(&mempool_status.message),
             ),
