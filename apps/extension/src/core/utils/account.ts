@@ -27,7 +27,9 @@ import Browser from 'core/utils/browser';
 import bs58 from 'bs58';
 import { HDKey } from '@scure/bip32';
 import {
-  defaultNetworkName, defaultNetworks,
+  defaultCustomNetworks,
+  defaultNetworkName,
+  defaultNetworks,
 } from 'core/hooks/useNetworks';
 import { Accounts } from 'core/hooks/useEncryptedStorageState';
 
@@ -292,7 +294,7 @@ export async function getBackgroundNetwork() {
   const serializedCustomNetworks = result && result[WALLET_STATE_CUSTOM_NETWORKS_STORAGE_KEY];
   const customNetworks = serializedCustomNetworks
     ? JSON.parse(serializedCustomNetworks)
-    : undefined;
+    : defaultCustomNetworks;
 
   const networks = { ...defaultNetworks, ...customNetworks };
   return networks[networkName ?? defaultNetworkName];

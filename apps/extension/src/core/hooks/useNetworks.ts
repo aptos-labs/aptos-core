@@ -21,7 +21,7 @@ export interface Network {
 
 export type Networks = Record<string, Network>;
 
-const defaultCustomNetworks: Networks = {
+export const defaultCustomNetworks: Networks = {
   [DefaultNetworks.Localhost]: {
     faucetUrl: 'http://localhost:80',
     name: DefaultNetworks.Localhost,
