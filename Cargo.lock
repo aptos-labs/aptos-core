@@ -3828,6 +3828,7 @@ name = "framework"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-aggregator",
  "aptos-crypto",
  "aptos-gas",
  "aptos-sdk-builder",
@@ -3837,6 +3838,7 @@ dependencies = [
  "base64 0.13.0",
  "bcs",
  "better_any",
+ "claim",
  "clap 3.2.16",
  "curve25519-dalek",
  "flate2",
