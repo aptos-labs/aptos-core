@@ -14,6 +14,7 @@ class HeaderComponent < ViewComponent::Base
         NavItem.new('/community', 'Aptos Community', 'Aptos Community'),
         NavItem.new('/it1', 'AIT1', 'Incentivized Testnet 1 Results'),
         NavItem.new('/it2', 'AIT2', 'Incentivized Testnet 2 Results'),
+        NavItem.new('/it3', 'AIT3', 'Incentivized Testnet 3'),
         NavItem.new('https://forum.aptoslabs.com/', 'Forum', 'Aptos Forum')
       ]
     ),
@@ -55,7 +56,7 @@ class HeaderComponent < ViewComponent::Base
     ]
     @rest[:data] ||= {}
     @rest[:data][:controller] = 'header'
-    @rest[:data][:action] = 'resize@window->header#windowResize'
+    @rest[:data][:action] = 'resize@window->header#windowResize click@window->header#windowClick'
   end
 
   def nav_groups

@@ -19,13 +19,13 @@ mod tests {
     use aptos_keygen::KeyGen;
     use aptos_rest_client::{
         aptos_api_types::{
-            AccountData, DirectWriteSet, LedgerInfo, PendingTransaction,
-            TransactionPayload as TransactionPayloadData, WriteSet, WriteSetPayload,
+            AccountData, LedgerInfo, ModuleBundlePayload, PendingTransaction,
+            TransactionPayload as TransactionPayloadData,
         },
         FaucetClient,
     };
     use aptos_sdk::{
-        transaction_builder::aptos_stdlib::ScriptFunctionCall,
+        transaction_builder::aptos_stdlib::EntryFunctionCall,
         types::{
             account_address::AccountAddress,
             chain_id::ChainId,
@@ -187,16 +187,16 @@ mod tests {
         if let Script(script) = txn.payload() {
             panic!("unexpected type of script: {:?}", script.args())
         }
-        if let Some(script_function) = ScriptFunctionCall::decode(txn.payload()) {
-            match script_function {
-                ScriptFunctionCall::AccountCreateAccount {
+        if let Some(entry_function) = EntryFunctionCall::decode(txn.payload()) {
+            match entry_function {
+                EntryFunctionCall::AccountCreateAccount {
                     auth_key: address, ..
                 } => {
                     let mut writer = accounts.write();
                     let previous = writer.insert(address, AccountState::new(0));
                     assert!(previous.is_none(), "should not create account twice");
                 }
-                ScriptFunctionCall::AptosCoinMint {
+                EntryFunctionCall::AptosCoinMint {
                     dst_addr, amount, ..
                 } => {
                     // Sometimes we call CreateAccount and Mint at the same time (from our tests: this is a test method)
@@ -210,7 +210,7 @@ mod tests {
                         .expect("account should be created");
                     account.balance += amount;
                 }
-                script => panic!("unexpected type of script function: {:?}", script),
+                script => panic!("unexpected type of entry function: {:?}", script),
             }
         }
 
@@ -237,12 +237,7 @@ mod tests {
     }
 
     fn dummy_payload() -> TransactionPayloadData {
-        TransactionPayloadData::WriteSetPayload(WriteSetPayload {
-            write_set: WriteSet::DirectWriteSet(DirectWriteSet {
-                changes: Vec::new(),
-                events: Vec::new(),
-            }),
-        })
+        TransactionPayloadData::ModuleBundlePayload(ModuleBundlePayload { modules: vec![] })
     }
 
     #[derive(Clone, Debug, Serialize, PartialEq)]

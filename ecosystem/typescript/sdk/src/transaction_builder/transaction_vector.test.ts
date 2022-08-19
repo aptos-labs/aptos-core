@@ -15,11 +15,11 @@ import {
   AccountAddress,
   ChainId,
   RawTransaction,
-  ScriptFunction,
+  EntryFunction,
   StructTag,
   TypeTag,
   TypeTagVector,
-  TransactionPayloadScriptFunction,
+  TransactionPayloadEntryFunction,
   Identifier,
   TypeTagStruct,
   TypeTagAddress,
@@ -49,9 +49,9 @@ import { TransactionBuilderEd25519 } from "./builder";
 const VECTOR_FILES_ROOT_DIR =
   process.env.VECTOR_FILES_ROOT_DIR || path.resolve(__dirname, "..", "..", "..", "..", "..", "api", "goldens");
 
-const SCRIPT_FUNCTION_VECTOR = path.join(
+const ENTRY_FUNCTION_VECTOR = path.join(
   VECTOR_FILES_ROOT_DIR,
-  "aptos_api__tests__transaction_vector_test__test_script_function_payload.json",
+  "aptos_api__tests__transaction_vector_test__test_entry_function_payload.json",
 );
 
 const SCRIPT_VECTOR = path.join(
@@ -176,7 +176,7 @@ type IRawTxn = {
 
 function verify(
   raw_txn: IRawTxn,
-  payload: TransactionPayloadScriptFunction | TransactionPayloadScript | TransactionPayloadModuleBundle,
+  payload: TransactionPayloadEntryFunction | TransactionPayloadScript | TransactionPayloadModuleBundle,
   private_key: string,
   expected_output: string,
 ) {
@@ -196,12 +196,12 @@ function verify(
 }
 
 describe("Transaction builder vector test", () => {
-  it("should pass on script function payload", () => {
-    const vector: any[] = JSON.parse(fs.readFileSync(SCRIPT_FUNCTION_VECTOR, "utf8"));
+  it("should pass on entry function payload", () => {
+    const vector: any[] = JSON.parse(fs.readFileSync(ENTRY_FUNCTION_VECTOR, "utf8"));
     vector.forEach(({ raw_txn, signed_txn_bcs, private_key }) => {
-      const payload = raw_txn.payload.ScriptFunction;
-      const scriptFunctionPayload = new TransactionPayloadScriptFunction(
-        ScriptFunction.natural(
+      const payload = raw_txn.payload.EntryFunction;
+      const entryFunctionPayload = new TransactionPayloadEntryFunction(
+        EntryFunction.natural(
           `${payload.module.address}::${payload.module.name}`,
           payload.function,
           payload.ty_args.map((tag: any) => parseTypeTag(tag)),
@@ -209,7 +209,7 @@ describe("Transaction builder vector test", () => {
         ),
       );
 
-      verify(raw_txn, scriptFunctionPayload, private_key, signed_txn_bcs);
+      verify(raw_txn, entryFunctionPayload, private_key, signed_txn_bcs);
     });
   });
 

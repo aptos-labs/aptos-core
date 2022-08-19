@@ -401,7 +401,7 @@ fn run_forever() -> ForgeConfig<'static> {
     ForgeConfig::default()
         .with_aptos_tests(&[&FundAccount, &TransferCoins])
         .with_admin_tests(&[&GetMetadata])
-        .with_genesis_module_bundle(framework::head_release_bundle().clone())
+        .with_genesis_module_bundle(cached_packages::head_release_bundle().clone())
         .with_aptos_tests(&[&RunForever])
 }
 
@@ -410,7 +410,7 @@ fn local_test_suite() -> ForgeConfig<'static> {
         .with_aptos_tests(&[&FundAccount, &TransferCoins])
         .with_admin_tests(&[&GetMetadata])
         .with_network_tests(&[&RestartValidator, &EmitTransaction])
-        .with_genesis_module_bundle(framework::head_release_bundle().clone())
+        .with_genesis_module_bundle(cached_packages::head_release_bundle().clone())
 }
 
 fn k8s_test_suite() -> ForgeConfig<'static> {
@@ -429,7 +429,6 @@ fn single_test_suite(test_name: &str) -> Result<ForgeConfig<'static>> {
     let config =
         ForgeConfig::default().with_initial_validator_count(NonZeroUsize::new(30).unwrap());
     let single_test_suite = match test_name {
-        "bench" => config.with_network_tests(&[&PerformanceBenchmark]),
         "state_sync" => config
             .with_initial_fullnode_count(1)
             .with_network_tests(&[&StateSyncPerformance]),

@@ -90,7 +90,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let builder = aptos_genesis::builder::Builder::new(
         tmp_dir.path(),
-        framework::head_release_bundle().clone(),
+        cached_packages::head_release_bundle().clone(),
     )
     .unwrap()
     .with_init_genesis_config(Some(Arc::new(|genesis_config| {
@@ -377,7 +377,7 @@ impl TestContext {
             .unwrap()
     }
 
-    pub async fn api_execute_script_function(
+    pub async fn api_execute_entry_function(
         &mut self,
         account: &mut LocalAccount,
         module: &str,
@@ -388,7 +388,7 @@ impl TestContext {
         self.api_execute_txn(
             account,
             json!({
-                "type": "script_function_payload",
+                "type": "entry_function_payload",
                 "function": format!(
                     "{}::{}::{}",
                     account.address().to_hex_literal(),
@@ -547,7 +547,6 @@ impl TestContext {
             0,
             round,
             self.validator_owner,
-            Some(0),
             vec![0],
             vec![],
             self.fake_time_usecs,

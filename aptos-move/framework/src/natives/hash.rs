@@ -3,6 +3,7 @@
 
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
+    move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
     move_vm_runtime::native_functions::{NativeContext, NativeFunction},
     move_vm_types::{
         loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
@@ -19,8 +20,8 @@ use std::{collections::VecDeque, hash::Hasher, sync::Arc};
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct SipHashGasParameters {
-    pub base_cost: u64,
-    pub unit_cost: u64,
+    pub base_cost: InternalGas,
+    pub unit_cost: InternalGasPerByte,
 }
 
 /// Feed thes bytes into SipHasher. This is not cryptographically secure.
@@ -33,12 +34,11 @@ fn native_sip_hash(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(args.len() == 1);
 
-    let mut cost = gas_params.base_cost;
-
     let bytes = pop_arg!(args, Vec<u8>);
 
+    let cost = gas_params.base_cost + gas_params.unit_cost * NumBytes::new(bytes.len() as u64);
+
     // SipHash of the serialized bytes
-    cost += gas_params.unit_cost;
     let mut hasher = siphasher::sip::SipHasher::new();
     hasher.write(&bytes);
     let hash = hasher.finish();

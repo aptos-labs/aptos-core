@@ -43,7 +43,7 @@ mod transaction_argument;
 pub use change_set::ChangeSet;
 pub use module::{Module, ModuleBundle};
 pub use script::{
-    ArgumentABI, Script, ScriptABI, ScriptFunction, ScriptFunctionABI, TransactionScriptABI,
+    ArgumentABI, EntryABI, EntryFunction, EntryFunctionABI, Script, TransactionScriptABI,
     TypeArgumentABI,
 };
 
@@ -136,13 +136,13 @@ impl RawTransaction {
         }
     }
 
-    /// Create a new `RawTransaction` with a script function.
+    /// Create a new `RawTransaction` with a entry function.
     ///
     /// A script transaction contains only code to execute. No publishing is allowed in scripts.
-    pub fn new_script_function(
+    pub fn new_entry_function(
         sender: AccountAddress,
         sequence_number: u64,
-        script_function: ScriptFunction,
+        entry_function: EntryFunction,
         max_gas_amount: u64,
         gas_unit_price: u64,
         expiration_timestamp_secs: u64,
@@ -151,7 +151,7 @@ impl RawTransaction {
         RawTransaction {
             sender,
             sequence_number,
-            payload: TransactionPayload::ScriptFunction(script_function),
+            payload: TransactionPayload::EntryFunction(entry_function),
             max_gas_amount,
             gas_unit_price,
             expiration_timestamp_secs,
@@ -203,62 +203,6 @@ impl RawTransaction {
             max_gas_amount,
             gas_unit_price,
             expiration_timestamp_secs,
-            chain_id,
-        }
-    }
-
-    pub fn new_write_set(
-        sender: AccountAddress,
-        sequence_number: u64,
-        write_set: WriteSet,
-        chain_id: ChainId,
-    ) -> Self {
-        Self::new_change_set(
-            sender,
-            sequence_number,
-            ChangeSet::new(write_set, vec![]),
-            chain_id,
-        )
-    }
-
-    pub fn new_change_set(
-        sender: AccountAddress,
-        sequence_number: u64,
-        change_set: ChangeSet,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::WriteSet(WriteSetPayload::Direct(change_set)),
-            // Since write-set transactions bypass the VM, these fields aren't relevant.
-            max_gas_amount: 0,
-            gas_unit_price: 0,
-            // Write-set transactions are special and important and shouldn't expire.
-            expiration_timestamp_secs: u64::max_value(),
-            chain_id,
-        }
-    }
-
-    pub fn new_writeset_script(
-        sender: AccountAddress,
-        sequence_number: u64,
-        script: Script,
-        signer: AccountAddress,
-        chain_id: ChainId,
-    ) -> Self {
-        RawTransaction {
-            sender,
-            sequence_number,
-            payload: TransactionPayload::WriteSet(WriteSetPayload::Script {
-                execute_as: signer,
-                script,
-            }),
-            // Since write-set transactions bypass the VM, these fields aren't relevant.
-            max_gas_amount: 0,
-            gas_unit_price: 0,
-            // Write-set transactions are special and important and shouldn't expire.
-            expiration_timestamp_secs: u64::max_value(),
             chain_id,
         }
     }
@@ -340,12 +284,11 @@ impl RawTransaction {
 
     pub fn format_for_client(&self, get_transaction_name: impl Fn(&[u8]) -> String) -> String {
         let (code, args) = match &self.payload {
-            TransactionPayload::WriteSet(_) => ("genesis".to_string(), vec![]),
             TransactionPayload::Script(script) => (
                 get_transaction_name(script.code()),
                 convert_txn_args(script.args()),
             ),
-            TransactionPayload::ScriptFunction(script_fn) => (
+            TransactionPayload::EntryFunction(script_fn) => (
                 format!("{}::{}", script_fn.module(), script_fn.function()),
                 script_fn.args().to_vec(),
             ),
@@ -415,28 +358,19 @@ impl RawTransactionWithData {
 /// Different kinds of transactions.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TransactionPayload {
-    /// A system maintenance transaction.
-    WriteSet(WriteSetPayload),
     /// A transaction that executes code.
     Script(Script),
     /// A transaction that publishes multiple modules at the same time.
     ModuleBundle(ModuleBundle),
-    /// A transaction that executes an existing script function published on-chain.
-    ScriptFunction(ScriptFunction),
+    /// A transaction that executes an existing entry function published on-chain.
+    EntryFunction(EntryFunction),
 }
 
 impl TransactionPayload {
-    pub fn should_trigger_reconfiguration_by_default(&self) -> bool {
+    pub fn into_entry_function(self) -> EntryFunction {
         match self {
-            Self::WriteSet(ws) => ws.should_trigger_reconfiguration_by_default(),
-            Self::Script(_) | Self::ScriptFunction(_) | Self::ModuleBundle(_) => false,
-        }
-    }
-
-    pub fn into_script_function(self) -> ScriptFunction {
-        match self {
-            Self::ScriptFunction(f) => f,
-            payload => panic!("Expected ScriptFunction(_) payload, found: {:#?}", payload),
+            Self::EntryFunction(f) => f,
+            payload => panic!("Expected EntryFunction(_) payload, found: {:#?}", payload),
         }
     }
 }
@@ -1040,6 +974,9 @@ pub struct TransactionInfoV0 {
     /// transaction. Depending on the protocol configuration, this can be generated periodical
     /// only, like per block.
     state_checkpoint_hash: Option<HashValue>,
+
+    /// Potentially summarizes all evicted items from state. Always `None` for now.
+    state_cemetery_hash: Option<HashValue>,
 }
 
 impl TransactionInfoV0 {
@@ -1058,6 +995,7 @@ impl TransactionInfoV0 {
             event_root_hash,
             state_change_hash,
             state_checkpoint_hash,
+            state_cemetery_hash: None,
         }
     }
 

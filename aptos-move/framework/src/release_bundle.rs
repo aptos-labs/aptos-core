@@ -4,7 +4,7 @@
 use crate::built_package::BuiltPackage;
 use crate::natives::code::PackageMetadata;
 use crate::path_in_crate;
-use aptos_types::transaction::ScriptABI;
+use aptos_types::transaction::EntryABI;
 use move_deps::move_binary_format::access::ModuleAccess;
 use move_deps::move_binary_format::errors::PartialVMError;
 use move_deps::move_binary_format::CompiledModule;
@@ -73,8 +73,8 @@ impl ReleaseBundle {
         map
     }
 
-    /// Returns a list of all ScriptABIs in this bundle.
-    pub fn abis(&self) -> Vec<ScriptABI> {
+    /// Returns a list of all EntryABIs in this bundle.
+    pub fn abis(&self) -> Vec<EntryABI> {
         let mut result = vec![];
         for pack in &self.packages {
             let mut abis = pack.abis();
@@ -168,11 +168,11 @@ impl ReleasePackage {
     }
 
     /// Returns the ABIs.
-    pub fn abis(&self) -> Vec<ScriptABI> {
+    pub fn abis(&self) -> Vec<EntryABI> {
         self.metadata
             .abis
             .iter()
-            .map(|a| bcs::from_bytes::<ScriptABI>(a).expect("BCS for ScriptABI must be valid"))
+            .map(|a| bcs::from_bytes::<EntryABI>(a).expect("BCS for EntryABI must be valid"))
             .collect()
     }
 

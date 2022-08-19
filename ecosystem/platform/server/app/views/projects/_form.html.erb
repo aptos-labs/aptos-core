@@ -38,10 +38,8 @@
     </div>
 
     <div class="mb-6">
-      <%= form.fields_for(:project_categories) do |category_form| %>
-        <%= category_form.label :categories, class: 'font-mono uppercase block mb-2' %>
-        <%= category_form.text_field :category_id, placeholder: 'Enter Category ID' %>
-      <% end %>
+      <%= form.label :category_ids, 'Categories', class: 'font-mono uppercase block mb-2' %>
+      <%= form.collection_select :category_ids, Category.all, :id, :title, {}, { multiple: true, class: 'text-black' } %>
     </div>
   </div>
 

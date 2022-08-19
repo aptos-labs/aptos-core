@@ -177,6 +177,9 @@ where
                     }
                 }
             }
+            Node::Null => {
+                done = true;
+            }
         }
 
         Ok(Self {
@@ -243,6 +246,7 @@ where
                     ));
                     current_node_key = next_node_key;
                 }
+                Node::Null => unreachable!("Null node has leaf count 0 so here is unreachable"),
             };
             current_node = reader.get_node(&current_node_key)?;
         }
@@ -300,6 +304,9 @@ where
                     // iterated past the last key.
                     return None;
                 }
+                Ok(Node::Null) => {
+                    unreachable!("When tree is empty, done should be already set to true")
+                }
                 Err(err) => return Some(Err(err)),
             }
         }
@@ -328,6 +335,9 @@ where
                     let ret = (leaf_node.account_key(), leaf_node.value_index().clone());
                     Self::cleanup_stack(&mut self.parent_stack);
                     return Some(Ok(ret));
+                }
+                Ok(Node::Null) => {
+                    unreachable!("When tree is empty, done should be already set to true")
                 }
                 Err(err) => return Some(Err(err)),
             }

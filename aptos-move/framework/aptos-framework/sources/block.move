@@ -3,6 +3,7 @@ module aptos_framework::block {
     use std::error;
     use std::vector;
     use aptos_std::event::{Self, EventHandle};
+    use std::option;
 
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
@@ -41,15 +42,15 @@ module aptos_framework::block {
     const EZERO_EPOCH_INTERVAL: u64 = 3;
 
     /// This can only be called during Genesis.
-    public(friend) fun initialize(account: &signer, epoch_interval: u64) {
+    public(friend) fun initialize(account: &signer, epoch_interval_microsecs: u64) {
         system_addresses::assert_aptos_framework(account);
-        assert!(epoch_interval > 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
+        assert!(epoch_interval_microsecs > 0, error::invalid_argument(EZERO_EPOCH_INTERVAL));
 
         move_to<BlockResource>(
             account,
             BlockResource {
                 height: 0,
-                epoch_interval,
+                epoch_interval: epoch_interval_microsecs,
                 new_block_events: event::new_event_handle<Self::NewBlockEvent>(account),
             }
         );
@@ -57,7 +58,7 @@ module aptos_framework::block {
 
     /// Update the epoch interval.
     /// Can only be called as part of the Aptos governance proposal process established by the AptosGovernance module.
-    public fun update_epoch_interval(
+    public fun update_epoch_interval_microsecs(
         aptos_framework: &signer,
         new_epoch_interval: u64,
     ) acquires BlockResource {
@@ -68,6 +69,11 @@ module aptos_framework::block {
         block_metadata.epoch_interval = new_epoch_interval;
     }
 
+    /// Return epoch interval in seconds.
+    public fun get_epoch_interval_secs(): u64 acquires BlockResource {
+        borrow_global<BlockResource>(@aptos_framework).epoch_interval / 1000000
+    }
+
     /// Set the metadata for the current block.
     /// The runtime always runs this before executing the transactions in a block.
     fun block_prologue(
@@ -75,12 +81,12 @@ module aptos_framework::block {
         epoch: u64,
         round: u64,
         proposer: address,
-        proposer_index_optional: vector<u64>,
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64
     ) acquires BlockResource {
         timestamp::assert_operating();
+
         // Operational constraint: can only be invoked by the VM.
         system_addresses::assert_vm(&vm);
 
@@ -89,6 +95,11 @@ module aptos_framework::block {
             proposer == @vm_reserved || stake::is_current_epoch_validator(proposer),
             error::permission_denied(EINVALID_PROPOSER),
         );
+
+        let proposer_index = option::none();
+        if (proposer != @vm_reserved) {
+            proposer_index = option::some(stake::get_validator_index(proposer));
+        };
 
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
@@ -106,7 +117,7 @@ module aptos_framework::block {
 
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
-        stake::update_performance_statistics(proposer_index_optional, failed_proposer_indices);
+        stake::update_performance_statistics(proposer_index, failed_proposer_indices);
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             reconfiguration::reconfigure();
@@ -151,7 +162,7 @@ module aptos_framework::block {
     public entry fun test_update_epoch_interval(aptos_framework: signer) acquires BlockResource {
         initialize(&aptos_framework, 1);
         assert!(borrow_global<BlockResource>(@aptos_framework).epoch_interval == 1, 0);
-        update_epoch_interval(&aptos_framework, 2);
+        update_epoch_interval_microsecs(&aptos_framework, 2);
         assert!(borrow_global<BlockResource>(@aptos_framework).epoch_interval == 2, 1);
     }
 
@@ -162,6 +173,6 @@ module aptos_framework::block {
         account: signer,
     ) acquires BlockResource {
         initialize(&aptos_framework, 1);
-        update_epoch_interval(&account, 2);
+        update_epoch_interval_microsecs(&account, 2);
     }
 }

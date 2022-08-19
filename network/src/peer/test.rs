@@ -4,7 +4,7 @@
 use crate::{
     constants::{
         INBOUND_RPC_TIMEOUT_MS, MAX_CONCURRENT_INBOUND_RPCS, MAX_CONCURRENT_OUTBOUND_RPCS,
-        MAX_FRAME_SIZE, NETWORK_CHANNEL_SIZE,
+        MAX_FRAME_SIZE, MAX_MESSAGE_SIZE, NETWORK_CHANNEL_SIZE,
     },
     peer::{DisconnectReason, Peer, PeerNotification, PeerRequest},
     peer_manager::TransportNotification,
@@ -14,8 +14,8 @@ use crate::{
         wire::{
             handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
             messaging::v1::{
-                DirectSendMsg, NetworkMessage, NetworkMessageSink, NetworkMessageStream,
-                RpcRequest, RpcResponse,
+                DirectSendMsg, MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream,
+                NetworkMessage, RpcRequest, RpcResponse,
             },
         },
     },
@@ -88,6 +88,7 @@ fn build_test_peer(
         MAX_CONCURRENT_INBOUND_RPCS,
         MAX_CONCURRENT_OUTBOUND_RPCS,
         MAX_FRAME_SIZE,
+        MAX_MESSAGE_SIZE,
         None,
         None,
     );
@@ -143,12 +144,12 @@ fn build_test_connected_peers(
 fn build_network_sink_stream(
     connection: &mut MemorySocket,
 ) -> (
-    NetworkMessageSink<impl AsyncWrite + '_>,
-    NetworkMessageStream<impl AsyncRead + '_>,
+    MultiplexMessageSink<impl AsyncWrite + '_>,
+    MultiplexMessageStream<impl AsyncRead + '_>,
 ) {
     let (read_half, write_half) = tokio::io::split(connection.compat());
-    let sink = NetworkMessageSink::new(write_half.compat_write(), MAX_FRAME_SIZE, None);
-    let stream = NetworkMessageStream::new(read_half.compat(), MAX_FRAME_SIZE, None);
+    let sink = MultiplexMessageSink::new(write_half.compat_write(), MAX_FRAME_SIZE, None);
+    let stream = MultiplexMessageStream::new(read_half.compat(), MAX_FRAME_SIZE, None);
     (sink, stream)
 }
 
@@ -212,11 +213,11 @@ fn peer_send_message() {
         protocol_id: PROTOCOL,
         mdata: Bytes::from("hello world"),
     };
-    let recv_msg = NetworkMessage::DirectSendMsg(DirectSendMsg {
+    let recv_msg = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: PROTOCOL,
         priority: 0,
         raw_msg: Vec::from("hello world"),
-    });
+    }));
 
     let client = async {
         // Client should receive the direct send messages.
@@ -250,18 +251,18 @@ fn peer_recv_message() {
             ConnectionOrigin::Inbound,
         );
 
-    let send_msg = NetworkMessage::DirectSendMsg(DirectSendMsg {
+    let send_msg = MultiplexMessage::Message(NetworkMessage::DirectSendMsg(DirectSendMsg {
         protocol_id: PROTOCOL,
         priority: 0,
         raw_msg: Vec::from("hello world"),
-    });
+    }));
     let recv_msg = PeerNotification::RecvMessage(Message {
         protocol_id: PROTOCOL,
         mdata: Bytes::from("hello world"),
     });
 
     let client = async move {
-        let mut connection = NetworkMessageSink::new(connection, MAX_FRAME_SIZE, None);
+        let mut connection = MultiplexMessageSink::new(connection, MAX_FRAME_SIZE, None);
         for _ in 0..30 {
             // The client should then send the network message.
             connection.send(&send_msg).await.unwrap();
@@ -348,22 +349,22 @@ fn peer_recv_rpc() {
         );
     let (mut client_sink, mut client_stream) = build_network_sink_stream(&mut connection);
 
-    let send_msg = NetworkMessage::RpcRequest(RpcRequest {
+    let send_msg = MultiplexMessage::Message(NetworkMessage::RpcRequest(RpcRequest {
         request_id: 123,
         protocol_id: PROTOCOL,
         priority: 0,
         raw_request: Vec::from("hello world"),
-    });
+    }));
     let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
         protocol_id: PROTOCOL,
         data: Bytes::from("hello world"),
         res_tx: oneshot::channel().0,
     });
-    let resp_msg = NetworkMessage::RpcResponse(RpcResponse {
+    let resp_msg = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
         request_id: 123,
         priority: 0,
         raw_response: Vec::from("goodbye world"),
-    });
+    }));
 
     let client = async move {
         for _ in 0..30 {
@@ -407,22 +408,22 @@ fn peer_recv_rpc_concurrent() {
         );
     let (mut client_sink, mut client_stream) = build_network_sink_stream(&mut connection);
 
-    let send_msg = NetworkMessage::RpcRequest(RpcRequest {
+    let send_msg = MultiplexMessage::Message(NetworkMessage::RpcRequest(RpcRequest {
         request_id: 123,
         protocol_id: PROTOCOL,
         priority: 0,
         raw_request: Vec::from("hello world"),
-    });
+    }));
     let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
         protocol_id: PROTOCOL,
         data: Bytes::from("hello world"),
         res_tx: oneshot::channel().0,
     });
-    let resp_msg = NetworkMessage::RpcResponse(RpcResponse {
+    let resp_msg = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
         request_id: 123,
         priority: 0,
         raw_response: Vec::from("goodbye world"),
-    });
+    }));
 
     let client = async move {
         // The client should send many rpc requests.
@@ -474,12 +475,12 @@ fn peer_recv_rpc_timeout() {
         );
     let (mut client_sink, client_stream) = build_network_sink_stream(&mut connection);
 
-    let send_msg = NetworkMessage::RpcRequest(RpcRequest {
+    let send_msg = MultiplexMessage::Message(NetworkMessage::RpcRequest(RpcRequest {
         request_id: 123,
         protocol_id: PROTOCOL,
         priority: 0,
         raw_request: Vec::from("hello world"),
-    });
+    }));
     let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
         protocol_id: PROTOCOL,
         data: Bytes::from("hello world"),
@@ -532,12 +533,12 @@ fn peer_recv_rpc_cancel() {
         );
     let (mut client_sink, client_stream) = build_network_sink_stream(&mut connection);
 
-    let send_msg = NetworkMessage::RpcRequest(RpcRequest {
+    let send_msg = MultiplexMessage::Message(NetworkMessage::RpcRequest(RpcRequest {
         request_id: 123,
         protocol_id: PROTOCOL,
         priority: 0,
         raw_request: Vec::from("hello world"),
-    });
+    }));
     let recv_msg = PeerNotification::RecvRpc(InboundRpcRequest {
         protocol_id: PROTOCOL,
         data: Bytes::from("hello world"),
@@ -605,7 +606,7 @@ fn peer_send_rpc() {
             // Server should then receive the expected rpc request.
             let received = server_stream.next().await.unwrap().unwrap();
             let received = match received {
-                NetworkMessage::RpcRequest(request) => request,
+                MultiplexMessage::Message(NetworkMessage::RpcRequest(request)) => request,
                 _ => panic!("Expected RpcRequest; unexpected: {:?}", received),
             };
 
@@ -619,11 +620,11 @@ fn peer_send_rpc() {
                 received.request_id,
             );
 
-            let response = NetworkMessage::RpcResponse(RpcResponse {
+            let response = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
                 request_id: received.request_id,
                 priority: 0,
                 raw_response: Vec::from(&b"goodbye world"[..]),
-            });
+            }));
 
             // Server should send the rpc request.
             server_sink.send(&response).await.unwrap();
@@ -674,7 +675,7 @@ fn peer_send_rpc_concurrent() {
             let received = server_stream.next().await.unwrap().unwrap();
 
             let received = match received {
-                NetworkMessage::RpcRequest(request) => request,
+                MultiplexMessage::Message(NetworkMessage::RpcRequest(request)) => request,
                 _ => panic!("Expected RpcRequest; unexpected: {:?}", received),
             };
 
@@ -688,11 +689,11 @@ fn peer_send_rpc_concurrent() {
                 received.request_id,
             );
 
-            let response = NetworkMessage::RpcResponse(RpcResponse {
+            let response = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
                 request_id: received.request_id,
                 priority: 0,
                 raw_response: Vec::from(&b"goodbye world"[..]),
-            });
+            }));
 
             // Server should send the rpc request.
             server_sink.send(&response).await.unwrap();
@@ -729,7 +730,7 @@ fn peer_send_rpc_cancel() {
         // Server receives the rpc request from client.
         let received = server_stream.next().await.unwrap().unwrap();
         let received = match received {
-            NetworkMessage::RpcRequest(request) => request,
+            MultiplexMessage::Message(NetworkMessage::RpcRequest(request)) => request,
             _ => panic!("Expected RpcRequest; unexpected: {:?}", received),
         };
 
@@ -745,11 +746,11 @@ fn peer_send_rpc_cancel() {
         drop(response_rx);
 
         // Server sending an expired response is fine.
-        let response = NetworkMessage::RpcResponse(RpcResponse {
+        let response = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
             request_id: received.request_id,
             priority: 0,
             raw_response: Vec::from(&b"goodbye world"[..]),
-        });
+        }));
         server_sink.send(&response).await.unwrap();
 
         // Make sure the peer actor actually saw the message.
@@ -790,7 +791,7 @@ fn peer_send_rpc_timeout() {
         // Server receives the rpc request from client.
         let received = server_stream.next().await.unwrap().unwrap();
         let received = match received {
-            NetworkMessage::RpcRequest(request) => request,
+            MultiplexMessage::Message(NetworkMessage::RpcRequest(request)) => request,
             _ => panic!("Expected RpcRequest; unexpected: {:?}", received),
         };
 
@@ -809,11 +810,11 @@ fn peer_send_rpc_timeout() {
         assert!(matches!(response_rx.await, Ok(Err(RpcError::TimedOut))));
 
         // Server sending an expired response is fine.
-        let response = NetworkMessage::RpcResponse(RpcResponse {
+        let response = MultiplexMessage::Message(NetworkMessage::RpcResponse(RpcResponse {
             request_id: received.request_id,
             priority: 0,
             raw_response: Vec::from(&b"goodbye world"[..]),
-        });
+        }));
         server_sink.send(&response).await.unwrap();
 
         // Make sure the peer actor actually saw the message.
@@ -892,4 +893,58 @@ fn peer_terminates_when_request_tx_has_dropped() {
         drop(peer_handle);
     };
     rt.block_on(future::join(peer.start(), drop));
+}
+
+#[test]
+fn peers_send_multiplex() {
+    ::aptos_logger::Logger::init_for_testing();
+    let rt = Runtime::new().unwrap();
+    let (
+        (peer_a, mut peer_handle_a, mut connection_notifs_rx_a, mut peer_notifs_rx_a),
+        (peer_b, mut peer_handle_b, mut connection_notifs_rx_b, mut peer_notifs_rx_b),
+    ) = build_test_connected_peers(rt.handle().clone(), TimeService::mock());
+
+    let remote_peer_id_a = peer_a.remote_peer_id();
+    let remote_peer_id_b = peer_b.remote_peer_id();
+
+    let test = async move {
+        let msg_a = Message {
+            protocol_id: PROTOCOL,
+            mdata: Bytes::from(vec![0; MAX_MESSAGE_SIZE]), // stream message
+        };
+        let msg_b = Message {
+            protocol_id: PROTOCOL,
+            mdata: Bytes::from(vec![1; 1024]), // normal message
+        };
+
+        // Peer A -> msg_a -> Peer B
+        peer_handle_a.send_direct_send(msg_a.clone());
+        // Peer A <- msg_b <- Peer B
+        peer_handle_b.send_direct_send(msg_b.clone());
+
+        // Check that each peer received the other's message
+        let notif_a = peer_notifs_rx_a.next().await;
+        let notif_b = peer_notifs_rx_b.next().await;
+        assert_eq!(notif_a, Some(PeerNotification::RecvMessage(msg_b)));
+        assert_eq!(notif_b, Some(PeerNotification::RecvMessage(msg_a)));
+
+        // Shut one peers and the other should shutdown due to ConnectionLost
+        drop(peer_handle_a);
+
+        // Check that we received both shutdown events
+        assert_disconnected_event(
+            remote_peer_id_a,
+            DisconnectReason::Requested,
+            &mut connection_notifs_rx_a,
+        )
+        .await;
+        assert_disconnected_event(
+            remote_peer_id_b,
+            DisconnectReason::ConnectionLost,
+            &mut connection_notifs_rx_b,
+        )
+        .await;
+    };
+
+    rt.block_on(future::join3(peer_a.start(), peer_b.start(), test));
 }

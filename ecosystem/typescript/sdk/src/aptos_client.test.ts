@@ -6,7 +6,13 @@ import * as Gen from "./generated/index";
 import { FAUCET_URL, NODE_URL } from "./util.test";
 import { FaucetClient } from "./faucet_client";
 import { AptosAccount } from "./aptos_account";
-import { TxnBuilderTypes, TransactionBuilderMultiEd25519, BCS, TransactionBuilder } from "./transaction_builder";
+import {
+  TxnBuilderTypes,
+  TransactionBuilderMultiEd25519,
+  BCS,
+  TransactionBuilder,
+  TransactionBuilderRemoteABI,
+} from "./transaction_builder";
 import { TokenClient } from "./token_client";
 
 const account = "0x1::account::Account";
@@ -88,8 +94,8 @@ test(
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -97,7 +103,7 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(account1.address(), scriptFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload);
 
     const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
     const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
@@ -107,6 +113,43 @@ test(
     resources = await client.getAccountResources(account2.address());
     accountResource = resources.find((r) => r.type === aptosCoin);
     expect((accountResource!.data as any).coin.value).toBe("717");
+  },
+  30 * 1000,
+);
+
+test(
+  "submits transaction with remote ABI",
+  async () => {
+    const client = new AptosClient(NODE_URL);
+    const faucetClient = new FaucetClient(NODE_URL, FAUCET_URL);
+
+    const account1 = new AptosAccount();
+    await faucetClient.fundAccount(account1.address(), 50000);
+    let resources = await client.getAccountResources(account1.address());
+    let accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("50000");
+
+    const account2 = new AptosAccount();
+    await faucetClient.fundAccount(account2.address(), 0);
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("0");
+
+    const builder = new TransactionBuilderRemoteABI(client, { sender: account1.address() });
+    const rawTxn = await builder.build(
+      "0x1::coin::transfer",
+      ["0x1::aptos_coin::AptosCoin"],
+      [account2.address(), 400],
+    );
+
+    const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
+    const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
+
+    await client.waitForTransaction(transactionRes.hash);
+
+    resources = await client.getAccountResources(account2.address());
+    accountResource = resources.find((r) => r.type === aptosCoin);
+    expect((accountResource!.data as any).coin.value).toBe("400");
   },
   30 * 1000,
 );
@@ -146,8 +189,8 @@ test(
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -155,7 +198,7 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(mutisigAccountAddress, scriptFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(mutisigAccountAddress, entryFunctionPayload);
 
     const txnBuilder = new TransactionBuilderMultiEd25519((signingMessage: TxnBuilderTypes.SigningMessage) => {
       const sigHexStr1 = account1.signBuffer(signingMessage);
@@ -210,7 +253,7 @@ test(
     await checkAptosCoin();
 
     const payload: Gen.TransactionPayload = {
-      type: "script_function_payload",
+      type: "entry_function_payload",
       function: coinTransferFunction,
       type_arguments: ["0x1::aptos_coin::AptosCoin"],
       arguments: [account2.address().hex(), "100000"],
@@ -262,8 +305,8 @@ test(
     await checkAptosCoin();
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -271,7 +314,7 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(account1.address(), scriptFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload);
 
     const bcsTxn = AptosClient.generateBCSSimulation(account1, rawTxn);
     const transactionRes = (await client.submitBCSSimulation(bcsTxn))[0];
@@ -356,8 +399,8 @@ test(
     let aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x3::token",
         "direct_transfer_script",
         [],
@@ -371,7 +414,7 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(alice.address(), scriptFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(alice.address(), entryFunctionPayload);
     const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [
       TxnBuilderTypes.AccountAddress.fromHex(bob.address()),
     ]);

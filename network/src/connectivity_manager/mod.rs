@@ -413,7 +413,8 @@ where
     /// this function will close our connection to it.
     async fn close_stale_connections(&mut self) {
         let eligible = self.eligible.read().clone();
-        let stale_connections: Vec<_> = self
+
+        for p in self
             .connected
             .iter()
             .filter(|(peer_id, _)| !eligible.contains_key(peer_id))
@@ -429,8 +430,7 @@ where
                     Some(*peer_id)
                 }
             })
-            .collect();
-        for p in stale_connections.into_iter() {
+        {
             info!(
                 NetworkSchema::new(&self.network_context).remote_peer(&p),
                 "{} Closing stale connection to peer {}",

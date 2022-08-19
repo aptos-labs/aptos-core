@@ -3,7 +3,7 @@
 
 import { HexString } from "../../hex_string";
 import { Deserializer } from "../bcs";
-import { ScriptABI, ScriptFunctionABI, TransactionScriptABI } from "./abi";
+import { ScriptABI, EntryFunctionABI, TransactionScriptABI } from "./abi";
 import { TypeTagAddress, TypeTagU64 } from "./type_tag";
 
 // eslint-disable-next-line operator-linebreak
@@ -19,14 +19,14 @@ const TRANSACTION_SCRIPT_ABI =
 describe("ABI", () => {
   it("parses create_acount successfully", async () => {
     const deserializer = new Deserializer(new HexString(SCRIPT_FUNCTION_ABI).toUint8Array());
-    const scriptFunctionABI = ScriptABI.deserialize(deserializer) as ScriptFunctionABI;
-    const { address: moduleAddress, name: moduleName } = scriptFunctionABI.module_name;
-    expect(scriptFunctionABI.name).toBe("create_account");
+    const entryFunctionABI = ScriptABI.deserialize(deserializer) as EntryFunctionABI;
+    const { address: moduleAddress, name: moduleName } = entryFunctionABI.module_name;
+    expect(entryFunctionABI.name).toBe("create_account");
     expect(HexString.fromUint8Array(moduleAddress.address).toShortString()).toBe("0x1");
     expect(moduleName.value).toBe("Account");
-    expect(scriptFunctionABI.doc.trim()).toBe("Basic account creation methods.");
+    expect(entryFunctionABI.doc.trim()).toBe("Basic account creation methods.");
 
-    const arg = scriptFunctionABI.args[0];
+    const arg = entryFunctionABI.args[0];
     expect(arg.name).toBe("auth_key");
     expect(arg.type_tag instanceof TypeTagAddress).toBeTruthy();
   });

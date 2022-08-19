@@ -7,9 +7,9 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     state_store::state_key::StateKey,
-    transaction::{ScriptFunction, SignedTransaction, TransactionPayload, TransactionStatus},
+    transaction::{EntryFunction, SignedTransaction, TransactionPayload, TransactionStatus},
 };
-use framework::aptos_stdlib;
+use cached_packages::aptos_stdlib;
 use framework::{BuildOptions, BuiltPackage};
 use language_e2e_tests::{
     account::{Account, AccountData},
@@ -150,7 +150,7 @@ impl MoveHarness {
         } = fun;
         self.create_transaction_payload(
             account,
-            TransactionPayload::ScriptFunction(ScriptFunction::new(
+            TransactionPayload::EntryFunction(EntryFunction::new(
                 module_id,
                 function_id,
                 ty_args,
@@ -208,12 +208,12 @@ impl MoveHarness {
 
     pub fn new_block_with_metadata(
         &mut self,
-        proposer_index: Option<u32>,
+        proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
     ) {
         self.fast_forward(1);
         self.executor
-            .new_block_with_metadata(proposer_index, failed_proposer_indices);
+            .new_block_with_metadata(proposer, failed_proposer_indices);
     }
 
     pub fn read_state_value(&self, state_key: &StateKey) -> Option<Vec<u8>> {

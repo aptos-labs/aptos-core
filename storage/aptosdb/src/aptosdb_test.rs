@@ -103,6 +103,7 @@ fn test_storage_config() {
 
             let ledger_pruner = LedgerPrunerManager::new(
                 Arc::clone(&aptos_db.ledger_db),
+                Arc::clone(&aptos_db.state_store),
                 LedgerPrunerConfig {
                     enable: enable_ledger,
                     prune_window: 100,
@@ -132,6 +133,7 @@ fn test_error_if_version_is_pruned() {
 
     let ledger_pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
+        Arc::clone(&aptos_db.state_store),
         LedgerPrunerConfig {
             enable: true,
             prune_window: 0,

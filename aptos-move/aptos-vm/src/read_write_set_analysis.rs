@@ -105,7 +105,7 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
         concretize: bool,
     ) -> Result<(Vec<ResourceKey>, Vec<ResourceKey>)> {
         match tx.payload() {
-            TransactionPayload::ScriptFunction(s) => self.get_concretized_keys_script_function(
+            TransactionPayload::EntryFunction(s) => self.get_concretized_keys_entry_function(
                 tx,
                 s.module(),
                 s.function(),
@@ -181,14 +181,14 @@ impl<'a, R: MoveResolverExt> ReadWriteSetAnalysis<'a, R> {
                 self.concretize_secondary_indexes(metadata_access, concretize)
             }
             PreprocessedTransaction::InvalidSignature => Ok((vec![], vec![])),
-            PreprocessedTransaction::WriteSet(_) | PreprocessedTransaction::WaypointWriteSet(_) => {
+            PreprocessedTransaction::StateCheckpoint => Ok((vec![], vec![])),
+            PreprocessedTransaction::WaypointWriteSet(_) => {
                 bail!("Unsupported writeset transaction")
             }
-            PreprocessedTransaction::StateCheckpoint => Ok((vec![], vec![])),
         }
     }
 
-    fn get_concretized_keys_script_function(
+    fn get_concretized_keys_entry_function(
         &self,
         tx: &SignedTransaction,
         module_name: &ModuleId,

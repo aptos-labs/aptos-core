@@ -227,7 +227,7 @@ module aptos_token::token {
     }
 
     //
-    // Creator Script functions
+    // Creator Entry functions
     //
 
     /// create a empty token collection with parameters
@@ -272,7 +272,7 @@ module aptos_token::token {
     }
 
     //
-    // Transaction Script functions
+    // Transaction Entry functions
     //
 
     public entry fun direct_transfer_script(

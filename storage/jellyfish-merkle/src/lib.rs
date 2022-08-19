@@ -81,6 +81,7 @@ pub mod test_helper;
 
 use crate::metrics::APTOS_JELLYFISH_LEAF_COUNT;
 use anyhow::{bail, ensure, format_err, Result};
+use aptos_crypto::hash::SPARSE_MERKLE_PLACEHOLDER_HASH;
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::proof::SparseMerkleProofExt;
 use aptos_types::{
@@ -421,7 +422,7 @@ where
             .collect::<Vec<_>>();
 
         let mut batch = TreeUpdateBatch::new();
-        let root_node = if let Some(persisted_version) = persisted_version {
+        let root_node_opt = if let Some(persisted_version) = persisted_version {
             IO_POOL.install(|| {
                 self.batch_insert_at(
                     &NodeKey::new_empty_path(persisted_version),
@@ -441,14 +442,19 @@ where
                 &node_hashes,
                 &mut batch,
             )?
-        }
-        .ok_or_else(|| format_err!("Empty tree is impossible."))?;
+        };
 
         let node_key = NodeKey::new_empty_path(version);
-        let root_hash = root_node.hash();
-
-        APTOS_JELLYFISH_LEAF_COUNT.set(root_node.leaf_count() as i64);
-        batch.put_node(node_key, root_node);
+        let root_hash = if let Some(root_node) = root_node_opt {
+            APTOS_JELLYFISH_LEAF_COUNT.set(root_node.leaf_count() as i64);
+            let hash = root_node.hash();
+            batch.put_node(node_key, root_node);
+            hash
+        } else {
+            APTOS_JELLYFISH_LEAF_COUNT.set(0);
+            batch.put_node(node_key, Node::Null);
+            *SPARSE_MERKLE_PLACEHOLDER_HASH
+        };
 
         Ok((root_hash, batch))
     }
@@ -570,6 +576,10 @@ where
             Node::Leaf(leaf_node) => self.batch_update_subtree_with_existing_leaf(
                 node_key, version, leaf_node, kvs, depth, hash_cache, batch,
             ),
+            Node::Null => {
+                ensure!(depth == 0, "Null node can only exist at depth 0");
+                self.batch_update_subtree(node_key, version, kvs, 0, hash_cache, batch)
+            }
         }
     }
 
@@ -851,6 +861,9 @@ where
                             siblings
                         }),
                     ));
+                }
+                Node::Null => {
+                    return Ok((None, SparseMerkleProofExt::new(None, vec![])));
                 }
             }
         }

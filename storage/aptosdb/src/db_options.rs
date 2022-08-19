@@ -29,6 +29,7 @@ pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
         TRANSACTION_INFO_CF_NAME,
         VERSION_DATA_CF_NAME,
         WRITE_SET_CF_NAME,
+        DB_METADATA_CF_NAME,
     ]
 }
 
@@ -37,6 +38,7 @@ pub(super) fn state_merkle_db_column_families() -> Vec<ColumnFamilyName> {
         /* empty cf */ DEFAULT_COLUMN_FAMILY_NAME,
         JELLYFISH_MERKLE_NODE_CF_NAME,
         STALE_NODE_INDEX_CF_NAME,
+        DB_METADATA_CF_NAME,
     ]
 }
 

@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey};
+use aptos_gas::{FeePerGasUnit, Gas, NumBytes};
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     transaction::{SignedTransaction, TransactionPayload},
 };
-use move_deps::move_core_types::gas_schedule::{GasAlgebra, GasCarrier, GasPrice};
 use std::convert::TryFrom;
 
 pub struct TransactionMetadata {
@@ -17,9 +17,9 @@ pub struct TransactionMetadata {
     pub secondary_signers: Vec<AccountAddress>,
     pub secondary_authentication_keys: Vec<Vec<u8>>,
     pub sequence_number: u64,
-    pub max_gas_amount: u64,
-    pub gas_unit_price: GasPrice<GasCarrier>,
-    pub transaction_size: u64,
+    pub max_gas_amount: Gas,
+    pub gas_unit_price: FeePerGasUnit,
+    pub transaction_size: NumBytes,
     pub expiration_timestamp_secs: u64,
     pub chain_id: ChainId,
     pub script_hash: Vec<u8>,
@@ -38,25 +38,24 @@ impl TransactionMetadata {
                 .map(|account_auth| account_auth.authentication_key().to_vec())
                 .collect(),
             sequence_number: txn.sequence_number(),
-            max_gas_amount: txn.max_gas_amount(),
-            gas_unit_price: GasPrice::new(txn.gas_unit_price()),
-            transaction_size: txn.raw_txn_bytes_len() as u64,
+            max_gas_amount: txn.max_gas_amount().into(),
+            gas_unit_price: txn.gas_unit_price().into(),
+            transaction_size: (txn.raw_txn_bytes_len() as u64).into(),
             expiration_timestamp_secs: txn.expiration_timestamp_secs(),
             chain_id: txn.chain_id(),
             script_hash: match txn.payload() {
                 TransactionPayload::Script(s) => HashValue::sha3_256_of(s.code()).to_vec(),
-                TransactionPayload::ScriptFunction(_) => vec![],
+                TransactionPayload::EntryFunction(_) => vec![],
                 TransactionPayload::ModuleBundle(_) => vec![],
-                TransactionPayload::WriteSet(_) => vec![],
             },
         }
     }
 
-    pub fn max_gas_amount(&self) -> u64 {
+    pub fn max_gas_amount(&self) -> Gas {
         self.max_gas_amount
     }
 
-    pub fn gas_unit_price(&self) -> GasPrice<GasCarrier> {
+    pub fn gas_unit_price(&self) -> FeePerGasUnit {
         self.gas_unit_price
     }
 
@@ -76,7 +75,7 @@ impl TransactionMetadata {
         self.sequence_number
     }
 
-    pub fn transaction_size(&self) -> u64 {
+    pub fn transaction_size(&self) -> NumBytes {
         self.transaction_size
     }
 
@@ -104,9 +103,9 @@ impl Default for TransactionMetadata {
             secondary_signers: vec![],
             secondary_authentication_keys: vec![],
             sequence_number: 0,
-            max_gas_amount: 100_000_000,
-            gas_unit_price: GasPrice::new(0),
-            transaction_size: 0,
+            max_gas_amount: 100_000_000.into(),
+            gas_unit_price: 0.into(),
+            transaction_size: 0.into(),
             expiration_timestamp_secs: 0,
             chain_id: ChainId::test(),
             script_hash: vec![],

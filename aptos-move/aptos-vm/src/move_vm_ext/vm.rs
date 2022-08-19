@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_vm_ext::{MoveResolverExt, NativeAggregatorContext, SessionExt, SessionId},
+    move_vm_ext::{MoveResolverExt, SessionExt, SessionId},
     natives::aptos_natives,
 };
+use aptos_aggregator::aggregator_extension::NativeAggregatorContext;
 use aptos_gas::NativeGasParameters;
 use framework::natives::{code::NativeCodeContext, transaction_context::NativeTransactionContext};
 use move_deps::{

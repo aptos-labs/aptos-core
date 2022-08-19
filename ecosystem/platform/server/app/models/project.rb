@@ -21,12 +21,16 @@ class Project < ApplicationRecord
   has_many :project_members, dependent: :destroy
   has_many :members, through: :project_members, source: :user do
     def public
-      where('project_members.public = ?', true)
+      where('project_members.public': true)
     end
   end
   has_one_attached :thumbnail
   has_many_attached :screenshots
   accepts_nested_attributes_for :project_categories, :project_members
+
+  scope :filter_by_category, lambda { |category_id|
+    joins(:project_categories).where('project_categories.category_id': category_id)
+  }
 
   validates :title, presence: true, length: { maximum: 140 }
   validates :short_description, presence: true, length: { maximum: 140 }

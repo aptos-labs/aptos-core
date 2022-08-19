@@ -6,9 +6,11 @@ use crate::common::types::{
     TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
-use crate::move_tool::{compile_move, ArgWithType, FunctionArgType};
+use crate::move_tool::{compile_move, init_move_dir, ArgWithType, FunctionArgType};
 use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
+use aptos_logger::warn;
+use aptos_rest_client::aptos_api_types::U64;
 use aptos_rest_client::{aptos_api_types::MoveType, Transaction};
 use aptos_types::{
     account_address::AccountAddress,
@@ -24,6 +26,7 @@ use move_deps::{
 use reqwest::Url;
 use serde::Deserialize;
 use serde::Serialize;
+use std::path::Path;
 use std::{
     collections::BTreeMap,
     convert::{TryFrom, TryInto},
@@ -31,6 +34,7 @@ use std::{
     fs,
     path::PathBuf,
 };
+use tempfile::TempDir;
 
 /// Tool for on-chain governance
 ///
@@ -41,7 +45,6 @@ use std::{
 pub enum GovernanceTool {
     Propose(SubmitProposal),
     Vote(SubmitVote),
-    PrepareProposal(PrepareProposal),
     ExecuteProposal(ExecuteProposal),
 }
 
@@ -51,7 +54,6 @@ impl GovernanceTool {
         match self {
             Propose(tool) => tool.execute_serialized().await,
             Vote(tool) => tool.execute_serialized().await,
-            PrepareProposal(tool) => tool.execute_serialized().await,
             ExecuteProposal(tool) => tool.execute_serialized().await,
         }
     }
@@ -60,109 +62,163 @@ impl GovernanceTool {
 /// Submit proposal to other validators to be proposed on
 #[derive(Parser)]
 pub struct SubmitProposal {
-    /// Execution hash of the script to be voted on
-    #[clap(long, parse(try_from_str = read_hex_hash))]
-    pub(crate) execution_hash: HashValue,
-
     /// Code location of the script to be voted on
     #[clap(long)]
     pub(crate) metadata_url: Url,
 
     #[clap(flatten)]
-    pub(crate) prompt_options: PromptOptions,
-    #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
     #[clap(flatten)]
     pub(crate) pool_address_args: PoolAddressArgs,
+    #[clap(flatten)]
+    pub(crate) compile_proposal_args: CompileProposalArgs,
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for SubmitProposal {
+impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
     fn command_name(&self) -> &'static str {
         "SubmitProposal"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<ProposalSubmissionSummary> {
+        let (_bytecode, script_hash) = self.compile_proposal_args.compile()?;
+
         // Validate the proposal metadata
-        let client = reqwest::ClientBuilder::default()
-            .tls_built_in_root_certs(true)
-            .build()
-            .map_err(|err| {
-                CliError::UnexpectedError(format!("Failed to build HTTP client {}", err))
-            })?;
-        let bytes = client
-            .get(self.metadata_url.clone())
-            .send()
-            .await
-            .map_err(|err| {
-                CliError::CommandArgumentError(format!(
-                    "Failed to fetch metadata url {}: {}",
-                    self.metadata_url, err
-                ))
-            })?
-            .bytes()
-            .await
-            .map_err(|err| {
-                CliError::CommandArgumentError(format!(
-                    "Failed to fetch metadata url {}: {}",
-                    self.metadata_url, err
-                ))
-            })?;
-        let metadata: ProposalMetadata = serde_json::from_slice(&bytes).map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Metadata is not in a proper JSON format: {}",
-                err
-            ))
-        })?;
-        Url::parse(&metadata.source_code_url).map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Source code URL {} is invalid {}",
-                metadata.source_code_url, err
-            ))
-        })?;
-        Url::parse(&metadata.discussion_url).map_err(|err| {
-            CliError::CommandArgumentError(format!(
-                "Discussion URL {} is invalid {}",
-                metadata.discussion_url, err
-            ))
-        })?;
+        let (metadata, metadata_hash) = get_metadata(self.metadata_url.clone()).await?;
 
-        let metadata_hash = HashValue::sha3_256_of(&bytes);
+        println!(
+            "{}\n\tMetadata Hash: {}\n\tScript Hash: {}",
+            metadata, metadata_hash, script_hash
+        );
+        prompt_yes_with_override(
+            "Do you want to submit this proposal?",
+            self.compile_proposal_args.prompt_options,
+        )?;
 
-        println!("{}, Hash: {}", metadata, metadata_hash);
-        prompt_yes_with_override("Do you want to submit this proposal?", self.prompt_options)?;
-
-        self.txn_options
-            .submit_script_function(
+        let txn = self
+            .txn_options
+            .submit_entry_function(
                 AccountAddress::ONE,
                 "aptos_governance",
                 "create_proposal",
                 vec![],
                 vec![
                     bcs::to_bytes(&self.pool_address_args.pool_address)?,
-                    bcs::to_bytes(&self.execution_hash.to_hex())?,
+                    bcs::to_bytes(&script_hash)?,
                     bcs::to_bytes(&self.metadata_url.to_string())?,
                     bcs::to_bytes(&metadata_hash.to_hex())?,
                 ],
             )
-            .await
+            .await?;
+
+        if let Transaction::UserTransaction(inner) = txn {
+            // Find event with proposal id
+            let proposal_id = if let Some(event) = inner.events.iter().find(|event| {
+                event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
+            }) {
+                let data: CreateProposalEvent = serde_json::from_value(event.data.clone())
+                    .map_err(|_| {
+                        CliError::UnexpectedError(
+                            "Failed to parse Proposal event to get ProposalId".to_string(),
+                        )
+                    })?;
+                Some(data.proposal_id.0)
+            } else {
+                warn!("No proposal event found to find proposal id");
+                None
+            };
+            let request = inner.request;
+            let info = inner.info;
+
+            return Ok(ProposalSubmissionSummary {
+                proposal_id,
+                transaction_hash: info.hash.into(),
+                transaction_version: info.version.into(),
+                gas_used: info.gas_used.0,
+                gas_price_per_unit: request.gas_unit_price.0,
+                sequence_number: request.sequence_number.0,
+                vm_status: info.vm_status,
+            });
+        }
+        Err(CliError::UnexpectedError(
+            "Unable to find parse proposal transaction output".to_string(),
+        ))
     }
 }
 
-fn read_hex_hash(str: &str) -> CliTypedResult<HashValue> {
-    let hex = str.strip_prefix("0x").unwrap_or(str);
-    HashValue::from_hex(hex).map_err(|err| CliError::CommandArgumentError(err.to_string()))
+#[derive(Debug, Deserialize, Serialize)]
+struct CreateProposalEvent {
+    proposal_id: U64,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+struct ProposalSubmissionSummary {
+    proposal_id: Option<u64>,
+    transaction_hash: HashValue,
+    transaction_version: u64,
+    gas_used: u64,
+    gas_price_per_unit: u64,
+    sequence_number: u64,
+    vm_status: String,
+}
+
+/// Retrieve metadata and validate it
+async fn get_metadata(metadata_url: Url) -> CliTypedResult<(ProposalMetadata, HashValue)> {
+    let client = reqwest::ClientBuilder::default()
+        .tls_built_in_root_certs(true)
+        .build()
+        .map_err(|err| CliError::UnexpectedError(format!("Failed to build HTTP client {}", err)))?;
+    let bytes = client
+        .get(metadata_url.clone())
+        .send()
+        .await
+        .map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Failed to fetch metadata url {}: {}",
+                metadata_url, err
+            ))
+        })?
+        .bytes()
+        .await
+        .map_err(|err| {
+            CliError::CommandArgumentError(format!(
+                "Failed to fetch metadata url {}: {}",
+                metadata_url, err
+            ))
+        })?;
+    let metadata: ProposalMetadata = serde_json::from_slice(&bytes).map_err(|err| {
+        CliError::CommandArgumentError(format!("Metadata is not in a proper JSON format: {}", err))
+    })?;
+    Url::parse(&metadata.source_code_url).map_err(|err| {
+        CliError::CommandArgumentError(format!(
+            "Source code URL {} is invalid {}",
+            metadata.source_code_url, err
+        ))
+    })?;
+    Url::parse(&metadata.discussion_url).map_err(|err| {
+        CliError::CommandArgumentError(format!(
+            "Discussion URL {} is invalid {}",
+            metadata.discussion_url, err
+        ))
+    })?;
+    let metadata_hash = HashValue::sha3_256_of(&bytes);
+    Ok((metadata, metadata_hash))
+}
+
+/// Submit a vote on a current proposal
 #[derive(Parser)]
 pub struct SubmitVote {
     /// Id of proposal to vote on
     #[clap(long)]
     pub(crate) proposal_id: u64,
 
-    /// Vote choice. True for yes. False for no.
-    #[clap(long)]
-    pub(crate) should_pass: bool,
+    /// Vote yes on the proposal
+    #[clap(long, group = "vote")]
+    pub(crate) yes: bool,
+
+    /// Vote no on the proposal
+    #[clap(long, group = "vote")]
+    pub(crate) no: bool,
 
     #[clap(flatten)]
     pub(crate) prompt_options: PromptOptions,
@@ -179,15 +235,25 @@ impl CliCommand<Transaction> for SubmitVote {
     }
 
     async fn execute(mut self) -> CliTypedResult<Transaction> {
+        let (vote_str, vote) = match (self.yes, self.no) {
+            (true, false) => ("Yes", true),
+            (false, true) => ("No", false),
+            (_, _) => {
+                return Err(CliError::CommandArgumentError(
+                    "Must choose either --yes or --no".to_string(),
+                ))
+            }
+        };
+
         // TODO: Display details of proposal
-        let vote = if self.should_pass { "Yes" } else { "No" };
+
         prompt_yes_with_override(
-            &format!("Are you sure you want to vote {}", vote),
+            &format!("Are you sure you want to vote {}", vote_str),
             self.prompt_options,
         )?;
 
         self.txn_options
-            .submit_script_function(
+            .submit_entry_function(
                 AccountAddress::ONE,
                 "aptos_governance",
                 "vote",
@@ -195,7 +261,7 @@ impl CliCommand<Transaction> for SubmitVote {
                 vec![
                     bcs::to_bytes(&self.pool_address_args.pool_address)?,
                     bcs::to_bytes(&self.proposal_id)?,
-                    bcs::to_bytes(&self.should_pass)?,
+                    bcs::to_bytes(&vote)?,
                 ],
             )
             .await
@@ -220,79 +286,98 @@ impl std::fmt::Display for ProposalMetadata {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize)]
-pub struct ScriptHash {
-    hash: String,
-    bytecode: String,
+fn compile_in_temp_dir(
+    script_path: &Path,
+    git_revision: &str,
+    prompt_options: PromptOptions,
+) -> CliTypedResult<(Vec<u8>, HashValue)> {
+    // Make a temporary directory for compilation
+    let temp_dir = TempDir::new().map_err(|err| {
+        CliError::UnexpectedError(format!("Failed to create temporary directory {}", err))
+    })?;
+
+    // Initialize a move directory
+    let package_dir = temp_dir.path();
+    init_move_dir(
+        package_dir,
+        "Proposal",
+        git_revision,
+        BTreeMap::new(),
+        prompt_options,
+    )?;
+
+    // Insert the new script
+    let sources_dir = package_dir.join("sources");
+    let new_script_path = if let Some(file_name) = script_path.file_name() {
+        sources_dir.join(file_name)
+    } else {
+        // If for some reason we can't get the move file
+        sources_dir.join("script.move")
+    };
+    fs::copy(script_path, new_script_path.as_path()).map_err(|err| {
+        CliError::IO(
+            format!(
+                "Failed to copy {} to {}",
+                script_path.display(),
+                new_script_path.display()
+            ),
+            err,
+        )
+    })?;
+
+    // Compile the script
+    compile_script(package_dir)
 }
 
-#[derive(Parser)]
-pub struct PrepareProposal {
-    /// Path to the Move package that contains the execution script
-    #[clap(long, parse(from_os_str))]
-    pub path: PathBuf,
-}
+fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
+    let build_config = BuildConfig {
+        additional_named_addresses: BTreeMap::new(),
+        generate_abis: false,
+        generate_docs: false,
+        ..Default::default()
+    };
 
-#[async_trait]
-impl CliCommand<ScriptHash> for PrepareProposal {
-    fn command_name(&self) -> &'static str {
-        "PrepareProposal"
-    }
+    let compiled_package = compile_move(build_config, package_dir)?;
+    let scripts_count = compiled_package.scripts().count();
 
-    async fn execute(mut self) -> CliTypedResult<ScriptHash> {
-        let build_config = BuildConfig {
-            additional_named_addresses: BTreeMap::new(),
-            generate_abis: false,
-            generate_docs: false,
-            ..Default::default()
-        };
-
-        let compiled_package = compile_move(build_config, self.path.as_path())?;
-        let scripts_count = compiled_package.scripts().count();
-
-        if scripts_count != 1 {
-            return Err(CliError::UnexpectedError(format!(
-                "Only one script can be prepared a time. Make sure one and only one script file \
+    if scripts_count != 1 {
+        return Err(CliError::UnexpectedError(format!(
+            "Only one script can be prepared a time. Make sure one and only one script file \
                 is included in the Move package. Found {} scripts.",
-                scripts_count
-            )));
+            scripts_count
+        )));
+    }
+
+    let script = *compiled_package
+        .scripts()
+        .collect::<Vec<_>>()
+        .get(0)
+        .unwrap();
+
+    match script.unit {
+        CompiledUnitEnum::Script(ref s) => {
+            let mut bytes = vec![];
+
+            s.script
+                .serialize(&mut bytes)
+                .map_err(|err| CliError::UnexpectedError(format!("Unexpected error: {}", err)))?;
+            let hash = HashValue::sha3_256_of(bytes.as_slice());
+            Ok((bytes, hash))
         }
-
-        let script = *compiled_package
-            .scripts()
-            .collect::<Vec<_>>()
-            .get(0)
-            .unwrap();
-
-        match script.unit {
-            CompiledUnitEnum::Script(ref s) => {
-                let mut bytes = vec![];
-
-                s.script.serialize(&mut bytes).map_err(|err| {
-                    CliError::UnexpectedError(format!("Unexpected error: {}", err))
-                })?;
-
-                Ok(ScriptHash {
-                    hash: hex::encode(HashValue::sha3_256_of(bytes.as_slice()).to_vec()),
-                    bytecode: hex::encode(bytes),
-                })
-            }
-            CompiledUnitEnum::Module(_) => Err(CliError::UnexpectedError(
-                "You can only execute a script, a module is not supported.".to_string(),
-            )),
-        }
+        CompiledUnitEnum::Module(_) => Err(CliError::UnexpectedError(
+            "You can only execute a script, a module is not supported.".to_string(),
+        )),
     }
 }
 
+/// Execute a proposal that has passed voting requirements
 #[derive(Parser)]
 pub struct ExecuteProposal {
-    /// Path to the compiled script file
-    #[clap(long, parse(from_os_str))]
-    pub path: PathBuf,
-
-    /// Hex encoded arguments separated by spaces.
+    /// Arguments combined with their type separated by spaces.
     ///
-    /// Example: `0x01 0x02 0x03`
+    /// Supported types [u8, u64, u128, bool, hex, string, address]
+    ///
+    /// Example: `address:0x1 bool:true u8:0`
     #[clap(long, multiple_values = true)]
     pub(crate) args: Vec<ArgWithType>,
 
@@ -304,6 +389,8 @@ pub struct ExecuteProposal {
 
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
+    #[clap(flatten)]
+    pub(crate) compile_proposal_args: CompileProposalArgs,
 }
 
 impl TryFrom<&ArgWithType> for TransactionArgument {
@@ -352,17 +439,10 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
     }
 
     async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
-        if !self.path.exists() {
-            return Err(CliError::UnableToReadFile(
-                self.path.display().to_string(),
-                "Path doesn't exist".to_string(),
-            ));
-        }
+        let (bytecode, _script_hash) = self.compile_proposal_args.compile()?;
+        // TODO: Check hash so we don't do a failed roundtrip?
 
-        let code = fs::read(self.path.as_path()).map_err(|err| {
-            CliError::UnableToReadFile(self.path.display().to_string(), err.to_string())
-        })?;
-
+        // TODO: Clean these up to be common with the run function in move
         let args = self
             .args
             .iter()
@@ -378,11 +458,47 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
             type_args.push(type_tag)
         }
 
-        let txn = TransactionPayload::Script(Script::new(code, type_args, args));
+        let txn = TransactionPayload::Script(Script::new(bytecode, type_args, args));
 
         self.txn_options
             .submit_transaction(txn)
             .await
             .map(TransactionSummary::from)
+    }
+}
+
+/// Execute a proposal that has passed voting requirements
+#[derive(Parser)]
+pub struct CompileProposalArgs {
+    /// Path to the Move script for the proposal
+    #[clap(long, parse(from_os_str))]
+    pub script_path: PathBuf,
+
+    /// Git hash or branch of the framework in aptos core
+    #[clap(long)]
+    pub framework_git_rev: String,
+
+    #[clap(flatten)]
+    pub prompt_options: PromptOptions,
+}
+
+impl CompileProposalArgs {
+    fn compile(&self) -> CliTypedResult<(Vec<u8>, HashValue)> {
+        // Check script file
+        let script_path = self.script_path.as_path();
+        if !self.script_path.exists() {
+            return Err(CliError::CommandArgumentError(format!(
+                "{} does not exist",
+                script_path.display()
+            )));
+        } else if self.script_path.is_dir() {
+            return Err(CliError::CommandArgumentError(format!(
+                "{} is a directory",
+                script_path.display()
+            )));
+        }
+
+        // Compile script
+        compile_in_temp_dir(script_path, &self.framework_git_rev, self.prompt_options)
     }
 }

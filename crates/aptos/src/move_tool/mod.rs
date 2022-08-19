@@ -13,7 +13,9 @@ pub use stored_package::*;
 use crate::common::types::MoveManifestAccountWrapper;
 use crate::common::types::{ProfileOptions, RestOptions};
 use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current, write_to_file};
-use crate::move_tool::manifest::{Dependency, MovePackageManifest, PackageInfo};
+use crate::move_tool::manifest::{
+    Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo,
+};
 use crate::{
     common::{
         types::{
@@ -29,7 +31,7 @@ use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
+use aptos_types::transaction::{EntryFunction, ModuleBundle, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
 use framework::{BuildOptions, BuiltPackage};
@@ -120,50 +122,67 @@ impl CliCommand<()> for InitPackage {
 
     async fn execute(self) -> CliTypedResult<()> {
         let package_dir = dir_default_to_current(self.package_dir.clone())?;
-        let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
-        check_if_file_exists(move_toml.as_path(), self.prompt_options)?;
-        create_dir_if_not_exist(
-            package_dir
-                .join(SourcePackageLayout::Sources.path())
-                .as_path(),
-        )?;
-
         let addresses = self
             .named_addresses
             .clone()
             .into_iter()
             .map(|(key, value)| (key, value.account_address.into()))
             .collect();
-        let mut dependencies = BTreeMap::new();
-        dependencies.insert(
-            "AptosFramework".to_string(),
-            Dependency {
-                local: None,
-                git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
-                rev: Some("devnet".to_string()),
-                subdir: Some("aptos-move/framework/aptos-framework".to_string()),
-                aptos: None,
-                address: None,
-            },
-        );
-        let manifest = MovePackageManifest {
-            package: PackageInfo {
-                name: self.name,
-                version: "0.0.0".to_string(),
-                author: None,
-            },
-            addresses,
-            dependencies,
-        };
 
-        write_to_file(
-            move_toml.as_path(),
-            SourcePackageLayout::Manifest.location_str(),
-            toml::to_string_pretty(&manifest)
-                .map_err(|err| CliError::UnexpectedError(err.to_string()))?
-                .as_bytes(),
+        init_move_dir(
+            package_dir.as_path(),
+            &self.name,
+            "devnet",
+            addresses,
+            self.prompt_options,
         )
     }
+}
+
+pub fn init_move_dir(
+    package_dir: &Path,
+    name: &str,
+    rev: &str,
+    addresses: BTreeMap<String, ManifestNamedAddress>,
+    prompt_options: PromptOptions,
+) -> CliTypedResult<()> {
+    let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
+    check_if_file_exists(move_toml.as_path(), prompt_options)?;
+    create_dir_if_not_exist(
+        package_dir
+            .join(SourcePackageLayout::Sources.path())
+            .as_path(),
+    )?;
+
+    let mut dependencies = BTreeMap::new();
+    dependencies.insert(
+        "AptosFramework".to_string(),
+        Dependency {
+            local: None,
+            git: Some("https://github.com/aptos-labs/aptos-core.git".to_string()),
+            rev: Some(rev.to_string()),
+            subdir: Some("aptos-move/framework/aptos-framework".to_string()),
+            aptos: None,
+            address: None,
+        },
+    );
+    let manifest = MovePackageManifest {
+        package: PackageInfo {
+            name: name.to_string(),
+            version: "1.0.0".to_string(),
+            author: None,
+        },
+        addresses,
+        dependencies,
+    };
+
+    write_to_file(
+        move_toml.as_path(),
+        SourcePackageLayout::Manifest.location_str(),
+        toml::to_string_pretty(&manifest)
+            .map_err(|err| CliError::UnexpectedError(err.to_string()))?
+            .as_bytes(),
+    )
 }
 
 /// Compiles a package and returns the [`ModuleId`]s
@@ -585,14 +604,16 @@ pub struct RunFunction {
     /// Example: `0x842ed41fad9640a2ad08fdd7d3e4f7f505319aac7d67e1c0dd6a7cce8732c7e3::message::set_message`
     #[clap(long)]
     pub(crate) function_id: MemberId,
-    /// Hex encoded arguments separated by spaces.
+    /// Arguments combined with their type separated by spaces.
     ///
-    /// Example: `0x01 0x02 0x03`
+    /// Supported types [u8, u64, u128, bool, hex, string, address]
+    ///
+    /// Example: `address:0x1 bool:true u8:0`
     #[clap(long, multiple_values = true)]
     pub(crate) args: Vec<ArgWithType>,
     /// TypeTag arguments separated by spaces.
     ///
-    /// Example: `u8 u64 u128 bool address vector true false signer`
+    /// Example: `u8 u64 u128 bool address vector signer`
     #[clap(long, multiple_values = true)]
     pub(crate) type_args: Vec<MoveType>,
 }
@@ -619,7 +640,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
         }
 
         self.txn_options
-            .submit_transaction(TransactionPayload::ScriptFunction(ScriptFunction::new(
+            .submit_transaction(TransactionPayload::EntryFunction(EntryFunction::new(
                 self.function_id.module_id.clone(),
                 self.function_id.member_id.clone(),
                 type_args,

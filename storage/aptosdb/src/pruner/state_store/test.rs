@@ -1,7 +1,8 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::config::StateMerklePrunerConfig;
+use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
+use proptest::{prelude::*, proptest};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -14,9 +15,10 @@ use storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 
 use crate::pruner::state_pruner_worker::StatePrunerWorker;
 use crate::stale_node_index::StaleNodeIndexSchema;
+use crate::test_helper::{arb_state_kv_sets, update_store};
 use crate::{
-    change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB, PrunerManager,
-    StatePrunerManager,
+    change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB, LedgerPrunerManager,
+    PrunerManager, StatePrunerManager,
 };
 
 fn put_value_set(
@@ -62,6 +64,21 @@ fn verify_state_in_store(
     assert_eq!(value.as_ref(), expected_value);
 }
 
+fn create_state_pruner_manager(
+    state_merkle_db: &Arc<DB>,
+    prune_batch_size: usize,
+) -> StatePrunerManager {
+    StatePrunerManager::new(
+        Arc::clone(state_merkle_db),
+        StateMerklePrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: prune_batch_size,
+            user_pruning_window_offset: 0,
+        },
+    )
+}
+
 #[test]
 fn test_state_store_pruner() {
     let key = StateKey::Raw(String::from("test_key1").into_bytes());
@@ -76,15 +93,6 @@ fn test_state_store_pruner() {
         1000,  /* snapshot_size_threshold, does not matter */
         false, /* hack_for_tests */
     );
-    let pruner = StatePrunerManager::new(
-        Arc::clone(&aptos_db.state_merkle_db),
-        StateMerklePrunerConfig {
-            enable: true,
-            prune_window: 0,
-            batch_size: prune_batch_size,
-            user_pruning_window_offset: 0,
-        },
-    );
 
     let mut root_hashes = vec![];
     // Insert 25 values in the db.
@@ -98,8 +106,10 @@ fn test_state_store_pruner() {
         ));
     }
 
-    // Prune till version=0. This should basically be a no-op
+    // Prune till version=0. This should basically be a no-op. Create a new pruner everytime to
+    // test the min_readable_version initialization logic.
     {
+        let pruner = create_state_pruner_manager(&aptos_db.state_merkle_db, prune_batch_size);
         pruner.wake_and_wait_pruner(0 /* latest_version */).unwrap();
         for i in 0..num_versions {
             verify_state_in_store(
@@ -112,8 +122,10 @@ fn test_state_store_pruner() {
     }
 
     // Notify the pruner to update the version to be 10 - since we use a batch size of 10,
-    // we expect versions 0 to 9 to be pruned.
+    // we expect versions 0 to 9 to be pruned. Create a new pruner everytime to test the
+    // min_readable_version initialization logic.
     {
+        let pruner = create_state_pruner_manager(&aptos_db.state_merkle_db, prune_batch_size);
         pruner
             .wake_and_wait_pruner(prune_batch_size as u64 /* latest_version */)
             .unwrap();
@@ -164,15 +176,6 @@ fn test_state_store_pruner_partial_version() {
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
     let state_store = &aptos_db.state_store;
-    let pruner = StatePrunerManager::new(
-        Arc::clone(&aptos_db.state_merkle_db),
-        StateMerklePrunerConfig {
-            enable: true,
-            prune_window: 0,
-            batch_size: prune_batch_size,
-            user_pruning_window_offset: 0,
-        },
-    );
 
     let _root0 = put_value_set(
         &aptos_db.ledger_db,
@@ -196,8 +199,10 @@ fn test_state_store_pruner_partial_version() {
         2, /* version */
     );
 
-    // Prune till version=0. This should basically be a no-op
+    // Prune till version=0. This should basically be a no-op. Create a new pruner every time
+    // to test the min_readable_version initialization logic.
     {
+        let pruner = create_state_pruner_manager(&aptos_db.state_merkle_db, prune_batch_size);
         pruner.wake_and_wait_pruner(0 /* latest_version */).unwrap();
         verify_state_in_store(state_store, key1.clone(), Some(&value1), 1);
         verify_state_in_store(state_store, key2.clone(), Some(&value2_update), 1);
@@ -205,8 +210,10 @@ fn test_state_store_pruner_partial_version() {
     }
 
     // Test for batched pruning, since we use a batch size of 1, updating the latest version to 1
-    // should prune 1 stale node with the version 0.
+    // should prune 1 stale node with the version 0. Create a new pruner everytime to test the
+    // min_readable_version initialization logic.
     {
+        let pruner = create_state_pruner_manager(&aptos_db.state_merkle_db, prune_batch_size);
         assert!(pruner.wake_and_wait_pruner(1 /* latest_version */,).is_ok());
         assert!(state_store
             .get_state_value_with_proof_by_version(&key1, 0_u64)
@@ -216,8 +223,10 @@ fn test_state_store_pruner_partial_version() {
         verify_state_in_store(state_store, key2.clone(), Some(&value2_update), 1);
         verify_state_in_store(state_store, key3.clone(), Some(&value3), 1);
     }
-    // Prune 3 more times. All version 0 and 1 stale nodes should be gone.
+    // Prune 3 more times. All version 0 and 1 stale nodes should be gone. Create a new pruner
+    // everytime to test the min_readable_version initialization logic.
     {
+        let pruner = create_state_pruner_manager(&aptos_db.state_merkle_db, prune_batch_size);
         assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
         assert!(pruner.wake_and_wait_pruner(2 /* latest_version */,).is_ok());
 
@@ -309,7 +318,7 @@ fn test_worker_quit_eagerly() {
 
     let tmp_dir = TempPath::new();
     let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let db = aptos_db.ledger_db;
+    let db = Arc::clone(&aptos_db.ledger_db);
     let state_store = &aptos_db.state_store;
 
     let _root0 = put_value_set(
@@ -350,5 +359,62 @@ fn test_worker_quit_eagerly() {
         verify_state_in_store(state_store, key.clone(), Some(&value0), 0);
         verify_state_in_store(state_store, key.clone(), Some(&value1), 1);
         verify_state_in_store(state_store, key, Some(&value2), 2);
+    }
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(10))]
+
+    #[test]
+    fn test_state_value_pruner(
+        input in arb_state_kv_sets(10, 5, 5),
+    ) {
+        verify_state_value_pruner(input);
+    }
+}
+
+fn verify_state_value_pruner(inputs: Vec<Vec<(StateKey, Option<StateValue>)>>) {
+    let tmp_dir = TempPath::new();
+    let db = AptosDB::new_for_test(&tmp_dir);
+    let store = &db.state_store;
+
+    let mut version = 0;
+    let mut current_state_values = HashMap::new();
+    let pruner = LedgerPrunerManager::new(
+        Arc::clone(&db.ledger_db),
+        Arc::clone(store),
+        LedgerPrunerConfig {
+            enable: true,
+            prune_window: 0,
+            batch_size: 1,
+            user_pruning_window_offset: 0,
+        },
+    );
+    for batch in inputs {
+        update_store(store, batch.clone().into_iter(), version);
+        for (k, v) in batch.iter() {
+            if let Some(old_v_opt) = current_state_values.insert(k.clone(), v.clone()) {
+                pruner
+                    .wake_and_wait_pruner(version as u64 /* latest_version */)
+                    .unwrap();
+                if version > 0 {
+                    verify_state_value(vec![(k, &old_v_opt)].into_iter(), version - 1, store, true);
+                }
+            }
+            verify_state_value(current_state_values.iter(), version, store, false);
+            version += 1;
+        }
+    }
+}
+
+fn verify_state_value<'a, I: Iterator<Item = (&'a StateKey, &'a Option<StateValue>)>>(
+    kvs: I,
+    version: Version,
+    state_store: &Arc<StateStore>,
+    pruned: bool,
+) {
+    for (k, v) in kvs {
+        let v_from_db = state_store.get_state_value_by_version(k, version).unwrap();
+        assert_eq!(&v_from_db, if pruned { &None } else { v });
     }
 }

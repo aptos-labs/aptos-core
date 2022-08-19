@@ -1,11 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use proptest::{
-    collection::{hash_map, vec},
-    prelude::*,
-    sample::Index,
-};
+use proptest::{collection::hash_map, prelude::*};
 
 use aptos_jellyfish_merkle::{restore::StateSnapshotRestore, TreeReader};
 use aptos_temppath::TempPath;
@@ -14,6 +10,7 @@ use aptos_types::{
 };
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader, DbWriter, StateSnapshotReceiver};
 
+use crate::test_helper::{arb_state_kv_sets, update_store};
 use crate::{pruner::state_store::StateMerklePruner, AptosDB};
 
 use super::*;
@@ -48,7 +45,7 @@ fn prune_stale_indices(
     limit: usize,
 ) -> Version {
     state_pruner
-        .prune_state_store(
+        .prune_state_merkle(
             min_readable_version,
             target_min_readable_version,
             limit,
@@ -254,7 +251,6 @@ fn test_stale_node_index() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
 
     // Update.
     // ```text
@@ -299,6 +295,7 @@ fn test_stale_node_index() {
     // Prune with limit = 2 and target_min_readable_version = 2, two entries with
     // stale_since_version = 1 will be pruned. min_readable_version will be promoted to 1.
     {
+        let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
         assert_eq!(
             prune_stale_indices(
                 &pruner, 0, /* min_readable_version */
@@ -319,6 +316,7 @@ fn test_stale_node_index() {
     // stale_since_version = 2 will be pruned. Min readable version will change even though there
     // is one more entry with stale_since_version = 2 remaining.
     {
+        let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
         assert_eq!(
             prune_stale_indices(
                 &pruner, 1, /* min_readable_version */
@@ -340,6 +338,7 @@ fn test_stale_node_index() {
     // stale_since_version = 2 will be pruned. Min_readable_version will change since there is
     // one more entry with stale_since_version = 2 remaining.
     {
+        let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
         assert_eq!(
             prune_stale_indices(
                 &pruner, 1, /* min_readable_version */
@@ -374,7 +373,6 @@ fn test_stale_node_index_with_target_version() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
 
     // Update.
     // ```text
@@ -417,8 +415,10 @@ fn test_stale_node_index_with_target_version() {
 
     // Verify.
     // Prune with limit = 2 and target_min_readable_version = 1, two entries with
-    // stale_since_version = 1 will be pruned. min_readable_version will be promoted to 1.
+    // stale_since_version = 1 will be pruned. min_readable_version will be promoted to 1. Create a
+    // new pruner everytime to test the min_readable_version initialization logic.
     {
+        let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
         assert_eq!(
             prune_stale_indices(
                 &pruner, 0, /* min_readable_version */
@@ -444,8 +444,10 @@ fn test_stale_node_index_with_target_version() {
         verify_value_and_proof(store, key3.clone(), Some(&value3), 1, root1);
     }
     // Prune with limit = 1 and target_min_readable_version = 1, entries with
-    // stale_since_version = 2 will not be pruned.
+    // stale_since_version = 2 will not be pruned. Create a new pruner everytime to test the
+    // min_readable_version initialization logic.
     {
+        let pruner = StateMerklePruner::new(Arc::clone(&db.state_merkle_db));
         assert_eq!(
             prune_stale_indices(
                 &pruner, 1, /* min_readable_version */
@@ -765,20 +767,7 @@ proptest! {
 
     #[test]
     fn test_get_usage(
-        input in (
-            vec(any::<StateKey>(), 10),
-            vec(vec((any::<Index>(), any::<StateValue>()), 1..5), 1..5)
-        ).prop_map(|(keys, input)| {
-            input
-            .into_iter()
-            .map(|kvs|
-                kvs
-                .into_iter()
-                .map(|(idx, value)| (idx.get(&keys).clone(), value))
-                .collect::<Vec<_>>()
-            )
-            .collect::<Vec<_>>()
-        }),
+        input in arb_state_kv_sets(10, 5, 5)
     ) {
         let tmp_dir = TempPath::new();
         let db = AptosDB::new_for_test(&tmp_dir);
@@ -834,32 +823,5 @@ proptest! {
 
 // Initializes the state store by inserting one key at each version.
 fn init_store(store: &StateStore, input: impl Iterator<Item = (StateKey, StateValue)>) {
-    update_store(store, input, 0);
-}
-
-fn update_store(
-    store: &StateStore,
-    input: impl Iterator<Item = (StateKey, StateValue)>,
-    first_version: Version,
-) -> HashValue {
-    let mut root_hash = *SPARSE_MERKLE_PLACEHOLDER_HASH;
-    for (i, (key, value)) in input.enumerate() {
-        let value_state_set = vec![(key, Some(value))].into_iter().collect();
-        let jmt_updates = jmt_updates(&value_state_set);
-        let version = first_version + i as Version;
-        root_hash = store
-            .merklize_value_set(
-                jmt_update_refs(&jmt_updates),
-                None,
-                version,
-                version.checked_sub(1),
-            )
-            .unwrap();
-        let mut cs = ChangeSet::new();
-        store
-            .put_value_sets(vec![&value_state_set], version, &mut cs)
-            .unwrap();
-        store.ledger_db.write_schemas(cs.batch).unwrap();
-    }
-    root_hash
+    update_store(store, input.into_iter().map(|(k, v)| (k, Some(v))), 0);
 }

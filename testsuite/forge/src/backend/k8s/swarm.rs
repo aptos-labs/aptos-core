@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::interface::system_metrics::{query_prometheus_system_metrics, SystemMetricsThreshold};
 use crate::{
     chaos, check_for_container_restart, create_k8s_client, get_free_port, get_stateful_set_image,
     node::K8sNode,
@@ -82,7 +83,7 @@ impl K8sSwarm {
         let prom_client = match prometheus::get_prometheus_client() {
             Ok(p) => Some(p),
             Err(e) => {
-                info!("Could not build prometheus client: {}", e);
+                error!("Could not build prometheus client: {}", e);
                 None
             }
         };
@@ -161,6 +162,9 @@ impl Swarm for K8sSwarm {
             .get(version)
             .cloned()
             .ok_or_else(|| anyhow!("Invalid version: {:?}", version))?;
+        // stop the validator first so there is no race on the upgrade
+        validator.stop().await?;
+        // set the image tag of the StatefulSet spec while there are 0 replicas
         set_stateful_set_image_tag(
             validator.stateful_set_name().to_string(),
             // the container name for the validator in its StatefulSet is "validator"
@@ -294,6 +298,28 @@ impl Swarm for K8sSwarm {
             return query_with_metadata(c, query, time, timeout, labels_map).await;
         }
         bail!("No prom client");
+    }
+
+    async fn ensure_healthy_system_metrics(
+        &mut self,
+        start_time: i64,
+        end_time: i64,
+        threshold: SystemMetricsThreshold,
+    ) -> Result<()> {
+        if let Some(c) = &self.prom_client {
+            let system_metrics = query_prometheus_system_metrics(
+                c,
+                start_time,
+                end_time,
+                30.0,
+                &self.kube_namespace,
+            )
+            .await?;
+            threshold.ensure_threshold(&system_metrics)?;
+            Ok(())
+        } else {
+            bail!("No prom client");
+        }
     }
 }
 
