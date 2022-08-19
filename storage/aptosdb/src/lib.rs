@@ -63,6 +63,7 @@ use aptos_crypto::hash::HashValue;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_rocksdb_options::gen_rocksdb_options;
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{new_block_event_key, NewBlockEvent},
@@ -283,8 +284,15 @@ impl AptosDB {
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.state_merkle_pruner_config,
         );
+        let state_store = Arc::new(StateStore::new(
+            Arc::clone(&arc_ledger_rocksdb),
+            Arc::clone(&arc_state_merkle_rocksdb),
+            target_snapshot_size,
+            hack_for_tests,
+        ));
         let ledger_pruner = LedgerPrunerManager::new(
             Arc::clone(&arc_ledger_rocksdb),
+            Arc::clone(&state_store),
             pruner_config.ledger_pruner_config,
         );
 
@@ -293,12 +301,7 @@ impl AptosDB {
             state_merkle_db: Arc::clone(&arc_state_merkle_rocksdb),
             event_store: Arc::new(EventStore::new(Arc::clone(&arc_ledger_rocksdb))),
             ledger_store: Arc::new(LedgerStore::new(Arc::clone(&arc_ledger_rocksdb))),
-            state_store: Arc::new(StateStore::new(
-                Arc::clone(&arc_ledger_rocksdb),
-                Arc::clone(&arc_state_merkle_rocksdb),
-                target_snapshot_size,
-                hack_for_tests,
-            )),
+            state_store,
             system_store: Arc::new(SystemStore::new(Arc::clone(&arc_ledger_rocksdb))),
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&arc_ledger_rocksdb))),
             state_pruner,
@@ -350,13 +353,13 @@ impl AptosDB {
                     &gen_rocksdb_options(&rocksdb_configs.ledger_db_config, false),
                     ledger_db_path.clone(),
                     "ledger_db",
-                    gen_ledger_cfds(),
+                    gen_ledger_cfds(&rocksdb_configs.ledger_db_config),
                 )?,
                 DB::open_cf(
                     &gen_rocksdb_options(&rocksdb_configs.state_merkle_db_config, false),
                     state_merkle_db_path.clone(),
                     "state_merkle_db",
-                    gen_state_merkle_cfds(),
+                    gen_state_merkle_cfds(&rocksdb_configs.state_merkle_db_config),
                 )?,
             )
         };
@@ -730,6 +733,7 @@ impl AptosDB {
         &self,
         txns_to_commit: &[TransactionToCommit],
         first_version: u64,
+        expected_state_db_usage: StateStorageUsage,
         cs: &mut ChangeSet,
     ) -> Result<HashValue> {
         let last_version = first_version + txns_to_commit.len() as u64 - 1;
@@ -744,8 +748,12 @@ impl AptosDB {
                 .iter()
                 .map(|txn_to_commit| txn_to_commit.state_updates())
                 .collect::<Vec<_>>();
-            self.state_store
-                .put_value_sets(state_updates_vec, first_version, cs)?;
+            self.state_store.put_value_sets(
+                state_updates_vec,
+                first_version,
+                expected_state_db_usage,
+                cs,
+            )?;
         }
 
         // Event updates. Gather event accumulator root hashes.
@@ -1381,6 +1389,15 @@ impl DbReader for AptosDB {
     fn indexer_enabled(&self) -> bool {
         self.indexer.is_some()
     }
+
+    fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
+        gauged_api("get_state_storage_usage", || {
+            if let Some(v) = version {
+                error_if_version_is_pruned(&self.ledger_pruner, "state storage usage", v)?;
+            }
+            self.state_store.get_usage(version)
+        })
+    }
 }
 
 impl DbWriter for AptosDB {
@@ -1428,8 +1445,12 @@ impl DbWriter for AptosDB {
             // Gather db mutations to `batch`.
             let mut cs = ChangeSet::new();
 
-            let new_root_hash =
-                self.save_transactions_impl(txns_to_commit, first_version, &mut cs)?;
+            let new_root_hash = self.save_transactions_impl(
+                txns_to_commit,
+                first_version,
+                latest_in_memory_state.current.usage(),
+                &mut cs,
+            )?;
 
             // If expected ledger info is provided, verify result root hash and save the ledger info.
             if let Some(x) = ledger_info_with_sigs {
@@ -1625,7 +1646,11 @@ impl DbWriter for AptosDB {
 
             // Delete the genesis transaction
             StateMerklePruner::prune_genesis(self.state_merkle_db.clone(), &mut change_set)?;
-            LedgerPruner::prune_genesis(self.ledger_db.clone(), &mut change_set)?;
+            LedgerPruner::prune_genesis(
+                self.ledger_db.clone(),
+                self.state_store.clone(),
+                &mut change_set,
+            )?;
 
             // Apply the change set writes to the database (atomically) and update in-memory state
             self.ledger_db.clone().write_schemas(change_set.batch)?;

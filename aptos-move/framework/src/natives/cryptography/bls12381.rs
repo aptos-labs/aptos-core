@@ -252,7 +252,7 @@ impl GasParameters {
  * Otherwise, if only num_validatable_pubkeys deserialize correctly, an extra per_pubkey_deserialize_cost
  * must be charged for the failed deserialization.
  **************************************************************************************************/
-fn native_bls12381_aggregate_pop_verified_pubkeys(
+fn native_bls12381_aggregate_pubkeys(
     gas_params: &GasParameters,
     _context: &mut NativeContext,
     _ty_args: Vec<Type>,
@@ -647,10 +647,7 @@ pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, Nati
         // BLS over BLS12-381
         (
             "aggregate_pubkeys_internal",
-            make_native_from_func(
-                gas_params.clone(),
-                native_bls12381_aggregate_pop_verified_pubkeys,
-            ),
+            make_native_from_func(gas_params.clone(), native_bls12381_aggregate_pubkeys),
         ),
         (
             "aggregate_signatures_internal",

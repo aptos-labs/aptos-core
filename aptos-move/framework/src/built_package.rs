@@ -13,7 +13,6 @@ use move_deps::move_package::source_package::manifest_parser::{
 };
 use move_deps::move_package::BuildConfig;
 use serde::{Deserialize, Serialize};
-use serde_bytes::ByteBuf;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -115,7 +114,8 @@ impl BuiltPackage {
         let mut modules = vec![];
         for u in &self.package.root_compiled_units {
             let name = u.unit.name().to_string();
-            let source = zip_metadata(std::fs::read_to_string(&u.source_path)?.as_bytes())?;
+            let source = std::fs::read_to_string(&u.source_path)?;
+            let source = zip_metadata(source.as_bytes())?;
             let source_map = zip_metadata(&u.unit.serialize_source_map())?;
             modules.push(ModuleMetadata {
                 name,
@@ -124,12 +124,16 @@ impl BuiltPackage {
             })
         }
         let error_map = if let Some(map) = &self.error_map {
-            bcs::to_bytes(map).expect("bcs for error map")
+            zip_metadata(&bcs::to_bytes(map).expect("bcs for error map"))?
         } else {
-            vec![]
+            String::new()
         };
         let abis = if let Some(abis) = &self.package.compiled_abis {
-            abis.iter().map(|(_, a)| ByteBuf::from(a.clone())).collect()
+            let mut r = vec![];
+            for (_, a) in abis {
+                r.push(zip_metadata(a)?)
+            }
+            r
         } else {
             vec![]
         };

@@ -141,6 +141,23 @@ pub static ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+// Async committer gauges:
+pub(crate) static LATEST_SNAPSHOT_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_storage_latest_state_snapshot_version",
+        "The version of the most recent snapshot."
+    )
+    .unwrap()
+});
+
+pub(crate) static LATEST_CHECKPOINT_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_storage_latest_state_checkpoint_version",
+        "The version of the most recent committed checkpoint."
+    )
+    .unwrap()
+});
+
 // Backup progress gauges:
 
 pub(crate) static BACKUP_EPOCH_ENDING_EPOCH: Lazy<IntGauge> = Lazy::new(|| {

@@ -6,7 +6,7 @@ use crate::{
     peer::Peer,
     protocols::wire::{
         handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
-        messaging::v1::{NetworkMessage, NetworkMessageSink},
+        messaging::v1::{MultiplexMessage, MultiplexMessageSink},
     },
     testutils::fake_socket::ReadOnlyTestSocketVec,
     transport::{Connection, ConnectionId, ConnectionMetadata},
@@ -22,21 +22,21 @@ use netcore::transport::ConnectionOrigin;
 use proptest::{arbitrary::any, collection::vec};
 use std::time::Duration;
 
-/// Generate a sequence of `NetworkMessage`, bcs serialize them, and write them
+/// Generate a sequence of `MultiplexMessage`, bcs serialize them, and write them
 /// out to a buffer using our length-prefixed message codec.
 pub fn generate_corpus(gen: &mut ValueGenerator) -> Vec<u8> {
-    let network_msgs = gen.generate(vec(any::<NetworkMessage>(), 1..20));
+    let network_msgs = gen.generate(vec(any::<MultiplexMessage>(), 1..20));
 
     let (write_socket, mut read_socket) = MemorySocket::new_pair();
-    let mut writer = NetworkMessageSink::new(write_socket, constants::MAX_FRAME_SIZE, None);
+    let mut writer = MultiplexMessageSink::new(write_socket, constants::MAX_FRAME_SIZE, None);
 
-    // Write the `NetworkMessage`s to a fake socket
+    // Write the `MultiplexMessage`s to a fake socket
     let f_send = async move {
         for network_msg in &network_msgs {
             writer.send(network_msg).await.unwrap();
         }
     };
-    // Read the serialized `NetworkMessage`s from the fake socket
+    // Read the serialized `MultiplexMessage`s from the fake socket
     let f_recv = async move {
         let mut buf = Vec::new();
         read_socket.read_to_end(&mut buf).await.unwrap();
@@ -106,6 +106,7 @@ pub fn fuzz(data: &[u8]) {
         constants::MAX_CONCURRENT_INBOUND_RPCS,
         constants::MAX_CONCURRENT_OUTBOUND_RPCS,
         constants::MAX_FRAME_SIZE,
+        constants::MAX_MESSAGE_SIZE,
         None,
         None,
     );

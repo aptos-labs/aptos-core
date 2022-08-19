@@ -162,6 +162,9 @@ impl Swarm for K8sSwarm {
             .get(version)
             .cloned()
             .ok_or_else(|| anyhow!("Invalid version: {:?}", version))?;
+        // stop the validator first so there is no race on the upgrade
+        validator.stop().await?;
+        // set the image tag of the StatefulSet spec while there are 0 replicas
         set_stateful_set_image_tag(
             validator.stateful_set_name().to_string(),
             // the container name for the validator in its StatefulSet is "validator"

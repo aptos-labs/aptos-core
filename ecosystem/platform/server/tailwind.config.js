@@ -36,6 +36,9 @@ module.exports = {
         mono: ["lft-etica-mono", ...defaultTheme.fontFamily.mono],
         display: ["apparat-semicond", ...defaultTheme.fontFamily.sans],
       },
+      fontWeight: {
+        normal: 300,
+      },
       screens: {
         'max-sm': {'max': '767px'},
       }

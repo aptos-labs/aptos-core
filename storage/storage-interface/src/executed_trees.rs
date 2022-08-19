@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::{hash::TransactionAccumulatorHasher, HashValue};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::StateViewId;
 use aptos_types::{proof::accumulator::InMemoryAccumulator, transaction::Version};
 use std::sync::Arc;
@@ -60,11 +61,13 @@ impl ExecutedTrees {
 
     pub fn new_at_state_checkpoint(
         state_root_hash: HashValue,
+        state_usage: StateStorageUsage,
         frozen_subtrees_in_accumulator: Vec<HashValue>,
         num_leaves_in_accumulator: u64,
     ) -> Self {
         let state = StateDelta::new_at_checkpoint(
             state_root_hash,
+            state_usage,
             num_leaves_in_accumulator.checked_sub(1),
         );
         let transaction_accumulator = Arc::new(

@@ -18,8 +18,8 @@ use aptos_types::{
     contract_event::ContractEvent,
     state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
-        ExecutionStatus, Module as TransactionModule, RawTransaction, Script as TransactionScript,
-        ScriptFunction as TransactionScriptFunction, Transaction, TransactionOutput,
+        EntryFunction as TransactionEntryFunction, ExecutionStatus, Module as TransactionModule,
+        RawTransaction, Script as TransactionScript, Transaction, TransactionOutput,
         TransactionStatus,
     },
 };
@@ -284,7 +284,7 @@ fn panic_missing_private_key(cmd_name: &str) -> ! {
 static PRECOMPILED_APTOS_FRAMEWORK: Lazy<FullyCompiledProgram> = Lazy::new(|| {
     let deps = vec![PackagePaths {
         name: None,
-        paths: framework::head_release_bundle().files().unwrap(),
+        paths: cached_packages::head_release_bundle().files().unwrap(),
         named_address_map: framework::named_addresses().clone(),
     }];
     let program_res = move_compiler::construct_pre_compiled_lib(
@@ -774,7 +774,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         extra_args: Self::ExtraRunArgs,
     ) -> Result<(Option<String>, SerializedReturnValues)> {
         if extra_args.script {
-            panic!("Script functions are not supported.")
+            panic!("Entry functions are not supported.")
         }
 
         if signers.len() != 1 {
@@ -800,10 +800,10 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             extra_args.gas_unit_price,
             gas_budget,
         )?;
-        let txn = RawTransaction::new_script_function(
+        let txn = RawTransaction::new_entry_function(
             signer,
             params.sequence_number,
-            TransactionScriptFunction::new(
+            TransactionEntryFunction::new(
                 module.clone(),
                 function.to_owned(),
                 type_args,
@@ -872,7 +872,6 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     0,
                     block_cmd.time,
                     proposer,
-                    Some(0),
                     vec![],
                     vec![],
                     block_cmd.time,

@@ -90,36 +90,49 @@ set_forge_namespace() {
     FORGE_NAMESPACE=${FORGE_NAMESPACE:0:64}
 }
 
-# Set an image tag to use
-set_image_tag() {
+# Either: (1) confirms the given $IMAGE_TAG exists, or (2) searches the git history to set:
+#  LATEST_IMAGE_TAG -- the latest built image
+#  SECOND_LATEST_IMAGE_TAG -- the second latest built image
+get_image_tags() {
     echo "Ensure image exists"
-    # if IMAGE_TAG not set, check the last few commits on HEAD
-    if [ -z "$IMAGE_TAG" ]; then
-        echo "IMAGE_TAG not set, trying the latest commits before HEAD"
-        commit_threshold=5
-        for i in $(seq 0 $commit_threshold); do
-            IMAGE_TAG_DEFAULT=$(git rev-parse HEAD~$i)
-            echo "Trying tag: ${IMAGE_TAG_DEFAULT}"
-            git --no-pager log --format=%B -n 1 $IMAGE_TAG_DEFAULT
-            img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG_DEFAULT 2>/dev/null)
-            if [ "$?" -eq 0 ]; then
-                echo "Image tag exists. Using tag: ${IMAGE_TAG_DEFAULT}"
-                IMAGE_TAG=$IMAGE_TAG_DEFAULT
-                return 0
-            fi
-        done
-        # if IMAGE_TAG still not set after checking HEAD,
-        if [ -z "$IMAGE_TAG" ]; then
-            echo "None of the last ${commit_threshold} commits have been built and pushed"
-            exit 1
-        fi
-    else
+    if [ -n "$IMAGE_TAG" ]; then
         img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG 2>/dev/null)
         if [ "$?" -ne 0 ]; then
             echo "IMAGE_TAG does not exist in ECR: ${IMAGE_TAG}. Make sure your commit has been pushed to GitHub previously."
             echo "If you're trying to run the code from your PR, apply the label 'CICD:build-images' and wait for the builds to finish."
-            exit 1
+            echo
+            echo "Attempting to find the latest commits before HEAD that have been built..."
+            echo
         fi
+    fi
+    commit_threshold=20
+    # get the LATEST_IMAGE_TAG
+    for i in $(seq 0 $commit_threshold); do
+        IMAGE_TAG_DEFAULT=$(git rev-parse HEAD~$i)
+        echo "Trying tag: ${IMAGE_TAG_DEFAULT}"
+        git --no-pager log --format=%B -n 1 $IMAGE_TAG_DEFAULT
+        img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG_DEFAULT 2>/dev/null)
+        if [ "$?" -eq 0 ]; then
+            LATEST_IMAGE_TAG=$IMAGE_TAG_DEFAULT
+            break
+        fi
+    done
+    # get the SECOND_LATEST_IMAGE_TAG
+    for i in $(seq 1 $commit_threshold); do
+        # start at the latest built image tag, and search backwards from there
+        IMAGE_TAG_DEFAULT=$(git rev-parse $LATEST_IMAGE_TAG~$i)
+        echo "Trying tag: ${IMAGE_TAG_DEFAULT}"
+        git --no-pager log --format=%B -n 1 $IMAGE_TAG_DEFAULT
+        img=$(aws ecr describe-images --repository-name="aptos/validator" --image-ids=imageTag=$IMAGE_TAG_DEFAULT 2>/dev/null)
+        if [ "$?" -eq 0 ]; then
+            SECOND_LATEST_IMAGE_TAG=$IMAGE_TAG_DEFAULT
+            break
+        fi
+    done
+    # if IMAGE_TAG still not set after checking HEAD,
+    if [ -z "$LATEST_IMAGE_TAG" ]; then
+        echo "None of the last ${commit_threshold} commits have been built and pushed"
+        exit 1
     fi
 }
 
@@ -174,11 +187,29 @@ set_forge_namespace
 
 HUMIO_LOGS_LINK="https://cloud.us.humio.com/k8s/search?query=%24forgeLogs%28validator_instance%3Dvalidator-0%29%20%7C%20$FORGE_NAMESPACE%20&live=true&start=24h&widgetType=list-view&columns=%5B%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22%40timestamp%22%2C%22format%22%3A%22timestamp%22%2C%22width%22%3A180%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22level%22%2C%22format%22%3A%22text%22%2C%22width%22%3A54%7D%2C%7B%22type%22%3A%22link%22%2C%22openInNewBrowserTab%22%3Atrue%2C%22style%22%3A%22button%22%2C%22hrefTemplate%22%3A%22https%3A%2F%2Fgithub.com%2Faptos-labs%2Faptos-core%2Fpull%2F%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22textTemplate%22%3A%22%7B%7Bfields%5B%5C%22github_pr%5C%22%5D%7D%7D%22%2C%22header%22%3A%22Forge%20PR%22%2C%22width%22%3A79%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.namespace%22%2C%22format%22%3A%22text%22%2C%22width%22%3A104%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.pod_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A126%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22k8s.container_name%22%2C%22format%22%3A%22text%22%2C%22width%22%3A85%7D%2C%7B%22type%22%3A%22field%22%2C%22fieldName%22%3A%22message%22%2C%22format%22%3A%22text%22%7D%5D&newestAtBottom=true&showOnlyFirstLine=false"
 
-# set the image tag in IMAGE_TAG
-set_image_tag
-if [ -z "$UPGRADE_IMAGE_TAG" ]; then
-    UPGRADE_IMAGE_TAG=$IMAGE_TAG
+get_image_tags
+
+echo "Calculated image tags:"
+echo "  latest: $LATEST_IMAGE_TAG"
+echo "  second latest: $SECOND_LATEST_IMAGE_TAG"
+
+# Set the relative image tags for each components, dependent on the test suite
+if [ "$FORGE_TEST_SUITE" = "compat" ]; then
+    # if we're doing compat tests, start at the second latest, and upgrade to the latest
+    FORGE_IMAGE_TAG=${FORGE_IMAGE_TAG:-$LATEST_IMAGE_TAG}
+    IMAGE_TAG=${IMAGE_TAG:-$SECOND_LATEST_IMAGE_TAG}
+    UPGRADE_IMAGE_TAG=${UPGRADE_IMAGE_TAG:-$LATEST_IMAGE_TAG}
+else
+    # otherwise, start at the latest always
+    FORGE_IMAGE_TAG=${FORGE_IMAGE_TAG:-$LATEST_IMAGE_TAG}
+    IMAGE_TAG=${IMAGE_TAG:-$LATEST_IMAGE_TAG}
+    UPGRADE_IMAGE_TAG=${UPGRADE_IMAGE_TAG:-$LATEST_IMAGE_TAG}
 fi
+
+echo "Testing image tags:"
+echo "  forge: $FORGE_IMAGE_TAG"
+echo "  base: $IMAGE_TAG"
+echo "  upgrade (if applicable): $UPGRADE_IMAGE_TAG"
 
 # set the o11y resource locations in
 # ES_DEFAULT_INDEX, ES_BASE_URL, GRAFANA_BASE_URL
@@ -242,6 +273,7 @@ elif [ "$FORGE_RUNNER_MODE" = "k8s" ]; then
         -e "s/{FORGE_TEST_SUITE}/${FORGE_TEST_SUITE}/g" \
         -e "s/{FORGE_RUNNER_DURATION_SECS}/${FORGE_RUNNER_DURATION_SECS}/g" \
         -e "s/{FORGE_RUNNER_TPS_THRESHOLD}/${FORGE_RUNNER_TPS_THRESHOLD}/g" \
+        -e "s/{FORGE_IMAGE_TAG}/${FORGE_IMAGE_TAG}/g" \
         -e "s/{IMAGE_TAG}/${IMAGE_TAG}/g" \
         -e "s/{UPGRADE_IMAGE_TAG}/${UPGRADE_IMAGE_TAG}/g" \
         -e "s/{AWS_ACCOUNT_NUM}/${AWS_ACCOUNT_NUM}/g" \

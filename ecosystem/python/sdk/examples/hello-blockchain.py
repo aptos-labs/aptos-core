@@ -21,7 +21,7 @@ from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.bcs import Serializer
 from aptos_sdk.client import FaucetClient, RestClient
 from aptos_sdk.transactions import (
-    ScriptFunction,
+    EntryFunction,
     TransactionArgument,
     TransactionPayload,
 )
@@ -41,7 +41,7 @@ class HelloBlockchainClient(RestClient):
     def set_message(self, contract_address: str, sender: Account, message: str) -> str:
         """Potentially initialize and set the resource message::MessageHolder::message"""
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             f"0x{contract_address}::message",
             "set_message",
             [],

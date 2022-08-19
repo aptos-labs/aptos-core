@@ -10,14 +10,14 @@ use crate::pruner::db_pruner::DBPruner;
 use crate::pruner::ledger_pruner_worker::LedgerPrunerWorker;
 use crate::pruner::ledger_store::ledger_store_pruner::LedgerPruner;
 use crate::pruner::pruner_manager::PrunerManager;
-use crate::utils;
+use crate::{utils, StateStore};
 use aptos_types::transaction::Version;
 use schemadb::DB;
 use std::{sync::Arc, thread::JoinHandle};
 
 /// The `PrunerManager` for `LedgerPruner`.
 #[derive(Debug)]
-pub struct LedgerPrunerManager {
+pub(crate) struct LedgerPrunerManager {
     pruner_enabled: bool,
     /// DB version window, which dictates how many version of other stores like transaction, ledger
     /// info, events etc to keep.
@@ -128,10 +128,12 @@ impl PrunerManager for LedgerPrunerManager {
 
 impl LedgerPrunerManager {
     /// Creates a worker thread that waits on a channel for pruning commands.
-    pub fn new(ledger_rocksdb: Arc<DB>, ledger_pruner_config: LedgerPrunerConfig) -> Self {
-        let ledger_db_clone = Arc::clone(&ledger_rocksdb);
-
-        let ledger_pruner = utils::create_ledger_pruner(ledger_db_clone);
+    pub fn new(
+        ledger_rocksdb: Arc<DB>,
+        state_store: Arc<StateStore>,
+        ledger_pruner_config: LedgerPrunerConfig,
+    ) -> Self {
+        let ledger_pruner = utils::create_ledger_pruner(ledger_rocksdb, state_store);
 
         if ledger_pruner_config.enable {
             PRUNER_WINDOW

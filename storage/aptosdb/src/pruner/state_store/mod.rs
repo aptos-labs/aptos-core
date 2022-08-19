@@ -18,6 +18,7 @@ use std::sync::{
     Arc,
 };
 
+pub(crate) mod state_value_pruner;
 #[cfg(test)]
 mod test;
 
@@ -48,7 +49,7 @@ impl DBPruner for StateMerklePruner {
         let min_readable_version = self.min_readable_version.load(Ordering::Relaxed);
         let target_version = self.target_version();
 
-        return match self.prune_state_store(min_readable_version, target_version, batch_size, None)
+        return match self.prune_state_merkle(min_readable_version, target_version, batch_size, None)
         {
             Ok(new_min_readable_version) => Ok(new_min_readable_version),
             Err(e) => {
@@ -126,7 +127,7 @@ impl StateMerklePruner {
 
         let min_readable_version = state_pruner.min_readable_version.load(Ordering::Relaxed);
         let target_version = state_pruner.target_version();
-        state_pruner.prune_state_store(
+        state_pruner.prune_state_merkle(
             min_readable_version,
             target_version,
             max_version,
@@ -139,7 +140,7 @@ impl StateMerklePruner {
     // If the existing schema batch is not none, this function only adds items need to be
     // deleted to the schema batch and the caller is responsible for committing the schema batches
     // to the DB.
-    pub fn prune_state_store(
+    pub fn prune_state_merkle(
         &self,
         min_readable_version: Version,
         target_version: Version,

@@ -25,7 +25,7 @@ pub struct ReleaseOptions {
     #[clap(long)]
     pub rust_bindings: Vec<String>,
     /// The path to the file where to place the release bundle.
-    #[clap(long, default_value = "release.mrb", parse(from_os_str))]
+    #[clap(long, default_value = "head.mrb", parse(from_os_str))]
     pub output: PathBuf,
 }
 
