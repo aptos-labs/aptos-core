@@ -7,7 +7,7 @@ use proptest::prelude::*;
 
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_state_view::StateViewId;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -129,7 +129,7 @@ fn gen_ledger_info(
         ),
         HashValue::zero(),
     );
-    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
 }
 
 #[test]

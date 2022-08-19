@@ -75,6 +75,7 @@ Rails.application.routes.draw do
 
   # Static pages
   get 'community', to: 'static_page#community'
+  get 'incentivized-testnet', to: 'static_page#incentivized_testnet'
   get 'terms', to: 'static_page#terms'
   get 'terms-testnet', to: 'static_page#terms_testnet'
   get 'privacy', to: 'static_page#privacy'

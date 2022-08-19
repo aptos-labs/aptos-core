@@ -272,7 +272,7 @@ impl ConsensusSyncNotification {
 mod tests {
     use crate::{ConsensusNotification, ConsensusNotificationSender, Error};
     use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
-    use aptos_types::multi_signature::MultiSignature;
+    use aptos_types::aggregate_signature::AggregateSignature;
     use aptos_types::{
         account_address::AccountAddress,
         block_info::BlockInfo,
@@ -449,7 +449,7 @@ mod tests {
     fn create_ledger_info() -> LedgerInfoWithSignatures {
         LedgerInfoWithSignatures::new(
             LedgerInfo::new(BlockInfo::empty(), HashValue::zero()),
-            MultiSignature::empty(),
+            AggregateSignature::empty(),
         )
     }
 

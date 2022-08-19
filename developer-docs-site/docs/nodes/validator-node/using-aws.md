@@ -76,7 +76,7 @@ Make sure you complete these pre-requisite steps before you proceed:
       region        = <aws region>  # Specify the region
       # zone_id     = "<Route53 zone id>"  # zone id for Route53 if you want to use DNS
       era           = 1              # bump era number to wipe the chain
-      chain_id      = 40
+      chain_id      = 43
       image_tag     = "testnet" # Specify the image tag to use
       validator_name = "<Name of your Validator>"
     }
