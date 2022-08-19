@@ -121,24 +121,13 @@ impl GasParameters {
                 },
             },
             aggregator: aggregator::GasParameters {
-                add: aggregator::AddGasParameters {
-                    base_cost: 0.into(),
-                },
-                read: aggregator::ReadGasParameters {
-                    base_cost: 0.into(),
-                },
-                sub: aggregator::SubGasParameters {
-                    base_cost: 0.into(),
-                },
-                destroy: aggregator::DestroyGasParameters {
-                    base_cost: 0.into(),
-                },
+                add: aggregator::AddGasParameters { base: 0.into() },
+                read: aggregator::ReadGasParameters { base: 0.into() },
+                sub: aggregator::SubGasParameters { base: 0.into() },
+                destroy: aggregator::DestroyGasParameters { base: 0.into() },
             },
             aggregator_factory: aggregator_factory::GasParameters {
-                new_aggregator: aggregator_factory::NewAggregatorGasParameters {
-                    base_cost: 0.into(),
-                    unit_cost: 0.into(),
-                },
+                new_aggregator: aggregator_factory::NewAggregatorGasParameters { base: 0.into() },
             },
         }
     }

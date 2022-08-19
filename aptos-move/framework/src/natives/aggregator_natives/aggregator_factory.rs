@@ -5,7 +5,7 @@ use aptos_aggregator::aggregator_extension::AggregatorID;
 use aptos_crypto::hash::DefaultHasher;
 use move_deps::{
     move_binary_format::errors::PartialVMResult,
-    move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes},
+    move_core_types::gas_algebra::InternalGas,
     move_vm_runtime::native_functions::{NativeContext, NativeFunction},
     move_vm_types::{
         loaded_data::runtime_types::Type,
@@ -22,13 +22,12 @@ use crate::natives::aggregator_natives::{helpers::get_handle, NativeAggregatorCo
 /***************************************************************************************************
  * native fun new_aggregator(aggregator_factory: &mut AggregatorFactory, limit: u128): Aggregator;
  *
- *   gas cost: base_cost + unit_cost * data_length
+ *   gas cost: base_cost
  *
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct NewAggregatorGasParameters {
-    pub base_cost: InternalGas,
-    pub unit_cost: InternalGasPerByte,
+    pub base: InternalGas,
 }
 
 fn native_new_aggregator(
@@ -68,11 +67,8 @@ fn native_new_aggregator(
     let id = AggregatorID::new(handle, key);
     aggregator_data.create_new_aggregator(id, limit);
 
-    // NOTE(Gas): O(1) cost: simple creation of a new value and taking a hash.
-    let cost = gas_params.base_cost + gas_params.unit_cost * NumBytes::new(bytes.len() as u64);
-
     Ok(NativeResult::ok(
-        cost,
+        gas_params.base,
         smallvec![Value::struct_(Struct::pack(vec![
             Value::u128(handle),
             Value::u128(key),

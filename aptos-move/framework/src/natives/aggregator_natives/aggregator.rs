@@ -29,7 +29,7 @@ use crate::natives::aggregator_natives::{
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct AddGasParameters {
-    pub base_cost: InternalGas,
+    pub base: InternalGas,
 }
 
 fn native_add(
@@ -53,10 +53,7 @@ fn native_add(
 
     aggregator.add(value)?;
 
-    // NOTE(Gas): O(1) cost: simple addition.
-    let cost = gas_params.base_cost;
-
-    Ok(NativeResult::ok(cost, smallvec![]))
+    Ok(NativeResult::ok(gas_params.base, smallvec![]))
 }
 
 pub fn make_native_add(gas_params: AddGasParameters) -> NativeFunction {
@@ -71,7 +68,7 @@ pub fn make_native_add(gas_params: AddGasParameters) -> NativeFunction {
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct ReadGasParameters {
-    pub base_cost: InternalGas,
+    pub base: InternalGas,
 }
 
 fn native_read(
@@ -94,11 +91,10 @@ fn native_read(
 
     let value = aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
 
-    // NOTE(Gas): O(1) cost: serialization/deserialization and potential
-    // resolving to storage.
-    let cost = gas_params.base_cost;
-
-    Ok(NativeResult::ok(cost, smallvec![Value::u128(value)]))
+    Ok(NativeResult::ok(
+        gas_params.base,
+        smallvec![Value::u128(value)],
+    ))
 }
 
 pub fn make_native_read(gas_params: ReadGasParameters) -> NativeFunction {
@@ -113,7 +109,7 @@ pub fn make_native_read(gas_params: ReadGasParameters) -> NativeFunction {
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct SubGasParameters {
-    pub base_cost: InternalGas,
+    pub base: InternalGas,
 }
 
 fn native_sub(
@@ -142,10 +138,7 @@ fn native_sub(
     aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
     aggregator.sub(value)?;
 
-    // NOTE(Gas): O(1) cost: simple subtraction.
-    let cost = gas_params.base_cost;
-
-    Ok(NativeResult::ok(cost, smallvec![]))
+    Ok(NativeResult::ok(gas_params.base, smallvec![]))
 }
 
 pub fn make_native_sub(gas_params: SubGasParameters) -> NativeFunction {
@@ -160,7 +153,7 @@ pub fn make_native_sub(gas_params: SubGasParameters) -> NativeFunction {
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct DestroyGasParameters {
-    pub base_cost: InternalGas,
+    pub base: InternalGas,
 }
 
 fn native_destroy(
@@ -183,10 +176,7 @@ fn native_destroy(
     let id = AggregatorID::new(handle, key);
     aggregator_data.remove_aggregator(id);
 
-    // NOTE(Gas): O(1) cost: simple destruction of a small struct.
-    let cost = gas_params.base_cost;
-
-    Ok(NativeResult::ok(cost, smallvec![]))
+    Ok(NativeResult::ok(gas_params.base, smallvec![]))
 }
 
 pub fn make_native_destroy(gas_params: DestroyGasParameters) -> NativeFunction {

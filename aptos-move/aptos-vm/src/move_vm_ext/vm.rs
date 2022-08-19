@@ -7,9 +7,8 @@ use crate::{
 };
 use aptos_gas::NativeGasParameters;
 use framework::natives::{
-    state_storage::NativeStateStorageContext
     aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
-    transaction_context::NativeTransactionContext,
+    state_storage::NativeStateStorageContext, transaction_context::NativeTransactionContext,
 };
 use move_deps::{
     move_binary_format::errors::VMResult,
