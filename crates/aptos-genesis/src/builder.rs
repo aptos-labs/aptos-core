@@ -9,6 +9,7 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_config::config::RocksDbStorageConfig;
+use aptos_config::keys::ConfigKey;
 use aptos_config::{
     config::{
         DiscoveryMethod, Identity, IdentityBlob, InitialSafetyRulesConfig, NetworkConfig,
@@ -49,6 +50,7 @@ pub struct ValidatorNodeConfig {
     pub name: String,
     pub config: NodeConfig,
     pub dir: PathBuf,
+    pub account_private_key: Option<ConfigKey<Ed25519PrivateKey>>,
     pub genesis_stake_amount: u64,
 }
 
@@ -69,6 +71,7 @@ impl ValidatorNodeConfig {
             name,
             config,
             dir,
+            account_private_key: None,
             genesis_stake_amount,
         })
     }
@@ -76,7 +79,8 @@ impl ValidatorNodeConfig {
     /// Initializes keys and identities for a validator config
     /// TODO: Put this all in storage rather than files?
     fn init_keys(&mut self, seed: Option<[u8; 32]>) -> anyhow::Result<()> {
-        self.get_key_objects(seed)?;
+        let (validator_identity, _, _, _) = self.get_key_objects(seed)?;
+        self.account_private_key = validator_identity.account_private_key.map(ConfigKey::new);
 
         // Init network identity
         let validator_network = self.config.validator_network.as_mut().unwrap();
