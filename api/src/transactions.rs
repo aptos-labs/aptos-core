@@ -275,12 +275,16 @@ impl TransactionsApi {
             .map_err(BasicErrorWith404::internal)
             .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
 
-        BasicResponse::try_from_rust_value((
-            self.render_transactions(data)?,
-            &latest_ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+        match accept_type {
+            AcceptType::Json => BasicResponse::try_from_json((
+                self.render_transactions(data)?,
+                &latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+            AcceptType::Bcs => {
+                BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 
     fn render_transactions<E: InternalError>(
