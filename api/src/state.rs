@@ -188,11 +188,6 @@ impl StateApi {
         name: IdentifierWrapper,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveModuleBytecode> {
-        // TODO: Determine what is needed to deserialize the storage type
-        if accept_type == &AcceptType::Bcs {
-            return Err(anyhow!("BCS is not supported for get module"))
-                .map_err(BasicErrorWith404::bad_request);
-        }
         let module_id = ModuleId::new(address.into(), name.into());
         let access_path = AccessPath::code_access_path(module_id.clone());
         let state_key = StateKey::AccessPath(access_path);
@@ -203,17 +198,19 @@ impl StateApi {
             .map_err(BasicErrorWith404::internal)?
             .ok_or_else(|| build_not_found("Module", module_id, ledger_version))?;
 
-        let module = MoveModuleBytecode::new(bytes)
-            .try_parse_abi()
-            .context("Failed to parse move module ABI from bytes retrieved from storage")
-            .map_err(BasicErrorWith404::internal)?;
+        match accept_type {
+            AcceptType::Json => {
+                let module = MoveModuleBytecode::new(bytes)
+                    .try_parse_abi()
+                    .context("Failed to parse move module ABI from bytes retrieved from storage")
+                    .map_err(BasicErrorWith404::internal)?;
 
-        BasicResponse::try_from_rust_value((
-            module,
-            &ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+                BasicResponse::try_from_json((module, &ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => {
+                BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 
     pub fn table_item(

@@ -647,6 +647,24 @@ impl Client {
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
+    pub async fn get_account_module(
+        &self,
+        address: AccountAddress,
+        module_name: &str,
+    ) -> Result<Response<MoveModuleBytecode>> {
+        let url = self.build_path(&format!("accounts/{}/module/{}", address, module_name))?;
+        self.get(url).await
+    }
+
+    pub async fn get_account_module_bcs(
+        &self,
+        address: AccountAddress,
+        module_name: &str,
+    ) -> Result<Response<bytes::Bytes>> {
+        let url = self.build_path(&format!("accounts/{}/module/{}", address, module_name))?;
+        self.get_bcs(url).await
+    }
+
     pub async fn get_account_events(
         &self,
         address: AccountAddress,
