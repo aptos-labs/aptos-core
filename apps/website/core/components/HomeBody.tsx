@@ -15,7 +15,7 @@ const HomeBody = () => (
         {COMPANY_NAME_WITH_WALLET}
       </Text>
       <Text textAlign="center" fontWeight={600} fontSize={['4xl', '5xl', '6xl']} marginTop="0px !important">
-        Your tool to explore the world
+        Your tool to explore Aptos
       </Text>
       <Center>
         <HStack>
