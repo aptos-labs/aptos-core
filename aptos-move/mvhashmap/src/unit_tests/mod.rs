@@ -42,7 +42,7 @@ fn add_for(txn_idx: usize, limit: u128) -> DeltaOp {
 // Generate determinitc subtractions.
 fn sub_for(txn_idx: usize) -> DeltaOp {
     DeltaOp::Subtraction {
-        value: txn_idx as u128,
+        value: 5 * txn_idx as u128,
     }
 }
 
@@ -82,7 +82,7 @@ fn create_write_read_placeholder_struct() {
 
     // Reads have to go traverse deltas until a write is found.
     let r_sum = mvtbl.read(&ap1, 14);
-    assert_eq!(Ok(Resolved(u128_for(10, 1) + 11 + 12 - 13)), r_sum);
+    assert_eq!(Ok(Resolved(u128_for(10, 1) + 11 + 12 - 5 * 13)), r_sum);
 
     // More writes.
     mvtbl.add_write(&ap1, (12, 0), value_for(12, 0));
@@ -90,7 +90,7 @@ fn create_write_read_placeholder_struct() {
 
     // Verify reads.
     let r_12 = mvtbl.read(&ap1, 15);
-    assert_eq!(Ok(Resolved(u128_for(12, 0) - 13)), r_12);
+    assert_eq!(Ok(Resolved(u128_for(12, 0) - 5 * 13)), r_12);
     let r_10 = mvtbl.read(&ap1, 11);
     assert_eq!(Ok(Version((10, 1), arc_value_for(10, 1))), r_10);
     let r_8 = mvtbl.read(&ap1, 10);
@@ -131,7 +131,7 @@ fn create_write_read_placeholder_struct() {
     // Reads from ap1 and ap3 go to db.
     let r_db = mvtbl.read(&ap1, 30);
     assert_eq!(
-        Err(Unresolved(DeltaOp::Subtraction { value: 13 - 11 })),
+        Err(Unresolved(DeltaOp::Subtraction { value: 5 * 13 - 11 })),
         r_db
     );
     let r_db = mvtbl.read(&ap3, 30);
@@ -143,4 +143,15 @@ fn create_write_read_placeholder_struct() {
     // Read entry by txn 10 at ap2.
     let r_10 = mvtbl.read(&ap2, 15);
     assert_eq!(Ok(Version((10, 2), arc_value_for(10, 2))), r_10);
+
+    // Both delta-write and delte-delta application failures are detected.
+    mvtbl.add_delta(&ap1, 30, add_for(30, 32));
+    mvtbl.add_delta(&ap1, 31, add_for(31, 32));
+    let r_33 = mvtbl.read(&ap1, 33);
+    assert_eq!(Err(DeltaApplicationFailure), r_33);
+
+    mvtbl.add_write(&ap2, (10, 3), value_for(10, 3));
+    mvtbl.add_delta(&ap2, 30, sub_for(30));
+    let r_31 = mvtbl.read(&ap2, 31);
+    assert_eq!(Err(DeltaApplicationFailure), r_31);
 }
