@@ -3,7 +3,6 @@
 
 #![forbid(unsafe_code)]
 
-use crate::telemetry_log_sender::TelemetryLogSender;
 use crate::{
     build_information::create_build_info_telemetry_event,
     constants::{
@@ -17,6 +16,7 @@ use crate::{
     network_metrics::create_network_metric_telemetry_event,
     sender::TelemetrySender,
     system_information::create_system_info_telemetry_event,
+    telemetry_log_sender::TelemetryLogSender,
 };
 use aptos_config::config::NodeConfig;
 use aptos_logger::prelude::*;

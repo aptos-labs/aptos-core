@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics;
+use crate::metrics::{increment_log_ingest_failures_by, increment_log_ingest_successes_by};
 use anyhow::{anyhow, Error};
 use aptos_config::config::NodeConfig;
 use aptos_crypto::{
@@ -68,9 +69,11 @@ impl TelemetrySender {
             let result = self.post_logs(json.as_bytes()).await;
             match result {
                 Ok(_) => {
+                    increment_log_ingest_successes_by(batch.len() as u64);
                     debug!("Sent log of length: {}", len);
                 }
                 Err(error) => {
+                    increment_log_ingest_failures_by(batch.len() as u64);
                     error!("Failed send log of length: {} with error: {}", len, error);
                 }
             }

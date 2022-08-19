@@ -1,8 +1,10 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::metrics::increment_log_ingest_too_large_by;
 use crate::sender::TelemetrySender;
 use aptos_config::config::NodeConfig;
+use aptos_logger::prelude::*;
 use aptos_types::chain_id::ChainId;
 use futures::channel::mpsc;
 use futures::StreamExt;
@@ -30,9 +32,11 @@ impl TelemetryLogSender {
         }
     }
 
-    pub async fn handle_next_buf(&mut self, log: String) {
+    pub async fn handle_next_log(&mut self, log: String) {
         if log.len() > self.max_bytes {
-            todo!() // TODO: drop
+            warn!("Log ignored, size: {}", log.len());
+            increment_log_ingest_too_large_by(1);
+            return;
         }
 
         self.current_bytes += log.len();
@@ -52,8 +56,8 @@ impl TelemetryLogSender {
     pub async fn start(mut self, mut rx: mpsc::Receiver<String>) {
         loop {
             tokio::select! {
-                Some(buf) = rx.next() => {
-                    self.handle_next_buf(buf).await;
+                Some(log) = rx.next() => {
+                    self.handle_next_log(log).await;
                 }
             }
         }

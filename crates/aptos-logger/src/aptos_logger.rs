@@ -11,8 +11,6 @@ use crate::{
         STRUCT_LOG_PARSE_ERROR_COUNT, STRUCT_LOG_QUEUE_ERROR_COUNT, STRUCT_LOG_SEND_ERROR_COUNT,
     },
     logger::Logger,
-    prelude::{sample, SampleRate},
-    sample::Sampling,
     struct_log::TcpWriter,
     Event, Filter, Key, Level, LevelFilter, Metadata,
 };
@@ -32,7 +30,6 @@ use std::{
     str::FromStr,
     sync::{self, Arc},
     thread,
-    time::Duration,
 };
 use strum_macros::EnumString;
 
