@@ -3,5 +3,5 @@
 
 #![forbid(unsafe_code)]
 
-pub use framework::aptos_stdlib;
+pub use cached_packages::aptos_stdlib;
 pub mod error_explain;

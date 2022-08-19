@@ -75,7 +75,7 @@ async fn test_account_modules() {
 // Unstable due to framework changes
 #[ignore]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_get_module_with_script_functions() {
+async fn test_get_module_with_entry_functions() {
     let mut context = new_test_context(current_function_name!());
     let address = "0x1";
 

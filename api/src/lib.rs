@@ -46,7 +46,7 @@ pub enum ApiTags {
 }
 
 // Note: Many of these exports are just for the test-context crate, which is
-// needed outside of the API, e.g. for sf-stream.
+// needed outside of the API, e.g. for fh-stream.
 pub use context::Context;
 pub use response::BasicError;
 pub use runtime::{attach_poem_to_runtime, bootstrap, get_api_service};

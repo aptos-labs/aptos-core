@@ -123,7 +123,7 @@ impl LocalSwarm {
         let (root_key, genesis, genesis_waypoint, validators) =
             aptos_genesis::builder::Builder::new(
                 &dir_actual,
-                genesis_framework.unwrap_or_else(|| framework::head_release_bundle().clone()),
+                genesis_framework.unwrap_or_else(|| cached_packages::head_release_bundle().clone()),
             )?
             .with_num_validators(number_of_validators)
             .with_init_config(Some(Arc::new(
@@ -162,8 +162,7 @@ impl LocalSwarm {
         let mut validators = validators
             .into_iter()
             .map(|v| {
-                let node =
-                    LocalNode::new(version.to_owned(), v.name, v.dir, v.account_private_key)?;
+                let node = LocalNode::new(version.to_owned(), v.name, v.dir)?;
                 Ok((node.peer_id(), node))
             })
             .collect::<Result<HashMap<_, _>>>()?;
@@ -244,7 +243,7 @@ impl LocalSwarm {
     }
 
     async fn wait_for_startup(&mut self) -> Result<()> {
-        let num_attempts = 10;
+        let num_attempts = 30;
         let mut done = vec![false; self.validators.len()];
         for i in 0..num_attempts {
             info!("Wait for startup attempt: {} of {}", i, num_attempts);
@@ -324,7 +323,6 @@ impl LocalSwarm {
             version.to_owned(),
             fullnode_config.name,
             fullnode_config.dir,
-            None,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -352,7 +350,6 @@ impl LocalSwarm {
             version.to_owned(),
             fullnode_config.name,
             fullnode_config.dir,
-            None,
         )?;
 
         let peer_id = fullnode.peer_id();
@@ -380,16 +377,11 @@ impl LocalSwarm {
     }
 
     pub fn validators(&self) -> impl Iterator<Item = &LocalNode> {
-        // sort by id to keep the order stable:
-        let mut validators: Vec<&LocalNode> = self.validators.values().collect();
-        validators.sort_by_key(|v| v.name().parse::<i32>().unwrap());
-        validators.into_iter()
+        self.validators.values()
     }
 
     pub fn validators_mut(&mut self) -> impl Iterator<Item = &mut LocalNode> {
-        let mut validators: Vec<&mut LocalNode> = self.validators.values_mut().collect();
-        validators.sort_by_key(|v| v.name().parse::<i32>().unwrap());
-        validators.into_iter()
+        self.validators.values_mut()
     }
 
     pub fn fullnode(&self, peer_id: PeerId) -> Option<&LocalNode> {

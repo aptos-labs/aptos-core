@@ -31,7 +31,7 @@ console.log("Faucet URL", FAUCET_URL);
   console.log(`account2 coins: ${balance}. Should be 0!`);
 
   const payload: Types.TransactionPayload = {
-    type: "script_function_payload",
+    type: "entry_function_payload",
     function: "0x1::coin::transfer",
     type_arguments: ["0x1::aptos_coin::AptosCoin"],
     arguments: [account2.address().hex(), "717"],

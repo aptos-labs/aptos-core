@@ -22,7 +22,7 @@ from aptos_sdk.account_address import AccountAddress
 from aptos_sdk.bcs import Serializer
 from aptos_sdk.client import FaucetClient, RestClient
 from aptos_sdk.transactions import (
-    ScriptFunction,
+    EntryFunction,
     TransactionArgument,
     TransactionPayload,
 )
@@ -35,7 +35,7 @@ class CoinClient(RestClient):
     def initialize_coin(self, sender: Account) -> Optional[str]:
         """Initialize a new coin with the given coin type."""
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x1::managed_coin",
             "initialize",
             [TypeTag(StructTag.from_str(f"{sender.address()}::moon_coin::MoonCoin"))],
@@ -55,7 +55,7 @@ class CoinClient(RestClient):
         """Register the receiver account to receive transfers for the new coin."""
 
         print(f"{coin_address}::moon_coin::MoonCoin")
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x1::managed_coin",
             "register",
             [TypeTag(StructTag.from_str(f"{coin_address}::moon_coin::MoonCoin"))],
@@ -71,7 +71,7 @@ class CoinClient(RestClient):
     ) -> str:
         """Register the receiver account to receive transfers for the new coin."""
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x1::managed_coin",
             "mint",
             [TypeTag(StructTag.from_str(f"{minter.address()}::moon_coin::MoonCoin"))],

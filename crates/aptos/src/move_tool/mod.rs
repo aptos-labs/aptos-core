@@ -31,7 +31,7 @@ use aptos_module_verifier::module_init::verify_module_init_function;
 use aptos_rest_client::aptos_api_types::MoveType;
 use aptos_transactional_test_harness::run_aptos_test;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::{ModuleBundle, ScriptFunction, TransactionPayload};
+use aptos_types::transaction::{EntryFunction, ModuleBundle, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
 use framework::{BuildOptions, BuiltPackage};
@@ -640,7 +640,7 @@ impl CliCommand<TransactionSummary> for RunFunction {
         }
 
         self.txn_options
-            .submit_transaction(TransactionPayload::ScriptFunction(ScriptFunction::new(
+            .submit_transaction(TransactionPayload::EntryFunction(EntryFunction::new(
                 self.function_id.module_id.clone(),
                 self.function_id.member_id.clone(),
                 type_args,

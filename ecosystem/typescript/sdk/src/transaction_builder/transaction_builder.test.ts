@@ -15,14 +15,14 @@ import {
   ModuleBundle,
   RawTransaction,
   Script,
-  ScriptFunction,
+  EntryFunction,
   StructTag,
   TransactionArgumentAddress,
   TransactionArgumentU8,
   TransactionArgumentU8Vector,
   TransactionPayloadModuleBundle,
   TransactionPayloadScript,
-  TransactionPayloadScriptFunction,
+  TransactionPayloadEntryFunction,
   TypeTagStruct,
 } from "./aptos_types";
 
@@ -61,9 +61,9 @@ test("throws when preparing signing message with invalid payload", () => {
   }).toThrow("Unknown transaction type.");
 });
 
-test("serialize script function payload with no type args", () => {
-  const scriptFunctionPayload = new TransactionPayloadScriptFunction(
-    ScriptFunction.natural(
+test("serialize entry function payload with no type args", () => {
+  const entryFunctionPayload = new TransactionPayloadEntryFunction(
+    EntryFunction.natural(
       `${ADDRESS_1}::aptos_coin`,
       "transfer",
       [],
@@ -74,7 +74,7 @@ test("serialize script function payload with no type args", () => {
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(new HexString(ADDRESS_3)),
     0n,
-    scriptFunctionPayload,
+    entryFunctionPayload,
     2000n,
     0n,
     BigInt(TXN_EXPIRE),
@@ -88,11 +88,11 @@ test("serialize script function payload with no type args", () => {
   );
 });
 
-test("serialize script function payload with type args", () => {
+test("serialize entry function payload with type args", () => {
   const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::aptos_coin::AptosCoin`));
 
-  const scriptFunctionPayload = new TransactionPayloadScriptFunction(
-    ScriptFunction.natural(
+  const entryFunctionPayload = new TransactionPayloadEntryFunction(
+    EntryFunction.natural(
       `${ADDRESS_1}::coin`,
       "transfer",
       [token],
@@ -103,7 +103,7 @@ test("serialize script function payload with type args", () => {
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS_3),
     0n,
-    scriptFunctionPayload,
+    entryFunctionPayload,
     2000n,
     0n,
     BigInt(TXN_EXPIRE),
@@ -117,17 +117,17 @@ test("serialize script function payload with type args", () => {
   );
 });
 
-test("serialize script function payload with type args but no function args", () => {
+test("serialize entry function payload with type args but no function args", () => {
   const token = new TypeTagStruct(StructTag.fromString(`${ADDRESS_4}::aptos_coin::AptosCoin`));
 
-  const scriptFunctionPayload = new TransactionPayloadScriptFunction(
-    ScriptFunction.natural(`${ADDRESS_1}::coin`, "fake_func", [token], []),
+  const entryFunctionPayload = new TransactionPayloadEntryFunction(
+    EntryFunction.natural(`${ADDRESS_1}::coin`, "fake_func", [token], []),
   );
 
   const rawTxn = new RawTransaction(
     AccountAddress.fromHex(ADDRESS_3),
     0n,
-    scriptFunctionPayload,
+    entryFunctionPayload,
     2000n,
     0n,
     BigInt(TXN_EXPIRE),

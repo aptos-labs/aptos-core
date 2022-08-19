@@ -9,9 +9,9 @@ use aptos_indexer::{
     token_processor::TokenTransactionProcessor,
 };
 use aptos_sdk::types::LocalAccount;
+use cached_packages::aptos_stdlib::aptos_token_stdlib;
 use diesel::connection::Connection;
 use forge::{AptosPublicInfo, Result, Swarm};
-use framework::aptos_stdlib::aptos_token_stdlib;
 use std::sync::Arc;
 
 use crate::smoke_test_environment::new_local_swarm_with_aptos;

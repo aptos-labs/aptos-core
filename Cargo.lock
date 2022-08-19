@@ -167,6 +167,7 @@ dependencies = [
  "async-trait",
  "base64 0.13.0",
  "bcs",
+ "cached-packages",
  "clap 3.2.16",
  "clap_complete",
  "dirs 4.0.0",
@@ -229,7 +230,6 @@ dependencies = [
  "aptos-mempool",
  "aptos-metrics-core",
  "aptos-proptest-helpers",
- "aptos-runtime",
  "aptos-sdk",
  "aptos-secure-storage",
  "aptos-state-view",
@@ -297,6 +297,7 @@ dependencies = [
  "async-trait",
  "bcs",
  "bytes 1.2.1",
+ "cached-packages",
  "executor",
  "executor-types",
  "fail 0.5.0",
@@ -540,6 +541,54 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-fh-stream"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-api",
+ "aptos-api-test-context",
+ "aptos-api-types",
+ "aptos-bitvec",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-genesis",
+ "aptos-global-constants",
+ "aptos-logger",
+ "aptos-mempool",
+ "aptos-metrics-core",
+ "aptos-proptest-helpers",
+ "aptos-protos",
+ "aptos-sdk",
+ "aptos-secure-storage",
+ "aptos-temppath",
+ "aptos-types",
+ "aptos-vm",
+ "aptosdb",
+ "base64 0.13.0",
+ "bytes 1.2.1",
+ "executor",
+ "executor-types",
+ "fail 0.5.0",
+ "framework",
+ "futures",
+ "goldenfile",
+ "hex",
+ "hyper 0.14.20",
+ "mempool-notifications",
+ "move-deps",
+ "once_cell",
+ "prost",
+ "rand 0.7.3",
+ "regex",
+ "serde 1.0.141",
+ "serde_json",
+ "storage-interface",
+ "tokio 1.19.2",
+ "vm-validator",
+ "warp",
+]
+
+[[package]]
 name = "aptos-fuzz"
 version = "0.1.0"
 dependencies = [
@@ -612,6 +661,7 @@ dependencies = [
  "aptos-vm",
  "aptosdb",
  "bcs",
+ "cached-packages",
  "consensus-types",
  "executor",
  "framework",
@@ -807,13 +857,12 @@ dependencies = [
  "aptos-config",
  "aptos-crypto",
  "aptos-data-client",
+ "aptos-fh-stream",
  "aptos-genesis",
  "aptos-infallible",
  "aptos-logger",
  "aptos-mempool",
- "aptos-runtime",
  "aptos-secure-storage",
- "aptos-sf-stream",
  "aptos-state-view",
  "aptos-telemetry",
  "aptos-temppath",
@@ -823,6 +872,7 @@ dependencies = [
  "aptosdb",
  "backup-service",
  "bcs",
+ "cached-packages",
  "clap 3.2.16",
  "consensus",
  "consensus-notifications",
@@ -1017,7 +1067,6 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-node",
  "aptos-rest-client",
- "aptos-runtime",
  "aptos-sdk",
  "aptos-transaction-builder",
  "aptos-types",
@@ -1060,16 +1109,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aptos-runtime"
-version = "0.1.0"
-dependencies = [
- "aptos-metrics-core",
- "once_cell",
- "tokio 1.19.2",
- "tokio-metrics",
-]
-
-[[package]]
 name = "aptos-sdk"
 version = "0.0.3"
 dependencies = [
@@ -1089,6 +1128,7 @@ dependencies = [
  "anyhow",
  "aptos-types",
  "bcs",
+ "cached-packages",
  "framework",
  "heck 0.3.3",
  "move-deps",
@@ -1146,54 +1186,6 @@ dependencies = [
  "serde 1.0.141",
  "serde_json",
  "thiserror",
-]
-
-[[package]]
-name = "aptos-sf-stream"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-api",
- "aptos-api-test-context",
- "aptos-api-types",
- "aptos-bitvec",
- "aptos-config",
- "aptos-crypto",
- "aptos-genesis",
- "aptos-global-constants",
- "aptos-logger",
- "aptos-mempool",
- "aptos-metrics-core",
- "aptos-proptest-helpers",
- "aptos-protos",
- "aptos-sdk",
- "aptos-secure-storage",
- "aptos-temppath",
- "aptos-types",
- "aptos-vm",
- "aptosdb",
- "base64 0.13.0",
- "bytes 1.2.1",
- "executor",
- "executor-types",
- "fail 0.5.0",
- "framework",
- "futures",
- "goldenfile",
- "hex",
- "hyper 0.14.20",
- "mempool-notifications",
- "move-deps",
- "once_cell",
- "prost",
- "rand 0.7.3",
- "regex",
- "serde 1.0.141",
- "serde_json",
- "storage-interface",
- "tokio 1.19.2",
- "vm-validator",
- "warp",
 ]
 
 [[package]]
@@ -1321,7 +1313,7 @@ version = "0.0.3"
 dependencies = [
  "aptos-types",
  "bcs",
- "framework",
+ "cached-packages",
  "move-deps",
  "once_cell",
  "proptest",
@@ -1341,6 +1333,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs",
+ "cached-packages",
  "clap 3.2.16",
  "datatest-stable",
  "framework",
@@ -1472,6 +1465,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs",
+ "cached-packages",
  "framework",
  "handlebars",
  "move-deps",
@@ -2214,6 +2208,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1db59621ec70f09c5e9b597b220c7a2b43611f4710dc03ceb8748637775692c"
 
 [[package]]
+name = "cached-packages"
+version = "0.1.0"
+dependencies = [
+ "aptos-types",
+ "bcs",
+ "framework",
+ "include_dir 0.7.2",
+ "move-deps",
+ "once_cell",
+ "proptest",
+ "proptest-derive",
+ "tempfile",
+]
+
+[[package]]
 name = "cassowary"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2496,7 +2505,6 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
- "aptos-runtime",
  "aptos-secure-storage",
  "aptos-temppath",
  "aptos-types",
@@ -3321,6 +3329,7 @@ dependencies = [
  "aptos-vm",
  "aptos-writeset-generator",
  "bcs",
+ "cached-packages",
  "framework",
  "itertools",
  "language-e2e-tests",
@@ -3730,6 +3739,7 @@ dependencies = [
  "aptos-secure-storage",
  "aptos-transaction-builder",
  "async-trait",
+ "cached-packages",
  "either",
  "framework",
  "futures",
@@ -3765,6 +3775,7 @@ dependencies = [
  "aptos-rest-client",
  "aptos-sdk",
  "async-trait",
+ "cached-packages",
  "forge",
  "framework",
  "structopt 0.3.26",
@@ -4634,6 +4645,7 @@ version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "482a2e29200b7eed25d7fdbd14423326760b7f6658d21a4cf12d55a50713c69f"
 dependencies = [
+ "glob",
  "include_dir_macros",
 ]
 
@@ -4997,6 +5009,7 @@ dependencies = [
  "aptos-vm",
  "aptos-writeset-generator",
  "bcs",
+ "cached-packages",
  "framework",
  "goldenfile",
  "hex",
@@ -5026,6 +5039,7 @@ dependencies = [
  "aptos-vm",
  "aptos-writeset-generator",
  "bcs",
+ "cached-packages",
  "framework",
  "itertools",
  "language-e2e-tests",
@@ -8834,6 +8848,7 @@ dependencies = [
  "backup-cli",
  "base64 0.13.0",
  "bcs",
+ "cached-packages",
  "consensus",
  "diesel",
  "forge",
@@ -9506,17 +9521,6 @@ dependencies = [
  "proc-macro2 1.0.42",
  "quote 1.0.20",
  "syn 1.0.98",
-]
-
-[[package]]
-name = "tokio-metrics"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcb585a0069b53171684e22d5255984ec30d1c7304fd0a4a9a603ffd8c765cdd"
-dependencies = [
- "futures-util",
- "pin-project-lite 0.2.9",
- "tokio 1.19.2",
 ]
 
 [[package]]
@@ -10260,6 +10264,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bcs",
+ "cached-packages",
  "framework",
  "move-deps",
  "once_cell",

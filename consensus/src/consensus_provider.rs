@@ -15,7 +15,6 @@ use crate::{
 use aptos_config::config::NodeConfig;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_runtime::instrumented_runtime::instrument_tokio_runtime;
 use aptos_vm::AptosVM;
 use consensus_notifications::ConsensusNotificationSender;
 use event_notifications::ReconfigNotificationListener;
@@ -42,7 +41,6 @@ pub fn start_consensus(
         .enable_all()
         .build()
         .expect("Failed to create Tokio runtime!");
-    instrument_tokio_runtime(&runtime, "consensus");
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
     let txn_notifier = Arc::new(MempoolNotifier::new(
         consensus_to_mempool_sender.clone(),

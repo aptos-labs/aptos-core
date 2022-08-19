@@ -61,10 +61,10 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
 
   const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-  // TS SDK support 3 types of transaction payloads: `ScriptFunction`, `Script` and `Module`.
+  // TS SDK support 3 types of transaction payloads: `EntryFunction`, `Script` and `Module`.
   // See https://aptos-labs.github.io/ts-sdk-doc/ for the details.
-  const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-    TxnBuilderTypes.ScriptFunction.natural(
+  const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+    TxnBuilderTypes.EntryFunction.natural(
       // Fully qualified module name, `AccountAddress::ModuleName`
       "0x1::coin",
       // Module function
@@ -87,7 +87,7 @@ const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptosl
     // Transaction sender account address
     TxnBuilderTypes.AccountAddress.fromHex(mutisigAccountAddress),
     BigInt(sequenceNumber),
-    scriptFunctionPayload,
+    entryFunctionPayload,
     // Max gas unit to spend
     2000n,
     // Gas price per unit

@@ -9,7 +9,7 @@
 //! describes in greater detail how these messages are sent and received
 //! over-the-wire.
 
-use crate::protocols::wire::handshake::v1::ProtocolId;
+use crate::protocols::{stream::StreamMessage, wire::handshake::v1::ProtocolId};
 use aptos_rate_limiter::{async_lib::AsyncRateLimiter, rate_limit::SharedBucket};
 use bytes::Bytes;
 use futures::{
@@ -43,6 +43,25 @@ pub enum NetworkMessage {
     RpcRequest(RpcRequest),
     RpcResponse(RpcResponse),
     DirectSendMsg(DirectSendMsg),
+}
+
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+pub enum MultiplexMessage {
+    Message(NetworkMessage),
+    Stream(StreamMessage),
+}
+
+impl NetworkMessage {
+    /// The size of the raw data excluding the headers
+    pub fn data_len(&self) -> usize {
+        match self {
+            NetworkMessage::Error(_) => 0,
+            NetworkMessage::RpcRequest(request) => request.raw_request.len(),
+            NetworkMessage::RpcResponse(response) => response.raw_response.len(),
+            NetworkMessage::DirectSendMsg(message) => message.raw_msg.len(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
@@ -153,15 +172,15 @@ pub fn network_message_frame_codec(max_frame_size: usize) -> LengthDelimitedCode
         .new_codec()
 }
 
-/// A `Stream` of inbound `NetworkMessage`s read and deserialized from an
+/// A `Stream` of inbound `MultiplexMessage`s read and deserialized from an
 /// underlying socket.
 #[pin_project]
-pub struct NetworkMessageStream<TReadSocket: AsyncRead + Unpin> {
+pub struct MultiplexMessageStream<TReadSocket: AsyncRead + Unpin> {
     #[pin]
     framed_read: FramedRead<Compat<AsyncRateLimiter<TReadSocket>>, LengthDelimitedCodec>,
 }
 
-impl<TReadSocket: AsyncRead + Unpin> NetworkMessageStream<TReadSocket> {
+impl<TReadSocket: AsyncRead + Unpin> MultiplexMessageStream<TReadSocket> {
     pub fn new(socket: TReadSocket, max_frame_size: usize, bucket: Option<SharedBucket>) -> Self {
         let frame_codec = network_message_frame_codec(max_frame_size);
         let rate_limited_socket = AsyncRateLimiter::new(socket, bucket);
@@ -171,8 +190,8 @@ impl<TReadSocket: AsyncRead + Unpin> NetworkMessageStream<TReadSocket> {
     }
 }
 
-impl<TReadSocket: AsyncRead + Unpin> Stream for NetworkMessageStream<TReadSocket> {
-    type Item = Result<NetworkMessage, ReadError>;
+impl<TReadSocket: AsyncRead + Unpin> Stream for MultiplexMessageStream<TReadSocket> {
+    type Item = Result<MultiplexMessage, ReadError>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.project().framed_read.poll_next(cx) {
@@ -202,12 +221,12 @@ impl<TReadSocket: AsyncRead + Unpin> Stream for NetworkMessageStream<TReadSocket
 /// A `Sink` of outbound `NetworkMessage`s that will be serialized and sent over
 /// an underlying socket.
 #[pin_project]
-pub struct NetworkMessageSink<TWriteSocket: AsyncWrite> {
+pub struct MultiplexMessageSink<TWriteSocket: AsyncWrite> {
     #[pin]
     framed_write: FramedWrite<Compat<AsyncRateLimiter<TWriteSocket>>, LengthDelimitedCodec>,
 }
 
-impl<TWriteSocket: AsyncWrite> NetworkMessageSink<TWriteSocket> {
+impl<TWriteSocket: AsyncWrite> MultiplexMessageSink<TWriteSocket> {
     pub fn new(socket: TWriteSocket, max_frame_size: usize, bucket: Option<SharedBucket>) -> Self {
         let frame_codec = network_message_frame_codec(max_frame_size);
         let rate_limited_socket = AsyncRateLimiter::new(socket, bucket);
@@ -218,7 +237,7 @@ impl<TWriteSocket: AsyncWrite> NetworkMessageSink<TWriteSocket> {
 }
 
 #[cfg(test)]
-impl<TWriteSocket: AsyncWrite + Unpin> NetworkMessageSink<TWriteSocket> {
+impl<TWriteSocket: AsyncWrite + Unpin> MultiplexMessageSink<TWriteSocket> {
     pub async fn send_raw_frame(&mut self, frame: Bytes) -> Result<(), WriteError> {
         use futures::sink::SinkExt;
         self.framed_write
@@ -228,7 +247,7 @@ impl<TWriteSocket: AsyncWrite + Unpin> NetworkMessageSink<TWriteSocket> {
     }
 }
 
-impl<TWriteSocket: AsyncWrite> Sink<&NetworkMessage> for NetworkMessageSink<TWriteSocket> {
+impl<TWriteSocket: AsyncWrite> Sink<&MultiplexMessage> for MultiplexMessageSink<TWriteSocket> {
     type Error = WriteError;
 
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -238,7 +257,7 @@ impl<TWriteSocket: AsyncWrite> Sink<&NetworkMessage> for NetworkMessageSink<TWri
             .map_err(WriteError::IoError)
     }
 
-    fn start_send(self: Pin<&mut Self>, message: &NetworkMessage) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, message: &MultiplexMessage) -> Result<(), Self::Error> {
         let frame = bcs::to_bytes(message).map_err(WriteError::SerializeError)?;
         let frame = Bytes::from(frame);
 

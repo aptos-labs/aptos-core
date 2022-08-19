@@ -215,7 +215,7 @@ impl AptosVM {
         ))
     }
 
-    fn execute_script_or_script_function<S: MoveResolverExt>(
+    fn execute_script_or_entry_function<S: MoveResolverExt>(
         &self,
         mut session: SessionExt<S>,
         gas_meter: &mut AptosGasMeter,
@@ -223,7 +223,7 @@ impl AptosVM {
         payload: &TransactionPayload,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
-        fail_point!("move_adapter::execute_script_or_script_function", |_| {
+        fail_point!("move_adapter::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             ))
@@ -254,7 +254,7 @@ impl AptosVM {
                         gas_meter,
                     )
                 }
-                TransactionPayload::ScriptFunction(script_fn) => {
+                TransactionPayload::EntryFunction(script_fn) => {
                     let mut senders = vec![txn_data.sender()];
 
                     senders.extend(txn_data.secondary_signers());
@@ -498,8 +498,8 @@ impl AptosVM {
 
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
-            | payload @ TransactionPayload::ScriptFunction(_) => self
-                .execute_script_or_script_function(
+            | payload @ TransactionPayload::EntryFunction(_) => self
+                .execute_script_or_entry_function(
                     session,
                     &mut gas_meter,
                     &txn_data,
@@ -739,8 +739,8 @@ impl AptosVM {
                 self.0.check_gas(txn_data, log_context)?;
                 self.0.run_script_prologue(session, txn_data, log_context)
             }
-            TransactionPayload::ScriptFunction(_) => {
-                // NOTE: Script and ScriptFunction shares the same prologue
+            TransactionPayload::EntryFunction(_) => {
+                // NOTE: Script and EntryFunction shares the same prologue
                 self.0.check_gas(txn_data, log_context)?;
                 self.0.run_script_prologue(session, txn_data, log_context)
             }
@@ -966,8 +966,8 @@ impl AptosSimulationVM {
 
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
-            | payload @ TransactionPayload::ScriptFunction(_) => {
-                self.0.execute_script_or_script_function(
+            | payload @ TransactionPayload::EntryFunction(_) => {
+                self.0.execute_script_or_entry_function(
                     session,
                     &mut gas_meter,
                     &txn_data,
