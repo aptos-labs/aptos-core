@@ -8,10 +8,20 @@ mod proptest_types;
 #[derive(Debug, PartialEq)]
 struct Value(Vec<usize>);
 
-impl DeserializeU128 for Value {
-    fn deserialize(&self) -> Option<u128> {
-        let value = self.0.clone().into_iter().reduce(|a, b| a + b)?;
-        Some(value as u128)
+impl TransactionWrite for Value {
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+        let mut v: Vec<u8> = self.0.clone().into_iter().flat_map(|element| element.to_be_bytes()).collect();
+        v.resize(16, 0);
+        Some(v)
+    }
+}
+
+impl Value {
+    fn extract_u128(&self) -> u128 {
+        // TODO: re-use this function with other prop-tests.
+        let v = self.extract_raw_bytes().unwrap();
+        assert_eq!(v.len(), 16);
+        bcs::from_bytes(&v).unwrap()
     }
 }
 
@@ -28,7 +38,7 @@ fn arc_value_for(txn_idx: usize, incarnation: usize) -> Arc<Value> {
 
 // Convert value for txn_idx and incarnation into u128.
 fn u128_for(txn_idx: usize, incarnation: usize) -> u128 {
-    value_for(txn_idx, incarnation).deserialize().unwrap()
+    value_for(txn_idx, incarnation).extract_u128()
 }
 
 // Generate determinitc additions.
@@ -40,9 +50,9 @@ fn add_for(txn_idx: usize, limit: u128) -> DeltaOp {
 }
 
 // Generate determinitc subtractions.
-fn sub_for(txn_idx: usize) -> DeltaOp {
+fn sub_for(txn_idx: usize, base: u128) -> DeltaOp {
     DeltaOp::Subtraction {
-        value: 5 * txn_idx as u128,
+        value: base + (txn_idx as u128)
     }
 }
 
@@ -78,11 +88,11 @@ fn create_write_read_placeholder_struct() {
     // More deltas.
     mvtbl.add_delta(&ap1, 11, add_for(11, 1000));
     mvtbl.add_delta(&ap1, 12, add_for(12, 1000));
-    mvtbl.add_delta(&ap1, 13, sub_for(13));
+    mvtbl.add_delta(&ap1, 13, sub_for(13, 61));
 
     // Reads have to go traverse deltas until a write is found.
     let r_sum = mvtbl.read(&ap1, 14);
-    assert_eq!(Ok(Resolved(u128_for(10, 1) + 11 + 12 - 5 * 13)), r_sum);
+    assert_eq!(Ok(Resolved(u128_for(10, 1) + 11 + 12 - (61 + 13))), r_sum);
 
     // More writes.
     mvtbl.add_write(&ap1, (12, 0), value_for(12, 0));
@@ -90,7 +100,7 @@ fn create_write_read_placeholder_struct() {
 
     // Verify reads.
     let r_12 = mvtbl.read(&ap1, 15);
-    assert_eq!(Ok(Resolved(u128_for(12, 0) - 5 * 13)), r_12);
+    assert_eq!(Ok(Resolved(u128_for(12, 0) - (61 + 13))), r_12);
     let r_10 = mvtbl.read(&ap1, 11);
     assert_eq!(Ok(Version((10, 1), arc_value_for(10, 1))), r_10);
     let r_8 = mvtbl.read(&ap1, 10);
@@ -131,7 +141,7 @@ fn create_write_read_placeholder_struct() {
     // Reads from ap1 and ap3 go to db.
     let r_db = mvtbl.read(&ap1, 30);
     assert_eq!(
-        Err(Unresolved(DeltaOp::Subtraction { value: 5 * 13 - 11 })),
+        Err(Unresolved(DeltaOp::Subtraction { value: (61 + 13) - 11 })),
         r_db
     );
     let r_db = mvtbl.read(&ap3, 30);
@@ -144,14 +154,17 @@ fn create_write_read_placeholder_struct() {
     let r_10 = mvtbl.read(&ap2, 15);
     assert_eq!(Ok(Version((10, 2), arc_value_for(10, 2))), r_10);
 
-    // Both delta-write and delte-delta application failures are detected.
+    // Both delta-write and delta-delta application failures are detected.
     mvtbl.add_delta(&ap1, 30, add_for(30, 32));
     mvtbl.add_delta(&ap1, 31, add_for(31, 32));
     let r_33 = mvtbl.read(&ap1, 33);
     assert_eq!(Err(DeltaApplicationFailure), r_33);
 
-    mvtbl.add_write(&ap2, (10, 3), value_for(10, 3));
-    mvtbl.add_delta(&ap2, 30, sub_for(30));
+    let val = value_for(10, 3);
+    // sub base sub_for for which should underflow (with txn index)
+    let sub_base = val.extract_u128();
+    mvtbl.add_write(&ap2, (10, 3), val);
+    mvtbl.add_delta(&ap2, 30, sub_for(30, sub_base));
     let r_31 = mvtbl.read(&ap2, 31);
     assert_eq!(Err(DeltaApplicationFailure), r_31);
 }

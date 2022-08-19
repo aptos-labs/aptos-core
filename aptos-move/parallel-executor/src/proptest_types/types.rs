@@ -76,21 +76,22 @@ pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
 );
 
 impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> TransactionWrite
-    for ValueType<V>
+for ValueType<V>
 {
     fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
-        Some(self.0.clone().into())
+        let mut v = self.0.clone().into();
+        v.resize(16, 1);
+        Some(v)
     }
 }
 
 impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> ValueType<V> {
-    fn _extract_u128(&self) -> Option<u128> {
+    // TODO: make this a trait.
+    fn extract_u128(&self) -> u128 {
+        // TODO: re-use this function with other prop-tests.
         let v = self.extract_raw_bytes().unwrap();
-        if v.is_empty() {
-            None
-        } else {
-            Some(v[0] as u128)
-        }
+        assert_eq!(v.len(), 16);
+        bcs::from_bytes(&v).unwrap()
     }
 }
 
@@ -112,12 +113,12 @@ pub struct TransactionGenParams {
 pub struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + 'static> {
     /// Generate keys and values for possible write-sets based on above transaction gen parameters.
     #[proptest(
-        strategy = "vec(vec((any::<Index>(), any::<V>()), 1..params.write_size), 1..params.read_write_alternatives)"
+    strategy = "vec(vec((any::<Index>(), any::<V>()), 1..params.write_size), 1..params.read_write_alternatives)"
     )]
     keys_modified: Vec<Vec<(Index, V)>>,
     /// Generate keys for possible read-sets of the transaction based on the above parameters.
     #[proptest(
-        strategy = "vec(vec(any::<Index>(), 1..params.read_size), 1..params.read_write_alternatives)"
+    strategy = "vec(vec(any::<Index>(), 1..params.read_size), 1..params.read_write_alternatives)"
     )]
     keys_read: Vec<Vec<Index>>,
 }
@@ -269,9 +270,9 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq> TransactionGen<V> {
 }
 
 impl<K, V> TransactionType for Transaction<K, V>
-where
-    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    where
+        K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+        V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Key = K;
     type Value = V;
@@ -290,9 +291,9 @@ impl<K, V> Task<K, V> {
 }
 
 impl<K, V> ExecutorTask for Task<K, V>
-where
-    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    where
+        K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+        V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type T = Transaction<K, V>;
     type Output = Output<K, V>;
@@ -358,9 +359,9 @@ pub struct Output<K, V>(
 );
 
 impl<K, V> TransactionOutput for Output<K, V>
-where
-    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+    where
+        K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+        V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type T = Transaction<K, V>;
 
@@ -388,7 +389,7 @@ pub enum ExpectedOutput<V> {
     Success(Vec<Vec<(Option<V>, Option<u128>)>>),
 }
 
-impl<V: Debug + Clone + PartialEq + Eq + DeserializeU128> ExpectedOutput<V> {
+impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
     /// Must be invoked after parallel execution to work with dynamic read/writes.
     pub fn generate_baseline<K: Hash + Clone + Eq>(txns: &[Transaction<K, V>]) -> Self {
         let mut current_world = HashMap::new();
@@ -435,7 +436,7 @@ impl<V: Debug + Clone + PartialEq + Eq + DeserializeU128> ExpectedOutput<V> {
                         let base = match delta_world.remove(k) {
                             None => match current_world.remove(k) {
                                 None => STORAGE_DELTA_VAL,
-                                Some(w_value) => w_value.deserialize().unwrap(),
+                                Some(w_value) => w_value.extract_u128(),
                             },
                             Some(value) => value,
                         };
@@ -467,7 +468,7 @@ impl<V: Debug + Clone + PartialEq + Eq + DeserializeU128> ExpectedOutput<V> {
                         // u128 value of the aggregator is known, check it matches.
                         match result {
                             (_, Some(value)) => expected_value == value.clone(),
-                            (Some(v), None) => expected_value == v.deserialize().unwrap(),
+                            (Some(v), None) => expected_value == v.extract_u128(),
                             _ => false,
                         }
                     }
@@ -492,9 +493,9 @@ impl<V: Debug + Clone + PartialEq + Eq + DeserializeU128> ExpectedOutput<V> {
                         Self::check_result(expected_results, result)
                     })
                     && results
-                        .iter()
-                        .skip(*skip_at)
-                        .all(|Output(_, _, result)| result.is_empty())
+                    .iter()
+                    .skip(*skip_at)
+                    .all(|Output(_, _, result)| result.is_empty())
             }
             (Self::Success(expected_results), Ok(results)) => expected_results
                 .iter()

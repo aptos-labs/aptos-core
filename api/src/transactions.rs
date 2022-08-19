@@ -551,16 +551,16 @@ impl TransactionsApi {
             zero_hash,
             zero_hash,
             None,
-            output.gas_used(),
+            output.0.gas_used(),
             exe_status,
         );
         let simulated_txn = TransactionOnChainData {
             version,
             transaction: aptos_types::transaction::Transaction::UserTransaction(txn),
             info,
-            events: output.events().to_vec(),
+            events: output.0.events().to_vec(),
             accumulator_root_hash: aptos_crypto::HashValue::default(),
-            changes: output.write_set().clone(),
+            changes: output.0.write_set().clone(),
         };
 
         let transactions = self.render_transactions(vec![simulated_txn])?;

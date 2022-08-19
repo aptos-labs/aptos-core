@@ -133,7 +133,7 @@ impl<
                     self.captured_reads
                         .lock()
                         .push(ReadDescriptor::from_delta_application_failure(key.clone()));
-                    return Read::U128(0);
+                    return ReadResult::U128(0);
                 }
             };
         }

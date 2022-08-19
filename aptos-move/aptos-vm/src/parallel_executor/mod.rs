@@ -15,7 +15,7 @@ use aptos_parallel_executor::{
     errors::Error,
     executor::ParallelTransactionExecutor,
     task::{
-        DataCache as PDataCache, Transaction as PTransaction,
+        Transaction as PTransaction,
         TransactionOutput as PTransactionOutput,
     },
 };
@@ -92,18 +92,18 @@ impl ParallelAptosVM {
                 // TODO: with more deltas, do this in parallel, and together with parallel
                 // execution's output processing. (Note: need to make DataCache trait
                 // to avoid circular dependencies).
-                let data_cache = StateViewCache::new(state_view);
+                let mut data_cache = StateViewCache::new(state_view);
                 Ok((
                     results
                         .into_iter()
                         .map(|out| {
                             let output_ext = AptosTransactionOutput::into(out);
                             let (output, delta_writes) =
-                                output_ext.into_transaction_output(&data_cache);
+                                output_ext.into_transaction_output(&data_cache).expect("Delta application failed");
 
                             if !output.status().is_discarded() {
                                 data_cache.push_write_set(
-                                    delta_writes.expect("Expected materialized delta writeset"),
+                                    &delta_writes.expect("Expected materialized delta writeset"),
                                 );
                             }
                             output

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::delta_change_set::DeltaOp;
-use aptos_types::write_set::DeserializeU128;
+use aptos_types::write_set::TransactionWrite;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
 use std::{
@@ -108,7 +108,7 @@ pub enum MVHashMapOutput<V> {
 
 pub type Result<V> = anyhow::Result<MVHashMapOutput<V>, MVHashMapError>;
 
-impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
+impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
     pub fn new() -> MVHashMap<K, V> {
         MVHashMap {
             data: DashMap::new(),
@@ -197,8 +197,8 @@ impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
                                         // apply the aggregated delta. If Delta application
                                         // fails, we return a corresponding error, so that
                                         // the speculative execution can also fail.
-                                        let value = data
-                                            .deserialize()
+                                        let value :u128 = bcs::from_bytes(&data
+                                            .extract_raw_bytes().expect("could not extract bytes"))
                                             .expect("cannot deserialize into u128");
                                         return delta
                                             .apply_to(value)

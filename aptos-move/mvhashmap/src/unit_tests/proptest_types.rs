@@ -3,11 +3,10 @@
 
 use super::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_aggregator::delta_change_set::DeltaOp;
-use aptos_types::write_set::DeserializeU128;
+use aptos_types::write_set::TransactionWrite;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap},
-    convert::TryInto,
     fmt::Debug,
     hash::Hash,
     sync::atomic::{AtomicUsize, Ordering},
@@ -35,24 +34,29 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
 
 struct Value<V>(Option<V>);
 
-impl<V: Into<Vec<u8>> + Clone> DeserializeU128 for Value<V> {
-    fn deserialize(&self) -> Option<u128> {
-        let result = self
-            .0
-            .clone()
-            .map(|v| v.into())
-            .filter(|v: &Vec<u8>| v.len() >= 16)
-            .map(|v| u128::from_be_bytes(v[0..16].try_into().unwrap()));
+impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>>{
+        let mut bytes = match self.0.clone().map(|v| {
+            v.into()
+        }) {
+            Some(v) => v,
+            None => vec![],
+        };
 
-        // TODO: if we can enforce proptest generating serializable values, we
-        // should do it. This solves the problem for now.
-        if result.is_none() {
-            Some(0)
-        } else {
-            result
-        }
+        bytes.resize(16, 0);
+        Some(bytes)
     }
 }
+
+impl<V: Into<Vec<u8>> + Clone> Value<V> {
+    fn extract_u128(&self) -> u128 {
+        // TODO: re-use this function with other prop-tests.
+        let v = self.extract_raw_bytes().unwrap();
+        assert_eq!(v.len(), 16);
+        bcs::from_bytes(&v).unwrap()
+    }
+}
+
 enum Data<V> {
     Write(Value<V>),
     Delta(DeltaOp),
@@ -91,7 +95,7 @@ where
                     match data {
                         Data::Write(v) => match acc {
                             Some(d) => {
-                                let int = v.deserialize().expect("should not fail");
+                                let int = v.extract_u128();
                                 match d.apply_to(int) {
                                     Err(_) => return ExpectedOutput::Failure,
                                     Ok(i) => return ExpectedOutput::Resolved(i),
