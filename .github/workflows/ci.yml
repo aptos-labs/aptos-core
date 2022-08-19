@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: 
-      - main
+      - rosetta-stable
   pull_request:
 
 env:
