@@ -36,6 +36,7 @@ use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::{EntryFunction, ModuleBundle, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
+use framework::natives::code::UpgradePolicy;
 use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
 use move_deps::move_cli::base::test::UnitTestResult;
@@ -519,6 +520,13 @@ impl CliCommand<&'static str> for DownloadPackage {
             .get_package(self.package)
             .await
             .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+        if package.upgrade_policy() == UpgradePolicy::arbitrary() {
+            return Err(CliError::CommandArgumentError(
+                "A package with upgrade policy `arbitrary` cannot be downloaded \
+                since it is not safe to depend on such packages."
+                    .to_owned(),
+            ));
+        }
         let package_path = path.join(package.name());
         package
             .save_package_to_disk(package_path.clone(), true)

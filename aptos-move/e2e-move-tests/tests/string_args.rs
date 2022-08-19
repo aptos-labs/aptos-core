@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::account_address::AccountAddress;
-use e2e_move_tests::{assert_success, enable_golden, MoveHarness};
+use e2e_move_tests::{assert_success, MoveHarness};
 use move_deps::move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
 
