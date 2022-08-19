@@ -49,7 +49,6 @@ proptest! {
 
         verify_event_store_pruner_disabled(event_batches);
     }
-
 }
 
 fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
@@ -73,6 +72,7 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
         // logic.
         let pruner = LedgerPrunerManager::new(
             Arc::clone(&aptos_db.ledger_db),
+            Arc::clone(&aptos_db.state_store),
             LedgerPrunerConfig {
                 enable: true,
                 prune_window: 0,
@@ -83,7 +83,7 @@ fn verify_event_store_pruner(events: Vec<Vec<ContractEvent>>) {
         pruner
             .wake_and_wait_pruner(i as u64 /* latest_version */)
             .unwrap();
-        // ensure that all events up to i * 2 has been pruned
+        // ensure that all events up to i has been pruned
         for j in 0..i {
             verify_events_not_in_store(j as u64, event_store);
             verify_event_by_key_not_in_store(&events, j as u64, event_store);

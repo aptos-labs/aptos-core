@@ -29,15 +29,15 @@ pub fn bootstrap(
     db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
 ) -> Option<anyhow::Result<Runtime>> {
-    if !config.sf_stream.enabled {
+    if !config.firehose_stream.enabled {
         return None;
     }
 
     let runtime = Builder::new_multi_thread()
-        .thread_name("sf-stream")
+        .thread_name("fh-stream")
         .enable_all()
         .build()
-        .expect("[sf-stream] failed to create runtime");
+        .expect("[fh-stream] failed to create runtime");
 
     let node_config = config.clone();
 
@@ -45,18 +45,18 @@ pub fn bootstrap(
         let context = Context::new(chain_id, db, mp_sender.clone(), node_config.clone());
         let context_arc = Arc::new(context);
         // Let the env variable take precedence over the config file
-        let config_starting_version = node_config.sf_stream.starting_version.unwrap_or(0);
+        let config_starting_version = node_config.firehose_stream.starting_version.unwrap_or(0);
         let starting_version = std::env::var("STARTING_VERSION")
             .map(|v| v.parse::<u64>().unwrap_or(config_starting_version))
             .unwrap_or(config_starting_version);
 
-        let mut streamer = SfStreamer::new(context_arc, starting_version, Some(mp_sender));
+        let mut streamer = FirehoseStreamer::new(context_arc, starting_version, Some(mp_sender));
         streamer.start().await;
     });
     Some(Ok(runtime))
 }
 
-pub struct SfStreamer {
+pub struct FirehoseStreamer {
     pub context: Arc<Context>,
     pub resolver: Arc<RemoteStorageOwned<DbStateView>>,
     pub current_block_height: u64,
@@ -65,7 +65,7 @@ pub struct SfStreamer {
     pub mp_sender: MempoolClientSender,
 }
 
-impl SfStreamer {
+impl FirehoseStreamer {
     pub fn new(
         context: Arc<Context>,
         starting_version: u64,
@@ -82,7 +82,7 @@ impl SfStreamer {
                 )
             });
 
-        // fake mempool client/sender, if we need to, so we can use the same code for both api and sf-streamer
+        // fake mempool client/sender, if we need to, so we can use the same code for both api and fh-streamer
         let mp_client_sender = mp_client_sender.unwrap_or_else(|| {
             let (mp_client_sender, _mp_client_events) = channel(1);
             mp_client_sender
@@ -119,7 +119,7 @@ impl SfStreamer {
             Err(err) => {
                 // TODO: If block has been pruned, panic
                 warn!(
-                    "[sf-stream] failed to get block info for block_height={}. Error: {}",
+                    "[fh-stream] failed to get block info for block_height={}. Error: {}",
                     self.current_block_height, err
                 );
                 sleep(Duration::from_millis(300)).await;
@@ -151,19 +151,19 @@ impl SfStreamer {
         ) {
             Ok(transactions) => transactions,
             Err(err) => {
-                error!("[sf-stream] failed to get transactions: {}", err);
+                error!("[fh-stream] failed to get transactions: {}", err);
                 sleep(Duration::from_millis(100)).await;
                 return vec![];
             }
         };
 
         if transactions.is_empty() {
-            debug!("[sf-stream] no transactions to send");
+            debug!("[fh-stream] no transactions to send");
             sleep(Duration::from_millis(100)).await;
             return vec![];
         }
         debug!(
-            "[sf-stream] got {} transactions from {} to {} [version on last actual transaction {}]",
+            "[fh-stream] got {} transactions from {} to {} [version on last actual transaction {}]",
             transactions.len(),
             block_start_version,
             block_last_version,

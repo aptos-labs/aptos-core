@@ -243,7 +243,7 @@ impl LocalSwarm {
     }
 
     async fn wait_for_startup(&mut self) -> Result<()> {
-        let num_attempts = 10;
+        let num_attempts = 30;
         let mut done = vec![false; self.validators.len()];
         for i in 0..num_attempts {
             info!("Wait for startup attempt: {} of {}", i, num_attempts);

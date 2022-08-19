@@ -7,6 +7,15 @@
 module aptos_std::bls12381 {
     use std::option::{Self, Option};
 
+    /// The signature size, in bytes
+    const SIGNATURE_SIZE: u64 = 96;
+
+    /// The public key size, in bytes
+    const PUBLIC_KEY_NUM_BYTES: u64 = 48;
+
+    /// The caller was supposed to input one or more public keys.
+    const EZERO_PUBKEYS: u64 = 1;
+
     // TODO: Performance would increase if structs in this module are implemented natively via handles (similar to Table and
     // RistrettoPoint). This will avoid unnecessary (de)serialization. We would need to allow storage of these structs too.
 
@@ -72,11 +81,21 @@ module aptos_std::bls12381 {
         }
     }
 
+    /// Serializes a public key into 48 bytes.
+    public fun public_key_to_bytes(pk: &PublicKey): vector<u8> {
+        pk.bytes
+    }
+
     /// Creates a new proof-of-possession (PoP) which can be later used to create a PublicKeyWithPoP struct,
     public fun proof_of_possession_from_bytes(bytes: vector<u8>): ProofOfPossession {
         ProofOfPossession {
             bytes
         }
+    }
+
+    /// Serializes the signature into 96 bytes.
+    public fun proof_of_possession_to_bytes(pop: &ProofOfPossession): vector<u8> {
+        pop.bytes
     }
 
     /// Creates a PoP'd public key from a normal public key and a corresponding proof-of-possession.
@@ -90,7 +109,12 @@ module aptos_std::bls12381 {
         }
     }
 
-    /// Creates a new signature key from a sequence of bytes. Does not check the signature for prime-order subgroup
+    /// Serializes a PoP'd public key into 48 bytes.
+    public fun public_key_with_pop_to_bytes(pk: &PublicKeyWithPoP): vector<u8> {
+        pk.bytes
+    }
+
+    /// Creates a new signature from a sequence of bytes. Does not check the signature for prime-order subgroup
     /// membership since that is done implicitly during verification.
     public fun signature_from_bytes(bytes: vector<u8>): Signature {
         Signature {
@@ -98,26 +122,36 @@ module aptos_std::bls12381 {
         }
     }
 
+    /// Serializes the signature into 96 bytes.
+    public fun signature_to_bytes(sig: &Signature): vector<u8> {
+        sig.bytes
+    }
+
+    /// Checks that the group element that defines a signature is in the prime-order subgroup.
+    public fun signature_subgroup_check(signature: &Signature): bool {
+        signature_subgroup_check_internal(signature.bytes)
+    }
+
     /// Given a vector of public keys with verified PoPs, combines them into an *aggregated* public key which can be used
     /// to verify multisignatures using `verify_multisignature` and aggregate signatures using `verify_aggregate_signature`.
-    /// Returns 'None' if no public keys are given as input.
-    /// Does not abort.
-    public fun aggregate_pubkeys(public_keys: vector<PublicKeyWithPoP>): Option<AggrPublicKeysWithPoP> {
+    /// Aborts if no public keys are given as input.
+    public fun aggregate_pubkeys(public_keys: vector<PublicKeyWithPoP>): AggrPublicKeysWithPoP {
         let (bytes, success) = aggregate_pubkeys_internal(public_keys);
-        if (success) {
-            option::some(
-                AggrPublicKeysWithPoP {
-                    bytes
-                }
-            )
-        } else {
-            option::none<AggrPublicKeysWithPoP>()
+        assert!(success, std::error::invalid_argument(EZERO_PUBKEYS));
+
+        AggrPublicKeysWithPoP {
+            bytes
         }
     }
 
+    /// Serializes an aggregate public key into 48 bytes.
+    public fun aggregate_pubkey_to_bytes(apk: &AggrPublicKeysWithPoP): vector<u8> {
+        apk.bytes
+    }
+
     /// Aggregates the input signatures into an aggregate-or-multi-signature structure, which can be later verified via
-    /// `verify_aggregate_signature` or `verify_multisignature`. Returns `None` if zero public keys are given as input
-    /// or if some of the public keys are invalid.
+    /// `verify_aggregate_signature` or `verify_multisignature`. Returns `None` if zero signatures are given as input
+    /// or if some of the signatures are not valid group elements.
     public fun aggregate_signatures(signatures: vector<Signature>): Option<AggrOrMultiSignature> {
         let (bytes, success) = aggregate_signatures_internal(signatures);
         if (success) {
@@ -129,6 +163,16 @@ module aptos_std::bls12381 {
         } else {
             option::none<AggrOrMultiSignature>()
         }
+    }
+
+    /// Serializes an aggregate-or-multi-signature into 96 bytes.
+    public fun aggr_or_multi_signature_to_bytes(sig: &AggrOrMultiSignature): vector<u8> {
+        sig.bytes
+    }
+
+    /// Checks that the group element that defines an aggregate-or-multi-signature is in the prime-order subgroup.
+    public fun aggr_or_multi_signature_subgroup_check(signature: &AggrOrMultiSignature): bool {
+        signature_subgroup_check_internal(signature.bytes)
     }
 
     /// Verifies an aggregate signature, an aggregation of many signatures `s_i`, each on a different message `m_i`.
@@ -176,8 +220,7 @@ module aptos_std::bls12381 {
     ///
     /// Given a vector of serialized public keys, combines them into an aggregated public key, returning `(bytes, true)`,
     /// where `bytes` store the serialized public key.
-    /// Returns `(_, false)` if no public keys are given as input.
-    /// Does not abort.
+    /// Aborts if no public keys are given as input.
     native fun aggregate_pubkeys_internal(public_keys: vector<PublicKeyWithPoP>): (vector<u8>, bool);
 
 
@@ -316,10 +359,15 @@ module aptos_std::bls12381 {
     }
 
     #[test]
-    fun test_pubkey_aggregation() {
-        // First, test empty aggregation
-        assert!(option::is_none(&mut aggregate_pubkeys(vector[])), 1);
+    #[expected_failure(abort_code = 65537)]
+    fun test_empty_pubkey_aggregation() {
+        // First, make sure if no inputs are given, the function returns None
+        // assert!(aggregate_pop_verified_pubkeys(vector::empty()) == option::none(), 1);
+        aggregate_pubkeys(std::vector::empty());
+    }
 
+    #[test]
+    fun test_pubkey_aggregation() {
         // Second, try some test-cases generated by running the following command in `crates/aptos-crypto`:
         //  $ cargo test -- sample_aggregate_pk_and_multisig --nocapture --include-ignored
         let pks = vector[
@@ -344,7 +392,7 @@ module aptos_std::bls12381 {
         while (i < std::vector::length(&pks)) {
             std::vector::push_back(&mut accum_pk, *std::vector::borrow(&pks, i));
 
-            let apk = option::extract(&mut aggregate_pubkeys(accum_pk));
+            let apk = aggregate_pubkeys(accum_pk);
 
             // Make sure PKs were aggregated correctly
             assert!(apk == *std::vector::borrow(&agg_pks, i), 1);
@@ -398,11 +446,6 @@ module aptos_std::bls12381 {
 
     #[test]
     fun test_verify_multisig() {
-        // First, make sure if no inputs are given, the function returns None
-        // assert!(aggregate_pop_verified_pubkeys(vector::empty()) == option::none(), 1);
-        let none_opt = aggregate_pubkeys(std::vector::empty());
-        assert!(option::is_none(&none_opt), 1);
-
         // Second, try some test-cases generated by running the following command in `crates/aptos-crypto`:
         //  $ cargo test -- sample_aggregate_pk_and_multisig --nocapture --include-ignored
         let pks = vector[
@@ -436,7 +479,7 @@ module aptos_std::bls12381 {
         while (i < std::vector::length(&pks)) {
             std::vector::push_back(&mut accum_pk, *std::vector::borrow(&pks, i));
 
-            let apk = option::extract(&mut aggregate_pubkeys(accum_pk));
+            let apk = aggregate_pubkeys(accum_pk);
 
             assert!(apk == *std::vector::borrow(&agg_pks, i), 1);
 

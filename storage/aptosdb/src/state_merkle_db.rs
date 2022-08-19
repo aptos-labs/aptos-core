@@ -6,6 +6,7 @@ use crate::stale_node_index::StaleNodeIndexSchema;
 use crate::OTHER_TIMERS_SECONDS;
 use anyhow::Result;
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_jellyfish_merkle::node_type::NodeType;
 use aptos_jellyfish_merkle::{
     node_type::NodeKey, JellyfishMerkleTree, TreeReader, TreeUpdateBatch, TreeWriter,
 };
@@ -182,7 +183,12 @@ impl TreeReader<StateKey> for StateMerkleDb {
         let mut iter = self.iter::<JellyfishMerkleNodeSchema>(Default::default())?;
         iter.seek_to_first();
         let version = match iter.next().transpose()? {
-            Some((node_key, _node)) => node_key.version(),
+            Some((node_key, node)) => {
+                if node.node_type() == NodeType::Null {
+                    return Ok(None);
+                }
+                node_key.version()
+            }
             None => return Ok(None),
         };
 
