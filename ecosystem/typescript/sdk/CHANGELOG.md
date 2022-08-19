@@ -5,12 +5,12 @@ All notable changes to the Aptos Node SDK will be captured in this file. This ch
 **Note:** The Aptos TS SDK does not follow semantic version while we are in active development. Instead, breaking changes will be announced with each devnet cut. Once we launch our mainnet, the SDK will follow semantic versioning closely.
 
 ## Unreleased
-
 N/A
 
 ## 1.3.7 (2022-08-17)
 
 - Add a transaction builder that is able to serialize transaction arguments with remote ABIs. Remote ABIs are fetchable through REST APIs. With the remote ABI transaction builder, developers can build BCS transactions by only providing the native JS values.
+- Make all functions that accept `BigInt` parameters accept `BigInt | number` instead.
 
 ## 1.3.6 (2022-08-10)
 
