@@ -38,7 +38,8 @@ To participate in the AIT-3 program, follow the below steps. Use these steps as 
 1. Navigate to the [Aptos Community page](https://aptoslabs.com/community) and follow the steps, starting with registering or signing in to your Discord account.
 
 2. Before you click on Step 2 **CONNECT WALLET**: 
-   1. Install the Petra (Aptos Wallet) extension using Step 3 instructions, and 
+   1. Delete any previous versions of Aptos Wallet you have installed on Chrome
+   2. Install the Petra (Aptos Wallet) extension using Step 3 instructions, and 
    2. Create the first wallet using Step 4 instructions.
 3. **Install** the Petra (Aptos Wallet) extension on your Chrome browser by [following the instructions here](/guides/install-petra-wallet-extension).
     
@@ -48,7 +49,7 @@ To participate in the AIT-3 program, follow the below steps. Use these steps as 
 
    1. Open the Aptos Wallet extension from the Extensions section of the Chrome browser, or by clicking on the puzzle piece on top right of the browser and selecting Aptos Wallet.
    2. Click **Create a new wallet**. 
-   3. Make sure to store your mnemonic somewhere safe. This account will be used in the future.
+   3. Make sure to store your seed phrase somewhere safe. This account will be used in the future.
     
 5. Click on Step 2 **CONNECT WALLET** to register the owner wallet address to your Aptos Community account. The Aptos team will airdrop coins to this owner wallet address. 
 
