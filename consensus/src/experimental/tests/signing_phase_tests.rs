@@ -17,7 +17,7 @@ use crate::{
     test_utils::consensus_runtime,
 };
 use aptos_crypto::HashValue;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -102,7 +102,7 @@ fn add_signing_phase_test_cases(
         SigningRequest {
             ordered_ledger_info: LedgerInfoWithSignatures::new(
                 ordered_ledger_info.ledger_info().clone(),
-                MultiSignature::empty(),
+                AggregateSignature::empty(),
             ),
             commit_ledger_info: executed_ledger_info.ledger_info().clone(),
         },

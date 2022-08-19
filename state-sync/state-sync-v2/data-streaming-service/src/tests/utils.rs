@@ -8,7 +8,7 @@ use aptos_data_client::{
     ResponseCallback, ResponseContext, ResponseError,
 };
 use aptos_logger::Level;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     account_address::AccountAddress,
     block_info::BlockInfo,
@@ -385,7 +385,7 @@ pub fn create_ledger_info(
     );
     LedgerInfoWithSignatures::new(
         LedgerInfo::new(block_info, HashValue::zero()),
-        MultiSignature::empty(),
+        AggregateSignature::empty(),
     )
 }
 

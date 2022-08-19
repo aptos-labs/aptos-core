@@ -10,7 +10,7 @@ use aptos_config::config::StorageServiceConfig;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, SigningKey, Uniform};
 use aptos_logger::Level;
 use aptos_time_service::{MockTimeService, TimeService};
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::write_set::WriteSet;
 use aptos_types::{
     account_address::AccountAddress,
@@ -1949,7 +1949,7 @@ fn create_test_ledger_info_with_sigs(epoch: u64, version: u64) -> LedgerInfoWith
         ),
         HashValue::zero(),
     );
-    LedgerInfoWithSignatures::new(ledger_info, MultiSignature::empty())
+    LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
 }
 
 /// Creates a test transaction output
@@ -2031,7 +2031,8 @@ fn create_epoch_ending_ledger_infos_using_sizes(
     // Create the ledger infos with signatures
     (0..num_ledger_infos)
         .map(|_| {
-            let multi_signatures = MultiSignature::new(BitVec::from(random_bytes.clone()), None);
+            let multi_signatures =
+                AggregateSignature::new(BitVec::from(random_bytes.clone()), None);
             LedgerInfoWithSignatures::new(ledger_info.clone(), multi_signatures)
         })
         .collect()

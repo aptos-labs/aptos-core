@@ -8,7 +8,8 @@ use aptos_api_types::{
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
 use aptos_config::config::{
-    NodeConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
+    NodeConfig, RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
 };
 use aptos_crypto::{hash::HashValue, SigningKey};
 use aptos_mempool::mocks::MockSharedMempool;
@@ -39,7 +40,7 @@ use storage_interface::DbReaderWriter;
 
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use rand::SeedableRng;
 use serde_json::{json, Value};
 use std::{boxed::Box, iter::once, net::SocketAddr, sync::Arc, time::Duration};
@@ -113,6 +114,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
                 RocksdbConfigs::default(),
                 false, /* indexer */
                 TARGET_SNAPSHOT_SIZE,
+                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             )
             .unwrap(),
         )
@@ -577,6 +579,6 @@ impl TestContext {
             ),
             HashValue::zero(),
         );
-        LedgerInfoWithSignatures::new(info, MultiSignature::empty())
+        LedgerInfoWithSignatures::new(info, AggregateSignature::empty())
     }
 }
