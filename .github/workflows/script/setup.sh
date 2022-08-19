@@ -33,7 +33,7 @@
 #         }
 # }' | python3 -c 'import json,sys;obj=json.load(sys.stdin);print(obj["current_block_identifier"]["index"])'))
 
-apt-get update
-apt-get -y install jq
+nohup apt-get update > /dev/null 2>&1 &
+nohup apt-get -y install jq > /dev/null 2>&1 &
 
 echo $(seq $START_INDEX $BLKS_PER_CHUNK 112419 | jq -cnR '[inputs | select(length>0)]')
