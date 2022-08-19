@@ -9,8 +9,8 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { COMPANY_NAME, CURRENT_YEAR } from 'core/constants';
+import { secondaryTextColor } from 'core/colors';
 import ChakraLink from './ChakraLink';
-import { secondaryTextColor } from './LoginDemo';
 
 const secondaryBgColor = {
   dark: 'whiteAlpha.100',

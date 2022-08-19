@@ -6,7 +6,7 @@ import {
 } from '@chakra-ui/react';
 import { COMPANY_NAME_WITH_WALLET } from 'core/constants';
 import { ChakraLinkBare } from './ChakraLink';
-import LoginDemo from './LoginDemo';
+import WalletDemo from './WalletDemo';
 
 const HomeBody = () => (
   <VStack pb={24}>
@@ -28,7 +28,7 @@ const HomeBody = () => (
       </Center>
     </VStack>
     <VStack pt={16} pb={8}>
-      <LoginDemo />
+      <WalletDemo />
     </VStack>
   </VStack>
 );
