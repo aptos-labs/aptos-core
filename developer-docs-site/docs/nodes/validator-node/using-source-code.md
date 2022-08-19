@@ -141,16 +141,7 @@ With your development environment ready, now you can start to setup your Validat
 
     This will create two files in your working directory, `genesis.blob` and `waypoint.txt`.
 
-12. Copy the `validator.yaml`, `fullnode.yaml` files into this directory.
-    ```
-    mkdir ~/$WORKSPACE/config
-    cp docker/compose/aptos-node/validator.yaml ~/$WORKSPACE/validator.yaml
-    cp docker/compose/aptos-node/fullnode.yaml ~/$WORKSPACE/fullnode.yaml
-    ```
-
-    Modify the config file to update the key path, genesis file path, waypoint path.
-
-13. To recap, in your working directory (`~/$WORKSPACE`), you should have a list of files:
+12. To recap, in your working directory (`~/$WORKSPACE`), you should have a list of files:
     - `validator.yaml` validator config file
     - `fullnode.yaml` fullnode config file
     - `keys` folder, which includes:
@@ -166,7 +157,7 @@ With your development environment ready, now you can start to setup your Validat
     - `waypoint.txt`: The waypoint for the genesis transaction (from step 11).
     - `genesis.blob` The genesis binary that contains all the information about the framework, validatorSet and more (from step 11).
 
-14. Start your local Validator by running the below command:
+13. Start your local Validator by running the below command:
 
     ```
     cargo run -p aptos-node --release -- -f ~/$WORKSPACE/validator.yaml
