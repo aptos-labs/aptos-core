@@ -65,8 +65,6 @@ BlockMetadata:
     - round: U64
     - proposer:
         TYPENAME: AccountAddress
-    - proposer_index:
-        OPTION: U32
     - previous_block_votes_bitvec: BYTES
     - failed_proposer_indices:
         SEQ: U32
@@ -197,6 +195,17 @@ Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
   NEWTYPESTRUCT: BYTES
+EntryFunction:
+  STRUCT:
+    - module:
+        TYPENAME: ModuleId
+    - function:
+        TYPENAME: Identifier
+    - ty_args:
+        SEQ:
+          TYPENAME: TypeTag
+    - args:
+        SEQ: BYTES
 EpochChangeProof:
   STRUCT:
     - ledger_info_with_sigs:
@@ -218,7 +227,11 @@ EventKey:
     - account_address:
         TYPENAME: AccountAddress
 HashValue:
-  NEWTYPESTRUCT: BYTES
+  STRUCT:
+    - hash:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
 LedgerInfo:
@@ -314,17 +327,6 @@ Script:
     - args:
         SEQ:
           TYPENAME: TransactionArgument
-ScriptFunction:
-  STRUCT:
-    - module:
-        TYPENAME: ModuleId
-    - function:
-        TYPENAME: Identifier
-    - ty_args:
-        SEQ:
-          TYPENAME: TypeTag
-    - args:
-        SEQ: BYTES
 Signature:
   NEWTYPESTRUCT: BYTES
 SignedTransaction:
@@ -450,9 +452,9 @@ TransactionPayload:
         NEWTYPE:
           TYPENAME: ModuleBundle
     2:
-      ScriptFunction:
+      EntryFunction:
         NEWTYPE:
-          TYPENAME: ScriptFunction
+          TYPENAME: EntryFunction
 TwoChainTimeout:
   STRUCT:
     - epoch: U64

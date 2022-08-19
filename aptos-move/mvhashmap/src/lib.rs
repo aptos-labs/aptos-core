@@ -53,6 +53,13 @@ impl<V> Entry<V> {
         }
     }
 
+    pub fn new_delta_from(flag: usize, data: DeltaOp) -> Entry<V> {
+        Entry {
+            flag: AtomicUsize::new(flag),
+            cell: EntryCell::Delta(data),
+        }
+    }
+
     pub fn flag(&self) -> usize {
         self.flag.load(Ordering::SeqCst)
     }
@@ -76,7 +83,7 @@ pub struct MVHashMap<K, V> {
 
 /// Returned as Err(..) when failed to read from the multi-version data-structure.
 #[derive(Debug, PartialEq)]
-pub enum Error {
+pub enum MVHashMapError {
     /// No prior entry is found.
     NotFound,
     /// Read resulted in an unresolved delta value.
@@ -89,14 +96,17 @@ pub enum Error {
 
 /// Returned as Ok(..) when read successfully from the multi-version data-structure.
 #[derive(Debug, PartialEq)]
-pub enum Output<V> {
-    /// Result of resolved delta op, always u128.
+pub enum MVHashMapOutput<V> {
+    /// Result of resolved delta op, always u128. Unlike with `Version`, we return
+    /// actual data because u128 is cheap to copy amd validation can be done correctly
+    /// on values as well (ABA is not a problem).
     Resolved(u128),
-    /// Information from the last versioned-write.
+    /// Information from the last versioned-write. Note that the version is returned
+    /// and not the data to avoid passing big values around.
     Version(Version, Arc<V>),
 }
 
-pub type Result<V> = anyhow::Result<Output<V>, Error>;
+pub type Result<V> = anyhow::Result<MVHashMapOutput<V>, MVHashMapError>;
 
 impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
     pub fn new() -> MVHashMap<K, V> {
@@ -105,9 +115,9 @@ impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
         }
     }
 
-    /// Write a versioned data at a specified key. If the WriteCell entry is overwritten,
-    /// asserts that the new incarnation is strictly higher.
-    pub fn write(&self, key: &K, version: Version, data: V) {
+    /// Add a write of versioned data at a specified key. If the entry is overwritten, asserts
+    /// that the new incarnation is strictly higher.
+    pub fn add_write(&self, key: &K, version: Version, data: V) {
         let (txn_idx, incarnation) = version;
 
         let mut map = self.data.entry(key.clone()).or_insert(BTreeMap::new());
@@ -118,8 +128,23 @@ impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
 
         // Assert that the previous entry for txn_idx, if present, had lower incarnation.
         assert!(prev_entry
-            .map(|entry| matches!(entry.cell, EntryCell::Write(i, _) if i < incarnation))
+            .map(|entry| -> bool {
+                if let EntryCell::Write(i, _) = entry.cell {
+                    i < incarnation
+                } else {
+                    true
+                }
+            })
             .unwrap_or(true));
+    }
+
+    /// Add a delta at a specified key.
+    pub fn add_delta(&self, key: &K, txn_idx: usize, delta: DeltaOp) {
+        let mut map = self.data.entry(key.clone()).or_insert(BTreeMap::new());
+        map.insert(
+            txn_idx,
+            CachePadded::new(Entry::new_delta_from(FLAG_DONE, delta)),
+        );
     }
 
     /// Mark an entry from transaction 'txn_idx' at access path 'key' as an estimated write
@@ -141,8 +166,8 @@ impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
 
     /// Read entry from transaction 'txn_idx' at access path 'key'.
     pub fn read(&self, key: &K, txn_idx: TxnIndex) -> Result<V> {
-        use Error::*;
-        use Output::*;
+        use MVHashMapError::*;
+        use MVHashMapOutput::*;
 
         match self.data.get(key) {
             Some(tree) => {
@@ -191,19 +216,16 @@ impl<K: Hash + Clone + Eq, V: DeserializeU128> MVHashMap<K, V> {
                             }
                             EntryCell::Delta(delta) => {
                                 match aggregator.as_mut() {
-                                    Some(other_delta) => {
+                                    Some(accumulator) => {
                                         // Read hit a delta during traversing the
                                         // block and aggregating other deltas. Merge
                                         // two deltas together. If Delta application
                                         // fails, we return a corresponding error, so that
                                         // the speculative execution can also fail.
-
-                                        // TODO: We need a function:
-                                        //   delta.merge(other_delta) and match on it.
-                                        // Wait until other PR lands to reuse that. For
-                                        // now place anything.
-                                        // LINE BELOW MAKES NO SENSE!
-                                        other_delta.apply_to(0);
+                                        let new_delta = accumulator
+                                            .merge_with(delta.clone())
+                                            .map_err(|_| DeltaApplicationFailure)?;
+                                        *accumulator = new_delta;
                                     }
                                     None => {
                                         // Read hit a delta value and has to

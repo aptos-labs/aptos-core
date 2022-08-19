@@ -1,11 +1,13 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{Error, MVHashMap, Output};
+use super::{MVHashMap, MVHashMapError, MVHashMapOutput};
+use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_types::write_set::DeserializeU128;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
     collections::{BTreeMap, HashMap},
+    convert::TryInto,
     fmt::Debug,
     hash::Hash,
     sync::atomic::{AtomicUsize, Ordering},
@@ -18,6 +20,7 @@ enum Operator<V: Debug + Clone> {
     Insert(V),
     Remove,
     Read,
+    Update(DeltaOp),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -25,29 +28,49 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
     NotInMap,
     Deleted,
     Value(V),
+    Resolved(u128),
+    Unresolved(DeltaOp),
+    Failure,
 }
 
 struct Value<V>(Option<V>);
 
-impl<V> DeserializeU128 for Value<V> {
+impl<V: Into<Vec<u8>> + Clone> DeserializeU128 for Value<V> {
     fn deserialize(&self) -> Option<u128> {
-        Some(0)
+        let result = self
+            .0
+            .clone()
+            .map(|v| v.into())
+            .filter(|v: &Vec<u8>| v.len() >= 16)
+            .map(|v| u128::from_be_bytes(v[0..16].try_into().unwrap()));
+
+        // TODO: if we can enforce proptest generating serializable values, we
+        // should do it. This solves the problem for now.
+        if result.is_none() {
+            Some(0)
+        } else {
+            result
+        }
     }
 }
-
-struct Baseline<K, V>(HashMap<K, BTreeMap<usize, Value<V>>>);
+enum Data<V> {
+    Write(Value<V>),
+    Delta(DeltaOp),
+}
+struct Baseline<K, V>(HashMap<K, BTreeMap<usize, Data<V>>>);
 
 impl<K, V> Baseline<K, V>
 where
     K: Hash + Eq + Clone,
-    V: Clone + Debug + PartialEq,
+    V: Clone + Into<Vec<u8>> + Debug + PartialEq,
 {
     pub fn new(txns: &[(K, Operator<V>)]) -> Self {
-        let mut baseline: HashMap<K, BTreeMap<usize, Value<V>>> = HashMap::new();
+        let mut baseline: HashMap<K, BTreeMap<usize, Data<V>>> = HashMap::new();
         for (idx, (k, op)) in txns.iter().enumerate() {
             let value_to_update = match op {
-                Operator::Insert(v) => Value(Some(v.clone())),
-                Operator::Remove => Value(None),
+                Operator::Insert(v) => Data::Write(Value(Some(v.clone()))),
+                Operator::Remove => Data::Write(Value(None)),
+                Operator::Update(d) => Data::Delta(d.clone()),
                 Operator::Read => continue,
             };
 
@@ -60,14 +83,40 @@ where
     }
 
     pub fn get(&self, key: &K, version: usize) -> ExpectedOutput<V> {
-        match self
-            .0
-            .get(key)
-            .and_then(|tree| tree.range(..version).last())
-        {
+        match self.0.get(key).and_then(|tree| Some(tree.range(..version))) {
             None => ExpectedOutput::NotInMap,
-            Some((_, Value(Some(v)))) => ExpectedOutput::Value(v.clone()),
-            Some((_, Value(None))) => ExpectedOutput::Deleted,
+            Some(mut iter) => {
+                let mut acc: Option<DeltaOp> = None;
+                while let Some((_, data)) = iter.next_back() {
+                    match data {
+                        Data::Write(v) => match acc {
+                            Some(d) => {
+                                let int = v.deserialize().expect("should not fail");
+                                match d.apply_to(int) {
+                                    Err(_) => return ExpectedOutput::Failure,
+                                    Ok(i) => return ExpectedOutput::Resolved(i),
+                                }
+                            }
+                            None => match v {
+                                Value(Some(w)) => return ExpectedOutput::Value(w.clone()),
+                                Value(None) => return ExpectedOutput::Deleted,
+                            },
+                        },
+                        Data::Delta(d) => match acc.as_mut() {
+                            Some(a) => match a.merge_with(d.clone()) {
+                                Err(_) => return ExpectedOutput::Failure,
+                                Ok(d) => *a = d,
+                            },
+                            None => acc = Some(d.clone()),
+                        },
+                    }
+                }
+
+                match acc {
+                    Some(d) => ExpectedOutput::Unresolved(d),
+                    None => ExpectedOutput::NotInMap,
+                }
+            }
         }
     }
 }
@@ -75,8 +124,16 @@ where
 fn operator_strategy<V: Arbitrary + Clone>() -> impl Strategy<Value = Operator<V>> {
     prop_oneof![
         2 => any::<V>().prop_map(Operator::Insert),
+        4 => any::<u32>().prop_map(|v| {
+            // TODO: Is there a proptest way of doing that?
+            if v % 2 == 0 {
+                Operator::Update(DeltaOp::Subtraction { value: v as u128})
+            } else {
+                Operator::Update(DeltaOp::Addition { value: v as u128, limit: u32::MAX as u128})
+            }
+        }),
         1 => Just(Operator::Remove),
-        4 => Just(Operator::Read),
+        1 => Just(Operator::Read),
     ]
 }
 
@@ -86,7 +143,7 @@ fn run_and_assert<K, V>(
 ) -> Result<(), TestCaseError>
 where
     K: PartialOrd + Send + Clone + Hash + Eq + Sync,
-    V: Send + Debug + Clone + PartialEq + Sync,
+    V: Send + Into<Vec<u8>> + Debug + Clone + PartialEq + Sync,
 {
     let transactions: Vec<(K, Operator<V>)> = transaction_gens
         .into_iter()
@@ -96,18 +153,20 @@ where
     let baseline = Baseline::new(transactions.as_slice());
     let map = MVHashMap::<K, Value<V>>::new();
 
-    // make ESTIMATE placeholders for all versions to be written.
+    // make ESTIMATE placeholders for all versions to be updated.
     // allows to test that correct values appear at the end of concurrent execution.
     let versions_to_write = transactions
         .iter()
         .enumerate()
         .filter_map(|(idx, (key, op))| match op {
             Operator::Read => None,
-            Operator::Insert(_) | Operator::Remove => Some((key.clone(), idx)),
+            Operator::Insert(_) | Operator::Remove | Operator::Update(_) => {
+                Some((key.clone(), idx))
+            }
         })
         .collect::<Vec<_>>();
     for (key, idx) in versions_to_write {
-        map.write(&key, (idx, 0), Value(None));
+        map.add_write(&key, (idx, 0), Value(None));
         map.mark_estimate(&key, idx);
     }
 
@@ -126,8 +185,8 @@ where
                 let key = &transactions[idx].0;
                 match &transactions[idx].1 {
                     Operator::Read => {
-                        use Error::*;
-                        use Output::*;
+                        use MVHashMapError::*;
+                        use MVHashMapOutput::*;
 
                         let baseline = baseline.get(key, idx);
                         let mut retry_attempts = 0;
@@ -154,15 +213,26 @@ where
                                     }
                                     break;
                                 }
-                                Ok(Resolved(_)) => {
-                                    // TODO: support this case.
+                                Ok(Resolved(v)) => {
+                                    assert_eq!(baseline, ExpectedOutput::Resolved(v), "{:?}", idx);
+                                    break;
                                 }
                                 Err(NotFound) => {
                                     assert_eq!(baseline, ExpectedOutput::NotInMap, "{:?}", idx);
                                     break;
                                 }
-                                Err(Unresolved(_)) => {
-                                    // TODO: support this case.
+                                Err(DeltaApplicationFailure) => {
+                                    assert_eq!(baseline, ExpectedOutput::Failure, "{:?}", idx);
+                                    break;
+                                }
+                                Err(Unresolved(d)) => {
+                                    assert_eq!(
+                                        baseline,
+                                        ExpectedOutput::Unresolved(d),
+                                        "{:?}",
+                                        idx
+                                    );
+                                    break;
                                 }
                                 Err(Dependency(_i)) => (),
                             }
@@ -174,11 +244,12 @@ where
                         }
                     }
                     Operator::Remove => {
-                        map.write(key, (idx, 1), Value(None));
+                        map.add_write(key, (idx, 1), Value(None));
                     }
                     Operator::Insert(v) => {
-                        map.write(key, (idx, 1), Value(Some(v.clone())));
+                        map.add_write(key, (idx, 1), Value(Some(v.clone())));
                     }
+                    Operator::Update(delta) => map.add_delta(key, idx, delta.clone()),
                 }
             })
         }

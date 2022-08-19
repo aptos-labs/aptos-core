@@ -3,7 +3,7 @@
 
 use crate::{
     errors::{Error, Result},
-    executor::{MVHashMapView, Read},
+    executor::{MVHashMapView, ReadResult},
     task::{
         ExecutionStatus, ExecutorTask, ModulePath, Transaction as TransactionType,
         TransactionOutput,
@@ -321,16 +321,16 @@ where
                 let mut reads_result = vec![];
                 for k in reads[read_idx].iter() {
                     reads_result.push(match view.read(k) {
-                        Read::Value(v) => (Some((*v).clone()), None),
-                        Read::U128(v) => (None, Some(v)),
-                        Read::Unresolved(delta) => {
+                        ReadResult::Value(v) => (Some((*v).clone()), None),
+                        ReadResult::U128(v) => (None, Some(v)),
+                        ReadResult::Unresolved(delta) => {
                             let delta_val = match delta.apply_to(STORAGE_DELTA_VAL) {
                                 Ok(res) => res,
                                 Err(_) => FAILURE_DELTA_VAL,
                             };
                             (None, Some(delta_val))
                         }
-                        Read::None => (None, None),
+                        ReadResult::None => (None, None),
                     });
                 }
                 ExecutionStatus::Success(Output(

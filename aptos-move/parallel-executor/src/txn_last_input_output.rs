@@ -21,6 +21,7 @@ use std::{
 
 type TxnInput<K> = Vec<ReadDescriptor<K>>;
 type TxnOutput<T, E> = ExecutionStatus<T, Error<E>>;
+type KeySet<T> = HashSet<<<T as TransactionOutput>::T as Transaction>::Key>;
 
 /// Information about the read which is used by validation.
 #[derive(Clone, PartialEq)]
@@ -213,18 +214,17 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
         self.inputs[txn_idx].load_full()
     }
 
-    // Extracts a set of paths written during execution from transaction output.
-    pub fn write_set(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> HashSet<<<T as TransactionOutput>::T as Transaction>::Key> {
+    // Extracts a set of paths written or updated during execution from transaction
+    // output: (modified by writes, modified by deltas).
+    pub fn modified_keys(&self, txn_idx: TxnIndex) -> (KeySet<T>, KeySet<T>) {
         match &self.outputs[txn_idx].load_full() {
-            None => HashSet::new(),
+            None => (HashSet::new(), HashSet::new()),
             Some(txn_output) => match txn_output.as_ref() {
-                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => {
-                    t.get_writes().into_iter().map(|(k, _)| k).collect()
-                }
-                ExecutionStatus::Abort(_) => HashSet::new(),
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => (
+                    t.get_writes().into_iter().map(|(k, _)| k).collect(),
+                    t.get_deltas().into_iter().map(|(k, _)| k).collect(),
+                ),
+                ExecutionStatus::Abort(_) => (HashSet::new(), HashSet::new()),
             },
         }
     }

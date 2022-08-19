@@ -10,10 +10,10 @@ use crate::{
 use aptos_aggregator::delta_change_set::DeltaOp;
 use aptos_infallible::Mutex;
 use aptos_types::write_set::DeserializeU128;
-use mvhashmap::{Error as MVError, MVHashMap, Output};
+use mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use num_cpus;
 use once_cell::sync::Lazy;
-use std::{collections::HashSet, hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
+use std::{hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
 
 static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
@@ -39,7 +39,7 @@ pub struct MVHashMapView<'a, K, V> {
 
 /// A struct which describes the result of the read from the proxy. The client
 /// can interpret these types to further resolve the reads.
-pub enum Read<V> {
+pub enum ReadResult<V> {
     // Successful read of a value.
     Value(Arc<V>),
     // Similar to above, but the value was aggregated and is an integer.
@@ -63,9 +63,9 @@ impl<
     }
 
     /// Captures a read from the VM execution.
-    pub fn read(&self, key: &K) -> Read<V> {
-        use MVError::*;
-        use Output::*;
+    pub fn read(&self, key: &K) -> ReadResult<V> {
+        use MVHashMapError::*;
+        use MVHashMapOutput::*;
 
         loop {
             match self.versioned_map.read(key, self.txn_idx) {
@@ -78,25 +78,26 @@ impl<
                             txn_idx,
                             incarnation,
                         ));
-                    return Read::Value(v);
+                    return ReadResult::Value(v);
                 }
                 Ok(Resolved(value)) => {
                     self.captured_reads
                         .lock()
                         .push(ReadDescriptor::from_resolved(key.clone(), value));
-                    return Read::U128(value);
+                    return ReadResult::U128(value);
                 }
                 Err(NotFound) => {
                     self.captured_reads
                         .lock()
                         .push(ReadDescriptor::from_storage(key.clone()));
-                    return Read::None;
+                    return ReadResult::None;
                 }
+                Err(DeltaApplicationFailure) => todo!(),
                 Err(Unresolved(delta)) => {
                     self.captured_reads
                         .lock()
                         .push(ReadDescriptor::from_unresolved(key.clone(), delta));
-                    return Read::Unresolved(delta);
+                    return ReadResult::Unresolved(delta);
                 }
                 Err(Dependency(dep_idx)) => {
                     // `self.txn_idx` estimated to depend on a write from `dep_idx`.
@@ -196,17 +197,27 @@ where
 
         // VM execution.
         let execute_result = executor.execute_transaction(&state_view, txn);
-        let mut prev_write_set: HashSet<T::Key> = last_input_output.write_set(idx_to_execute);
+        let (mut prev_write_keys, mut prev_delta_keys) =
+            last_input_output.modified_keys(idx_to_execute);
 
-        // For tracking whether the recent execution wrote outside of the previous write set.
-        let mut writes_outside = false;
-        let mut apply_writes = |output: &<E as ExecutorTask>::Output| {
+        // For tracking whether the recent execution wrote outside of the previous write/delta set.
+        let mut updates_outside = false;
+        let mut apply_updates = |output: &<E as ExecutorTask>::Output| {
+            // First, apply writes.
             let write_version = (idx_to_execute, incarnation);
             for (k, v) in output.get_writes().into_iter() {
-                if !prev_write_set.remove(&k) {
-                    writes_outside = true
+                if !prev_write_keys.remove(&k) {
+                    updates_outside = true
                 }
-                versioned_data_cache.write(&k, write_version, v);
+                versioned_data_cache.add_write(&k, write_version, v);
+            }
+
+            // Then, apply deltas.
+            for (k, d) in output.get_deltas().into_iter() {
+                if !prev_delta_keys.remove(&k) {
+                    updates_outside = true
+                }
+                versioned_data_cache.add_delta(&k, idx_to_execute, d);
             }
         };
 
@@ -216,13 +227,13 @@ where
             // user defined error), no immediate action is taken. Instead the statuses
             // are recorded and (final statuses) are analyzed when the block is executed.
             ExecutionStatus::Success(output) => {
-                // Apply the writes to the versioned_data_cache.
-                apply_writes(&output);
+                // Apply the writes/deltas to the versioned_data_cache.
+                apply_updates(&output);
                 ExecutionStatus::Success(output)
             }
             ExecutionStatus::SkipRest(output) => {
-                // Apply the writes and record status indicating skip.
-                apply_writes(&output);
+                // Apply the writes/deltas and record status indicating skip.
+                apply_updates(&output);
                 ExecutionStatus::SkipRest(output)
             }
             ExecutionStatus::Abort(err) => {
@@ -231,13 +242,14 @@ where
             }
         };
 
-        // Remove entries from previous write set that were not overwritten.
-        for k in &prev_write_set {
+        // Remove entries from previous write/delta set that were not overwritten.
+        let unmodified_keys = prev_write_keys.iter().chain(prev_delta_keys.iter());
+        for k in unmodified_keys {
             versioned_data_cache.delete(k, idx_to_execute);
         }
 
         last_input_output.record(idx_to_execute, state_view.take_reads(), result);
-        scheduler.finish_execution(idx_to_execute, incarnation, writes_outside, guard)
+        scheduler.finish_execution(idx_to_execute, incarnation, updates_outside, guard)
     }
 
     fn validate<'a>(
@@ -252,8 +264,8 @@ where
         versioned_data_cache: &MVHashMap<<T as Transaction>::Key, <T as Transaction>::Value>,
         scheduler: &'a Scheduler,
     ) -> SchedulerTask<'a> {
-        use MVError::*;
-        use Output::*;
+        use MVHashMapError::*;
+        use MVHashMapOutput::*;
 
         let (idx_to_validate, incarnation) = version_to_validate;
         let read_set = last_input_output
@@ -274,8 +286,9 @@ where
         let aborted = !valid && scheduler.try_abort(idx_to_validate, incarnation);
 
         if aborted {
-            // Not valid and successfully aborted, mark the latest write-set as estimates.
-            for k in &last_input_output.write_set(idx_to_validate) {
+            // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
+            let (write_keys, delta_keys) = &last_input_output.modified_keys(idx_to_validate);
+            for k in write_keys.iter().chain(delta_keys.iter()) {
                 versioned_data_cache.mark_estimate(k, idx_to_validate);
             }
 

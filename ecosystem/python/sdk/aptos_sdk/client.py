@@ -13,7 +13,7 @@ from .bcs import Serializer
 from .transactions import (
     MultiAgentRawTransaction,
     RawTransaction,
-    ScriptFunction,
+    EntryFunction,
     SignedTransaction,
     TransactionArgument,
     TransactionPayload,
@@ -236,7 +236,7 @@ class RestClient:
         Returns the sequence number of the transaction used to transfer."""
 
         payload = {
-            "type": "script_function_payload",
+            "type": "entry_function_payload",
             "function": "0x1::coin::transfer",
             "type_arguments": ["0x1::aptos_coin::AptosCoin"],
             "arguments": [
@@ -254,7 +254,7 @@ class RestClient:
             TransactionArgument(amount, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x1::coin",
             "transfer",
             [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
@@ -285,7 +285,7 @@ class RestClient:
             ),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token",
             "create_collection_script",
             [],
@@ -326,7 +326,7 @@ class RestClient:
             TransactionArgument([], Serializer.sequence_serializer(Serializer.str)),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token",
             "create_token_script",
             [],
@@ -356,7 +356,7 @@ class RestClient:
             TransactionArgument(amount, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token_transfers",
             "offer_script",
             [],
@@ -384,7 +384,7 @@ class RestClient:
             TransactionArgument(property_version, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token_transfers",
             "claim_script",
             [],
@@ -413,7 +413,7 @@ class RestClient:
             TransactionArgument(amount, Serializer.u64),
         ]
 
-        payload = ScriptFunction.natural(
+        payload = EntryFunction.natural(
             "0x3::token",
             "direct_transfer_script",
             [],

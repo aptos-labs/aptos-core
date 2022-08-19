@@ -6523,7 +6523,7 @@
                   "return": []
                 },
                 {
-                  "name": "initialize_owner_only",
+                  "name": "initialize_stake_owner",
                   "visibility": "public",
                   "is_entry": true,
                   "generic_type_params": [],
@@ -17379,7 +17379,7 @@
                       "return": []
                     },
                     {
-                      "name": "initialize_owner_only",
+                      "name": "initialize_stake_owner",
                       "visibility": "public",
                       "is_entry": true,
                       "generic_type_params": [],

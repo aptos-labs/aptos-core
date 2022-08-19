@@ -17,6 +17,7 @@ use crate::{
 };
 
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_temppath::TempPath;
 use aptos_types::{
     proof::SparseMerkleLeafNode,
@@ -103,6 +104,7 @@ fn test_storage_config() {
 
             let ledger_pruner = LedgerPrunerManager::new(
                 Arc::clone(&aptos_db.ledger_db),
+                Arc::clone(&aptos_db.state_store),
                 LedgerPrunerConfig {
                     enable: enable_ledger,
                     prune_window: 100,
@@ -132,6 +134,7 @@ fn test_error_if_version_is_pruned() {
 
     let ledger_pruner = LedgerPrunerManager::new(
         Arc::clone(&aptos_db.ledger_db),
+        Arc::clone(&aptos_db.state_store),
         LedgerPrunerConfig {
             enable: true,
             prune_window: 0,
@@ -185,6 +188,7 @@ fn test_get_latest_executed_trees() {
     assert!(
         bootstrapped.is_same_view(&ExecutedTrees::new_at_state_checkpoint(
             txn_info.state_checkpoint_hash().unwrap(),
+            StateStorageUsage::new_untracked(),
             vec![txn_info.hash()],
             1,
         ))

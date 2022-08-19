@@ -26,6 +26,7 @@ aptos-types = { path = "../../types" }
 move-deps = { path = "../move-deps", features = ["address32"] }
 
 [dev-dependencies]
+cached-packages = { path = "../../aptos-move/framework/cached-packages" }
 framework = { path = "../framework" }
 tempfile = "3.3.0"
 which = "4.2.5"

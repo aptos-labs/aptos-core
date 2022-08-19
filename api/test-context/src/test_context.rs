@@ -8,7 +8,8 @@ use aptos_api_types::{
     X_APTOS_LEDGER_TIMESTAMP, X_APTOS_LEDGER_VERSION,
 };
 use aptos_config::config::{
-    NodeConfig, RocksdbConfigs, NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
+    NodeConfig, RocksdbConfigs, DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
+    NO_OP_STORAGE_PRUNER_CONFIG, TARGET_SNAPSHOT_SIZE,
 };
 use aptos_crypto::{hash::HashValue, SigningKey};
 use aptos_mempool::mocks::MockSharedMempool;
@@ -90,7 +91,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let builder = aptos_genesis::builder::Builder::new(
         tmp_dir.path(),
-        framework::head_release_bundle().clone(),
+        cached_packages::head_release_bundle().clone(),
     )
     .unwrap()
     .with_init_genesis_config(Some(Arc::new(|genesis_config| {
@@ -113,6 +114,7 @@ pub fn new_test_context(test_name: String, use_db_with_indexer: bool) -> TestCon
                 RocksdbConfigs::default(),
                 false, /* indexer */
                 TARGET_SNAPSHOT_SIZE,
+                DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
             )
             .unwrap(),
         )
@@ -377,7 +379,7 @@ impl TestContext {
             .unwrap()
     }
 
-    pub async fn api_execute_script_function(
+    pub async fn api_execute_entry_function(
         &mut self,
         account: &mut LocalAccount,
         module: &str,
@@ -388,7 +390,7 @@ impl TestContext {
         self.api_execute_txn(
             account,
             json!({
-                "type": "script_function_payload",
+                "type": "entry_function_payload",
                 "function": format!(
                     "{}::{}::{}",
                     account.address().to_hex_literal(),
@@ -547,7 +549,6 @@ impl TestContext {
             0,
             round,
             self.validator_owner,
-            Some(0),
             vec![0],
             vec![],
             self.fake_time_usecs,

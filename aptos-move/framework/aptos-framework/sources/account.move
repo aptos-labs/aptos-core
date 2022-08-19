@@ -14,7 +14,7 @@ module aptos_framework::account {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
     use aptos_std::table::{Self, Table};
-    use aptos_std::signature;
+    use aptos_std::ed25519;
 
     friend aptos_framework::coins;
     friend aptos_framework::genesis;
@@ -53,10 +53,12 @@ module aptos_framework::account {
         address_map: Table<address, address>,
     }
 
-    // This holds information that will be provided to prove that
-    // the user owns the public-private key pair and knows that
-    // they are going to perform an auth key rotation
-    struct RotationProof has copy, drop {
+    /// This structs stores the challenge message that should be signed during key rotation. First, this struct is
+    /// signed by the account owner's current public key, which proves possession of a capability to rotate the key.
+    /// Second, this struct is signed by the new public key that the account owner wants to rotate to, which proves
+    /// knowledge of this new public key's associated secret key. These two signatures cannot be replayed in another
+    /// context because they include the TXN's unique sequence number.
+    struct RotationProofChallenge has copy, drop {
         sequence_number: u64,
         originator: address, // originating address
         current_auth_key: address, // current auth key
@@ -79,10 +81,12 @@ module aptos_framework::account {
     const EOUT_OF_GAS: u64 = 6;
     /// Writesets are not allowed
     const EWRITESET_NOT_ALLOWED: u64 = 7;
-    /// Specified public key is invalid
-    const EINVALID_PUBLIC_KEY: u64 = 8;
-    /// Specified proof of knowledge required to prove ownership of a key is invalid
+    /// Specified current public key is not correct
+    const EWRONG_CURRENT_PUBLIC_KEY: u64 = 8;
+    /// Specified proof of knowledge required to prove ownership of a public key is invalid
     const EINVALID_PROOF_OF_KNOWLEDGE: u64 = 9;
+    /// The caller does not have a digital-signature-based capability to call this function
+    const ENO_CAPABILITY: u64 = 10;
 
     /// Prologue errors. These are separated out from the other errors in this
     /// module since they are mapped separately to major VM statuses, and are
@@ -205,46 +209,66 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    // This function rotates the authentication key upon successful verification of private key ownership, and records
-    // the new authentication key <> originating address mapping on chain.
-    // `rotation_proof_current_signature` refers to the struct RotationProof signed by the current private key
-    // `rotation_proof_next_signature` refers to the struct RotationProof signed by the next private key
-    public entry fun rotate_authentication_key_ed25519(account: &signer, rotation_proof_current_signature: vector<u8>, rotation_proof_next_signature: vector<u8>, current_public_key: vector<u8>, new_public_key: vector<u8>) acquires Account, OriginatingAddress {
+    /// Rotates the authentication key and records a mapping on chain from the new authentication key to the originating
+    /// address of the account. To authorize the rotation, a signature under the old public key on a `RotationProofChallenge`
+    /// is given in `current_sig`. To ensure the account owner knows the secret key corresponding to the new public key
+    /// in `new_pubkey`, a proof-of-knowledge is given in `new_sig` (i.e., a signature under the new public key on the
+    /// same `RotationProofChallenge` struct).
+    public entry fun rotate_authentication_key_ed25519(
+        account: &signer,
+        curr_sig_bytes: vector<u8>,
+        new_sig_bytes: vector<u8>,
+        curr_pk_bytes: vector<u8>,
+        new_pk_bytes: vector<u8>,
+    ) acquires Account, OriginatingAddress {
+        // Get the originating address of the account owner
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
-        assert!(
-            vector::length(&current_public_key) == 32 && vector::length(&new_public_key) == 32,
-            error::invalid_argument(EINVALID_PUBLIC_KEY)
-        );
-        assert!(
-            vector::length(&rotation_proof_current_signature) == 64 && vector::length(&rotation_proof_next_signature) == 64,
-            error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE)
-        );
+        let curr_pubkey = ed25519::new_unvalidated_public_key_from_bytes(curr_pk_bytes);
+        let new_pubkey = ed25519::new_unvalidated_public_key_from_bytes(new_pk_bytes);
+        let new_sig = ed25519::new_signature_from_bytes(new_sig_bytes);
+        let curr_sig = ed25519::new_signature_from_bytes(curr_sig_bytes);
 
+        // Get the current authentication key of the account
         let account_resource = borrow_global_mut<Account>(addr);
-        let current_auth_key = create_address(account_resource.authentication_key);
+        let curr_auth_key = create_address(account_resource.authentication_key);
 
-        let rotation_proof = RotationProof {
+        // Check current_pk matches current_auth_key:
+        //  1. First, append the Ed25519 scheme identifier '0x00' to the PK
+        //  2. Second, hash this using SHA3-256
+        vector::push_back(&mut curr_pk_bytes, 0);
+        let expected_current_auth_key = hash::sha3_256(curr_pk_bytes);
+        assert!(create_address(expected_current_auth_key) == curr_auth_key, std::error::unauthenticated(EWRONG_CURRENT_PUBLIC_KEY));
+
+        // Construct a RotationProofChallenge struct
+        let challenge = RotationProofChallenge {
             sequence_number: account_resource.sequence_number,
             originator: addr,
-            current_auth_key,
-            new_public_key,
+            current_auth_key: curr_auth_key,
+            new_public_key: new_pk_bytes,
         };
 
-        assert!(signature::ed25519_verify_t(rotation_proof_current_signature, current_public_key, copy rotation_proof), EINVALID_PROOF_OF_KNOWLEDGE);
-        assert!(signature::ed25519_verify_t(rotation_proof_next_signature, new_public_key, rotation_proof), EINVALID_PROOF_OF_KNOWLEDGE);
+        // Verify a digital-signature-based capability that assures us this key rotation was intended by the account owner
+        assert!(ed25519::signature_verify_strict_t(&curr_sig, &curr_pubkey, copy challenge), std::error::permission_denied(ENO_CAPABILITY));
+        // Verify a proof-of-knowledge of the new public key we are rotating to
+        assert!(ed25519::signature_verify_strict_t(&new_sig, &new_pubkey, challenge), std::error::invalid_argument(EINVALID_PROOF_OF_KNOWLEDGE));
 
+        // Update the originating address map: i.e., set this account's new address to point to the originating address.
+        // Begin by removing the entry for the current authentication key, if there is one.
         let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
-        if (table::contains(address_map, current_auth_key)) {
-            table::remove(address_map, current_auth_key);
+        if (table::contains(address_map, curr_auth_key)) {
+            table::remove(address_map, curr_auth_key);
         };
 
-        // The authentication key is the sha256 hash of the public key and its scheme.
-        // For ed25519, we are adding scheme 0 at the end of the public key.
-        vector::push_back(&mut new_public_key, 0);
-        let new_auth_key = hash::sha3_256(new_public_key);
+        // Derive the authentication key of the new PK
+        vector::push_back(&mut new_pk_bytes, 0);
+        let new_auth_key = hash::sha3_256(new_pk_bytes);
         let new_address = create_address(new_auth_key);
+
+        // Update the originating address map
         table::add(address_map, new_address, addr);
+
+        // Update the account with the new authentication key
         account_resource.authentication_key = new_auth_key;
     }
 
@@ -565,20 +589,20 @@ module aptos_framework::account {
     }
 
     #[test(alice = @0xa11ce)]
-    #[expected_failure(abort_code = 65544)]
-    public entry fun test_invalid_public_key(alice: signer) acquires Account, OriginatingAddress {
+    #[expected_failure(abort_code = 65537)]
+    public entry fun test_empty_public_key(alice: signer) acquires Account, OriginatingAddress {
         create_account(signer::address_of(&alice));
-        let test_public_key = vector::empty<u8>();
-        let test_signature = vector::empty<u8>();
-        rotate_authentication_key_ed25519(&alice, test_signature, test_signature, test_public_key, test_public_key);
+        let pk = vector::empty<u8>();
+        let sig = x"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+        rotate_authentication_key_ed25519(&alice, sig, sig, pk, pk);
     }
 
     #[test(alice = @0xa11ce)]
-    #[expected_failure(abort_code = 65545)]
-    public entry fun test_invalid_signature(alice: signer) acquires Account, OriginatingAddress {
+    #[expected_failure(abort_code = 65538)]
+    public entry fun test_empty_signature(alice: signer) acquires Account, OriginatingAddress {
         create_account(signer::address_of(&alice));
-        let account_resource = borrow_global_mut<Account>(signer::address_of(&alice));
-        let test_signature = vector::empty<u8>();
-        rotate_authentication_key_ed25519(&alice, test_signature, test_signature, account_resource.authentication_key, account_resource.authentication_key);
+        let test_signature  = vector::empty<u8>();
+        let pk = x"0000000000000000000000000000000000000000000000000000000000000000";
+        rotate_authentication_key_ed25519(&alice, test_signature, test_signature, pk, pk);
     }
 }
