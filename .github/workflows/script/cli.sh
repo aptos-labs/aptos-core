@@ -27,5 +27,8 @@ nohup docker run -d -p 8082:8082 --rm -v $(pwd)/data:/opt/aptos aptos-core:roset
 
 sleep 60
 
-# echo "start check:data"
+echo "download rosetta-cli"
+curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
+
+echo "start check:data"
 ./bin/rosetta-cli --configuration-file crates/aptos-rosetta/rosetta_cli.json check:data --start-block $START_INDEX --end-block $END_INDEX
