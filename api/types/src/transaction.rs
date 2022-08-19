@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Address, EntryFunctionId, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode,
+    Address, AptosError, EntryFunctionId, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode,
     MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, U64,
 };
 
@@ -345,6 +345,33 @@ pub struct SubmitTransactionRequest {
     pub user_transaction_request: UserTransactionRequestInner,
 
     pub signature: TransactionSignature,
+}
+
+#[derive(Debug, Serialize, Deserialize, Object)]
+pub struct SubmitTransactionsBatchExecutionResult {
+    pub transaction_results: Vec<SubmitTransactionsBatchSingleExecutionResult>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Union)]
+pub enum SubmitTransactionsBatchSingleExecutionResult {
+    SUCCESS(HashValue),
+    FAILURE(AptosError),
+}
+
+impl SubmitTransactionsBatchSingleExecutionResult {
+    pub fn is_failure(&self) -> bool {
+        match self {
+            Self::SUCCESS(_) => false,
+            Self::FAILURE(_) => true,
+        }
+    }
+
+    pub fn unwrap(&self) -> aptos_crypto::hash::HashValue {
+        match self {
+            Self::SUCCESS(h) => h.0,
+            Self::FAILURE(f) => panic!("Unwrapping failure: {:?}", f),
+        }
+    }
 }
 
 // TODO: Rename this to remove the Inner when we cut over.

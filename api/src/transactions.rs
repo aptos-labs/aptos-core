@@ -15,15 +15,16 @@ use crate::page::Page;
 use crate::response::{
     api_disabled, transaction_not_found_by_hash, transaction_not_found_by_version, BadRequestError,
     BasicError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult,
-    BasicResultWith404, InsufficientStorageError, InternalError, ServiceUnavailableError,
+    BasicResultWith404, InsufficientStorageError, InternalError,
 };
 use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    Address, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation, HashValue,
-    HexEncodedBytes, LedgerInfo, PendingTransaction, SubmitTransactionRequest, Transaction,
-    TransactionData, TransactionOnChainData, UserTransaction, U64,
+    Address, AptosError, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation,
+    HashValue, HexEncodedBytes, LedgerInfo, PendingTransaction, SubmitTransactionRequest,
+    SubmitTransactionsBatchExecutionResult, SubmitTransactionsBatchSingleExecutionResult,
+    Transaction, TransactionData, TransactionOnChainData, UserTransaction, U64,
 };
 use aptos_crypto::signing_message;
 use aptos_types::mempool_status::MempoolStatusCode;
@@ -37,6 +38,7 @@ use poem_openapi::payload::Json;
 use poem_openapi::{ApiRequest, OpenApi};
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
+
 generate_error_response!(
     SubmitTransactionError,
     (400, BadRequest),
@@ -50,6 +52,15 @@ generate_error_response!(
 type SubmitTransactionResult<T> =
     poem::Result<SubmitTransactionResponse<T>, SubmitTransactionError>;
 
+generate_success_response!(
+    SubmitTransactionsBatchResponse,
+    (202, Accepted),
+    (206, AcceptedPartial)
+);
+
+type SubmitTransactionsBatchResult<T> =
+    poem::Result<SubmitTransactionsBatchResponse<T>, SubmitTransactionError>;
+
 type SimulateTransactionResult<T> = poem::Result<BasicResponse<T>, SubmitTransactionError>;
 
 // TODO: Consider making both content types accept either
@@ -62,6 +73,20 @@ type SimulateTransactionResult<T> = poem::Result<BasicResponse<T>, SubmitTransac
 pub enum SubmitTransactionPost {
     #[oai(content_type = "application/json")]
     Json(Json<SubmitTransactionRequest>),
+
+    // TODO: Since I don't want to impl all the Poem derives on SignedTransaction,
+    // find a way to at least indicate in the spec that it expects a SignedTransaction.
+    // TODO: https://github.com/aptos-labs/aptos-core/issues/2275
+    #[oai(content_type = "application/x.aptos.signed_transaction+bcs")]
+    Bcs(Bcs),
+}
+
+// We need a custom type here because we use different types for each of the
+// content types possible for the POST data.
+#[derive(ApiRequest, Debug)]
+pub enum SubmitTransactionsBatchPost {
+    #[oai(content_type = "application/json")]
+    Json(Json<Vec<SubmitTransactionRequest>>),
 
     // TODO: Since I don't want to impl all the Poem derives on SignedTransaction,
     // find a way to at least indicate in the spec that it expects a SignedTransaction.
@@ -213,7 +238,36 @@ impl TransactionsApi {
         }
         let ledger_info = self.context.get_latest_ledger_info()?;
         let signed_transaction = self.get_signed_transaction(&ledger_info, data)?;
-        self.create(&accept_type, ledger_info, signed_transaction)
+        self.create(&accept_type, &ledger_info, signed_transaction)
+            .await
+    }
+
+    #[oai(
+        path = "/transactions/batch",
+        method = "post",
+        operation_id = "submit_batch_transactions",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn submit_transactions_batch(
+        &self,
+        accept_type: AcceptType,
+        data: SubmitTransactionsBatchPost,
+    ) -> SubmitTransactionsBatchResult<SubmitTransactionsBatchExecutionResult> {
+        fail_point_poem("endpoint_submit_batch_transactions")?;
+        let ledger_info = self.context.get_latest_ledger_info()?;
+        let signed_transactions_batch = self.get_signed_transactions_batch(&ledger_info, data)?;
+        if self.context.max_submit_transaction_batch_size() < signed_transactions_batch.len() {
+            return Err(SubmitTransactionError::bad_request_with_code(
+                &format!(
+                    "Submitted too many transactions: {}, while limit is {}",
+                    signed_transactions_batch.len(),
+                    self.context.max_submit_transaction_batch_size(),
+                ),
+                AptosErrorCode::InvalidInput,
+                &ledger_info,
+            ));
+        }
+        self.create_batch(&accept_type, &ledger_info, signed_transactions_batch)
             .await
     }
 
@@ -564,59 +618,66 @@ impl TransactionsApi {
         }
     }
 
-    async fn create(
+    fn get_signed_transactions_batch(
         &self,
-        accept_type: &AcceptType,
-        ledger_info: LedgerInfo,
-        txn: SignedTransaction,
-    ) -> SubmitTransactionResult<PendingTransaction> {
+        ledger_info: &LedgerInfo,
+        data: SubmitTransactionsBatchPost,
+    ) -> Result<Vec<SignedTransaction>, SubmitTransactionError> {
+        match data {
+            SubmitTransactionsBatchPost::Bcs(data) => {
+                let signed_transactions = bcs::from_bytes(&data.0)
+                    .context("Failed to deserialize input into SignedTransaction")
+                    .map_err(|err| {
+                        SubmitTransactionError::bad_request_with_code(
+                            err,
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        )
+                    })?;
+                Ok(signed_transactions)
+            }
+            SubmitTransactionsBatchPost::Json(data) => data
+                .0
+                .into_iter()
+                .enumerate()
+                .map(|(index, txn)| {
+                    self.context
+                        .move_resolver_poem(ledger_info)?
+                        .as_converter(self.context.db.clone())
+                        .try_into_signed_transaction_poem(txn, self.context.chain_id())
+                        .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
+                        .map_err(|err| {
+                            SubmitTransactionError::bad_request_with_code(
+                                err,
+                                AptosErrorCode::InvalidInput,
+                                ledger_info,
+                            )
+                        })
+                })
+                .collect(),
+        }
+    }
+
+    async fn create_internal(&self, txn: SignedTransaction) -> Result<(), AptosError> {
         let (mempool_status, vm_status_opt) = self
             .context
-            .submit_transaction(txn.clone())
+            .submit_transaction(txn)
             .await
             .context("Mempool failed to initially evaluate submitted transaction")
             .map_err(|err| {
-                SubmitTransactionError::internal_with_code(
-                    err,
-                    AptosErrorCode::InternalError,
-                    &ledger_info,
-                )
+                aptos_api_types::AptosError::new_with_error_code(err, AptosErrorCode::InternalError)
             })?;
         match mempool_status.code {
-            MempoolStatusCode::Accepted => match accept_type {
-                AcceptType::Json => {
-                    let resolver = self.context.move_resolver_poem(&ledger_info)?;
-                    let pending_txn = resolver
-                            .as_converter(self.context.db.clone())
-                            .try_into_pending_transaction_poem(txn)
-                            .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
-                            .map_err(|err| SubmitTransactionError::internal_with_code(
-                                err,
-                                AptosErrorCode::InternalError,
-                                &ledger_info,
-                            ))?;
-                    SubmitTransactionResponse::try_from_json((
-                        pending_txn,
-                        &ledger_info,
-                        SubmitTransactionResponseStatus::Accepted,
-                    ))
-                }
-                AcceptType::Bcs => SubmitTransactionResponse::try_from_bcs((
-                    (),
-                    &ledger_info,
-                    SubmitTransactionResponseStatus::Accepted,
-                )),
-            },
+            MempoolStatusCode::Accepted => Ok(()),
             MempoolStatusCode::MempoolIsFull | MempoolStatusCode::TooManyTransactions => {
-                Err(SubmitTransactionError::insufficient_storage_with_code(
+                Err(AptosError::new_with_error_code(
                     &mempool_status.message,
                     AptosErrorCode::MempoolIsFull,
-                    &ledger_info,
                 ))
             }
             MempoolStatusCode::VmError => {
                 if let Some(status) = vm_status_opt {
-                    Err(SubmitTransactionError::bad_request_with_vm_status(
+                    Err(AptosError::new_with_vm_status(
                         format!(
                             "Invalid transaction: Type: {:?} Code: {:?}",
                             status.status_type(),
@@ -624,37 +685,126 @@ impl TransactionsApi {
                         ),
                         AptosErrorCode::VmError,
                         status,
-                        &ledger_info,
                     ))
                 } else {
-                    Err(SubmitTransactionError::bad_request_with_vm_status(
+                    Err(AptosError::new_with_vm_status(
                         "Invalid transaction: unknown",
                         AptosErrorCode::VmError,
                         StatusCode::UNKNOWN_STATUS,
-                        &ledger_info,
                     ))
                 }
             }
-            MempoolStatusCode::InvalidSeqNumber => {
-                Err(SubmitTransactionError::bad_request_with_code(
-                    mempool_status.message,
-                    AptosErrorCode::SequenceNumberTooOld,
-                    &ledger_info,
-                ))
-            }
-            MempoolStatusCode::InvalidUpdate => Err(SubmitTransactionError::bad_request_with_code(
+            MempoolStatusCode::InvalidSeqNumber => Err(AptosError::new_with_error_code(
+                mempool_status.message,
+                AptosErrorCode::SequenceNumberTooOld,
+            )),
+
+            MempoolStatusCode::InvalidUpdate => Err(AptosError::new_with_error_code(
                 mempool_status.message,
                 AptosErrorCode::InvalidTransactionUpdate,
-                &ledger_info,
             )),
-            MempoolStatusCode::UnknownStatus => {
-                Err(SubmitTransactionError::service_unavailable_with_code(
-                    format!("Transaction was rejected with status {}", mempool_status),
-                    AptosErrorCode::InternalError,
-                    &ledger_info,
-                ))
-            }
+            MempoolStatusCode::UnknownStatus => Err(AptosError::new_with_error_code(
+                format!("Transaction was rejected with status {}", mempool_status,),
+                AptosErrorCode::InternalError,
+            )),
         }
+    }
+
+    async fn create(
+        &self,
+        accept_type: &AcceptType,
+        ledger_info: &LedgerInfo,
+        txn: SignedTransaction,
+    ) -> SubmitTransactionResult<PendingTransaction> {
+        match self.create_internal(txn.clone()).await {
+            Ok(()) => match accept_type {
+                AcceptType::Json => {
+                    let resolver = self
+                        .context
+                        .move_resolver()
+                        .context("Failed to read latest state checkpoint from DB")
+                        .map_err(|e| {
+                            SubmitTransactionError::internal_with_code(
+                                e,
+                                AptosErrorCode::InternalError,
+                                ledger_info,
+                            )
+                        })?;
+
+                    let pending_txn = resolver
+                            .as_converter(self.context.db.clone())
+                            .try_into_pending_transaction_poem(txn)
+                            .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
+                            .map_err(|err| SubmitTransactionError::internal_with_code(
+                                err,
+                                AptosErrorCode::InternalError,
+                                ledger_info,
+                            ))?;
+                    SubmitTransactionResponse::try_from_json((
+                        pending_txn,
+                        ledger_info,
+                        SubmitTransactionResponseStatus::Accepted,
+                    ))
+                }
+                AcceptType::Bcs => SubmitTransactionResponse::try_from_bcs((
+                    (),
+                    ledger_info,
+                    SubmitTransactionResponseStatus::Accepted,
+                )),
+            },
+            Err(error) => match error.error_code {
+                AptosErrorCode::InternalError => Err(
+                    SubmitTransactionError::internal_from_aptos_error(error, ledger_info),
+                ),
+                AptosErrorCode::VmError
+                | AptosErrorCode::SequenceNumberTooOld
+                | AptosErrorCode::InvalidTransactionUpdate => Err(
+                    SubmitTransactionError::bad_request_from_aptos_error(error, ledger_info),
+                ),
+                AptosErrorCode::MempoolIsFull => Err(
+                    SubmitTransactionError::insufficient_storage_from_aptos_error(
+                        error,
+                        ledger_info,
+                    ),
+                ),
+                _ => Err(SubmitTransactionError::internal_from_aptos_error(
+                    error,
+                    ledger_info,
+                )),
+            },
+        }
+    }
+
+    async fn create_batch(
+        &self,
+        accept_type: &AcceptType,
+        ledger_info: &LedgerInfo,
+        txns: Vec<SignedTransaction>,
+    ) -> SubmitTransactionsBatchResult<SubmitTransactionsBatchExecutionResult> {
+        let mut txn_results = Vec::new();
+        for txn in txns {
+            txn_results.push(match self.create_internal(txn.clone()).await {
+                Ok(()) => SubmitTransactionsBatchSingleExecutionResult::SUCCESS(
+                    txn.committed_hash().into(),
+                ),
+                Err(error) => SubmitTransactionsBatchSingleExecutionResult::FAILURE(error),
+            });
+        }
+
+        let response_status = if txn_results.iter().any(|r| r.is_failure()) {
+            SubmitTransactionsBatchResponseStatus::Accepted
+        } else {
+            SubmitTransactionsBatchResponseStatus::AcceptedPartial
+        };
+
+        SubmitTransactionsBatchResponse::try_from_rust_value((
+            SubmitTransactionsBatchExecutionResult {
+                transaction_results: txn_results,
+            },
+            ledger_info,
+            response_status,
+            accept_type,
+        ))
     }
 
     // TODO: This returns a Vec<Transaction>, but is it possible for a single

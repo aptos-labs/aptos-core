@@ -8,8 +8,11 @@ use crate::{
 use anyhow::{format_err, Result};
 use aptos::common::types::EncodingType;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+use aptos_infallible::Mutex;
 use aptos_logger::{debug, info};
-use aptos_rest_client::{Client as RestClient, PendingTransaction, Response};
+use aptos_rest_client::{
+    aptos_api_types::SubmitTransactionsBatchSingleExecutionResult, Client as RestClient,
+};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
@@ -340,6 +343,11 @@ pub fn create_and_fund_account_request(
     ))
 }
 
+struct SubmittingTxnState {
+    pub txns: Vec<SignedTransaction>,
+    pub results: Vec<SubmitTransactionsBatchSingleExecutionResult>,
+}
+
 pub async fn execute_and_wait_transactions(
     client: &RestClient,
     account: &mut LocalAccount,
@@ -353,15 +361,73 @@ pub async fn execute_and_wait_transactions(
         account.address()
     );
 
-    let pending_txns: Vec<Response<PendingTransaction>> = try_join_all(
-        txns.iter()
-            .map(|t| RETRY_POLICY.retry(move || client.submit(t))),
-    )
-    .await?;
+    async fn submit_batch(
+        client: &RestClient,
+        state_mutex: &Mutex<SubmittingTxnState>,
+    ) -> Result<()> {
+        let (indices, txns) = {
+            let state = state_mutex.lock();
 
-    for pt in pending_txns {
+            let mut indices = Vec::new();
+            let mut txns = Vec::new();
+            for (i, txn) in state.txns.iter().enumerate() {
+                if state.results.get(i).map(|r| r.is_failure()).unwrap_or(true) {
+                    indices.push(i);
+                    txns.push(txn.clone());
+                }
+            }
+            (indices, txns)
+        };
+
+        let results = client.submit_batch_bcs(&txns).await.unwrap().into_inner();
+
+        let mut state = state_mutex.lock();
+        for (idx, result) in results.transaction_results.into_iter().enumerate() {
+            let input_idx = *indices.get(idx).unwrap();
+            if state.results.len() == input_idx {
+                // We need to fill it up on the first call:
+                state.results.push(result);
+            } else {
+                state.results[input_idx] = result;
+            }
+        }
+
+        if state.results.iter().any(|r| r.is_failure()) {
+            Err(format_err!(""))
+        } else {
+            Ok(())
+        }
+    }
+
+    let state_mutex = Mutex::new(SubmittingTxnState {
+        txns,
+        results: vec![],
+    });
+    let state_ref = &state_mutex;
+    RETRY_POLICY
+        .retry(move || submit_batch(client, state_ref))
+        .await
+        .map_err(|e| {
+            format_err!(
+                "Failed to wait for transactions: {:?}, {}",
+                state_mutex
+                    .lock()
+                    .results
+                    .iter()
+                    .filter(|r| r.is_failure())
+                    .collect::<Vec<_>>(),
+                e
+            )
+        })?;
+
+    let state = state_mutex.into_inner();
+
+    for (idx, pt) in state.results.iter().enumerate() {
         client
-            .wait_for_transaction(&pt.into_inner())
+            .wait_for_transaction_by_hash_bcs(
+                pt.unwrap(),
+                state.txns[idx].expiration_timestamp_secs(),
+            )
             .await
             .map_err(|e| format_err!("Failed to wait for transactions: {}", e))?;
     }

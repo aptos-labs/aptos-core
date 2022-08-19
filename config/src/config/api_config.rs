@@ -30,6 +30,8 @@ pub struct ApiConfig {
     pub transaction_submission_enabled: bool,
     #[serde(default = "default_enabled")]
     pub transaction_simulation_enabled: bool,
+
+    pub max_submit_transaction_batch_size: usize,
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -60,6 +62,7 @@ impl Default for ApiConfig {
             encode_submission_enabled: default_enabled(),
             transaction_submission_enabled: default_enabled(),
             transaction_simulation_enabled: default_enabled(),
+            max_submit_transaction_batch_size: 100,
         }
     }
 }

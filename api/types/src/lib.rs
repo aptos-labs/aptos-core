@@ -40,10 +40,11 @@ pub use transaction::{
     AccountSignature, BlockMetadataTransaction, DeleteModule, DeleteResource, DeleteTableItem,
     DirectWriteSet, Ed25519Signature, EncodeSubmissionRequest, EntryFunctionPayload, Event,
     GasEstimation, GenesisPayload, GenesisTransaction, ModuleBundlePayload, MultiEd25519Signature,
-    PendingTransaction, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
-    TransactionData, TransactionId, TransactionInfo, TransactionOnChainData, TransactionPayload,
-    TransactionSignature, TransactionSigningMessage, UserCreateSigningMessageRequest,
-    UserTransaction, UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet,
-    WriteSetChange, WriteSetPayload, WriteTableItem,
+    PendingTransaction, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest,
+    SubmitTransactionsBatchExecutionResult, SubmitTransactionsBatchSingleExecutionResult,
+    Transaction, TransactionData, TransactionId, TransactionInfo, TransactionOnChainData,
+    TransactionPayload, TransactionSignature, TransactionSigningMessage,
+    UserCreateSigningMessageRequest, UserTransaction, UserTransactionRequest, VersionedEvent,
+    WriteModule, WriteResource, WriteSet, WriteSetChange, WriteSetPayload, WriteTableItem,
 };
 pub use wrappers::IdentifierWrapper;

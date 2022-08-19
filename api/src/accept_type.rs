@@ -4,7 +4,7 @@
 use aptos_api_types::mime_types::BCS;
 use poem::{web::Accept, FromRequest, Request, RequestBody, Result};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum AcceptType {
     Json,
     Bcs,
