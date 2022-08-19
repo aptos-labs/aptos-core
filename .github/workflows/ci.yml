@@ -13,6 +13,7 @@ jobs:
 
   setup:
     runs-on: ubuntu-latest
+    container: node:14.16
     outputs:
       matrix: ${{steps.setup_work.outputs.matrix}}
       workload: ${{steps.set_blks_per_chunk.outputs.blks_per_chunk}}
@@ -32,6 +33,7 @@ jobs:
 
   rosetta-validation:
     runs-on: ubuntu-latest
+    container: node:14.16
     needs: setup
     strategy:
       matrix: 
