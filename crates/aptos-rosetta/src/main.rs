@@ -169,6 +169,7 @@ impl ServerArgs for OfflineArgs {
             tls_key_path: self.tls_key_path.clone(),
             content_length_limit: self.content_length_limit,
             failpoints_enabled: false,
+            max_submit_transaction_batch_size: 100,
         }
     }
 

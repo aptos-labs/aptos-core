@@ -20,6 +20,7 @@ pub struct ApiConfig {
     pub content_length_limit: Option<u64>,
     #[serde(default = "default_disabled")]
     pub failpoints_enabled: bool,
+    pub max_submit_transaction_batch_size: usize,
 }
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -45,6 +46,7 @@ impl Default for ApiConfig {
             tls_key_path: None,
             content_length_limit: None,
             failpoints_enabled: default_disabled(),
+            max_submit_transaction_batch_size: 100,
         }
     }
 }

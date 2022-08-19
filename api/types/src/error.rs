@@ -3,12 +3,12 @@
 
 use aptos_types::vm_status::StatusCode;
 use poem_openapi::{Enum, Object};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 
 /// This is the generic struct we use for all API errors, it contains a string
 /// message and an Aptos API specific error code.
-#[derive(Debug, Deserialize, Object)]
+#[derive(Debug, Serialize, Deserialize, Object)]
 pub struct AptosError {
     /// A message describing the error
     pub message: String,
@@ -54,7 +54,7 @@ impl AptosError {
 
 /// These codes provide more granular error information beyond just the HTTP
 /// status code of the response.
-#[derive(Copy, Clone, Debug, Deserialize, Enum)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Enum)]
 #[oai(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 #[repr(u32)]

@@ -95,6 +95,11 @@ macro_rules! generate_error_traits {
                 vm_status: aptos_types::vm_status::StatusCode,
                 ledger_info: &aptos_api_types::LedgerInfo
             ) -> Self where Self: Sized;
+
+            fn [<$trait_name:snake _from_aptos_error>](
+                aptos_error: aptos_api_types::AptosError,
+                ledger_info: &aptos_api_types::LedgerInfo
+            ) -> Self where Self: Sized;
         }
         )*
         }
@@ -188,6 +193,23 @@ macro_rules! generate_error_response {
             ) -> Self where Self: Sized {
                 let error = aptos_api_types::AptosError::new_with_vm_status(err, error_code, vm_status);
                 let payload = poem_openapi::payload::Json(error);
+                Self::from($enum_name::$name(
+                    payload,
+                    Some(ledger_info.chain_id),
+                    Some(ledger_info.ledger_version.into()),
+                    Some(ledger_info.oldest_ledger_version.into()),
+                    Some(ledger_info.ledger_timestamp.into()),
+                    Some(ledger_info.epoch.into()),
+                    Some(ledger_info.block_height.into()),
+                    Some(ledger_info.oldest_block_height.into()),
+                ))
+            }
+
+            fn [<$name:snake _from_aptos_error>](
+                aptos_error: aptos_api_types::AptosError,
+                ledger_info: &aptos_api_types::LedgerInfo
+            ) -> Self where Self: Sized {
+                let payload = poem_openapi::payload::Json(aptos_error);
                 Self::from($enum_name::$name(
                     payload,
                     Some(ledger_info.chain_id),

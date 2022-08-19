@@ -5,6 +5,7 @@ pub mod aptos;
 pub mod error;
 pub mod faucet;
 
+use aptos_api_types::SubmitTransactionsBatchExecutionResult;
 pub use faucet::FaucetClient;
 pub mod response;
 pub use response::Response;
@@ -267,7 +268,7 @@ impl Client {
         self.json(response).await
     }
 
-    pub async fn submit_bcs(&self, txn: &SignedTransaction) -> AptosResult<Response<()>> {
+    pub async fn submit_bcs(&self, txn: &SignedTransaction) -> AptosResult<Response<HashValue>> {
         let txn_payload = bcs::to_bytes(txn)?;
         let url = self.build_path("transactions")?;
 
@@ -282,6 +283,26 @@ impl Client {
 
         let response = self.check_and_parse_bcs_response(response).await?;
         Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
+    }
+
+    pub async fn submit_batch_bcs(
+        &self,
+        txns: &[SignedTransaction],
+    ) -> Result<Response<SubmitTransactionsBatchExecutionResult>> {
+        let txn_payload = bcs::to_bytes(&txns.to_vec())?;
+        let url = self.build_path("transactions/batch")?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(ACCEPT, BCS)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes)).unwrap())
     }
 
     pub async fn submit_and_wait(

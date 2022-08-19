@@ -62,6 +62,7 @@ pub async fn setup_test(
         tls_key_path: None,
         content_length_limit: None,
         failpoints_enabled: false,
+        max_submit_transaction_batch_size: 100,
     };
 
     // Start the server

@@ -90,6 +90,10 @@ impl Context {
         self.node_config.api.failpoints_enabled
     }
 
+    pub fn max_submit_transaction_batch_size(&self) -> usize {
+        self.node_config.api.max_submit_transaction_batch_size
+    }
+
     pub async fn submit_transaction(&self, txn: SignedTransaction) -> Result<SubmissionStatus> {
         let (req_sender, callback) = oneshot::channel();
         self.mp_sender
