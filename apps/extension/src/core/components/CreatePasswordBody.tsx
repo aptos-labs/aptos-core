@@ -10,7 +10,6 @@ import {
   Input,
   InputGroup,
   InputRightElement,
-  Link,
   Tag,
   Text,
   useColorMode,
@@ -140,9 +139,16 @@ export default function CreatePasswordBody() {
         >
           I agree to the
           {' '}
-          <Link color="teal.500" href="https://petra.app/terms">
+          <Button
+            as="a"
+            href="https://petra.app/Wallet_Terms.pdf"
+            color="teal.500"
+            target="_blank"
+            rel="noreferrer"
+            variant="link"
+          >
             Terms of Service
-          </Link>
+          </Button>
         </Checkbox>
       </Center>
     </VStack>

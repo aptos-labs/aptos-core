@@ -35,6 +35,9 @@ export default function Footer() {
             <ChakraLink color={secondaryTextColor[colorMode]} href="https://aptoslabs.com/privacy/" target="_blank">
               Privacy
             </ChakraLink>
+            <ChakraLink color={secondaryTextColor[colorMode]} href="/Wallet_Terms.pdf" target="_blank">
+              Terms
+            </ChakraLink>
           </HStack>
         </Grid>
         <Box width="100%">
