@@ -38,6 +38,9 @@ For this tutorial, will be focusing on `hello_blockchain/src` and re-using the `
 
 You can find the rust project [here](https://github.com/aptos-labs/aptos-core/tree/main/developer-docs-site/static/examples/rust)
 
+The key is that you need have two terminals open at the same time:  One is Move terminal, the other is Python terminal, and the sequence of events of switching these two terminals is very important.
+
+
   </TabItem>
 </Tabs>
 
@@ -259,38 +262,51 @@ For Rust:
 </TabItem>
 </Tabs>
 
-- After a few moments it will mention that "Update the module with Alice's address, build, copy to the provided path,
-  and press enter."
-- In the "Move Window" terminal, and for the Move file we had previously looked at:
-  - Copy Alice's address
-  - Compile the modules with Alice's address by `aptos move compile --package-dir . --named-addresses HelloBlockchain=0x{alice_address_here}`. Here, we replace the generic named address `HelloBlockChain='_'` in `hello_blockchain/move.toml` with Alice's Address
-  - Copy `build/Examples/bytecode_modules/Message.mv` to the same folder as this tutorial project code
-- Return to your other terminal window, and press "enter" at the prompt to continue executing the rest of the code
+On Python terminal:
+ python git:(c6841bd6b0) python3 hello_blockchain.py Message.mv
 
-The output should look like the following:
-
-```
 === Addresses ===
-Alice: 11c32982d04fbcc79b694647edff88c5b5d5b1a99c9d2854039175facbeefb40
-Bob: 7ec8f962139943bc41c17a72e782b7729b1625cf65ed7812152a5677364a4f88
+Alice: 10bf3a5f10a4dcd6b387221559ca4cf6ead4850ae3499816494fd94845938d7b
+Bob: 43f9269af65f97e24d71d874de7e070ad889c7da7254d14307e7c887b4e4ee7c
 
 === Initial Balances ===
-Alice: 10000000
-Bob: 10000000
+Alice: {'type': '0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>', 'data': {'coin': {'value': '5000'}, 'deposit_events': {'counter': '1', 'guid': {'id': {'addr': '0x10bf3a5f10a4dcd6b387221559ca4cf6ead4850ae3499816494fd94845938d7b', 'creation_num': '1'}}}, 'withdraw_events': {'counter': '0', 'guid': {'id': {'addr': '0x10bf3a5f10a4dcd6b387221559ca4cf6ead4850ae3499816494fd94845938d7b', 'creation_num': '2'}}}}}
+Bob: {'type': '0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>', 'data': {'coin': {'value': '5000'}, 'deposit_events': {'counter': '1', 'guid': {'id': {'addr': '0x43f9269af65f97e24d71d874de7e070ad889c7da7254d14307e7c887b4e4ee7c', 'creation_num': '1'}}}, 'withdraw_events': {'counter': '0', 'guid': {'id': {'addr': '0x43f9269af65f97e24d71d874de7e070ad889c7da7254d14307e7c887b4e4ee7c', 'creation_num': '2'}}}}}
 
-Update the module with Alice's address, build, copy to the provided path, and press enter.
+Update the module with Alice's address, build, copy to the provided path, and press enter.  
+
+
+AT the point, move to the other Move terminal: 
+
+On the Move terminal
+/Users/feizheng/aptos-core/aptos-move/move-examples/hello_blockchain
+➜  hello_blockchain git:(c6841bd6b0) aptos move compile --package-dir . --named-addresses HelloBlockchain=0x10bf3a5f10a4dcd6b387221559ca4cf6ead4850ae3499816494fd94845938d7b
+{
+  "Result": [
+    "10BF3A5F10A4DCD6B387221559CA4CF6EAD4850AE3499816494FD94845938D7B::message"
+  ]
+}
+
+➜  bytecode_modules git:(c6841bd6b0) cp message.mv /Users/feizheng/aptos-core/developer-docs-site/static/examples/python/
+
+
+AT this point, move to the other Python terminal: 
+
+Press “Enter”
+
 
 === Testing Alice ===
 Publishing...
 Initial value: None
 Setting the message to "Hello, Blockchain"
-New value: Hello, Blockchain
+New value: {'type': '0x10bf3a5f10a4dcd6b387221559ca4cf6ead4850ae3499816494fd94845938d7b::message::MessageHolder', 'data': {'message': 'Hello, Blockchain', 'message_change_events': {'counter': '0', 'guid': {'id': {'addr': '0x10bf3a5f10a4dcd6b387221559ca4cf6ead4850ae3499816494fd94845938d7b', 'creation_num': '3'}}}}}
 
 === Testing Bob ===
 Initial value: None
 Setting the message to "Hello, Blockchain"
-New value: Hello, Blockchain
-```
+New value: {'type': '0x10bf3a5f10a4dcd6b387221559ca4cf6ead4850ae3499816494fd94845938d7b::message::MessageHolder', 'data': {'message': 'Hello, Blockchain', 'message_change_events': {'counter': '0', 'guid': {'id': {'addr': '0x43f9269af65f97e24d71d874de7e070ad889c7da7254d14307e7c887b4e4ee7c', 'creation_num': '3'}}}}}
+
+
 
 The outcome shows that Alice and Bob went from having no resource to one with a `message` set to "Hello, Blockchain".
 
