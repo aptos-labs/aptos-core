@@ -139,7 +139,7 @@ fn native_sub(
     // the value first. While this limits commutativity, it is sufficient for
     // now.
     // TODO: change this when we implement commutative subtraction.
-    // aggregator.materialize(aggregator_context, &id)?;
+    aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
     aggregator.sub(value)?;
 
     // NOTE(Gas): O(1) cost: simple subtraction.
