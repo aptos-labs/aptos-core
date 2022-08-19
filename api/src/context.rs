@@ -3,9 +3,7 @@
 
 use crate::response::{AptosErrorResponse, BasicErrorWith404, InternalError, NotFoundError};
 use anyhow::{anyhow, ensure, format_err, Context as AnyhowContext, Result};
-use aptos_api_types::{
-    AptosErrorCode, AsConverter, Block, BlockInfo, LedgerInfo, TransactionOnChainData,
-};
+use aptos_api_types::{AptosErrorCode, AsConverter, Block, LedgerInfo, TransactionOnChainData};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
@@ -174,36 +172,6 @@ impl Context {
 
     pub fn get_block_timestamp(&self, version: u64) -> Result<u64> {
         self.db.get_block_timestamp(version)
-    }
-
-    /// Retrieves information about a block
-    pub fn get_block_info(&self, version: u64, ledger_version: u64) -> Result<BlockInfo> {
-        let (first_version, last_version, new_block_event) =
-            self.db.get_block_info_by_version(version)?;
-        ensure!(
-            last_version <= ledger_version,
-            "Block last version {} for txn version {} < ledger version {}",
-            last_version,
-            version,
-            ledger_version
-        );
-
-        let txn_with_proof =
-            self.db
-                .get_transaction_by_version(first_version, ledger_version, false)?;
-
-        // TODO: embed block hash into the NewBlockEvent
-        let (block_hash, timestamp) =
-            get_block_hash_and_timestamp(&txn_with_proof.transaction, first_version)?;
-
-        Ok(BlockInfo {
-            block_height: new_block_event.height(),
-            start_version: first_version,
-            end_version: last_version,
-            block_hash: block_hash.into(),
-            block_timestamp: timestamp,
-            num_transactions: (last_version + 1 - first_version) as u16,
-        })
     }
 
     pub fn get_block_by_height(
