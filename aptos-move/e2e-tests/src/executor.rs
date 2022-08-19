@@ -190,7 +190,7 @@ impl FakeExecutor {
     /// initialization done.
     pub fn stdlib_only_genesis() -> Self {
         let mut genesis = Self::no_genesis();
-        for (bytes, module) in framework::head_release_bundle().code_and_compiled_modules() {
+        for (bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules() {
             let id = module.self_id();
             genesis.add_module(&id, bytes.to_vec());
         }
@@ -439,12 +439,17 @@ impl FakeExecutor {
 
     pub fn new_block_with_timestamp(&mut self, time_microseconds: u64) {
         self.block_time = time_microseconds;
-        self.new_block_with_metadata(None, vec![])
+
+        let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
+            .expect("Unable to retrieve the validator set from storage");
+        let proposer = *validator_set.payload().next().unwrap().account_address();
+        // when updating time, proposer cannot be ZERO.
+        self.new_block_with_metadata(proposer, vec![])
     }
 
     pub fn new_block_with_metadata(
         &mut self,
-        proposer_index: Option<u32>,
+        proposer: AccountAddress,
         failed_proposer_indices: Vec<u32>,
     ) {
         let validator_set = ValidatorSet::fetch_config(&self.data_store.as_move_resolver())
@@ -453,8 +458,7 @@ impl FakeExecutor {
             HashValue::zero(),
             0,
             0,
-            *validator_set.payload().next().unwrap().account_address(),
-            proposer_index,
+            proposer,
             BitVec::with_num_bits(validator_set.num_validators() as u16).into(),
             failed_proposer_indices,
             self.block_time,
@@ -520,10 +524,12 @@ impl FakeExecutor {
                     )
                 });
             let session_out = session.finish().expect("Failed to generate txn effects");
-            let (write_set, _events) = session_out
+            // TODO: Support deltas in fake executor.
+            let (_, change_set) = session_out
                 .into_change_set(&mut ())
                 .expect("Failed to generate writeset")
                 .into_inner();
+            let (write_set, _events) = change_set.into_inner();
             write_set
         };
         self.data_store.add_write_set(&write_set);
@@ -550,10 +556,12 @@ impl FakeExecutor {
             )
             .map_err(|e| e.into_vm_status())?;
         let session_out = session.finish().expect("Failed to generate txn effects");
-        let (writeset, _events) = session_out
+        // TODO: Support deltas in fake executor.
+        let (_, change_set) = session_out
             .into_change_set(&mut ())
             .expect("Failed to generate writeset")
             .into_inner();
+        let (writeset, _events) = change_set.into_inner();
         Ok(writeset)
     }
 }

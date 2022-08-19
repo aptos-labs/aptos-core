@@ -138,6 +138,7 @@ jobs:
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           append: true
+          recreate: true
           path: ${{ env.FORGE_COMMENT }}
       - name: Post to a Slack channel
         # Post a Slack comment if the run has not been cancelled and the envs are set
@@ -148,7 +149,7 @@ jobs:
           # For posting a rich message using Block Kit
           payload: |
             {
-              "text": "${{ github.job }}(suite: ${{ inputs.FORGE_TEST_SUITE }}, namespace: ${{ inputs.FORGE_NAMESPACE }}) ${{ job.status }}: ${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
+              "text": "${{ job.status == 'success' && ':white_check_mark:' || ':x:' }} ${{ github.job }}(suite: `${{ inputs.FORGE_TEST_SUITE }}`, namespace: `${{ inputs.FORGE_NAMESPACE }}`): <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|link>"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.FORGE_SLACK_WEBHOOK_URL }}

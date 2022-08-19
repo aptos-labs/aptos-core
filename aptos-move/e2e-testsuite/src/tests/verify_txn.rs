@@ -719,7 +719,7 @@ fn good_module_uses_bad(
         address,
     );
 
-    let framework_modules = framework::head_release_bundle().compiled_modules();
+    let framework_modules = cached_packages::head_release_bundle().compiled_modules();
     let compiler = Compiler {
         deps: framework_modules
             .iter()

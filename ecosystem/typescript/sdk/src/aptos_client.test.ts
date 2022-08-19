@@ -94,8 +94,8 @@ test(
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -103,7 +103,7 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(account1.address(), scriptFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload);
 
     const bcsTxn = AptosClient.generateBCSTransaction(account1, rawTxn);
     const transactionRes = await client.submitSignedBCSTransaction(bcsTxn);
@@ -189,8 +189,8 @@ test(
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -198,7 +198,7 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(mutisigAccountAddress, scriptFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(mutisigAccountAddress, entryFunctionPayload);
 
     const txnBuilder = new TransactionBuilderMultiEd25519((signingMessage: TxnBuilderTypes.SigningMessage) => {
       const sigHexStr1 = account1.signBuffer(signingMessage);
@@ -253,7 +253,7 @@ test(
     await checkAptosCoin();
 
     const payload: Gen.TransactionPayload = {
-      type: "script_function_payload",
+      type: "entry_function_payload",
       function: coinTransferFunction,
       type_arguments: ["0x1::aptos_coin::AptosCoin"],
       arguments: [account2.address().hex(), "100000"],
@@ -305,8 +305,8 @@ test(
     await checkAptosCoin();
 
     const token = new TxnBuilderTypes.TypeTagStruct(TxnBuilderTypes.StructTag.fromString("0x1::aptos_coin::AptosCoin"));
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x1::coin",
         "transfer",
         [token],
@@ -314,7 +314,7 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(account1.address(), scriptFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(account1.address(), entryFunctionPayload);
 
     const bcsTxn = AptosClient.generateBCSSimulation(account1, rawTxn);
     const transactionRes = (await client.submitBCSSimulation(bcsTxn))[0];
@@ -399,8 +399,8 @@ test(
     let aliceBalance = await tokenClient.getTokenBalanceForAccount(alice.address().hex(), tokenId);
     expect(aliceBalance.amount).toBe("1");
 
-    const scriptFunctionPayload = new TxnBuilderTypes.TransactionPayloadScriptFunction(
-      TxnBuilderTypes.ScriptFunction.natural(
+    const entryFunctionPayload = new TxnBuilderTypes.TransactionPayloadEntryFunction(
+      TxnBuilderTypes.EntryFunction.natural(
         "0x3::token",
         "direct_transfer_script",
         [],
@@ -414,7 +414,7 @@ test(
       ),
     );
 
-    const rawTxn = await client.generateRawTransaction(alice.address(), scriptFunctionPayload);
+    const rawTxn = await client.generateRawTransaction(alice.address(), entryFunctionPayload);
     const multiAgentTxn = new TxnBuilderTypes.MultiAgentRawTransaction(rawTxn, [
       TxnBuilderTypes.AccountAddress.fromHex(bob.address()),
     ]);

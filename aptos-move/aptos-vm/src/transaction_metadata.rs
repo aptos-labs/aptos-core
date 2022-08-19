@@ -45,7 +45,7 @@ impl TransactionMetadata {
             chain_id: txn.chain_id(),
             script_hash: match txn.payload() {
                 TransactionPayload::Script(s) => HashValue::sha3_256_of(s.code()).to_vec(),
-                TransactionPayload::ScriptFunction(_) => vec![],
+                TransactionPayload::EntryFunction(_) => vec![],
                 TransactionPayload::ModuleBundle(_) => vec![],
             },
         }

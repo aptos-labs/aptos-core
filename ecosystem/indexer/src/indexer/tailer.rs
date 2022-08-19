@@ -692,7 +692,7 @@ mod test {
               "gas_unit_price": "1",
               "expiration_timestamp_secs": "1649713172",
               "payload": {
-                "type": "script_function_payload",
+                "type": "entry_function_payload",
                 "function": "0x1::aptos_coin::mint",
                 "type_arguments": [],
                 "arguments": [
@@ -835,7 +835,7 @@ mod test {
               "gas_unit_price": "1",
               "expiration_timestamp_secs": "1651789617",
               "payload": {
-                "type": "script_function_payload",
+                "type": "entry_function_payload",
                 "function": "0x2a0e66fde889cebf0401e676bb9bfa073e03caa9c009c66b739c30d24dccad81::Message::set_message",
                 "type_arguments": [],
                 "arguments": [

@@ -308,7 +308,7 @@ async fn construction_parse(
 
     // This is messy, but all we can do
     let operations = match unsigned_txn.into_payload() {
-        TransactionPayload::ScriptFunction(inner) => {
+        TransactionPayload::EntryFunction(inner) => {
             let (module, function_name, type_args, args) = inner.into_inner();
 
             let module_name = Identifier::from(module.name());
