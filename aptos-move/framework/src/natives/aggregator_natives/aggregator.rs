@@ -17,7 +17,7 @@ use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
 
 use crate::natives::aggregator_natives::{
-    helpers::{get_aggregator_fields, unpack_aggregator_struct},
+    helpers::{aggregator_info, unpack_aggregator_struct},
     NativeAggregatorContext,
 };
 
@@ -40,11 +40,9 @@ fn native_add(
 ) -> PartialVMResult<NativeResult> {
     assert!(args.len() == 2);
 
-    // Get aggregator fields and a value to add.
+    // Get aggregator information and a value to add.
     let value = pop_arg!(args, u128);
-    let aggregator_ref = pop_arg!(args, StructRef);
-    let (handle, key, limit) = get_aggregator_fields(&aggregator_ref)?;
-    let id = AggregatorID::new(handle, key);
+    let (id, limit) = aggregator_info(&pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
@@ -78,11 +76,9 @@ fn native_read(
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert!(args.len() == 1);
-    let aggregator_ref = pop_arg!(args, StructRef);
 
-    // Extract fields from aggregator struct reference.
-    let (handle, key, limit) = get_aggregator_fields(&aggregator_ref)?;
-    let id = AggregatorID::new(handle, key);
+    // Extract information from aggregator struct reference.
+    let (id, limit) = aggregator_info(&pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
@@ -120,11 +116,9 @@ fn native_sub(
 ) -> PartialVMResult<NativeResult> {
     assert!(args.len() == 2);
 
-    // Get aggregator fields and a value to subtract.
+    // Get aggregator information and a value to subtract.
     let value = pop_arg!(args, u128);
-    let aggregator_ref = pop_arg!(args, StructRef);
-    let (handle, key, limit) = get_aggregator_fields(&aggregator_ref)?;
-    let id = AggregatorID::new(handle, key);
+    let (id, limit) = aggregator_info(&pop_arg!(args, StructRef))?;
 
     // Get aggregator.
     let aggregator_context = context.extensions().get::<NativeAggregatorContext>();
