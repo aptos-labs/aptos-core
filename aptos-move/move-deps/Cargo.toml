@@ -36,6 +36,7 @@ move-model = { git = "https://github.com/move-language/move", rev = "27984155db1
 move-package = { git = "https://github.com/move-language/move", rev = "27984155db173416d551f25af1c8db004e21338e" }
 move-prover = { git = "https://github.com/move-language/move", rev = "27984155db173416d551f25af1c8db004e21338e" }
 move-prover-test-utils = { git = "https://github.com/move-language/move", rev = "27984155db173416d551f25af1c8db004e21338e" }
+move-prover-boogie-backend = { git = "https://github.com/move-language/move", rev = "27984155db173416d551f25af1c8db004e21338e" }
 move-resource-viewer = { git = "https://github.com/move-language/move", rev = "27984155db173416d551f25af1c8db004e21338e" }
 move-stackless-bytecode-interpreter = { git = "https://github.com/move-language/move", rev = "27984155db173416d551f25af1c8db004e21338e" }
 move-stdlib = { git = "https://github.com/move-language/move", rev = "27984155db173416d551f25af1c8db004e21338e" }

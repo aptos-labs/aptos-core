@@ -5776,6 +5776,7 @@ dependencies = [
  "move-model",
  "move-package",
  "move-prover",
+ "move-prover-boogie-backend",
  "move-prover-test-utils",
  "move-resource-viewer",
  "move-stackless-bytecode-interpreter",
