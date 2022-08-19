@@ -300,17 +300,18 @@ The output after executing:
 
 ```
 === Addresses ===
-Alice: e26d69b8d3ff12874358da6a4082a2ac
-Bob: c8585f009c8a90f22c6b603f28b9ed8c
+Alice: 0xa89a3cb49d796a359a399bfaac02b3b21c1fe654e3caacf45510fbc963be7cc8. Key Seed: a1b528793689fe4da161329cd76359fa947ea71a927d6389a8aec9ddbc58e7da
+Bob: 0x98110e268f314bda79d252ac5e3cc3e845a15c2112c3a81b3d817dce8aa7eed7. Key Seed: 18a05cb5be3a227c11418a550c05b6ca5b2bce53bd2a2e113a6051612f265980
 
 === Initial Balances ===
 Alice: 5000
 Bob: 0
 
 === Final Balances ===
-Alice: 3927
+Alice: 3996
 Bob: 1000
 ```
+
 
 The output shows that Bob received 1000 coins from Alice. Alice paid 73 coins for gas.
 
