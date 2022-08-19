@@ -94,7 +94,7 @@ variable "utility_instance_num" {
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "Standard_F4s_v2"
+  default     = "Standard_F16s_v2"
 }
 
 variable "validator_instance_num" {

@@ -162,7 +162,7 @@ variable "utility_instance_max_num" {
 
 variable "validator_instance_type" {
   description = "Instance type used for validator and fullnodes"
-  default     = "c5.xlarge"
+  default     = "c5.4xlarge"
 }
 
 variable "validator_instance_num" {
