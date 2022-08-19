@@ -97,7 +97,7 @@ pub(crate) static APTOS_LOG_INGEST_TOO_LARGE: Lazy<IntCounter> = Lazy::new(|| {
 /// Counter for failed log ingest events sent to Telemetry Service
 pub(crate) static APTOS_LOG_INGEST_FAILURE: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
-        "aptos_log_ingest_success",
+        "aptos_log_ingest_failure",
         "Number of log ingest events that failed to send"
     )
     .unwrap()
