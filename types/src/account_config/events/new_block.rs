@@ -7,7 +7,6 @@ use crate::{
     event::{EventHandle, EventKey},
 };
 use anyhow::Result;
-use aptos_crypto::HashValue;
 use move_deps::move_core_types::{
     ident_str,
     identifier::IdentStr,
@@ -20,7 +19,7 @@ use serde::{Deserialize, Serialize};
 /// Should be kept in-sync with NewBlockEvent move struct in block.move.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NewBlockEvent {
-    id: HashValue,
+    hash: AccountAddress,
     epoch: u64,
     round: u64,
     height: u64,
@@ -67,7 +66,7 @@ impl NewBlockEvent {
     }
 
     pub fn new(
-        id: HashValue,
+        hash: AccountAddress,
         epoch: u64,
         round: u64,
         height: u64,
@@ -77,7 +76,7 @@ impl NewBlockEvent {
         timestamp: u64,
     ) -> Self {
         Self {
-            id,
+            hash,
             epoch,
             round,
             height,
