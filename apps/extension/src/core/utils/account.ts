@@ -9,6 +9,7 @@ import {
   WALLET_STATE_ACCOUNT_ADDRESS_KEY,
   WALLET_STATE_LOADED_KEY,
   WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY,
+  WALLET_STATE_CUSTOM_NETWORKS_STORAGE_KEY,
 } from 'core/constants';
 import {
   AccountsState,
@@ -278,12 +279,23 @@ export function getBackgroundAptosAccountState(): Promise<AptosAccountState> {
 }
 
 export async function getBackgroundNetwork() {
-  const result = await Browser.persistentStorage()?.get([WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY]);
+  const result = await Browser.persistentStorage()?.get([
+    WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY,
+    WALLET_STATE_CUSTOM_NETWORKS_STORAGE_KEY,
+  ]);
+
   const serializedNetworkId = result && result[WALLET_STATE_NETWORK_LOCAL_STORAGE_KEY];
   const networkName = serializedNetworkId
     ? JSON.parse(serializedNetworkId)
     : undefined;
-  return defaultNetworks[networkName ?? defaultNetworkName];
+
+  const serializedCustomNetworks = result && result[WALLET_STATE_CUSTOM_NETWORKS_STORAGE_KEY];
+  const customNetworks = serializedCustomNetworks
+    ? JSON.parse(serializedCustomNetworks)
+    : undefined;
+
+  const networks = { ...defaultNetworks, ...customNetworks };
+  return networks[networkName ?? defaultNetworkName];
 }
 
 export async function loadBackgroundState(): Promise<boolean> {
