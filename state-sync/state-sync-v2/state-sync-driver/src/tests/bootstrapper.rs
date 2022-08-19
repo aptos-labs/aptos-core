@@ -26,6 +26,7 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use claim::{assert_matches, assert_none, assert_ok};
+use data_streaming_service::streaming_client::NotificationAndFeedback;
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload},
     streaming_client::NotificationFeedback,
@@ -50,6 +51,7 @@ async fn test_bootstrap_genesis_waypoint() {
     let (bootstrap_notification_sender, bootstrap_notification_receiver) = oneshot::channel();
     bootstrapper
         .subscribe_to_bootstrap_notifications(bootstrap_notification_sender)
+        .await
         .unwrap();
 
     // Create a global data summary where only epoch 0 has ended
@@ -93,6 +95,7 @@ async fn test_bootstrap_immediate_notification() {
     let (bootstrap_notification_sender, bootstrap_notification_receiver) = oneshot::channel();
     bootstrapper
         .subscribe_to_bootstrap_notifications(bootstrap_notification_sender)
+        .await
         .unwrap();
     verify_bootstrap_notification(bootstrap_notification_receiver);
 }
@@ -120,6 +123,7 @@ async fn test_bootstrap_no_notification() {
     let (bootstrap_notification_sender, bootstrap_notification_receiver) = oneshot::channel();
     bootstrapper
         .subscribe_to_bootstrap_notifications(bootstrap_notification_sender)
+        .await
         .unwrap();
 
     // Drive progress
@@ -142,6 +146,7 @@ async fn test_critical_timeout() {
     let mut expectation_sequence = Sequence::new();
     let (_notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
         mock_streaming_client
             .expect_get_all_epoch_ending_ledger_infos()
@@ -150,6 +155,10 @@ async fn test_critical_timeout() {
             .return_once(move |_| Ok(data_stream_listener))
             .in_sequence(&mut expectation_sequence);
     }
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .with(eq(data_stream_id_1), eq(None))
+        .return_const(Ok(()));
 
     // Create the bootstrapper
     let mut bootstrapper = create_bootstrapper(driver_configuration, mock_streaming_client, true);
@@ -204,6 +213,7 @@ async fn test_data_stream_state_values() {
     let mut expectation_sequence = Sequence::new();
     let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
         mock_streaming_client
             .expect_get_all_transaction_outputs()
@@ -219,8 +229,11 @@ async fn test_data_stream_state_values() {
     mock_streaming_client
         .expect_terminate_stream_with_feedback()
         .with(
-            eq(notification_id),
-            eq(NotificationFeedback::InvalidPayloadData),
+            eq(data_stream_id_1),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            ))),
         )
         .return_const(Ok(()));
 
@@ -275,6 +288,7 @@ async fn test_data_stream_transactions() {
     let mut expectation_sequence = Sequence::new();
     let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
         mock_streaming_client
             .expect_get_all_transactions()
@@ -286,8 +300,11 @@ async fn test_data_stream_transactions() {
     mock_streaming_client
         .expect_terminate_stream_with_feedback()
         .with(
-            eq(notification_id),
-            eq(NotificationFeedback::InvalidPayloadData),
+            eq(data_stream_id_1),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            ))),
         )
         .return_const(Ok(()));
 
@@ -342,6 +359,7 @@ async fn test_data_stream_transaction_outputs() {
     let mut expectation_sequence = Sequence::new();
     let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
         mock_streaming_client
             .expect_get_all_transaction_outputs()
@@ -353,8 +371,11 @@ async fn test_data_stream_transaction_outputs() {
     mock_streaming_client
         .expect_terminate_stream_with_feedback()
         .with(
-            eq(notification_id),
-            eq(NotificationFeedback::EmptyPayloadData),
+            eq(data_stream_id_1),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::EmptyPayloadData,
+            ))),
         )
         .return_const(Ok(()));
 
@@ -511,6 +532,7 @@ async fn test_snapshot_sync_existing_state() {
     let mut expectation_sequence = Sequence::new();
     let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     mock_streaming_client
         .expect_get_all_state_values()
         .times(1)
@@ -522,8 +544,11 @@ async fn test_snapshot_sync_existing_state() {
         .expect_terminate_stream_with_feedback()
         .times(1)
         .with(
-            eq(notification_id),
-            eq(NotificationFeedback::InvalidPayloadData),
+            eq(data_stream_id_1),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            ))),
         )
         .return_const(Ok(()))
         .in_sequence(&mut expectation_sequence);
@@ -807,6 +832,7 @@ async fn test_waypoint_mismatch() {
     // Create the mock streaming client
     let mut mock_streaming_client = create_mock_streaming_client();
     let (notification_sender, data_stream_listener) = create_data_stream_listener();
+    let data_stream_id = data_stream_listener.data_stream_id;
     mock_streaming_client
         .expect_get_all_epoch_ending_ledger_infos()
         .with(eq(1))
@@ -815,8 +841,11 @@ async fn test_waypoint_mismatch() {
     mock_streaming_client
         .expect_terminate_stream_with_feedback()
         .with(
-            eq(notification_id),
-            eq(NotificationFeedback::PayloadProofFailed),
+            eq(data_stream_id),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::PayloadProofFailed,
+            ))),
         )
         .return_const(Ok(()));
 
