@@ -9,9 +9,4 @@ module aptos_std::aptos_hash {
 
         sip_hash(bytes)
     }
-
-    spec sip_hash_from_value {
-        // TODO: temporary mockup.
-        pragma opaque;
-    }
 }
