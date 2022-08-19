@@ -8,10 +8,6 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # AIT-3
 
-:::caution DRAFT-only
-These AIT-3 docs are draft-only for now.
-:::
-
 <p class="card-section-h2">Welcome to AIT-3</p>
 
 The Aptos Incentivized Testnet-3 (AIT-3) is a rewards program for any Aptos community member. All you need is an interest in becoming an Aptos validator node operator, and be willing and capable to test the new features.

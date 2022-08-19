@@ -40,7 +40,7 @@ To participate in the AIT-3 program, follow the below steps. Use these steps as 
 2. Before you click on Step 2 **CONNECT WALLET**: 
    1. Install the Petra (Aptos Wallet) extension using Step 3 instructions, and 
    2. Create the first wallet using Step 4 instructions.
-3. **Install** the Petra (Aptos Wallet) extension on your Chrome browser by [following the instructions here](/guides/building-wallet-extension).
+3. **Install** the Petra (Aptos Wallet) extension on your Chrome browser by [following the instructions here](/guides/install-petra-wallet-extension).
     
 4. <span id="create-wallet">Create the first wallet using Petra (Aptos Wallet)</span>. 
 
@@ -49,7 +49,6 @@ To participate in the AIT-3 program, follow the below steps. Use these steps as 
    1. Open the Aptos Wallet extension from the Extensions section of the Chrome browser, or by clicking on the puzzle piece on top right of the browser and selecting Aptos Wallet.
    2. Click **Create a new wallet**. 
    3. When you are done creating the wallet, go to **Extensions** > **Aptos Wallet** and click on the gear icon on the bottom right. You will see the **Settings** screen. Click on the **Network** button and make sure the AIT-3 network is selected. 
-   4. Next, click again on the gear icon on the bottom right to go to the **Settings** page. Click on the **Credentials**. Copy and paste and save both the **Private key** and **Address** keys in a separate text file for later use. **This private key is the owner key**.
     
 5. Click on Step 2 **CONNECT WALLET** to register the owner wallet address to your Aptos Community account. The Aptos team will airdrop coins to this owner wallet address. 
 
