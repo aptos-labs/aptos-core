@@ -107,8 +107,9 @@ gem 'sentry-ruby'
 gem 'statesman', '~> 10.0'
 
 # Feature flags
-gem 'flipper', '~> 0.24.1'
-gem 'flipper-active_record', '~> 0.24.1'
+gem 'flipper', '~> 0.25.1'
+gem 'flipper-active_record', '~> 0.25.1'
+gem 'flipper-ui', '~> 0.25.1'
 
 # Redis
 gem 'hiredis', '~> 0.6.3'

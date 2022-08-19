@@ -22,7 +22,16 @@ Rails.application.routes.draw do
       confirmations: 'users/confirmations'
     }
   }
+
+  # Administration
   ActiveAdmin.routes(self)
+  constraints(lambda { |request|
+    user = request.env['warden'].user
+    user.present? && user.respond_to?(:is_root?) && user.is_root?
+  }) do
+    # Feature flags
+    mount Flipper::UI.app(Flipper) => '/flipper'
+  end
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
