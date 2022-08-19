@@ -296,7 +296,7 @@ async fn test_block() {
         .await
         .expect("Should transfer coins");
     let final_block_to_check = rest_client
-        .get_block_info(summary.version)
+        .get_block_by_version(summary.version, false)
         .await
         .expect("Should be able to get block info for completed txns");
     let final_block_height = final_block_to_check.into_inner().block_height.0 + 2;
@@ -335,7 +335,7 @@ async fn test_block() {
             .expect("Should be able to get blocks that are already known");
         let block = response.block.expect("Every response should have a block");
         let actual_block = rest_client
-            .get_block(block_height, true)
+            .get_block_by_height(block_height, true)
             .await
             .expect("Should be able to get block for a known block")
             .into_inner();
@@ -744,7 +744,7 @@ async fn test_invalid_transaction_gas_charged() {
     let txn_version = actual_txn.info.version.0;
 
     let block_info = rest_client
-        .get_block_info(txn_version)
+        .get_block_by_version(txn_version, false)
         .await
         .unwrap()
         .into_inner();
