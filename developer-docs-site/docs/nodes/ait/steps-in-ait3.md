@@ -25,7 +25,7 @@ Participants in the AIT-3 program must demonstrate the ability to configure and 
 alt="Signed Transaction Flow"
 sources={{
     light: useBaseUrl('/img/docs/sign-in-to-survey.svg'),
-    dark: useBaseUrl('/img/docs/sign-in-to-survey.svg'),
+    dark: useBaseUrl('/img/docs/sign-in-to-survey-dark.svg'),
   }}
 />
 </center>
@@ -65,7 +65,7 @@ To participate in the AIT-3 program, follow the below steps. Use these steps as 
 alt="Signed Transaction Flow"
 sources={{
     light: useBaseUrl('/img/docs/install-validator-and-register.svg'),
-    dark: useBaseUrl('/img/docs/install-validator-and-register.svg'),
+    dark: useBaseUrl('/img/docs/install-validator-and-register-dark.svg'),
   }}
 />
 </center>
@@ -103,7 +103,7 @@ sources={{
 alt="Signed Transaction Flow"
 sources={{
     light: useBaseUrl('/img/docs/initialize-staking-pool.svg'),
-    dark: useBaseUrl('/img/docs/initialize-staking-pool.svg'),
+    dark: useBaseUrl('/img/docs/initialize-staking-pool-dark.svg'),
   }}
 />
 
