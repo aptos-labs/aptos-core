@@ -155,8 +155,9 @@ mod tests {
                 let info = aptos_rest_client::aptos_api_types::TransactionInfo {
                     version: 0.into(),
                     hash: HashValue::zero().into(),
-                    state_root_hash: HashValue::zero().into(),
+                    state_change_hash: HashValue::zero().into(),
                     event_root_hash: HashValue::zero().into(),
+                    state_checkpoint_hash: None,
                     gas_used: 0.into(),
                     success: true,
                     vm_status: "Executed".to_string(),

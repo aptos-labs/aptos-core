@@ -291,8 +291,9 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
 pub struct TransactionInfo {
     pub version: U64,
     pub hash: HashValue,
-    pub state_root_hash: HashValue,
+    pub state_change_hash: HashValue,
     pub event_root_hash: HashValue,
+    pub state_checkpoint_hash: Option<HashValue>,
     pub gas_used: U64,
     pub success: bool,
     pub vm_status: String,

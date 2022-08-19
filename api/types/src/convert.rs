@@ -136,8 +136,9 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         TransactionInfo {
             version: version.into(),
             hash: info.transaction_hash().into(),
-            state_root_hash: info.state_change_hash().into(),
+            state_change_hash: info.state_change_hash().into(),
             event_root_hash: info.event_root_hash().into(),
+            state_checkpoint_hash: info.state_checkpoint_hash().map(|h| h.into()),
             gas_used: info.gas_used().into(),
             success: info.status().is_success(),
             vm_status: self.explain_vm_status(info.status()),

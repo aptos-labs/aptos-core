@@ -470,7 +470,9 @@ pub fn convert_timestamp_usecs(timestamp: u64) -> timestamp::Timestamp {
 pub fn convert_transaction_info(transaction_info: &TransactionInfo) -> extractor::TransactionInfo {
     extractor::TransactionInfo {
         hash: transaction_info.hash.0.to_vec(),
-        state_root_hash: transaction_info.state_root_hash.0.to_vec(),
+        // FIXME(bowen): rename "state_root_hash" -> "state_change_hash"
+        // FIXME(bowen): add `state_checkpoint_hash: Option<HashValue>`
+        state_root_hash: transaction_info.state_change_hash.0.to_vec(),
         event_root_hash: transaction_info.event_root_hash.0.to_vec(),
         gas_used: transaction_info.gas_used.0,
         success: transaction_info.success,
