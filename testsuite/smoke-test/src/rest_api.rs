@@ -317,11 +317,14 @@ async fn alden_test() {
         "A Received from resources: {} decoded: {:?}",
         resources_hex, decoded
     );
-    let bytes = client
-        .get_account_resource_bcs(account, "0x1::account::Account")
-        .await
-        .unwrap()
-        .into_inner();
+    let bytes: Vec<u8> = bcs::from_bytes(
+        &client
+            .get_account_resource_bcs(account, "0x1::account::Account")
+            .await
+            .unwrap()
+            .into_inner(),
+    )
+    .unwrap();
     let resource_hex = hex::encode(&bytes);
     let decoded = bcs::from_bytes::<AccountResource>(&bytes);
     println!(
