@@ -42,7 +42,7 @@ fn native_write_to_event_store(
     let guid = pop_arg!(arguments, Vec<u8>);
 
     // TODO(Gas): fix this
-    let cost = gas_params.base_cost + gas_params.unit_cost * msg.size();
+    let cost = gas_params.base_cost; // + gas_params.unit_cost * msg.size();
 
     if !context.save_event(guid, seq_num, ty, msg)? {
         return Ok(NativeResult::err(cost, 0));

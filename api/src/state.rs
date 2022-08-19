@@ -1,31 +1,34 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::context::Context;
-use crate::failpoint::fail_point_poem;
-use crate::response::{
-    build_not_found, BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus,
-    BasicResultWith404, InternalError, NotFoundError,
+use crate::{
+    accept_type::AcceptType,
+    context::Context,
+    failpoint::fail_point_poem,
+    response::{
+        build_not_found, BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus,
+        BasicResultWith404, InternalError, NotFoundError,
+    },
+    ApiTags,
 };
-use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag, MoveValue,
-    TableItemRequest, TransactionId, U128, U64,
+    Address, AsConverter, IdentifierWrapper, LedgerInfo, MoveModuleBytecode, MoveResource,
+    MoveStructTag, MoveValue, TableItemRequest, TransactionId, U128, U64,
 };
-use aptos_api_types::{LedgerInfo, MoveResource};
 use aptos_state_view::StateView;
-use aptos_types::access_path::AccessPath;
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::state_store::table::TableHandle;
+use aptos_types::{
+    access_path::AccessPath,
+    state_store::{state_key::StateKey, table::TableHandle},
+};
 use aptos_vm::data_cache::AsMoveResolver;
 use move_deps::move_core_types::language_storage::{ModuleId, ResourceKey, StructTag};
-use poem_openapi::param::Query;
-use poem_openapi::payload::Json;
-use poem_openapi::{param::Path, OpenApi};
-use std::convert::TryInto;
-use std::sync::Arc;
+use poem_openapi::{
+    param::{Path, Query},
+    payload::Json,
+    OpenApi,
+};
+use std::{convert::TryInto, sync::Arc};
 use storage_interface::state_view::DbStateView;
 
 pub struct StateApi {
@@ -96,7 +99,7 @@ impl StateApi {
     /// fields could themselves be composed of other structs. This makes it
     /// impractical to express using query params, meaning GET isn't an option.
     #[oai(
-        path = "/tables/:table_handle/item",
+        path = "/tables/:table_handle_low/:table_handle_high/item",
         method = "post",
         operation_id = "get_table_item",
         tag = "ApiTags::Tables"
@@ -104,14 +107,17 @@ impl StateApi {
     async fn get_table_item(
         &self,
         accept_type: AcceptType,
-        table_handle: Path<U128>,
+        table_handle_low: Path<U128>,
+        table_handle_high: Path<U128>,
         table_item_request: Json<TableItemRequest>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveValue> {
+        let low: u128 = table_handle_low.0 .0;
+        let high: u128 = table_handle_high.0 .0;
         fail_point_poem("endpoint_get_table_item")?;
         self.table_item(
             &accept_type,
-            table_handle.0,
+            TableHandle { low, high },
             table_item_request.0,
             ledger_version.0,
         )
@@ -212,7 +218,7 @@ impl StateApi {
     pub fn table_item(
         &self,
         accept_type: &AcceptType,
-        table_handle: U128,
+        table_handle: TableHandle,
         table_item_request: TableItemRequest,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveValue> {
@@ -241,7 +247,7 @@ impl StateApi {
             .simple_serialize()
             .ok_or_else(|| BasicErrorWith404::internal_str("Failed to serialize table key"))?;
 
-        let state_key = StateKey::table_item(TableHandle(table_handle.0), raw_key);
+        let state_key = StateKey::table_item(table_handle, raw_key);
         let bytes = state_view
             .get_state_value(&state_key)
             .context(format!(

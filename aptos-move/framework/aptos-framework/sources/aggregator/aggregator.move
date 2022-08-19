@@ -62,8 +62,10 @@
 /// parallelism in execution.
 module aptos_framework::aggregator {
 
+    use aptos_std::crypto_hash::HashValue;
+
     /// When the value of aggregator (actual or accumulated) overflows (raised
-    /// by native code).
+        /// by native code).
     const EAGGREGATOR_OVERFLOW: u64 = 1;
 
     /// When the value of aggregator (actual or accumulated) underflows, i.e goes
@@ -74,7 +76,7 @@ module aptos_framework::aggregator {
     const ENOT_SUPPORTED: u64 = 3;
 
     struct Aggregator has store {
-        handle: u128,
+        handle: HashValue,
         key: u128,
         limit: u128,
     }

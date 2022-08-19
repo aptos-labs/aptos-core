@@ -49,17 +49,18 @@ pub struct NativeGasParameters {
 impl FromOnChainGasSchedule for NativeGasParameters {
     fn from_on_chain_gas_schedule(gas_schedule: &BTreeMap<String, u64>) -> Option<Self> {
         Some(Self {
-            move_stdlib: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
-            aptos_framework: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
+            move_stdlib: move_stdlib::natives::GasParameters::zeros(), // FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
+            aptos_framework: framework::natives::GasParameters::zeros(), // FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
         })
     }
 }
 
 impl ToOnChainGasSchedule for NativeGasParameters {
     fn to_on_chain_gas_schedule(&self) -> Vec<(String, u64)> {
-        let mut entries = self.move_stdlib.to_on_chain_gas_schedule();
-        entries.extend(self.aptos_framework.to_on_chain_gas_schedule());
-        entries
+        // let mut entries = self.move_stdlib.to_on_chain_gas_schedule();
+        // entries.extend(self.aptos_framework.to_on_chain_gas_schedule());
+        // entries
+        vec![]
     }
 }
 
@@ -75,8 +76,10 @@ impl NativeGasParameters {
 impl InitialGasSchedule for NativeGasParameters {
     fn initial() -> Self {
         Self {
-            move_stdlib: InitialGasSchedule::initial(),
-            aptos_framework: InitialGasSchedule::initial(),
+            // move_stdlib: InitialGasSchedule::initial(),
+            // aptos_framework: InitialGasSchedule::initial(),
+            move_stdlib: move_stdlib::natives::GasParameters::zeros(),
+            aptos_framework: framework::natives::GasParameters::zeros(),
         }
     }
 }

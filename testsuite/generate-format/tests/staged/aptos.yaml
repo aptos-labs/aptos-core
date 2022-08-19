@@ -160,7 +160,9 @@ StructTag:
         SEQ:
           TYPENAME: TypeTag
 TableHandle:
-  NEWTYPESTRUCT: U128
+  STRUCT:
+    - low: U128
+    - high: U128
 Transaction:
   ENUM:
     0:

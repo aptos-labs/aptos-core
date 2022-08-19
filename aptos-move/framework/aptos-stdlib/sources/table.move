@@ -6,11 +6,12 @@
 /// struct itself, while the operations are implemented as native functions. No traversal is provided.
 
 module aptos_std::table {
+    use aptos_std::crypto_hash::HashValue;
     friend aptos_std::table_with_length;
 
     /// Type of tables
     struct Table<phantom K: copy + drop, phantom V> has store {
-        handle: u128,
+        handle: HashValue,
     }
 
     /// Create a new Table.
@@ -111,7 +112,7 @@ module aptos_std::table {
 
     // Primitives which take as an additional type parameter `Box<V>`, so the implementation
     // can use this to determine serialization layout.
-    native fun new_table_handle<K, V>(): u128;
+    native fun new_table_handle<K, V>(): HashValue;
     native fun add_box<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K, val: Box<V>);
     native fun borrow_box<K: copy + drop, V, B>(table: &Table<K, V>, key: K): &Box<V>;
     native fun borrow_box_mut<K: copy + drop, V, B>(table: &mut Table<K, V>, key: K): &mut Box<V>;

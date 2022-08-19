@@ -3,8 +3,12 @@
 
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
+use aptos_api_types::HashValue;
 use aptos_sdk::types::LocalAccount;
-use move_deps::{move_core_types::account_address::AccountAddress, move_package::BuildConfig};
+use move_deps::{
+    move_core_types::account_address::AccountAddress, move_package::BuildConfig,
+    move_table_extension::TableHandle,
+};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{convert::TryInto, path::PathBuf};
@@ -217,8 +221,8 @@ fn get_account_module(address: &str, name: &str) -> String {
     format!("/accounts/{}/module/{}", address, name)
 }
 
-fn get_table_item(handle: u128) -> String {
-    format!("/tables/{}/item", handle)
+fn get_table_item(handle_low: u128, handle_high: u128) -> String {
+    format!("/tables/{}/{}/item", handle_low, handle_high)
 }
 
 async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
@@ -269,9 +273,10 @@ async fn api_get_table_item<T: Serialize>(
     value_type: &str,
     key: T,
 ) -> Value {
-    let handle = table["handle"].as_str().unwrap().parse().unwrap();
+    let handle_low = table["handle"]["low"].as_str().unwrap().parse().unwrap();
+    let handle_high = table["handle"]["high"].as_str().unwrap().parse().unwrap();
     ctx.post(
-        &get_table_item(handle),
+        &get_table_item(handle_low, handle_high),
         json!({
             "key_type": key_type,
             "value_type": value_type,
