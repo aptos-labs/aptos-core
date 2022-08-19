@@ -17,11 +17,12 @@ curl -s https://raw.githubusercontent.com/aptos-labs/aptos-core/rosetta-stable/c
 curl -s -o data/genesis.blob https://rosetta.aptosdev.com/genesis.blob
 curl -s -o data/waypoint.txt https://rosetta.aptosdev.com/waypoint.txt
 
+sleep 1600
+
 # Run the node in online remote mode (detached mode)
 docker run -d -p 8082:8082 --rm -v $(pwd)/data:/opt/aptos aptos-core:rosetta-$GIT_REF online-remote --rest-api-url https://rosetta.aptosdev.com
 
-
-sleep 1500
+sleep 60
 
 block_tip=($(curl -s --location --request POST 'http://localhost:8082/network/status' \
 --header 'Content-Type: application/json' \
