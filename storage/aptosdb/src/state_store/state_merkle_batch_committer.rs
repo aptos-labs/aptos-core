@@ -7,13 +7,13 @@ use crate::jellyfish_merkle_node::JellyfishMerkleNodeSchema;
 use crate::metrics::LATEST_SNAPSHOT_VERSION;
 use crate::state_store::buffered_state::CommitMessage;
 use crate::state_store::StateDb;
-use crate::version_data::{VersionData, VersionDataSchema};
+use crate::version_data::VersionDataSchema;
 use crate::OTHER_TIMERS_SECONDS;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::HashValue;
 use aptos_jellyfish_merkle::node_type::NodeKey;
-use aptos_logger::{info, trace, warn};
-use aptos_types::transaction::Version;
+use aptos_logger::{info, trace};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use schemadb::SchemaBatch;
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
@@ -74,8 +74,7 @@ impl StateMerkleBatchCommitter {
                         .expect("Current version should not be None");
                     LATEST_SNAPSHOT_VERSION.set(current_version as i64);
 
-                    self.check_state_item_count_consistency(state_delta.current_version.unwrap())
-                        .unwrap_or_else(|e| warn!("{}", e));
+                    self.check_usage_consistency(&state_delta).unwrap();
                 }
                 CommitMessage::Sync(finish_sender) => finish_sender.send(()).unwrap(),
                 CommitMessage::Exit => {
@@ -86,17 +85,18 @@ impl StateMerkleBatchCommitter {
         trace!("State merkle batch committing thread exit.")
     }
 
-    fn check_state_item_count_consistency(&self, version: Version) -> Result<()> {
-        let VersionData {
-            state_items: count_from_ledger_db,
-            total_state_bytes: _,
-        } = self
+    fn check_usage_consistency(&self, state_delta: &StateDelta) -> Result<()> {
+        let version = state_delta
+            .current_version
+            .ok_or_else(|| anyhow!("Committing without version."))?;
+
+        let usage_from_ledger_db: StateStorageUsage = self
             .state_db
             .ledger_db
             .get::<VersionDataSchema>(&version)?
-            .ok_or_else(|| anyhow!("VersionData missing for version {}", version))?;
-
-        let count_from_state_tree = self
+            .ok_or_else(|| anyhow!("VersionData missing for version {}", version))?
+            .get_state_storage_usage();
+        let leaf_count_from_jmt = self
             .state_db
             .state_merkle_db
             .get::<JellyfishMerkleNodeSchema>(&NodeKey::new_empty_path(version))?
@@ -104,11 +104,22 @@ impl StateMerkleBatchCommitter {
             .leaf_count();
 
         ensure!(
-            count_from_ledger_db == count_from_state_tree,
+            usage_from_ledger_db.items() == leaf_count_from_jmt,
             "State item count inconsistent, {} from ledger db and {} from state tree.",
-            count_from_ledger_db,
-            count_from_state_tree,
+            usage_from_ledger_db.items(),
+            leaf_count_from_jmt,
         );
+
+        let usage_from_smt = state_delta.current.usage();
+        if !usage_from_smt.is_untracked() {
+            ensure!(
+                usage_from_smt == usage_from_ledger_db,
+                "State storage usage info inconsistent. from smt: {:?}, from ledger_db: {:?}",
+                usage_from_smt,
+                usage_from_ledger_db,
+            );
+        }
+
         Ok(())
     }
 }

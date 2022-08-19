@@ -66,7 +66,12 @@ pub(crate) fn update_store(
             .unwrap();
         let mut cs = ChangeSet::new();
         store
-            .put_value_sets(vec![&value_state_set], version, &mut cs)
+            .put_value_sets(
+                vec![&value_state_set],
+                version,
+                StateStorageUsage::new_untracked(),
+                &mut cs,
+            )
             .unwrap();
         store.ledger_db.write_schemas(cs.batch).unwrap();
     }
@@ -94,6 +99,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                         .iter()
                         .map(|(k, v)| (k.hash(), v.as_ref()))
                         .collect(),
+                    StateStorageUsage::new_untracked(),
                     &ProofReader::new_empty(),
                 )
                 .unwrap()
@@ -104,6 +110,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
             state.updates_since_base.clear();
         }
     }
+
     if next_version.checked_sub(1) != state.current_version {
         state.current = state
             .current
@@ -115,6 +122,7 @@ pub fn update_in_memory_state(state: &mut StateDelta, txns_to_commit: &[Transact
                     .iter()
                     .map(|(k, v)| (k.hash(), v.as_ref()))
                     .collect(),
+                StateStorageUsage::new_untracked(),
                 &ProofReader::new_empty(),
             )
             .unwrap()

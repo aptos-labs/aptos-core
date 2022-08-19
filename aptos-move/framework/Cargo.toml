@@ -36,6 +36,7 @@ tempfile = "3.3.0"
 
 aptos-crypto = { path = "../../crates/aptos-crypto" }
 aptos-sdk-builder = { path = "../aptos-sdk-builder" }
+aptos-state-view = { path = "../../storage/state-view" }
 aptos-types = { path = "../../types" }
 move-deps = { path = "../move-deps", features = ["address32"] }
 

@@ -227,7 +227,11 @@ EventKey:
     - account_address:
         TYPENAME: AccountAddress
 HashValue:
-  NEWTYPESTRUCT: BYTES
+  STRUCT:
+    - hash:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
 LedgerInfo:

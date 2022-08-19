@@ -71,16 +71,19 @@ impl From<RocksdbOpt> for RocksdbConfigs {
                 max_open_files: opt.ledger_db_max_open_files,
                 max_total_wal_size: opt.ledger_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
+                ..Default::default()
             },
             state_merkle_db_config: RocksdbConfig {
                 max_open_files: opt.state_merkle_db_max_open_files,
                 max_total_wal_size: opt.state_merkle_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
+                ..Default::default()
             },
             index_db_config: RocksdbConfig {
                 max_open_files: opt.index_db_max_open_files,
                 max_total_wal_size: opt.index_db_max_total_wal_size,
                 max_background_jobs: opt.max_background_jobs,
+                ..Default::default()
             },
         }
     }

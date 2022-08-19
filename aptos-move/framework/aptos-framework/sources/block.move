@@ -2,13 +2,15 @@
 module aptos_framework::block {
     use std::error;
     use std::vector;
-    use aptos_std::event::{Self, EventHandle};
     use std::option;
+    use aptos_std::event::{Self, EventHandle};
+    use aptos_std::crypto_hash::{Self, HashValue};
 
     use aptos_framework::timestamp;
     use aptos_framework::system_addresses;
     use aptos_framework::reconfiguration;
     use aptos_framework::stake;
+    use aptos_framework::state_storage;
 
     friend aptos_framework::genesis;
 
@@ -24,6 +26,7 @@ module aptos_framework::block {
 
     /// Should be in-sync with NewBlockEvent rust struct in new_block.rs
     struct NewBlockEvent has drop, store {
+        id: HashValue,
         epoch: u64,
         round: u64,
         height: u64,
@@ -78,6 +81,7 @@ module aptos_framework::block {
     /// The runtime always runs this before executing the transactions in a block.
     fun block_prologue(
         vm: signer,
+        id: vector<u128>,
         epoch: u64,
         round: u64,
         proposer: address,
@@ -103,8 +107,10 @@ module aptos_framework::block {
 
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
+        let id = crypto_hash::new_hash_value(*vector::borrow(&id, 0), *vector::borrow(&id, 1));
 
         let new_block_event = NewBlockEvent {
+            id,
             epoch,
             round,
             height: block_metadata_ref.height,
@@ -118,6 +124,7 @@ module aptos_framework::block {
         // Performance scores have to be updated before the epoch transition as the transaction that triggers the
         // transition is the last block in the previous epoch.
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
+        state_storage::on_new_block();
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
             reconfiguration::reconfigure();
@@ -143,10 +150,12 @@ module aptos_framework::block {
     /// reconfiguration event.
     fun emit_genesis_block_event(vm: signer) acquires BlockResource {
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
+        let genesis_id = crypto_hash::new_hash_value(0 ,0);
         emit_new_block_event(
             &vm,
             &mut block_metadata_ref.new_block_events,
             NewBlockEvent {
+                id: genesis_id,
                 epoch: 0,
                 round: 0,
                 height: 0,
