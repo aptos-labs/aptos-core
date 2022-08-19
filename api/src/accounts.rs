@@ -102,7 +102,7 @@ impl AccountsApi {
         accept_type: AcceptType,
         address: Path<Address>,
         ledger_version: Query<Option<U64>>,
-    ) -> BasicResultWith404<BTreeMap<MoveModuleId, MoveModuleBytecode>> {
+    ) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
         fail_point_poem("endpoint_get_account_modules")?;
         let account = Account::new(self.context.clone(), address.0, ledger_version.0)?;
         account.modules(&accept_type)
@@ -212,17 +212,13 @@ impl Account {
         }
     }
 
-    pub fn modules(
-        self,
-        accept_type: &AcceptType,
-    ) -> BasicResultWith404<BTreeMap<MoveModuleId, MoveModuleBytecode>> {
+    pub fn modules(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
         let modules = self.account_state()?.into_modules();
         match accept_type {
             AcceptType::Json => {
-                let mut converted_modules = BTreeMap::new();
-                for (module_id, module) in modules {
-                    converted_modules.insert(
-                        module_id.into(),
+                let mut converted_modules = Vec::new();
+                for (_, module) in modules {
+                    converted_modules.push(
                         MoveModuleBytecode::new(module)
                             .try_parse_abi()
                             .context("Failed to parse move module ABI")

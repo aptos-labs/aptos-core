@@ -106,12 +106,7 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
                 .map_err(map_err_func)?
                 .into_inner()
                 .into_iter()
-                .map(|(module_id, module)| (module_id, json!(module.try_parse_abi().unwrap())))
-                .map(|(module_id, module)| {
-                    let mut map = serde_json::Map::new();
-                    map.insert(module_id.to_string(), module);
-                    serde_json::Value::Object(map)
-                })
+                .map(|module| (json!(module.try_parse_abi().unwrap())))
                 .collect::<Vec<serde_json::Value>>(),
             ListQuery::Resources => client
                 .get_account_resources(account)

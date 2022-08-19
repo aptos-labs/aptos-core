@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::ed25519::Ed25519Signature;
-use aptos_rest_client::aptos_api_types::TransactionData;
+use aptos_rest_client::aptos_api_types::{MoveModuleId, TransactionData};
 use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
@@ -112,10 +112,15 @@ async fn test_bcs() {
         .into_inner();
 
     assert_eq!(modules.len(), bcs_modules.len());
-    let (module_id, module_bytecode) = modules.iter().next().unwrap();
+    let module_bytecode = modules.get(0).unwrap().clone().try_parse_abi().unwrap();
+    let module_abi = module_bytecode.abi.as_ref().unwrap();
+    let module_id = MoveModuleId {
+        address: module_abi.address,
+        name: module_abi.name.clone(),
+    };
     assert_eq!(
         &module_bytecode.bytecode.0,
-        bcs_modules.get(module_id).unwrap()
+        bcs_modules.get(&module_id).unwrap()
     );
 
     let json_module = client
