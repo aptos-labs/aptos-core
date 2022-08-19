@@ -148,7 +148,9 @@ impl Default for LedgerPrunerConfig {
     fn default() -> Self {
         LedgerPrunerConfig {
             enable: true,
-            prune_window: 10_000_000,
+            // This assumes we have 1T disk, minus the space needed by state merkle db and the
+            // overhead in storage.
+            prune_window: 150_000_000,
             batch_size: 500,
             user_pruning_window_offset: 200_000,
         }
@@ -159,7 +161,8 @@ impl Default for StateMerklePrunerConfig {
     fn default() -> Self {
         StateMerklePrunerConfig {
             enable: true,
-            prune_window: 1_000_000,
+            // This is based on ~5K TPS * 2h/epoch * 2 epochs.
+            prune_window: 80_000_000,
             // A 10k transaction block (touching 60k state values, in the case of the account
             // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
             batch_size: 1_000,

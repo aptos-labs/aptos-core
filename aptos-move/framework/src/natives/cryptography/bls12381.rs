@@ -39,23 +39,23 @@ fn pop_vec_of_vec_u8(arguments: &mut VecDeque<Value>) -> PartialVMResult<Vec<Vec
 
 #[derive(Debug, Clone)]
 pub struct GasParameters {
-    pub base_cost: InternalGas,
+    pub base: InternalGas,
 
-    pub per_pubkey_deserialize_cost: InternalGasPerArg,
-    pub per_pubkey_aggregate_cost: InternalGasPerArg,
-    pub per_pubkey_subgroup_check_cost: InternalGasPerArg,
+    pub per_pubkey_deserialize: InternalGasPerArg,
+    pub per_pubkey_aggregate: InternalGasPerArg,
+    pub per_pubkey_subgroup_check: InternalGasPerArg,
 
-    pub per_sig_deserialize_cost: InternalGasPerArg,
-    pub per_sig_aggregate_cost: InternalGasPerArg,
-    pub per_sig_subgroup_check_cost: InternalGasPerArg,
+    pub per_sig_deserialize: InternalGasPerArg,
+    pub per_sig_aggregate: InternalGasPerArg,
+    pub per_sig_subgroup_check: InternalGasPerArg,
 
-    pub per_sig_verify_cost: InternalGasPerArg,
-    pub per_pop_verify_cost: InternalGasPerArg,
+    pub per_sig_verify: InternalGasPerArg,
+    pub per_pop_verify: InternalGasPerArg,
 
-    pub per_pairing_cost: InternalGasPerArg, // a size-n BLS aggregate signature requires n+1 pairings
+    pub per_pairing: InternalGasPerArg, // a size-n BLS aggregate signature requires n+1 pairings
 
-    pub per_msg_hashing_cost: InternalGasPerArg,
-    pub per_byte_hashing_cost: InternalGasPerByte, // signature verification involves signing |msg| bytes
+    pub per_msg_hashing: InternalGasPerArg,
+    pub per_byte_hashing: InternalGasPerByte, // signature verification involves signing |msg| bytes
 }
 
 impl GasParameters {
@@ -86,7 +86,7 @@ impl GasParameters {
         pk_bytes: Vec<u8>,
         cost: &mut InternalGas,
     ) -> Option<bls12381::PublicKey> {
-        *cost += self.per_pubkey_deserialize_cost * NumArgs::one();
+        *cost += self.per_pubkey_deserialize * NumArgs::one();
 
         match bls12381::PublicKey::try_from(&pk_bytes[..]) {
             Ok(key) => Some(key),
@@ -122,7 +122,7 @@ impl GasParameters {
         sig_bytes: Vec<u8>,
         cost: &mut InternalGas,
     ) -> Option<bls12381::Signature> {
-        *cost += self.per_sig_deserialize_cost * NumArgs::one();
+        *cost += self.per_sig_deserialize * NumArgs::one();
 
         match bls12381::Signature::try_from(&sig_bytes[..]) {
             Ok(sig) => Some(sig),
@@ -137,7 +137,7 @@ impl GasParameters {
         pop_bytes: Vec<u8>,
         cost: &mut InternalGas,
     ) -> Option<bls12381::ProofOfPossession> {
-        *cost += self.per_sig_deserialize_cost * NumArgs::one();
+        *cost += self.per_sig_deserialize * NumArgs::one();
 
         match bls12381::ProofOfPossession::try_from(&pop_bytes[..]) {
             Ok(pop) => Some(pop),
@@ -149,7 +149,7 @@ impl GasParameters {
     /// Checks prime-order subgroup membership on a bls12381::PublicKey struct.
     fn bls12381_pk_subgroub_check(&self, pk: &bls12381::PublicKey, cost: &mut InternalGas) -> bool {
         // NOTE(Gas): constant-time; around 39 microseconds on Apple M1
-        *cost += self.per_pubkey_deserialize_cost * NumArgs::one();
+        *cost += self.per_pubkey_deserialize * NumArgs::one();
         pk.subgroup_check().is_ok()
     }
 
@@ -159,7 +159,7 @@ impl GasParameters {
         sig: &bls12381::Signature,
         cost: &mut InternalGas,
     ) -> bool {
-        *cost += self.per_sig_subgroup_check_cost * NumArgs::one();
+        *cost += self.per_sig_subgroup_check * NumArgs::one();
         sig.subgroup_check().is_ok()
     }
 
@@ -171,9 +171,9 @@ impl GasParameters {
         msg: Vec<u8>,
         cost: &mut InternalGas,
     ) -> bool {
-        *cost += self.per_sig_verify_cost * NumArgs::one()
-            + self.per_msg_hashing_cost * NumArgs::one()
-            + self.per_byte_hashing_cost * NumBytes::new(msg.len() as u64);
+        *cost += self.per_sig_verify * NumArgs::one()
+            + self.per_msg_hashing * NumArgs::one()
+            + self.per_byte_hashing * NumBytes::new(msg.len() as u64);
 
         sig.verify_arbitrary_msg(&msg[..], pk).is_ok()
     }
@@ -201,7 +201,7 @@ impl GasParameters {
         debug_assert!(_ty_args.is_empty());
         debug_assert!(arguments.len() == 3);
 
-        let mut cost = self.base_cost;
+        let mut cost = self.base;
         let msg_bytes = pop_arg!(arguments, Vec<u8>);
         let aggpk_bytes = pop_arg!(arguments, Vec<u8>);
         let multisig_bytes = pop_arg!(arguments, Vec<u8>);
@@ -264,7 +264,7 @@ fn native_bls12381_aggregate_pubkeys(
     // Parses a Vec<Vec<u8>> of all serialized public keys
     let pks_bytes = pop_vec_of_vec_u8(&mut arguments)?;
     let num_pks = pks_bytes.len();
-    let mut cost = gas_params.base_cost;
+    let mut cost = gas_params.base;
 
     // If zero PKs were given as input, return None.
     if pks_bytes.is_empty() {
@@ -287,7 +287,7 @@ fn native_bls12381_aggregate_pubkeys(
 
     // Aggregate the public keys (this will NOT subgroup-check the individual PKs)
     // NOTE(Gas): |pks| elliptic curve additions
-    cost += gas_params.per_pubkey_aggregate_cost * NumArgs::new(num_pks as u64);
+    cost += gas_params.per_pubkey_aggregate * NumArgs::new(num_pks as u64);
     let aggpk =
         match bls12381::PublicKey::aggregate(pks.iter().collect::<Vec<&bls12381::PublicKey>>()) {
             Ok(aggpk) => aggpk,
@@ -335,7 +335,7 @@ pub fn native_bls12381_aggregate_signatures(
     let sigs_serialized = pop_vec_of_vec_u8(&mut arguments)?;
     let num_sigs = sigs_serialized.len();
 
-    let mut cost = gas_params.base_cost;
+    let mut cost = gas_params.base;
 
     // If zero signatures were given as input, return None.
     if sigs_serialized.is_empty() {
@@ -356,7 +356,7 @@ pub fn native_bls12381_aggregate_signatures(
 
     // Aggregate the signatures (this will NOT group-check the individual signatures)
     // NOTE(Gas): |sigs| elliptic curve additions
-    cost += gas_params.per_sig_aggregate_cost * NumArgs::new(sigs.len() as u64);
+    cost += gas_params.per_sig_aggregate * NumArgs::new(sigs.len() as u64);
     let aggsig = match bls12381::Signature::aggregate(sigs) {
         Ok(aggsig) => aggsig,
         Err(_) => {
@@ -393,7 +393,7 @@ pub fn native_bls12381_signature_subgroup_check(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let mut cost = gas_params.base_cost;
+    let mut cost = gas_params.base;
 
     let sig_bytes = pop_arg!(arguments, Vec<u8>);
 
@@ -424,7 +424,7 @@ fn native_bls12381_validate_pubkey(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
-    let mut cost = gas_params.base_cost;
+    let mut cost = gas_params.base;
     let pk_bytes = pop_arg!(arguments, Vec<u8>);
 
     let pk = match gas_params.bls12381_deserialize_pk(pk_bytes, &mut cost) {
@@ -475,7 +475,7 @@ pub fn native_bls12381_verify_aggregate_signature(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 3);
 
-    let mut cost = gas_params.base_cost;
+    let mut cost = gas_params.base;
 
     // Parses a Vec<Vec<u8>> of all messages
     let messages = pop_vec_arg!(arguments, Vec<u8>);
@@ -512,9 +512,9 @@ pub fn native_bls12381_verify_aggregate_signature(
 
     // The cost of verifying a size-n aggregate signatures involves n+1 parings and hashing all
     // the messages to elliptic curve points (proportional to sum of all message lengths).
-    cost += gas_params.per_pairing_cost * NumArgs::new((messages.len() + 1) as u64)
-        + gas_params.per_msg_hashing_cost * NumArgs::new(messages.len() as u64)
-        + gas_params.per_byte_hashing_cost
+    cost += gas_params.per_pairing * NumArgs::new((messages.len() + 1) as u64)
+        + gas_params.per_msg_hashing * NumArgs::new(messages.len() as u64)
+        + gas_params.per_byte_hashing
             * messages.iter().fold(NumBytes::new(0), |sum, msg| {
                 sum + NumBytes::new(msg.len() as u64)
             });
@@ -594,7 +594,7 @@ fn native_bls12381_verify_proof_of_possession(
     debug_assert!(_ty_args.is_empty());
     debug_assert!(arguments.len() == 2);
 
-    let mut cost = gas_params.base_cost;
+    let mut cost = gas_params.base;
     let pop_bytes = pop_arg!(arguments, Vec<u8>);
     let key_bytes = pop_arg!(arguments, Vec<u8>);
 
@@ -609,7 +609,7 @@ fn native_bls12381_verify_proof_of_possession(
     };
 
     // NOTE(Gas): 2 bilinear pairings and a hash-to-curve
-    cost += gas_params.per_pop_verify_cost * NumArgs::one();
+    cost += gas_params.per_pop_verify * NumArgs::one();
     let valid = pop.verify(&pk).is_ok();
 
     Ok(NativeResult::ok(cost, smallvec![Value::bool(valid)]))
