@@ -99,6 +99,7 @@ impl<'a> NativeAggregatorContext<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use aptos_types::account_address::AccountAddress;
     use claim::assert_matches;
     use move_deps::{
         move_core_types::gas_algebra::InternalGas,
@@ -127,7 +128,7 @@ mod test {
     }
 
     fn test_id(key: u128) -> AggregatorID {
-        AggregatorID::new(0, key)
+        AggregatorID::new(TableHandle(AccountAddress::ZERO), key)
     }
 
     // All aggregators are initialized deterministically based on their ID,

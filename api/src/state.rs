@@ -1,31 +1,34 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
-use crate::context::Context;
-use crate::failpoint::fail_point_poem;
-use crate::response::{
-    build_not_found, BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus,
-    BasicResultWith404, InternalError, NotFoundError,
+use crate::{
+    accept_type::AcceptType,
+    context::Context,
+    failpoint::fail_point_poem,
+    response::{
+        build_not_found, BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus,
+        BasicResultWith404, InternalError, NotFoundError,
+    },
+    ApiTags,
 };
-use crate::ApiTags;
 use anyhow::{anyhow, Context as AnyhowContext};
 use aptos_api_types::{
-    Address, AsConverter, IdentifierWrapper, MoveModuleBytecode, MoveStructTag, MoveValue,
-    TableItemRequest, TransactionId, U128, U64,
+    Address, AsConverter, IdentifierWrapper, LedgerInfo, MoveModuleBytecode, MoveResource,
+    MoveStructTag, MoveValue, TableItemRequest, TransactionId, U64,
 };
-use aptos_api_types::{LedgerInfo, MoveResource};
 use aptos_state_view::StateView;
-use aptos_types::access_path::AccessPath;
-use aptos_types::state_store::state_key::StateKey;
-use aptos_types::state_store::table::TableHandle;
+use aptos_types::{
+    access_path::AccessPath,
+    state_store::{state_key::StateKey, table::TableHandle},
+};
 use aptos_vm::data_cache::AsMoveResolver;
 use move_deps::move_core_types::language_storage::{ModuleId, ResourceKey, StructTag};
-use poem_openapi::param::Query;
-use poem_openapi::payload::Json;
-use poem_openapi::{param::Path, OpenApi};
-use std::convert::TryInto;
-use std::sync::Arc;
+use poem_openapi::{
+    param::{Path, Query},
+    payload::Json,
+    OpenApi,
+};
+use std::{convert::TryInto, sync::Arc};
 use storage_interface::state_view::DbStateView;
 
 pub struct StateApi {
@@ -104,7 +107,7 @@ impl StateApi {
     async fn get_table_item(
         &self,
         accept_type: AcceptType,
-        table_handle: Path<U128>,
+        table_handle: Path<Address>,
         table_item_request: Json<TableItemRequest>,
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveValue> {
@@ -216,7 +219,7 @@ impl StateApi {
     pub fn table_item(
         &self,
         accept_type: &AcceptType,
-        table_handle: U128,
+        table_handle: Address,
         table_item_request: TableItemRequest,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveValue> {
@@ -250,7 +253,7 @@ impl StateApi {
             .simple_serialize()
             .ok_or_else(|| BasicErrorWith404::internal_str("Failed to serialize table key"))?;
 
-        let state_key = StateKey::table_item(TableHandle(table_handle.0), raw_key);
+        let state_key = StateKey::table_item(TableHandle(table_handle.into()), raw_key);
         let bytes = state_view
             .get_state_value(&state_key)
             .context(format!(

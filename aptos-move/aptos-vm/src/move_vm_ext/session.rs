@@ -206,7 +206,7 @@ impl SessionOutput {
         for (id, change) in aggregator_change_set.changes {
             let AggregatorID { handle, key } = id;
             let key_bytes = serialize(&key);
-            let state_key = StateKey::table_item(TableHandle(handle), key_bytes);
+            let state_key = StateKey::table_item(TableHandle::from(handle), key_bytes);
 
             match change {
                 AggregatorChange::Write(value) => {

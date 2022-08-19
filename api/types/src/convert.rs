@@ -15,12 +15,11 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_types::state_store::table::TableHandle;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
     contract_event::{ContractEvent, EventWithVersion},
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
         EntryFunction, ExecutionStatus, ModuleBundle, RawTransaction, Script, SignedTransaction,
     },
@@ -39,11 +38,11 @@ use move_deps::{
     move_resource_viewer::MoveValueAnnotator,
 };
 use serde_json::Value;
-use std::sync::Arc;
 use std::{
     convert::{TryFrom, TryInto},
     iter::IntoIterator,
     rc::Rc,
+    sync::Arc,
 };
 use storage_interface::DbReader;
 
@@ -284,7 +283,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         key: Vec<u8>,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let hex_handle = handle.0.to_be_bytes().to_vec().into();
+        let hex_handle = handle.0.to_vec().into();
         let key: HexEncodedBytes = key.into();
         let ret = match op {
             WriteOp::Deletion => {
