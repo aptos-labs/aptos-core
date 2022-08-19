@@ -47,10 +47,7 @@ use move_deps::{
         identifier::Identifier,
         language_storage::{ModuleId, TypeTag},
     },
-    move_package::{
-        compilation::compiled_package::CompiledPackage,
-        source_package::layout::SourcePackageLayout, BuildConfig,
-    },
+    move_package::{source_package::layout::SourcePackageLayout, BuildConfig},
     move_prover,
     move_unit_test::UnitTestingConfig,
 };
@@ -205,19 +202,18 @@ impl CliCommand<Vec<String>> for CompilePackage {
     }
 
     async fn execute(self) -> CliTypedResult<Vec<String>> {
-        let build_config = BuildConfig {
-            additional_named_addresses: self.move_options.named_addresses(),
-            generate_abis: true,
-            generate_docs: true,
+        let build_options = BuildOptions {
+            with_srcs: false,
+            with_abis: true,
+            with_source_maps: true,
+            with_error_map: true,
             install_dir: self.move_options.output_dir.clone(),
-            ..Default::default()
+            named_addresses: self.move_options.named_addresses(),
         };
-        let compiled_package = compile_move(
-            build_config,
-            self.move_options.get_package_path()?.as_path(),
-        )?;
+        let pack = BuiltPackage::build(self.move_options.get_package_path()?, build_options)
+            .map_err(|e| CliError::MoveCompilationError(format!("{:#}", e)))?;
         let mut ids = Vec::new();
-        for &module in compiled_package.root_modules_map().iter_modules().iter() {
+        for module in pack.modules() {
             verify_module_init_function(module)
                 .map_err(|e| CliError::MoveCompilationError(e.to_string()))?;
             ids.push(module.self_id().to_string());
@@ -335,17 +331,6 @@ impl CliCommand<&'static str> for ProvePackage {
     }
 }
 
-/// Compiles a Move package dir, and returns the compiled modules.
-pub(crate) fn compile_move(
-    build_config: BuildConfig,
-    package_dir: &Path,
-) -> CliTypedResult<CompiledPackage> {
-    // TODO: Add caching
-    build_config
-        .compile_package(package_dir, &mut Vec::new())
-        .map_err(|err| CliError::MoveCompilationError(format!("{:#}", err)))
-}
-
 /// Publishes the modules in a Move package
 #[derive(Parser)]
 pub struct PublishPackage {
@@ -412,6 +397,7 @@ impl IncludedArtifacts {
                 with_source_maps: false,
                 with_error_map: false,
                 named_addresses,
+                install_dir: Option::None,
             },
             Sparse => BuildOptions {
                 with_srcs: true,
@@ -419,6 +405,7 @@ impl IncludedArtifacts {
                 with_source_maps: false,
                 with_error_map: false,
                 named_addresses,
+                install_dir: Option::None,
             },
             All => BuildOptions {
                 with_srcs: true,
@@ -426,6 +413,7 @@ impl IncludedArtifacts {
                 with_source_maps: true,
                 with_error_map: true,
                 named_addresses,
+                install_dir: Option::None,
             },
         }
     }
@@ -462,7 +450,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
         } else {
             // Send the compiled module and metadata using the code::publish_package_txn.
             let metadata = package.extract_metadata()?;
-            let payload = aptos_transaction_builder::aptos_stdlib::code_publish_package_txn(
+            let payload = cached_packages::aptos_stdlib::code_publish_package_txn(
                 bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
                 compiled_units,
             );

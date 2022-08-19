@@ -46,7 +46,6 @@ use aptos_sdk::{
     },
     transaction_builder::TransactionFactory,
 };
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{
@@ -54,6 +53,7 @@ use aptos_types::{
         Transaction::UserTransaction, TransactionPayload,
     },
 };
+use cached_packages::aptos_stdlib;
 use std::str::FromStr;
 use warp::Filter;
 

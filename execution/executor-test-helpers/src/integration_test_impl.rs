@@ -8,7 +8,6 @@ use aptos_sdk::{
     types::{AccountKey, LocalAccount},
 };
 use aptos_state_view::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     account_config::aptos_test_root_address,
     account_view::AccountView,
@@ -25,6 +24,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptosdb::AptosDB;
+use cached_packages::aptos_stdlib;
 use consensus_types::block::Block;
 use executor::block_executor::BlockExecutor;
 use executor_types::BlockExecutorTrait;

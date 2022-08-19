@@ -10,10 +10,10 @@ use crate::{
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
 
-pub use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::transaction::{
     authenticator::AuthenticationKeyPreimage, EntryFunction, ModuleBundle, Script,
 };
+pub use cached_packages::aptos_stdlib;
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,

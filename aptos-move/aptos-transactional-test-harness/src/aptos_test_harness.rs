@@ -501,7 +501,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_test_root_address(),
             parameters.sequence_number,
-            aptos_transaction_builder::aptos_stdlib::account_create_account(account_addr),
+            cached_packages::aptos_stdlib::account_create_account(account_addr),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.expiration_timestamp_secs,
@@ -517,7 +517,7 @@ impl<'a> AptosTestAdapter<'a> {
         let txn = RawTransaction::new(
             aptos_test_root_address(),
             parameters.sequence_number + 1,
-            aptos_transaction_builder::aptos_stdlib::aptos_coin_mint(account_addr, amount),
+            cached_packages::aptos_stdlib::aptos_coin_mint(account_addr, amount),
             parameters.max_gas_amount,
             parameters.gas_unit_price,
             parameters.expiration_timestamp_secs,

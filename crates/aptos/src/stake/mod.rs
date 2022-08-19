@@ -3,9 +3,9 @@
 
 use crate::common::types::{CliCommand, CliResult, CliTypedResult, TransactionOptions};
 use aptos_rest_client::Transaction;
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
+use cached_packages::aptos_stdlib;
 use clap::Parser;
 
 /// Tool for manipulating stake

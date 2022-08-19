@@ -11,6 +11,9 @@ use std::io::{Read, Write};
 mod built_package;
 pub use built_package::*;
 
+mod module_metadata;
+pub use module_metadata::*;
+
 mod error_map;
 pub mod natives;
 mod release_builder;
