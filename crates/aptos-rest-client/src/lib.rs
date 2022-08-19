@@ -23,10 +23,11 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::mime_types::BCS_OUTPUT_NEW;
 use aptos_api_types::{
     mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, HexEncodedBytes,
-    MoveModuleId, TransactionOnChainData, VersionedEvent,
+    MoveModuleId, TransactionData, TransactionOnChainData, VersionedEvent,
 };
 use aptos_crypto::HashValue;
 use aptos_types::account_config::AccountResource;
+use aptos_types::transaction::ExecutionStatus;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{NewBlockEvent, CORE_CODE_ADDRESS},
@@ -247,6 +248,64 @@ impl Client {
         Err(anyhow!("timeout"))
     }
 
+    pub async fn wait_for_transaction_by_hash_bcs(
+        &self,
+        hash: HashValue,
+        expiration_timestamp_secs: u64,
+    ) -> Result<Response<TransactionOnChainData>, (Option<Response<TransactionData>>, anyhow::Error)>
+    {
+        const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+        const DEFAULT_DELAY: Duration = Duration::from_millis(500);
+
+        let start = std::time::Instant::now();
+        while start.elapsed() < DEFAULT_TIMEOUT {
+            let resp = self
+                .get_transaction_by_hash_bcs_inner(hash)
+                .await
+                .map_err(|err| (None, err))?;
+
+            // If it's not found, keep waiting for it
+            if resp.status() != StatusCode::NOT_FOUND {
+                let resp = self
+                    .check_and_parse_bcs_response(resp)
+                    .await
+                    .map_err(|err| (None, err))?;
+                let resp = resp
+                    .and_then(|bytes| bcs::from_bytes(&bytes))
+                    .map_err(|err| (None, err.into()))?;
+                let (maybe_pending_txn, state) = resp.into_parts();
+
+                // If we have a committed transaction, determine if it failed or not
+                if let TransactionData::OnChain(txn) = maybe_pending_txn {
+                    let status = txn.info.status();
+
+                    // The user can handle the error
+                    return match status {
+                        ExecutionStatus::Success => Ok(Response::new(txn, state)),
+                        _ => Err((
+                            Some(Response::new(TransactionData::OnChain(txn), state)),
+                            anyhow!("Transaction failed"),
+                        )),
+                    };
+                }
+
+                // If it's expired lets give up
+                if Duration::from_secs(expiration_timestamp_secs)
+                    <= Duration::from_micros(state.timestamp_usecs)
+                {
+                    return Err((
+                        Some(Response::new(maybe_pending_txn, state)),
+                        anyhow!("Transaction expired"),
+                    ));
+                }
+            }
+
+            tokio::time::sleep(DEFAULT_DELAY).await;
+        }
+
+        return Err((None, anyhow!("Timed out waiting for transaction")));
+    }
+
     pub async fn get_transactions(
         &self,
         start: Option<u64>,
@@ -273,6 +332,29 @@ impl Client {
             .await
     }
 
+    pub async fn get_transaction_by_hash_bcs(
+        &self,
+        hash: HashValue,
+    ) -> Result<Response<TransactionData>> {
+        let response = self.get_transaction_by_hash_bcs_inner(hash).await?;
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_transaction_by_hash_bcs_inner(
+        &self,
+        hash: HashValue,
+    ) -> Result<reqwest::Response> {
+        let url = self.build_path(&format!("transactions/by_hash/{}", hash.to_hex_literal()))?;
+        let response = self
+            .inner
+            .get(url)
+            .header(ACCEPT, BCS_OUTPUT_NEW)
+            .send()
+            .await?;
+        Ok(response)
+    }
+
     async fn get_transaction_by_hash_inner(&self, hash: HashValue) -> Result<reqwest::Response> {
         let url = self.build_path(&format!("transactions/by_hash/{}", hash.to_hex_literal()))?;
         Ok(self.inner.get(url).send().await?)
@@ -281,6 +363,15 @@ impl Client {
     pub async fn get_transaction_by_version(&self, version: u64) -> Result<Response<Transaction>> {
         self.json(self.get_transaction_by_version_inner(version).await?)
             .await
+    }
+
+    pub async fn get_transaction_by_version_bcs(
+        &self,
+        version: u64,
+    ) -> Result<Response<TransactionData>> {
+        let url = self.build_path(&format!("transactions/by_version/{}", version))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
     async fn get_transaction_by_version_inner(&self, version: u64) -> Result<reqwest::Response> {
@@ -617,8 +708,7 @@ impl Client {
             .header(ACCEPT, BCS_OUTPUT_NEW)
             .send()
             .await?;
-        let (response, state) = self.check_response(response).await?;
-        Ok(Response::new(response.bytes().await?, state))
+        self.check_and_parse_bcs_response(response).await
     }
 
     async fn get_bcs_with_page(
@@ -637,7 +727,13 @@ impl Client {
         }
 
         let response = request.send().await?;
+        self.check_and_parse_bcs_response(response).await
+    }
 
+    async fn check_and_parse_bcs_response(
+        &self,
+        response: reqwest::Response,
+    ) -> Result<Response<bytes::Bytes>> {
         let (response, state) = self.check_response(response).await?;
         Ok(Response::new(response.bytes().await?, state))
     }

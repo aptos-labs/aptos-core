@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_rest_client::aptos_api_types::TransactionData;
 use aptos_sdk::move_types::language_storage::StructTag;
 use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
@@ -114,11 +115,16 @@ async fn test_bcs() {
         .transfer(&mut local_account, &other_local_account, 500)
         .await
         .unwrap();
-
+    let expected_txn_hash = pending_transaction.hash.into();
     let expected_txn = client
-        .wait_for_transaction(&pending_transaction)
+        .wait_for_transaction_by_hash_bcs(
+            expected_txn_hash,
+            pending_transaction.request.expiration_timestamp_secs.0,
+        )
         .await
-        .unwrap();
+        .unwrap()
+        .into_inner();
+    let expected_txn_version = expected_txn.version;
 
     // Check transactions on an account
     let transactions = client
@@ -133,8 +139,8 @@ async fn test_bcs() {
         .into_inner();
 
     // Should only have the transfer up there
-    assert!(transactions.contains(expected_txn.inner()));
-    assert_eq!(1, transactions.len());
+    assert!(transactions_bcs.contains(&expected_txn));
+    assert_eq!(1, transactions_bcs.len());
     assert_eq!(transactions.len(), transactions_bcs.len());
 
     for (i, expected_transaction) in transactions.iter().enumerate() {
@@ -150,4 +156,24 @@ async fn test_bcs() {
         };
         assert_eq!(expected_hash, bcs_hash);
     }
+
+    // Check that the transaction is able to be looked up by hash and version
+    let expected_txn_data = TransactionData::OnChain(expected_txn);
+
+    assert_eq!(
+        expected_txn_data,
+        client
+            .get_transaction_by_hash_bcs(expected_txn_hash)
+            .await
+            .unwrap()
+            .into_inner()
+    );
+    assert_eq!(
+        expected_txn_data,
+        client
+            .get_transaction_by_version_bcs(expected_txn_version)
+            .await
+            .unwrap()
+            .into_inner()
+    );
 }
