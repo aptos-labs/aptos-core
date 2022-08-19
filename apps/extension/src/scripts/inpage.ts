@@ -1,19 +1,23 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { MessageMethod } from '../core/types/dappTypes';
+import { MessageMethod } from 'core/types/dappTypes';
+import { ProviderEvent, ProviderMessage } from 'core/utils/providerEvents';
+import { TransactionPayload } from 'aptos/dist/generated';
+
+type OnProviderMessageCallback = (params: any) => void;
 
 class Web3 {
   requestId;
 
-  eventListenerMap;
+  eventListenerMap: Record<string, OnProviderMessageCallback>;
 
   constructor() {
     this.requestId = 0;
     this.eventListenerMap = {};
 
     // init the event listener helper
-    window.addEventListener('message', (request) => {
+    window.addEventListener('message', (request: MessageEvent<ProviderMessage>) => {
       const { data } = request;
       if (data && this.eventListenerMap[data.event]) {
         this.eventListenerMap[data.event](data.params);
@@ -21,7 +25,7 @@ class Web3 {
     });
   }
 
-  on(event, callback) {
+  on(event: ProviderEvent, callback: OnProviderMessageCallback) {
     this.eventListenerMap[event] = callback;
   }
 
@@ -45,28 +49,27 @@ class Web3 {
     return this.message(MessageMethod.GET_NETWORK, {});
   }
 
-  signMessage(message) {
+  signMessage(message: string) {
     return this.message(MessageMethod.SIGN_MESSAGE, { message });
   }
 
-  signAndSubmitTransaction(transaction) {
+  async signAndSubmitTransaction(transaction: TransactionPayload) {
     return this.message(MessageMethod.SIGN_AND_SUBMIT_TRANSACTION, { transaction });
   }
 
-  signTransaction(transaction) {
+  async signTransaction(transaction: TransactionPayload) {
     return this.message(MessageMethod.SIGN_TRANSACTION, { transaction });
   }
 
-  message(method, args) {
+  message(method: MessageMethod, args: any) {
     this.requestId += 1;
     const id = this.requestId;
-    return new Promise((resolve, reject) => {
+    return new Promise<any>((resolve, reject) => {
       window.postMessage({ args, id, method });
       window.addEventListener('message', function handler(event) {
         if (event.data.responseMethod === method
             && event.data.id === id
-            && (event.data.response !== undefined
-              || event.data.response !== null)) {
+            && (event.data.response !== undefined || true)) {
           const { response } = event.data;
           this.removeEventListener('message', handler);
           if (response && response.error) {
@@ -80,4 +83,4 @@ class Web3 {
   }
 }
 
-window.aptos = new Web3();
+(window as any).aptos = new Web3();

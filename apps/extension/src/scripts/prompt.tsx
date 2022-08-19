@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import React, {StrictMode, useEffect, useState} from 'react';
+import React, { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Heading,
@@ -18,12 +18,12 @@ import {
   Image,
 } from '@chakra-ui/react';
 import { InfoIcon } from '@chakra-ui/icons';
-import { Permission, PromptMessage } from 'core/types/dappTypes';
+import { Permission, PromptInfo, PromptMessage } from 'core/types/dappTypes';
 import { AppStateProvider, useAppState } from 'core/hooks/useAppState';
 import {
   AccountsProvider,
   InitializedAccountsProvider,
-} from "core/hooks/useAccounts";
+} from 'core/hooks/useAccounts';
 import Password from 'pages/Password';
 import { AptosBlackLogo } from 'core/components/AptosLogo';
 
@@ -40,21 +40,25 @@ const theme = extendTheme({
   useSystemColorMode: false,
 });
 
-function PermissionsPrompt({ domain, imageURI, title, permission }) {
-  const onApprove = async (data, event) => {
+type PermissionPromptInfo = Omit<PromptInfo, 'promptType'> & { permission: Permission };
+
+function PermissionsPrompt({
+  domain, imageURI, permission: requestedPermission, title,
+}: PermissionPromptInfo) {
+  const onApprove = async (event: React.MouseEvent) => {
     event?.preventDefault();
     await chrome.runtime.sendMessage(PromptMessage.APPROVED);
     window.close();
   };
 
-  const onCancel = async (data, event) => {
+  const onCancel = async (event: React.MouseEvent) => {
     event?.preventDefault();
     await chrome.runtime.sendMessage(PromptMessage.REJECTED);
     window.close();
   };
 
   const permissions = [];
-  switch (permission) {
+  switch (requestedPermission) {
     case Permission.CONNECT:
       permissions.push('View your account address');
       permissions.push('Request your approval for transactions');
@@ -65,8 +69,10 @@ function PermissionsPrompt({ domain, imageURI, title, permission }) {
       break;
     case Permission.SIGN_MESSAGE:
       permissions.push('Sign a message');
+      break;
+    default:
+      break;
   }
-
 
   return (
     <VStack
@@ -102,13 +108,13 @@ function PermissionsPrompt({ domain, imageURI, title, permission }) {
           <HStack key={permission}>
             <InfoIcon w={4} h={4} />
             <Text fontSize="sm" wordBreak="break-word">
-              {permission}
+              { permission }
             </Text>
           </HStack>
         ))}
       </VStack>
       <SimpleGrid flex={0} spacing={4} width="100%" columns={2}>
-        <Button onClick={onCancel} >
+        <Button onClick={onCancel}>
           Cancel
         </Button>
         <Button colorScheme="teal" onClick={onApprove}>
@@ -120,14 +126,14 @@ function PermissionsPrompt({ domain, imageURI, title, permission }) {
 }
 
 function PromptState() {
-  const [promptInfo, setPromptInfo] = useState(undefined);
+  const [promptInfo, setPromptInfo] = useState<PromptInfo>();
 
   const {
     accounts,
     activeAccountAddress,
-    isAppStateReady,
     encryptedAccounts,
     encryptionKey,
+    isAppStateReady,
     salt,
   } = useAppState();
 
@@ -174,27 +180,28 @@ function PromptState() {
         </Text>
       </VStack>
     );
-  } else if (!areAccountsUnlocked) {
+  } if (!areAccountsUnlocked) {
     return (
       <AccountsProvider>
         <InitializedAccountsProvider encryptedAccounts={encryptedAccounts} salt={salt}>
           <VStack w="100vw" h="100vh">
-            <Password/>
+            <Password />
           </VStack>
         </InitializedAccountsProvider>
       </AccountsProvider>
     );
-  } else {
-    return <PermissionsPrompt
+  }
+  return (
+    <PermissionsPrompt
       domain={domain}
       imageURI={imageURI}
       title={title}
       permission={promptType.permission}
-    />;
-  }
+    />
+  );
 }
 
-const root = createRoot(document.getElementById('prompt'));
+const root = createRoot(document.getElementById('prompt') as Element);
 root.render(
   <ChakraProvider theme={theme}>
     <StrictMode>

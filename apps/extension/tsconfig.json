@@ -26,10 +26,11 @@
     },
   },
   "exclude": [
-    "node_modules"
+    "node_modules",
   ],
   "include": [
     ".eslintrc.js",
+    "config-overrides.js",
     "src"
   ]
 }

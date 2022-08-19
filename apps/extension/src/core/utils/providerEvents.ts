@@ -5,15 +5,20 @@ import { getBackgroundCurrentPublicAccount, getBackgroundNetwork } from './accou
 import Browser from './browser';
 import Permissions from './permissions';
 
-export const ProviderEvent = Object.freeze({
-  ACCOUNT_CHANGED: 'accountChanged',
-  NETWORK_CHANGED: 'networkChanged',
-} as const);
+export enum ProviderEvent {
+  ACCOUNT_CHANGED = 'accountChanged',
+  NETWORK_CHANGED = 'networkChanged',
+}
+
+export interface ProviderMessage {
+  event: ProviderEvent,
+  params?: any,
+}
 
 async function sendToTabs(
   address: string | undefined,
-  permissionlessMessage: {},
-  permissionedMessage: {},
+  permissionlessMessage: ProviderMessage,
+  permissionedMessage: ProviderMessage,
 ) {
   const tabs = await Browser.tabs()?.query({});
   if (tabs) {
@@ -31,7 +36,7 @@ async function sendToTabs(
   }
 }
 
-export async function sendProviderEvent(event: string) {
+export async function sendProviderEvent(event: ProviderEvent) {
   const publicAccount = await getBackgroundCurrentPublicAccount();
   switch (event) {
     case ProviderEvent.ACCOUNT_CHANGED:

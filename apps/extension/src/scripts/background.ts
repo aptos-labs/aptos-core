@@ -1,28 +1,34 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-import { AptosClient, BCS } from 'aptos';
+import {
+  AptosAccount,
+  AptosClient,
+  BCS,
+} from 'aptos';
 import fetchAdapter from '@vespaiach/axios-fetch-adapter';
 import axios from 'axios';
 import { sign } from 'tweetnacl';
-import {
-  MessageMethod, Permission, warningPrompt,
-} from '../core/types/dappTypes';
-import PromptPresenter from '../core/utils/promptPresenter';
+import { MessageMethod, Permission, warningPrompt } from 'core/types/dappTypes';
+import PromptPresenter from 'core/utils/promptPresenter';
 import {
   getBackgroundAptosAccountState,
   getBackgroundNetwork,
   getBackgroundCurrentPublicAccount,
-} from '../core/utils/account';
-import Permissions from '../core/utils/permissions';
-import { DappErrorType, TransactionError } from '../core/types/errors';
+} from 'core/utils/account';
+import Permissions from 'core/utils/permissions';
+import { DappErrorType, TransactionError } from 'core/types/errors';
+import { PublicAccount } from 'core/types/stateTypes';
+import { TransactionPayload } from 'aptos/dist/generated';
 
 // The fetch adapter is necessary to use axios from a service worker
 axios.defaults.adapter = fetchAdapter;
 
+type ResponseCallback = (response?: any) => void;
+
 // Utils
 
-async function checkAccount(sendResponse) {
+async function checkAccount(sendResponse: ResponseCallback) {
   const account = await getBackgroundAptosAccountState();
   if (account === undefined) {
     sendResponse({ error: DappErrorType.NO_ACCOUNTS });
@@ -32,17 +38,24 @@ async function checkAccount(sendResponse) {
 
 async function getCurrentDomain() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tabs[0].url === undefined) {
+    throw new Error("Couldn't retrieve tab URL");
+  }
   const url = new URL(tabs[0].url);
   return url.hostname;
 }
 
-async function signTransaction(client, account, transaction) {
+async function signTransaction(
+  client: AptosClient,
+  account: AptosAccount,
+  transaction: TransactionPayload,
+) {
   const address = account.address();
   const txn = await client.generateTransaction(address, transaction);
   return client.signTransaction(account, txn);
 }
 
-async function checkConnected(address, sendResponse) {
+async function checkConnected(address: string, sendResponse: ResponseCallback) {
   if (await Permissions.isDomainAllowed(await getCurrentDomain(), address)) {
     return true;
   }
@@ -50,13 +63,13 @@ async function checkConnected(address, sendResponse) {
   return false;
 }
 
-function rejectRequest(sendResponse) {
+function rejectRequest(sendResponse: ResponseCallback) {
   sendResponse({ error: DappErrorType.USER_REJECTION });
 }
 
 // Aptos dApp methods
 
-async function getAccountAddress(publicAccount, sendResponse) {
+async function getAccountAddress(publicAccount: PublicAccount, sendResponse: ResponseCallback) {
   const connected = await checkConnected(publicAccount.address, sendResponse);
   if (!connected) {
     return;
@@ -64,7 +77,7 @@ async function getAccountAddress(publicAccount, sendResponse) {
   sendResponse(publicAccount);
 }
 
-async function getNetwork(sendResponse) {
+async function getNetwork(sendResponse: ResponseCallback) {
   try {
     const network = await getBackgroundNetwork();
     sendResponse(network.name);
@@ -73,7 +86,7 @@ async function getNetwork(sendResponse) {
   }
 }
 
-async function connect(publicAccount, sendResponse) {
+async function connect(publicAccount: PublicAccount, sendResponse: ResponseCallback) {
   if (await Permissions.requestPermissions(
     Permission.CONNECT,
     await getCurrentDomain(),
@@ -85,12 +98,12 @@ async function connect(publicAccount, sendResponse) {
   }
 }
 
-async function disconnect(address, sendResponse) {
+async function disconnect(address: string, sendResponse: ResponseCallback) {
   await Permissions.removeDomain(await getCurrentDomain(), address);
   sendResponse({});
 }
 
-async function isConnected(address, sendResponse) {
+async function isConnected(address: string, sendResponse: ResponseCallback) {
   const status = await Permissions.isDomainAllowed(
     await getCurrentDomain(),
     address,
@@ -98,7 +111,12 @@ async function isConnected(address, sendResponse) {
   sendResponse(status);
 }
 
-async function signAndSubmitTransaction(client, publicAccount, transaction, sendResponse) {
+async function signAndSubmitTransaction(
+  client: AptosClient,
+  publicAccount: PublicAccount,
+  transaction: TransactionPayload,
+  sendResponse: ResponseCallback,
+) {
   const connected = await checkConnected(publicAccount.address, sendResponse);
   if (!connected) {
     return;
@@ -123,12 +141,17 @@ async function signAndSubmitTransaction(client, publicAccount, transaction, send
     const signedTransaction = await signTransaction(client, account, transaction);
     const response = await client.submitTransaction(signedTransaction);
     sendResponse(response);
-  } catch (error) {
+  } catch (error: any) {
     sendResponse(TransactionError(error));
   }
 }
 
-async function signTransactionAndSendResponse(client, publicAccount, transaction, sendResponse) {
+async function signTransactionAndSendResponse(
+  client: AptosClient,
+  publicAccount: PublicAccount,
+  transaction: TransactionPayload,
+  sendResponse: ResponseCallback,
+) {
   const connected = await checkConnected(publicAccount.address, sendResponse);
   if (!connected) {
     return;
@@ -152,12 +175,16 @@ async function signTransactionAndSendResponse(client, publicAccount, transaction
   try {
     const signedTransaction = await signTransaction(client, account, transaction);
     sendResponse({ signedTransaction });
-  } catch (error) {
+  } catch (error: any) {
     sendResponse(TransactionError(error));
   }
 }
 
-async function signMessage(publicAccount, message, sendResponse) {
+async function signMessage(
+  publicAccount: PublicAccount,
+  message: string,
+  sendResponse: ResponseCallback,
+) {
   const connected = await checkConnected(publicAccount.address, sendResponse);
   if (!connected) {
     return;
@@ -190,7 +217,7 @@ async function signMessage(publicAccount, message, sendResponse) {
   }
 }
 
-function shouldShowNoAccountsPrompt(method) {
+function shouldShowNoAccountsPrompt(method: MessageMethod) {
   switch (method) {
     case MessageMethod.CONNECT:
       return true;
@@ -199,7 +226,7 @@ function shouldShowNoAccountsPrompt(method) {
   }
 }
 
-async function handleDappRequest(request, sendResponse) {
+async function handleDappRequest(request: any, sendResponse: ResponseCallback) {
   const publicAccount = await getBackgroundCurrentPublicAccount();
   const network = await getBackgroundNetwork();
   if (!publicAccount) {
@@ -228,7 +255,12 @@ async function handleDappRequest(request, sendResponse) {
       await getNetwork(sendResponse);
       break;
     case MessageMethod.SIGN_AND_SUBMIT_TRANSACTION:
-      await signAndSubmitTransaction(client, publicAccount, request.args.transaction, sendResponse);
+      await signAndSubmitTransaction(
+        client,
+        publicAccount,
+        request.args.transaction,
+        sendResponse,
+      );
       break;
     case MessageMethod.SIGN_TRANSACTION:
       await signTransactionAndSendResponse(
@@ -249,7 +281,7 @@ async function handleDappRequest(request, sendResponse) {
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   try {
-    handleDappRequest(request, sendResponse);
+    handleDappRequest(request, sendResponse).then();
   } catch (error) {
     sendResponse({ error });
   }
