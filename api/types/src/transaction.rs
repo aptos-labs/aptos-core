@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Address, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode, MoveModuleId, MoveResource,
-    MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, ScriptFunctionId, U64,
+    Address, EntryFunctionId, EventKey, HashValue, HexEncodedBytes, MoveModuleBytecode,
+    MoveModuleId, MoveResource, MoveScriptBytecode, MoveStructTag, MoveType, MoveValue, U64,
 };
 
 use anyhow::{bail, Context as AnyhowContext};
@@ -473,7 +473,7 @@ pub enum GenesisPayload {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum TransactionPayload {
-    ScriptFunctionPayload(ScriptFunctionPayload),
+    EntryFunctionPayload(EntryFunctionPayload),
     ScriptPayload(ScriptPayload),
     ModuleBundlePayload(ModuleBundlePayload),
 }
@@ -484,8 +484,8 @@ pub struct ModuleBundlePayload {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Object)]
-pub struct ScriptFunctionPayload {
-    pub function: ScriptFunctionId,
+pub struct EntryFunctionPayload {
+    pub function: EntryFunctionId,
     pub type_arguments: Vec<MoveType>,
     // TODO: Use the real data here, not a JSON representation.
     pub arguments: Vec<serde_json::Value>,

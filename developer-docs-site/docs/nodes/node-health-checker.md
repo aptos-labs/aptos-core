@@ -14,7 +14,7 @@ The Aptos Node Health Checker (NHC) service can be used to check the health of t
 If you are a node operator, use this NHC service to check if your node is running correctly. The NHC service evaluates your node's health by comparing against a baseline node configuration, and outputs the evaluation results. 
 
 :::tip Node health check for AIT
-If you are participating in the [Aptos Incentivized Testnet](/nodes/ait/ait-2), then use the NHC service to demonstrate that you can run your validator node successfully. The Aptos team uses this service continuously to check your node's health. 
+If you are participating in the [Aptos Incentivized Testnet](/nodes/ait/ait-3), then use the NHC service to demonstrate that you can run your validator node successfully. The Aptos team uses this service continuously to check your node's health. 
 :::
 
 This document describes how to run NHC when you are operating a node. 

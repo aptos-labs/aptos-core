@@ -5,13 +5,13 @@ metadata:
   labels:
     app.kubernetes.io/name: forge
     forge-namespace: {FORGE_NAMESPACE}
-    forge-image-tag: {IMAGE_TAG}
+    forge-image-tag: {FORGE_IMAGE_TAG}
 spec:
   restartPolicy: Never
   serviceAccountName: forge
   containers:
   - name: main
-    image: {AWS_ACCOUNT_NUM}.dkr.ecr.{AWS_REGION}.amazonaws.com/aptos/forge:{IMAGE_TAG}
+    image: {AWS_ACCOUNT_NUM}.dkr.ecr.{AWS_REGION}.amazonaws.com/aptos/forge:{FORGE_IMAGE_TAG}
     imagePullPolicy: Always
     command:
     - /bin/bash

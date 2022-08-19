@@ -16,18 +16,18 @@ import {
   SigningMessage,
   MultiAgentRawTransaction,
   AccountAddress,
-  ScriptFunction,
+  EntryFunction,
   Identifier,
   ChainId,
   Script,
   TransactionPayload,
   TransactionArgument,
-  TransactionPayloadScriptFunction,
+  TransactionPayloadEntryFunction,
   TransactionPayloadScript,
   ModuleId,
 } from "./aptos_types";
 import { bcsToBytes, Bytes, Deserializer, Serializer, Uint64, Uint8 } from "./bcs";
-import { ArgumentABI, ScriptABI, ScriptFunctionABI, TransactionScriptABI, TypeArgumentABI } from "./aptos_types/abi";
+import { ArgumentABI, EntryFunctionABI, ScriptABI, TransactionScriptABI, TypeArgumentABI } from "./aptos_types/abi";
 import { HexString, MaybeHexString } from "../hex_string";
 import { argToTransactionArgument, TypeTagParser, serializeArg } from "./builder_utils";
 import * as Gen from "../generated/index";
@@ -168,8 +168,8 @@ export class TransactionBuilderABI {
       const deserializer = new Deserializer(abi);
       const scriptABI = ScriptABI.deserialize(deserializer);
       let k: string;
-      if (scriptABI instanceof ScriptFunctionABI) {
-        const funcABI = scriptABI as ScriptFunctionABI;
+      if (scriptABI instanceof EntryFunctionABI) {
+        const funcABI = scriptABI as EntryFunctionABI;
         const { address: addr, name: moduleName } = funcABI.module_name;
         k = `${HexString.fromUint8Array(addr.address).toShortString()}::${moduleName.value}::${funcABI.name}`;
       } else {
@@ -236,11 +236,11 @@ export class TransactionBuilderABI {
 
     const scriptABI = this.abiMap.get(func);
 
-    if (scriptABI instanceof ScriptFunctionABI) {
-      const funcABI = scriptABI as ScriptFunctionABI;
+    if (scriptABI instanceof EntryFunctionABI) {
+      const funcABI = scriptABI as EntryFunctionABI;
       const bcsArgs = TransactionBuilderABI.toBCSArgs(funcABI.args, args);
-      payload = new TransactionPayloadScriptFunction(
-        new ScriptFunction(funcABI.module_name, new Identifier(funcABI.name), typeTags, bcsArgs),
+      payload = new TransactionPayloadEntryFunction(
+        new EntryFunction(funcABI.module_name, new Identifier(funcABI.name), typeTags, bcsArgs),
       );
     }
 
@@ -351,7 +351,7 @@ export class TransactionBuilderRemoteABI {
    * @param args
    * @returns RawTransaction
    */
-  async build(func: Gen.ScriptFunctionId, ty_tags: Gen.MoveType[], args: any[]): Promise<RawTransaction> {
+  async build(func: Gen.EntryFunctionId, ty_tags: Gen.MoveType[], args: any[]): Promise<RawTransaction> {
     const funcNameParts = func.split("::");
     if (funcNameParts.length !== 3) {
       throw new Error(
@@ -378,7 +378,7 @@ export class TransactionBuilderRemoteABI {
     // Convert string arguments to TypeArgumentABI
     const typeArgABIs = originalArgs.map((arg, i) => new ArgumentABI(`var${i}`, new TypeTagParser(arg).parseTypeTag()));
 
-    const scriptFunctionABI = new ScriptFunctionABI(
+    const entryFunctionABI = new EntryFunctionABI(
       funcAbi.name,
       ModuleId.fromStr(`${addr}::${module}`),
       "", // Doc string
@@ -395,7 +395,7 @@ export class TransactionBuilderRemoteABI {
       this.aptosClient.getChainId(),
     ]);
 
-    const builderABI = new TransactionBuilderABI([bcsToBytes(scriptFunctionABI)], {
+    const builderABI = new TransactionBuilderABI([bcsToBytes(entryFunctionABI)], {
       sender,
       sequenceNumber,
       chainId,

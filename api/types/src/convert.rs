@@ -7,9 +7,9 @@ use crate::{
         ModuleBundlePayload, StateCheckpointTransaction, UserTransactionRequestInner, WriteModule,
         WriteResource, WriteTableItem,
     },
-    Bytecode, DirectWriteSet, Event, HexEncodedBytes, MoveFunction, MoveModuleBytecode,
-    MoveResource, MoveScriptBytecode, MoveValue, PendingTransaction, ScriptFunctionId,
-    ScriptFunctionPayload, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
+    Bytecode, DirectWriteSet, EntryFunctionId, EntryFunctionPayload, Event, HexEncodedBytes,
+    MoveFunction, MoveModuleBytecode, MoveResource, MoveScriptBytecode, MoveValue,
+    PendingTransaction, ScriptPayload, ScriptWriteSet, SubmitTransactionRequest, Transaction,
     TransactionInfo, TransactionOnChainData, TransactionPayload, UserTransactionRequest,
     VersionedEvent, WriteSet, WriteSetChange, WriteSetPayload,
 };
@@ -23,7 +23,7 @@ use aptos_types::{
     contract_event::{ContractEvent, EventWithVersion},
     state_store::state_key::StateKey,
     transaction::{
-        ExecutionStatus, ModuleBundle, RawTransaction, Script, ScriptFunction, SignedTransaction,
+        EntryFunction, ExecutionStatus, ModuleBundle, RawTransaction, Script, SignedTransaction,
     },
     vm_status::AbortLocation,
     write_set::WriteOp,
@@ -163,7 +163,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     .map(|module| MoveModuleBytecode::from(module).try_parse_abi())
                     .collect::<Result<Vec<_>>>()?,
             }),
-            ScriptFunction(fun) => {
+            EntryFunction(fun) => {
                 let (module, function, ty_args, args) = fun.into_inner();
                 let func_args = self
                     .inner
@@ -179,9 +179,9 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                         .collect::<Result<_>>()?,
                 };
 
-                TransactionPayload::ScriptFunctionPayload(ScriptFunctionPayload {
+                TransactionPayload::EntryFunctionPayload(EntryFunctionPayload {
                     arguments: json_args,
-                    function: ScriptFunctionId {
+                    function: EntryFunctionId {
                         module: module.into(),
                         name: function.into(),
                     },
@@ -462,21 +462,21 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         use aptos_types::transaction::TransactionPayload as Target;
 
         let ret = match payload {
-            TransactionPayload::ScriptFunctionPayload(script_func_payload) => {
-                let ScriptFunctionPayload {
+            TransactionPayload::EntryFunctionPayload(entry_func_payload) => {
+                let EntryFunctionPayload {
                     function,
                     type_arguments,
                     arguments,
-                } = script_func_payload;
+                } = entry_func_payload;
 
                 let module = function.module.clone();
                 let code = self.inner.get_module(&module.clone().into())? as Rc<dyn Bytecode>;
                 let func = code
-                    .find_script_function(function.name.0.as_ident_str())
-                    .ok_or_else(|| format_err!("could not find script function by {}", function))?;
+                    .find_entry_function(function.name.0.as_ident_str())
+                    .ok_or_else(|| format_err!("could not find entry function by {}", function))?;
                 ensure!(
                     func.generic_type_params.len() == type_arguments.len(),
-                    "expect {} type arguments for script function {}, but got {}",
+                    "expect {} type arguments for entry function {}, but got {}",
                     func.generic_type_params.len(),
                     function,
                     type_arguments.len()
@@ -487,7 +487,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     .map(bcs::to_bytes)
                     .collect::<Result<_, bcs::Error>>()?;
 
-                Target::ScriptFunction(ScriptFunction::new(
+                Target::EntryFunction(EntryFunction::new(
                     module.into(),
                     function.name.into(),
                     type_arguments
@@ -718,7 +718,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
             }
             ExecutionStatus::MiscellaneousError( code ) => {
                 code.map_or(
-                    "Move bytecode deserialization / verification failed, including script function not found or invalid arguments".to_owned(),
+                    "Move bytecode deserialization / verification failed, including entry function not found or invalid arguments".to_owned(),
                     |e| format!(
                         "Transaction Executed and Committed with Error {:#?}", e
                     )

@@ -656,7 +656,7 @@ fn parse_operations_from_txn_payload(
     payload: &TransactionPayload,
 ) -> Vec<Operation> {
     let mut operations = vec![];
-    if let TransactionPayload::ScriptFunctionPayload(inner) = payload {
+    if let TransactionPayload::EntryFunctionPayload(inner) = payload {
         if AccountAddress::ONE == *inner.function.module.address.inner()
             && coin_module_identifier() == inner.function.module.name.0
             && transfer_function_identifier() == inner.function.name.0

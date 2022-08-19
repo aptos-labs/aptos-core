@@ -128,6 +128,19 @@ pub static OTHER_TIMERS_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static NODE_CACHE_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        // metric name
+        "aptos_storage_node_cache_seconds",
+        // metric description
+        "Latency of node cache.",
+        // metric labels (dimensions)
+        &["name"],
+        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 30).unwrap(),
+    )
+    .unwrap()
+});
+
 /// Rocksdb metrics
 pub static ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
     register_int_gauge_vec!(
@@ -137,6 +150,23 @@ pub static ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
         "rocksdb integer properties",
         // metric labels (dimensions)
         &["cf_name", "property_name",]
+    )
+    .unwrap()
+});
+
+// Async committer gauges:
+pub(crate) static LATEST_SNAPSHOT_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_storage_latest_state_snapshot_version",
+        "The version of the most recent snapshot."
+    )
+    .unwrap()
+});
+
+pub(crate) static LATEST_CHECKPOINT_VERSION: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_storage_latest_state_checkpoint_version",
+        "The version of the most recent committed checkpoint."
     )
     .unwrap()
 });

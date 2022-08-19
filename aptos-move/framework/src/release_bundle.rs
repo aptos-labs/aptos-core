@@ -3,8 +3,8 @@
 
 use crate::built_package::BuiltPackage;
 use crate::natives::code::PackageMetadata;
-use crate::path_in_crate;
-use aptos_types::transaction::ScriptABI;
+use crate::{path_in_crate, unzip_metadata};
+use aptos_types::transaction::EntryABI;
 use move_deps::move_binary_format::access::ModuleAccess;
 use move_deps::move_binary_format::errors::PartialVMError;
 use move_deps::move_binary_format::CompiledModule;
@@ -62,19 +62,19 @@ impl ReleaseBundle {
     pub fn error_mapping(&self) -> ErrorMapping {
         let mut map = ErrorMapping::default();
         for pack in &self.packages {
+            let m = unzip_metadata(&pack.package_metadata().error_map).expect("unzip metadata");
             let ErrorMapping {
                 mut error_categories,
                 mut module_error_maps,
-            } = bcs::from_bytes::<ErrorMapping>(&pack.package_metadata().error_map)
-                .expect("bcs of error map");
+            } = bcs::from_bytes::<ErrorMapping>(&m).expect("bcs of error map");
             map.error_categories.append(&mut error_categories);
             map.module_error_maps.append(&mut module_error_maps);
         }
         map
     }
 
-    /// Returns a list of all ScriptABIs in this bundle.
-    pub fn abis(&self) -> Vec<ScriptABI> {
+    /// Returns a list of all EntryABIs in this bundle.
+    pub fn abis(&self) -> Vec<EntryABI> {
         let mut result = vec![];
         for pack in &self.packages {
             let mut abis = pack.abis();
@@ -168,11 +168,14 @@ impl ReleasePackage {
     }
 
     /// Returns the ABIs.
-    pub fn abis(&self) -> Vec<ScriptABI> {
+    pub fn abis(&self) -> Vec<EntryABI> {
         self.metadata
             .abis
             .iter()
-            .map(|a| bcs::from_bytes::<ScriptABI>(a).expect("BCS for ScriptABI must be valid"))
+            .map(|a| {
+                bcs::from_bytes::<EntryABI>(&unzip_metadata(a).unwrap())
+                    .expect("BCS for EntryABI must be valid")
+            })
             .collect()
     }
 

@@ -19,7 +19,10 @@ use crate::{
     VMExecutor, VMValidator,
 };
 use anyhow::Result;
-use aptos_aggregator::transaction::TransactionOutputExt;
+use aptos_aggregator::{
+    delta_change_set::DeltaChangeSet,
+    transaction::{ChangeSetExt, TransactionOutputExt},
+};
 use aptos_crypto::HashValue;
 use aptos_gas::AptosGasMeter;
 use aptos_logger::prelude::*;
@@ -215,7 +218,7 @@ impl AptosVM {
         ))
     }
 
-    fn execute_script_or_script_function<S: MoveResolverExt>(
+    fn execute_script_or_entry_function<S: MoveResolverExt>(
         &self,
         mut session: SessionExt<S>,
         gas_meter: &mut AptosGasMeter,
@@ -223,7 +226,7 @@ impl AptosVM {
         payload: &TransactionPayload,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
-        fail_point!("move_adapter::execute_script_or_script_function", |_| {
+        fail_point!("move_adapter::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             ))
@@ -254,7 +257,7 @@ impl AptosVM {
                         gas_meter,
                     )
                 }
-                TransactionPayload::ScriptFunction(script_fn) => {
+                TransactionPayload::EntryFunction(script_fn) => {
                     let mut senders = vec![txn_data.sender()];
 
                     senders.extend(txn_data.secondary_signers());
@@ -498,8 +501,8 @@ impl AptosVM {
 
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
-            | payload @ TransactionPayload::ScriptFunction(_) => self
-                .execute_script_or_script_function(
+            | payload @ TransactionPayload::EntryFunction(_) => self
+                .execute_script_or_entry_function(
                     session,
                     &mut gas_meter,
                     &txn_data,
@@ -542,11 +545,13 @@ impl AptosVM {
         writeset_payload: &WriteSetPayload,
         txn_sender: Option<AccountAddress>,
         session_id: SessionId,
-    ) -> Result<ChangeSet, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
+    ) -> Result<ChangeSetExt, Result<(VMStatus, TransactionOutputExt), VMStatus>> {
         let mut gas_meter = UnmeteredGasMeter;
 
         Ok(match writeset_payload {
-            WriteSetPayload::Direct(change_set) => change_set.clone(),
+            WriteSetPayload::Direct(change_set) => {
+                ChangeSetExt::new(DeltaChangeSet::empty(), change_set.clone())
+            }
             WriteSetPayload::Script { script, execute_as } => {
                 let mut tmp_session = self.0.new_session(storage, session_id);
                 let senders = match txn_sender {
@@ -631,27 +636,26 @@ impl AptosVM {
     ) -> Result<(VMStatus, TransactionOutputExt), VMStatus> {
         // TODO: user specified genesis id to distinguish different genesis write sets
         let genesis_id = HashValue::zero();
-        let change_set = match self.execute_writeset(
+        let change_set_ext = match self.execute_writeset(
             storage,
             &writeset_payload,
             None,
             SessionId::genesis(genesis_id),
         ) {
-            Ok(cs) => cs,
+            Ok(cse) => cse,
             Err(e) => return e,
         };
+
+        let (delta_change_set, change_set) = change_set_ext.into_inner();
         Self::validate_waypoint_change_set(&change_set, log_context)?;
         let (write_set, events) = change_set.into_inner();
         self.read_writeset(storage, &write_set)?;
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
+
+        let txn_output = TransactionOutput::new(write_set, events, 0, VMStatus::Executed.into());
         Ok((
             VMStatus::Executed,
-            TransactionOutputExt::from(TransactionOutput::new(
-                write_set,
-                events,
-                0,
-                VMStatus::Executed.into(),
-            )),
+            TransactionOutputExt::new(delta_change_set, txn_output),
         ))
     }
 
@@ -739,8 +743,8 @@ impl AptosVM {
                 self.0.check_gas(txn_data, log_context)?;
                 self.0.run_script_prologue(session, txn_data, log_context)
             }
-            TransactionPayload::ScriptFunction(_) => {
-                // NOTE: Script and ScriptFunction shares the same prologue
+            TransactionPayload::EntryFunction(_) => {
+                // NOTE: Script and EntryFunction shares the same prologue
                 self.0.check_gas(txn_data, log_context)?;
                 self.0.run_script_prologue(session, txn_data, log_context)
             }
@@ -966,8 +970,8 @@ impl AptosSimulationVM {
 
         let result = match txn.payload() {
             payload @ TransactionPayload::Script(_)
-            | payload @ TransactionPayload::ScriptFunction(_) => {
-                self.0.execute_script_or_script_function(
+            | payload @ TransactionPayload::EntryFunction(_) => {
+                self.0.execute_script_or_entry_function(
                     session,
                     &mut gas_meter,
                     &txn_data,

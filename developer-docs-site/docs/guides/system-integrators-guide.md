@@ -34,7 +34,7 @@ There are two options to run a local testnet:
 1. Directly run a local testnet is to follow [this guide](/nodes/local-testnet/run-a-local-testnet/).
 2. Use the CLI by 1) [installing with the CLI](/cli-tools/aptos-cli-tool/install-aptos-cli) and 2) start a [local node with a faucet](/nodes/local-testnet/using-cli-to-run-a-local-testnet#starting-a-local-testnet-with-a-faucet)
 
-This will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet service at `http://127.0.1:8000` for option 1 or `http://127.0.0.1:8081` for option 2. The applications will output the location of the services.
+This will expose a REST API service at `http://127.0.0.1:8080/v1` and a Faucet service at `http://127.0.0.1:8000` for option 1 or `http://127.0.0.1:8081` for option 2. The applications will output the location of the services.
 
 ### Access Devnet
 

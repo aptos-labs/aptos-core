@@ -42,6 +42,5 @@ do
     cp target/release/$BIN dist/$BIN
 done
 
-# Build the Aptos Move framework. In fact the framework should be guaranteed to be up-to-date
-# via tests but better be sure.
-cargo run --package framework -- release
+# Build the Aptos Move framework and place it in dist. It can be found afterwards in the current directory.
+( cd dist && cargo run --package framework -- release )

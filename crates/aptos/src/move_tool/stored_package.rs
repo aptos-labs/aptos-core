@@ -4,14 +4,13 @@
 use anyhow::bail;
 use aptos_rest_client::Client;
 use aptos_types::account_address::AccountAddress;
-use aptos_types::transaction::ScriptABI;
+use aptos_types::transaction::EntryABI;
 use framework::natives::code::{
     ModuleMetadata, PackageMetadata, PackageRegistry, PackageRegistryJson, UpgradePolicy,
 };
 use framework::unzip_metadata;
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
-use serde_bytes::ByteBuf;
 use std::fs;
 use std::path::PathBuf;
 
@@ -103,11 +102,11 @@ impl<'a> CachedPackageMetadata<'a> {
         &self.metadata.manifest
     }
 
-    pub fn error_map_raw(&self) -> &[u8] {
+    pub fn error_map_raw(&self) -> &str {
         &self.metadata.error_map
     }
 
-    pub fn abis(&self) -> &[ByteBuf] {
+    pub fn abis(&self) -> &[String] {
         self.metadata.abis.as_slice()
     }
 
@@ -150,12 +149,12 @@ impl<'a> CachedPackageMetadata<'a> {
         if with_derived_artifacts {
             let abis_dir = path.join(CompiledPackageLayout::CompiledABIs.path());
             for abi_blob in &self.metadata.abis {
-                let abi = bcs::from_bytes::<ScriptABI>(abi_blob.as_slice())?;
+                let abi = bcs::from_bytes::<EntryABI>(&unzip_metadata(abi_blob)?)?;
                 let path = match abi {
-                    ScriptABI::TransactionScript(abi) => {
+                    EntryABI::TransactionScript(abi) => {
                         PathBuf::from(format!("{}.abi", abi.name()))
                     }
-                    ScriptABI::ScriptFunction(abi) => {
+                    EntryABI::EntryFunction(abi) => {
                         PathBuf::from(abi.module_name().name().as_str())
                             .join(format!("{}.abi", abi.name()))
                     }
@@ -169,7 +168,7 @@ impl<'a> CachedPackageMetadata<'a> {
             for module in &self.metadata.modules {
                 fs::write(
                     source_map_dir.join(format!("{}.mvsm", module.name)),
-                    &module.source_map,
+                    &unzip_metadata(&module.source_map)?,
                 )?;
             }
         }
@@ -182,11 +181,11 @@ impl<'a> CachedModuleMetadata<'a> {
         &self.metadata.name
     }
 
-    pub fn zipped_source(&self) -> &[u8] {
+    pub fn zipped_source(&self) -> &str {
         &self.metadata.source
     }
 
-    pub fn zipped_source_map_raw(&self) -> &[u8] {
+    pub fn zipped_source_map_raw(&self) -> &str {
         &self.metadata.source_map
     }
 }

@@ -3,6 +3,7 @@
 
 //! This file defines state store buffered state that has been committed.
 
+use crate::metrics::LATEST_CHECKPOINT_VERSION;
 use crate::state_store::state_snapshot_committer::StateSnapshotCommitter;
 use crate::state_store::StateDb;
 use anyhow::{ensure, Result};
@@ -67,7 +68,7 @@ impl BufferedState {
             .expect("Failed to spawn state committer thread.");
         // The initial snapshot is always already persisted in db.
         initial_snapshot_ready_sender.send(()).unwrap();
-        Self {
+        let myself = Self {
             state_until_checkpoint: None,
             state_after_checkpoint,
             state_commit_sender,
@@ -75,7 +76,9 @@ impl BufferedState {
             snapshot_ready_receivers: VecDeque::from([initial_snapshot_ready_receiver]),
             // The join handle of the async state commit thread for graceful drop.
             join_handle: Some(join_handle),
-        }
+        };
+        myself.report_latest_committed_version();
+        myself
     }
 
     pub fn current_state(&self) -> &StateDelta {
@@ -143,6 +146,14 @@ impl BufferedState {
         self.maybe_commit(true /* sync_commit */);
     }
 
+    fn report_latest_committed_version(&self) {
+        LATEST_CHECKPOINT_VERSION.set(
+            self.state_after_checkpoint
+                .base_version
+                .map_or(-1, |v| v as i64),
+        );
+    }
+
     pub fn update(
         &mut self,
         updates_until_next_checkpoint_since_current_option: Option<
@@ -178,6 +189,7 @@ impl BufferedState {
             self.state_after_checkpoint = new_state_after_checkpoint;
         }
         self.maybe_commit(sync_commit);
+        self.report_latest_committed_version();
         Ok(())
     }
 }
