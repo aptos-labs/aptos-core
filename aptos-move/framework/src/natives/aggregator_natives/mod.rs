@@ -6,4 +6,4 @@ pub mod aggregator_factory;
 pub mod context;
 mod helpers;
 
-pub use context::NativeAggregatorContext;
+pub use context::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext};
