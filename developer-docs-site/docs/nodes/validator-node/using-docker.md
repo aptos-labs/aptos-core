@@ -131,7 +131,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 9. To recap, in your working directory, you should have a list of files:
     - `docker-compose.yaml` docker compose file to run validator and fullnode
     - `keys` folder, which includes:
-      - `public-keys.yaml`: Publick keys for the owner account, consensus, networking (from step 4).
+      - `public-keys.yaml`: Public keys for the owner account, consensus, networking (from step 4).
       - `private-keys.yaml`: Private keys for the owner account, consensus, networking (from step 4).
       - `validator-identity.yaml`: Private keys for setting the Validator identity (from step 4).
       - `validator-full-node-identity.yaml`: Private keys for setting validator full node identity (from step 4).
