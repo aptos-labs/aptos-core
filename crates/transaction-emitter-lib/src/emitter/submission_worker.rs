@@ -99,10 +99,10 @@ impl SubmissionWorker {
             let wait_until = *loop_start_time + wait_duration;
             let txn_offset_time = Arc::new(AtomicU64::new(0));
 
-            if let Err(e) = try_join_all(requests.into_iter().map(|req| {
-                submit_transaction(
+            if let Err(e) = try_join_all(requests.chunks(10).map(|reqs| {
+                submit_transactions(
                     &self.client,
-                    req,
+                    reqs,
                     loop_start_time.clone(),
                     txn_offset_time.clone(),
                     self.stats.clone(),
@@ -240,23 +240,38 @@ impl SubmissionWorker {
     }
 }
 
-pub async fn submit_transaction(
+pub async fn submit_transactions(
     client: &RestClient,
-    txn: SignedTransaction,
+    txns: &[SignedTransaction],
     loop_start_time: Arc<Instant>,
     txn_offset_time: Arc<AtomicU64>,
     stats: Arc<StatsAccumulator>,
 ) -> anyhow::Result<()> {
     let cur_time = Instant::now();
     let offset = cur_time - *loop_start_time;
-    txn_offset_time.fetch_add(offset.as_millis() as u64, Ordering::Relaxed);
-    stats.submitted.fetch_add(1, Ordering::Relaxed);
-    let resp = client.submit(&txn).await;
-    if let Err(e) = resp {
-        sample!(
+    txn_offset_time.fetch_add(
+        txns.len() as u64 * offset.as_millis() as u64,
+        Ordering::Relaxed,
+    );
+    stats
+        .submitted
+        .fetch_add(txns.len() as u64, Ordering::Relaxed);
+    match client.submit_batch_bcs(txns).await {
+        Err(e) => sample!(
             SampleRate::Duration(Duration::from_secs(60)),
-            warn!("[{:?}] Failed to submit request: {:?}", client, e)
-        );
-    }
+            warn!("[{:?}] Failed to submit batch request: {:?}", client, e)
+        ),
+        Ok(v) => {
+            for f in v.into_inner().transaction_failures {
+                sample!(
+                    SampleRate::Duration(Duration::from_secs(60)),
+                    warn!(
+                        "[{:?}] Failed to submit a request within a batch: {:?}",
+                        client, f
+                    )
+                );
+            }
+        }
+    };
     Ok(())
 }
