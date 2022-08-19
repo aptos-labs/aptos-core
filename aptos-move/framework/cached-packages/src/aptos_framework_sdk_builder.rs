@@ -238,7 +238,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Updates the major version to a larger version.
-    /// This is only used in test environments and outside of them, the core resources account shouldn't exist.
+    /// This can be called by on chain governance.
     VersionSetVersion {
         major: u64,
     },
@@ -993,7 +993,7 @@ pub fn stake_withdraw(withdraw_amount: u64) -> TransactionPayload {
 }
 
 /// Updates the major version to a larger version.
-/// This is only used in test environments and outside of them, the core resources account shouldn't exist.
+/// This can be called by on chain governance.
 pub fn version_set_version(major: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(

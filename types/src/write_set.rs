@@ -41,6 +41,19 @@ impl WriteOp {
     }
 }
 
+pub trait TransactionWrite {
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>>;
+}
+
+impl TransactionWrite for WriteOp {
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+        match self {
+            WriteOp::Creation(v) | WriteOp::Modification(v) => Some(v.clone()),
+            WriteOp::Deletion => None,
+        }
+    }
+}
+
 impl std::fmt::Debug for WriteOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

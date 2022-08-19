@@ -3,7 +3,6 @@
 
 #![forbid(unsafe_code)]
 use crate::{account::Account, compile, executor::FakeExecutor};
-use aptos_transaction_builder::aptos_stdlib;
 
 pub fn close_module_publishing(
     executor: &mut FakeExecutor,
@@ -40,27 +39,4 @@ pub fn start_with_released_df() -> (FakeExecutor, Account) {
     dr_account.rotate_key(private_key, public_key);
 
     (executor, dr_account)
-}
-
-pub fn upgrade_df(
-    executor: &mut FakeExecutor,
-    dr_account: &Account,
-    dr_seqno: &mut u64,
-    update_version_number: Option<u64>,
-) {
-    close_module_publishing(executor, dr_account, dr_seqno);
-    for (bytes, module) in cached_packages::head_release_bundle().code_and_compiled_modules() {
-        executor.add_module(&module.self_id(), bytes.to_vec());
-    }
-
-    if let Some(version_number) = update_version_number {
-        executor.execute_and_apply(
-            dr_account
-                .transaction()
-                .payload(aptos_stdlib::version_set_version(version_number))
-                .sequence_number(*dr_seqno)
-                .sign(),
-        );
-        *dr_seqno = dr_seqno.checked_add(1).unwrap();
-    }
 }
