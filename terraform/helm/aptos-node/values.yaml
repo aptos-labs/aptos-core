@@ -70,8 +70,8 @@ fullnode:
       cpu: 15.5
       memory: 30Gi
     requests:
-      cpu: 15.5
-      memory: 30Gi
+      cpu: 15
+      memory: 26Gi
   storage:
     # -- Kubernetes storage class to use for fullnode persistent storage
     class:
