@@ -112,11 +112,24 @@ async fn test_bcs() {
         .into_inner();
 
     assert_eq!(modules.len(), bcs_modules.len());
-    let (module_id, _) = modules.iter().next().unwrap();
+    let (module_id, module_bytecode) = modules.iter().next().unwrap();
     assert_eq!(
-        &modules.get(module_id).unwrap().bytecode.0,
+        &module_bytecode.bytecode.0,
         bcs_modules.get(module_id).unwrap()
     );
+
+    let json_module = client
+        .get_account_module(AccountAddress::ONE, module_id.name.as_str())
+        .await
+        .unwrap()
+        .into_inner();
+    let bcs_module = client
+        .get_account_module_bcs(AccountAddress::ONE, module_id.name.as_str())
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(json_module.bytecode.0, bcs_module);
+    assert_eq!(module_bytecode.bytecode.0, bcs_module);
 
     // Transfer money to make a transaction
     let pending_transaction = info
