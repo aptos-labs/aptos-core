@@ -2,9 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_histogram_vec, register_int_counter_vec, HistogramTimer, HistogramVec, IntCounterVec,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
+
+/// Counter for the number of active data streams
+pub static ACTIVE_DATA_STREAMS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_data_streaming_service_active_data_streams",
+        "Counters related to the number of active data streams",
+    )
+    .unwrap()
+});
+
+/// Counter for the number of times there was a send failure
+pub static DATA_STREAM_SEND_FAILURE: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_data_streaming_service_stream_send_failure",
+        "Counters related to send failures along the data stream",
+    )
+    .unwrap()
+});
 
 /// Counter for the creation of new data streams
 pub static CREATE_DATA_STREAM: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -87,8 +106,13 @@ pub static DATA_REQUEST_PROCESSING_LATENCY: Lazy<HistogramVec> = Lazy::new(|| {
 });
 
 /// Increments the given counter with the provided label values.
-pub fn increment_counter(counter: &Lazy<IntCounterVec>, label: String) {
-    counter.with_label_values(&[&label]).inc();
+pub fn increment_counter(counter: &Lazy<IntCounterVec>, label: &str) {
+    counter.with_label_values(&[label]).inc();
+}
+
+/// Sets the number of active data streams
+pub fn set_active_data_streams(value: usize) {
+    ACTIVE_DATA_STREAMS.set(value as i64);
 }
 
 /// Starts the timer for the provided histogram and label values.
