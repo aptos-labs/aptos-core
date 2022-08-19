@@ -68,8 +68,8 @@ function Wallet() {
             isNodeAvailable === false ? (
               <Alert status="error" borderRadius=".5rem">
                 <AlertIcon />
-                <AlertDescription>
-                  <Text fontWeight={700}>Not connected</Text>
+                <AlertDescription fontSize="md">
+                  <Text fontSize="md" fontWeight={700}>Not connected</Text>
                   please check your connection
                 </AlertDescription>
               </Alert>
