@@ -32,7 +32,7 @@ use aptos_api::{context::Context, index};
 use aptos_api_types::HexEncodedBytes;
 use aptos_config::keys::ConfigKey;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregated_signature::AggregatedSignature;
 use bytes::Bytes;
 use hyper::Response;
 use rand::SeedableRng;
@@ -265,7 +265,7 @@ impl TestContext {
             ),
             HashValue::zero(),
         );
-        LedgerInfoWithSignatures::new(info, MultiSignature::empty())
+        LedgerInfoWithSignatures::new(info, AggregatedSignature::empty())
     }
 
     pub async fn api_execute_entry_function(
