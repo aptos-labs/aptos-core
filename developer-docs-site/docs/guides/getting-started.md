@@ -10,6 +10,10 @@ import TabItem from '@theme/TabItem';
 
 To kick-start your journey as a developer in the Aptos ecosystem, set up your development environment as described in this section.
 
+Note:  If have not done so, you'd  need to install Homebrew: https://docs.brew.sh/Installation
+https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh
+
+
 ### Clone the Aptos-core repo
 
 Start by cloning the `aptos-core` GitHub repo from [GitHub](https://github.com/aptos-labs/aptos-core).
