@@ -237,5 +237,55 @@ async fn test_bcs() {
         .await
         .unwrap()
         .into_inner();
+    let txn_version = txn.version;
     assert_eq!(txn.transaction.as_signed_user_txn().unwrap(), &transfer_txn);
+
+    // Check blocks
+    let json_block = client
+        .get_block_by_version(txn_version, true)
+        .await
+        .unwrap()
+        .into_inner();
+    let bcs_block = client
+        .get_block_by_version_bcs(txn_version, true)
+        .await
+        .unwrap()
+        .into_inner();
+
+    assert_eq!(json_block.block_height.0, bcs_block.block_height);
+    assert_eq!(
+        aptos_crypto::HashValue::from(json_block.block_hash),
+        bcs_block.block_hash
+    );
+
+    let json_txns = json_block.transactions.unwrap();
+    let first_json_txn = json_txns.first().unwrap();
+    let bcs_txns = bcs_block.transactions.unwrap();
+    let first_bcs_txn = bcs_txns.first().unwrap();
+    assert_eq!(first_json_txn.version().unwrap(), first_bcs_txn.version);
+    assert_eq!(
+        aptos_crypto::HashValue::from(first_json_txn.transaction_info().unwrap().hash),
+        first_bcs_txn.info.transaction_hash()
+    );
+
+    let json_block_by_height = client
+        .get_block_by_height(bcs_block.block_height, true)
+        .await
+        .unwrap()
+        .into_inner();
+    let bcs_block_by_height = client
+        .get_block_by_height_bcs(bcs_block.block_height, true)
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(
+        json_block_by_height.block_height.0,
+        bcs_block_by_height.block_height
+    );
+    assert_eq!(bcs_block.block_height, bcs_block_by_height.block_height);
+    assert_eq!(bcs_block.block_hash, bcs_block_by_height.block_hash);
+    assert_eq!(
+        aptos_crypto::HashValue::from(json_block_by_height.block_hash),
+        bcs_block_by_height.block_hash
+    );
 }

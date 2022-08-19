@@ -1,9 +1,15 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::response::{AptosErrorResponse, BasicErrorWith404, InternalError, NotFoundError};
+use crate::accept_type::AcceptType;
+use crate::response::{
+    AptosErrorResponse, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
+    InternalError, NotFoundError,
+};
 use anyhow::{anyhow, ensure, format_err, Context as AnyhowContext, Result};
-use aptos_api_types::{AptosErrorCode, AsConverter, Block, LedgerInfo, TransactionOnChainData};
+use aptos_api_types::{
+    AptosErrorCode, AsConverter, BcsBlock, Block, LedgerInfo, TransactionOnChainData,
+};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
@@ -176,10 +182,11 @@ impl Context {
 
     pub fn get_block_by_height(
         &self,
+        accept_type: &AcceptType,
         height: u64,
-        ledger_version: u64,
+        latest_ledger_info: LedgerInfo,
         with_transactions: bool,
-    ) -> Result<Block, BasicErrorWith404> {
+    ) -> BasicResultWith404<Block> {
         let (first_version, last_version, new_block_event) = self
             .db
             .get_block_info_by_height(height)
@@ -187,7 +194,8 @@ impl Context {
             .map_err(BasicErrorWith404::not_found)?;
 
         self.get_block(
-            ledger_version,
+            accept_type,
+            latest_ledger_info,
             with_transactions,
             first_version,
             last_version,
@@ -197,10 +205,11 @@ impl Context {
 
     pub fn get_block_by_version(
         &self,
+        accept_type: &AcceptType,
         version: u64,
-        ledger_version: u64,
+        latest_ledger_info: LedgerInfo,
         with_transactions: bool,
-    ) -> Result<Block, BasicErrorWith404> {
+    ) -> BasicResultWith404<Block> {
         let (first_version, last_version, new_block_event) = self
             .db
             .get_block_info_by_version(version)
@@ -208,7 +217,8 @@ impl Context {
             .map_err(BasicErrorWith404::not_found)?;
 
         self.get_block(
-            ledger_version,
+            accept_type,
+            latest_ledger_info,
             with_transactions,
             first_version,
             last_version,
@@ -218,12 +228,14 @@ impl Context {
 
     fn get_block(
         &self,
-        ledger_version: Version,
+        accept_type: &AcceptType,
+        latest_ledger_info: LedgerInfo,
         with_transactions: bool,
         first_version: Version,
         last_version: Version,
         new_block_event: NewBlockEvent,
-    ) -> Result<Block, BasicErrorWith404> {
+    ) -> BasicResultWith404<Block> {
+        let ledger_version = latest_ledger_info.ledger_version.0;
         if last_version > ledger_version {
             return Err(BasicErrorWith404::not_found(anyhow!("Block not found")));
         }
@@ -261,20 +273,35 @@ impl Context {
             (block_hash, timestamp, None)
         };
 
-        let transactions = if let Some(inner) = txns {
-            Some(self.render_transactions(inner, timestamp)?)
-        } else {
-            None
-        };
-
-        Ok(Block {
-            block_height: new_block_event.height().into(),
-            block_hash: block_hash.into(),
-            block_timestamp: new_block_event.proposed_time().into(),
-            first_version: first_version.into(),
-            last_version: last_version.into(),
-            transactions,
-        })
+        match accept_type {
+            AcceptType::Json => {
+                let transactions = if let Some(inner) = txns {
+                    Some(self.render_transactions(inner, timestamp)?)
+                } else {
+                    None
+                };
+                let block = Block {
+                    block_height: new_block_event.height().into(),
+                    block_hash: block_hash.into(),
+                    block_timestamp: new_block_event.proposed_time().into(),
+                    first_version: first_version.into(),
+                    last_version: last_version.into(),
+                    transactions,
+                };
+                BasicResponse::try_from_json((block, &latest_ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => {
+                let block = BcsBlock {
+                    block_height: new_block_event.height(),
+                    block_hash,
+                    block_timestamp: new_block_event.proposed_time(),
+                    first_version,
+                    last_version,
+                    transactions: txns,
+                };
+                BasicResponse::try_from_bcs((block, &latest_ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 
     pub fn render_transactions<E: InternalError>(
