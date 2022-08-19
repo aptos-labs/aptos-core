@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2022_08_17_185306) do
+ActiveRecord::Schema[7.0].define(version: 2022_08_19_161242) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -291,6 +291,7 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_17_185306) do
     t.text "content", null: false
     t.datetime "created_at"
     t.datetime "updated_at"
+    t.datetime "notified_at", comment: "The time at which a notification was sent for this network operation."
   end
 
   create_table "nft_offers", force: :cascade do |t|
