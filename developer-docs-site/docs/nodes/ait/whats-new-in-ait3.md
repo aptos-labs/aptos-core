@@ -16,7 +16,7 @@ Several new features are up for testing by the AIT-3 participants. See below:
 
 ### Petra (Aptos Wallet)
 
-- Petra, the new Aptos Wallet, is now available as a Chrome webapp extension. You will use this Wallet to participate in staking and governance in AIT-3. 
+- Petra, the new Aptos Wallet, is now available as a Chrome webapp extension. You will use this Wallet to participate in staking and governance in AIT-3.  See installation instruction [here](/guides/building-wallet-extension)
 
 ### Owner, operator and voter personas
 
@@ -33,7 +33,6 @@ Participation in staking and governance is now enabled with three personas: an o
 ### Staking
 
 - A new staking UI, making it easier to manage staking.
-- Effects of changing the stake to weigh more on the proposer. **Hypothesis**: This better reflects the higher compute cost of the proposer.
 
 
 ### On-chain governance

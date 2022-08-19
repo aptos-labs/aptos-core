@@ -22,7 +22,9 @@ The Aptos Incentivized Testnet-3 (AIT-3) is a rewards program for any Aptos comm
 _All dates and times shown are for Pacific Time, year 2022._
 
 - **August 19:** Registration starts. Node and identity verification begins.
-- **August 19:** AIT-3 goes live at noon. Validator score tracking begins.
+- **August 26:** Registration ends.
+- **August 27:** Notification for selection result will be send out.
+- **August 30:** AIT3 becomes live.
 - **September 9:** AIT-3 concludes.
 
 :::
