@@ -292,6 +292,7 @@ ActiveRecord::Schema[7.0].define(version: 2022_08_19_233543) do
     t.text "content", null: false
     t.datetime "created_at"
     t.datetime "updated_at"
+    t.datetime "notified_at", comment: "The time at which a notification was sent for this network operation."
   end
 
   create_table "nft_offers", force: :cascade do |t|
