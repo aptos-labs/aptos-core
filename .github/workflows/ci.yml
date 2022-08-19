@@ -34,8 +34,6 @@ jobs:
   rosetta-validation:
     runs-on: ubuntu-latest
     container: node:14.16
-    ports:
-      - 8082:8082
     needs: setup
     strategy:
       matrix: 

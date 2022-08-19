@@ -26,4 +26,4 @@ full_node_networks:
 
 api:
     enabled: true
-    address: 127.0.0.1:8080
+    address: 0.0.0.0:8080
