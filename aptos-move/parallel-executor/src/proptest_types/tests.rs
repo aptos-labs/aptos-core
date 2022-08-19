@@ -5,7 +5,7 @@ use crate::{
     errors::Error,
     executor::ParallelTransactionExecutor,
     proptest_types::types::{
-        ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams,
+        ExpectedOutput, KeyType, Task, Transaction, TransactionGen, TransactionGenParams, ValueType,
     },
 };
 use claim::assert_ok;
@@ -30,6 +30,7 @@ fn run_transactions<K, V>(
 where
     K: Hash + Clone + Debug + Eq + Send + Sync + PartialOrd + Ord + 'static,
     V: Clone + Eq + Send + Sync + Arbitrary + 'static,
+    Vec<u8>: From<V>,
 {
     let mut transactions: Vec<_> = transaction_gens
         .into_iter()
@@ -46,11 +47,11 @@ where
 
     let mut ret = true;
     for _ in 0..num_repeat {
-        let output =
-            ParallelTransactionExecutor::<Transaction<KeyType<K>, V>, Task<KeyType<K>, V>>::new(
-                num_cpus::get(),
-            )
-            .execute_transactions_parallel((), transactions.clone());
+        let output = ParallelTransactionExecutor::<
+            Transaction<KeyType<K>, ValueType<V>>,
+            Task<KeyType<K>, ValueType<V>>,
+        >::new(num_cpus::get())
+        .execute_transactions_parallel((), transactions.clone());
 
         if module_access.0 && module_access.1 {
             assert_eq!(output.unwrap_err(), Error::ModulePathReadWrite);
@@ -249,7 +250,7 @@ fn publishing_fixed_params() {
             let mut new_writes = vec![];
             for incarnation_writes in writes {
                 assert!(!incarnation_writes.is_empty());
-                let val = incarnation_writes[0].1;
+                let val = incarnation_writes[0].1.clone();
                 let insert_idx = indices[1].index(incarnation_writes.len());
                 incarnation_writes.insert(insert_idx, (KeyType(universe[42], true), val));
                 new_writes.push(incarnation_writes.clone());
@@ -268,8 +269,8 @@ fn publishing_fixed_params() {
 
     // Confirm still no intersection
     let output = ParallelTransactionExecutor::<
-        Transaction<KeyType<[u8; 32]>, [u8; 32]>,
-        Task<KeyType<[u8; 32]>, [u8; 32]>,
+        Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+        Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
     >::new(num_cpus::get())
     .execute_transactions_parallel((), transactions.clone());
     assert_ok!(output);
@@ -303,8 +304,8 @@ fn publishing_fixed_params() {
 
     for _ in 0..200 {
         let output = ParallelTransactionExecutor::<
-            Transaction<KeyType<[u8; 32]>, [u8; 32]>,
-            Task<KeyType<[u8; 32]>, [u8; 32]>,
+            Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+            Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
         >::new(num_cpus::get())
         .execute_transactions_parallel((), transactions.clone());
 
