@@ -35,6 +35,9 @@ Using the Faucet interface at the Aptos devnet, this tutorial code automatically
 
 4. Combine the above wrappers into an application, execute and verify.
 
+Note:   You don't need to write any codes at all.  Codes are already existed within Aptos. The following sample codes are shown to illustrate concepts, ie how things work.  You just need to read this section to understand them. At the end of the section,  please follow the instructions to execute the codes.
+
+
 ## Before you start
 
 Make sure you follow the below steps first so you can run the tutorial.
