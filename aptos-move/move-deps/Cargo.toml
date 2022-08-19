@@ -35,6 +35,7 @@ move-ir-compiler = { git = "https://github.com/move-language/move", rev = "5ecf4
 move-model = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
 move-package = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
 move-prover = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
+move-prover-boogie-backend = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
 move-prover-test-utils = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
 move-resource-viewer = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
 move-stackless-bytecode-interpreter = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
@@ -48,6 +49,7 @@ move-vm-test-utils = { git = "https://github.com/move-language/move", rev = "5ec
 move-vm-types = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
 read-write-set = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
 read-write-set-dynamic = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
+
 
 [features]
 default = []
