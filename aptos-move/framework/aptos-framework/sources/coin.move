@@ -65,17 +65,11 @@ module aptos_framework::coin {
         withdraw_events: EventHandle<WithdrawEvent>,
     }
 
-    /// Tracks supply of coins of in the system. Implemented as an integer or a
-    /// parallelizable aggregator.
-    struct Supply has store {
-        inner: OptionalAggregator,
-    }
-
     /// Maximum possible coin supply.
     const MAX_U128: u128 = 340282366920938463463374607431768211455;
 
-    /// Configuration that controls the behavior of `Supply`. If the field is set,
-    /// users of `Supply` are allowed to upgrade to parallelizable implementations.
+    /// Configuration that controls the behavior of total coin supply. If the field
+    /// is set, coin creators are allowed to upgrade to parallelizable implementations.
     struct SupplyConfig has key {
         allow_upgrades: bool,
     }
@@ -91,7 +85,7 @@ module aptos_framework::coin {
         /// be displayed to a user as `5.05` (`505 / 10 ** 2`).
         decimals: u8,
         /// Amount of this coin type in existence.
-        supply: Option<Supply>,
+        supply: Option<OptionalAggregator>,
     }
 
     /// Event emitted when some amount of a coin is deposited into an account.
@@ -114,34 +108,7 @@ module aptos_framework::coin {
     struct BurnCapability<phantom CoinType> has copy, store { }
 
     //
-    // Supply functions
-    //
-
-    /// Creates new supply which can be an aggregator (parallelizable) or a standard
-    /// integer.
-    fun initialize_supply(parallelizable: bool): Supply {
-        Supply {
-            inner: optional_aggregator::new(MAX_U128, parallelizable),
-        }
-    }
-
-    /// Adds `amount` to total supply of `CoinType`. Called when minting coins.
-    fun add(supply: &mut Supply, amount: u128) {
-        optional_aggregator::add(&mut supply.inner, amount);
-    }
-
-    /// Subtracts `amount` from total supply of `CoinType`. Called when burning coins.
-    fun sub(supply: &mut Supply, amount: u128) {
-        optional_aggregator::sub(&mut supply.inner, amount);
-    }
-
-    /// Returns the total supply of `CoinType` in existence.
-    fun read(supply: &Supply): u128 {
-        optional_aggregator::read(&supply.inner)
-    }
-
-    //
-    // Supply config
+    // Total supply config
     //
 
     /// Publishes supply configuration. Initially, upgrading is not allowed.
@@ -151,11 +118,11 @@ module aptos_framework::coin {
     }
 
     /// This should be called by on-chain governance to update the config and allow
-    // `Supply` upgradability.
-    public fun allow_supply_upgrades(account: &signer) acquires SupplyConfig {
+    // or disallow upgradability of total supply.
+    public fun allow_supply_upgrades(account: &signer, allowed: bool) acquires SupplyConfig {
         system_addresses::assert_aptos_framework(account);
         let allow_upgrades = &mut borrow_global_mut<SupplyConfig>(@aptos_framework).allow_upgrades;
-        *allow_upgrades = true;
+        *allow_upgrades = allowed;
     }
 
     //
@@ -206,9 +173,12 @@ module aptos_framework::coin {
 
     /// Returns the amount of coin in existence.
     public fun supply<CoinType>(): Option<u128> acquires CoinInfo {
-        let supply = &borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
-        if (option::is_some(supply)) {
-            option::some(read(option::borrow(supply)))
+        let maybe_supply = &borrow_global<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
+        if (option::is_some(maybe_supply)) {
+            // We do track supply, in this case read from optional aggregator.
+            let supply = option::borrow(maybe_supply);
+            let value = optional_aggregator::read(supply);
+            option::some(value)
         } else {
             option::none()
         }
@@ -224,10 +194,10 @@ module aptos_framework::coin {
         let Coin { value: amount } = coin;
         assert!(amount > 0, error::invalid_argument(EZERO_COIN_AMOUNT));
 
-        let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
-        if (option::is_some(supply)) {
-            let supply = option::borrow_mut(supply);
-            sub(supply, (amount as u128));
+        let maybe_supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
+        if (option::is_some(maybe_supply)) {
+            let supply = option::borrow_mut(maybe_supply);
+            optional_aggregator::sub(supply, (amount as u128));
         }
     }
 
@@ -308,7 +278,7 @@ module aptos_framework::coin {
     public entry fun upgrade_supply<CoinType>(account: &signer) acquires CoinInfo, SupplyConfig {
         let account_addr = signer::address_of(account);
 
-        // Only coin creators can upgrade supply.
+        // Only coin creators can upgrade total supply.
         assert!(
             coin_address<CoinType>() == account_addr,
             error::invalid_argument(ECOIN_INFO_ADDRESS_MISMATCH),
@@ -320,13 +290,13 @@ module aptos_framework::coin {
             error::permission_denied(ECOIN_SUPPLY_UPGRADE_NOT_SUPPORTED)
         );
 
-        let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(account_addr).supply;
-        if (option::is_some(supply)) {
-            let supply = option::borrow_mut(supply);
+        let maybe_supply = &mut borrow_global_mut<CoinInfo<CoinType>>(account_addr).supply;
+        if (option::is_some(maybe_supply)) {
+            let supply = option::borrow_mut(maybe_supply);
 
             // If supply is tracked and the current implementation uses an integer - upgrade.
-            if (!optional_aggregator::is_parallelizable(&supply.inner)) {
-                optional_aggregator::switch(&mut supply.inner);
+            if (!optional_aggregator::is_parallelizable(supply)) {
+                optional_aggregator::switch(supply);
             }
         }
     }
@@ -345,7 +315,7 @@ module aptos_framework::coin {
     }
 
     /// Same as `initialize` but supply can be initialized to parallelizable aggregator.
-    public fun initialize_with_parallelizable_supply<CoinType>(
+    public(friend) fun initialize_with_parallelizable_supply<CoinType>(
         account: &signer,
         name: string::String,
         symbol: string::String,
@@ -380,7 +350,7 @@ module aptos_framework::coin {
             name,
             symbol,
             decimals,
-            supply: if (monitor_supply) { option::some(initialize_supply(parallelizable)) } else { option::none() },
+            supply: if (monitor_supply) { option::some(optional_aggregator::new(MAX_U128, parallelizable)) } else { option::none() },
         };
         move_to(account, coin_info);
 
@@ -405,10 +375,10 @@ module aptos_framework::coin {
             return zero<CoinType>()
         };
 
-        let supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
-        if (option::is_some(supply)) {
-            let supply = option::borrow_mut(supply);
-            add(supply, (amount as u128));
+        let maybe_supply = &mut borrow_global_mut<CoinInfo<CoinType>>(coin_address<CoinType>()).supply;
+        if (option::is_some(maybe_supply)) {
+            let supply = option::borrow_mut(maybe_supply);
+            optional_aggregator::add(supply, (amount as u128));
         };
 
         Coin<CoinType> { value: amount }
@@ -861,16 +831,16 @@ module aptos_framework::coin {
         aggregator_factory::initialize_aggregator_factory(&framework);
         initialize_with_aggregator(&framework);
 
-        let supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
-        let supply = option::borrow_mut(supply);
+        let maybe_supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
+        let supply = option::borrow_mut(maybe_supply);
 
         // Supply should be parallelizable.
-        assert!(optional_aggregator::is_parallelizable(&supply.inner), 0);
+        assert!(optional_aggregator::is_parallelizable(supply), 0);
 
-        add(supply, 100);
-        sub(supply, 50);
-        add(supply, 950);
-        assert!(read(supply) == 1000, 0);
+        optional_aggregator::add(supply, 100);
+        optional_aggregator::sub(supply, 50);
+        optional_aggregator::add(supply, 950);
+        assert!(optional_aggregator::read(supply) == 1000, 0);
     }
 
     #[test(framework = @aptos_framework)]
@@ -879,12 +849,12 @@ module aptos_framework::coin {
         aggregator_factory::initialize_aggregator_factory(&framework);
         initialize_with_aggregator(&framework);
 
-        let supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
-        let supply = option::borrow_mut(supply);
+        let maybe_supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
+        let supply = option::borrow_mut(maybe_supply);
 
-        add(supply, MAX_U128);
-        add(supply, 1);
-        sub(supply, 1);
+        optional_aggregator::add(supply, MAX_U128);
+        optional_aggregator::add(supply, 1);
+        optional_aggregator::sub(supply, 1);
     }
 
     #[test(framework = @aptos_framework)]
@@ -894,16 +864,16 @@ module aptos_framework::coin {
         aggregator_factory::initialize_aggregator_factory(&framework);
         initialize_with_integer(&framework);
 
-        let supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
-        let supply = option::borrow_mut(supply);
+        let maybe_supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
+        let supply = option::borrow_mut(maybe_supply);
 
         // Supply should be non-parallelizable.
-        assert!(!optional_aggregator::is_parallelizable(&supply.inner), 0);
+        assert!(!optional_aggregator::is_parallelizable(supply), 0);
 
-        add(supply, 100);
-        sub(supply, 50);
-        add(supply, 950);
-        assert!(read(supply) == 1000, 0);
+        optional_aggregator::add(supply, 100);
+        optional_aggregator::sub(supply, 50);
+        optional_aggregator::add(supply, 950);
+        assert!(optional_aggregator::read(supply) == 1000, 0);
 
         upgrade_supply<FakeMoney>(&framework);
     }
@@ -915,19 +885,19 @@ module aptos_framework::coin {
         initialize_with_integer(&framework);
 
         // Ensure we have a non-parellelizable non-zero supply.
-        let supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
-        let supply = option::borrow_mut(supply);
-        assert!(!optional_aggregator::is_parallelizable(&supply.inner), 0);
-        add(supply, 100);
+        let maybe_supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
+        let supply = option::borrow_mut(maybe_supply);
+        assert!(!optional_aggregator::is_parallelizable(supply), 0);
+        optional_aggregator::add(supply, 100);
 
         // Upgrade.
-        allow_supply_upgrades(&framework);
+        allow_supply_upgrades(&framework, true);
         upgrade_supply<FakeMoney>(&framework);
 
-        // Check supply again>
-        let supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
-        let supply = option::borrow_mut(supply);
-        assert!(optional_aggregator::is_parallelizable(&supply.inner), 0);
-        assert!(read(supply) == 100, 0);
+        // Check supply again.
+        let maybe_supply = &mut borrow_global_mut<CoinInfo<FakeMoney>>(coin_address<FakeMoney>()).supply;
+        let supply = option::borrow_mut(maybe_supply);
+        assert!(optional_aggregator::is_parallelizable(supply), 0);
+        assert!(optional_aggregator::read(supply) == 100, 0);
     }
 }
