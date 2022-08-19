@@ -18,6 +18,30 @@ pub struct RocksdbConfig {
     pub max_open_files: i32,
     pub max_total_wal_size: u64,
     pub max_background_jobs: i32,
+    pub block_cache_size: u64,
+    pub block_size: u64,
+    pub cache_index_and_filter_blocks: bool,
+}
+
+impl Default for RocksdbConfig {
+    fn default() -> Self {
+        Self {
+            // Allow db to close old sst files, saving memory.
+            max_open_files: 5000,
+            // For now we set the max total WAL size to be 1G. This config can be useful when column
+            // families are updated at non-uniform frequencies.
+            max_total_wal_size: 1u64 << 30,
+            // This includes threads for flashing and compaction. Rocksdb will decide the # of
+            // threads to use internally.
+            max_background_jobs: 16,
+            // Default block cache size is 8MB,
+            block_cache_size: 8 * (1u64 << 20),
+            // Default block cache size is 4KB,
+            block_size: 4 * (1u64 << 10),
+            // Whether cache index and filter blocks into block cache.
+            cache_index_and_filter_blocks: false,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -31,35 +55,11 @@ pub struct RocksdbConfigs {
 impl Default for RocksdbConfigs {
     fn default() -> Self {
         Self {
-            ledger_db_config: RocksdbConfig {
-                // Allow db to close old sst files, saving memory.
-                max_open_files: 5000,
-                // For now we set the max total WAL size to be 1G. This config can be useful when column
-                // families are updated at non-uniform frequencies.
-                max_total_wal_size: 1u64 << 30,
-                // This includes threads for flashing and compaction. Rocksdb will decide the # of
-                // threads to use internally.
-                max_background_jobs: 16,
-            },
-            state_merkle_db_config: RocksdbConfig {
-                // Allow db to close old sst files, saving memory.
-                max_open_files: 5000,
-                // For now we set the max total WAL size to be 1G. This config can be useful when column
-                // families are updated at non-uniform frequencies.
-                max_total_wal_size: 1u64 << 30,
-                // This includes threads for flashing and compaction. Rocksdb will decide the # of
-                // threads to use internally.
-                max_background_jobs: 16,
-            },
+            ledger_db_config: RocksdbConfig::default(),
+            state_merkle_db_config: RocksdbConfig::default(),
             index_db_config: RocksdbConfig {
-                // Allow db to close old sst files, saving memory.
                 max_open_files: 1000,
-                // For now we set the max total WAL size to be 1G. This config can be useful when column
-                // families are updated at non-uniform frequencies.
-                max_total_wal_size: 1u64 << 30,
-                // This includes threads for flashing and compaction. Rocksdb will decide the # of
-                // threads to use internally.
-                max_background_jobs: 16,
+                ..Default::default()
             },
         }
     }
