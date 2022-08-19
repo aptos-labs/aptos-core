@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::data_stream::DataStreamId;
 use crate::{data_notification::NotificationId, data_stream::DataStreamListener, error::Error};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use async_trait::async_trait;
@@ -104,20 +105,20 @@ pub trait DataStreamingClient {
         target: Option<LedgerInfoWithSignatures>,
     ) -> Result<DataStreamListener, Error>;
 
-    /// Terminates the stream that sent the notification with the given
-    /// `notification_id` and provides feedback for the termination reason.
+    /// Terminates the stream with the given stream id and (optionally) provides
+    /// feedback about the notification and the termination reason.
     ///
     /// Note:
     /// 1. This is required because: (i) clients must terminate completed
-    /// streams (after receiving an end of stream notification); and (ii) data
-    /// payloads may be invalid, e.g., due to malformed data returned by a
+    /// streams (e.g., after receiving an end of stream notification); and (ii)
+    /// data payloads may be invalid, e.g., due to malformed data returned by a
     /// misbehaving peer. This notifies the streaming service to terminate the
     /// stream and take any action based on the provided feedback.
     /// 2. Clients that wish to continue fetching data need to open a new stream.
     async fn terminate_stream_with_feedback(
         &self,
-        notification_id: NotificationId,
-        notification_feedback: NotificationFeedback,
+        data_stream_id: DataStreamId,
+        notification_and_feedback: Option<NotificationAndFeedback>,
     ) -> Result<(), Error>;
 }
 
@@ -209,8 +210,8 @@ pub struct ContinuouslyStreamTransactionOutputsRequest {
 /// A client request for terminating a stream and providing payload feedback.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TerminateStreamRequest {
-    pub notification_id: NotificationId,
-    pub notification_feedback: NotificationFeedback,
+    pub data_stream_id: DataStreamId,
+    pub notification_and_feedback: Option<NotificationAndFeedback>,
 }
 
 /// The feedback for a given notification.
@@ -363,12 +364,12 @@ impl DataStreamingClient for StreamingServiceClient {
 
     async fn terminate_stream_with_feedback(
         &self,
-        notification_id: u64,
-        notification_feedback: NotificationFeedback,
+        data_stream_id: DataStreamId,
+        notification_and_feedback: Option<NotificationAndFeedback>,
     ) -> Result<(), Error> {
         let client_request = StreamRequest::TerminateStream(TerminateStreamRequest {
-            notification_id,
-            notification_feedback,
+            data_stream_id,
+            notification_and_feedback,
         });
         // We can ignore the receiver as no data will be sent.
         let _ = self.send_stream_request(client_request).await?;
@@ -400,6 +401,26 @@ impl Stream for StreamingServiceListener {
 impl FusedStream for StreamingServiceListener {
     fn is_terminated(&self) -> bool {
         self.request_receiver.is_terminated()
+    }
+}
+
+/// A simple container that allows clients to specify feedback
+/// for a notification they received.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NotificationAndFeedback {
+    pub notification_id: NotificationId,
+    pub notification_feedback: NotificationFeedback,
+}
+
+impl NotificationAndFeedback {
+    pub fn new(
+        notification_id: NotificationId,
+        notification_feedback: NotificationFeedback,
+    ) -> Self {
+        Self {
+            notification_id,
+            notification_feedback,
+        }
     }
 }
 

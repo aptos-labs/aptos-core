@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::streaming_client::NotificationAndFeedback;
 use crate::{
     data_notification::DataNotification,
     data_stream::DataStreamListener,
@@ -209,11 +210,14 @@ fn test_terminate_stream() {
         new_streaming_service_client_listener_pair();
 
     // Note the request we expect to receive on the streaming service side
-    let request_notification_id = 19478;
-    let notification_feedback = NotificationFeedback::InvalidPayloadData;
+    let data_stream_id = 50505;
+    let notification_and_feedback = Some(NotificationAndFeedback::new(
+        19478,
+        NotificationFeedback::InvalidPayloadData,
+    ));
     let expected_request = StreamRequest::TerminateStream(TerminateStreamRequest {
-        notification_id: request_notification_id,
-        notification_feedback: notification_feedback.clone(),
+        data_stream_id,
+        notification_and_feedback: notification_and_feedback.clone(),
     });
 
     // Spawn a new server thread to handle any feedback requests
@@ -222,7 +226,7 @@ fn test_terminate_stream() {
     // Provide payload feedback and verify no error is returned
     let result = block_on(
         streaming_service_client
-            .terminate_stream_with_feedback(request_notification_id, notification_feedback),
+            .terminate_stream_with_feedback(data_stream_id, notification_and_feedback),
     );
     assert_ok!(result);
 }
@@ -286,7 +290,7 @@ fn new_data_stream_sender_listener() -> (
 ) {
     let (notification_sender, notification_receiver) =
         aptos_channel::new(QueueStyle::KLAST, 1, None);
-    let data_stream_listener = DataStreamListener::new(notification_receiver);
+    let data_stream_listener = DataStreamListener::new(0, notification_receiver);
 
     (notification_sender, data_stream_listener)
 }

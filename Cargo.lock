@@ -8765,6 +8765,7 @@ dependencies = [
  "move-deps",
  "network",
  "once_cell",
+ "rand 0.7.3",
  "schemadb",
  "scratchpad",
  "serde 1.0.143",
