@@ -204,8 +204,8 @@ async fn test_bcs() {
     }
 
     // Test simulation of a transaction should be the same in BCS & JSON
-    let transaction_factory = info.transaction_factory();
-    let transfer_txn = transaction_factory
+    let transfer_txn = info
+        .transaction_factory()
         .transfer(other_local_account.address(), 500)
         .sender(local_account.address())
         .sequence_number(local_account.sequence_number())
@@ -224,4 +224,18 @@ async fn test_bcs() {
         aptos_crypto::HashValue::from(json_txn.info.hash),
         bcs_txn.info.transaction_hash()
     );
+
+    // Actually submit the transaction, and ensure it submits and succeeds
+    // TODO: check failure case?
+    let transfer_txn = local_account.sign_with_transaction_builder(
+        info.transaction_factory()
+            .transfer(other_local_account.address(), 500),
+    );
+
+    let txn = client
+        .submit_and_wait_bcs(&transfer_txn)
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(txn.transaction.as_signed_user_txn().unwrap(), &transfer_txn);
 }

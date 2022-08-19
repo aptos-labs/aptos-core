@@ -220,9 +220,35 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn submit_bcs(&self, txn: &SignedTransaction) -> Result<Response<()>> {
+        let txn_payload = bcs::to_bytes(txn)?;
+        let url = self.build_path("transactions")?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(ACCEPT, BCS_OUTPUT_NEW)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
+    }
+
     pub async fn submit_and_wait(&self, txn: &SignedTransaction) -> Result<Response<Transaction>> {
         self.submit(txn).await?;
         self.wait_for_signed_transaction(txn).await
+    }
+
+    pub async fn submit_and_wait_bcs(
+        &self,
+        txn: &SignedTransaction,
+    ) -> Result<Response<TransactionOnChainData>, (Option<Response<TransactionData>>, anyhow::Error)>
+    {
+        self.submit_bcs(txn).await.map_err(|err| (None, err))?;
+        self.wait_for_signed_transaction_bcs(txn).await
     }
 
     pub async fn wait_for_transaction(
@@ -245,6 +271,19 @@ impl Client {
     ) -> Result<Response<Transaction>> {
         let expiration_timestamp = transaction.expiration_timestamp_secs();
         self.wait_for_transaction_by_hash(
+            transaction.clone().committed_hash(),
+            expiration_timestamp,
+        )
+        .await
+    }
+
+    pub async fn wait_for_signed_transaction_bcs(
+        &self,
+        transaction: &SignedTransaction,
+    ) -> Result<Response<TransactionOnChainData>, (Option<Response<TransactionData>>, anyhow::Error)>
+    {
+        let expiration_timestamp = transaction.expiration_timestamp_secs();
+        self.wait_for_transaction_by_hash_bcs(
             transaction.clone().committed_hash(),
             expiration_timestamp,
         )
