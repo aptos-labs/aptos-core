@@ -42,9 +42,10 @@ use mempool_notifications::MempoolNotificationSender;
 use network::application::storage::PeerMetadataStorage;
 use network_builder::builder::NetworkBuilder;
 use rand::{rngs::StdRng, SeedableRng};
-use state_sync_driver::driver_factory::DriverFactory;
-use state_sync_driver::driver_factory::StateSyncRuntimes;
-use state_sync_driver::metadata_storage::PersistentMetadataStorage;
+use state_sync_driver::{
+    driver_factory::{DriverFactory, StateSyncRuntimes},
+    metadata_storage::PersistentMetadataStorage,
+};
 use std::{
     boxed::Box,
     collections::{HashMap, HashSet},
@@ -481,6 +482,7 @@ pub fn setup_environment(node_config: NodeConfig) -> anyhow::Result<AptosHandle>
             node_config.storage.rocksdb_configs,
             node_config.storage.enable_indexer,
             node_config.storage.target_snapshot_size,
+            node_config.storage.max_num_nodes_per_lru_cache_shard,
         )
         .map_err(|err| anyhow!("DB failed to open {}", err))?,
     );

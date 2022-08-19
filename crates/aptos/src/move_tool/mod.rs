@@ -12,7 +12,9 @@ pub use stored_package::*;
 
 use crate::common::types::MoveManifestAccountWrapper;
 use crate::common::types::{ProfileOptions, RestOptions};
-use crate::common::utils::{create_dir_if_not_exist, dir_default_to_current, write_to_file};
+use crate::common::utils::{
+    create_dir_if_not_exist, dir_default_to_current, prompt_yes_with_override, write_to_file,
+};
 use crate::move_tool::manifest::{
     Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo,
 };
@@ -34,9 +36,11 @@ use aptos_types::account_address::AccountAddress;
 use aptos_types::transaction::{EntryFunction, ModuleBundle, TransactionPayload};
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser, Subcommand};
+use framework::natives::code::UpgradePolicy;
 use framework::{BuildOptions, BuiltPackage};
 use itertools::Itertools;
 use move_deps::move_cli::base::test::UnitTestResult;
+use move_deps::move_command_line_common::env::MOVE_HOME;
 use move_deps::{
     move_cli,
     move_core_types::{
@@ -72,6 +76,7 @@ pub enum MoveTool {
     Publish(PublishPackage),
     Download(DownloadPackage),
     List(ListPackage),
+    Clean(CleanPackage),
     Run(RunFunction),
     Test(TestPackage),
     Prove(ProvePackage),
@@ -86,6 +91,7 @@ impl MoveTool {
             MoveTool::Publish(tool) => tool.execute_serialized().await,
             MoveTool::Download(tool) => tool.execute_serialized().await,
             MoveTool::List(tool) => tool.execute_serialized().await,
+            MoveTool::Clean(tool) => tool.execute_serialized().await,
             MoveTool::Run(tool) => tool.execute_serialized().await,
             MoveTool::Test(tool) => tool.execute_serialized().await,
             MoveTool::Prove(tool) => tool.execute_serialized().await,
@@ -482,7 +488,7 @@ impl CliCommand<TransactionSummary> for PublishPackage {
 #[derive(Parser)]
 pub struct DownloadPackage {
     #[clap(flatten)]
-    rest_options: RestOptions,
+    pub rest_options: RestOptions,
     #[clap(flatten)]
     pub(crate) profile_options: ProfileOptions,
     /// Address of the account.
@@ -490,10 +496,10 @@ pub struct DownloadPackage {
     pub(crate) account: AccountAddress,
     /// Name of the package.
     #[clap(long)]
-    package: String,
+    pub package: String,
     /// Where to store the downloaded packages. Defaults to the current directory.
     #[clap(long)]
-    target: Option<String>,
+    pub target: Option<String>,
 }
 
 #[async_trait]
@@ -514,6 +520,13 @@ impl CliCommand<&'static str> for DownloadPackage {
             .get_package(self.package)
             .await
             .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+        if package.upgrade_policy() == UpgradePolicy::arbitrary() {
+            return Err(CliError::CommandArgumentError(
+                "A package with upgrade policy `arbitrary` cannot be downloaded \
+                since it is not safe to depend on such packages."
+                    .to_owned(),
+            ));
+        }
         let package_path = path.join(package.name());
         package
             .save_package_to_disk(package_path.clone(), true)
@@ -591,6 +604,43 @@ impl CliCommand<&'static str> for ListPackage {
             }
         }
         Ok("list succeeded")
+    }
+}
+
+/// Cleans derived artifacts of a package.
+#[derive(Parser)]
+pub struct CleanPackage {
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) prompt_options: PromptOptions,
+}
+
+#[async_trait]
+impl CliCommand<&'static str> for CleanPackage {
+    fn command_name(&self) -> &'static str {
+        "Clean"
+    }
+    async fn execute(self) -> CliTypedResult<&'static str> {
+        let path = self.move_options.get_package_path()?;
+        let build_dir = path.join("build");
+        std::fs::remove_dir_all(build_dir)
+            .map_err(|e| CliError::IO("Removing Move build dir".to_string(), e))?;
+
+        let move_dir = &*MOVE_HOME;
+        if prompt_yes_with_override(
+            &format!(
+                "Do you also want to delete the local package download cache at `{}`?",
+                move_dir
+            ),
+            self.prompt_options,
+        )
+        .is_ok()
+        {
+            std::fs::remove_dir_all(PathBuf::from(move_dir))
+                .map_err(|e| CliError::IO("Removing Move cache dir".to_string(), e))?;
+        }
+        Ok("succeeded")
     }
 }
 

@@ -6,6 +6,7 @@
 //! This crate defines [`trait StateView`](StateView).
 
 use crate::account_with_state_view::{AccountWithStateView, AsAccountWithStateView};
+use crate::state_storage_usage::StateStorageUsage;
 use anyhow::Result;
 use aptos_crypto::HashValue;
 use aptos_types::{
@@ -15,6 +16,7 @@ use std::ops::Deref;
 
 pub mod account_with_state_cache;
 pub mod account_with_state_view;
+pub mod state_storage_usage;
 
 /// `StateView` is a trait that defines a read-only snapshot of the global state. It is passed to
 /// the VM for transaction execution, during which the VM is guaranteed to read anything at the
@@ -31,6 +33,9 @@ pub trait StateView: Sync {
     /// VM needs this method to know whether the current state view is for genesis state creation.
     /// Currently TransactionPayload::WriteSet is only valid for genesis state creation.
     fn is_genesis(&self) -> bool;
+
+    /// Get state storage usage info at epoch ending.
+    fn get_usage(&self) -> Result<StateStorageUsage>;
 }
 
 #[derive(Copy, Clone)]
@@ -60,6 +65,10 @@ where
 
     fn is_genesis(&self) -> bool {
         self.deref().is_genesis()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        self.deref().get_usage()
     }
 }
 
