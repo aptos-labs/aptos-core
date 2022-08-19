@@ -41,6 +41,4 @@ block_tip=($(curl -s --location --request POST 'https://rosetta.aptosdev.com/net
         }
 }' | python3 -c 'import json,sys;obj=json.load(sys.stdin);print(obj["current_block_identifier"]["index"])'))
 
-
-echo "block tip", $block_tip
 echo $(seq $START_INDEX $BLKS_PER_CHUNK 2000 | jq -cnR '[inputs | select(length>0)]')
