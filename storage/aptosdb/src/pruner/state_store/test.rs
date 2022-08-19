@@ -3,23 +3,25 @@
 
 use aptos_config::config::{LedgerPrunerConfig, StateMerklePrunerConfig};
 use proptest::{prelude::*, proptest};
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use aptos_crypto::HashValue;
 use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_temppath::TempPath;
-use aptos_types::state_store::{state_key::StateKey, state_value::StateValue};
-use aptos_types::transaction::Version;
+use aptos_types::{
+    state_store::{state_key::StateKey, state_value::StateValue},
+    transaction::Version,
+};
 use schemadb::{ReadOptions, DB};
 use storage_interface::{jmt_update_refs, jmt_updates, DbReader};
 
-use crate::pruner::state_pruner_worker::StatePrunerWorker;
-use crate::stale_node_index::StaleNodeIndexSchema;
-use crate::test_helper::{arb_state_kv_sets, update_store};
 use crate::{
-    change_set::ChangeSet, pruner::*, state_store::StateStore, AptosDB, LedgerPrunerManager,
-    PrunerManager, StatePrunerManager,
+    change_set::ChangeSet,
+    pruner::{state_pruner_worker::StatePrunerWorker, *},
+    stale_node_index::StaleNodeIndexSchema,
+    state_store::StateStore,
+    test_helper::{arb_state_kv_sets, update_store},
+    AptosDB, LedgerPrunerManager, PrunerManager, StatePrunerManager,
 };
 
 fn put_value_set(
@@ -92,13 +94,8 @@ fn test_state_store_pruner() {
     let prune_batch_size = 10;
     let num_versions = 25;
     let tmp_dir = TempPath::new();
-    let aptos_db = AptosDB::new_for_test(&tmp_dir);
-    let state_store = &StateStore::new(
-        Arc::clone(&aptos_db.ledger_db),
-        Arc::clone(&aptos_db.state_merkle_db),
-        1000,  /* snapshot_size_threshold, does not matter */
-        false, /* hack_for_tests */
-    );
+    let aptos_db = AptosDB::new_for_test_no_cache(&tmp_dir);
+    let state_store = &aptos_db.state_store;
 
     let mut root_hashes = vec![];
     // Insert 25 values in the db.
@@ -180,7 +177,7 @@ fn test_state_store_pruner_partial_version() {
 
     let prune_batch_size = 1;
     let tmp_dir = TempPath::new();
-    let aptos_db = AptosDB::new_for_test(&tmp_dir);
+    let aptos_db = AptosDB::new_for_test_no_cache(&tmp_dir);
     let state_store = &aptos_db.state_store;
 
     let _root0 = put_value_set(
