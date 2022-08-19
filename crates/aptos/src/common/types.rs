@@ -908,7 +908,7 @@ pub struct TransactionSummary {
 
 impl From<Transaction> for TransactionSummary {
     fn from(transaction: Transaction) -> Self {
-        transaction.into()
+        TransactionSummary::from(&transaction)
     }
 }
 impl From<&Transaction> for TransactionSummary {
