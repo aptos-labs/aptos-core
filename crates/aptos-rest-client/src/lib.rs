@@ -28,6 +28,7 @@ use aptos_api_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_types::account_config::AccountResource;
+use aptos_types::contract_event::EventWithVersion;
 use aptos_types::transaction::ExecutionStatus;
 use aptos_types::{
     account_address::AccountAddress,
@@ -690,6 +691,25 @@ impl Client {
 
         let response = request.send().await?;
         self.json(response).await
+    }
+
+    pub async fn get_account_events_bcs(
+        &self,
+        address: AccountAddress,
+        struct_tag: &str,
+        field_name: &str,
+        start: Option<u64>,
+        limit: Option<u16>,
+    ) -> Result<Response<Vec<EventWithVersion>>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/events/{}/{}",
+            address.to_hex_literal(),
+            struct_tag,
+            field_name
+        ))?;
+
+        let response = self.get_bcs_with_page(url, start, limit).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
     pub async fn get_new_block_events(

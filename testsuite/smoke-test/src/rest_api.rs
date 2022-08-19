@@ -308,4 +308,31 @@ async fn test_bcs() {
         aptos_crypto::HashValue::from(json_block_by_height.block_hash),
         bcs_block_by_height.block_hash
     );
+
+    let json_events = client
+        .get_account_events(
+            AccountAddress::ONE,
+            "0x1::block::BlockResource",
+            "new_block_events",
+            Some(0),
+            Some(1),
+        )
+        .await
+        .unwrap()
+        .into_inner();
+    let bcs_events = client
+        .get_account_events_bcs(
+            AccountAddress::ONE,
+            "0x1::block::BlockResource",
+            "new_block_events",
+            Some(0),
+            Some(1),
+        )
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(
+        json_events.first().unwrap().version.0,
+        bcs_events.first().unwrap().transaction_version
+    );
 }
