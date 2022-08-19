@@ -1,9 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::delta_change_set::{
-    addition, deserialize, serialize, subtraction, DeltaOp, DeltaUpdate,
-};
+use crate::delta_change_set::{addition, deserialize, serialize, subtraction};
 use aptos_types::vm_status::StatusCode;
 use move_deps::{
     move_binary_format::errors::{PartialVMError, PartialVMResult},
@@ -250,21 +248,16 @@ impl Aggregator {
                         }
                     }
 
-                    // Get the value from the storage and try to apply the delta
-                    // to it. If application succeeds, we change the state of the
-                    // aggregator. Otherwise the error is propagated to the caller.
-
+                    // Change the state and return the new value.
                     self.state = AggregatorState::Data;
-
-                    // Return the new value.
                     Ok(self.value)
                 },
             )
     }
 
     /// Unpacks aggregator into its fields.
-    pub fn into(self) -> (u128, AggregatorState, u128) {
-        (self.value, self.state, self.limit)
+    pub fn into(self) -> (u128, AggregatorState, u128, Option<History>) {
+        (self.value, self.state, self.limit, self.history)
     }
 }
 
@@ -363,7 +356,7 @@ mod test {
     use aptos_state_view::state_storage_usage::StateStorageUsage;
     use aptos_state_view::StateView;
     use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
-    use claim::{assert_err, assert_matches, assert_ok};
+    use claim::{assert_err, assert_ok};
     use move_deps::{
         move_core_types::gas_algebra::InternalGas, move_table_extension::TableOperation,
     };
@@ -379,7 +372,7 @@ mod test {
         fn new() -> Self {
             let mut data = HashMap::new();
 
-            // Initialize storage with some test data: see `test_set_up`.
+            // Initialize storage with some test data.
             data.insert(id_to_state_key(test_id(600)), serialize(&300));
             FakeTestStorage { data }
         }
@@ -431,134 +424,49 @@ mod test {
     #[allow(clippy::redundant_closure)]
     static TEST_RESOLVER: Lazy<FakeTestStorage> = Lazy::new(|| FakeTestStorage::new());
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-        // All aggregators are initialized deterministically based on their ID,
-        // with the follwing spec.
-        //
-        //     +-------+---------------+----------+-----+---------+
-        //     |  key  | storage value |  create  | get | remove  |
-        //     +-------+---------------+----------+-----+---------+
-        //     |  100  |               |   yes    | yes |   yes   |
-        //     |  200  |               |   yes    | yes |         |
-        //     |  300  |               |   yes    |     |   yes   |
-        //     |  400  |               |   yes    |     |         |
-        //     |  500  |               |          | yes |   yes   |
-        //     |  600  |      300      |          | yes |         |
-        //     |  700  |               |          | yes |         |
-        //     |  800  |               |          |     |   yes   |
-        //     +-------+---------------+----------+-----+---------+
-        aggregator_data.create_new_aggregator(test_id(100), 100);
-        aggregator_data.create_new_aggregator(test_id(200), 200);
-        aggregator_data.create_new_aggregator(test_id(300), 300);
-        aggregator_data.create_new_aggregator(test_id(400), 400);
-
-        aggregator_data.get_aggregator(test_id(100), 100);
-        aggregator_data.get_aggregator(test_id(200), 200);
-        aggregator_data.get_aggregator(test_id(500), 500);
-        aggregator_data.get_aggregator(test_id(600), 600);
-        aggregator_data.get_aggregator(test_id(700), 700);
-
-        aggregator_data.remove_aggregator(test_id(100));
-        aggregator_data.remove_aggregator(test_id(300));
-        aggregator_data.remove_aggregator(test_id(500));
-        aggregator_data.remove_aggregator(test_id(800));
-    }
-
-    #[allow(clippy::redundant_closure)]
-    static TEST_RESOLVER: Lazy<FakeTestStorage> = Lazy::new(|| FakeTestStorage::new());
-
-    #[test]
-    fn test_into_change_set() {
-        let context = NativeAggregatorContext::new(0, &*TEST_RESOLVER);
-        test_set_up(&context);
-
-        let AggregatorChangeSet { changes } = context.into_change_set();
-        use AggregatorChange::*;
-
-        // These aggregators have been created and removed - no side-effects.
-        assert!(!changes.contains_key(&test_id(100)));
-        assert_matches!(changes.get(&test_id(200)).unwrap(), Write(0));
-        assert!(!changes.contains_key(&test_id(300)));
-        assert_matches!(changes.get(&test_id(400)).unwrap(), Write(0));
-        assert_matches!(changes.get(&test_id(500)).unwrap(), Delete);
-        assert!(changes.contains_key(&test_id(600)));
-        assert!(changes.contains_key(&test_id(700)));
-        assert_matches!(changes.get(&test_id(800)).unwrap(), Delete);
-    }
-
     #[test]
     fn test_materialize_not_in_storage() {
-        let context = NativeAggregatorContext::new(0, &*TEST_RESOLVER);
-        test_set_up(&context);
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
+        let mut aggregator_data = AggregatorData::default();
 
         let aggregator = aggregator_data.get_aggregator(test_id(700), 700);
-        assert_err!(aggregator.materialize(&context, &test_id(700)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(700)));
     }
 
     #[test]
     fn test_materialize_known() {
-        let context = NativeAggregatorContext::new(0, &*TEST_RESOLVER);
-        test_set_up(&context);
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
+        let mut aggregator_data = AggregatorData::default();
+        aggregator_data.create_new_aggregator(test_id(200), 200);
 
         let aggregator = aggregator_data.get_aggregator(test_id(200), 200);
         assert_ok!(aggregator.add(100));
-        assert_ok!(aggregator.materialize(&context, &test_id(200)));
+        assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(200)));
         assert_eq!(aggregator.value, 100);
     }
 
     #[test]
     fn test_materialize_overflow() {
-        let context = NativeAggregatorContext::new(0, &*TEST_RESOLVER);
-        test_set_up(&context);
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
+        let mut aggregator_data = AggregatorData::default();
 
         // +0 to +400 satisfies <= 600 and is ok, but materialization fails
         // with 300 + 400 > 600!
         let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
         assert_ok!(aggregator.add(400));
-        assert_err!(aggregator.materialize(&context, &test_id(600)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(600)));
     }
 
     #[test]
     fn test_materialize_underflow() {
-        let context = NativeAggregatorContext::new(0, &*TEST_RESOLVER);
-        test_set_up(&context);
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
+        let mut aggregator_data = AggregatorData::default();
 
         // +0 to -400 is ok, but materialization fails with 300 - 400 < 0!
         let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
         assert_ok!(aggregator.add(400));
-        assert_err!(aggregator.materialize(&context, &test_id(600)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(600)));
     }
-///////////////////////////////////////////////////////////////////////////////////////////////////
-    fn test_set_up(aggregator_data: &mut AggregatorData) {
-        // Aggregators with data.
-        aggregator_data.create_new_aggregator(test_id(1), 1000);
-
-        // Aggregators with delta.
-        aggregator_data.get_aggregator(test_id(4), 1000);
-        aggregator_data.get_aggregator(test_id(5), 10);
-    }
-
-    #[test]
-    fn test_aggregator_operations() {
-        let mut aggregator_data = AggregatorData::default();
-        test_set_up(&mut aggregator_data);
-
-        // This aggregator has been created by this transaction, hence the
-        // value is known.
-        let aggregator = aggregator_data.get_aggregator(test_id(1), 1000);
-        assert_matches!(aggregator.state, AggregatorState::Data);
-        assert_eq!(aggregator.value, 0);
-///////////////////////////////////////////////////////////////////////////////////////////////////
 
     #[test]
     fn test_materialize_non_monotonic_1() {
-        let context = NativeAggregatorContext::new(0, &*TEST_RESOLVER);
-        test_set_up(&context);
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
+        let mut aggregator_data = AggregatorData::default();
 
         // +0 to +400 to +0 is ok, but materialization fails since we had 300 + 400 > 600!
         let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
@@ -566,22 +474,12 @@ mod test {
         assert_ok!(aggregator.sub(300));
         assert_eq!(aggregator.value, 100);
         assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
-        assert_err!(aggregator.materialize(&context, &test_id(600)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(600)));
     }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
     #[test]
     fn test_materialize_non_monotonic_2() {
-        let context = NativeAggregatorContext::new(0, &*TEST_RESOLVER);
-        test_set_up(&context);
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
-=======
-        // This aggregator has not been created by this transaction, and contains
-        // an unknown value.
-        let aggregator = aggregator_data.get_aggregator(test_id(4), 1000);
-        assert_matches!(aggregator.state, AggregatorState::PositiveDelta);
-        assert_eq!(aggregator.value, 0);
-///////////////////////////////////////////////////////////////////////////////////////////////////
+        let mut aggregator_data = AggregatorData::default();
 
         // +0 to -301 to -300 is ok, but materialization fails since we had 300 - 301 < 0!
         let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
@@ -589,15 +487,12 @@ mod test {
         assert_ok!(aggregator.add(1));
         assert_eq!(aggregator.value, 300);
         assert_eq!(aggregator.state, AggregatorState::NegativeDelta);
-        assert_err!(aggregator.materialize(&context, &test_id(600)));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(600)));
     }
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
     #[test]
     fn test_add_overflow() {
-        let context = NativeAggregatorContext::new(0, &*TEST_RESOLVER);
-        test_set_up(&context);
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
+        let mut aggregator_data = AggregatorData::default();
 
         // +0 to +800 > 600!
         let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
@@ -610,9 +505,8 @@ mod test {
 
     #[test]
     fn test_sub_underflow() {
-        let context = NativeAggregatorContext::new(0, &*TEST_RESOLVER);
-        test_set_up(&context);
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
+        let mut aggregator_data = AggregatorData::default();
+        aggregator_data.create_new_aggregator(test_id(200), 200);
 
         // +0 to -601 is impossible!
         let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
@@ -625,9 +519,7 @@ mod test {
 
     #[test]
     fn test_commutative() {
-        let context = NativeAggregatorContext::new(0, &*TEST_RESOLVER);
-        test_set_up(&context);
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
+        let mut aggregator_data = AggregatorData::default();
 
         // +200 -300 +50 +300 -25 +375 -600.
         let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
@@ -642,30 +534,14 @@ mod test {
         assert_ok!(aggregator.add(50));
         assert_ok!(aggregator.add(300));
         assert_ok!(aggregator.sub(25));
-=======
-        // 900 + 200 > 1000!
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(4)));
-
-        // This aggregator also has not been created by this transaction, and
-        // contains an unknown value.
-        let aggregator = aggregator_data.get_aggregator(test_id(5), 10);
-        assert_matches!(aggregator.state, AggregatorState::PositiveDelta);
-        assert_eq!(aggregator.value, 0);
-///////////////////////////////////////////////////////////////////////////////////////////////////
 
         assert_eq!(aggregator.value, 225);
         assert_eq!(aggregator.history.as_ref().unwrap().max_positive, 250);
         assert_eq!(aggregator.history.as_ref().unwrap().min_negative, 100);
         assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
         assert_ok!(aggregator.add(375));
         assert_ok!(aggregator.sub(600));
-=======
-        assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(5)));
-        assert_matches!(aggregator.state, AggregatorState::Data);
-        assert_eq!(aggregator.value, 7);
-///////////////////////////////////////////////////////////////////////////////////////////////////
 
         assert_eq!(aggregator.value, 0);
         assert_eq!(aggregator.history.as_ref().unwrap().max_positive, 600);

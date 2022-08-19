@@ -2,14 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
-    aggregator_extension::{extension_error, AggregatorData, AggregatorID, AggregatorState},
-    delta_change_set::DeltaOp,
+    aggregator_extension::{AggregatorData, AggregatorID, AggregatorState},
+    delta_change_set::{DeltaOp, DeltaUpdate},
 };
 use better_any::{Tid, TidAble};
-use move_deps::{
-    move_binary_format::errors::PartialVMResult,
-    move_table_extension::{TableHandle, TableResolver},
-};
+use move_deps::move_table_extension::TableResolver;
 use std::{cell::RefCell, collections::BTreeMap};
 
 /// Represents a single aggregator change.
@@ -56,14 +53,6 @@ impl<'a> NativeAggregatorContext<'a> {
         self.txn_hash
     }
 
-    /// Resolves the value as a table item and returns its bytes.
-    pub fn resolve_to_bytes(&self, handle: &TableHandle, key: &[u8]) -> PartialVMResult<Vec<u8>> {
-        self.resolver
-            .resolve_table_entry(handle, key)
-            .map_err(|_| extension_error("value to found"))?
-            .map_or(Err(extension_error("value to found")), Ok)
-    }
-
     /// Returns all changes made within this context (i.e. by a single
     /// transaction).
     pub fn into_change_set(self) -> AggregatorChangeSet {
@@ -76,12 +65,22 @@ impl<'a> NativeAggregatorContext<'a> {
 
         // First, process all writes and deltas.
         for (id, aggregator) in aggregators {
-            let (value, state, limit) = aggregator.into();
+            let (value, state, limit, history) = aggregator.into();
 
             let change = match state {
                 AggregatorState::Data => AggregatorChange::Write(value),
                 AggregatorState::PositiveDelta => {
-                    let delta_op = DeltaOp::Addition { value, limit };
+                    let history = history.unwrap();
+                    let plus = DeltaUpdate::Plus(value);
+                    let delta_op =
+                        DeltaOp::new(plus, limit, history.max_positive, history.min_negative);
+                    AggregatorChange::Merge(delta_op)
+                }
+                AggregatorState::NegativeDelta => {
+                    let history = history.unwrap();
+                    let minus = DeltaUpdate::Minus(value);
+                    let delta_op =
+                        DeltaOp::new(minus, limit, history.max_positive, history.min_negative);
                     AggregatorChange::Merge(delta_op)
                 }
             };
@@ -102,31 +101,9 @@ mod test {
     use super::*;
     use claim::assert_matches;
     use move_deps::{
-        move_core_types::gas_algebra::InternalGas, move_table_extension::TableOperation,
+        move_core_types::gas_algebra::InternalGas,
+        move_table_extension::{TableHandle, TableOperation},
     };
-
-    fn test_id(key: u128) -> AggregatorID {
-        AggregatorID::new(0, key)
-    }
-
-    fn test_set_up(context: &NativeAggregatorContext) {
-        let mut aggregator_data = context.aggregator_data.borrow_mut();
-
-        // Aggregators with data.
-        aggregator_data.create_new_aggregator(test_id(0), 1000);
-        aggregator_data.create_new_aggregator(test_id(1), 1000);
-        aggregator_data.create_new_aggregator(test_id(2), 1000);
-
-        // Aggregators with delta.
-        aggregator_data.get_aggregator(test_id(3), 1000);
-        aggregator_data.get_aggregator(test_id(4), 1000);
-        aggregator_data.get_aggregator(test_id(5), 10);
-
-        // Different cases of aggregator removal.
-        aggregator_data.remove_aggregator(test_id(0));
-        aggregator_data.remove_aggregator(test_id(3));
-        aggregator_data.remove_aggregator(test_id(6));
-    }
 
     struct EmptyStorage;
 
@@ -149,41 +126,60 @@ mod test {
         }
     }
 
+    fn test_id(key: u128) -> AggregatorID {
+        AggregatorID::new(0, key)
+    }
+
+    // All aggregators are initialized deterministically based on their ID,
+    // with the follwing spec.
+    //
+    //     +-------+---------------+----------+-----+---------+
+    //     |  key  | storage value |  create  | get | remove  |
+    //     +-------+---------------+----------+-----+---------+
+    //     |  100  |               |   yes    | yes |   yes   |
+    //     |  200  |               |   yes    | yes |         |
+    //     |  300  |               |   yes    |     |   yes   |
+    //     |  400  |               |   yes    |     |         |
+    //     |  500  |               |          | yes |   yes   |
+    //     |  600  |      300      |          | yes |         |
+    //     |  700  |               |          | yes |         |
+    //     |  800  |               |          |     |   yes   |
+    //     +-------+---------------+----------+-----+---------+
+    fn test_set_up(context: &NativeAggregatorContext) {
+        let mut aggregator_data = context.aggregator_data.borrow_mut();
+
+        aggregator_data.create_new_aggregator(test_id(100), 100);
+        aggregator_data.create_new_aggregator(test_id(200), 200);
+        aggregator_data.create_new_aggregator(test_id(300), 300);
+        aggregator_data.create_new_aggregator(test_id(400), 400);
+
+        aggregator_data.get_aggregator(test_id(100), 100);
+        aggregator_data.get_aggregator(test_id(200), 200);
+        aggregator_data.get_aggregator(test_id(500), 500);
+        aggregator_data.get_aggregator(test_id(600), 600);
+        aggregator_data.get_aggregator(test_id(700), 700);
+
+        aggregator_data.remove_aggregator(test_id(100));
+        aggregator_data.remove_aggregator(test_id(300));
+        aggregator_data.remove_aggregator(test_id(500));
+        aggregator_data.remove_aggregator(test_id(800));
+    }
+
     #[test]
     fn test_into_change_set() {
         let context = NativeAggregatorContext::new(0, &EmptyStorage);
-        test_set_up(&context);
+        use AggregatorChange::*;
 
+        test_set_up(&context);
         let AggregatorChangeSet { changes } = context.into_change_set();
 
-        assert!(!changes.contains_key(&test_id(0)));
-
-        assert_matches!(
-            changes.get(&test_id(1)).unwrap(),
-            AggregatorChange::Write(0)
-        );
-        assert_matches!(
-            changes.get(&test_id(2)).unwrap(),
-            AggregatorChange::Write(0)
-        );
-
-        assert_matches!(changes.get(&test_id(3)).unwrap(), AggregatorChange::Delete);
-
-        assert_matches!(
-            changes.get(&test_id(4)).unwrap(),
-            AggregatorChange::Merge(DeltaOp::Addition {
-                value: 0,
-                limit: 1000
-            })
-        );
-        assert_matches!(
-            changes.get(&test_id(5)).unwrap(),
-            AggregatorChange::Merge(DeltaOp::Addition {
-                value: 0,
-                limit: 10
-            })
-        );
-
-        assert_matches!(changes.get(&test_id(6)).unwrap(), AggregatorChange::Delete);
+        assert!(!changes.contains_key(&test_id(100)));
+        assert_matches!(changes.get(&test_id(200)).unwrap(), Write(0));
+        assert!(!changes.contains_key(&test_id(300)));
+        assert_matches!(changes.get(&test_id(400)).unwrap(), Write(0));
+        assert_matches!(changes.get(&test_id(500)).unwrap(), Delete);
+        assert!(changes.contains_key(&test_id(600)));
+        assert!(changes.contains_key(&test_id(700)));
+        assert_matches!(changes.get(&test_id(800)).unwrap(), Delete);
     }
 }
