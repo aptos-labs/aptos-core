@@ -68,8 +68,8 @@ pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
     pub V,
 );
 
-impl<V: Into<Vec<u8>> + Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary>
-    DeserializeU128 for ValueType<V>
+impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> DeserializeU128
+    for ValueType<V>
 {
     fn deserialize(&self) -> Option<u128> {
         let v: Vec<u8> = self.0.clone().into();
