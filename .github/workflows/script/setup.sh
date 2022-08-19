@@ -33,4 +33,4 @@
 #         }
 # }' | python3 -c 'import json,sys;obj=json.load(sys.stdin);print(obj["current_block_identifier"]["index"])'))
 
-echo $(seq $START_INDEX $BLKS_PER_CHUNK 112419 | jq -cnR '[inputs | select(length>0)]')
+echo $(seq $START_INDEX $BLKS_PER_CHUNK 5000 | jq -cnR '[inputs | select(length>0)]')

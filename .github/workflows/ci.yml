@@ -25,7 +25,7 @@ jobs:
     - id: setup_work 
       env:
           START_INDEX: 100
-          BLKS_PER_CHUNK: 20000
+          BLKS_PER_CHUNK: 500
       run: echo "::set-output name=matrix::$(.github/workflows/script/setup.sh)"
     - id: set_blks_per_chunk
       run: echo "::set-output name=blks_per_chunk::500"
