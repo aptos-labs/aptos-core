@@ -37,7 +37,7 @@ fn native_ecdsa_recover(
     let recovery_id = pop_arg!(arguments, u8);
     let msg = pop_arg!(arguments, Vec<u8>);
 
-    let mut cost = gas_params.base_cost;
+    let mut cost = gas_params.base;
 
     // NOTE(Gas): O(1) cost
     // (In reality, O(|msg|) deserialization cost, with |msg| < libsecp256k1_core::util::MESSAGE_SIZE
@@ -66,7 +66,7 @@ fn native_ecdsa_recover(
         }
     };
 
-    cost += gas_params.ecdsa_recover_cost * NumArgs::one();
+    cost += gas_params.ecdsa_recover * NumArgs::one();
 
     // NOTE(Gas): O(1) cost: a size-2 multi-scalar multiplication
     match libsecp256k1::recover(&msg, &sig, &rid) {
@@ -90,8 +90,8 @@ fn native_ecdsa_recover(
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct GasParameters {
-    pub base_cost: InternalGas,
-    pub ecdsa_recover_cost: InternalGasPerArg,
+    pub base: InternalGas,
+    pub ecdsa_recover: InternalGasPerArg,
 }
 
 pub fn make_all(gas_params: GasParameters) -> impl Iterator<Item = (String, NativeFunction)> {

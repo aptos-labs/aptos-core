@@ -8,9 +8,9 @@ use move_deps::{
     move_vm_runtime::native_functions::{NativeContext, NativeFunction},
     move_vm_types::{
         loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
+        views::ValueView,
     },
 };
-
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
 
@@ -22,8 +22,8 @@ use std::{collections::VecDeque, sync::Arc};
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct WriteToEventStoreGasParameters {
-    pub base_cost: InternalGas,
-    pub unit_cost: InternalGasPerAbstractMemoryUnit,
+    pub base: InternalGas,
+    pub per_abstract_memory_unit: InternalGasPerAbstractMemoryUnit,
 }
 
 #[inline]
@@ -41,8 +41,9 @@ fn native_write_to_event_store(
     let seq_num = pop_arg!(arguments, u64);
     let guid = pop_arg!(arguments, Vec<u8>);
 
-    // TODO(Gas): fix this
-    let cost = gas_params.base_cost + gas_params.unit_cost * msg.size();
+    // TODO(Gas): Get rid of abstract memory size
+    let cost =
+        gas_params.base + gas_params.per_abstract_memory_unit * msg.legacy_abstract_memory_size();
 
     if !context.save_event(guid, seq_num, ty, msg)? {
         return Ok(NativeResult::err(cost, 0));

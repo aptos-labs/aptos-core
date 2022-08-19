@@ -52,7 +52,7 @@
         "data": {
           "type": "0x1::state_storage::StateStorageUsage",
           "data": {
-            "bytes": "278613",
+            "bytes": "279325",
             "epoch": "1",
             "items": "96"
           }
@@ -107,7 +107,7 @@
     "hash": "",
     "state_root_hash": "",
     "event_root_hash": "",
-    "gas_used": "2",
+    "gas_used": "3",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
