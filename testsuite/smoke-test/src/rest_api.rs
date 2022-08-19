@@ -176,4 +176,29 @@ async fn test_bcs() {
             .unwrap()
             .into_inner()
     );
+
+    // Check that the first 5 transactions match
+    let json_txns = client
+        .get_transactions(Some(0), Some(5))
+        .await
+        .unwrap()
+        .into_inner();
+    let bcs_txns = client
+        .get_transactions_bcs(Some(0), Some(5))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(5, json_txns.len());
+    assert_eq!(json_txns.len(), bcs_txns.len());
+
+    // Ensure same hashes and versions for each transaction
+    for (i, json_txn) in json_txns.iter().enumerate() {
+        let bcs_txn = bcs_txns.get(i).unwrap();
+
+        assert_eq!(json_txn.version().unwrap(), bcs_txn.version);
+        assert_eq!(
+            aptos_crypto::HashValue::from(json_txn.transaction_info().unwrap().hash),
+            bcs_txn.info.transaction_hash()
+        );
+    }
 }
