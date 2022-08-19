@@ -20,12 +20,12 @@ curl -s https://raw.githubusercontent.com/aptos-labs/aptos-core/rosetta-stable/c
 curl -s -o data/genesis.blob https://rosetta.aptosdev.com/genesis.blob
 curl -s -o data/waypoint.txt https://rosetta.aptosdev.com/waypoint.txt
 
-sleep 3000
+sleep 2400
 
 # Run the node in online remote mode (detached mode)
 nohup docker run -d -p 8082:8082 --rm -v $(pwd)/data:/opt/aptos aptos-core:rosetta-$GIT_REF online-remote --rest-api-url https://rosetta.aptosdev.com > /dev/null 2>&1 &
 
-sleep 60
+sleep 120
 
 echo "download rosetta-cli"
 curl -sSfL https://raw.githubusercontent.com/coinbase/rosetta-cli/master/scripts/install.sh | sh -s
