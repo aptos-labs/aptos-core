@@ -39,6 +39,47 @@ impl DeltaOp {
         }
     }
 
+    /// Consumes two deltas and returns a new one.
+    pub fn merge_with(self, other: DeltaOp) -> PartialVMResult<DeltaOp> {
+        use DeltaOp::*;
+
+        Ok(match (self, other) {
+            (
+                Addition { value, limit },
+                Addition {
+                    value: other_value,
+                    limit: other_limit,
+                },
+            ) => {
+                debug_assert!(limit == other_limit, "merging deltas with different limits");
+                let new_value = addition(value, other_value, limit)?;
+                Addition {
+                    value: new_value,
+                    limit,
+                }
+            }
+            (Addition { value, limit }, Subtraction { value: other_value })
+            | (Subtraction { value: other_value }, Addition { value, limit }) => {
+                if value >= other_value {
+                    let new_value = subtraction(value, other_value)?;
+                    Addition {
+                        value: new_value,
+                        limit,
+                    }
+                } else {
+                    let new_value = subtraction(other_value, value)?;
+                    Subtraction { value: new_value }
+                }
+            }
+            (Subtraction { value }, Subtraction { value: other_value }) => {
+                // While subtraction never carries a limit, merging 2 deltas
+                // can still overflow.
+                let new_value = addition(value, other_value, u128::MAX)?;
+                Subtraction { value: new_value }
+            }
+        })
+    }
+
     /// Consumes a single delta and tries to materialize it with a given state
     /// key. If materialization succeeds, a write op is produced. Otherwise, an
     /// error VM status is returned.
@@ -218,6 +259,33 @@ mod tests {
 
         assert_ok_eq!(sub5.apply_to(5), 0);
         assert_ok_eq!(sub5.apply_to(100), 95);
+    }
+
+    #[test]
+    fn test_delta_merge() {
+        let add5 = addition(5, 10);
+        let add7 = addition(7, 10);
+        let sub2 = subtraction(2);
+        let sub6 = subtraction(6);
+
+        assert_err!(add5.merge_with(add7));
+        assert_matches!(
+            add5.merge_with(add5),
+            Ok(DeltaOp::Addition {
+                value: 10,
+                limit: 10
+            })
+        );
+        assert_matches!(
+            add5.merge_with(sub2),
+            Ok(DeltaOp::Addition {
+                value: 3,
+                limit: 10
+            })
+        );
+        assert_matches!(sub6.merge_with(sub2), Ok(DeltaOp::Subtraction { value: 8 }));
+        assert_matches!(sub6.merge_with(add5), Ok(DeltaOp::Subtraction { value: 1 }));
+        assert_matches!(add5.merge_with(sub6), Ok(DeltaOp::Subtraction { value: 1 }));
     }
 
     #[derive(Default)]
