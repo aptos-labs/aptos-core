@@ -48,7 +48,7 @@ variable "chain_id" {
 
 variable "machine_type" {
   description = "Machine type for running fullnode. All configurations can be obtained at https://www.vultr.com/api/#tag/plans"
-  default     = "vc2-4c-8gb"
+  default     = "vc2-8c-16gb"
 }
 
 variable "api_key" {

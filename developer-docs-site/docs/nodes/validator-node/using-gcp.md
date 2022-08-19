@@ -72,7 +72,7 @@ Install the below pre-requisites if have not done so:
     zone          = "c"            # Specify the zone suffix
     project       = "<GCP Project ID>" # Specify your GCP project ID
     era           = 1              # bump era number to wipe the chain
-    chain_id      = 40
+    chain_id      = 43
     image_tag     = "testnet" # Specify the docker image tag to use
     validator_name = "<Name of Your Validator, no space, e.g. aptosbot>"
   }
@@ -176,7 +176,7 @@ This will download all the Terraform dependencies for you, in the `.terraform` f
 13. Download the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
 
     ```
-    curl https://raw.githubusercontent.com/aptos-labs/aptos-core/testnet/aptos-move/framework/releases/head.mrb --output framework.mrb
+    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb
     ```
 
 14. Compile the genesis blob and waypoint.

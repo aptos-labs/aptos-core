@@ -9,7 +9,7 @@ use aptos_config::{
 };
 use aptos_crypto::HashValue;
 use aptos_time_service::{MockTimeService, TimeService};
-use aptos_types::multi_signature::MultiSignature;
+use aptos_types::aggregate_signature::AggregateSignature;
 use aptos_types::{
     block_info::BlockInfo,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
@@ -46,7 +46,7 @@ fn mock_ledger_info(version: Version) -> LedgerInfoWithSignatures {
             BlockInfo::new(0, 0, HashValue::zero(), HashValue::zero(), version, 0, None),
             HashValue::zero(),
         ),
-        MultiSignature::empty(),
+        AggregateSignature::empty(),
     )
 }
 

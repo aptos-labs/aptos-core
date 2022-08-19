@@ -46,8 +46,8 @@ fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std:
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct TypeOfGasParameters {
-    pub base_cost: InternalGas,
-    pub unit_cost: InternalGasPerAbstractMemoryUnit,
+    pub base: InternalGas,
+    pub per_abstract_memory_unit: InternalGasPerAbstractMemoryUnit,
 }
 
 fn native_type_of(
@@ -60,9 +60,9 @@ fn native_type_of(
     debug_assert!(arguments.is_empty());
 
     // TODO(Gas): Stop using abstract memory size
-    let mut cost = gas_params.base_cost;
-    if gas_params.unit_cost > 0.into() {
-        cost += gas_params.unit_cost * ty_args[0].size()
+    let mut cost = gas_params.base;
+    if gas_params.per_abstract_memory_unit > 0.into() {
+        cost += gas_params.per_abstract_memory_unit * ty_args[0].size()
     }
 
     let type_tag = context.type_to_type_tag(&ty_args[0])?;
@@ -94,8 +94,8 @@ pub fn make_native_type_of(gas_params: TypeOfGasParameters) -> NativeFunction {
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct TypeNameGasParameters {
-    pub base_cost: InternalGas,
-    pub unit_cost: InternalGasPerAbstractMemoryUnit,
+    pub base: InternalGas,
+    pub per_abstract_memory_unit: InternalGasPerAbstractMemoryUnit,
 }
 
 fn native_type_name(
@@ -108,9 +108,9 @@ fn native_type_name(
     debug_assert!(arguments.is_empty());
 
     // TODO(Gas): Stop using abstract memory size
-    let mut cost = gas_params.base_cost;
-    if gas_params.unit_cost > 0.into() {
-        cost += gas_params.unit_cost * ty_args[0].size()
+    let mut cost = gas_params.base;
+    if gas_params.per_abstract_memory_unit > 0.into() {
+        cost += gas_params.per_abstract_memory_unit * ty_args[0].size()
     }
 
     let type_tag = context.type_to_type_tag(&ty_args[0])?;

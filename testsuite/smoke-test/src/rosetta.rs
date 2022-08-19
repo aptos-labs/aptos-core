@@ -267,7 +267,6 @@ async fn get_balance(
 
 /// This test tests all of Rosetta's functionality from the read side in one go.  Since
 /// it's block based and it needs time to run, we do all the checks in a single test.
-#[ignore]
 #[tokio::test]
 async fn test_block() {
     let (swarm, cli, _faucet, rosetta_client) = setup_test(1, 5).await;
@@ -309,6 +308,20 @@ async fn test_block() {
     // TODO: Handle multiple coin types
 
     eprintln!("Checking blocks 0..{}", final_block_height);
+
+    // Wait until the Rosetta service is ready
+    let request = NetworkRequest {
+        network_identifier: NetworkIdentifier::from(chain_id),
+    };
+
+    loop {
+        let status = try_until_ok_default(|| rosetta_client.network_status(&request))
+            .await
+            .unwrap();
+        if status.current_block_identifier.index >= final_block_height {
+            break;
+        }
+    }
 
     // Now we have to watch all the changes
     let mut current_version = 0;

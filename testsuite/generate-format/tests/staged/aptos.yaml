@@ -81,7 +81,11 @@ EventKey:
     - account_address:
         TYPENAME: AccountAddress
 HashValue:
-  NEWTYPESTRUCT: BYTES
+  STRUCT:
+    - hash:
+        TUPLEARRAY:
+          CONTENT: U8
+          SIZE: 32
 Identifier:
   NEWTYPESTRUCT: STR
 Module:
@@ -270,8 +274,11 @@ WriteOp:
     2:
       Deletion: UNIT
 WriteSet:
-  NEWTYPESTRUCT:
-    TYPENAME: WriteSetMut
+  ENUM:
+    0:
+      V0:
+        NEWTYPE:
+          TYPENAME: WriteSetV0
 WriteSetMut:
   STRUCT:
     - write_set:
@@ -292,3 +299,6 @@ WriteSetPayload:
               TYPENAME: AccountAddress
           - script:
               TYPENAME: Script
+WriteSetV0:
+  NEWTYPESTRUCT:
+    TYPENAME: WriteSetMut

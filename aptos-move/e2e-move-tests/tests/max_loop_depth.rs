@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::{account_address::AccountAddress, vm_status::StatusCode};
-use e2e_move_tests::{assert_success, assert_vm_status, enable_golden, MoveHarness};
+use e2e_move_tests::{assert_success, assert_vm_status, MoveHarness};
 use serde::{Deserialize, Serialize};
 
 mod common;
@@ -16,7 +16,6 @@ struct ModuleData {
 #[test]
 fn module_loop_depth_at_limit() {
     let mut h = MoveHarness::new();
-    enable_golden!(h);
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
@@ -28,7 +27,6 @@ fn module_loop_depth_at_limit() {
 #[test]
 fn module_loop_depth_just_above_limit() {
     let mut h = MoveHarness::new();
-    enable_golden!(h);
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
