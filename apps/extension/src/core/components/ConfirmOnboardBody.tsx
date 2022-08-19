@@ -14,7 +14,7 @@ import { FaDiscord } from '@react-icons/all-files/fa/FaDiscord';
 import React from 'react';
 
 const aptosDevWalletExtensionUrl = 'https://petra.app/docs/petra-intro';
-const aptosWalletDiscordUrl = 'https://discord.gg/rt2tQSFd';
+const aptosWalletDiscordUrl = 'https://discord.gg/nhDrkGawxV';
 
 export default function ConfirmOnboardBody() {
   return (
