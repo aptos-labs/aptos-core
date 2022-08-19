@@ -53,13 +53,13 @@ use move_deps::{
     move_vm_runtime::session::SerializedReturnValues,
 };
 use once_cell::sync::Lazy;
-use std::sync::Arc;
 use std::{
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
     fmt,
     path::Path,
     string::String,
+    sync::Arc,
 };
 use vm_genesis::GENESIS_KEYPAIR;
 /**
@@ -167,7 +167,7 @@ struct BlockCommand {
 #[derive(StructOpt, Debug)]
 struct ViewTableCommand {
     #[structopt(long = "table_handle")]
-    table_handle: u128,
+    table_handle: AccountAddress,
 
     #[structopt(long = "key_type", parse(try_from_str = parse_type_tag))]
     key_type: TypeTag,

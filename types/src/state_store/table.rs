@@ -1,14 +1,16 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use core::num::ParseIntError;
-use move_deps::move_core_types::language_storage::TypeTag;
+use move_deps::move_core_types::{
+    account_address::{AccountAddress, AccountAddressParseError},
+    language_storage::TypeTag,
+};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
-pub struct TableHandle(pub u128);
+pub struct TableHandle(pub AccountAddress);
 
 impl TableHandle {
     pub fn size(&self) -> usize {
@@ -17,10 +19,10 @@ impl TableHandle {
 }
 
 impl FromStr for TableHandle {
-    type Err = ParseIntError;
+    type Err = AccountAddressParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let handle = u128::from_str(s)?;
+        let handle = AccountAddress::from_str(s)?;
         Ok(Self(handle))
     }
 }

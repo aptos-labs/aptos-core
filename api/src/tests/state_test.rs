@@ -217,7 +217,7 @@ fn get_account_module(address: &str, name: &str) -> String {
     format!("/accounts/{}/module/{}", address, name)
 }
 
-fn get_table_item(handle: u128) -> String {
+fn get_table_item(handle: AccountAddress) -> String {
     format!("/tables/{}/item", handle)
 }
 
