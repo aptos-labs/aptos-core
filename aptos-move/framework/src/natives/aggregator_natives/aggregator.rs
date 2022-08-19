@@ -125,11 +125,6 @@ fn native_sub(
     let mut aggregator_data = aggregator_context.aggregator_data.borrow_mut();
     let aggregator = aggregator_data.get_aggregator(id, limit);
 
-    // For first version of `Aggregator` (V1), subtraction always materializes
-    // the value first. While this limits commutativity, it is sufficient for
-    // now.
-    // TODO: change this when we implement commutative subtraction.
-    aggregator.read_and_materialize(aggregator_context.resolver, &id)?;
     aggregator.sub(value)?;
 
     Ok(NativeResult::ok(gas_params.base, smallvec![]))

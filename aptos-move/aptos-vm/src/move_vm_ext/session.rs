@@ -290,11 +290,11 @@ impl SessionOutput {
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                             *entry_mut = Write(new_data);
                         }
-                        (Merge(delta1), Merge(delta2)) => {
-                            let new_delta = delta1
+                        (Merge(mut delta1), Merge(delta2)) => {
+                            delta1
                                 .merge_with(delta2)
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-                            *entry_mut = Merge(new_delta)
+                            *entry_mut = Merge(delta1)
                         }
                         // Hashing properties guarantee that aggregator keys should
                         // not collide, making this case impossible.

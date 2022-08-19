@@ -16,6 +16,8 @@ pub enum AggregatorState {
     Data,
     // If aggregator stores a non-negative delta.
     PositiveDelta,
+    // If aggregator stores a negative delta.
+    NegativeDelta,
 }
 
 /// Uniquely identifies each aggregator instance in storage.
@@ -37,6 +39,57 @@ impl AggregatorID {
     }
 }
 
+/// Tracks values seen by aggregator. In particular, stores information about
+/// the biggest and the smallest deltas seen during execution in the VM. This
+/// information can be used by the executor to check if delta should have
+/// failed. Most importantly, it allows commutativity of adds/subs. Example:
+///
+///
+/// This graph shows how delta of aggregator changed during a single transaction
+/// execution:
+///
+/// +A ===========================================>
+///            ||
+///          ||||                               +X
+///         |||||  ||||||                    ||||
+///      |||||||||||||||||||||||||          |||||
+/// +0 ===========================================> time
+///                       ||||||
+///                         ||
+///                         ||
+/// -B ===========================================>
+///
+/// Clearly, +X succeeds if +A and -B succeed. Therefore each delta
+/// validation consists of:
+///   1. check +A did not overflow
+///   2. check -A did not drop below zero
+/// Checking +X is irrelevant since +A >= +X.
+///
+/// TODO: while we support tracking of the history, it is not yet fully used on
+/// executor side because we don't know how to throw errors.
+#[derive(Debug)]
+pub struct History {
+    pub max_positive: u128,
+    pub min_negative: u128,
+}
+
+impl History {
+    fn new() -> Self {
+        History {
+            max_positive: 0,
+            min_negative: 0,
+        }
+    }
+
+    fn record_positive(&mut self, value: u128) {
+        self.max_positive = u128::max(self.max_positive, value);
+    }
+
+    fn record_negative(&mut self, value: u128) {
+        self.min_negative = u128::max(self.min_negative, value);
+    }
+}
+
 /// Internal aggregator data structure.
 pub struct Aggregator {
     // Describes a value of an aggregator.
@@ -49,14 +102,52 @@ pub struct Aggregator {
     // lower bound. If we want to support custom lower bounds, or have more
     // complex postconditions, we should factor this out in its own struct.
     limit: u128,
+    // Describes values seen by this aggregator. Note that if aggregator knows
+    // its value, then storing history doesn't make sense.
+    history: Option<History>,
 }
 
 impl Aggregator {
+    /// Records observed delta in history. Should be called after an operation
+    /// to record its side-effects.
+    fn record(&mut self) {
+        if let Some(history) = self.history.as_mut() {
+            match self.state {
+                AggregatorState::PositiveDelta => history.record_positive(self.value),
+                AggregatorState::NegativeDelta => history.record_negative(self.value),
+                AggregatorState::Data => {
+                    unreachable!("history is not tracked when aggregator knows its value")
+                }
+            }
+        }
+    }
+
     /// Implements logic for adding to an aggregator.
     pub fn add(&mut self, value: u128) -> PartialVMResult<()> {
-        // At this point, aggregator holds a positive delta or knows the value.
-        // Hence, we can add, of course checking for overflow.
-        self.value = addition(self.value, value, self.limit)?;
+        match self.state {
+            AggregatorState::Data | AggregatorState::PositiveDelta => {
+                // If aggregator knows the value, or is a positive delta, we
+                // can add directly and keep the state.
+                self.value = addition(self.value, value, self.limit)?;
+            }
+            AggregatorState::NegativeDelta => {
+                // Negative delta is a special case, since the state might
+                // change depending on how big the `value` is. Suppose
+                // aggregator has -X and want to do +Y. Then, there are two
+                // cases:
+                //     1. X <= Y: then the result is +(Y-X)
+                //     2. X  > Y: then the result is -(X-Y)
+                if self.value <= value {
+                    self.value = subtraction(value, self.value)?;
+                    self.state = AggregatorState::PositiveDelta;
+                } else {
+                    self.value = subtraction(self.value, value)?;
+                }
+            }
+        }
+
+        // Record side-effects of addition in history.
+        self.record();
         Ok(())
     }
 
@@ -67,15 +158,38 @@ impl Aggregator {
                 // Aggregator knows the value, therefore we can subtract
                 // checking we don't drop below zero.
                 self.value = subtraction(self.value, value)?;
-                Ok(())
             }
-            // For now, `aggregator::sub` always materializes the value, so
-            // this should be unreachable.
-            // TODO: support non-materialized subtractions.
             AggregatorState::PositiveDelta => {
-                unreachable!("subtraction always materializes the value")
+                // Positive delta is a special case because the state can
+                // change depending on how big the `value` is. Suppose
+                // aggregator has +X and want to do -Y. Then, there are two
+                // cases:
+                //     1. X >= Y: then the result is +(X-Y)
+                //     2. X  < Y: then the result is -(Y-X)
+                if self.value >= value {
+                    self.value = subtraction(self.value, value)?;
+                } else {
+                    // Check that we can subtract in general: we don't want to
+                    // allow -10000 when limit is 10.
+                    // TODO: maybe `subtraction` should also know about the limit?
+                    subtraction(self.limit, value)?;
+
+                    self.value = subtraction(value, self.value)?;
+                    self.state = AggregatorState::NegativeDelta;
+                }
+            }
+            AggregatorState::NegativeDelta => {
+                // Since we operate on unsigned integers, we have to add
+                // when subtracting from negative delta. Note that if limit
+                // is some X, then we cannot subtract more than X, and so
+                // we should return an error there.
+                self.value = addition(self.value, value, self.limit)?;
             }
         }
+
+        // Record side-effects of addition in history.
+        self.record();
+        Ok(())
     }
 
     /// Implements logic for reading the value of an aggregator. As a
@@ -104,26 +218,46 @@ impl Aggregator {
                     "could not find the value of the aggregator",
                 )),
                 |bytes| {
-                    // The only remaining case is PositiveDelta. Assert just in
-                    // case.
-                    debug_assert!(self.state == AggregatorState::PositiveDelta);
+                    // Get the value from the storage to which we want to apply
+                    // the delta.
+                    let value_from_storage = deserialize(&bytes);
 
-                    // Get the value from the storage and try to apply the delta
-                    // to it. If application succeeds, we change the state of the
-                    // aggregator. Otherwise the error is propagated to the caller.
-                    let base = deserialize(&bytes);
-                    self.value = addition(base, self.value, self.limit)?;
+                    // Sanity checks.
+                    debug_assert!(
+                        self.history.is_some(),
+                        "resolving aggregator with no history"
+                    );
+                    let history = self.history.as_ref().unwrap();
+
+                    // Validate history of the aggregator, ensure that there
+                    // was no violation of postcondition. We can do it by
+                    // emulating addition and subtraction.
+                    addition(value_from_storage, history.max_positive, self.limit)?;
+                    subtraction(value_from_storage, history.min_negative)?;
+
+                    // Validation succeeded, and now we can actually apply the delta.
+                    match self.state {
+                        AggregatorState::PositiveDelta => {
+                            self.value = addition(value_from_storage, self.value, self.limit)?;
+                        }
+                        AggregatorState::NegativeDelta => {
+                            self.value = subtraction(value_from_storage, self.value)?;
+                        }
+                        AggregatorState::Data => {
+                            unreachable!("history is not tracked when aggregator knows its value")
+                        }
+                    }
+
+                    // Change the state and return the new value.
                     self.state = AggregatorState::Data;
-
-                    // Return the new value.
                     Ok(self.value)
                 },
             )
     }
 
     /// Unpacks aggregator into its fields.
-    pub fn into(self) -> (u128, AggregatorState, u128) {
-        (self.value, self.state, self.limit)
+    pub fn into(self) -> (u128, AggregatorState, u128, Option<History>) {
+        (self.value, self.state, self.limit, self.history)
     }
 }
 
@@ -153,6 +287,7 @@ impl AggregatorData {
             value: 0,
             state: AggregatorState::PositiveDelta,
             limit,
+            history: Some(History::new()),
         });
         self.aggregators.get_mut(&id).unwrap()
     }
@@ -170,6 +305,7 @@ impl AggregatorData {
             value: 0,
             state: AggregatorState::Data,
             limit,
+            history: None,
         };
         self.aggregators.insert(id, aggregator);
         self.new_aggregators.insert(id);
@@ -220,7 +356,7 @@ mod test {
     use aptos_state_view::state_storage_usage::StateStorageUsage;
     use aptos_state_view::StateView;
     use aptos_types::state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle};
-    use claim::{assert_err, assert_matches, assert_ok};
+    use claim::{assert_err, assert_ok};
     use move_deps::{
         move_core_types::gas_algebra::InternalGas, move_table_extension::TableOperation,
     };
@@ -237,8 +373,7 @@ mod test {
             let mut data = HashMap::new();
 
             // Initialize storage with some test data.
-            data.insert(id_to_state_key(test_id(4)), serialize(&900));
-            data.insert(id_to_state_key(test_id(5)), serialize(&5));
+            data.insert(id_to_state_key(test_id(600)), serialize(&300));
             FakeTestStorage { data }
         }
     }
@@ -289,64 +424,128 @@ mod test {
     #[allow(clippy::redundant_closure)]
     static TEST_RESOLVER: Lazy<FakeTestStorage> = Lazy::new(|| FakeTestStorage::new());
 
-    fn test_set_up(aggregator_data: &mut AggregatorData) {
-        // Aggregators with data.
-        aggregator_data.create_new_aggregator(test_id(1), 1000);
+    #[test]
+    fn test_materialize_not_in_storage() {
+        let mut aggregator_data = AggregatorData::default();
 
-        // Aggregators with delta.
-        aggregator_data.get_aggregator(test_id(4), 1000);
-        aggregator_data.get_aggregator(test_id(5), 10);
+        let aggregator = aggregator_data.get_aggregator(test_id(700), 700);
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(700)));
     }
 
     #[test]
-    fn test_aggregator_operations() {
+    fn test_materialize_known() {
         let mut aggregator_data = AggregatorData::default();
-        test_set_up(&mut aggregator_data);
+        aggregator_data.create_new_aggregator(test_id(200), 200);
 
-        // This aggregator has been created by this transaction, hence the
-        // value is known.
-        let aggregator = aggregator_data.get_aggregator(test_id(1), 1000);
-        assert_matches!(aggregator.state, AggregatorState::Data);
-        assert_eq!(aggregator.value, 0);
-
+        let aggregator = aggregator_data.get_aggregator(test_id(200), 200);
         assert_ok!(aggregator.add(100));
-        assert_ok!(aggregator.add(900));
-        assert_matches!(aggregator.state, AggregatorState::Data);
-        assert_eq!(aggregator.value, 1000);
+        assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(200)));
+        assert_eq!(aggregator.value, 100);
+    }
 
-        // Overflow!
-        assert_err!(aggregator.add(1));
+    #[test]
+    fn test_materialize_overflow() {
+        let mut aggregator_data = AggregatorData::default();
 
-        // This aggregator has not been created by this transaction, and contains
-        // an unknown value.
-        let aggregator = aggregator_data.get_aggregator(test_id(4), 1000);
-        assert_matches!(aggregator.state, AggregatorState::PositiveDelta);
+        // +0 to +400 satisfies <= 600 and is ok, but materialization fails
+        // with 300 + 400 > 600!
+        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        assert_ok!(aggregator.add(400));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(600)));
+    }
+
+    #[test]
+    fn test_materialize_underflow() {
+        let mut aggregator_data = AggregatorData::default();
+
+        // +0 to -400 is ok, but materialization fails with 300 - 400 < 0!
+        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        assert_ok!(aggregator.add(400));
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(600)));
+    }
+
+    #[test]
+    fn test_materialize_non_monotonic_1() {
+        let mut aggregator_data = AggregatorData::default();
+
+        // +0 to +400 to +0 is ok, but materialization fails since we had 300 + 400 > 600!
+        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        assert_ok!(aggregator.add(400));
+        assert_ok!(aggregator.sub(300));
+        assert_eq!(aggregator.value, 100);
+        assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(600)));
+    }
+
+    #[test]
+    fn test_materialize_non_monotonic_2() {
+        let mut aggregator_data = AggregatorData::default();
+
+        // +0 to -301 to -300 is ok, but materialization fails since we had 300 - 301 < 0!
+        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        assert_ok!(aggregator.sub(301));
+        assert_ok!(aggregator.add(1));
+        assert_eq!(aggregator.value, 300);
+        assert_eq!(aggregator.state, AggregatorState::NegativeDelta);
+        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(600)));
+    }
+
+    #[test]
+    fn test_add_overflow() {
+        let mut aggregator_data = AggregatorData::default();
+
+        // +0 to +800 > 600!
+        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        assert_err!(aggregator.add(800));
+
+        // 0 + 300 > 200!
+        let aggregator = aggregator_data.get_aggregator(test_id(200), 200);
+        assert_err!(aggregator.add(300));
+    }
+
+    #[test]
+    fn test_sub_underflow() {
+        let mut aggregator_data = AggregatorData::default();
+        aggregator_data.create_new_aggregator(test_id(200), 200);
+
+        // +0 to -601 is impossible!
+        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        assert_err!(aggregator.sub(601));
+
+        // Similarly, we cannot subtract anything from 0...
+        let aggregator = aggregator_data.get_aggregator(test_id(200), 200);
+        assert_err!(aggregator.sub(2));
+    }
+
+    #[test]
+    fn test_commutative() {
+        let mut aggregator_data = AggregatorData::default();
+
+        // +200 -300 +50 +300 -25 +375 -600.
+        let aggregator = aggregator_data.get_aggregator(test_id(600), 600);
+        assert_ok!(aggregator.add(200));
+        assert_ok!(aggregator.sub(300));
+
+        assert_eq!(aggregator.value, 100);
+        assert_eq!(aggregator.history.as_ref().unwrap().max_positive, 200);
+        assert_eq!(aggregator.history.as_ref().unwrap().min_negative, 100);
+        assert_eq!(aggregator.state, AggregatorState::NegativeDelta);
+
+        assert_ok!(aggregator.add(50));
+        assert_ok!(aggregator.add(300));
+        assert_ok!(aggregator.sub(25));
+
+        assert_eq!(aggregator.value, 225);
+        assert_eq!(aggregator.history.as_ref().unwrap().max_positive, 250);
+        assert_eq!(aggregator.history.as_ref().unwrap().min_negative, 100);
+        assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
+
+        assert_ok!(aggregator.add(375));
+        assert_ok!(aggregator.sub(600));
+
         assert_eq!(aggregator.value, 0);
-
-        assert_ok!(aggregator.add(100));
-        assert_ok!(aggregator.add(100));
-        assert_matches!(aggregator.state, AggregatorState::PositiveDelta);
-        assert_eq!(aggregator.value, 200);
-
-        // 900 + 200 > 1000!
-        assert_err!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(4)));
-
-        // This aggregator also has not been created by this transaction, and
-        // contains an unknown value.
-        let aggregator = aggregator_data.get_aggregator(test_id(5), 10);
-        assert_matches!(aggregator.state, AggregatorState::PositiveDelta);
-        assert_eq!(aggregator.value, 0);
-
-        assert_ok!(aggregator.add(2));
-        assert_matches!(aggregator.state, AggregatorState::PositiveDelta);
-        assert_eq!(aggregator.value, 2);
-
-        assert_ok!(aggregator.read_and_materialize(&*TEST_RESOLVER, &test_id(5)));
-        assert_matches!(aggregator.state, AggregatorState::Data);
-        assert_eq!(aggregator.value, 7);
-
-        assert_ok!(aggregator.sub(7));
-        assert_matches!(aggregator.state, AggregatorState::Data);
-        assert_eq!(aggregator.value, 0);
+        assert_eq!(aggregator.history.as_ref().unwrap().max_positive, 600);
+        assert_eq!(aggregator.history.as_ref().unwrap().min_negative, 100);
+        assert_eq!(aggregator.state, AggregatorState::PositiveDelta);
     }
 }
