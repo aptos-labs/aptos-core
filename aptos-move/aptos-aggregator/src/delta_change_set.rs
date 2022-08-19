@@ -35,7 +35,7 @@ pub struct DeltaOp {
 }
 
 /// Different delta functions.
-#[derive(Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub enum DeltaUpdate {
     Plus(u128),
     Minus(u128),
@@ -74,43 +74,27 @@ impl DeltaOp {
         }
     }
 
-    /// Consumes two deltas and returns a new one.
-    pub fn merge_with(self, other: DeltaOp) -> PartialVMResult<DeltaOp> {
-        use DeltaOp::*;
+    /// Aggregates another delta into `self`.
+    pub fn merge_with(&mut self, other: DeltaOp) -> PartialVMResult<()> {
+        use DeltaUpdate::*;
 
-        Ok(match (self, other) {
-            (
-                Addition { value, limit },
-                Addition {
-                    value: other_value,
-                    limit: other_limit,
-                },
-            ) => {
-                debug_assert!(limit == other_limit, "merging deltas with different limits");
-                let new_value = addition(value, other_value, limit)?;
-                Addition {
-                    value: new_value,
-                    limit,
-                }
+        Ok(match (self.update, other.update) {
+            (Plus(value), Plus(other_value)) => {
+                let new_value = addition(value, other_value, self.limit)?;
+                self.update = Plus(new_value);
             }
-            (Addition { value, limit }, Subtraction { value: other_value })
-            | (Subtraction { value: other_value }, Addition { value, limit }) => {
+            (Plus(value), Minus(other_value)) | (Minus(other_value), Plus(value)) => {
                 if value >= other_value {
                     let new_value = subtraction(value, other_value)?;
-                    Addition {
-                        value: new_value,
-                        limit,
-                    }
+                    self.update = Plus(new_value);
                 } else {
                     let new_value = subtraction(other_value, value)?;
-                    Subtraction { value: new_value }
+                    self.update = Minus(new_value);
                 }
             }
-            (Subtraction { value }, Subtraction { value: other_value }) => {
-                // While subtraction never carries a limit, merging 2 deltas
-                // can still overflow.
-                let new_value = addition(value, other_value, u128::MAX)?;
-                Subtraction { value: new_value }
+            (Minus(value), Minus(other_value)) => {
+                let new_value = addition(value, other_value, self.limit)?;
+                self.update = Minus(new_value);
             }
         })
     }
@@ -264,7 +248,7 @@ impl ::std::iter::IntoIterator for DeltaChangeSet {
 mod tests {
     use super::*;
     use aptos_state_view::state_storage_usage::StateStorageUsage;
-    use claim::{assert_err, assert_matches, assert_ok_eq};
+    use claim::{assert_err, assert_matches, assert_ok, assert_ok_eq};
     use once_cell::sync::Lazy;
     use std::collections::HashMap;
 
@@ -298,29 +282,30 @@ mod tests {
 
     #[test]
     fn test_delta_merge() {
-        let add5 = addition(5, 10);
-        let add7 = addition(7, 10);
-        let sub2 = subtraction(2);
-        let sub6 = subtraction(6);
+        use DeltaUpdate::*;
 
-        assert_err!(add5.merge_with(add7));
-        assert_matches!(
-            add5.merge_with(add5),
-            Ok(DeltaOp::Addition {
-                value: 10,
-                limit: 10
-            })
-        );
-        assert_matches!(
-            add5.merge_with(sub2),
-            Ok(DeltaOp::Addition {
-                value: 3,
-                limit: 10
-            })
-        );
-        assert_matches!(sub6.merge_with(sub2), Ok(DeltaOp::Subtraction { value: 8 }));
-        assert_matches!(sub6.merge_with(add5), Ok(DeltaOp::Subtraction { value: 1 }));
-        assert_matches!(add5.merge_with(sub6), Ok(DeltaOp::Subtraction { value: 1 }));
+        let mut v = addition(5, 20);
+        let add20 = addition(20, 20);
+        let sub15 = subtraction(15, 20);
+        let add7 = addition(7, 20);
+        let mut sub1 = subtraction(1, 20);
+        let sub20 = subtraction(20, 20);
+
+        // Overflow on merge.
+        assert_err!(v.merge_with(add20)); // 25
+
+        // Successful merges.
+        assert_ok!(v.merge_with(v)); // 10
+        assert_matches!(v.update, Plus(10));
+        assert_ok!(v.merge_with(sub15)); // -5
+        assert_matches!(v.update, Minus(5));
+        assert_ok!(v.merge_with(add7)); // 2
+        assert_matches!(v.update, Plus(2));
+        assert_ok!(v.merge_with(sub1)); // 1
+        assert_matches!(v.update, Plus(1));
+
+        // Underflow on merge.
+        assert_err!(sub1.merge_with(sub20)); // -21
     }
 
     #[derive(Default)]

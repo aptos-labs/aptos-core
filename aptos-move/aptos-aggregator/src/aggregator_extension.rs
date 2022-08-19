@@ -251,7 +251,7 @@ impl Aggregator {
                     );
                     let history = self.history.as_ref().unwrap();
 
-                    // Validate hsitory of the aggregator, ensure that there
+                    // Validate history of the aggregator, ensure that there
                     // was no violation of postcondition. We can do it by
                     // emulating addition and subtraction.
                     addition(value_from_storage, history.max_positive, self.limit)?;
