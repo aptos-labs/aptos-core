@@ -3,7 +3,7 @@
         "blockchain": "aptos",
         "network": "TESTING"
     },
-    "online_url": "http://localhost:8082",
+    "online_url": "http://0.0.0.0:8082",
     "data_directory": "data",
     "http_timeout": 30,
     "max_retries": 5,
@@ -17,7 +17,7 @@
     "error_stack_trace_disabled": false,
     "coin_supported": false,
     "construction": {
-        "offline_url": "http://localhost:8083",
+        "offline_url": "http://0.0.0.0:8083",
         "max_offline_connections": 500,
         "stale_depth": 100,
         "broadcast_limit": 5,
