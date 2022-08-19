@@ -72,7 +72,7 @@ Install the below pre-requisites if have not done so:
     zone          = "c"            # Specify the zone suffix
     project       = "<GCP Project ID>" # Specify your GCP project ID
     era           = 1              # bump era number to wipe the chain
-    chain_id      = 40
+    chain_id      = 43
     image_tag     = "testnet" # Specify the docker image tag to use
     validator_name = "<Name of Your Validator, no space, e.g. aptosbot>"
   }
