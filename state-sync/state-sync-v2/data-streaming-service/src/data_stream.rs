@@ -109,11 +109,11 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
     ) -> Result<(Self, DataStreamListener), Error> {
         // Create a new data stream listener
         let (notification_sender, notification_receiver) = aptos_channel::new(
-            QueueStyle::KLAST,
+            QueueStyle::FIFO, // If the stream overflows, drop the new messages
             config.max_data_stream_channel_sizes as usize,
             None,
         );
-        let data_stream_listener = DataStreamListener::new(notification_receiver);
+        let data_stream_listener = DataStreamListener::new(data_stream_id, notification_receiver);
 
         // Create a new stream engine
         let stream_engine = StreamEngine::new(stream_request, advertised_data)?;
@@ -291,6 +291,11 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStream<T> {
         } else {
             Ok(())
         }
+    }
+
+    /// Returns true iff there was a send failure
+    pub fn send_failure(&self) -> bool {
+        self.send_failure
     }
 
     fn send_end_of_stream_notification(&mut self) -> Result<(), Error> {
@@ -600,6 +605,7 @@ impl<T> Drop for DataStream<T> {
 /// Allows listening to data streams (i.e., streams of data notifications).
 #[derive(Debug)]
 pub struct DataStreamListener {
+    pub data_stream_id: DataStreamId,
     notification_receiver: channel::aptos_channel::Receiver<(), DataNotification>,
 
     /// Stores the number of consecutive timeouts encountered when listening to this stream
@@ -608,9 +614,11 @@ pub struct DataStreamListener {
 
 impl DataStreamListener {
     pub fn new(
+        data_stream_id: DataStreamId,
         notification_receiver: channel::aptos_channel::Receiver<(), DataNotification>,
     ) -> Self {
         Self {
+            data_stream_id,
             notification_receiver,
             num_consecutive_timeouts: 0,
         }
@@ -707,7 +715,7 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
     // Update the requests sent counter
     increment_counter(
         &metrics::SENT_DATA_REQUESTS,
-        data_client_request.get_label().into(),
+        data_client_request.get_label(),
     );
 
     // Spawn the request
@@ -748,11 +756,11 @@ fn spawn_request_task<T: AptosDataClient + Send + Clone + 'static>(
             Ok(response) => {
                 increment_counter(
                     &metrics::RECEIVED_DATA_RESPONSE,
-                    response.payload.get_label().into(),
+                    response.payload.get_label(),
                 );
             }
             Err(error) => {
-                increment_counter(&metrics::RECEIVED_RESPONSE_ERROR, error.get_label().into());
+                increment_counter(&metrics::RECEIVED_RESPONSE_ERROR, error.get_label());
             }
         }
 

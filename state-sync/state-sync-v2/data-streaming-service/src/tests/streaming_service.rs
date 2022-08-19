@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::streaming_client::NotificationAndFeedback;
 use crate::{
     data_notification::DataPayload,
     error::Error,
@@ -107,8 +108,11 @@ async fn test_notifications_state_values_limited_chunks() {
             // Terminate the stream and fetch a new one (we hit non-contiguous data)
             streaming_client
                 .terminate_stream_with_feedback(
-                    data_notification.notification_id,
-                    NotificationFeedback::InvalidPayloadData,
+                    stream_listener.data_stream_id,
+                    Some(NotificationAndFeedback::new(
+                        data_notification.notification_id,
+                        NotificationFeedback::InvalidPayloadData,
+                    )),
                 )
                 .await
                 .unwrap();
@@ -146,8 +150,11 @@ async fn test_notifications_state_values_multiple_streams() {
                     // Terminate the stream
                     streaming_client
                         .terminate_stream_with_feedback(
-                            data_notification.notification_id,
-                            NotificationFeedback::InvalidPayloadData,
+                            stream_listener.data_stream_id,
+                            Some(NotificationAndFeedback::new(
+                                data_notification.notification_id,
+                                NotificationFeedback::InvalidPayloadData,
+                            )),
                         )
                         .await
                         .unwrap();
@@ -327,8 +334,11 @@ async fn test_notifications_continuous_outputs_limited_chunks() {
             // Terminate the stream and fetch a new one (we hit non-contiguous data)
             streaming_client
                 .terminate_stream_with_feedback(
-                    data_notification.notification_id,
-                    NotificationFeedback::InvalidPayloadData,
+                    stream_listener.data_stream_id,
+                    Some(NotificationAndFeedback::new(
+                        data_notification.notification_id,
+                        NotificationFeedback::InvalidPayloadData,
+                    )),
                 )
                 .await
                 .unwrap();
@@ -386,8 +396,11 @@ async fn test_notifications_continuous_outputs_multiple_streams() {
                     // Terminate the stream
                     streaming_client
                         .terminate_stream_with_feedback(
-                            data_notification.notification_id,
-                            NotificationFeedback::InvalidPayloadData,
+                            stream_listener.data_stream_id,
+                            Some(NotificationAndFeedback::new(
+                                data_notification.notification_id,
+                                NotificationFeedback::InvalidPayloadData,
+                            )),
                         )
                         .await
                         .unwrap();
@@ -527,8 +540,11 @@ async fn test_notifications_continuous_transactions_limited_chunks() {
             // Terminate the stream and fetch a new one (we hit non-contiguous data)
             streaming_client
                 .terminate_stream_with_feedback(
-                    data_notification.notification_id,
-                    NotificationFeedback::InvalidPayloadData,
+                    stream_listener.data_stream_id,
+                    Some(NotificationAndFeedback::new(
+                        data_notification.notification_id,
+                        NotificationFeedback::InvalidPayloadData,
+                    )),
                 )
                 .await
                 .unwrap();
@@ -675,8 +691,11 @@ async fn test_notifications_epoch_ending_limited_chunks() {
             // Terminate the stream and fetch a new one (we hit non-contiguous data)
             streaming_client
                 .terminate_stream_with_feedback(
-                    data_notification.notification_id,
-                    NotificationFeedback::InvalidPayloadData,
+                    stream_listener.data_stream_id,
+                    Some(NotificationAndFeedback::new(
+                        data_notification.notification_id,
+                        NotificationFeedback::InvalidPayloadData,
+                    )),
                 )
                 .await
                 .unwrap();
@@ -711,8 +730,11 @@ async fn test_notifications_epoch_ending_multiple_streams() {
                     // Terminate the stream
                     streaming_client
                         .terminate_stream_with_feedback(
-                            data_notification.notification_id,
-                            NotificationFeedback::InvalidPayloadData,
+                            stream_listener.data_stream_id,
+                            Some(NotificationAndFeedback::new(
+                                data_notification.notification_id,
+                                NotificationFeedback::InvalidPayloadData,
+                            )),
                         )
                         .await
                         .unwrap();
@@ -919,8 +941,11 @@ async fn test_notifications_transaction_outputs_limited_chunks() {
             // Terminate the stream and fetch a new one (we hit non-contiguous data)
             streaming_client
                 .terminate_stream_with_feedback(
-                    data_notification.notification_id,
-                    NotificationFeedback::InvalidPayloadData,
+                    stream_listener.data_stream_id,
+                    Some(NotificationAndFeedback::new(
+                        data_notification.notification_id,
+                        NotificationFeedback::InvalidPayloadData,
+                    )),
                 )
                 .await
                 .unwrap();
@@ -1022,8 +1047,11 @@ async fn test_notifications_transactions_limited_chunks() {
             // Terminate the stream and fetch a new one (we hit non-contiguous data)
             streaming_client
                 .terminate_stream_with_feedback(
-                    data_notification.notification_id,
-                    NotificationFeedback::InvalidPayloadData,
+                    stream_listener.data_stream_id,
+                    Some(NotificationAndFeedback::new(
+                        data_notification.notification_id,
+                        NotificationFeedback::InvalidPayloadData,
+                    )),
                 )
                 .await
                 .unwrap();
@@ -1071,8 +1099,11 @@ async fn test_notifications_transactions_multiple_streams() {
                     // Terminate the stream
                     streaming_client
                         .terminate_stream_with_feedback(
-                            data_notification.notification_id,
-                            NotificationFeedback::InvalidPayloadData,
+                            stream_listener.data_stream_id,
+                            Some(NotificationAndFeedback::new(
+                                data_notification.notification_id,
+                                NotificationFeedback::InvalidPayloadData,
+                            )),
                         )
                         .await
                         .unwrap();
@@ -1391,8 +1422,11 @@ async fn test_terminate_complete_stream() {
             DataPayload::EndOfStream => {
                 let result = streaming_client
                     .terminate_stream_with_feedback(
-                        data_notification.notification_id,
-                        NotificationFeedback::InvalidPayloadData,
+                        stream_listener.data_stream_id,
+                        Some(NotificationAndFeedback::new(
+                            data_notification.notification_id,
+                            NotificationFeedback::InvalidPayloadData,
+                        )),
                     )
                     .await;
                 assert_ok!(result);
@@ -1426,8 +1460,11 @@ async fn test_terminate_stream() {
     // Terminate the stream
     let result = streaming_client
         .terminate_stream_with_feedback(
-            data_notification.notification_id,
-            NotificationFeedback::InvalidPayloadData,
+            stream_listener.data_stream_id,
+            Some(NotificationAndFeedback::new(
+                data_notification.notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            )),
         )
         .await;
     assert_ok!(result);
@@ -1444,22 +1481,39 @@ async fn test_terminate_stream() {
 }
 
 fn create_streaming_client_and_service() -> StreamingServiceClient {
-    create_streaming_client_with_mocks(false, false, false)
+    create_streaming_client_and_spawn_server(false, false, false)
 }
 
 fn create_streaming_client_and_service_with_data_delay() -> StreamingServiceClient {
-    create_streaming_client_with_mocks(true, false, false)
+    create_streaming_client_and_spawn_server(true, false, false)
 }
 
 fn create_streaming_client_and_service_with_chunk_limits() -> StreamingServiceClient {
-    create_streaming_client_with_mocks(false, true, true)
+    create_streaming_client_and_spawn_server(false, true, true)
 }
 
-fn create_streaming_client_with_mocks(
+fn create_streaming_client_and_spawn_server(
     data_beyond_highest_advertised: bool,
     limit_chunk_sizes: bool,
     skip_emulate_network_latencies: bool,
 ) -> StreamingServiceClient {
+    let (client, service) = create_streaming_client_and_server(
+        data_beyond_highest_advertised,
+        limit_chunk_sizes,
+        skip_emulate_network_latencies,
+    );
+    tokio::spawn(service.start_service());
+    client
+}
+
+pub fn create_streaming_client_and_server(
+    data_beyond_highest_advertised: bool,
+    limit_chunk_sizes: bool,
+    skip_emulate_network_latencies: bool,
+) -> (
+    StreamingServiceClient,
+    DataStreamingService<MockAptosDataClient>,
+) {
     initialize_logger();
 
     // Create a new streaming client and listener
@@ -1486,7 +1540,6 @@ fn create_streaming_client_with_mocks(
         aptos_data_client,
         streaming_service_listener,
     );
-    tokio::spawn(streaming_service.start_service());
 
-    streaming_client
+    (streaming_client, streaming_service)
 }

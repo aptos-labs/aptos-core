@@ -22,6 +22,7 @@ use aptos_infallible::Mutex;
 use aptos_types::transaction::{TransactionOutputListWithProof, Version};
 use claim::assert_matches;
 use consensus_notifications::ConsensusSyncNotification;
+use data_streaming_service::streaming_client::NotificationAndFeedback;
 use data_streaming_service::{
     data_notification::{DataNotification, DataPayload},
     streaming_client::NotificationFeedback,
@@ -47,6 +48,7 @@ async fn test_critical_timeout() {
     let mut expectation_sequence = Sequence::new();
     let (_notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
         mock_streaming_client
             .expect_continuously_stream_transaction_outputs()
@@ -59,6 +61,10 @@ async fn test_critical_timeout() {
             .return_once(move |_, _, _| Ok(data_stream_listener))
             .in_sequence(&mut expectation_sequence);
     }
+    mock_streaming_client
+        .expect_terminate_stream_with_feedback()
+        .with(eq(data_stream_id_1), eq(None))
+        .return_const(Ok(()));
 
     // Create the continuous syncer
     let mut continuous_syncer = create_continuous_syncer(
@@ -124,6 +130,7 @@ async fn test_data_stream_transactions_with_target() {
     let mut expectation_sequence = Sequence::new();
     let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
         mock_streaming_client
             .expect_continuously_stream_transactions()
@@ -140,8 +147,11 @@ async fn test_data_stream_transactions_with_target() {
     mock_streaming_client
         .expect_terminate_stream_with_feedback()
         .with(
-            eq(notification_id),
-            eq(NotificationFeedback::EmptyPayloadData),
+            eq(data_stream_id_1),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::EmptyPayloadData,
+            ))),
         )
         .return_const(Ok(()));
 
@@ -205,6 +215,7 @@ async fn test_data_stream_transaction_outputs() {
     let mut expectation_sequence = Sequence::new();
     let (notification_sender_1, data_stream_listener_1) = create_data_stream_listener();
     let (_notification_sender_2, data_stream_listener_2) = create_data_stream_listener();
+    let data_stream_id_1 = data_stream_listener_1.data_stream_id;
     for data_stream_listener in [data_stream_listener_1, data_stream_listener_2] {
         mock_streaming_client
             .expect_continuously_stream_transaction_outputs()
@@ -220,8 +231,11 @@ async fn test_data_stream_transaction_outputs() {
     mock_streaming_client
         .expect_terminate_stream_with_feedback()
         .with(
-            eq(notification_id),
-            eq(NotificationFeedback::InvalidPayloadData),
+            eq(data_stream_id_1),
+            eq(Some(NotificationAndFeedback::new(
+                notification_id,
+                NotificationFeedback::InvalidPayloadData,
+            ))),
         )
         .return_const(Ok(()));
 
