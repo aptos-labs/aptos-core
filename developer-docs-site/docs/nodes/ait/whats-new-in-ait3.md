@@ -8,10 +8,6 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 # Whats New in AIT-3
 
-:::caution DRAFT-only
-These AIT-3 docs are draft-only for now.
-:::
-
 Several new features are up for testing by the AIT-3 participants. See below:
 
 ### Petra (Aptos Wallet)
@@ -22,7 +18,7 @@ Several new features are up for testing by the AIT-3 participants. See below:
 
 Participation in staking and governance is now enabled with three personas: an owner, an operator and a voter.  
 
-- **Owner**: The owner is the owner of the funds. For example, the owner Bob can assign his operator address to the account of Alice, a trusted validator operator. See also [How a custodian can stake on Aptos](/nodes/staking#how-a-custodian-can-stake-on-aptos). The owner account contains the validator settings and the coins. The coins are airdropped into the owner account.
+- **Owner**: The owner is the owner of the funds. For example, the owner Bob can assign his operator address to the account of Alice, a trusted validator operator. See also [How a custodian can stake on Aptos](/concepts/staking#how-a-custodian-can-stake-on-aptos). The owner account contains the validator settings and the coins. The coins are airdropped into the owner account.
 - **Operator**: If you are the owner, then, using your owner key, you will select the specific operator and you will:
   - Manage the settings for the specific validator, and
   - Delegate the stake pool to the validator.
