@@ -17,7 +17,6 @@ struct ModuleData {
 #[test]
 fn string_args() {
     let mut h = MoveHarness::new();
-    enable_golden!(h);
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());

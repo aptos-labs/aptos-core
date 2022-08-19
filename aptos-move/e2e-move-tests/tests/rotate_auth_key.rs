@@ -10,7 +10,7 @@ use aptos_types::{
 };
 
 use cached_packages::aptos_stdlib;
-use e2e_move_tests::{assert_success, enable_golden, MoveHarness};
+use e2e_move_tests::{assert_success, MoveHarness};
 use move_deps::move_core_types::parser::parse_struct_tag;
 use serde::{Deserialize, Serialize};
 
@@ -33,7 +33,6 @@ struct RotationProofChallenge {
 #[test]
 fn rotate_auth_key() {
     let mut harness = MoveHarness::new();
-    enable_golden!(harness);
 
     let account1 = harness.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
     let address = account1.address();
