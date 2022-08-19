@@ -23,7 +23,7 @@ use anyhow::{anyhow, Result};
 use aptos_api_types::mime_types::BCS_OUTPUT_NEW;
 use aptos_api_types::{
     mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, HexEncodedBytes,
-    MoveModuleId, VersionedEvent,
+    MoveModuleId, TransactionOnChainData, VersionedEvent,
 };
 use aptos_crypto::HashValue;
 use aptos_types::account_config::AccountResource;
@@ -308,6 +308,17 @@ impl Client {
         let response = request.send().await?;
 
         self.json(response).await
+    }
+
+    pub async fn get_account_transactions_bcs(
+        &self,
+        address: AccountAddress,
+        start: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<Response<Vec<TransactionOnChainData>>> {
+        let url = self.build_path(&format!("accounts/{}/transactions", address))?;
+        let response = self.get_bcs_with_page(url, start, limit).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
     pub async fn get_account_resources(
@@ -606,6 +617,27 @@ impl Client {
             .header(ACCEPT, BCS_OUTPUT_NEW)
             .send()
             .await?;
+        let (response, state) = self.check_response(response).await?;
+        Ok(Response::new(response.bytes().await?, state))
+    }
+
+    async fn get_bcs_with_page(
+        &self,
+        url: Url,
+        start: Option<u64>,
+        limit: Option<u64>,
+    ) -> Result<Response<bytes::Bytes>> {
+        let mut request = self.inner.get(url).header(ACCEPT, BCS_OUTPUT_NEW);
+        if let Some(start) = start {
+            request = request.query(&[("start", start)])
+        }
+
+        if let Some(limit) = limit {
+            request = request.query(&[("limit", limit)])
+        }
+
+        let response = request.send().await?;
+
         let (response, state) = self.check_response(response).await?;
         Ok(Response::new(response.bytes().await?, state))
     }
