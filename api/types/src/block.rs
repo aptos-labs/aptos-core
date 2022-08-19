@@ -16,7 +16,7 @@ pub struct Block {
     pub transactions: Option<Vec<Transaction>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Object)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BcsBlock {
     pub block_height: u64,
     pub block_hash: aptos_crypto::HashValue,
