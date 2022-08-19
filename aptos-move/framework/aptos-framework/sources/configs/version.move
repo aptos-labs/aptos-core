@@ -61,7 +61,7 @@ module aptos_framework::version {
     }
 
     #[test(aptos_framework = @aptos_framework, random_account = @0x123)]
-    #[expected_failure(abort_code = 0x50003)]
+    #[expected_failure(abort_code = 0x50002)]
     public entry fun test_set_version_unauthorized_should_fail(
         aptos_framework: signer,
         random_account: signer,
