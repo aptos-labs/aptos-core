@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: 
+      - rosetta-stable
+  pull_request:
+
+env:
+  go_version: 1.17
+
+jobs:
+
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{steps.setup_work.outputs.matrix}}
+      workload: ${{steps.set_blks_per_chunk.outputs.blks_per_chunk}}
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
+    - id: setup_work 
+      env:
+          START_INDEX: 13000000
+          BLKS_PER_CHUNK: 10000
+      run: echo "::set-output name=matrix::$(.github/workflows/script/setup.sh)"
+    - id: set_blks_per_chunk
+      run: echo "::set-output name=blks_per_chunk::10000"
+
+  rosetta-validation:
+    runs-on: ubuntu-latest
+    needs: setup
+    strategy:
+      matrix: 
+        range: ${{fromJson(needs.setup.outputs.matrix)}}
+    steps:
+    - run: |
+          echo ${{ matrix.range }}
+    - uses: actions/checkout@v2
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
+
+    - run: ./docker/rosetta/docker-build-rosetta.sh
+    - run: mkdir -p data
+    - run: cp config/src/config/test_data/public_full_node.yaml data/fullnode.yaml 
+    - run: curl -o data/genesis.blob https://devnet.aptoslabs.com/genesis.blob 
+    - run: curl -o data/waypoint.txt https://devnet.aptoslabs.com/waypoint.txt 
+    - run: docker run -d -p 8082:8082 --rm -v $(pwd)/data:/opt/aptos aptos-core:rosetta-latest online-remote --rest-api-url https://rosetta.aptosdev.com
+    - name: run check:data
+      env:
+        START_INDEX: ${{ matrix.range }}
+        COUNT: ${{ needs.setup.outputs.workload }}
+      run: .github/workflows/script/cli.sh
