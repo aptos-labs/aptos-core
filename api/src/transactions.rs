@@ -352,33 +352,37 @@ impl TransactionsApi {
         transaction_data: TransactionData,
         ledger_info: &LedgerInfo,
     ) -> BasicResultWith404<Transaction> {
-        let resolver = self.context.move_resolver_poem()?;
-        let transaction = match transaction_data {
-            TransactionData::OnChain(txn) => {
-                let timestamp = self
-                    .context
-                    .get_block_timestamp(txn.version)
-                    .context("Failed to get block timestamp from DB")
-                    .map_err(BasicErrorWith404::internal)?;
-                resolver
-                    .as_converter(self.context.db.clone())
-                    .try_into_onchain_transaction(timestamp, txn)
-                    .context("Failed to convert on chain transaction to Transaction")
-                    .map_err(BasicErrorWith404::internal)?
-            }
-            TransactionData::Pending(txn) => resolver
-                .as_converter(self.context.db.clone())
-                .try_into_pending_transaction(*txn)
-                .context("Failed to convert on pending transaction to Transaction")
-                .map_err(BasicErrorWith404::internal)?,
-        };
+        match accept_type {
+            AcceptType::Json => {
+                let resolver = self.context.move_resolver_poem()?;
+                let transaction = match transaction_data {
+                    TransactionData::OnChain(txn) => {
+                        let timestamp = self
+                            .context
+                            .get_block_timestamp(txn.version)
+                            .context("Failed to get block timestamp from DB")
+                            .map_err(BasicErrorWith404::internal)?;
+                        resolver
+                            .as_converter(self.context.db.clone())
+                            .try_into_onchain_transaction(timestamp, txn)
+                            .context("Failed to convert on chain transaction to Transaction")
+                            .map_err(BasicErrorWith404::internal)?
+                    }
+                    TransactionData::Pending(txn) => resolver
+                        .as_converter(self.context.db.clone())
+                        .try_into_pending_transaction(*txn)
+                        .context("Failed to convert on pending transaction to Transaction")
+                        .map_err(BasicErrorWith404::internal)?,
+                };
 
-        BasicResponse::try_from_rust_value((
-            transaction,
-            ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+                BasicResponse::try_from_json((transaction, ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => BasicResponse::try_from_bcs((
+                transaction_data,
+                ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+        }
     }
 
     fn get_by_version(

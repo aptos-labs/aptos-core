@@ -34,7 +34,7 @@ use std::{
 // TODO: Investigate the use of discriminator_name, see https://github.com/poem-web/poem/issues/329.
 // TODO: See https://github.com/poem-web/poem/issues/347 re mapping stuff. UPDATE: Wait for 2.0.7 to be released.
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum TransactionData {
     OnChain(TransactionOnChainData),
     Pending(Box<SignedTransaction>),
