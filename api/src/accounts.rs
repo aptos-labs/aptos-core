@@ -30,6 +30,7 @@ use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
 use std::collections::BTreeMap;
 use std::convert::TryInto;
+use std::str::FromStr;
 use std::sync::Arc;
 
 pub struct AccountsApi {
@@ -203,6 +204,10 @@ impl Account {
                 let resources: BTreeMap<StructTag, Vec<u8>> = resources
                     .map(|(key, value)| (key, value.to_vec()))
                     .collect();
+                println!(
+                    "RESOURCES: {:?}",
+                    resources.get(&StructTag::from_str("0x1::account::Account").unwrap())
+                );
                 BasicResponse::try_from_bcs((
                     resources,
                     &self.latest_ledger_info,

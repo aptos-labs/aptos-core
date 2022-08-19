@@ -289,3 +289,45 @@ async fn test_bcs() {
         bcs_block_by_height.block_hash
     );
 }
+
+#[tokio::test]
+async fn alden_test() {
+    let mut swarm = new_local_swarm_with_aptos(1).await;
+    let mut info = swarm.aptos_public_info();
+
+    // Create accounts
+    let local_account = info.create_and_fund_user_account(10000000).await.unwrap();
+    let account = local_account.address();
+
+    let client = info.client();
+    // Check get account
+
+    // Check get resources
+    let resources = client
+        .get_account_resources_bcs(account)
+        .await
+        .unwrap()
+        .into_inner();
+    let bytes = resources
+        .get(&StructTag::from_str("0x1::account::Account").unwrap())
+        .unwrap();
+    let resources_hex = hex::encode(bytes);
+    let decoded = bcs::from_bytes::<AccountResource>(bytes);
+    println!(
+        "A Received from resources: {} decoded: {:?}",
+        resources_hex, decoded
+    );
+    let bytes = client
+        .get_account_resource_bcs(account, "0x1::account::Account")
+        .await
+        .unwrap()
+        .into_inner();
+    let resource_hex = hex::encode(&bytes);
+    let decoded = bcs::from_bytes::<AccountResource>(&bytes);
+    println!(
+        "B Received from resource: {} decoded: {:?}",
+        resource_hex, decoded
+    );
+
+    assert_eq!(resources_hex, resource_hex, "See alden they don't match!")
+}

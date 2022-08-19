@@ -603,6 +603,15 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_account_resource_bcs(
+        &self,
+        address: AccountAddress,
+        resource_type: &str,
+    ) -> Result<Response<bytes::Bytes>> {
+        let url = self.build_path(&format!("accounts/{}/resource/{}", address, resource_type))?;
+        self.get_bcs(url).await
+    }
+
     pub async fn get_account_resource_at_version(
         &self,
         address: AccountAddress,
