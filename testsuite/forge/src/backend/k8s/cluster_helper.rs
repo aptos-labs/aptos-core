@@ -831,14 +831,16 @@ fn check_namespace_for_cleanup(
     } else {
         // TODO(rustielin): come up with some sane values for namespaces
         let cleanup_time_since_epoch: u64 = data.get("cleanup").unwrap().parse().unwrap();
-        info!(
-            "Namespace {} has remaining {} seconds before cleanup",
-            namespace,
-            cleanup_time_since_epoch - time_since_the_epoch
-        );
 
         if cleanup_time_since_epoch <= time_since_the_epoch {
+            info!("Namespace {} will be cleaned up", namespace,);
             return true;
+        } else {
+            info!(
+                "Namespace {} has remaining {} seconds before cleanup",
+                namespace,
+                cleanup_time_since_epoch - time_since_the_epoch
+            );
         }
     }
     false

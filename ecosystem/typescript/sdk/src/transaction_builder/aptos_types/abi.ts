@@ -53,7 +53,7 @@ export abstract class ScriptABI {
       case 0:
         return TransactionScriptABI.load(deserializer);
       case 1:
-        return ScriptFunctionABI.load(deserializer);
+        return EntryFunctionABI.load(deserializer);
       default:
         throw new Error(`Unknown variant index for TransactionPayload: ${index}`);
     }
@@ -98,9 +98,9 @@ export class TransactionScriptABI extends ScriptABI {
   }
 }
 
-export class ScriptFunctionABI extends ScriptABI {
+export class EntryFunctionABI extends ScriptABI {
   /**
-   * Constructs a ScriptFunctionABI instance
+   * Constructs a EntryFunctionABI instance
    * @param name
    * @param module_name Fully qualified module id
    * @param doc
@@ -126,12 +126,12 @@ export class ScriptFunctionABI extends ScriptABI {
     serializeVector<ArgumentABI>(this.args, serializer);
   }
 
-  static load(deserializer: Deserializer): ScriptFunctionABI {
+  static load(deserializer: Deserializer): EntryFunctionABI {
     const name = deserializer.deserializeStr();
     const moduleName = ModuleId.deserialize(deserializer);
     const doc = deserializer.deserializeStr();
     const tyArgs = deserializeVector(deserializer, TypeArgumentABI);
     const args = deserializeVector(deserializer, ArgumentABI);
-    return new ScriptFunctionABI(name, moduleName, doc, tyArgs, args);
+    return new EntryFunctionABI(name, moduleName, doc, tyArgs, args);
   }
 }

@@ -97,7 +97,7 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
 
         let txn = self
             .txn_options
-            .submit_script_function(
+            .submit_entry_function(
                 AccountAddress::ONE,
                 "aptos_governance",
                 "create_proposal",
@@ -253,7 +253,7 @@ impl CliCommand<Transaction> for SubmitVote {
         )?;
 
         self.txn_options
-            .submit_script_function(
+            .submit_entry_function(
                 AccountAddress::ONE,
                 "aptos_governance",
                 "vote",

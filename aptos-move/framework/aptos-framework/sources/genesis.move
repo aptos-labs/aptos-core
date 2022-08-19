@@ -16,6 +16,7 @@ module aptos_framework::genesis {
     use aptos_framework::transaction_fee;
     use aptos_framework::staking_config;
     use aptos_framework::version;
+    use aptos_framework::state_storage;
 
     struct ValidatorConfiguration has copy, drop {
         owner_address: address,
@@ -86,6 +87,7 @@ module aptos_framework::genesis {
         chain_id::initialize(&aptos_framework_account, chain_id);
         reconfiguration::initialize(&aptos_framework_account);
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
+        state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
     }
 
@@ -144,7 +146,7 @@ module aptos_framework::genesis {
             aptos_coin::mint(aptos_framework, validator.owner_address, validator.stake_amount);
 
             // Initialize the stake pool and join the validator set.
-            stake::initialize_owner_only(
+            stake::initialize_stake_owner(
                 owner,
                 validator.stake_amount,
                 validator.operator_address,

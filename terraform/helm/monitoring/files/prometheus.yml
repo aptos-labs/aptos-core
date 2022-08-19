@@ -31,10 +31,13 @@ scrape_configs:
   # Keep only the default/kubernetes service endpoints for the https port. This
   # will add targets for each API server which Kubernetes adds an endpoint to
   # the default/kubernetes service.
-  relabel_configs:
+  metric_relabel_configs:
   - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
     action: keep
     regex: default;kubernetes;https
+  - source_labels: [__name__]
+    action: drop
+    regex: '(.+)_request_duration_seconds_bucket'
   - target_label: owner
     replacement: {{ .Values.validator.name }}
 {{ end }}
@@ -119,6 +122,11 @@ scrape_configs:
   - source_labels: [__meta_kubernetes_pod_name]
     action: replace
     target_label: kubernetes_pod_name
+
+  metric_relabel_configs:
+  - source_labels: [__name__]
+    regex: 'vector_files_(.+)_total'
+    action: drop
 
 - job_name: "aptos-procs"
 

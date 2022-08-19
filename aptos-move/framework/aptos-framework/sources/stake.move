@@ -367,7 +367,7 @@ module aptos_framework::stake {
     /// except it leaves the ValidatorConfig to be set by another entity.
     /// Note: this triggers setting the operator and owner, set it to the account's address
     /// to set later.
-    public entry fun initialize_owner_only(
+    public entry fun initialize_stake_owner(
         owner: &signer,
         initial_stake_amount: u64,
         operator: address,
@@ -834,19 +834,19 @@ module aptos_framework::stake {
 
     /// Update the validator performance (proposal statistics). This is only called by block::prologue().
     /// This function cannot abort.
-    public(friend) fun update_performance_statistics(proposer_index_optional: vector<u64>, failed_proposer_indices: vector<u64>) acquires ValidatorPerformance {
+    public(friend) fun update_performance_statistics(proposer_index: Option<u64>, failed_proposer_indices: vector<u64>) acquires ValidatorPerformance {
         // Validator set cannot change until the end of the epoch, so the validator index in arguments should
         // match with those of the validators in ValidatorPerformance resource.
         let validator_perf = borrow_global_mut<ValidatorPerformance>(@aptos_framework);
         let validator_len = vector::length(&validator_perf.validators);
 
-        // proposer_indices is a vector because it can be missing (for NilBlocks)
-        if (vector::length(&proposer_index_optional) >= 1) {
-            let proposer_index = *vector::borrow(&proposer_index_optional, 0);
+        // proposer_index is an option because it can be missing (for NilBlocks)
+        if (option::is_some(&proposer_index)) {
+            let cur_proposer_index = option::extract(&mut proposer_index);
             // Here, and in all other vector::borrow, skip any validator indices that are out of bounds,
             // this ensures that this function doesn't abort if there are out of bounds errors.
-            if (proposer_index < validator_len) {
-                let validator = vector::borrow_mut(&mut validator_perf.validators, proposer_index);
+            if (cur_proposer_index < validator_len) {
+                let validator = vector::borrow_mut(&mut validator_perf.validators, cur_proposer_index);
                 validator.successful_proposals = validator.successful_proposals + 1;
             };
         };
@@ -1967,8 +1967,7 @@ module aptos_framework::stake {
         let validator_1_index = borrow_global<ValidatorConfig>(validator_1_address).validator_index;
         let validator_2_index = borrow_global<ValidatorConfig>(validator_2_address).validator_index;
         vector::push_back(&mut failed_proposer_indices, validator_2_index);
-        let proposer_indices = vector::empty<u64>();
-        vector::push_back(&mut proposer_indices, validator_1_index);
+        let proposer_indices = option::some(validator_1_index);
         update_performance_statistics(proposer_indices, failed_proposer_indices);
         end_epoch();
 
@@ -1984,7 +1983,7 @@ module aptos_framework::stake {
         let validator_2_index = borrow_global<ValidatorConfig>(validator_2_address).validator_index;
         vector::push_back(&mut failed_proposer_indices, validator_1_index);
         vector::push_back(&mut failed_proposer_indices, validator_2_index);
-        update_performance_statistics(vector::empty<u64>(), failed_proposer_indices);
+        update_performance_statistics(option::none(), failed_proposer_indices);
         // Fast forward so validator 2's stake is fully unlocked.
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_epoch();
@@ -2016,15 +2015,14 @@ module aptos_framework::stake {
         let failed_proposer_indices = vector::empty<u64>();
         vector::push_back(&mut failed_proposer_indices, valid_validator_index);
         vector::push_back(&mut failed_proposer_indices, out_of_bounds_index);
-        update_performance_statistics(vector::empty<u64>(), failed_proposer_indices);
+        update_performance_statistics(option::none(), failed_proposer_indices);
         end_epoch();
 
         // Validator received no rewards due to failing to propose.
         assert_validator_state(validator_address, 100, 0, 0, 0, 0);
 
         // Invalid validator index in the proposer should not lead to abort.
-        let proposer_index_optional = vector::empty<u64>();
-        vector::push_back(&mut proposer_index_optional, out_of_bounds_index);
+        let proposer_index_optional = option::some(out_of_bounds_index);
         update_performance_statistics(proposer_index_optional, vector::empty<u64>());
         end_epoch();
     }
@@ -2130,7 +2128,7 @@ module aptos_framework::stake {
         aptos_framework::coin::register_for_test<AptosCoin>(account);
         let address = signer::address_of(account);
         coin::deposit<AptosCoin>(address, coin::mint<AptosCoin>(1000, mint_cap));
-        initialize_owner_only(account, 0, address, address);
+        initialize_stake_owner(account, 0, address, address);
         add_stake(account, 100);
         assert_validator_state(signer::address_of(account), 100, 0, 0, 0, 0);
     }
@@ -2245,7 +2243,7 @@ module aptos_framework::stake {
         locked_until_secs: u64,
     ) acquires OwnerCapability, StakePool, ValidatorSet {
         let account_address = signer::address_of(account);
-        initialize_owner_only(account, 0, account_address, account_address);
+        initialize_stake_owner(account, 0, account_address, account_address);
         let stake_pool = borrow_global_mut<StakePool>(account_address);
         coin::merge(&mut stake_pool.active, active);
         coin::merge(&mut stake_pool.pending_inactive, pending_inactive);

@@ -147,7 +147,7 @@ COPY --link --from=builder /aptos/dist/transaction-emitter /usr/local/bin/transa
 
 ### Get Aptos Move releases for genesis ceremony
 RUN mkdir -p /aptos-framework/move
-COPY --link --from=builder /aptos/aptos-move/framework/releases/head.mrb /aptos-framework/move/head.mrb
+COPY --link --from=builder /aptos/dist/head.mrb /aptos-framework/move/head.mrb
 
 # add build info
 ARG BUILD_DATE

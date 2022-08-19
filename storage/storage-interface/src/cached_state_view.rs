@@ -5,6 +5,7 @@ use crate::state_view::DbStateView;
 use crate::{proof_fetcher::ProofFetcher, DbReader};
 use anyhow::{format_err, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     proof::SparseMerkleProofExt,
@@ -185,6 +186,10 @@ impl StateView for CachedStateView {
     fn is_genesis(&self) -> bool {
         self.snapshot.is_none()
     }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        Ok(self.speculative_state.usage())
+    }
 }
 
 pub struct CachedDbStateView {
@@ -223,5 +228,9 @@ impl StateView for CachedDbStateView {
 
     fn is_genesis(&self) -> bool {
         self.db_state_view.is_genesis()
+    }
+
+    fn get_usage(&self) -> Result<StateStorageUsage> {
+        self.db_state_view.get_usage()
     }
 }

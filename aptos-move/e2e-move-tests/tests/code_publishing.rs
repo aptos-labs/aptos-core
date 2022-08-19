@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::account_address::AccountAddress;
-use e2e_move_tests::{assert_abort, assert_success, assert_vm_status, enable_golden, MoveHarness};
+use e2e_move_tests::{assert_abort, assert_success, assert_vm_status, MoveHarness};
 use framework::natives::code::PackageRegistry;
 use move_deps::move_core_types::parser::parse_struct_tag;
 use move_deps::move_core_types::vm_status::StatusCode;
@@ -26,7 +26,6 @@ fn code_publishing_basic() {
     // Parallel execution and code publishing don't work well yet, hence all test harness created
     // here have this off
     let mut h = MoveHarness::new_no_parallel();
-    enable_golden!(h);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
     assert_success!(h.publish_package(
         &acc,
@@ -64,7 +63,6 @@ fn code_publishing_basic() {
 #[test]
 fn code_publishing_upgrade_success_no_compat() {
     let mut h = MoveHarness::new_no_parallel();
-    enable_golden!(h);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version with no compat requirements
@@ -83,7 +81,6 @@ fn code_publishing_upgrade_success_no_compat() {
 #[test]
 fn code_publishing_upgrade_success_compat() {
     let mut h = MoveHarness::new_no_parallel();
-    enable_golden!(h);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version with compat requirements
@@ -102,7 +99,6 @@ fn code_publishing_upgrade_success_compat() {
 #[test]
 fn code_publishing_upgrade_fail_compat() {
     let mut h = MoveHarness::new_no_parallel();
-    enable_golden!(h);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version with compat requirements
@@ -122,7 +118,6 @@ fn code_publishing_upgrade_fail_compat() {
 #[test]
 fn code_publishing_upgrade_fail_immutable() {
     let mut h = MoveHarness::new_no_parallel();
-    enable_golden!(h);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version with immutable requirements
@@ -142,7 +137,6 @@ fn code_publishing_upgrade_fail_immutable() {
 #[test]
 fn code_publishing_upgrade_fail_overlapping_module() {
     let mut h = MoveHarness::new_no_parallel();
-    enable_golden!(h);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Install the initial version
@@ -169,7 +163,6 @@ fn code_publishing_upgrade_fail_overlapping_module() {
 #[test]
 fn code_publishing_upgrade_loader_cache_consistency() {
     let mut h = MoveHarness::new_no_parallel();
-    enable_golden!(h);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     // Create a sequence of package upgrades
@@ -200,7 +193,6 @@ fn code_publishing_upgrade_loader_cache_consistency() {
 #[test]
 fn code_publishing_framework_upgrade() {
     let mut h = MoveHarness::new_no_parallel();
-    enable_golden!(h);
     let acc = h.aptos_framework_account();
 
     // We should be able to upgrade move-stdlib, as our local package has only
@@ -214,7 +206,6 @@ fn code_publishing_framework_upgrade() {
 #[test]
 fn code_publishing_framework_upgrade_fail() {
     let mut h = MoveHarness::new_no_parallel();
-    enable_golden!(h);
     let acc = h.aptos_framework_account();
 
     // We should not be able to upgrade move-stdlib because we removed a function

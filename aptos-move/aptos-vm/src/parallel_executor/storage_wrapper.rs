@@ -4,6 +4,7 @@
 use crate::data_cache::{IntoMoveResolver, RemoteStorageOwned};
 use aptos_aggregator::delta_change_set::{deserialize, serialize};
 use aptos_parallel_executor::executor::{MVHashMapView, ReadResult};
+use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::{StateView, StateViewId};
 use aptos_types::{
     state_store::state_key::StateKey,
@@ -61,5 +62,9 @@ impl<'a, S: StateView> StateView for VersionedView<'a, S> {
 
     fn is_genesis(&self) -> bool {
         self.base_view.is_genesis()
+    }
+
+    fn get_usage(&self) -> anyhow::Result<StateStorageUsage> {
+        self.base_view.get_usage()
     }
 }

@@ -15,7 +15,7 @@ use move_deps::{
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
 
-/// Abort code when from_bytes fails (0x03 == INVALID_ARGUMENT)
+/// Abort code when from_bytes fails (0x01 == INVALID_ARGUMENT)
 const EFROM_BYTES: u64 = 0x01_0001;
 
 /// Used to pass gas parameters into native functions.
@@ -64,8 +64,8 @@ macro_rules! pop_vec_arg {
  **************************************************************************************************/
 #[derive(Debug, Clone)]
 pub struct FromBytesGasParameters {
-    pub base_cost: InternalGas,
-    pub unit_cost: InternalGasPerByte,
+    pub base: InternalGas,
+    pub per_byte: InternalGasPerByte,
 }
 
 fn native_from_bytes(
@@ -86,7 +86,7 @@ fn native_from_bytes(
     })?;
 
     let bytes = pop_arg!(args, Vec<u8>);
-    let cost = gas_params.base_cost + gas_params.unit_cost * NumBytes::new(bytes.len() as u64);
+    let cost = gas_params.base + gas_params.per_byte * NumBytes::new(bytes.len() as u64);
     let val = match Value::simple_deserialize(&bytes, &layout) {
         Some(val) => val,
         None => return Ok(NativeResult::err(cost, EFROM_BYTES)),
