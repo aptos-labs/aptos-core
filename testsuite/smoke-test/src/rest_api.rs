@@ -6,6 +6,7 @@ use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use aptos_types::account_config::{AccountResource, CORE_CODE_ADDRESS};
 use aptos_types::transaction::authenticator::AuthenticationKey;
+use aptos_types::transaction::Transaction;
 use forge::Swarm;
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -62,10 +63,11 @@ async fn test_bcs() {
     let mut swarm = new_local_swarm_with_aptos(1).await;
     let mut info = swarm.aptos_public_info();
 
-    // Create account
-    let local_account = info.create_and_fund_user_account(10000000).await.unwrap();
+    // Create accounts
+    let mut local_account = info.create_and_fund_user_account(10000000).await.unwrap();
     let account = local_account.address();
     let public_key = local_account.public_key();
+    let other_local_account = info.create_and_fund_user_account(10000000).await.unwrap();
 
     let client = info.client();
     // Check get account
@@ -106,4 +108,46 @@ async fn test_bcs() {
         &modules.get(module_id).unwrap().bytecode.0,
         bcs_modules.get(module_id).unwrap()
     );
+
+    // Transfer money to make a transaction
+    let pending_transaction = info
+        .transfer(&mut local_account, &other_local_account, 500)
+        .await
+        .unwrap();
+
+    let expected_txn = client
+        .wait_for_transaction(&pending_transaction)
+        .await
+        .unwrap();
+
+    // Check transactions on an account
+    let transactions = client
+        .get_account_transactions(account, Some(0), Some(2))
+        .await
+        .unwrap()
+        .into_inner();
+    let transactions_bcs = client
+        .get_account_transactions_bcs(account, Some(0), Some(2))
+        .await
+        .unwrap()
+        .into_inner();
+
+    // Should only have the transfer up there
+    assert!(transactions.contains(expected_txn.inner()));
+    assert_eq!(1, transactions.len());
+    assert_eq!(transactions.len(), transactions_bcs.len());
+
+    for (i, expected_transaction) in transactions.iter().enumerate() {
+        let bcs_txn = transactions_bcs.get(i).unwrap();
+        assert_eq!(bcs_txn.version, expected_transaction.version().unwrap());
+        let expected_hash =
+            aptos_crypto::HashValue::from(expected_transaction.transaction_info().unwrap().hash);
+
+        let bcs_hash = if let Transaction::UserTransaction(ref txn) = bcs_txn.transaction {
+            txn.clone().committed_hash()
+        } else {
+            panic!("BCS transaction is not a user transaction! {:?}", bcs_txn);
+        };
+        assert_eq!(expected_hash, bcs_hash);
+    }
 }
