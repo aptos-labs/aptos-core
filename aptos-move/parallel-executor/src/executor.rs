@@ -13,7 +13,7 @@ use aptos_types::write_set::DeserializeU128;
 use mvhashmap::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use num_cpus;
 use once_cell::sync::Lazy;
-use std::{collections::HashSet, hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
+use std::{hash::Hash, marker::PhantomData, sync::Arc, thread::spawn};
 
 static RAYON_EXEC_POOL: Lazy<rayon::ThreadPool> = Lazy::new(|| {
     rayon::ThreadPoolBuilder::new()
