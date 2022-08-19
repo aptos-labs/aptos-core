@@ -327,6 +327,16 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_transactions_bcs(
+        &self,
+        start: Option<u64>,
+        limit: Option<u16>,
+    ) -> Result<Response<Vec<TransactionOnChainData>>> {
+        let url = self.build_path("transactions")?;
+        let response = self.get_bcs_with_page(url, start, limit).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_transaction_by_hash(&self, hash: HashValue) -> Result<Response<Transaction>> {
         self.json(self.get_transaction_by_hash_inner(hash).await?)
             .await
@@ -405,7 +415,7 @@ impl Client {
         &self,
         address: AccountAddress,
         start: Option<u64>,
-        limit: Option<u64>,
+        limit: Option<u16>,
     ) -> Result<Response<Vec<TransactionOnChainData>>> {
         let url = self.build_path(&format!("accounts/{}/transactions", address))?;
         let response = self.get_bcs_with_page(url, start, limit).await?;
@@ -715,7 +725,7 @@ impl Client {
         &self,
         url: Url,
         start: Option<u64>,
-        limit: Option<u64>,
+        limit: Option<u16>,
     ) -> Result<Response<bytes::Bytes>> {
         let mut request = self.inner.get(url).header(ACCEPT, BCS_OUTPUT_NEW);
         if let Some(start) = start {
