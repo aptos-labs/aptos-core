@@ -5,14 +5,15 @@ use crate::accept_type::AcceptType;
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use crate::response::{
-    build_not_found, AptosErrorResponse, BadRequestError, BasicErrorWith404, BasicResponse,
-    BasicResponseStatus, BasicResultWith404, InternalError,
+    account_not_found, resource_not_found, struct_field_not_found, AptosErrorResponse,
+    BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
+    InternalError,
 };
 use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     AccountData, Address, AptosErrorCode, AsConverter, LedgerInfo, MoveModuleBytecode,
-    MoveModuleId, MoveResource, MoveStructTag, TransactionId, U64,
+    MoveModuleId, MoveResource, MoveStructTag, U64,
 };
 use aptos_types::access_path::AccessPath;
 use aptos_types::account_config::AccountResource;
@@ -122,23 +123,15 @@ impl Account {
         address: Address,
         requested_ledger_version: Option<U64>,
     ) -> Result<Self, BasicErrorWith404> {
-        let latest_ledger_info = context.get_latest_ledger_info()?;
-        let ledger_version: u64 = requested_ledger_version
-            .map(|v| v.0)
-            .unwrap_or_else(|| latest_ledger_info.version());
-
-        if ledger_version > latest_ledger_info.version() {
-            return Err(build_not_found(
-                "ledger",
-                TransactionId::Version(U64::from(ledger_version)),
-                latest_ledger_info.version(),
-            ));
-        }
+        let (latest_ledger_info, requested_ledger_version) = context
+            .get_latest_ledger_info_and_verify_lookup_version(
+                requested_ledger_version.map(|inner| inner.0),
+            )?;
 
         Ok(Self {
             context,
             address,
-            ledger_version,
+            ledger_version: requested_ledger_version,
             latest_ledger_info,
         })
     }
@@ -157,7 +150,13 @@ impl Account {
 
         let state_value = match state_value {
             Some(state_value) => state_value,
-            None => return Err(self.resource_not_found(&AccountResource::struct_tag())),
+            None => {
+                return Err(resource_not_found(
+                    self.address,
+                    &AccountResource::struct_tag(),
+                    self.ledger_version,
+                ))
+            }
         };
 
         let account_resource: AccountResource = bcs::from_bytes(&state_value)
@@ -253,48 +252,9 @@ impl Account {
             .get_account_state(self.address.into(), self.ledger_version)
             .map_err(BasicErrorWith404::internal)
             .map_err(|e| e.error_code(AptosErrorCode::ReadFromStorageError))?
-            .ok_or_else(|| self.account_not_found())?;
+            .ok_or_else(|| account_not_found(self.address, self.ledger_version))?;
 
         Ok(state)
-    }
-
-    // Helpers for building errors.
-
-    fn account_not_found(&self) -> BasicErrorWith404 {
-        build_not_found(
-            "account",
-            format!(
-                "address({}) and ledger version({})",
-                self.address, self.ledger_version
-            ),
-            self.latest_ledger_info.version(),
-        )
-    }
-
-    fn resource_not_found(&self, struct_tag: &StructTag) -> BasicErrorWith404 {
-        build_not_found(
-            "resource",
-            format!(
-                "address({}), struct tag({}) and ledger version({})",
-                self.address, struct_tag, self.ledger_version
-            ),
-            self.latest_ledger_info.version(),
-        )
-    }
-
-    fn field_not_found(
-        &self,
-        struct_tag: &StructTag,
-        field_name: &Identifier,
-    ) -> BasicErrorWith404 {
-        build_not_found(
-            "resource",
-            format!(
-                "address({}), struct tag({}), field name({}) and ledger version({})",
-                self.address, struct_tag, field_name, self.ledger_version
-            ),
-            self.latest_ledger_info.version(),
-        )
     }
 
     // Events specific stuff.
@@ -314,7 +274,9 @@ impl Account {
         let (_id, value) = resource
             .into_iter()
             .find(|(id, _)| id == &field_name)
-            .ok_or_else(|| self.field_not_found(&struct_tag, &field_name))?;
+            .ok_or_else(|| {
+                struct_field_not_found(self.address, &struct_tag, &field_name, self.ledger_version)
+            })?;
 
         // Serialization should not fail, otherwise it's internal bug
         let event_handle_bytes = bcs::to_bytes(&value)
@@ -338,7 +300,7 @@ impl Account {
         let (typ, data) = account_state
             .get_resources()
             .find(|(tag, _data)| tag == struct_tag)
-            .ok_or_else(|| self.resource_not_found(struct_tag))?;
+            .ok_or_else(|| resource_not_found(self.address, struct_tag, self.ledger_version))?;
         let move_resolver = self.context.move_resolver_poem()?;
         move_resolver
             .as_converter(self.context.db.clone())

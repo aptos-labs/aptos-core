@@ -82,4 +82,11 @@ pub enum AptosErrorCode {
     HealthCheckFailed = 6,
 
     InternalError = 7,
+
+    AccountNotFound = 8,
+    ResourceNotFound = 9,
+    ModuleNotFound = 10,
+    StructFieldNotFound = 11,
+    VersionNotFound = 12,
+    VersionPruned = 13,
 }
