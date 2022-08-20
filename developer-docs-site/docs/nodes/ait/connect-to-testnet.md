@@ -142,7 +142,7 @@ All the selected participant will get Aptos coin airdrop into their owner accoun
     ```
     aptos node update-consensus-key  \
       --pool-address <owner-address> \
-      --validator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
+      --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
       --profile ait3-operator
     ```
 
