@@ -60,8 +60,20 @@ module aptos_framework::version {
         assert!(borrow_global<Version>(@aptos_framework).major == 2, 1);
     }
 
+    #[test(aptos_framework = @aptos_framework, core_resources = @core_resources)]
+    public entry fun test_set_version_core_resources(
+        aptos_framework: signer,
+        core_resources: signer,
+    ) acquires Version {
+        initialize(&aptos_framework, 1);
+        assert!(borrow_global<Version>(@aptos_framework).major == 1, 0);
+        initialize_for_test(&core_resources);
+        set_version(&core_resources, 2);
+        assert!(borrow_global<Version>(@aptos_framework).major == 2, 1);
+    }
+
     #[test(aptos_framework = @aptos_framework, random_account = @0x123)]
-    #[expected_failure(abort_code = 0x50003)]
+    #[expected_failure(abort_code = 327682)]
     public entry fun test_set_version_unauthorized_should_fail(
         aptos_framework: signer,
         random_account: signer,
