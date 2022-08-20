@@ -93,4 +93,5 @@ pub enum AptosErrorCode {
     BlockNotFound = 15,
     TableItemNotFound = 16,
     BlockPruned = 17,
+    InvalidInput = 18,
 }
