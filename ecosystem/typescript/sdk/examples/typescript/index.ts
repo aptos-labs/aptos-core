@@ -34,7 +34,7 @@ console.log("Faucet URL", FAUCET_URL);
     type: "entry_function_payload",
     function: "0x1::coin::transfer",
     type_arguments: ["0x1::aptos_coin::AptosCoin"],
-    arguments: [account2.address().hex(), "717"],
+    arguments: [account2.address().hex(), 717],
   };
   const txnRequest = await client.generateTransaction(account1.address(), payload);
   const signedTxn = await client.signTransaction(account1, txnRequest);
