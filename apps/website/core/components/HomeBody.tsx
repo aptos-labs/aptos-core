@@ -19,9 +19,9 @@ const HomeBody = () => (
       </Text>
       <Center>
         <HStack>
-          <ChakraLinkBare href="/docs">
-            <Button as="a" size="md" fontWeight={400} colorScheme="blue" borderRadius="full">
-              Learn more
+          <ChakraLinkBare href="https://chrome.google.com/webstore/detail/petra/ejjladinnckdgjemekebdpeokbikhfci">
+            <Button as="a" size="lg" fontWeight={600} colorScheme="blue" borderRadius="full">
+              Download
             </Button>
           </ChakraLinkBare>
         </HStack>
