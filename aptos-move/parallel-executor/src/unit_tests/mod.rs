@@ -7,7 +7,7 @@ use crate::{
     scheduler::{Scheduler, SchedulerTask, TaskGuard},
     task::ModulePath,
 };
-use aptos_aggregator::delta_change_set::{DeltaOp, DeltaUpdate};
+use aptos_aggregator::delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate};
 use aptos_types::write_set::TransactionWrite;
 use rand::random;
 use std::{
@@ -46,13 +46,7 @@ fn delta_counters() {
         transactions.push(Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
             reads: vec![vec![key.clone()]],
-            writes_and_deltas: vec![(
-                vec![],
-                vec![(
-                    key.clone(),
-                    DeltaOp::new(DeltaUpdate::Plus(5), u128::MAX, 0, 0),
-                )],
-            )],
+            writes_and_deltas: vec![(vec![], vec![(key.clone(), delta_add(5, u128::MAX))])],
         });
     }
 
@@ -66,13 +60,7 @@ fn delta_counters() {
         transactions.push(Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
             reads: vec![vec![key.clone()]],
-            writes_and_deltas: vec![(
-                vec![],
-                vec![(
-                    key.clone(),
-                    DeltaOp::new(DeltaUpdate::Minus(2), u128::MAX, 0, 0),
-                )],
-            )],
+            writes_and_deltas: vec![(vec![], vec![(key.clone(), delta_sub(2, u128::MAX))])],
         });
     }
 

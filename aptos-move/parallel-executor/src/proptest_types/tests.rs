@@ -145,6 +145,37 @@ fn dynamic_read_writes() {
 }
 
 #[test]
+fn deltas_writes_mixed() {
+    let mut runner = TestRunner::default();
+
+    let universe = vec(any::<[u8; 32]>(), 50)
+        .new_tree(&mut runner)
+        .expect("creating a new value should succeed")
+        .current();
+    let transaction_gen = vec(
+        any_with::<TransactionGen<[u8; 32]>>(TransactionGenParams::new_dynamic()),
+        1000,
+    )
+    .new_tree(&mut runner)
+    .expect("creating a new value should succeed")
+    .current();
+    let transactions: Vec<_> = transaction_gen
+        .into_iter()
+        .map(|txn_gen| txn_gen.materialize_with_deltas(&universe, 15))
+        .collect();
+
+    let output = ParallelTransactionExecutor::<
+        Transaction<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+        Task<KeyType<[u8; 32]>, ValueType<[u8; 32]>>,
+    >::new(num_cpus::get())
+    .execute_transactions_parallel((), transactions.clone());
+
+    // let baseline = ExpectedOutput::generate_baseline(&transactions);
+
+    // assert!(baseline.check_output(&output));
+}
+
+#[test]
 fn dynamic_read_writes_contended() {
     let mut runner = TestRunner::default();
 

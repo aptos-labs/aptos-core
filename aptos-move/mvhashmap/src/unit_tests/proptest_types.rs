@@ -3,7 +3,7 @@
 
 use super::{MVHashMap, MVHashMapError, MVHashMapOutput};
 use aptos_aggregator::{
-    delta_change_set::{DeltaOp, DeltaUpdate},
+    delta_change_set::{delta_add, delta_sub, DeltaOp},
     transaction::AggregatorValue,
 };
 use aptos_types::write_set::TransactionWrite;
@@ -116,14 +116,6 @@ where
             }
         }
     }
-}
-
-pub(crate) fn delta_sub(v: u128, limit: u128) -> DeltaOp {
-    DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v)
-}
-
-pub(crate) fn delta_add(v: u128, limit: u128) -> DeltaOp {
-    DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0)
 }
 
 fn operator_strategy<V: Arbitrary + Clone>() -> impl Strategy<Value = Operator<V>> {

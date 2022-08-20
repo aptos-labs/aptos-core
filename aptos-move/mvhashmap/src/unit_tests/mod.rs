@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use aptos_aggregator::{delta_change_set::DeltaUpdate, transaction::AggregatorValue};
+use aptos_aggregator::{
+    delta_change_set::{delta_add, delta_sub, DeltaOp, DeltaUpdate},
+    transaction::AggregatorValue,
+};
 
 mod proptest_types;
 
@@ -40,12 +43,12 @@ fn u128_for(txn_idx: usize, incarnation: usize) -> u128 {
 
 // Generate determinitc additions.
 fn add_for(txn_idx: usize, limit: u128) -> DeltaOp {
-    proptest_types::delta_add(txn_idx as u128, limit)
+    delta_add(txn_idx as u128, limit)
 }
 
 // Generate determinitc subtractions.
 fn sub_for(txn_idx: usize, base: u128) -> DeltaOp {
-    proptest_types::delta_sub(base + (txn_idx as u128), u128::MAX)
+    delta_sub(base + (txn_idx as u128), u128::MAX)
 }
 
 #[test]

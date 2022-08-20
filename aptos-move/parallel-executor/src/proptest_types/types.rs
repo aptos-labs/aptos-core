@@ -9,7 +9,10 @@ use crate::{
         TransactionOutput,
     },
 };
-use aptos_aggregator::{delta_change_set::DeltaOp, transaction::AggregatorValue};
+use aptos_aggregator::{
+    delta_change_set::{delta_add, delta_sub, DeltaOp},
+    transaction::AggregatorValue,
+};
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, write_set::TransactionWrite,
 };
@@ -157,12 +160,12 @@ impl Default for TransactionGenParams {
     }
 }
 
-impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq> TransactionGen<V> {
+impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> TransactionGen<V> {
     fn writes_and_deltas_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
         universe: &[K],
         gen: Vec<Vec<(Index, V)>>,
         module_write_fn: &dyn Fn(usize) -> bool,
-        delta_fn: &dyn Fn(usize) -> Option<DeltaOp>,
+        delta_fn: &dyn Fn(usize, &V) -> Option<DeltaOp>,
     ) -> Vec<(Vec<(KeyType<K>, ValueType<V>)>, Vec<(KeyType<K>, DeltaOp)>)> {
         let mut ret = vec![];
         for write_gen in gen.into_iter() {
@@ -172,7 +175,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq> TransactionGen<V> {
             for (idx, value) in write_gen.into_iter() {
                 let i = idx.index(universe.len());
                 let key = universe[i].clone();
-                match delta_fn(i) {
+                match delta_fn(i, &value) {
                     Some(delta) => incarnation_deltas.push((KeyType(key, false), delta)),
                     None => {
                         if !keys_modified.contains(&key) {
@@ -214,7 +217,41 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq> TransactionGen<V> {
     ) -> Transaction<KeyType<K>, ValueType<V>> {
         let is_module_write = |_| -> bool { module_access.0 };
         let is_module_read = |_| -> bool { module_access.1 };
-        let is_delta = |_| -> Option<DeltaOp> { None };
+        let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
+
+        Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            writes_and_deltas: Self::writes_and_deltas_from_gen(
+                universe,
+                self.keys_modified,
+                &is_module_write,
+                &is_delta,
+            ),
+            reads: Self::reads_from_gen(universe, self.keys_read, &is_module_read),
+        }
+    }
+
+    pub fn materialize_with_deltas<K: Clone + Hash + Debug + Eq + Ord>(
+        self,
+        universe: &[K],
+        delta_threshold: usize,
+    ) -> Transaction<KeyType<K>, ValueType<V>> {
+        let is_module_write = |_| -> bool { false };
+        let is_module_read = |_| -> bool { false };
+        let is_delta = |i, v: &V| -> Option<DeltaOp> {
+            if i >= delta_threshold {
+                let val = AggregatorValue::from_write(&ValueType(v.clone())).into();
+                if val % 10 == 0 {
+                    None
+                } else if val % 10 < 5 {
+                    Some(delta_sub(val / 100000, u128::MAX))
+                } else {
+                    Some(delta_add(val / 1000, u128::MAX))
+                }
+            } else {
+                None
+            }
+        };
 
         Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
@@ -244,7 +281,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq> TransactionGen<V> {
 
         let is_module_write = |i| -> bool { i >= write_threshold };
         let is_module_read = |i| -> bool { i >= read_threshold && i < write_threshold };
-        let is_delta = |_| -> Option<DeltaOp> { None };
+        let is_delta = |_, _: &V| -> Option<DeltaOp> { None };
 
         Transaction::Write {
             incarnation: Arc::new(AtomicUsize::new(0)),
