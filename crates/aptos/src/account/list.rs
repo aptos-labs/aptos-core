@@ -7,7 +7,6 @@ use crate::common::types::{
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
 use clap::{ArgEnum, Parser};
-use itertools::Itertools;
 use serde_json::json;
 use std::{
     fmt::{Display, Formatter},
