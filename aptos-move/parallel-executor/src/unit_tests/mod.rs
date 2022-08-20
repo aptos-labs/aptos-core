@@ -7,6 +7,7 @@ use crate::{
     scheduler::{Scheduler, SchedulerTask, TaskGuard},
     task::ModulePath,
 };
+use aptos_aggregator::delta_change_set::{DeltaOp, DeltaUpdate};
 use aptos_types::write_set::TransactionWrite;
 use rand::random;
 use std::{
@@ -28,18 +29,109 @@ where
     assert!(baseline.check_output(&output))
 }
 
-const TOTAL_KEY_NUM: u64 = 50;
-const WRITES_PER_KEY: u64 = 100;
-
 fn random_value() -> ValueType<Vec<u8>> {
     ValueType((0..4).map(|_| random::<u8>()).collect())
 }
 
 #[test]
+fn delta_counters() {
+    let key = KeyType(random::<[u8; 32]>(), false);
+    let mut transactions = vec![Transaction::Write {
+        incarnation: Arc::new(AtomicUsize::new(0)),
+        reads: vec![vec![]],
+        writes_and_deltas: vec![(vec![(key.clone(), random_value())], vec![])],
+    }];
+
+    for _ in 0..50 {
+        transactions.push(Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            reads: vec![vec![key.clone()]],
+            writes_and_deltas: vec![(
+                vec![],
+                vec![(
+                    key.clone(),
+                    DeltaOp::new(DeltaUpdate::Plus(5), u128::MAX, 0, 0),
+                )],
+            )],
+        });
+    }
+
+    transactions.push(Transaction::Write {
+        incarnation: Arc::new(AtomicUsize::new(0)),
+        reads: vec![vec![]],
+        writes_and_deltas: vec![(vec![(key.clone(), random_value())], vec![])],
+    });
+
+    for _ in 0..50 {
+        transactions.push(Transaction::Write {
+            incarnation: Arc::new(AtomicUsize::new(0)),
+            reads: vec![vec![key.clone()]],
+            writes_and_deltas: vec![(
+                vec![],
+                vec![(
+                    key.clone(),
+                    DeltaOp::new(DeltaUpdate::Minus(2), u128::MAX, 0, 0),
+                )],
+            )],
+        });
+    }
+
+    run_and_assert(transactions)
+}
+
+#[test]
+fn delta_chains() {
+    let mut transactions = vec![];
+    // Generate a series of transactions add and subtract from an aggregator.
+
+    let keys: Vec<KeyType<[u8; 32]>> = (0..10)
+        .map(|_| KeyType(random::<[u8; 32]>(), false))
+        .collect();
+
+    for i in 0..500 {
+        transactions.push(
+            Transaction::Write::<KeyType<[u8; 32]>, ValueType<[u8; 32]>> {
+                incarnation: Arc::new(AtomicUsize::new(0)),
+                reads: vec![keys.clone()],
+                writes_and_deltas: vec![(
+                    vec![],
+                    keys.iter()
+                        .enumerate()
+                        .filter_map(|(j, k)| match (i + j) % 2 == 0 {
+                            true => Some((
+                                k.clone(),
+                                // Deterministic pattern for adds/subtracts.
+                                DeltaOp::new(
+                                    if (i % 2 == 0) == (j < 5) {
+                                        DeltaUpdate::Plus(10)
+                                    } else {
+                                        DeltaUpdate::Minus(1)
+                                    },
+                                    // below params irrelevant for this test.
+                                    u128::MAX,
+                                    0,
+                                    0,
+                                ),
+                            )),
+                            false => None,
+                        })
+                        .collect(),
+                )],
+            },
+        )
+    }
+
+    run_and_assert(transactions)
+}
+
+const TOTAL_KEY_NUM: u64 = 50;
+const WRITES_PER_KEY: u64 = 100;
+
+#[test]
 fn cycle_transactions() {
     let mut transactions = vec![];
-    // For every key in `TOTAL_KEY_NUM`, generate a series transaction that will assign a value to
-    // this key.
+    // For every key in `TOTAL_KEY_NUM`, generate a series of transactions that will assign a
+    // value to this key.
     for _ in 0..TOTAL_KEY_NUM {
         let key = random::<[u8; 32]>();
         for _ in 0..WRITES_PER_KEY {
