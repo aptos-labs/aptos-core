@@ -11,10 +11,10 @@ use crate::{
     },
     ApiTags, Context,
 };
-use anyhow::{anyhow, Context as AnyhowContext};
+use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    Address, AsConverter, IdentifierWrapper, LedgerInfo, MoveModuleBytecode, MoveResource,
-    MoveStructTag, MoveValue, TableItemRequest, U64,
+    Address, AptosErrorCode, AsConverter, IdentifierWrapper, LedgerInfo, MoveModuleBytecode,
+    MoveResource, MoveStructTag, MoveValue, TableItemRequest, U64,
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -138,7 +138,7 @@ impl StateApi {
         let state_view = self
             .context
             .state_view_at_version(requested_ledger_version)
-            .map_err(E::internal)?;
+            .map_err(|err| E::internal_with_code(err, AptosErrorCode::ReadFromStorageError))?;
 
         Ok((latest_ledger_info, requested_ledger_version, state_view))
     }
@@ -153,7 +153,9 @@ impl StateApi {
         let resource_type: StructTag = resource_type
             .try_into()
             .context("Failed to parse given resource type")
-            .map_err(BasicErrorWith404::bad_request)?;
+            .map_err(|err| {
+                BasicErrorWith404::bad_request_with_code(err, AptosErrorCode::InvalidInput)
+            })?;
         let resource_key = ResourceKey::new(address.into(), resource_type.clone());
         let access_path = AccessPath::resource_access_path(resource_key);
         let state_key = StateKey::AccessPath(access_path);
@@ -161,7 +163,9 @@ impl StateApi {
         let bytes = state_view
             .get_state_value(&state_key)
             .context(format!("Failed to query DB to check for {:?}", state_key))
-            .map_err(BasicErrorWith404::internal)?
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(err, AptosErrorCode::ReadFromStorageError)
+            })?
             .ok_or_else(|| resource_not_found(address, &resource_type, ledger_version))?;
 
         match accept_type {
@@ -171,7 +175,12 @@ impl StateApi {
                     .as_converter(self.context.db.clone())
                     .try_into_resource(&resource_type, &bytes)
                     .context("Failed to deserialize resource data retrieved from DB")
-                    .map_err(BasicErrorWith404::internal)?;
+                    .map_err(|err| {
+                        BasicErrorWith404::internal_with_code(
+                            err,
+                            AptosErrorCode::InvalidBcsInStorageError,
+                        )
+                    })?;
 
                 BasicResponse::try_from_json((resource, &ledger_info, BasicResponseStatus::Ok))
             }
@@ -196,7 +205,9 @@ impl StateApi {
         let bytes = state_view
             .get_state_value(&state_key)
             .context(format!("Failed to query DB to check for {:?}", state_key))
-            .map_err(BasicErrorWith404::internal)?
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(err, AptosErrorCode::ReadFromStorageError)
+            })?
             .ok_or_else(|| module_not_found(address, module_id.name(), ledger_version))?;
 
         match accept_type {
@@ -204,7 +215,12 @@ impl StateApi {
                 let module = MoveModuleBytecode::new(bytes)
                     .try_parse_abi()
                     .context("Failed to parse move module ABI from bytes retrieved from storage")
-                    .map_err(BasicErrorWith404::internal)?;
+                    .map_err(|err| {
+                        BasicErrorWith404::internal_with_code(
+                            err,
+                            AptosErrorCode::InvalidBcsInStorageError,
+                        )
+                    })?;
 
                 BasicResponse::try_from_json((module, &ledger_info, BasicResponseStatus::Ok))
             }
@@ -221,21 +237,27 @@ impl StateApi {
         table_item_request: TableItemRequest,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveValue> {
-        // TODO: Determine what is needed to deserialize the storage type
+        // FIXME: Determine what is needed to deserialize the storage type
         if accept_type == &AcceptType::Bcs {
-            return Err(anyhow!("BCS is not supported for get table item"))
-                .map_err(BasicErrorWith404::bad_request);
+            return Err(BasicErrorWith404::bad_request_with_code(
+                "BCS is not supported for get table item",
+                AptosErrorCode::InvalidInput,
+            ));
         }
         let key_type = table_item_request
             .key_type
             .try_into()
             .context("Failed to parse key_type")
-            .map_err(BasicErrorWith404::bad_request)?;
+            .map_err(|err| {
+                BasicErrorWith404::bad_request_with_code(err, AptosErrorCode::InvalidInput)
+            })?;
         let value_type = table_item_request
             .value_type
             .try_into()
             .context("Failed to parse value_type")
-            .map_err(BasicErrorWith404::bad_request)?;
+            .map_err(|err| {
+                BasicErrorWith404::bad_request_with_code(err, AptosErrorCode::InvalidInput)
+            })?;
         let key = table_item_request.key;
 
         let (ledger_info, ledger_version, state_view) =
@@ -246,11 +268,15 @@ impl StateApi {
 
         let vm_key = converter
             .try_into_vm_value(&key_type, key.clone())
-            .map_err(BasicErrorWith404::bad_request)?;
-        let raw_key = vm_key
-            .undecorate()
-            .simple_serialize()
-            .ok_or_else(|| BasicErrorWith404::internal_str("Failed to serialize table key"))?;
+            .map_err(|err| {
+                BasicErrorWith404::bad_request_with_code(err, AptosErrorCode::InvalidInput)
+            })?;
+        let raw_key = vm_key.undecorate().simple_serialize().ok_or_else(|| {
+            BasicErrorWith404::bad_request_with_code(
+                "Failed to serialize table key",
+                AptosErrorCode::InvalidInput,
+            )
+        })?;
 
         let state_key = StateKey::table_item(TableHandle(table_handle.into()), raw_key);
         let bytes = state_view
@@ -259,13 +285,17 @@ impl StateApi {
                 "Failed when trying to retrieve table item from the DB with key: {}",
                 key
             ))
-            .map_err(BasicErrorWith404::internal)?
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(err, AptosErrorCode::ReadFromStorageError)
+            })?
             .ok_or_else(|| table_item_not_found(table_handle, &key, ledger_version))?;
 
         let move_value = converter
             .try_into_move_value(&value_type, &bytes)
             .context("Failed to deserialize table item retrieved from DB")
-            .map_err(BasicErrorWith404::internal)?;
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(err, AptosErrorCode::InvalidBcsInStorageError)
+            })?;
 
         BasicResponse::try_from_rust_value((
             move_value,
