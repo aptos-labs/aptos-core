@@ -8,6 +8,38 @@ sidebar_position: 14
 
 Do this only if you received the confirmation email from Aptos team for your eligibility. Nodes not selected will not have enough tokens to join the testnet. You can still run public fullnode in this case if you want.
 
+## Initializing staking pool
+
+In AIT3 we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool). Alternatively, you can also use CLI to intialize staking pool:
+
+- Initialize CLI with your wallet **private key**, you can get in from Settings -> Credentials
+
+  ```
+  aptos init --profile ait3-owner \
+    --rest-url http://ait3.aptosdev.com
+  ```
+
+- Initialize staking pool using CLI
+
+  ```
+  aptos stake initialize-stake-owner \
+    --initial-stake-amount 100000000000000 \
+    --operator-address <operator-address> \
+    --voter-address <voter-address> \
+    --profile ait3-owner
+  ```
+
+- Don't forget to transfer some coin to your operator account to pay gas, you can do that with Petra, or CLI
+
+  ```
+  aptos account create --account <operator-account> --profile ait3-owner
+  
+  aptos account transfer \
+  --account <operator-account> \
+  --amount 5000 \
+  --profile ait3-owner
+  ```
+
 ## Bootstrapping validator node
 
 Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode. AIT3 network Chain ID is 43.
