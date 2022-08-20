@@ -678,7 +678,159 @@
           "val": "1"
         },
         {
-          "key": "aptos_framework.bls12381.base",
+          "key": "aptos_framework.bit_vector.little_endian_bitvector_from_byte_vector.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bit_vector.little_endian_bitvector_from_byte_vector.per_byte",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bit_vector.big_endian_bitvector_from_byte_vector.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.bit_vector.big_endian_bitvector_from_byte_vector.per_byte",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.point_is_canonical.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.point_is_canonical.is_canonical",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.point_identity.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.point_decompress.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.point_decompress.decompress",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.point_compress.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.point_mul.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.point_equals.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.point_neg.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.point_add.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.point_add.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_is_canonical.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_is_canonical.per_scalar_deserialize",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_invert.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_invert.per_scalar_invert",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_from_sha512.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_from_sha512.per_hash_sha512",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_from_sha512.per_byte_sha512",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_mul.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_mul.mul",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_add.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_add.add",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_sub.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_sub.sub",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_neg.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_neg.neg",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_from_u64.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_from_u64.from_u64",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_from_u128.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_from_u128.from_u128",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_from_256_bits.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_from_256_bits.from_256_bits",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_from_512_bits.base",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.cryptography.ristretto255.scalar_from_512_bits.from_512_bits",
+          "val": "1"
+        },
+        {
+          "key": "aptos_framework.signature.bls12381_aggregate_pop_verified_pubkeys.base",
           "val": "1"
         },
         {
