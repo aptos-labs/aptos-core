@@ -46,8 +46,8 @@ pub enum ApiError {
     UnsupportedSignatureCount(Option<usize>),
     #[error("Node is offline, and this API is not supported in offline mode")]
     NodeIsOffline,
-    #[error("Block is not yet complete, request will need to be retried")]
-    BlockIncomplete,
+    #[error("Block hash lookup failed for block")]
+    BlockNotFound,
     #[error("Transaction cannot be parsed")]
     TransactionParseError(Option<&'static str>),
 }
@@ -63,7 +63,7 @@ impl ApiError {
             InvalidTransferOperations(None),
             InvalidSignatureType,
             NodeIsOffline,
-            BlockIncomplete,
+            BlockNotFound,
             BlockParameterConflict,
             NetworkIdentifierMismatch,
             ChainIdMismatch,
@@ -87,7 +87,7 @@ impl ApiError {
             InvalidTransferOperations(_) => 4,
             InvalidSignatureType => 5,
             NodeIsOffline => 6,
-            BlockIncomplete => 7,
+            BlockNotFound => 7,
             BlockParameterConflict => 8,
             NetworkIdentifierMismatch => 9,
             ChainIdMismatch => 10,
@@ -107,7 +107,7 @@ impl ApiError {
         matches!(
             self,
             ApiError::AccountNotFound(_)
-                | ApiError::BlockIncomplete
+                | ApiError::BlockNotFound
                 | ApiError::RetriableAptosError(_)
         )
     }
@@ -116,7 +116,7 @@ impl ApiError {
         use ApiError::*;
         match self {
             AccountNotFound(_) => StatusCode::NOT_FOUND,
-            BlockIncomplete => StatusCode::PRECONDITION_FAILED,
+            BlockNotFound => StatusCode::NOT_FOUND,
             NodeIsOffline => StatusCode::METHOD_NOT_ALLOWED,
             // TODO: Improve the error codes for these
             RetriableAptosError(_) => StatusCode::SERVICE_UNAVAILABLE,
@@ -128,8 +128,10 @@ impl ApiError {
         match self {
             ApiError::AptosError(_) => "Aptos API error",
             ApiError::RetriableAptosError(_) => "Retriable API error",
-            ApiError::BlockParameterConflict => "Block input parameters conflict",
-            ApiError::TransactionIsPending => "Transaction is still pending",
+            ApiError::BlockParameterConflict => {
+                "Block parameter conflict. Must provide either hash or index but not both"
+            }
+            ApiError::TransactionIsPending => "Transaction is pending",
             ApiError::NetworkIdentifierMismatch => "Network identifier doesn't match",
             ApiError::ChainIdMismatch => "Chain Id doesn't match",
             ApiError::DeserializationFailed(_) => "Deserialization failed",
@@ -143,7 +145,7 @@ impl ApiError {
             ApiError::UnsupportedCurrency(_) => "Currency is unsupported",
             ApiError::UnsupportedSignatureCount(_) => "Number of signatures is not supported",
             ApiError::NodeIsOffline => "This API is unavailable for the node because he's offline",
-            ApiError::BlockIncomplete => "Block is missing events",
+            ApiError::BlockNotFound => "Block is missing events",
             ApiError::TransactionParseError(_) => "Transaction failed to parse",
         }
         .to_string()
