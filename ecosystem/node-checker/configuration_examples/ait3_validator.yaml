@@ -14,7 +14,6 @@ evaluators:
   - api_latency
   - consensus_round
   - consensus_timeouts
-  - state_sync_version
 evaluator_args:
   build_version_args: {}
   consensus_proposals_args: {}
