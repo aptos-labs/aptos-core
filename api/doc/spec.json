@@ -3316,10 +3316,10 @@
           "epoch",
           "ledger_version",
           "oldest_ledger_version",
-          "block_height",
-          "oldest_block_height",
           "ledger_timestamp",
-          "node_role"
+          "node_role",
+          "oldest_block_height",
+          "block_height"
         ],
         "properties": {
           "chain_id": {
@@ -3335,17 +3335,17 @@
           "oldest_ledger_version": {
             "$ref": "#/components/schemas/U64"
           },
-          "block_height": {
-            "$ref": "#/components/schemas/U64"
-          },
-          "oldest_block_height": {
-            "$ref": "#/components/schemas/U64"
-          },
           "ledger_timestamp": {
             "$ref": "#/components/schemas/U64"
           },
           "node_role": {
             "$ref": "#/components/schemas/RoleType"
+          },
+          "oldest_block_height": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "block_height": {
+            "$ref": "#/components/schemas/U64"
           }
         }
       },
