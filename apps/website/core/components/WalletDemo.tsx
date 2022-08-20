@@ -91,6 +91,8 @@ export default function WalletDemo() {
 
   const isFundsSufficient = ((sendAmount + 2) <= coinBalance);
 
+  const sendAmountIsPositive = (sendAmount >= 0);
+
   const faucetOnClick = () => {
     setFaucetIsLoading(true);
     setTimeout(() => {
@@ -100,7 +102,7 @@ export default function WalletDemo() {
   };
 
   const sendOnClick = () => {
-    if (!isFundsSufficient) {
+    if (!isFundsSufficient || !sendAmountIsPositive) {
       return;
     }
     setSendIsLoading(true);
@@ -284,7 +286,8 @@ export default function WalletDemo() {
                                   color={secondaryErrorMessageColor[colorMode]}
                                   wordBreak="break-word"
                                 >
-                                  {(isFundsSufficient) ? '' : 'Insufficient funds'}
+                                  {(isFundsSufficient) ? '' : 'Insufficient funds\n'}
+                                  {(sendAmountIsPositive) ? '' : 'Amount must be positive'}
                                 </Text>
                               </Flex>
                             </VStack>
