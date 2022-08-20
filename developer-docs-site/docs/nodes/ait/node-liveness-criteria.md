@@ -5,7 +5,7 @@ slug: "node-liveness-criteria"
 
 # Node Liveness Criteria
 
-When you participate in the [Aptos Incentivized Testnet](https://medium.com/aptoslabs/aptos-incentivized-testnet-update-abcfcd94d54c), your validator node must pass liveness checks within 24 hours of being selected to participate in the testnet, and at a regular cadence onwards. This is required to ensure that your validator node contributes to the health of the overall network and that you become eligible for incentivized testnet rewards. 
+When you participate in the [Aptos Incentivized Testnet](https://aptoslabs.medium.com/welcome-to-aptos-incentivized-testnet-3-9d7ce888205c), your validator node must pass liveness checks within 24 hours of being selected to participate in the testnet, and at a regular cadence onwards. This is required to ensure that your validator node contributes to the health of the overall network and that you become eligible for incentivized testnet rewards. 
 
 This document describes how you can verify the status of your deployed validator node in the incentivized testnet to meet the success criteria.
 

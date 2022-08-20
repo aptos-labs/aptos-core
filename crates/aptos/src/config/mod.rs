@@ -236,7 +236,7 @@ fn find_workspace_config(
                 current_path.push(CONFIG_FOLDER);
                 if current_path.is_dir() {
                     break Ok(current_path);
-                } else if !current_path.pop() && !current_path.pop() {
+                } else if !(current_path.pop() && current_path.pop()) {
                     // If we aren't able to find the folder, we'll create a new one right here
                     break Ok(starting_path.join(CONFIG_FOLDER));
                 }

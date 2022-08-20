@@ -10,7 +10,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p .",
     "lint": "eslint \"**/*.ts\"",
-    "test": "jest --setupFiles dotenv/config",
+    "test": "jest",
     "_fmt": "prettier 'src/**/*.ts' 'examples/**/*.js' 'examples/**/*.ts' '.eslintrc.js'",
     "fmt": "yarn _fmt --write",
     "fmt:check": "yarn _fmt --check",
