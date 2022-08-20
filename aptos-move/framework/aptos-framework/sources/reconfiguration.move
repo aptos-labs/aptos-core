@@ -153,9 +153,7 @@ module aptos_framework::reconfiguration {
 
     // For tests, skips the guid validation.
     #[test_only]
-    public fun initialize_for_test(
-        account: &signer
-    ) {
+    public fun initialize_for_test(account: &signer) {
         system_addresses::assert_aptos_framework(account);
         move_to<Configuration>(
             account,

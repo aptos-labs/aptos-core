@@ -2251,9 +2251,7 @@ module aptos_framework::stake {
     }
 
     #[test_only]
-    public fun initialize_for_test(
-        aptos_framework: &signer
-    ) {
+    public fun initialize_for_test(aptos_framework: &signer){
         initialize(aptos_framework);
     }
 
