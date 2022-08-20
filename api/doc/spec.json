@@ -2885,7 +2885,7 @@
         "required": [
           "version",
           "hash",
-          "state_root_hash",
+          "state_change_hash",
           "event_root_hash",
           "gas_used",
           "success",
@@ -2908,10 +2908,13 @@
           "hash": {
             "$ref": "#/components/schemas/HashValue"
           },
-          "state_root_hash": {
+          "state_change_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_checkpoint_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
@@ -3227,7 +3230,7 @@
         "required": [
           "version",
           "hash",
-          "state_root_hash",
+          "state_change_hash",
           "event_root_hash",
           "gas_used",
           "success",
@@ -3244,10 +3247,13 @@
           "hash": {
             "$ref": "#/components/schemas/HashValue"
           },
-          "state_root_hash": {
+          "state_change_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_checkpoint_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
@@ -3779,7 +3785,7 @@
         "required": [
           "version",
           "hash",
-          "state_root_hash",
+          "state_change_hash",
           "event_root_hash",
           "gas_used",
           "success",
@@ -3795,10 +3801,13 @@
           "hash": {
             "$ref": "#/components/schemas/HashValue"
           },
-          "state_root_hash": {
+          "state_change_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_checkpoint_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
@@ -4176,7 +4185,7 @@
         "required": [
           "version",
           "hash",
-          "state_root_hash",
+          "state_change_hash",
           "event_root_hash",
           "gas_used",
           "success",
@@ -4199,10 +4208,13 @@
           "hash": {
             "$ref": "#/components/schemas/HashValue"
           },
-          "state_root_hash": {
+          "state_change_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_checkpoint_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
