@@ -140,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "0.2.6"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
@@ -1032,6 +1032,7 @@ dependencies = [
  "aptos-transaction-builder",
  "aptos-types",
  "bcs",
+ "bytes 1.2.1",
  "hex",
  "move-deps",
  "poem-openapi",
@@ -3830,6 +3831,7 @@ name = "framework"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-aggregator",
  "aptos-crypto",
  "aptos-gas",
  "aptos-sdk-builder",
@@ -3839,6 +3841,7 @@ dependencies = [
  "base64 0.13.0",
  "bcs",
  "better_any",
+ "claim",
  "clap 3.2.16",
  "curve25519-dalek",
  "flate2",

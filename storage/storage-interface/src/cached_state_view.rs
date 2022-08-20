@@ -174,13 +174,13 @@ impl StateView for CachedStateView {
         // First check if the cache has the state value.
         if let Some(contents) = self.state_cache.read().get(state_key) {
             // This can return None, which means the value has been deleted from the DB.
-            return Ok(contents.as_ref().map(|v| v.bytes.clone()));
+            return Ok(contents.as_ref().map(|v| v.bytes().to_vec()));
         }
         let state_value_option = self.get_state_value_internal(state_key)?;
         // Update the cache if still empty
         let mut cache = self.state_cache.write();
         let new_value = cache.entry(state_key.clone()).or_insert(state_value_option);
-        Ok(new_value.as_ref().map(|v| v.bytes.clone()))
+        Ok(new_value.as_ref().map(|v| v.bytes().to_vec()))
     }
 
     fn is_genesis(&self) -> bool {

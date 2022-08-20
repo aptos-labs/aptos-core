@@ -102,18 +102,20 @@ impl EventsApi {
             .context(format!("Failed to find events by key {}", event_key))
             .map_err(BasicErrorWith404::bad_request)?;
 
-        let resolver = self.context.move_resolver_poem()?;
-        let events = resolver
-            .as_converter(self.context.db.clone())
-            .try_into_versioned_events(&events)
-            .context("Failed to convert events from storage into response {}")
-            .map_err(BasicErrorWith404::internal)?;
+        match accept_type {
+            AcceptType::Json => {
+                let resolver = self.context.move_resolver_poem()?;
+                let events = resolver
+                    .as_converter(self.context.db.clone())
+                    .try_into_versioned_events(&events)
+                    .context("Failed to convert events from storage into response {}")
+                    .map_err(BasicErrorWith404::internal)?;
 
-        BasicResponse::try_from_rust_value((
-            events,
-            &latest_ledger_info,
-            BasicResponseStatus::Ok,
-            &accept_type,
-        ))
+                BasicResponse::try_from_json((events, &latest_ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => {
+                BasicResponse::try_from_bcs((events, &latest_ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 }

@@ -6,9 +6,7 @@ use crate::{
     transaction_metadata::TransactionMetadata,
 };
 use aptos_aggregator::{
-    aggregator_extension::{
-        AggregatorChange, AggregatorChangeSet, AggregatorID, NativeAggregatorContext,
-    },
+    aggregator_extension::AggregatorID,
     delta_change_set::{serialize, DeltaChangeSet},
     transaction::ChangeSetExt,
 };
@@ -21,7 +19,10 @@ use aptos_types::{
     transaction::{ChangeSet, SignatureCheckedTransaction},
     write_set::{WriteOp, WriteSetMut},
 };
-use framework::natives::code::{NativeCodeContext, PublishRequest};
+use framework::natives::{
+    aggregator_natives::{AggregatorChange, AggregatorChangeSet, NativeAggregatorContext},
+    code::{NativeCodeContext, PublishRequest},
+};
 use move_deps::{
     move_binary_format::errors::{Location, VMResult},
     move_core_types::{
@@ -289,11 +290,11 @@ impl SessionOutput {
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
                             *entry_mut = Write(new_data);
                         }
-                        (Merge(delta1), Merge(delta2)) => {
-                            let new_delta = delta1
+                        (Merge(mut delta1), Merge(delta2)) => {
+                            delta1
                                 .merge_with(delta2)
                                 .map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-                            *entry_mut = Merge(new_delta)
+                            *entry_mut = Merge(delta1)
                         }
                         // Hashing properties guarantee that aggregator keys should
                         // not collide, making this case impossible.

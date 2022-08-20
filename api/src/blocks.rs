@@ -4,11 +4,8 @@
 use crate::accept_type::AcceptType;
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
-use crate::response::{
-    BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
-};
+use crate::response::BasicResultWith404;
 use crate::ApiTags;
-use anyhow::Context as AnyhowContext;
 use aptos_api_types::Block;
 use poem_openapi::param::{Path, Query};
 use poem_openapi::OpenApi;
@@ -77,19 +74,12 @@ impl BlocksApi {
         with_transactions: bool,
     ) -> BasicResultWith404<Block> {
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
-        let latest_version = latest_ledger_info.version();
-        let block = self
-            .context
-            .get_block_by_height(block_height, latest_version, with_transactions)
-            .context("Failed to retrieve block by height")
-            .map_err(BasicErrorWith404::internal)?;
-
-        BasicResponse::try_from_rust_value((
-            block,
-            &latest_ledger_info,
-            BasicResponseStatus::Ok,
+        self.context.get_block_by_height(
             &accept_type,
-        ))
+            block_height,
+            latest_ledger_info,
+            with_transactions,
+        )
     }
 
     fn get_by_version(
@@ -99,18 +89,11 @@ impl BlocksApi {
         with_transactions: bool,
     ) -> BasicResultWith404<Block> {
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
-        let latest_version = latest_ledger_info.version();
-        let block = self
-            .context
-            .get_block_by_version(version, latest_version, with_transactions)
-            .context("Failed to retrieve block by height")
-            .map_err(BasicErrorWith404::internal)?;
-
-        BasicResponse::try_from_rust_value((
-            block,
-            &latest_ledger_info,
-            BasicResponseStatus::Ok,
+        self.context.get_block_by_version(
             &accept_type,
-        ))
+            version,
+            latest_ledger_info,
+            with_transactions,
+        )
     }
 }

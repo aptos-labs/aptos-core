@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{MVHashMap, MVHashMapError, MVHashMapOutput};
-use aptos_aggregator::{delta_change_set::DeltaOp, transaction::AggregatorValue};
+use aptos_aggregator::{
+    delta_change_set::{DeltaOp, DeltaUpdate},
+    transaction::AggregatorValue,
+};
 use aptos_types::write_set::TransactionWrite;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
@@ -96,10 +99,11 @@ where
                             },
                         },
                         Data::Delta(d) => match acc.as_mut() {
-                            Some(a) => match a.merge_with(d.clone()) {
-                                Err(_) => return ExpectedOutput::Failure,
-                                Ok(d) => *a = d,
-                            },
+                            Some(a) => {
+                                if a.merge_with(d.clone()).is_err() {
+                                    return ExpectedOutput::Failure;
+                                }
+                            }
                             None => acc = Some(d.clone()),
                         },
                     }
@@ -114,15 +118,23 @@ where
     }
 }
 
+pub(crate) fn delta_sub(v: u128, limit: u128) -> DeltaOp {
+    DeltaOp::new(DeltaUpdate::Minus(v), limit, 0, v)
+}
+
+pub(crate) fn delta_add(v: u128, limit: u128) -> DeltaOp {
+    DeltaOp::new(DeltaUpdate::Plus(v), limit, v, 0)
+}
+
 fn operator_strategy<V: Arbitrary + Clone>() -> impl Strategy<Value = Operator<V>> {
     prop_oneof![
         2 => any::<V>().prop_map(Operator::Insert),
         4 => any::<u32>().prop_map(|v| {
             // TODO: Is there a proptest way of doing that?
             if v % 2 == 0 {
-                Operator::Update(DeltaOp::Subtraction { value: v as u128})
+                Operator::Update(delta_sub(v as u128, u32::MAX as u128))
             } else {
-                Operator::Update(DeltaOp::Addition { value: v as u128, limit: u32::MAX as u128})
+        Operator::Update(delta_add(v as u128, u32::MAX as u128))
             }
         }),
         1 => Just(Operator::Remove),

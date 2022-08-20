@@ -17,7 +17,7 @@ async fn test_get_unknown_block_by_height() {
     let mut context = new_test_context(current_function_name!());
 
     let resp = context
-        .expect_status_code(500)
+        .expect_status_code(404)
         .get(&blocks_by_height(1000))
         .await;
     context.check_golden_output(resp);

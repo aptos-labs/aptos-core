@@ -101,13 +101,14 @@ message Event {
 
 message TransactionInfo {
   bytes hash = 1;
-  bytes state_root_hash = 2;
+  bytes state_change_hash = 2;
   bytes event_root_hash = 3;
-  uint64 gas_used = 4;
-  bool success = 5;
-  string vm_status = 6;
-  bytes accumulator_root_hash = 7;
-  repeated WriteSetChange changes = 8;
+  optional bytes state_checkpoint_hash = 4;
+  uint64 gas_used = 5;
+  bool success = 6;
+  string vm_status = 7;
+  bytes accumulator_root_hash = 8;
+  repeated WriteSetChange changes = 9;
 }
 
 message EventKey {

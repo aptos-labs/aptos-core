@@ -221,10 +221,9 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
                                         // two deltas together. If Delta application
                                         // fails, we return a corresponding error, so that
                                         // the speculative execution can also fail.
-                                        let new_delta = accumulator
+                                        accumulator
                                             .merge_with(delta.clone())
                                             .map_err(|_| DeltaApplicationFailure)?;
-                                        *accumulator = new_delta;
                                     }
                                     None => {
                                         // Read hit a delta value and has to

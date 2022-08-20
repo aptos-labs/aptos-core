@@ -28,10 +28,11 @@ full_node_networks:
 storage:
   backup_service_address: "0.0.0.0:6186"
   storage_pruner_config:
-    enable_ledger_pruner: {{ .Values.enable_ledger_pruner }}
-    {{- if .Values.ledger_prune_window }}
-    ledger_prune_window: {{ .Values.ledger_prune_window }}
-    {{- end }}
+    ledger_pruner_config:
+      enable: {{ .Values.enable_ledger_pruner }}
+      {{- if .Values.ledger_prune_window }}
+      prune_window: {{ .Values.ledger_prune_window }}
+      {{- end }}
 
 state_sync:
   state_sync_driver:

@@ -6,6 +6,7 @@ pub mod error;
 pub mod faucet;
 
 pub use faucet::FaucetClient;
+use std::collections::BTreeMap;
 pub mod response;
 pub use response::Response;
 pub mod state;
@@ -19,17 +20,24 @@ pub use types::{Account, Resource};
 
 use crate::aptos::{AptosVersion, Balance};
 use anyhow::{anyhow, Result};
+use aptos_api_types::mime_types::BCS_OUTPUT_NEW;
 use aptos_api_types::{
-    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, Block, HexEncodedBytes,
+    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, BcsBlock, Block,
+    HexEncodedBytes, MoveModuleId, TransactionData, TransactionOnChainData, UserTransaction,
     VersionedEvent,
 };
 use aptos_crypto::HashValue;
+use aptos_types::account_config::AccountResource;
+use aptos_types::contract_event::EventWithVersion;
+use aptos_types::transaction::ExecutionStatus;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{NewBlockEvent, CORE_CODE_ADDRESS},
     transaction::SignedTransaction,
 };
+use move_deps::move_core_types::language_storage::StructTag;
 use poem_openapi::types::ParseFromJSON;
+use reqwest::header::ACCEPT;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -96,7 +104,11 @@ impl Client {
             .await
     }
 
-    pub async fn get_block(&self, height: u64, with_transactions: bool) -> Result<Response<Block>> {
+    pub async fn get_block_by_height(
+        &self,
+        height: u64,
+        with_transactions: bool,
+    ) -> Result<Response<Block>> {
         self.get(self.build_path(&format!(
             "blocks/by_height/{}?with_transactions={}",
             height, with_transactions
@@ -104,9 +116,42 @@ impl Client {
         .await
     }
 
-    pub async fn get_block_info(&self, version: u64) -> Result<Response<Block>> {
-        self.get(self.build_path(&format!("blocks/by_version/{}", version))?)
-            .await
+    pub async fn get_block_by_height_bcs(
+        &self,
+        height: u64,
+        with_transactions: bool,
+    ) -> Result<Response<BcsBlock>> {
+        let url = self.build_path(&format!(
+            "blocks/by_height/{}?with_transactions={}",
+            height, with_transactions
+        ))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_block_by_version(
+        &self,
+        version: u64,
+        with_transactions: bool,
+    ) -> Result<Response<Block>> {
+        self.get(self.build_path(&format!(
+            "blocks/by_version/{}?with_transactions={}",
+            version, with_transactions
+        ))?)
+        .await
+    }
+
+    pub async fn get_block_by_version_bcs(
+        &self,
+        height: u64,
+        with_transactions: bool,
+    ) -> Result<Response<BcsBlock>> {
+        let url = self.build_path(&format!(
+            "blocks/by_version/{}?with_transactions={}",
+            height, with_transactions
+        ))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
     pub async fn get_account_balance(&self, address: AccountAddress) -> Result<Response<Balance>> {
@@ -149,16 +194,54 @@ impl Client {
 
     pub async fn get_ledger_information(&self) -> Result<Response<State>> {
         let response = self.get_index().await?.map(|r| State {
-            chain_id: r.ledger_info.chain_id,
-            epoch: r.ledger_info.epoch.into(),
-            version: r.ledger_info.ledger_version.into(),
-            timestamp_usecs: r.ledger_info.ledger_timestamp.into(),
-            oldest_ledger_version: r.ledger_info.oldest_ledger_version.into(),
-            oldest_block_height: r.ledger_info.oldest_block_height.into(),
-            block_height: r.ledger_info.block_height.into(),
+            chain_id: r.chain_id,
+            epoch: r.epoch.into(),
+            version: r.ledger_version.into(),
+            timestamp_usecs: r.ledger_timestamp.into(),
+            oldest_ledger_version: r.oldest_ledger_version.into(),
+            oldest_block_height: r.oldest_block_height.into(),
+            block_height: r.block_height.into(),
         });
 
         Ok(response)
+    }
+
+    pub async fn simulate(
+        &self,
+        txn: &SignedTransaction,
+    ) -> Result<Response<Vec<UserTransaction>>> {
+        let txn_payload = bcs::to_bytes(txn)?;
+        let url = self.build_path("transactions/simulate")?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        self.json(response).await
+    }
+
+    pub async fn simulate_bcs(
+        &self,
+        txn: &SignedTransaction,
+    ) -> Result<Response<TransactionOnChainData>> {
+        let txn_payload = bcs::to_bytes(txn)?;
+        let url = self.build_path("transactions/simulate")?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(ACCEPT, BCS_OUTPUT_NEW)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
     }
 
     pub async fn submit(&self, txn: &SignedTransaction) -> Result<Response<PendingTransaction>> {
@@ -176,9 +259,35 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn submit_bcs(&self, txn: &SignedTransaction) -> Result<Response<()>> {
+        let txn_payload = bcs::to_bytes(txn)?;
+        let url = self.build_path("transactions")?;
+
+        let response = self
+            .inner
+            .post(url)
+            .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
+            .header(ACCEPT, BCS_OUTPUT_NEW)
+            .body(txn_payload)
+            .send()
+            .await?;
+
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|bytes| bcs::from_bytes(&bytes))?)
+    }
+
     pub async fn submit_and_wait(&self, txn: &SignedTransaction) -> Result<Response<Transaction>> {
         self.submit(txn).await?;
         self.wait_for_signed_transaction(txn).await
+    }
+
+    pub async fn submit_and_wait_bcs(
+        &self,
+        txn: &SignedTransaction,
+    ) -> Result<Response<TransactionOnChainData>, (Option<Response<TransactionData>>, anyhow::Error)>
+    {
+        self.submit_bcs(txn).await.map_err(|err| (None, err))?;
+        self.wait_for_signed_transaction_bcs(txn).await
     }
 
     pub async fn wait_for_transaction(
@@ -201,6 +310,19 @@ impl Client {
     ) -> Result<Response<Transaction>> {
         let expiration_timestamp = transaction.expiration_timestamp_secs();
         self.wait_for_transaction_by_hash(
+            transaction.clone().committed_hash(),
+            expiration_timestamp,
+        )
+        .await
+    }
+
+    pub async fn wait_for_signed_transaction_bcs(
+        &self,
+        transaction: &SignedTransaction,
+    ) -> Result<Response<TransactionOnChainData>, (Option<Response<TransactionData>>, anyhow::Error)>
+    {
+        let expiration_timestamp = transaction.expiration_timestamp_secs();
+        self.wait_for_transaction_by_hash_bcs(
             transaction.clone().committed_hash(),
             expiration_timestamp,
         )
@@ -242,6 +364,64 @@ impl Client {
         Err(anyhow!("timeout"))
     }
 
+    pub async fn wait_for_transaction_by_hash_bcs(
+        &self,
+        hash: HashValue,
+        expiration_timestamp_secs: u64,
+    ) -> Result<Response<TransactionOnChainData>, (Option<Response<TransactionData>>, anyhow::Error)>
+    {
+        const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
+        const DEFAULT_DELAY: Duration = Duration::from_millis(500);
+
+        let start = std::time::Instant::now();
+        while start.elapsed() < DEFAULT_TIMEOUT {
+            let resp = self
+                .get_transaction_by_hash_bcs_inner(hash)
+                .await
+                .map_err(|err| (None, err))?;
+
+            // If it's not found, keep waiting for it
+            if resp.status() != StatusCode::NOT_FOUND {
+                let resp = self
+                    .check_and_parse_bcs_response(resp)
+                    .await
+                    .map_err(|err| (None, err))?;
+                let resp = resp
+                    .and_then(|bytes| bcs::from_bytes(&bytes))
+                    .map_err(|err| (None, err.into()))?;
+                let (maybe_pending_txn, state) = resp.into_parts();
+
+                // If we have a committed transaction, determine if it failed or not
+                if let TransactionData::OnChain(txn) = maybe_pending_txn {
+                    let status = txn.info.status();
+
+                    // The user can handle the error
+                    return match status {
+                        ExecutionStatus::Success => Ok(Response::new(txn, state)),
+                        _ => Err((
+                            Some(Response::new(TransactionData::OnChain(txn), state)),
+                            anyhow!("Transaction failed"),
+                        )),
+                    };
+                }
+
+                // If it's expired lets give up
+                if Duration::from_secs(expiration_timestamp_secs)
+                    <= Duration::from_micros(state.timestamp_usecs)
+                {
+                    return Err((
+                        Some(Response::new(maybe_pending_txn, state)),
+                        anyhow!("Transaction expired"),
+                    ));
+                }
+            }
+
+            tokio::time::sleep(DEFAULT_DELAY).await;
+        }
+
+        return Err((None, anyhow!("Timed out waiting for transaction")));
+    }
+
     pub async fn get_transactions(
         &self,
         start: Option<u64>,
@@ -263,9 +443,42 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_transactions_bcs(
+        &self,
+        start: Option<u64>,
+        limit: Option<u16>,
+    ) -> Result<Response<Vec<TransactionOnChainData>>> {
+        let url = self.build_path("transactions")?;
+        let response = self.get_bcs_with_page(url, start, limit).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_transaction_by_hash(&self, hash: HashValue) -> Result<Response<Transaction>> {
         self.json(self.get_transaction_by_hash_inner(hash).await?)
             .await
+    }
+
+    pub async fn get_transaction_by_hash_bcs(
+        &self,
+        hash: HashValue,
+    ) -> Result<Response<TransactionData>> {
+        let response = self.get_transaction_by_hash_bcs_inner(hash).await?;
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_transaction_by_hash_bcs_inner(
+        &self,
+        hash: HashValue,
+    ) -> Result<reqwest::Response> {
+        let url = self.build_path(&format!("transactions/by_hash/{}", hash.to_hex_literal()))?;
+        let response = self
+            .inner
+            .get(url)
+            .header(ACCEPT, BCS_OUTPUT_NEW)
+            .send()
+            .await?;
+        Ok(response)
     }
 
     async fn get_transaction_by_hash_inner(&self, hash: HashValue) -> Result<reqwest::Response> {
@@ -276,6 +489,15 @@ impl Client {
     pub async fn get_transaction_by_version(&self, version: u64) -> Result<Response<Transaction>> {
         self.json(self.get_transaction_by_version_inner(version).await?)
             .await
+    }
+
+    pub async fn get_transaction_by_version_bcs(
+        &self,
+        version: u64,
+    ) -> Result<Response<TransactionData>> {
+        let url = self.build_path(&format!("transactions/by_version/{}", version))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
     async fn get_transaction_by_version_inner(&self, version: u64) -> Result<reqwest::Response> {
@@ -305,6 +527,17 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_account_transactions_bcs(
+        &self,
+        address: AccountAddress,
+        start: Option<u64>,
+        limit: Option<u16>,
+    ) -> Result<Response<Vec<TransactionOnChainData>>> {
+        let url = self.build_path(&format!("accounts/{}/transactions", address))?;
+        let response = self.get_bcs_with_page(url, start, limit).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_account_resources(
         &self,
         address: AccountAddress,
@@ -314,6 +547,15 @@ impl Client {
         let response = self.inner.get(url).send().await?;
 
         self.json(response).await
+    }
+
+    pub async fn get_account_resources_bcs(
+        &self,
+        address: AccountAddress,
+    ) -> Result<Response<BTreeMap<StructTag, Vec<u8>>>> {
+        let url = self.build_path(&format!("accounts/{}/resources", address))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
     pub async fn get_account_resources_at_version(
@@ -362,6 +604,16 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_account_resource_bcs<T: DeserializeOwned>(
+        &self,
+        address: AccountAddress,
+        resource_type: &str,
+    ) -> Result<Response<T>> {
+        let url = self.build_path(&format!("accounts/{}/resource/{}", address, resource_type))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_account_resource_at_version(
         &self,
         address: AccountAddress,
@@ -385,6 +637,33 @@ impl Client {
 
         let response = self.inner.get(url).send().await?;
         self.json(response).await
+    }
+
+    pub async fn get_account_modules_bcs(
+        &self,
+        address: AccountAddress,
+    ) -> Result<Response<BTreeMap<MoveModuleId, Vec<u8>>>> {
+        let url = self.build_path(&format!("accounts/{}/modules", address))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_account_module(
+        &self,
+        address: AccountAddress,
+        module_name: &str,
+    ) -> Result<Response<MoveModuleBytecode>> {
+        let url = self.build_path(&format!("accounts/{}/module/{}", address, module_name))?;
+        self.get(url).await
+    }
+
+    pub async fn get_account_module_bcs(
+        &self,
+        address: AccountAddress,
+        module_name: &str,
+    ) -> Result<Response<bytes::Bytes>> {
+        let url = self.build_path(&format!("accounts/{}/module/{}", address, module_name))?;
+        self.get_bcs(url).await
     }
 
     pub async fn get_account_events(
@@ -414,21 +693,33 @@ impl Client {
         self.json(response).await
     }
 
+    pub async fn get_account_events_bcs(
+        &self,
+        address: AccountAddress,
+        struct_tag: &str,
+        field_name: &str,
+        start: Option<u64>,
+        limit: Option<u16>,
+    ) -> Result<Response<Vec<EventWithVersion>>> {
+        let url = self.build_path(&format!(
+            "accounts/{}/events/{}/{}",
+            address.to_hex_literal(),
+            struct_tag,
+            field_name
+        ))?;
+
+        let response = self.get_bcs_with_page(url, start, limit).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
     pub async fn get_new_block_events(
         &self,
         start: Option<u64>,
         limit: Option<u16>,
     ) -> Result<Response<Vec<VersionedNewBlockEvent>>> {
         #[derive(Clone, Debug, Serialize, Deserialize)]
-        pub struct BlockId {
-            #[serde(deserialize_with = "deserialize_from_string")]
-            low: u128,
-            #[serde(deserialize_with = "deserialize_from_string")]
-            high: u128,
-        }
-        #[derive(Clone, Debug, Serialize, Deserialize)]
         pub struct NewBlockEventResponse {
-            id: BlockId,
+            hash: String,
             #[serde(deserialize_with = "deserialize_from_string")]
             epoch: u64,
             #[serde(deserialize_with = "deserialize_from_string")]
@@ -462,11 +753,10 @@ impl Client {
                     serde_json::from_value::<NewBlockEventResponse>(event.data)
                         .map_err(|e| anyhow!(e))
                         .and_then(|e| {
-                            let mut raw_bytes = e.id.low.to_le_bytes().to_vec();
-                            raw_bytes.append(&mut e.id.high.to_le_bytes().to_vec());
                             Ok(VersionedNewBlockEvent {
                                 event: NewBlockEvent::new(
-                                    HashValue::from_slice(raw_bytes)?,
+                                    AccountAddress::from_hex_literal(&e.hash)
+                                        .map_err(|e| anyhow!(e))?,
                                     e.epoch,
                                     e.round,
                                     e.height,
@@ -511,6 +801,15 @@ impl Client {
         let url = self.build_path(&format!("accounts/{}", address))?;
         let response = self.inner.get(url).send().await?;
         self.json(response).await
+    }
+
+    pub async fn get_account_bcs(
+        &self,
+        address: AccountAddress,
+    ) -> Result<Response<AccountResource>> {
+        let url = self.build_path(&format!("accounts/{}", address))?;
+        let response = self.get_bcs(url).await?;
+        Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
     pub async fn set_failpoint(&self, name: String, actions: String) -> Result<String> {
@@ -573,6 +872,43 @@ impl Client {
 
     async fn get<T: DeserializeOwned>(&self, url: Url) -> Result<Response<T>> {
         self.json(self.inner.get(url).send().await?).await
+    }
+
+    async fn get_bcs(&self, url: Url) -> Result<Response<bytes::Bytes>> {
+        let response = self
+            .inner
+            .get(url)
+            .header(ACCEPT, BCS_OUTPUT_NEW)
+            .send()
+            .await?;
+        self.check_and_parse_bcs_response(response).await
+    }
+
+    async fn get_bcs_with_page(
+        &self,
+        url: Url,
+        start: Option<u64>,
+        limit: Option<u16>,
+    ) -> Result<Response<bytes::Bytes>> {
+        let mut request = self.inner.get(url).header(ACCEPT, BCS_OUTPUT_NEW);
+        if let Some(start) = start {
+            request = request.query(&[("start", start)])
+        }
+
+        if let Some(limit) = limit {
+            request = request.query(&[("limit", limit)])
+        }
+
+        let response = request.send().await?;
+        self.check_and_parse_bcs_response(response).await
+    }
+
+    async fn check_and_parse_bcs_response(
+        &self,
+        response: reqwest::Response,
+    ) -> Result<Response<bytes::Bytes>> {
+        let (response, state) = self.check_response(response).await?;
+        Ok(Response::new(response.bytes().await?, state))
     }
 }
 

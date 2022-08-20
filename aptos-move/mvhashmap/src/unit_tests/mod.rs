@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use aptos_aggregator::transaction::AggregatorValue;
+use aptos_aggregator::{delta_change_set::DeltaUpdate, transaction::AggregatorValue};
 
 mod proptest_types;
 
@@ -40,17 +40,12 @@ fn u128_for(txn_idx: usize, incarnation: usize) -> u128 {
 
 // Generate determinitc additions.
 fn add_for(txn_idx: usize, limit: u128) -> DeltaOp {
-    DeltaOp::Addition {
-        value: txn_idx as u128,
-        limit,
-    }
+    proptest_types::delta_add(txn_idx as u128, limit)
 }
 
 // Generate determinitc subtractions.
 fn sub_for(txn_idx: usize, base: u128) -> DeltaOp {
-    DeltaOp::Subtraction {
-        value: base + (txn_idx as u128),
-    }
+    proptest_types::delta_sub(base + (txn_idx as u128), u128::MAX)
 }
 
 #[test]
@@ -137,12 +132,10 @@ fn create_write_read_placeholder_struct() {
 
     // Reads from ap1 and ap3 go to db.
     let r_db = mvtbl.read(&ap1, 30);
-    assert_eq!(
-        Err(Unresolved(DeltaOp::Subtraction {
-            value: (61 + 13) - 11
-        })),
-        r_db
-    );
+    match r_db {
+        Err(Unresolved(delta)) => delta.get_update() == DeltaUpdate::Minus((61 + 13) - 11),
+        _ => unreachable!(),
+    };
     let r_db = mvtbl.read(&ap3, 30);
     assert_eq!(Err(NotFound), r_db);
 

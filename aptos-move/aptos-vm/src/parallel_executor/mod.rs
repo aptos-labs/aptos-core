@@ -14,10 +14,7 @@ use aptos_aggregator::{delta_change_set::DeltaOp, transaction::TransactionOutput
 use aptos_parallel_executor::{
     errors::Error,
     executor::ParallelTransactionExecutor,
-    task::{
-        Transaction as PTransaction,
-        TransactionOutput as PTransactionOutput,
-    },
+    task::{Transaction as PTransaction, TransactionOutput as PTransactionOutput},
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -98,8 +95,9 @@ impl ParallelAptosVM {
                         .into_iter()
                         .map(|out| {
                             let output_ext = AptosTransactionOutput::into(out);
-                            let (output, delta_writes) =
-                                output_ext.into_transaction_output(&data_cache).expect("Delta application failed");
+                            let (output, delta_writes) = output_ext
+                                .into_transaction_output(&data_cache)
+                                .expect("Delta application failed");
 
                             if !output.status().is_discarded() {
                                 data_cache.push_write_set(

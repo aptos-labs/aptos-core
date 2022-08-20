@@ -34,7 +34,7 @@ use std::{
 // TODO: Investigate the use of discriminator_name, see https://github.com/poem-web/poem/issues/329.
 // TODO: See https://github.com/poem-web/poem/issues/347 re mapping stuff. UPDATE: Wait for 2.0.7 to be released.
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum TransactionData {
     OnChain(TransactionOnChainData),
     Pending(Box<SignedTransaction>),
@@ -291,8 +291,9 @@ impl From<(&SignedTransaction, TransactionPayload)> for UserTransactionRequest {
 pub struct TransactionInfo {
     pub version: U64,
     pub hash: HashValue,
-    pub state_root_hash: HashValue,
+    pub state_change_hash: HashValue,
     pub event_root_hash: HashValue,
+    pub state_checkpoint_hash: Option<HashValue>,
     pub gas_used: U64,
     pub success: bool,
     pub vm_status: String,

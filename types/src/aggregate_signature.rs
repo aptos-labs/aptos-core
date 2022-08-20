@@ -3,36 +3,37 @@
 
 use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use aptos_bitvec::BitVec;
 use move_deps::move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
-/// This struct represents a BLS multi-signature: it stores a bit mask representing the set of
-/// validators participating in the signing process and the multi-signature itself, which was
-/// aggregated from these validators' partial BLS signatures.
+/// This struct represents a BLS multi-signature or aggregated signature:
+/// it stores a bit mask representing the set of validators participating in the signing process
+/// and the multi-signature/aggregated signature itself,
+/// which was aggregated from these validators' partial BLS signatures.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-pub struct MultiSignature {
+pub struct AggregateSignature {
     validator_bitmask: BitVec,
-    multi_sig: Option<bls12381::Signature>,
+    sig: Option<bls12381::Signature>,
 }
 
-impl MultiSignature {
+impl AggregateSignature {
     pub fn new(
         validator_bitmask: BitVec,
         aggregated_signature: Option<bls12381::Signature>,
     ) -> Self {
         Self {
             validator_bitmask,
-            multi_sig: aggregated_signature,
+            sig: aggregated_signature,
         }
     }
 
     pub fn empty() -> Self {
         Self {
             validator_bitmask: BitVec::default(),
-            multi_sig: None,
+            sig: None,
         }
     }
 
@@ -61,25 +62,25 @@ impl MultiSignature {
         self.validator_bitmask.count_ones() as usize
     }
 
-    pub fn multi_sig(&self) -> &Option<bls12381::Signature> {
-        &self.multi_sig
+    pub fn sig(&self) -> &Option<bls12381::Signature> {
+        &self.sig
     }
 }
 
 /// Partial signature from a set of validators. This struct is only used when aggregating the votes
 /// from different validators. It is only kept in memory and never sent through the network.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub struct PartialSignatures {
-    signatures: HashMap<AccountAddress, bls12381::Signature>,
+    signatures: BTreeMap<AccountAddress, bls12381::Signature>,
 }
 
 impl PartialSignatures {
-    pub fn new(signatures: HashMap<AccountAddress, bls12381::Signature>) -> Self {
+    pub fn new(signatures: BTreeMap<AccountAddress, bls12381::Signature>) -> Self {
         Self { signatures }
     }
 
     pub fn empty() -> Self {
-        Self::new(HashMap::new())
+        Self::new(BTreeMap::new())
     }
 
     pub fn is_empty(&self) -> bool {
@@ -94,7 +95,7 @@ impl PartialSignatures {
         self.signatures.entry(validator).or_insert(signature);
     }
 
-    pub fn signatures(&self) -> &HashMap<AccountAddress, bls12381::Signature> {
+    pub fn signatures(&self) -> &BTreeMap<AccountAddress, bls12381::Signature> {
         &self.signatures
     }
 }

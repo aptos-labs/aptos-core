@@ -105,10 +105,8 @@ impl CliCommand<Vec<serde_json::Value>> for ListAccount {
                 .await
                 .map_err(map_err_func)?
                 .into_inner()
-                .iter()
-                .cloned()
-                .map(|module| module.try_parse_abi().unwrap())
-                .map(|module| json!(module))
+                .into_iter()
+                .map(|module| (json!(module.try_parse_abi().unwrap())))
                 .collect::<Vec<serde_json::Value>>(),
             ListQuery::Resources => client
                 .get_account_resources(account)

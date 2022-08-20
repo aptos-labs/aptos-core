@@ -2,8 +2,9 @@
   {
     "version": "1",
     "hash": "",
-    "state_root_hash": "",
+    "state_change_hash": "",
     "event_root_hash": "",
+    "state_checkpoint_hash": null,
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",
@@ -52,9 +53,9 @@
         "data": {
           "type": "0x1::state_storage::StateStorageUsage",
           "data": {
-            "bytes": "279325",
+            "bytes": "281904",
             "epoch": "1",
-            "items": "96"
+            "items": "99"
           }
         },
         "type": "write_resource"
@@ -82,11 +83,8 @@
         "data": {
           "epoch": "0",
           "failed_proposer_indices": [],
+          "hash": "",
           "height": "1",
-          "id": {
-            "high": "44867518937664683910420312596687572060",
-            "low": "2791876110695916617903004309989527630"
-          },
           "previous_block_votes_bitvec": "0x00",
           "proposer": "0x66b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef",
           "round": "1",
@@ -105,8 +103,9 @@
   {
     "version": "2",
     "hash": "",
-    "state_root_hash": "",
+    "state_change_hash": "",
     "event_root_hash": "",
+    "state_checkpoint_hash": null,
     "gas_used": "3",
     "success": true,
     "vm_status": "Executed successfully",
@@ -256,8 +255,9 @@
   {
     "version": "3",
     "hash": "",
-    "state_root_hash": "",
+    "state_change_hash": "",
     "event_root_hash": "",
+    "state_checkpoint_hash": "",
     "gas_used": "0",
     "success": true,
     "vm_status": "Executed successfully",

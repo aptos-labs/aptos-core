@@ -11,8 +11,9 @@ import type { WriteSetChange } from './WriteSetChange';
 export type GenesisTransaction = {
     version: U64;
     hash: HashValue;
-    state_root_hash: HashValue;
+    state_change_hash: HashValue;
     event_root_hash: HashValue;
+    state_checkpoint_hash?: HashValue;
     gas_used: U64;
     success: boolean;
     vm_status: string;

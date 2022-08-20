@@ -198,7 +198,7 @@ impl CliCommand<()> for SetValidatorConfiguration {
 
         // Only add the public key if there is a full node
         let full_node_network_public_key = if self.full_node_host.is_some() {
-            operator_identity.validator_network_public_key
+            operator_identity.full_node_network_public_key
         } else {
             None
         };

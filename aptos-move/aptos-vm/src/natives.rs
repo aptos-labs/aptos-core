@@ -1,10 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::aggregator_extension::{aggregator_natives, NativeAggregatorContext};
 use aptos_gas::NativeGasParameters;
 use aptos_types::account_config::CORE_CODE_ADDRESS;
-use framework::natives::{code::NativeCodeContext, transaction_context::NativeTransactionContext};
+use framework::natives::{
+    aggregator_natives::NativeAggregatorContext, code::NativeCodeContext,
+    transaction_context::NativeTransactionContext,
+};
 use move_deps::move_unit_test;
 use move_deps::move_vm_runtime::native_extensions::NativeContextExtensions;
 use move_deps::move_vm_test_utils::BlankStorage;
@@ -23,7 +25,6 @@ pub fn aptos_natives(gas_params: NativeGasParameters) -> NativeFunctionTable {
             gas_params.aptos_framework,
         ))
         .chain(move_table_extension::table_natives(CORE_CODE_ADDRESS))
-        .chain(aggregator_natives(CORE_CODE_ADDRESS))
         // TODO(Gas): this isn't quite right yet...
         .chain(
             move_stdlib::natives::nursery_natives(

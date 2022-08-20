@@ -16,7 +16,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 - Stop your node and remove the data directory.
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Pull the latest changes on `testnet` branch, make sure you're at commit `6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6`
+- Pull the latest changes on `testnet` branch
 - Close the metrics port `9101` and REST API port `80` for your validator (you can leave it open for fullnode).
 - Restarting the node
 
@@ -24,7 +24,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 - Stop your node and remove the data volumes, `docker compose down --volumes`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
-- Update your docker image to use tag `testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6`. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6/images/sha256-5a97797af8dea7465ac011fec3fac11c0d4cdb42f3883292a6e0ed3e27be4b51?context=explore)
+- Update your docker image to use tag `testnet`
 - Close metrics port on 9101 and REST API port `80` for your validator (remove it from the docker compose file), you can leave it open for fullnode.
 - Restarting the node: `docker compose up`
 
@@ -32,7 +32,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 - Increase `era` number in your Terraform config, this will wipe the data once applied.
 - Update `chain_id` to 43.
-- Update your docker image to use tag `testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6` in the Terraform config. Check the image sha256 [here](https://hub.docker.com/layers/validator/aptoslabs/validator/testnet_6b4d6ff027fc6dc39c633e4f15da2b6a9084eac6/images/sha256-5a97797af8dea7465ac011fec3fac11c0d4cdb42f3883292a6e0ed3e27be4b51?context=explore)
+- Update your docker image to use tag `testnet`
 - Close metrics port and REST API port for validator (you can leave it open for fullnode), add the helm values in your `main.tf ` file, for example:
     ```
     module "aptos-node" {

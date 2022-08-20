@@ -27,6 +27,6 @@ impl DirectEvaluatorInput {
     }
 
     pub fn get_target_chain_id(&self) -> ChainId {
-        ChainId::new(self.target_index_response.ledger_info.chain_id)
+        ChainId::new(self.target_index_response.chain_id)
     }
 }

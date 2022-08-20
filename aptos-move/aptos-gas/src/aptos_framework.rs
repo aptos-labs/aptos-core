@@ -55,5 +55,11 @@ crate::natives::define_gas_parameters_for_natives!(GasParameters, "aptos_framewo
     [.event.write_to_event_store.base, "event.write_to_event_store.base", 1],
     [.event.write_to_event_store.per_abstract_memory_unit, "event.write_to_event_store.per_abstract_memory_unit", 1],
 
-    [.state_storage.get_usage.base_cost, "state_storage.get_usage.base", 1]
+    [.state_storage.get_usage.base_cost, "state_storage.get_usage.base", 1],
+
+    [.aggregator.add.base, "aggregator.add.base", 1],
+    [.aggregator.read.base, "aggregator.read.base", 1],
+    [.aggregator.sub.base, "aggregator.sub.base", 1],
+    [.aggregator.destroy.base, "aggregator.destroy.base", 1],
+    [.aggregator_factory.new_aggregator.base, "aggregator_factory.new_aggregator.base", 1]
 ]);

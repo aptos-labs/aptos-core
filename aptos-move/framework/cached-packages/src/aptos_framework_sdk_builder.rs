@@ -108,6 +108,12 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Upgrade total supply to use a parallelizable implementation if it is
+    /// available.
+    CoinUpgradeSupply {
+        coin_type: TypeTag,
+    },
+
     /// Entry function to register to receive a specific `CoinType`. An account that wants to hold a coin type
     /// has to explicitly registers to do so. The register creates a special `CoinStore`
     /// to hold the specified `CoinType`.
@@ -238,7 +244,7 @@ pub enum EntryFunctionCall {
     },
 
     /// Updates the major version to a larger version.
-    /// This is only used in test environments and outside of them, the core resources account shouldn't exist.
+    /// This can be called by on chain governance.
     VersionSetVersion {
         major: u64,
     },
@@ -293,6 +299,7 @@ impl EntryFunctionCall {
                 to,
                 amount,
             } => coin_transfer(coin_type, to, amount),
+            CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
             CoinsRegister { coin_type } => coins_register(coin_type),
             GasScheduleSetGasSchedule { gas_schedule_blob } => {
                 gas_schedule_set_gas_schedule(gas_schedule_blob)
@@ -597,6 +604,23 @@ pub fn coin_transfer(coin_type: TypeTag, to: AccountAddress, amount: u64) -> Tra
         ident_str!("transfer").to_owned(),
         vec![coin_type],
         vec![bcs::to_bytes(&to).unwrap(), bcs::to_bytes(&amount).unwrap()],
+    ))
+}
+
+/// Upgrade total supply to use a parallelizable implementation if it is
+/// available.
+pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("coin").to_owned(),
+        ),
+        ident_str!("upgrade_supply").to_owned(),
+        vec![coin_type],
+        vec![],
     ))
 }
 
@@ -993,7 +1017,7 @@ pub fn stake_withdraw(withdraw_amount: u64) -> TransactionPayload {
 }
 
 /// Updates the major version to a larger version.
-/// This is only used in test environments and outside of them, the core resources account shouldn't exist.
+/// This can be called by on chain governance.
 pub fn version_set_version(major: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -1135,6 +1159,16 @@ mod decoder {
                 coin_type: script.ty_args().get(0)?.clone(),
                 to: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn coin_upgrade_supply(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CoinUpgradeSupply {
+                coin_type: script.ty_args().get(0)?.clone(),
             })
         } else {
             None
@@ -1428,6 +1462,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_transfer".to_string(),
             Box::new(decoder::coin_transfer),
+        );
+        map.insert(
+            "coin_upgrade_supply".to_string(),
+            Box::new(decoder::coin_upgrade_supply),
         );
         map.insert(
             "coins_register".to_string(),
