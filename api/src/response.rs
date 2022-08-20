@@ -406,8 +406,8 @@ pub fn build_not_found<S: Display, E: NotFoundError>(
 
 pub fn version_not_found<E: NotFoundError>(ledger_version: u64) -> E {
     build_not_found(
-        "Version",
-        format!("ledger version({})", ledger_version),
+        "Ledger version",
+        format!("Ledger version({})", ledger_version),
         AptosErrorCode::VersionNotFound,
     )
 }
@@ -423,7 +423,7 @@ pub fn account_not_found<E: NotFoundError>(address: Address, ledger_version: u64
     build_not_found(
         "Account",
         format!(
-            "Address({}) and Ledger Version({})",
+            "Address({}) and Ledger version({})",
             address, ledger_version
         ),
         AptosErrorCode::AccountNotFound,
@@ -487,6 +487,29 @@ pub fn table_item_not_found<E: NotFoundError>(
             "Table handle({}), Table key({}) and Ledger version({})",
             table_handle, table_key, ledger_version
         ),
-        AptosErrorCode::StructFieldNotFound,
+        AptosErrorCode::TableItemNotFound,
+    )
+}
+
+pub fn block_not_found_by_height<E: NotFoundError>(block_height: u64) -> E {
+    build_not_found(
+        "Block",
+        format!("Block height({})", block_height,),
+        AptosErrorCode::BlockNotFound,
+    )
+}
+
+pub fn block_not_found_by_version<E: NotFoundError>(ledger_version: u64) -> E {
+    build_not_found(
+        "Block",
+        format!("Ledger version({})", ledger_version,),
+        AptosErrorCode::BlockNotFound,
+    )
+}
+
+pub fn block_pruned_by_height<E: GoneError>(block_height: u64) -> E {
+    E::gone_with_code(
+        &format!("Block({}) has been pruned", block_height),
+        AptosErrorCode::BlockPruned,
     )
 }

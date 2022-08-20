@@ -90,4 +90,7 @@ pub enum AptosErrorCode {
     VersionNotFound = 12,
     VersionPruned = 13,
     InvalidEventKey = 14,
+    BlockNotFound = 15,
+    TableItemNotFound = 16,
+    BlockPruned = 17,
 }

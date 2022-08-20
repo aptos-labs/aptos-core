@@ -1,15 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::accept_type::AcceptType;
 use crate::response::{
-    version_not_found, version_pruned, AptosErrorResponse, BasicErrorWith404, BasicResponse,
-    BasicResponseStatus, BasicResultWith404, InternalError, NotFoundError, StdApiError,
+    block_not_found_by_height, block_not_found_by_version, block_pruned_by_height,
+    version_not_found, version_pruned, InternalError, StdApiError,
 };
-use anyhow::{anyhow, ensure, format_err, Context as AnyhowContext, Result};
-use aptos_api_types::{
-    AptosErrorCode, AsConverter, BcsBlock, Block, LedgerInfo, TransactionOnChainData,
-};
+use anyhow::{ensure, format_err, Context as AnyhowContext, Result};
+use aptos_api_types::{AptosErrorCode, AsConverter, BcsBlock, LedgerInfo, TransactionOnChainData};
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
@@ -197,21 +194,24 @@ impl Context {
         self.db.get_block_timestamp(version)
     }
 
-    pub fn get_block_by_height(
+    pub fn get_block_by_height<E: StdApiError>(
         &self,
-        accept_type: &AcceptType,
         height: u64,
-        latest_ledger_info: LedgerInfo,
+        latest_ledger_info: &LedgerInfo,
         with_transactions: bool,
-    ) -> BasicResultWith404<Block> {
+    ) -> Result<BcsBlock, E> {
+        if height < latest_ledger_info.oldest_block_height.0 {
+            return Err(block_pruned_by_height(height));
+        } else if height > latest_ledger_info.block_height.0 {
+            return Err(block_not_found_by_height(height));
+        }
+
         let (first_version, last_version, new_block_event) = self
             .db
             .get_block_info_by_height(height)
-            .context("Failed to find block")
-            .map_err(BasicErrorWith404::not_found)?;
+            .map_err(|_| block_not_found_by_height(height))?;
 
         self.get_block(
-            accept_type,
             latest_ledger_info,
             with_transactions,
             first_version,
@@ -220,21 +220,24 @@ impl Context {
         )
     }
 
-    pub fn get_block_by_version(
+    pub fn get_block_by_version<E: StdApiError>(
         &self,
-        accept_type: &AcceptType,
         version: u64,
-        latest_ledger_info: LedgerInfo,
+        latest_ledger_info: &LedgerInfo,
         with_transactions: bool,
-    ) -> BasicResultWith404<Block> {
+    ) -> Result<BcsBlock, E> {
+        if version < latest_ledger_info.oldest_ledger_version.0 {
+            return Err(version_pruned(version));
+        } else if version > latest_ledger_info.version() {
+            return Err(version_not_found(version));
+        }
+
         let (first_version, last_version, new_block_event) = self
             .db
             .get_block_info_by_version(version)
-            .context("Failed to find block")
-            .map_err(BasicErrorWith404::not_found)?;
+            .map_err(|_| block_not_found_by_version(version))?;
 
         self.get_block(
-            accept_type,
             latest_ledger_info,
             with_transactions,
             first_version,
@@ -243,24 +246,25 @@ impl Context {
         )
     }
 
-    fn get_block(
+    fn get_block<E: StdApiError>(
         &self,
-        accept_type: &AcceptType,
-        latest_ledger_info: LedgerInfo,
+        latest_ledger_info: &LedgerInfo,
         with_transactions: bool,
         first_version: Version,
         last_version: Version,
         new_block_event: NewBlockEvent,
-    ) -> BasicResultWith404<Block> {
+    ) -> Result<BcsBlock, E> {
         let ledger_version = latest_ledger_info.ledger_version.0;
+
+        // We can't pull a block in the future, but this shouldn't happen
         if last_version > ledger_version {
-            return Err(BasicErrorWith404::not_found(anyhow!("Block not found")));
+            return Err(block_not_found_by_height(new_block_event.height()));
         }
+
         let block_hash = new_block_event
             .hash()
             .context("Failed to parse block hash")
-            .map_err(BasicErrorWith404::internal)
-            .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
+            .map_err(|err| E::internal_with_code(err, AptosErrorCode::InvalidBcsInStorageError))?;
         let block_timestamp = new_block_event.proposed_time();
         let txns = if with_transactions {
             Some(
@@ -270,42 +274,22 @@ impl Context {
                     ledger_version,
                 )
                 .context("Failed to read raw transactions from storage")
-                .map_err(BasicErrorWith404::internal)
-                .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?,
+                .map_err(|err| {
+                    E::internal_with_code(err, AptosErrorCode::InvalidBcsInStorageError)
+                })?,
             )
         } else {
             None
         };
 
-        match accept_type {
-            AcceptType::Json => {
-                let transactions = if let Some(inner) = txns {
-                    Some(self.render_transactions(inner, block_timestamp)?)
-                } else {
-                    None
-                };
-                let block = Block {
-                    block_height: new_block_event.height().into(),
-                    block_hash: block_hash.into(),
-                    block_timestamp: block_timestamp.into(),
-                    first_version: first_version.into(),
-                    last_version: last_version.into(),
-                    transactions,
-                };
-                BasicResponse::try_from_json((block, &latest_ledger_info, BasicResponseStatus::Ok))
-            }
-            AcceptType::Bcs => {
-                let block = BcsBlock {
-                    block_height: new_block_event.height(),
-                    block_hash,
-                    block_timestamp,
-                    first_version,
-                    last_version,
-                    transactions: txns,
-                };
-                BasicResponse::try_from_bcs((block, &latest_ledger_info, BasicResponseStatus::Ok))
-            }
-        }
+        Ok(BcsBlock {
+            block_height: new_block_event.height(),
+            block_hash,
+            block_timestamp,
+            first_version,
+            last_version,
+            transactions: txns,
+        })
     }
 
     pub fn render_transactions<E: InternalError>(
@@ -327,7 +311,7 @@ impl Context {
             })
             .collect::<Result<_, anyhow::Error>>()
             .context("Failed to convert transaction data from storage")
-            .map_err(E::internal)?;
+            .map_err(|err| E::internal_with_code(err, AptosErrorCode::InvalidBcsInStorageError))?;
 
         Ok(txns)
     }
