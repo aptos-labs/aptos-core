@@ -117,7 +117,7 @@ All the selected participant will get Aptos coin airdrop into their owner accoun
     You can check on the explorer `https://explorer.devnet.aptos.dev/account/<account-address>?network=ait3` or use the CLI
 
     ```
-    aptos account list --profile ait2
+    aptos account list --profile ait3-operator
     ```
     
     This will show you the coin balance you have in the validator account. You should be able to see something like:
