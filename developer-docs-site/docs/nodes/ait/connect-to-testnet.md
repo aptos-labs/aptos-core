@@ -16,6 +16,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 - Stop your node and remove the data directory.
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
+- Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
 - Pull the latest changes on `testnet` branch
 - Close the metrics port `9101` and REST API port `80` for your validator (you can leave it open for fullnode).
 - Restarting the node
@@ -24,6 +25,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 - Stop your node and remove the data volumes, `docker compose down --volumes`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
+- - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
 - Update your docker image to use tag `testnet`
 - Close metrics port on 9101 and REST API port `80` for your validator (remove it from the docker compose file), you can leave it open for fullnode.
 - Restarting the node: `docker compose up`
@@ -51,6 +53,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
     ```
 - Apply Terraform: `terraform apply`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
+- - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
 - Recreate the secrets, make sure the secret name matches your `era` number, e.g. if you have `era = 3`, you should replace the secret name to be `${WORKSPACE}-aptos-node-0-genesis-e3`
     ```
     export WORKSPACE=<your workspace name>
@@ -98,7 +101,7 @@ All the selected participant will get Aptos coin airdrop into their owner accoun
     ```
     aptos node update-validator-network-addresses  \
       --pool-address <owner-address> \
-      --validator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
+      --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
       --profile ait3-operator
     ```
 
