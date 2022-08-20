@@ -1187,7 +1187,7 @@ impl DbReader for AptosDB {
         version: Version,
     ) -> Result<Option<StateValue>> {
         gauged_api("get_state_value_by_version", || {
-            error_if_version_is_pruned(&self.state_pruner, "State", version)?;
+            error_if_version_is_pruned(&self.ledger_pruner, "State", version)?;
 
             self.state_store
                 .get_state_value_by_version(state_store_key, version)
@@ -1200,7 +1200,7 @@ impl DbReader for AptosDB {
         state_key: &StateKey,
         version: Version,
     ) -> Result<SparseMerkleProofExt> {
-        gauged_api("get_proof_by_version", || {
+        gauged_api("get_state_proof_by_version_ext", || {
             error_if_version_is_pruned(&self.state_pruner, "State", version)?;
 
             self.state_store
