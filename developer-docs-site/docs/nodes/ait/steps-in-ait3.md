@@ -88,11 +88,11 @@ sources={{
    
   Provide the details of your validator node on this node registration screen, all the public key information you need is in the `~/$WORKSPACE/keys/public-keys.yaml` file (please don't enter anything from private keys).
   
-  - OWNER KEY: the first wallet address you created.
-  - CONSENSUS KEY: consensus_public_key from `public-keys.yaml`
-  - CONSENSUS POP: consensus_proof_of_possession from `public-keys.yaml`
-  - ACCOUNT KEY: account_public_key from `public-keys.yaml`
-  - VALIDATOR NETWORK KEY: validator_network_public_key from `public-keys.yaml`
+    - OWNER KEY: the first wallet public key. From Settings -> Credentials
+    - CONSENSUS KEY: consensus_public_key from `public-keys.yaml`
+    - CONSENSUS POP: consensus_proof_of_possession from `public-keys.yaml`
+    - ACCOUNT KEY: account_public_key from `public-keys.yaml`
+    - VALIDATOR NETWORK KEY: validator_network_public_key from `public-keys.yaml`
 
 4. Next, click on **VALIDATE NODE**. If your node passes healthcheck, you will be prompted to complete the identity verification process.
 
