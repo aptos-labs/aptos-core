@@ -1,20 +1,20 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::response::{module_not_found, resource_not_found, table_item_not_found, StdApiError};
 use crate::{
     accept_type::AcceptType,
-    context::Context,
     failpoint::fail_point_poem,
     response::{
-        build_not_found, BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus,
-        BasicResultWith404, InternalError, NotFoundError,
+        BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
+        InternalError,
     },
-    ApiTags,
+    ApiTags, Context,
 };
 use anyhow::{anyhow, Context as AnyhowContext};
 use aptos_api_types::{
     Address, AsConverter, IdentifierWrapper, LedgerInfo, MoveModuleBytecode, MoveResource,
-    MoveStructTag, MoveValue, TableItemRequest, TransactionId, U64,
+    MoveStructTag, MoveValue, TableItemRequest, U64,
 };
 use aptos_state_view::StateView;
 use aptos_types::{
@@ -60,7 +60,12 @@ impl StateApi {
         ledger_version: Query<Option<U64>>,
     ) -> BasicResultWith404<MoveResource> {
         fail_point_poem("endpoint_get_account_resource")?;
-        self.resource(&accept_type, address.0, resource_type.0, ledger_version.0)
+        self.resource(
+            &accept_type,
+            address.0,
+            resource_type.0,
+            ledger_version.0.map(|inner| inner.0),
+        )
     }
 
     /// Get specific account module
@@ -122,28 +127,20 @@ impl StateApi {
 }
 
 impl StateApi {
-    fn preprocess_request<E: NotFoundError + InternalError>(
+    fn preprocess_request<E: StdApiError>(
         &self,
-        requested_ledger_version: Option<U64>,
+        requested_ledger_version: Option<u64>,
     ) -> Result<(LedgerInfo, u64, DbStateView), E> {
-        let latest_ledger_info = self.context.get_latest_ledger_info()?;
-        let ledger_version: u64 = requested_ledger_version
-            .map(|v| v.0)
-            .unwrap_or_else(|| latest_ledger_info.version());
+        let (latest_ledger_info, requested_ledger_version) = self
+            .context
+            .get_latest_ledger_info_and_verify_lookup_version(requested_ledger_version)?;
 
-        if ledger_version > latest_ledger_info.version() {
-            return Err(build_not_found(
-                "ledger",
-                TransactionId::Version(U64::from(ledger_version)),
-                latest_ledger_info.version(),
-            ));
-        }
-
-        let state_view = self.context.state_view_at_version(ledger_version)
-            .context(format!("Failed to get state view at version {} even after confirming the ledger has advanced past that version to {}", ledger_version, latest_ledger_info.version()))
+        let state_view = self
+            .context
+            .state_view_at_version(requested_ledger_version)
             .map_err(E::internal)?;
 
-        Ok((latest_ledger_info, ledger_version, state_view))
+        Ok((latest_ledger_info, requested_ledger_version, state_view))
     }
 
     fn resource(
@@ -151,21 +148,21 @@ impl StateApi {
         accept_type: &AcceptType,
         address: Address,
         resource_type: MoveStructTag,
-        ledger_version: Option<U64>,
+        ledger_version: Option<u64>,
     ) -> BasicResultWith404<MoveResource> {
         let resource_type: StructTag = resource_type
             .try_into()
             .context("Failed to parse given resource type")
             .map_err(BasicErrorWith404::bad_request)?;
         let resource_key = ResourceKey::new(address.into(), resource_type.clone());
-        let access_path = AccessPath::resource_access_path(resource_key.clone());
+        let access_path = AccessPath::resource_access_path(resource_key);
         let state_key = StateKey::AccessPath(access_path);
         let (ledger_info, ledger_version, state_view) = self.preprocess_request(ledger_version)?;
         let bytes = state_view
             .get_state_value(&state_key)
             .context(format!("Failed to query DB to check for {:?}", state_key))
             .map_err(BasicErrorWith404::internal)?
-            .ok_or_else(|| build_not_found("Resource", resource_key, ledger_version))?;
+            .ok_or_else(|| resource_not_found(address, &resource_type, ledger_version))?;
 
         match accept_type {
             AcceptType::Json => {
@@ -194,12 +191,13 @@ impl StateApi {
         let module_id = ModuleId::new(address.into(), name.into());
         let access_path = AccessPath::code_access_path(module_id.clone());
         let state_key = StateKey::AccessPath(access_path);
-        let (ledger_info, ledger_version, state_view) = self.preprocess_request(ledger_version)?;
+        let (ledger_info, ledger_version, state_view) =
+            self.preprocess_request(ledger_version.map(|inner| inner.0))?;
         let bytes = state_view
             .get_state_value(&state_key)
             .context(format!("Failed to query DB to check for {:?}", state_key))
             .map_err(BasicErrorWith404::internal)?
-            .ok_or_else(|| build_not_found("Module", module_id, ledger_version))?;
+            .ok_or_else(|| module_not_found(address, module_id.name(), ledger_version))?;
 
         match accept_type {
             AcceptType::Json => {
@@ -240,7 +238,8 @@ impl StateApi {
             .map_err(BasicErrorWith404::bad_request)?;
         let key = table_item_request.key;
 
-        let (ledger_info, ledger_version, state_view) = self.preprocess_request(ledger_version)?;
+        let (ledger_info, ledger_version, state_view) =
+            self.preprocess_request(ledger_version.map(|inner| inner.0))?;
 
         let resolver = state_view.as_move_resolver();
         let converter = resolver.as_converter(self.context.db.clone());
@@ -261,7 +260,7 @@ impl StateApi {
                 key
             ))
             .map_err(BasicErrorWith404::internal)?
-            .ok_or_else(|| build_not_found("table handle or item", key, ledger_version))?;
+            .ok_or_else(|| table_item_not_found(table_handle, &key, ledger_version))?;
 
         let move_value = converter
             .try_into_move_value(&value_type, &bytes)

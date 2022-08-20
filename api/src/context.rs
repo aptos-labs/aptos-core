@@ -3,8 +3,8 @@
 
 use crate::accept_type::AcceptType;
 use crate::response::{
-    AptosErrorResponse, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
-    InternalError, NotFoundError,
+    version_not_found, version_pruned, AptosErrorResponse, BasicErrorWith404, BasicResponse,
+    BasicResponseStatus, BasicResultWith404, InternalError, NotFoundError, StdApiError,
 };
 use anyhow::{anyhow, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_api_types::{
@@ -132,6 +132,25 @@ impl Context {
             oldest_block_event.height(),
             newest_block_event.height(),
         ))
+    }
+
+    pub fn get_latest_ledger_info_and_verify_lookup_version<E: StdApiError>(
+        &self,
+        requested_ledger_version: Option<Version>,
+    ) -> Result<(LedgerInfo, Version), E> {
+        let latest_ledger_info = self.get_latest_ledger_info()?;
+
+        let requested_ledger_version =
+            requested_ledger_version.unwrap_or_else(|| latest_ledger_info.version());
+
+        // This is too far in the future, a retriable case
+        if requested_ledger_version > latest_ledger_info.version() {
+            return Err(version_not_found(requested_ledger_version));
+        } else if requested_ledger_version < latest_ledger_info.oldest_ledger_version.0 {
+            return Err(version_pruned(requested_ledger_version));
+        }
+
+        Ok((latest_ledger_info, requested_ledger_version))
     }
 
     pub fn get_latest_ledger_info_with_signatures(&self) -> Result<LedgerInfoWithSignatures> {
