@@ -689,6 +689,7 @@ pub enum ExecutionStatus {
     MoveAbort {
         location: AbortLocation,
         code: u64,
+        info: Option<AbortInfo>,
     },
     ExecutionFailure {
         location: AbortLocation,
@@ -698,14 +699,24 @@ pub enum ExecutionStatus {
     MiscellaneousError(Option<StatusCode>),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
+#[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
+pub struct AbortInfo {
+    pub reason_name: String,
+    pub description: String,
+}
+
 impl From<KeptVMStatus> for ExecutionStatus {
     fn from(kept_status: KeptVMStatus) -> Self {
         match kept_status {
             KeptVMStatus::Executed => ExecutionStatus::Success,
             KeptVMStatus::OutOfGas => ExecutionStatus::OutOfGas,
-            KeptVMStatus::MoveAbort(location, code) => {
-                ExecutionStatus::MoveAbort { location, code }
-            }
+            KeptVMStatus::MoveAbort(location, code) => ExecutionStatus::MoveAbort {
+                location,
+                code,
+                info: None,
+            },
             KeptVMStatus::ExecutionFailure {
                 location: loc,
                 function: func,
@@ -725,6 +736,7 @@ impl ExecutionStatus {
         matches!(self, ExecutionStatus::Success)
     }
 }
+
 /// The status of executing a transaction. The VM decides whether or not we should `Keep` the
 /// transaction output or `Discard` it based upon the execution of the transaction. We wrap these
 /// decisions around a `VMStatus` that provides more detail on the final execution state of the VM.

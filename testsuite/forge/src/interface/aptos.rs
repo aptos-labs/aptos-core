@@ -15,7 +15,7 @@ use aptos_sdk::{
         LocalAccount,
     },
 };
-use aptos_transaction_builder::aptos_stdlib;
+use cached_packages::aptos_stdlib;
 use rand::{rngs::OsRng, Rng, SeedableRng};
 use reqwest::Url;
 

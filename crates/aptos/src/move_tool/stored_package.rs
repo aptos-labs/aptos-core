@@ -106,10 +106,6 @@ impl<'a> CachedPackageMetadata<'a> {
         &self.metadata.manifest
     }
 
-    pub fn error_map_raw(&self) -> &str {
-        &self.metadata.error_map
-    }
-
     pub fn abis(&self) -> &[String] {
         self.metadata.abis.as_slice()
     }
@@ -139,10 +135,6 @@ impl<'a> CachedPackageMetadata<'a> {
     ) -> anyhow::Result<()> {
         fs::create_dir_all(path)?;
         fs::write(path.join("Move.toml"), &self.metadata.manifest)?;
-        fs::write(
-            path.join("error_description.errmap"),
-            &self.metadata.error_map,
-        )?;
         fs::write(path.join("BuildInfo.yaml"), &self.metadata.build_info)?;
         let sources_dir = path.join(CompiledPackageLayout::Sources.path());
         fs::create_dir_all(&sources_dir)?;

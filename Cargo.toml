@@ -85,7 +85,6 @@ members = [
     "network/peer-monitoring-service/server",
     "network/peer-monitoring-service/types",
     "sdk",
-    "sdk/transaction-builder",
     "secure/net",
     "secure/push-metrics",
     "secure/storage",

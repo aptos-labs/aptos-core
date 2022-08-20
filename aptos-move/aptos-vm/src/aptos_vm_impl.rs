@@ -14,13 +14,16 @@ use aptos_aggregator::transaction::TransactionOutputExt;
 use aptos_gas::{AptosGasParameters, FromOnChainGasSchedule, Gas, NativeGasParameters};
 use aptos_logger::prelude::*;
 use aptos_state_view::StateView;
+use aptos_types::transaction::AbortInfo;
 use aptos_types::{
     account_config::{ChainSpecificAccountInfo, APTOS_CHAIN_INFO, CORE_CODE_ADDRESS},
     on_chain_config::{GasSchedule, OnChainConfig, Version, APTOS_VERSION_3},
     transaction::{ExecutionStatus, TransactionOutput, TransactionStatus},
     vm_status::{StatusCode, VMStatus},
 };
+use dashmap::DashMap;
 use fail::fail_point;
+use framework::{RuntimeModuleMetadata, APTOS_METADATA_KEY};
 use move_deps::{
     move_binary_format::{errors::VMResult, CompiledModule},
     move_core_types::{
@@ -41,6 +44,7 @@ pub struct AptosVMImpl {
     gas_params: Option<AptosGasParameters>,
     version: Option<Version>,
     chain_account_info: Option<ChainSpecificAccountInfo>,
+    metadata_cache: DashMap<ModuleId, Option<RuntimeModuleMetadata>>,
 }
 
 impl AptosVMImpl {
@@ -68,6 +72,7 @@ impl AptosVMImpl {
             gas_params,
             version: None,
             chain_account_info: None,
+            metadata_cache: Default::default(),
         };
         vm.version = Version::fetch_config(&storage);
         vm.chain_account_info = Self::get_chain_specific_account_info(&RemoteStorage::new(state));
@@ -88,6 +93,7 @@ impl AptosVMImpl {
             gas_params: Some(gas_params),
             version: Some(version),
             chain_account_info: None,
+            metadata_cache: Default::default(),
         }
     }
 
@@ -398,6 +404,31 @@ impl AptosVMImpl {
                     log_context,
                 )
             })
+    }
+
+    pub(crate) fn extract_abort_info(
+        &self,
+        module: &ModuleId,
+        abort_code: u64,
+    ) -> Option<AbortInfo> {
+        let entry = self
+            .metadata_cache
+            .entry(module.clone())
+            .or_insert_with(|| {
+                if let Some(m) = self
+                    .move_vm
+                    .get_module_metadata(module.clone(), &APTOS_METADATA_KEY)
+                {
+                    bcs::from_bytes::<RuntimeModuleMetadata>(&m.value).ok()
+                } else {
+                    None
+                }
+            });
+        if let Some(m) = entry.value() {
+            m.extract_abort_info(abort_code)
+        } else {
+            None
+        }
     }
 
     pub fn new_session<'r, R: MoveResolverExt>(
