@@ -220,7 +220,7 @@ module aptos_framework::aptos_governance {
 
         // The proposer's stake needs to be at least the required bond amount.
         let governance_config = borrow_global<GovernanceConfig>(@aptos_framework);
-        let stake_balance = stake::get_current_epoch_voting_power(stake_pool);
+        let stake_balance = get_voting_power(stake_pool);
         assert!(
             stake_balance >= governance_config.required_proposer_stake,
             error::invalid_argument(EINSUFFICIENT_PROPOSER_STAKE),
@@ -297,7 +297,7 @@ module aptos_framework::aptos_governance {
         // Voting power does not include pending_active or pending_inactive balances.
         // In general, the stake pool should not have pending_inactive balance if it still has lockup (required to vote)
         // And if pending_active will be added to active in the next epoch.
-        let voting_power = stake::get_current_epoch_voting_power(stake_pool);
+        let voting_power = get_voting_power(stake_pool);
         // Short-circuit if the voter has no voting power.
         assert!(voting_power > 0, error::invalid_argument(ENO_VOTING_POWER));
 
@@ -373,6 +373,15 @@ module aptos_framework::aptos_governance {
     public fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         reconfiguration::reconfigure();
+    }
+
+    /// Return the voting power a stake pool has with respect to governance proposals.
+    fun get_voting_power(pool_address: address): u64 {
+        let (active, _, pending_active, pending_inactive) = stake::get_stake(pool_address);
+        // We calculate the voting power as total non-inactive stakes of the pool. Even if the validator is not in the
+        // active validator set, as long as they have a lockup (separately checked in create_proposal and voting), their
+        // stake would still count in their voting power for governance proposals.
+        active + pending_active + pending_inactive
     }
 
     /// Return a signer for making changes to 0x1 as part of on-chain governance proposal process.
