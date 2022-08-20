@@ -26,3 +26,5 @@ runs:
         echo "/home/runner/.dotnet" | tee -a $GITHUB_PATH
         echo "/home/runner/.dotnet/tools" | tee -a $GITHUB_PATH
         echo "/home/runner/.cargo/bin" | tee -a $GITHUB_PATH
+    - run: "sudo apt install -y lld"
+      shell: bash
