@@ -13,7 +13,8 @@ class It3Profile < ApplicationRecord
   has_one :location, as: :item
 
   validates :owner_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }
-  validates :consensus_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }
+  validates :consensus_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{96}\z/i }
+  validates :consensus_pop, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{192}\z/i }
   validates :account_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }
   validates :network_key, presence: true, uniqueness: true, format: { with: /\A0x[a-f0-9]{64}\z/i }
 

@@ -12,7 +12,7 @@ use framework::unzip_metadata;
 use move_deps::move_package::compilation::package_layout::CompiledPackageLayout;
 use reqwest::Url;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // TODO: this is a first naive implementation of the package registry. Before mainnet
 // we need to use tables for the package registry.
@@ -46,8 +46,12 @@ impl CachedPackageRegistry {
     }
 
     /// Returns the list of packages in this registry by name.
-    pub fn package_names(&self) -> Vec<String> {
-        self.inner.packages.iter().map(|p| p.name.clone()).collect()
+    pub fn package_names(&self) -> Vec<&str> {
+        self.inner
+            .packages
+            .iter()
+            .map(|p| p.name.as_str())
+            .collect()
     }
 
     /// Finds the metadata for the given module in the registry by its unique name.
@@ -102,19 +106,15 @@ impl<'a> CachedPackageMetadata<'a> {
         &self.metadata.manifest
     }
 
-    pub fn error_map_raw(&self) -> &str {
-        &self.metadata.error_map
-    }
-
     pub fn abis(&self) -> &[String] {
         self.metadata.abis.as_slice()
     }
 
-    pub fn module_names(&self) -> Vec<String> {
+    pub fn module_names(&self) -> Vec<&str> {
         self.metadata
             .modules
             .iter()
-            .map(|s| s.name.clone())
+            .map(|s| s.name.as_str())
             .collect()
     }
 
@@ -130,15 +130,11 @@ impl<'a> CachedPackageMetadata<'a> {
 
     pub fn save_package_to_disk(
         &self,
-        path: PathBuf,
+        path: &Path,
         with_derived_artifacts: bool,
     ) -> anyhow::Result<()> {
-        fs::create_dir_all(&path)?;
+        fs::create_dir_all(path)?;
         fs::write(path.join("Move.toml"), &self.metadata.manifest)?;
-        fs::write(
-            path.join("error_description.errmap"),
-            &self.metadata.error_map,
-        )?;
         fs::write(path.join("BuildInfo.yaml"), &self.metadata.build_info)?;
         let sources_dir = path.join(CompiledPackageLayout::Sources.path());
         fs::create_dir_all(&sources_dir)?;

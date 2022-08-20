@@ -1629,7 +1629,7 @@
           {
             "name": "table_handle",
             "schema": {
-              "$ref": "#/components/schemas/U128"
+              "$ref": "#/components/schemas/Address"
             },
             "in": "path",
             "required": true,
@@ -2885,7 +2885,7 @@
         "required": [
           "version",
           "hash",
-          "state_root_hash",
+          "state_change_hash",
           "event_root_hash",
           "gas_used",
           "success",
@@ -2908,10 +2908,13 @@
           "hash": {
             "$ref": "#/components/schemas/HashValue"
           },
-          "state_root_hash": {
+          "state_change_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_checkpoint_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
@@ -3227,7 +3230,7 @@
         "required": [
           "version",
           "hash",
-          "state_root_hash",
+          "state_change_hash",
           "event_root_hash",
           "gas_used",
           "success",
@@ -3244,10 +3247,13 @@
           "hash": {
             "$ref": "#/components/schemas/HashValue"
           },
-          "state_root_hash": {
+          "state_change_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_checkpoint_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
@@ -3310,10 +3316,10 @@
           "epoch",
           "ledger_version",
           "oldest_ledger_version",
-          "block_height",
-          "oldest_block_height",
           "ledger_timestamp",
-          "node_role"
+          "node_role",
+          "oldest_block_height",
+          "block_height"
         ],
         "properties": {
           "chain_id": {
@@ -3329,17 +3335,17 @@
           "oldest_ledger_version": {
             "$ref": "#/components/schemas/U64"
           },
-          "block_height": {
-            "$ref": "#/components/schemas/U64"
-          },
-          "oldest_block_height": {
-            "$ref": "#/components/schemas/U64"
-          },
           "ledger_timestamp": {
             "$ref": "#/components/schemas/U64"
           },
           "node_role": {
             "$ref": "#/components/schemas/RoleType"
+          },
+          "oldest_block_height": {
+            "$ref": "#/components/schemas/U64"
+          },
+          "block_height": {
+            "$ref": "#/components/schemas/U64"
           }
         }
       },
@@ -3779,7 +3785,7 @@
         "required": [
           "version",
           "hash",
-          "state_root_hash",
+          "state_change_hash",
           "event_root_hash",
           "gas_used",
           "success",
@@ -3795,10 +3801,13 @@
           "hash": {
             "$ref": "#/components/schemas/HashValue"
           },
-          "state_root_hash": {
+          "state_change_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_checkpoint_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {
@@ -4176,7 +4185,7 @@
         "required": [
           "version",
           "hash",
-          "state_root_hash",
+          "state_change_hash",
           "event_root_hash",
           "gas_used",
           "success",
@@ -4199,10 +4208,13 @@
           "hash": {
             "$ref": "#/components/schemas/HashValue"
           },
-          "state_root_hash": {
+          "state_change_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "event_root_hash": {
+            "$ref": "#/components/schemas/HashValue"
+          },
+          "state_checkpoint_hash": {
             "$ref": "#/components/schemas/HashValue"
           },
           "gas_used": {

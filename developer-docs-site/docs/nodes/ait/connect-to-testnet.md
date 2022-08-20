@@ -8,6 +8,38 @@ sidebar_position: 14
 
 Do this only if you received the confirmation email from Aptos team for your eligibility. Nodes not selected will not have enough tokens to join the testnet. You can still run public fullnode in this case if you want.
 
+## Initializing staking pool
+
+In AIT3 we will have UI support to allow owner managing the staking pool, see details [here](https://aptos.dev/nodes/ait/steps-in-ait3#initialize-staking-pool). Alternatively, you can also use CLI to intialize staking pool:
+
+- Initialize CLI with your wallet **private key**, you can get in from Settings -> Credentials
+
+  ```
+  aptos init --profile ait3-owner \
+    --rest-url http://ait3.aptosdev.com
+  ```
+
+- Initialize staking pool using CLI
+
+  ```
+  aptos stake initialize-stake-owner \
+    --initial-stake-amount 100000000000000 \
+    --operator-address <operator-address> \
+    --voter-address <voter-address> \
+    --profile ait3-owner
+  ```
+
+- Don't forget to transfer some coin to your operator account to pay gas, you can do that with Petra, or CLI
+
+  ```
+  aptos account create --account <operator-account> --profile ait3-owner
+  
+  aptos account transfer \
+  --account <operator-account> \
+  --amount 5000 \
+  --profile ait3-owner
+  ```
+
 ## Bootstrapping validator node
 
 Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode. AIT3 network Chain ID is 43.
@@ -16,6 +48,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 - Stop your node and remove the data directory.
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
+- Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
 - Pull the latest changes on `testnet` branch
 - Close the metrics port `9101` and REST API port `80` for your validator (you can leave it open for fullnode).
 - Restarting the node
@@ -24,6 +57,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 - Stop your node and remove the data volumes, `docker compose down --volumes`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
+- - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
 - Update your docker image to use tag `testnet`
 - Close metrics port on 9101 and REST API port `80` for your validator (remove it from the docker compose file), you can leave it open for fullnode.
 - Restarting the node: `docker compose up`
@@ -51,6 +85,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
     ```
 - Apply Terraform: `terraform apply`
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
+- - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
 - Recreate the secrets, make sure the secret name matches your `era` number, e.g. if you have `era = 3`, you should replace the secret name to be `${WORKSPACE}-aptos-node-0-genesis-e3`
     ```
     export WORKSPACE=<your workspace name>
@@ -98,7 +133,7 @@ All the selected participant will get Aptos coin airdrop into their owner accoun
     ```
     aptos node update-validator-network-addresses  \
       --pool-address <owner-address> \
-      --validator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
+      --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
       --profile ait3-operator
     ```
 
@@ -107,7 +142,7 @@ All the selected participant will get Aptos coin airdrop into their owner accoun
     ```
     aptos node update-consensus-key  \
       --pool-address <owner-address> \
-      --validator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
+      --operator-config-file ~/$WORKSPACE/$USERNAME/operator.yaml \
       --profile ait3-operator
     ```
 

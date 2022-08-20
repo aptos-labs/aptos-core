@@ -233,10 +233,10 @@ fn find_workspace_config(
         ConfigSearchMode::CurrentDirAndParents => {
             let mut current_path = starting_path.clone();
             loop {
-                let cand = current_path.join(CONFIG_FOLDER);
-                if cand.is_dir() {
-                    break Ok(cand);
-                } else if !current_path.pop() {
+                current_path.push(CONFIG_FOLDER);
+                if current_path.is_dir() {
+                    break Ok(current_path);
+                } else if !(current_path.pop() && current_path.pop()) {
                     // If we aren't able to find the folder, we'll create a new one right here
                     break Ok(starting_path.join(CONFIG_FOLDER));
                 }

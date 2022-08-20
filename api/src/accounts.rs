@@ -12,7 +12,7 @@ use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     AccountData, Address, AptosErrorCode, AsConverter, LedgerInfo, MoveModuleBytecode,
-    MoveResource, MoveStructTag, TransactionId, U64,
+    MoveModuleId, MoveResource, MoveStructTag, TransactionId, U64,
 };
 use aptos_types::access_path::AccessPath;
 use aptos_types::account_config::AccountResource;
@@ -28,6 +28,7 @@ use move_deps::move_core_types::{
 };
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::sync::Arc;
 
@@ -164,50 +165,84 @@ impl Account {
             .map_err(BasicErrorWith404::internal)?;
         let account_data: AccountData = account_resource.into();
 
-        BasicResponse::try_from_rust_value((
-            account_data,
-            &self.latest_ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+        match accept_type {
+            AcceptType::Json => BasicResponse::try_from_json((
+                account_data,
+                &self.latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+            AcceptType::Bcs => BasicResponse::try_from_encoded((
+                state_value,
+                &self.latest_ledger_info,
+                BasicResponseStatus::Ok,
+            )),
+        }
     }
 
     pub fn resources(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveResource>> {
         let account_state = self.account_state()?;
         let resources = account_state.get_resources();
-        let move_resolver = self.context.move_resolver_poem()?;
-        let converted_resources = move_resolver
-            .as_converter(self.context.db.clone())
-            .try_into_resources(resources)
-            .context("Failed to build move resource response from data in DB")
-            .map_err(BasicErrorWith404::internal)
-            .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
 
-        BasicResponse::try_from_rust_value((
-            converted_resources,
-            &self.latest_ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+        match accept_type {
+            AcceptType::Json => {
+                let move_resolver = self.context.move_resolver_poem()?;
+                let converted_resources = move_resolver
+                    .as_converter(self.context.db.clone())
+                    .try_into_resources(resources)
+                    .context("Failed to build move resource response from data in DB")
+                    .map_err(BasicErrorWith404::internal)
+                    .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
+
+                BasicResponse::try_from_json((
+                    converted_resources,
+                    &self.latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            }
+            AcceptType::Bcs => {
+                let resources: BTreeMap<StructTag, Vec<u8>> = resources
+                    .map(|(key, value)| (key, value.to_vec()))
+                    .collect();
+                BasicResponse::try_from_bcs((
+                    resources,
+                    &self.latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            }
+        }
     }
 
     pub fn modules(self, accept_type: &AcceptType) -> BasicResultWith404<Vec<MoveModuleBytecode>> {
-        let mut modules = Vec::new();
-        for module in self.account_state()?.into_modules() {
-            modules.push(
-                MoveModuleBytecode::new(module)
-                    .try_parse_abi()
-                    .context("Failed to parse move module ABI")
-                    .map_err(BasicErrorWith404::internal)
-                    .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?,
-            );
+        let modules = self.account_state()?.into_modules();
+        match accept_type {
+            AcceptType::Json => {
+                let mut converted_modules = Vec::new();
+                for (_, module) in modules {
+                    converted_modules.push(
+                        MoveModuleBytecode::new(module)
+                            .try_parse_abi()
+                            .context("Failed to parse move module ABI")
+                            .map_err(BasicErrorWith404::internal)
+                            .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?,
+                    );
+                }
+                BasicResponse::try_from_json((
+                    converted_modules,
+                    &self.latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            }
+            AcceptType::Bcs => {
+                let modules: BTreeMap<MoveModuleId, Vec<u8>> = modules
+                    .map(|(key, value)| (key.into(), value.to_vec()))
+                    .collect();
+                BasicResponse::try_from_bcs((
+                    modules,
+                    &self.latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            }
         }
-        BasicResponse::try_from_rust_value((
-            modules,
-            &self.latest_ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
     }
 
     // Helpers for processing account state.

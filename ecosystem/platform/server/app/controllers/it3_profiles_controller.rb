@@ -164,9 +164,10 @@ class It3ProfilesController < ApplicationController
   # Only allow a list of trusted parameters through.
   def it3_profile_params
     params.fetch(:it3_profile, {}).permit(:owner_key,
-                                          :consensus_key, :account_key, :network_key, :validator_address,
-                                          :validator_port, :validator_api_port, :validator_metrics_port,
-                                          :fullnode_address, :fullnode_port, :fullnode_network_key, :terms_accepted)
+                                          :consensus_key, :consensus_pop, :account_key, :network_key,
+                                          :validator_address, :validator_port, :validator_api_port,
+                                          :validator_metrics_port, :fullnode_address, :fullnode_port,
+                                          :fullnode_network_key, :terms_accepted)
   end
 
   def ensure_registration_enabled!

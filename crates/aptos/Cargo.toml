@@ -54,7 +54,6 @@ aptos-sdk = { path = "../../sdk" }
 aptos-secure-storage = { path = "../../secure/storage" }
 aptos-telemetry = { path = "../aptos-telemetry" }
 aptos-temppath = { path = "../aptos-temppath" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-transactional-test-harness = { path = "../../aptos-move/aptos-transactional-test-harness" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }

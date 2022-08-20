@@ -101,6 +101,7 @@ impl AUTransactionGen for CreateExistingAccountGen {
             TransactionStatus::Keep(ExecutionStatus::MoveAbort {
                 location: AbortLocation::Script,
                 code: 777_777,
+                info: None,
             })
         } else {
             // Not enough gas to get past the prologue.

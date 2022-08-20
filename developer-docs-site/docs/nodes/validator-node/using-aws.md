@@ -184,7 +184,7 @@ This will download all the Terraform dependencies into the `.terraform` folder i
 13. Download the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
 
     ```
-    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb
+    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb -P ~/$WORKSPACE
     ```
 
 14. Compile the genesis blob and waypoint.

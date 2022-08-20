@@ -19,7 +19,6 @@ pub(super) fn ledger_db_column_families() -> Vec<ColumnFamilyName> {
         EVENT_BY_KEY_CF_NAME,
         EVENT_BY_VERSION_CF_NAME,
         EVENT_CF_NAME,
-        LEDGER_COUNTERS_CF_NAME,
         LEDGER_INFO_CF_NAME,
         STALE_STATE_VALUE_INDEX_CF_NAME,
         STATE_VALUE_CF_NAME,

@@ -178,7 +178,7 @@ impl BlockCache {
     ) -> ApiResult<aptos_rest_client::aptos_api_types::Block> {
         let block = self
             .rest_client
-            .get_block(height, with_transactions)
+            .get_block_by_height(height, with_transactions)
             .await?
             .into_inner();
         let block_id = BlockInfo::from_block(&block);

@@ -6,7 +6,7 @@ use crate::common::types::{
     TransactionSummary,
 };
 use crate::common::utils::prompt_yes_with_override;
-use crate::move_tool::{compile_move, init_move_dir, ArgWithType, FunctionArgType};
+use crate::move_tool::{init_move_dir, ArgWithType, FunctionArgType};
 use crate::{CliCommand, CliResult};
 use aptos_crypto::HashValue;
 use aptos_logger::warn;
@@ -18,10 +18,9 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use clap::Parser;
-use move_deps::{
-    move_compiler::compiled_unit::CompiledUnitEnum,
-    move_core_types::{language_storage::TypeTag, transaction_argument::TransactionArgument},
-    move_package::BuildConfig,
+use framework::{BuildOptions, BuiltPackage};
+use move_deps::move_core_types::{
+    language_storage::TypeTag, transaction_argument::TransactionArgument,
 };
 use reqwest::Url;
 use serde::Deserialize;
@@ -113,11 +112,11 @@ impl CliCommand<ProposalSubmissionSummary> for SubmitProposal {
 
         if let Transaction::UserTransaction(inner) = txn {
             // Find event with proposal id
-            let proposal_id = if let Some(event) = inner.events.iter().find(|event| {
+            let proposal_id = if let Some(event) = inner.events.into_iter().find(|event| {
                 event.typ.to_string().as_str() == "0x1::aptos_governance::CreateProposalEvent"
             }) {
-                let data: CreateProposalEvent = serde_json::from_value(event.data.clone())
-                    .map_err(|_| {
+                let data: CreateProposalEvent =
+                    serde_json::from_value(event.data).map_err(|_| {
                         CliError::UnexpectedError(
                             "Failed to parse Proposal event to get ProposalId".to_string(),
                         )
@@ -330,15 +329,18 @@ fn compile_in_temp_dir(
 }
 
 fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
-    let build_config = BuildConfig {
-        additional_named_addresses: BTreeMap::new(),
-        generate_abis: false,
-        generate_docs: false,
-        ..Default::default()
+    let build_options = BuildOptions {
+        with_srcs: false,
+        with_abis: false,
+        with_source_maps: false,
+        with_error_map: false,
+        install_dir: None,
+        named_addresses: Default::default(),
     };
 
-    let compiled_package = compile_move(build_config, package_dir)?;
-    let scripts_count = compiled_package.scripts().count();
+    let pack = BuiltPackage::build(package_dir.to_path_buf(), build_options)?;
+
+    let scripts_count = pack.script_count();
 
     if scripts_count != 1 {
         return Err(CliError::UnexpectedError(format!(
@@ -348,26 +350,9 @@ fn compile_script(package_dir: &Path) -> CliTypedResult<(Vec<u8>, HashValue)> {
         )));
     }
 
-    let script = *compiled_package
-        .scripts()
-        .collect::<Vec<_>>()
-        .get(0)
-        .unwrap();
-
-    match script.unit {
-        CompiledUnitEnum::Script(ref s) => {
-            let mut bytes = vec![];
-
-            s.script
-                .serialize(&mut bytes)
-                .map_err(|err| CliError::UnexpectedError(format!("Unexpected error: {}", err)))?;
-            let hash = HashValue::sha3_256_of(bytes.as_slice());
-            Ok((bytes, hash))
-        }
-        CompiledUnitEnum::Module(_) => Err(CliError::UnexpectedError(
-            "You can only execute a script, a module is not supported.".to_string(),
-        )),
-    }
+    let bytes = pack.extract_script_code().pop().unwrap();
+    let hash = HashValue::sha3_256_of(bytes.as_slice());
+    Ok((bytes, hash))
 }
 
 /// Execute a proposal that has passed voting requirements
@@ -452,7 +437,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
         let mut type_args: Vec<TypeTag> = Vec::new();
 
         // These TypeArgs are used for generics
-        for type_arg in self.type_args.iter().cloned() {
+        for type_arg in self.type_args.into_iter() {
             let type_tag = TypeTag::try_from(type_arg)
                 .map_err(|err| CliError::UnableToParse("--type-args", err.to_string()))?;
             type_args.push(type_tag)

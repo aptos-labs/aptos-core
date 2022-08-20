@@ -5,7 +5,7 @@ use crate::pruner::pruner_metadata::{PrunerMetadata, PrunerTag};
 use crate::pruner_metadata::PrunerMetadataSchema;
 use crate::{
     jellyfish_merkle_node::JellyfishMerkleNodeSchema, metrics::PRUNER_LEAST_READABLE_VERSION,
-    pruner::db_pruner::DBPruner, stale_node_index::StaleNodeIndexSchema, utils, ChangeSet,
+    pruner::db_pruner::DBPruner, stale_node_index::StaleNodeIndexSchema, utils,
     OTHER_TIMERS_SECONDS,
 };
 use anyhow::Result;
@@ -118,7 +118,7 @@ impl StateMerklePruner {
     }
 
     /// Prunes the genesis state and saves the db alterations to the given change set
-    pub fn prune_genesis(state_merkle_db: Arc<DB>, change_set: &mut ChangeSet) -> Result<()> {
+    pub fn prune_genesis(state_merkle_db: Arc<DB>, batch: &mut SchemaBatch) -> Result<()> {
         let target_version = 1; // The genesis version is 0. Delete [0,1) (exclusive)
         let max_version = 1; // We should only be pruning a single version
 
@@ -131,7 +131,7 @@ impl StateMerklePruner {
             min_readable_version,
             target_version,
             max_version,
-            Some(&mut change_set.batch),
+            Some(batch),
         )?;
 
         Ok(())

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_gas::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule};
-use aptos_transaction_builder::aptos_stdlib;
+use cached_packages::aptos_stdlib;
 use forge::Swarm;
 use std::time::Duration;
 

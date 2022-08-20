@@ -1,11 +1,12 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{CliCommand, CliResult, CliTypedResult, TransactionOptions};
-use aptos_rest_client::Transaction;
-use aptos_transaction_builder::aptos_stdlib;
+use crate::common::types::{
+    CliCommand, CliResult, CliTypedResult, TransactionOptions, TransactionSummary,
+};
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
+use cached_packages::aptos_stdlib;
 use clap::Parser;
 
 /// Tool for manipulating stake
@@ -50,15 +51,16 @@ pub struct AddStake {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for AddStake {
+impl CliCommand<TransactionSummary> for AddStake {
     fn command_name(&self) -> &'static str {
         "AddStake"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_add_stake(self.amount))
             .await
+            .map(|inner| inner.into())
     }
 }
 
@@ -76,15 +78,16 @@ pub struct UnlockStake {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for UnlockStake {
+impl CliCommand<TransactionSummary> for UnlockStake {
     fn command_name(&self) -> &'static str {
         "UnlockStake"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_unlock(self.amount))
             .await
+            .map(|inner| inner.into())
     }
 }
 
@@ -103,15 +106,16 @@ pub struct WithdrawStake {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for WithdrawStake {
+impl CliCommand<TransactionSummary> for WithdrawStake {
     fn command_name(&self) -> &'static str {
         "WithdrawStake"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.node_op_options
             .submit_transaction(aptos_stdlib::stake_withdraw(self.amount))
             .await
+            .map(|inner| inner.into())
     }
 }
 
@@ -125,15 +129,16 @@ pub struct IncreaseLockup {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for IncreaseLockup {
+impl CliCommand<TransactionSummary> for IncreaseLockup {
     fn command_name(&self) -> &'static str {
         "IncreaseLockup"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_increase_lockup())
             .await
+            .map(|inner| inner.into())
     }
 }
 
@@ -164,12 +169,12 @@ pub struct InitializeStakeOwner {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for InitializeStakeOwner {
+impl CliCommand<TransactionSummary> for InitializeStakeOwner {
     fn command_name(&self) -> &'static str {
         "InitializeStakeOwner"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         let owner_address = self.txn_options.sender_address()?;
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_initialize_stake_owner(
@@ -178,6 +183,7 @@ impl CliCommand<Transaction> for InitializeStakeOwner {
                 self.voter_address.unwrap_or(owner_address),
             ))
             .await
+            .map(|inner| inner.into())
     }
 }
 
@@ -195,15 +201,16 @@ pub struct SetOperator {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for SetOperator {
+impl CliCommand<TransactionSummary> for SetOperator {
     fn command_name(&self) -> &'static str {
         "SetOperator"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_set_operator(self.operator_address))
             .await
+            .map(|inner| inner.into())
     }
 }
 
@@ -221,14 +228,15 @@ pub struct SetDelegatedVoter {
 }
 
 #[async_trait]
-impl CliCommand<Transaction> for SetDelegatedVoter {
+impl CliCommand<TransactionSummary> for SetDelegatedVoter {
     fn command_name(&self) -> &'static str {
         "SetDelegatedVoter"
     }
 
-    async fn execute(mut self) -> CliTypedResult<Transaction> {
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
         self.txn_options
             .submit_transaction(aptos_stdlib::stake_set_delegated_voter(self.voter_address))
             .await
+            .map(|inner| inner.into())
     }
 }
