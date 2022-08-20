@@ -15,7 +15,6 @@ use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::StateView;
 use aptos_types::account_config::NewBlockEvent;
-use aptos_types::transaction::Transaction;
 use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
@@ -239,51 +238,38 @@ impl Context {
         if last_version > ledger_version {
             return Err(BasicErrorWith404::not_found(anyhow!("Block not found")));
         }
-
-        let (block_hash, timestamp, txns) = if with_transactions {
-            let txns = self
-                .get_transactions(
+        let block_hash = new_block_event
+            .hash()
+            .context("Failed to parse block hash")
+            .map_err(BasicErrorWith404::internal)
+            .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
+        let block_timestamp = new_block_event.proposed_time();
+        let txns = if with_transactions {
+            Some(
+                self.get_transactions(
                     first_version,
                     (last_version - first_version + 1) as u16,
                     ledger_version,
                 )
                 .context("Failed to read raw transactions from storage")
                 .map_err(BasicErrorWith404::internal)
-                .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
-
-            // TODO: embed block hash into the NewBlockEvent
-            let (block_hash, timestamp) = if let Some(txn) = txns.first() {
-                get_block_hash_and_timestamp(&txn.transaction, first_version)
-                    .map_err(BasicErrorWith404::internal)?
-            } else {
-                return Err(BasicErrorWith404::internal(anyhow!(
-                    "No transactions found for block"
-                )));
-            };
-            (block_hash, timestamp, Some(txns))
+                .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?,
+            )
         } else {
-            let txn = self
-                .get_transaction_by_version(first_version, ledger_version)
-                .context("Failed to read raw transactions from storage")
-                .map_err(BasicErrorWith404::internal)
-                .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
-            let (block_hash, timestamp) =
-                get_block_hash_and_timestamp(&txn.transaction, first_version)
-                    .map_err(BasicErrorWith404::internal)?;
-            (block_hash, timestamp, None)
+            None
         };
 
         match accept_type {
             AcceptType::Json => {
                 let transactions = if let Some(inner) = txns {
-                    Some(self.render_transactions(inner, timestamp)?)
+                    Some(self.render_transactions(inner, block_timestamp)?)
                 } else {
                     None
                 };
                 let block = Block {
                     block_height: new_block_event.height().into(),
                     block_hash: block_hash.into(),
-                    block_timestamp: new_block_event.proposed_time().into(),
+                    block_timestamp: block_timestamp.into(),
                     first_version: first_version.into(),
                     last_version: last_version.into(),
                     transactions,
@@ -294,7 +280,7 @@ impl Context {
                 let block = BcsBlock {
                     block_height: new_block_event.height(),
                     block_hash,
-                    block_timestamp: new_block_event.proposed_time(),
+                    block_timestamp,
                     first_version,
                     last_version,
                     transactions: txns,
@@ -474,19 +460,6 @@ impl Context {
                     result.reverse();
                     result
                 })
-        }
-    }
-}
-
-pub fn get_block_hash_and_timestamp(txn: &Transaction, version: u64) -> Result<(HashValue, u64)> {
-    match txn {
-        Transaction::GenesisTransaction(_) => Ok((HashValue::zero(), 0)),
-        Transaction::BlockMetadata(ref inner) => Ok((inner.id(), inner.timestamp_usecs())),
-        _ => {
-            return Err(anyhow!(
-                "Genesis or BlockMetadata transaction expected at block first version {}",
-                version,
-            ))
         }
     }
 }
