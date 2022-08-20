@@ -24,8 +24,9 @@
 /state-sync/ @joshlind
 # Owners for the `/consensus` directory and all its subdirectories.
 /consensus/ @zekun000
-# Owners for the `/storage` directory and all its subdirectories.
-/storage/ @msmouse
+# Owners for execution and storage
+/execution/ @msmouse @lightmark
+/storage/ @msmouse @lightmark
 # Owners for the `/aptos` directory and all its subdirectories. And other CLI related crates
 /crates/aptos @gregnazario
 /crates/aptos-genesis @gregnazario
