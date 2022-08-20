@@ -13,15 +13,13 @@ evaluators:
   - consensus_proposals
   - api_latency
   - consensus_round
-  - consensus_timeouts
-  - state_sync_version
   - api_transaction_availability
 evaluator_args:
   build_version_args: {}
   consensus_proposals_args: {}
   consensus_round_args: {}
   consensus_timeouts_args:
-    allowed_consensus_timeouts: 0
+    allowed_consensus_timeouts: 5
   hardware_args:
     min_cpu_cores: 8
     min_ram_gb: 16
