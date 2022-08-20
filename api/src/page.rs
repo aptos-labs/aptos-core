@@ -6,6 +6,8 @@ use aptos_api_types::AptosErrorCode;
 use serde::Deserialize;
 
 const DEFAULT_PAGE_SIZE: u16 = 25;
+
+/// This MAX_PAGE_SIZE must always be smaller than the `aptos_db::MAX_LIMIT` in the DB
 const MAX_PAGE_SIZE: u16 = 1000;
 
 #[derive(Clone, Debug, Deserialize)]

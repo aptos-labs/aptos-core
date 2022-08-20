@@ -9,12 +9,11 @@ use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use crate::page::Page;
 use crate::response::{
-    BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
-    InternalError,
+    BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
 };
 use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
-use aptos_api_types::{Address, EventKey, IdentifierWrapper, MoveStructTag, U64};
+use aptos_api_types::{Address, AptosErrorCode, EventKey, IdentifierWrapper, MoveStructTag, U64};
 use aptos_api_types::{AsConverter, VersionedEvent};
 use poem_openapi::param::Query;
 use poem_openapi::{param::Path, OpenApi};
@@ -97,10 +96,10 @@ impl EventsApi {
                 page.limit()?,
                 ledger_version,
             )
-            // TODO: Previously this was a 500, but I'm making this a 400. I suspect
-            // both could be true depending on the error. Make this more specific.
             .context(format!("Failed to find events by key {}", event_key))
-            .map_err(BasicErrorWith404::bad_request)?;
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(err, AptosErrorCode::ReadFromStorageError)
+            })?;
 
         match accept_type {
             AcceptType::Json => {
@@ -109,7 +108,12 @@ impl EventsApi {
                     .as_converter(self.context.db.clone())
                     .try_into_versioned_events(&events)
                     .context("Failed to convert events from storage into response {}")
-                    .map_err(BasicErrorWith404::internal)?;
+                    .map_err(|err| {
+                        BasicErrorWith404::internal_with_code(
+                            err,
+                            AptosErrorCode::InvalidBcsInStorageError,
+                        )
+                    })?;
 
                 BasicResponse::try_from_json((events, &latest_ledger_info, BasicResponseStatus::Ok))
             }
