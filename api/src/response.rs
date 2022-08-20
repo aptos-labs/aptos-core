@@ -32,8 +32,11 @@
 use std::fmt::Display;
 
 use super::accept_type::AcceptType;
-use aptos_api_types::{AptosError, AptosErrorCode};
+use aptos_api_types::{Address, AptosError, AptosErrorCode};
+use move_deps::move_core_types::identifier::{IdentStr, Identifier};
+use move_deps::move_core_types::language_storage::StructTag;
 use poem_openapi::{payload::Json, types::ToJSON, ResponseContent};
+use serde_json::Value;
 
 use super::bcs_payload::Bcs;
 
@@ -361,12 +364,17 @@ generate_success_response!(BasicResponse, (200, Ok));
 // The error response then impls these traits for each status type they mention.
 generate_error_traits!(
     BadRequest,
+    Gone,
     NotFound,
     PayloadTooLarge,
     Internal,
     InsufficientStorage,
     ServiceUnavailable
 );
+
+// Group these common errors together
+pub trait StdApiError: NotFoundError + GoneError + InternalError {}
+impl<T> StdApiError for T where T: NotFoundError + GoneError + InternalError {}
 
 // Generate an error response that only has options for 400 and 500.
 generate_error_response!(BasicError, (400, BadRequest), (500, Internal));
@@ -379,6 +387,7 @@ generate_error_response!(
     BasicErrorWith404,
     (400, BadRequest),
     (404, NotFound),
+    (410, Gone),
     (500, Internal)
 );
 pub type BasicResultWith404<T> = poem::Result<BasicResponse<T>, BasicErrorWith404>;
@@ -387,8 +396,97 @@ pub type BasicResultWith404<T> = poem::Result<BasicResponse<T>, BasicErrorWith40
 pub fn build_not_found<S: Display, E: NotFoundError>(
     resource: &str,
     identifier: S,
+    error_code: AptosErrorCode,
+) -> E {
+    E::not_found_with_code(
+        &format!("{} not found by {}", resource, identifier),
+        error_code,
+    )
+}
+
+pub fn version_not_found<E: NotFoundError>(ledger_version: u64) -> E {
+    build_not_found(
+        "Version",
+        format!("ledger version({})", ledger_version),
+        AptosErrorCode::VersionNotFound,
+    )
+}
+
+pub fn version_pruned<E: GoneError>(ledger_version: u64) -> E {
+    E::gone_with_code(
+        &format!("Ledger version({}) has been pruned", ledger_version),
+        AptosErrorCode::VersionPruned,
+    )
+}
+
+pub fn account_not_found<E: NotFoundError>(address: Address, ledger_version: u64) -> E {
+    build_not_found(
+        "Account",
+        format!(
+            "Address({}) and Ledger Version({})",
+            address, ledger_version
+        ),
+        AptosErrorCode::AccountNotFound,
+    )
+}
+
+pub fn resource_not_found<E: NotFoundError>(
+    address: Address,
+    struct_tag: &StructTag,
     ledger_version: u64,
 ) -> E {
-    E::not_found_str(&format!("{} not found by {}", resource, identifier))
-        .aptos_ledger_version(ledger_version)
+    build_not_found(
+        "Resource",
+        format!(
+            "Address({}), Struct tag({}) and Ledger version({})",
+            address, struct_tag, ledger_version
+        ),
+        AptosErrorCode::ResourceNotFound,
+    )
+}
+
+pub fn module_not_found<E: NotFoundError>(
+    address: Address,
+    module_name: &IdentStr,
+    ledger_version: u64,
+) -> E {
+    build_not_found(
+        "Module",
+        format!(
+            "Address({}), Module name({}) and Ledger version({})",
+            address, module_name, ledger_version
+        ),
+        AptosErrorCode::ModuleNotFound,
+    )
+}
+
+pub fn struct_field_not_found<E: NotFoundError>(
+    address: Address,
+    struct_tag: &StructTag,
+    field_name: &Identifier,
+    ledger_version: u64,
+) -> E {
+    build_not_found(
+        "Struct Field",
+        format!(
+            "Address({}), Struct tag({}), Field name({}) and Ledger version({})",
+            address, struct_tag, field_name, ledger_version
+        ),
+        AptosErrorCode::StructFieldNotFound,
+    )
+}
+
+pub fn table_item_not_found<E: NotFoundError>(
+    table_handle: Address,
+    table_key: &Value,
+    ledger_version: u64,
+) -> E {
+    build_not_found(
+        "Table Item",
+        format!(
+            "Table handle({}), Table key({}) and Ledger version({})",
+            table_handle, table_key, ledger_version
+        ),
+        AptosErrorCode::StructFieldNotFound,
+    )
 }
