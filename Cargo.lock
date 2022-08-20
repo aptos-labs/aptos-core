@@ -3350,6 +3350,7 @@ dependencies = [
  "project-root",
  "proptest",
  "serde 1.0.143",
+ "tempfile",
  "vm-genesis",
 ]
 
@@ -3832,6 +3833,7 @@ dependencies = [
  "curve25519-dalek",
  "flate2",
  "include_dir 0.7.2",
+ "itertools",
  "libsecp256k1",
  "log",
  "move-deps",

@@ -12,6 +12,9 @@ use move_deps::move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_EXTENSION,
 };
 use move_deps::move_core_types::language_storage::ModuleId;
+use move_deps::move_model::code_writer::CodeWriter;
+use move_deps::move_model::model::Loc;
+use move_deps::move_model::{emit, emitln};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -204,5 +207,80 @@ impl ReleasePackage {
             }
         }
         order.push(id)
+    }
+
+    pub fn generate_script_proposal(&self, out: PathBuf) -> anyhow::Result<()> {
+        let writer = CodeWriter::new(Loc::default());
+        emitln!(
+            writer,
+            "// Upgrade proposal for package `{}`\n",
+            self.metadata.name
+        );
+        emitln!(
+            writer,
+            "/*\nBuildInfo.yaml:\n{}\n*/\n",
+            self.metadata.build_info
+        );
+        emitln!(writer, "script {");
+        writer.indent();
+        emitln!(writer, "use aptos_framework::aptos_governance;");
+        emitln!(writer, "use aptos_framework::code;\n");
+        emitln!(writer, "fun main(proposal_id: u64){");
+        writer.indent();
+        emitln!(
+            writer,
+            "let framework_signer = aptos_governance::resolve(proposal_id, @aptos_framework);"
+        );
+        emit!(writer, "let code = ");
+        Self::generate_blobs(&writer, &self.code);
+        emitln!(writer, ";");
+
+        // The package metadaya can be larger than 64k, which is the max for Move constants.
+        // We therefore have to split it into chunks.
+        let mut metadata = bcs::to_bytes(&self.metadata)?;
+        let chunk_size = metadata.len() / 3;
+        for i in 1..4 {
+            let to_drain = if i == 3 { metadata.len() } else { chunk_size };
+            let chunk = metadata.drain(0..to_drain).collect::<Vec<_>>();
+            emit!(writer, "let chunk{} = ", i);
+            Self::generate_blob(&writer, &chunk);
+            emitln!(writer, ";")
+        }
+
+        emitln!(
+            writer,
+            "code::publish_package_chunk3_txn(&framework_signer, chunk1, chunk2, chunk3, code)"
+        );
+        writer.unindent();
+        emitln!(writer, "}");
+        writer.unindent();
+        emitln!(writer, "}");
+        writer.process_result(|s| std::fs::write(&out, s))?;
+        Ok(())
+    }
+
+    fn generate_blobs(writer: &CodeWriter, blobs: &[Vec<u8>]) {
+        emitln!(writer, "vector[");
+        writer.indent();
+        for blob in blobs {
+            Self::generate_blob(writer, blob);
+            emitln!(writer, ",")
+        }
+        writer.unindent();
+        emit!(writer, "]");
+    }
+
+    fn generate_blob(writer: &CodeWriter, data: &[u8]) {
+        emitln!(writer, "vector[");
+        writer.indent();
+        for (i, b) in data.iter().enumerate() {
+            if (i + 1) % 20 == 0 {
+                emitln!(writer);
+            }
+            emit!(writer, "{}u8,", b);
+        }
+        emitln!(writer);
+        writer.unindent();
+        emit!(writer, "]")
     }
 }

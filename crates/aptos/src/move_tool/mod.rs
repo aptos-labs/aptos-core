@@ -398,7 +398,10 @@ impl FromStr for IncludedArtifacts {
 }
 
 impl IncludedArtifacts {
-    fn build_options(self, named_addresses: BTreeMap<String, AccountAddress>) -> BuildOptions {
+    pub(crate) fn build_options(
+        self,
+        named_addresses: BTreeMap<String, AccountAddress>,
+    ) -> BuildOptions {
         use IncludedArtifacts::*;
         match self {
             None => BuildOptions {

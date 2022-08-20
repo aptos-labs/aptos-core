@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod harness;
+pub mod package_builder;
 pub mod stake;
 
 use anyhow::bail;

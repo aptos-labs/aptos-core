@@ -148,6 +148,19 @@ module aptos_framework::code {
         publish_package(owner, util::from_bytes<PackageMetadata>(pack_serialized), code)
     }
 
+    /// Same as `publish_package_txn` but allows to split the metadata into multiple parts for working around
+    /// size constraints.
+    public entry fun publish_package_chunk3_txn(owner: &signer,
+                                                 chunck1: vector<u8>,
+                                                 chunck2: vector<u8>,
+                                                 chunck3: vector<u8>,
+                                                 code: vector<vector<u8>>)
+    acquires PackageRegistry {
+        vector::append(&mut chunck1, chunck2);
+        vector::append(&mut chunck1, chunck3);
+        publish_package(owner, util::from_bytes<PackageMetadata>(chunck1), code)
+    }
+
     // Helpers
     // -------
 
