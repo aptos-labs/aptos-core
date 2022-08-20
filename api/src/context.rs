@@ -108,23 +108,22 @@ impl Context {
             .map_err(|e| e.into())
     }
 
-    // TODO: Add error codes to these errors.
     pub fn get_latest_ledger_info<E: InternalError>(&self) -> Result<LedgerInfo, E> {
         let maybe_oldest_version = self
             .db
             .get_first_viable_txn_version()
-            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
+            .map_err(|e| E::internal_with_code(e, AptosErrorCode::ReadFromStorageError))?;
         let ledger_info = self
             .get_latest_ledger_info_with_signatures()
             .map_err(E::internal)?;
         let (oldest_version, oldest_block_event) = self
             .db
             .get_next_block_event(maybe_oldest_version)
-            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
+            .map_err(|e| E::internal_with_code(e, AptosErrorCode::ReadFromStorageError))?;
         let (_, _, newest_block_event) = self
             .db
             .get_block_info_by_version(ledger_info.ledger_info().version())
-            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))?;
+            .map_err(|e| E::internal_with_code(e, AptosErrorCode::ReadFromStorageError))?;
 
         Ok(LedgerInfo::new(
             &self.chain_id(),
