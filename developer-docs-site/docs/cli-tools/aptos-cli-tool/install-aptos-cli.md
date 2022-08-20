@@ -45,8 +45,7 @@ source $HOME/.cargo/env
          - Check https://wiki.openssl.org/index.php/Compilation_and_Installation for full instructions.
       - `libclang`:
          - Check https://clang.llvm.org/get_started.html for full instructions.
-2. Install the `aptos` CLI tool by running the below command.  You can run this command from any directory.  The `aptos`
-   CLI tool will be installed into your `CARGO_HOME`, usually `~/.cargo`:
+2. Install the `aptos` CLI tool by running the below command.  **For AIT-3 use `testnet` instead of `devnet`.** You can run this command from any directory.  The `aptos` CLI tool will be installed into your `CARGO_HOME`, usually `~/.cargo`:
 ```bash
 cargo install --git https://github.com/aptos-labs/aptos-core.git aptos --branch devnet
 ```
