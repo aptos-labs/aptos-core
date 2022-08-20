@@ -2249,4 +2249,16 @@ module aptos_framework::stake {
         coin::merge(&mut stake_pool.pending_inactive, pending_inactive);
         stake_pool.locked_until_secs = locked_until_secs;
     }
+
+    #[test_only]
+    public fun initialize_for_test(
+        aptos_framework: &signer
+    ) {
+        initialize(aptos_framework);
+    }
+
+    #[test_only]
+    public fun store_aptos_coin_mint_cap_for_test(account: &signer, mint_cap: MintCapability<AptosCoin>) {
+        store_aptos_coin_mint_cap(account, mint_cap);
+    }
 }

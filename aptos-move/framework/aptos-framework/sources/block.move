@@ -182,4 +182,9 @@ module aptos_framework::block {
         initialize(&aptos_framework, 1);
         update_epoch_interval_microsecs(&account, 2);
     }
+
+    #[test_only]
+    public fun initialize_for_test(account: &signer, epoch_interval_microsecs: u64) {
+        initialize(account, epoch_interval_microsecs);
+    }
 }
