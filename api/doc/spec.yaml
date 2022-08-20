@@ -2052,7 +2052,7 @@ components:
       required:
       - version
       - hash
-      - state_root_hash
+      - state_change_hash
       - event_root_hash
       - gas_used
       - success
@@ -2072,9 +2072,11 @@ components:
           $ref: '#/components/schemas/U64'
         hash:
           $ref: '#/components/schemas/HashValue'
-        state_root_hash:
+        state_change_hash:
           $ref: '#/components/schemas/HashValue'
         event_root_hash:
+          $ref: '#/components/schemas/HashValue'
+        state_checkpoint_hash:
           $ref: '#/components/schemas/HashValue'
         gas_used:
           $ref: '#/components/schemas/U64'
@@ -2303,7 +2305,7 @@ components:
       required:
       - version
       - hash
-      - state_root_hash
+      - state_change_hash
       - event_root_hash
       - gas_used
       - success
@@ -2317,9 +2319,11 @@ components:
           $ref: '#/components/schemas/U64'
         hash:
           $ref: '#/components/schemas/HashValue'
-        state_root_hash:
+        state_change_hash:
           $ref: '#/components/schemas/HashValue'
         event_root_hash:
+          $ref: '#/components/schemas/HashValue'
+        state_checkpoint_hash:
           $ref: '#/components/schemas/HashValue'
         gas_used:
           $ref: '#/components/schemas/U64'
@@ -2769,7 +2773,7 @@ components:
       required:
       - version
       - hash
-      - state_root_hash
+      - state_change_hash
       - event_root_hash
       - gas_used
       - success
@@ -2782,9 +2786,11 @@ components:
           $ref: '#/components/schemas/U64'
         hash:
           $ref: '#/components/schemas/HashValue'
-        state_root_hash:
+        state_change_hash:
           $ref: '#/components/schemas/HashValue'
         event_root_hash:
+          $ref: '#/components/schemas/HashValue'
+        state_checkpoint_hash:
           $ref: '#/components/schemas/HashValue'
         gas_used:
           $ref: '#/components/schemas/U64'
@@ -3010,7 +3016,7 @@ components:
       required:
       - version
       - hash
-      - state_root_hash
+      - state_change_hash
       - event_root_hash
       - gas_used
       - success
@@ -3030,9 +3036,11 @@ components:
           $ref: '#/components/schemas/U64'
         hash:
           $ref: '#/components/schemas/HashValue'
-        state_root_hash:
+        state_change_hash:
           $ref: '#/components/schemas/HashValue'
         event_root_hash:
+          $ref: '#/components/schemas/HashValue'
+        state_checkpoint_hash:
           $ref: '#/components/schemas/HashValue'
         gas_used:
           $ref: '#/components/schemas/U64'
@@ -3245,4 +3253,3 @@ components:
           $ref: '#/components/schemas/DecodedTableData'
 externalDocs:
   url: https://github.com/aptos-labs/aptos-core
-
