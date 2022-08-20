@@ -20,7 +20,7 @@ pub use types::{Account, Resource};
 
 use crate::aptos::{AptosVersion, Balance};
 use anyhow::{anyhow, Result};
-use aptos_api_types::mime_types::BCS_OUTPUT_NEW;
+use aptos_api_types::mime_types::BCS;
 use aptos_api_types::{
     mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, BcsBlock, Block,
     HexEncodedBytes, MoveModuleId, TransactionData, TransactionOnChainData, UserTransaction,
@@ -235,7 +235,7 @@ impl Client {
             .inner
             .post(url)
             .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
-            .header(ACCEPT, BCS_OUTPUT_NEW)
+            .header(ACCEPT, BCS)
             .body(txn_payload)
             .send()
             .await?;
@@ -267,7 +267,7 @@ impl Client {
             .inner
             .post(url)
             .header(CONTENT_TYPE, BCS_CONTENT_TYPE)
-            .header(ACCEPT, BCS_OUTPUT_NEW)
+            .header(ACCEPT, BCS)
             .body(txn_payload)
             .send()
             .await?;
@@ -472,12 +472,7 @@ impl Client {
         hash: HashValue,
     ) -> Result<reqwest::Response> {
         let url = self.build_path(&format!("transactions/by_hash/{}", hash.to_hex_literal()))?;
-        let response = self
-            .inner
-            .get(url)
-            .header(ACCEPT, BCS_OUTPUT_NEW)
-            .send()
-            .await?;
+        let response = self.inner.get(url).header(ACCEPT, BCS).send().await?;
         Ok(response)
     }
 
@@ -875,12 +870,7 @@ impl Client {
     }
 
     async fn get_bcs(&self, url: Url) -> Result<Response<bytes::Bytes>> {
-        let response = self
-            .inner
-            .get(url)
-            .header(ACCEPT, BCS_OUTPUT_NEW)
-            .send()
-            .await?;
+        let response = self.inner.get(url).header(ACCEPT, BCS).send().await?;
         self.check_and_parse_bcs_response(response).await
     }
 
@@ -890,7 +880,7 @@ impl Client {
         start: Option<u64>,
         limit: Option<u16>,
     ) -> Result<Response<bytes::Bytes>> {
-        let mut request = self.inner.get(url).header(ACCEPT, BCS_OUTPUT_NEW);
+        let mut request = self.inner.get(url).header(ACCEPT, BCS);
         if let Some(start) = start {
             request = request.query(&[("start", start)])
         }

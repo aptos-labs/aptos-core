@@ -8340,6 +8340,7 @@ dependencies = [
  "aptos-state-view",
  "aptos-types",
  "bitvec",
+ "criterion",
  "itertools",
  "once_cell",
  "proptest",
