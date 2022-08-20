@@ -170,9 +170,9 @@ fn deltas_writes_mixed() {
     >::new(num_cpus::get())
     .execute_transactions_parallel((), transactions.clone());
 
-    // let baseline = ExpectedOutput::generate_baseline(&transactions);
+    let baseline = ExpectedOutput::generate_baseline(&transactions);
 
-    // assert!(baseline.check_output(&output));
+    assert!(baseline.check_output(&output));
 }
 
 #[test]

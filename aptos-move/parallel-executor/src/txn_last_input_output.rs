@@ -216,15 +216,17 @@ impl<K: ModulePath, T: TransactionOutput, E: Send + Clone> TxnLastInputOutput<K,
 
     // Extracts a set of paths written or updated during execution from transaction
     // output: (modified by writes, modified by deltas).
-    pub fn modified_keys(&self, txn_idx: TxnIndex) -> (KeySet<T>, KeySet<T>) {
+    pub fn modified_keys(&self, txn_idx: TxnIndex) -> KeySet<T> {
         match &self.outputs[txn_idx].load_full() {
-            None => (HashSet::new(), HashSet::new()),
+            None => HashSet::new(),
             Some(txn_output) => match txn_output.as_ref() {
-                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => (
-                    t.get_writes().into_iter().map(|(k, _)| k).collect(),
-                    t.get_deltas().into_iter().map(|(k, _)| k).collect(),
-                ),
-                ExecutionStatus::Abort(_) => (HashSet::new(), HashSet::new()),
+                ExecutionStatus::Success(t) | ExecutionStatus::SkipRest(t) => t
+                    .get_writes()
+                    .into_iter()
+                    .map(|(k, _)| k)
+                    .chain(t.get_deltas().into_iter().map(|(k, _)| k))
+                    .collect(),
+                ExecutionStatus::Abort(_) => HashSet::new(),
             },
         }
     }

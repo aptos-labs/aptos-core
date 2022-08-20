@@ -196,8 +196,7 @@ where
 
         // VM execution.
         let execute_result = executor.execute_transaction(&state_view, txn);
-        let (mut prev_write_keys, mut prev_delta_keys) =
-            last_input_output.modified_keys(idx_to_execute);
+        let mut prev_modified_keys = last_input_output.modified_keys(idx_to_execute);
 
         // For tracking whether the recent execution wrote outside of the previous write/delta set.
         let mut updates_outside = false;
@@ -205,16 +204,16 @@ where
             // First, apply writes.
             let write_version = (idx_to_execute, incarnation);
             for (k, v) in output.get_writes().into_iter() {
-                if !prev_write_keys.remove(&k) {
-                    updates_outside = true
+                if !prev_modified_keys.remove(&k) {
+                    updates_outside = true;
                 }
                 versioned_data_cache.add_write(&k, write_version, v);
             }
 
             // Then, apply deltas.
             for (k, d) in output.get_deltas().into_iter() {
-                if !prev_delta_keys.remove(&k) {
-                    updates_outside = true
+                if !prev_modified_keys.remove(&k) {
+                    updates_outside = true;
                 }
                 versioned_data_cache.add_delta(&k, idx_to_execute, d);
             }
@@ -242,9 +241,8 @@ where
         };
 
         // Remove entries from previous write/delta set that were not overwritten.
-        let unmodified_keys = prev_write_keys.iter().chain(prev_delta_keys.iter());
-        for k in unmodified_keys {
-            versioned_data_cache.delete(k, idx_to_execute);
+        for k in prev_modified_keys {
+            versioned_data_cache.delete(&k, idx_to_execute);
         }
 
         last_input_output.record(idx_to_execute, state_view.take_reads(), result);
@@ -286,9 +284,8 @@ where
 
         if aborted {
             // Not valid and successfully aborted, mark the latest write/delta sets as estimates.
-            let (write_keys, delta_keys) = &last_input_output.modified_keys(idx_to_validate);
-            for k in write_keys.iter().chain(delta_keys.iter()) {
-                versioned_data_cache.mark_estimate(k, idx_to_validate);
+            for k in last_input_output.modified_keys(idx_to_validate) {
+                versioned_data_cache.mark_estimate(&k, idx_to_validate);
             }
 
             scheduler.finish_abort(idx_to_validate, incarnation, guard)
@@ -348,7 +345,6 @@ where
         }
     }
 
-    // <S: StateView>
     pub fn execute_transactions_parallel(
         &self,
         executor_initial_arguments: E::Argument,

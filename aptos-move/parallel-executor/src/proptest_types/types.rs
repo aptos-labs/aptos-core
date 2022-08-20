@@ -175,11 +175,11 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
             for (idx, value) in write_gen.into_iter() {
                 let i = idx.index(universe.len());
                 let key = universe[i].clone();
-                match delta_fn(i, &value) {
-                    Some(delta) => incarnation_deltas.push((KeyType(key, false), delta)),
-                    None => {
-                        if !keys_modified.contains(&key) {
-                            keys_modified.insert(key.clone());
+                if !keys_modified.contains(&key) {
+                    keys_modified.insert(key.clone());
+                    match delta_fn(i, &value) {
+                        Some(delta) => incarnation_deltas.push((KeyType(key, false), delta)),
+                        None => {
                             incarnation_writes
                                 .push((KeyType(key, module_write_fn(i)), ValueType(value.clone())));
                         }
@@ -244,9 +244,9 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
                 if val % 10 == 0 {
                     None
                 } else if val % 10 < 5 {
-                    Some(delta_sub(val / 100000, u128::MAX))
+                    Some(delta_sub(val % 100, u128::MAX))
                 } else {
-                    Some(delta_add(val / 1000, u128::MAX))
+                    Some(delta_add(val % 100, u128::MAX))
                 }
             } else {
                 None
