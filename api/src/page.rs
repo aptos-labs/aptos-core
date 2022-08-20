@@ -27,11 +27,13 @@ impl Page {
     pub fn start<E: BadRequestError>(&self, default: u64, max: u64) -> Result<u64, E> {
         let start = self.start.unwrap_or(default);
         if start > max {
-            return Err(E::bad_request_str(&format!(
+            return Err(E::bad_request_with_code(
+                &format!(
                 "Given start value ({}) is higher than the current ledger version, it must be < {}",
                 start, max
-            ))
-            .error_code(AptosErrorCode::InvalidStartParam));
+            ),
+                AptosErrorCode::InvalidStartParam,
+            ));
         }
         Ok(start)
     }
@@ -43,18 +45,19 @@ impl Page {
     pub fn limit<E: BadRequestError>(&self) -> Result<u16, E> {
         let limit = self.limit.unwrap_or(DEFAULT_PAGE_SIZE);
         if limit == 0 {
-            return Err(E::bad_request_str(&format!(
-                "Given limit value ({}) must not be zero",
-                limit
-            ))
-            .error_code(AptosErrorCode::InvalidLimitParam));
+            return Err(E::bad_request_with_code(
+                &format!("Given limit value ({}) must not be zero", limit),
+                AptosErrorCode::InvalidLimitParam,
+            ));
         }
         if limit > MAX_PAGE_SIZE {
-            return Err(E::bad_request_str(&format!(
-                "Given limit value ({}) is too large, it must be < {}",
-                limit, MAX_PAGE_SIZE
-            ))
-            .error_code(AptosErrorCode::InvalidLimitParam));
+            return Err(E::bad_request_with_code(
+                &format!(
+                    "Given limit value ({}) is too large, it must be < {}",
+                    limit, MAX_PAGE_SIZE
+                ),
+                AptosErrorCode::InvalidLimitParam,
+            ));
         }
         Ok(limit)
     }
