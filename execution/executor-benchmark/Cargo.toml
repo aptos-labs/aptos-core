@@ -31,7 +31,6 @@ aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-sdk = { path = "../../sdk" }
 aptos-secure-push-metrics = { path = "../../secure/push-metrics" }
 aptos-state-view = { path = "../../storage/state-view" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
 aptos-types = { path = "../../types" }
 aptos-vm = { path = "../../aptos-move/aptos-vm" }
 

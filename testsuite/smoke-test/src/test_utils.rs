@@ -6,7 +6,7 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{transaction::SignedTransaction, LocalAccount},
 };
-use aptos_transaction_builder::aptos_stdlib;
+use cached_packages::aptos_stdlib;
 use forge::{LocalSwarm, NodeExt, Swarm};
 use rand::random;
 

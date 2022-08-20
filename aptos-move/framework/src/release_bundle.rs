@@ -11,7 +11,6 @@ use move_deps::move_binary_format::CompiledModule;
 use move_deps::move_command_line_common::files::{
     extension_equals, find_filenames, MOVE_EXTENSION,
 };
-use move_deps::move_core_types::errmap::ErrorMapping;
 use move_deps::move_core_types::language_storage::ModuleId;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -56,21 +55,6 @@ impl ReleaseBundle {
     pub fn write(&self, path: PathBuf) -> anyhow::Result<()> {
         std::fs::write(path, bcs::to_bytes(self)?)?;
         Ok(())
-    }
-
-    /// Constructs a unified error map for all packages in this bundle.
-    pub fn error_mapping(&self) -> ErrorMapping {
-        let mut map = ErrorMapping::default();
-        for pack in &self.packages {
-            let m = unzip_metadata(&pack.package_metadata().error_map).expect("unzip metadata");
-            let ErrorMapping {
-                mut error_categories,
-                mut module_error_maps,
-            } = bcs::from_bytes::<ErrorMapping>(&m).expect("bcs of error map");
-            map.error_categories.append(&mut error_categories);
-            map.module_error_maps.append(&mut module_error_maps);
-        }
-        map
     }
 
     /// Returns a list of all EntryABIs in this bundle.

@@ -102,6 +102,7 @@ impl ReleaseTarget {
                 with_source_maps: true,
                 with_error_map: true,
                 named_addresses: Default::default(),
+                install_dir: None,
             },
             packages: packages.iter().map(|(path, _)| path.to_owned()).collect(),
             rust_bindings: packages
