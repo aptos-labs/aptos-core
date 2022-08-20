@@ -91,6 +91,7 @@ macro_rules! generate_error_traits {
         pub trait [<$trait_name Error>]: AptosErrorResponse {
             fn [<$trait_name:snake>](error: anyhow::Error) -> Self where Self: Sized;
             fn [<$trait_name:snake _str>](error_str: &str) -> Self where Self: Sized;
+            fn [<$trait_name:snake _with_code>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode) -> Self where Self: Sized;
         }
         )*
         }
@@ -135,6 +136,12 @@ macro_rules! generate_error_response {
 
             fn [<$name:snake _str>](error_str: &str) -> Self where Self: Sized {
                 let error = aptos_api_types::AptosError::new(error_str.to_string());
+                let payload = poem_openapi::payload::Json(error);
+                Self::from($enum_name::$name(payload))
+            }
+
+            fn [<$name:snake _with_code>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode) -> Self where Self: Sized {
+                let error = aptos_api_types::AptosError::new_with_error_code(err, error_code);
                 let payload = poem_openapi::payload::Json(error);
                 Self::from($enum_name::$name(payload))
             }
@@ -271,7 +278,7 @@ macro_rules! generate_success_response {
         // parameter E: InternalError, with which we can build an internal error
         // response in case the BCS serialization fails.
         impl<T: poem_openapi::types::ToJSON + Send + Sync + serde::Serialize> $enum_name<T> {
-            pub fn try_from_rust_value<E: InternalError>(
+            pub fn try_from_rust_value<E: $crate::response::InternalError>(
                 (value, ledger_info, status, accept_type): (
                     T,
                     &aptos_api_types::LedgerInfo,
@@ -296,7 +303,7 @@ macro_rules! generate_success_response {
                 }
             }
 
-           pub fn try_from_json<E: InternalError>(
+           pub fn try_from_json<E: $crate::response::InternalError>(
                 (value, ledger_info, status): (
                     T,
                     &aptos_api_types::LedgerInfo,
@@ -310,7 +317,7 @@ macro_rules! generate_success_response {
                )))
             }
 
-            pub fn try_from_bcs<B: serde::Serialize, E: InternalError>(
+            pub fn try_from_bcs<B: serde::Serialize, E: $crate::response::InternalError>(
                 (value, ledger_info, status): (
                     B,
                     &aptos_api_types::LedgerInfo,
@@ -327,7 +334,7 @@ macro_rules! generate_success_response {
                )))
             }
 
-            pub fn try_from_encoded<E: InternalError>(
+            pub fn try_from_encoded<E: $crate::response::InternalError>(
                 (value, ledger_info, status): (
                     Vec<u8>,
                     &aptos_api_types::LedgerInfo,
