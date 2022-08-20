@@ -23,7 +23,7 @@ fn error_map() {
 
     // Load the code
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
-    assert_success!(h.publish_package(&acc, &common::package_path("error_map.data/pack")));
+    assert_success!(h.publish_package(&acc, &common::test_dir_path("error_map.data/pack")));
 
     // Now send transactions which abort with one of two errors, depending on the boolean parameter.
     let result = h.run_entry_function(

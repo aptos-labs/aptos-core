@@ -398,7 +398,10 @@ impl FromStr for IncludedArtifacts {
 }
 
 impl IncludedArtifacts {
-    fn build_options(self, named_addresses: BTreeMap<String, AccountAddress>) -> BuildOptions {
+    pub(crate) fn build_options(
+        self,
+        named_addresses: BTreeMap<String, AccountAddress>,
+    ) -> BuildOptions {
         use IncludedArtifacts::*;
         match self {
             None => BuildOptions {
@@ -544,7 +547,7 @@ impl CliCommand<&'static str> for DownloadPackage {
 /// Lists information about packages and modules on-chain
 #[derive(Parser)]
 pub struct ListPackage {
-    /// Address of the account onchain
+    /// Address of the account for which to list packages.
     #[clap(long, parse(try_from_str=crate::common::types::load_account_arg))]
     pub(crate) account: AccountAddress,
 
