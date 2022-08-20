@@ -121,7 +121,7 @@ Next, download these configuration YAML files into the `/etc/nhc` folder in your
 ```
 mkdir /etc/nhc
 cd /etc/nhc
-configs=(single_node_validator devnet_fullnode ait2_validator); for c in ${configs[@]}; do wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/ecosystem/node-checker/configurations/$c.yaml; done
+configs=(single_node_validator devnet_fullnode ait3_validator); for c in ${configs[@]}; do sudo wget https://raw.githubusercontent.com/aptos-labs/aptos-core/main/ecosystem/node-checker/configuration_examples/$c.yaml; done
 ```
 
 These configurations are not quite ready to be used as they are. You will need to modify certain fields, such as the baseline node address or evaluator set (`evaluators` and `evaluator_args` in the YAML) used. The best way to iterate on this is to run the NHC with a downloaded baseline configuration and see what it says on startup.
@@ -149,7 +149,7 @@ While the Aptos team hosts our own instances of this service, we encourage node 
 When you are ready with baseline configuration YAML and the required files, you can run the NHC server with a command like this, for example, with Docker:
 
 ```
-docker run -v /etc/nhc:/etc/nhc -p 20121:20121 -t aptoslabs/node-checker:nightly /usr/local/bin/aptos-node-checker server run --baseline-node-config-paths /etc/nhc/ait2_validator.yaml /etc/nhc/devnet_fullnode.yaml
+docker run -v /etc/nhc:/etc/nhc -p 20121:20121 -t aptoslabs/node-checker:nightly /usr/local/bin/aptos-node-checker server run --baseline-node-config-paths /etc/nhc/ait3_validator.yaml /etc/nhc/devnet_fullnode.yaml
 ```
 
 :::tip
@@ -171,7 +171,7 @@ Depending on your setup, you may want to check out a particular branch, to ensur
 Run NHC:
 
 ```
-cargo run --release -- server run --baseline-node-config-paths /etc/nhc/ait2_validator.yaml /etc/nhc/devnet_fullnode.yaml
+cargo run --bin aptos-node-checker server run --baseline-node-config-paths /etc/nhc/ait3_validator.yaml /etc/nhc/devnet_fullnode.yaml
 ```
 
 
