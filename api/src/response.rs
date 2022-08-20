@@ -293,7 +293,7 @@ macro_rules! generate_success_response {
                     AcceptType::Bcs => Ok(Self::from((
                         $crate::bcs_payload::Bcs(
                             bcs::to_bytes(&value)
-                                .map_err(|e| E::internal(e.into()).error_code(aptos_api_types::AptosErrorCode::BcsSerializationError))?
+                                .map_err(|e| E::internal_with_code(e, aptos_api_types::AptosErrorCode::BcsSerializationError))?
                         ),
                         ledger_info,
                         status
@@ -330,7 +330,7 @@ macro_rules! generate_success_response {
                Ok(Self::from((
                     $crate::bcs_payload::Bcs(
                         bcs::to_bytes(&value)
-                            .map_err(|e| E::internal(e.into()).error_code(aptos_api_types::AptosErrorCode::BcsSerializationError))?
+                            .map_err(|e| E::internal_with_code(e, aptos_api_types::AptosErrorCode::BcsSerializationError))?
                     ),
                     ledger_info,
                     status
