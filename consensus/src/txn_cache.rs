@@ -119,32 +119,32 @@ fn create_batch(batch_size: u32) -> Vec<SignedTransaction> {
 }
 
 struct Collector {
-    count_only: bool,
+    should_clone: bool,
     items: Mutex<Vec<SignedTransaction>>,
     counter: AtomicU64,
 }
 
 impl Collector {
-    pub fn new(count_only: bool) -> Collector {
+    pub fn new(should_clone: bool) -> Collector {
         Collector {
-            count_only,
+            should_clone,
             items: Mutex::new(Vec::new()),
             counter: AtomicU64::new(0),
         }
     }
 
     pub fn push(&self, tx: &SignedTransaction) {
-        if self.count_only {
-            self.counter.fetch_add(1_u64, Ordering::SeqCst);
-        } else {
+        if self.should_clone {
             self.items.lock().push(tx.clone());
+        } else {
+            self.counter.fetch_add(1_u64, Ordering::SeqCst);
         }
     }
     pub fn get_total(&self) -> usize {
-        if self.count_only {
-            self.counter.fetch_add(0_u64, Ordering::SeqCst) as usize
-        } else {
+        if self.should_clone {
             self.items.lock().len()
+        } else {
+            self.counter.fetch_add(0_u64, Ordering::SeqCst) as usize
         }
     }
 }
@@ -168,7 +168,7 @@ fn test_hit_rate(
             let batch_size = 10000;
             let mut batch = create_batch(batch_size);
             let hit_limit = hit_rate * batch_size / 100;
-            let mut collector = Collector::new(!should_clone);
+            let mut collector = Collector::new(should_clone);
             let thread_pool: ThreadPool = rayon::ThreadPoolBuilder::new()
                 .num_threads(thread_pool_size)
                 .build()
@@ -183,7 +183,7 @@ fn test_hit_rate(
                 batch.par_chunks(chunk_size).for_each(|chunk| {
                     let mut rng = thread_rng();
                     for tx in chunk {
-                        let in_cache = rng.gen::<f64>() < 0.1; //Almost no-op.
+                        let in_cache = cache.insert(tx); //Almost no-op.
                         if !in_cache {
                             collector.push(tx);
                         }
