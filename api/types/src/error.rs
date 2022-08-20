@@ -89,4 +89,5 @@ pub enum AptosErrorCode {
     StructFieldNotFound = 11,
     VersionNotFound = 12,
     VersionPruned = 13,
+    InvalidEventKey = 14,
 }

@@ -5,9 +5,8 @@ use crate::accept_type::AcceptType;
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use crate::response::{
-    account_not_found, resource_not_found, struct_field_not_found, AptosErrorResponse,
-    BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
-    InternalError,
+    account_not_found, resource_not_found, struct_field_not_found, BadRequestError,
+    BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404, InternalError,
 };
 use crate::ApiTags;
 use anyhow::Context as AnyhowContext;
@@ -161,7 +160,9 @@ impl Account {
 
         let account_resource: AccountResource = bcs::from_bytes(&state_value)
             .context("Internal error deserializing response from DB")
-            .map_err(BasicErrorWith404::internal)?;
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(err, AptosErrorCode::InvalidBcsInStorageError)
+            })?;
         let account_data: AccountData = account_resource.into();
 
         match accept_type {
@@ -189,8 +190,12 @@ impl Account {
                     .as_converter(self.context.db.clone())
                     .try_into_resources(resources)
                     .context("Failed to build move resource response from data in DB")
-                    .map_err(BasicErrorWith404::internal)
-                    .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
+                    .map_err(|err| {
+                        BasicErrorWith404::internal_with_code(
+                            err,
+                            AptosErrorCode::InvalidBcsInStorageError,
+                        )
+                    })?;
 
                 BasicResponse::try_from_json((
                     converted_resources,
@@ -221,8 +226,12 @@ impl Account {
                         MoveModuleBytecode::new(module)
                             .try_parse_abi()
                             .context("Failed to parse move module ABI")
-                            .map_err(BasicErrorWith404::internal)
-                            .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?,
+                            .map_err(|err| {
+                                BasicErrorWith404::internal_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidBcsInStorageError,
+                                )
+                            })?,
                     );
                 }
                 BasicResponse::try_from_json((
@@ -250,8 +259,10 @@ impl Account {
         let state = self
             .context
             .get_account_state(self.address.into(), self.ledger_version)
-            .map_err(BasicErrorWith404::internal)
-            .map_err(|e| e.error_code(AptosErrorCode::ReadFromStorageError))?
+            .context("Failed to read account state at requested version")
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(err, AptosErrorCode::ReadFromStorageError)
+            })?
             .ok_or_else(|| account_not_found(self.address, self.ledger_version))?;
 
         Ok(state)
@@ -267,7 +278,9 @@ impl Account {
         let struct_tag: StructTag = event_handle
             .try_into()
             .context("Given event handle was invalid")
-            .map_err(BasicErrorWith404::bad_request)?;
+            .map_err(|err| {
+                BasicErrorWith404::bad_request_with_code(err, AptosErrorCode::InvalidEventKey)
+            })?;
 
         let resource = self.find_resource(&struct_tag)?;
 
@@ -280,15 +293,19 @@ impl Account {
 
         // Serialization should not fail, otherwise it's internal bug
         let event_handle_bytes = bcs::to_bytes(&value)
-            .context("Failed to serialize event handle, this is an internal bug")
-            .map_err(BasicErrorWith404::internal)?;
+            .context("Failed to serialize event handle")
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(err, AptosErrorCode::BcsSerializationError)
+            })?;
         // Deserialization may fail because the bytes are not EventHandle struct type.
         let event_handle: EventHandle = bcs::from_bytes(&event_handle_bytes)
             .context(format!(
-                "Deserialization error, field({}) type is not EventHandle struct",
+                "Deserialization error, field({}) type is not a EventHandle struct",
                 field_name
             ))
-            .map_err(BasicErrorWith404::bad_request)?;
+            .map_err(|err| {
+                BasicErrorWith404::bad_request_with_code(err, AptosErrorCode::BcsSerializationError)
+            })?;
         Ok(*event_handle.key())
     }
 
@@ -306,6 +323,8 @@ impl Account {
             .as_converter(self.context.db.clone())
             .move_struct_fields(&typ, data)
             .context("Failed to convert move structs")
-            .map_err(BasicErrorWith404::internal)
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(err, AptosErrorCode::BcsSerializationError)
+            })
     }
 }
