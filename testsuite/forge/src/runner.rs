@@ -3,6 +3,7 @@
 
 use crate::*;
 use rand::{Rng, SeedableRng};
+use std::fmt::{Display, Formatter};
 use std::time::Duration;
 use std::{
     io::{self, Write},
@@ -304,6 +305,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     &mut report,
                 );
                 let result = run_test(|| runtime.block_on(test.run(&mut aptos_ctx)));
+                report.report_text(result.to_string());
                 summary.handle_result(test.name().to_owned(), result)?;
             }
 
@@ -315,6 +317,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     &mut report,
                 );
                 let result = run_test(|| test.run(&mut admin_ctx));
+                report.report_text(result.to_string());
                 summary.handle_result(test.name().to_owned(), result)?;
             }
 
@@ -327,6 +330,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
                     self.success_criteria.clone(),
                 );
                 let result = run_test(|| test.run(&mut network_ctx));
+                report.report_text(result.to_string());
                 summary.handle_result(test.name().to_owned(), result)?;
             }
 
@@ -381,6 +385,16 @@ enum TestResult {
     Ok,
     Failed,
     FailedWithMsg(String),
+}
+
+impl Display for TestResult {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match self {
+            TestResult::Ok => write!(f, "Test Ok"),
+            TestResult::Failed => write!(f, "Test Failed"),
+            TestResult::FailedWithMsg(msg) => write!(f, "Test Failed: {}", msg),
+        }
+    }
 }
 
 fn run_test<F: FnOnce() -> Result<()>>(f: F) -> TestResult {
