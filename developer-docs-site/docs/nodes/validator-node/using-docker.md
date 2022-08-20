@@ -117,7 +117,7 @@ Docker has only been tested on Linux, Windows, and Intel macOS. If you are on M1
 7. Download the AptosFramework Move package into the `~/$WORKSPACE` directory as `framework.mrb`
 
     ```
-    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb
+    wget https://github.com/aptos-labs/aptos-core/releases/download/aptos-framework-v0.3.0/framework.mrb -P ~/$WORKSPACE
     ```
 
 8. Compile genesis blob and waypoint
