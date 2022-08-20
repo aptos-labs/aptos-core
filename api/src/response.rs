@@ -357,7 +357,8 @@ generate_error_traits!(
     NotFound,
     PayloadTooLarge,
     Internal,
-    InsufficientStorage
+    InsufficientStorage,
+    ServiceUnavailable
 );
 
 // Generate an error response that only has options for 400 and 500.
