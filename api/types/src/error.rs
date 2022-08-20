@@ -12,7 +12,9 @@ use crate::move_types::U64;
 #[derive(Debug, Deserialize, Object)]
 pub struct AptosError {
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error_code: Option<AptosErrorCode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub aptos_ledger_version: Option<U64>,
 }
 
@@ -21,6 +23,17 @@ impl AptosError {
         Self {
             message,
             error_code: None,
+            aptos_ledger_version: None,
+        }
+    }
+
+    pub fn new_with_error_code<ErrorType: std::fmt::Display>(
+        error: ErrorType,
+        error_code: AptosErrorCode,
+    ) -> AptosError {
+        Self {
+            message: error.to_string(),
+            error_code: Some(error_code),
             aptos_ledger_version: None,
         }
     }
@@ -64,4 +77,9 @@ pub enum AptosErrorCode {
 
     /// The limit param given for paging is invalid.
     InvalidLimitParam = 5,
+
+    /// Health check failed
+    HealthCheckFailed = 6,
+
+    InternalError = 7,
 }
