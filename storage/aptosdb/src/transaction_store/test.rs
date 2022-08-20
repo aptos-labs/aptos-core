@@ -30,11 +30,11 @@ proptest! {
         let txns = init_store(universe, gens, store);
 
         // write sets
-        let mut cs = ChangeSet::new();
+        let mut batch = SchemaBatch::new();
         for (ver, ws) in write_sets.iter().enumerate() {
-            store.put_write_set(ver as Version, ws, &mut cs).unwrap();
+            store.put_write_set(ver as Version, ws, &mut batch).unwrap();
         }
-        store.db.write_schemas(cs.batch).unwrap();
+        store.db.write_schemas(batch).unwrap();
         assert_eq!(store.get_write_sets(0, write_sets.len() as Version).unwrap(), write_sets);
 
         let ledger_version = txns.len() as Version - 1;
@@ -212,11 +212,13 @@ fn init_store(
 
     assert!(store.get_transaction(0).is_err());
 
-    let mut cs = ChangeSet::new();
+    let mut batch = SchemaBatch::new();
     for (ver, txn) in txns.iter().enumerate() {
-        store.put_transaction(ver as Version, txn, &mut cs).unwrap();
+        store
+            .put_transaction(ver as Version, txn, &mut batch)
+            .unwrap();
     }
-    store.db.write_schemas(cs.batch).unwrap();
+    store.db.write_schemas(batch).unwrap();
 
     txns
 }
