@@ -37,6 +37,7 @@ import {
 import dynamic from 'next/dynamic';
 import WalletDemoFooter from './WalletDemoFooter';
 import WalletDemoHeader from './WalletDemoHeader';
+import ChakraLink from './ChakraLink';
 
 const ReactConfetti = dynamic(() => import('react-confetti'), { ssr: false });
 
@@ -180,6 +181,7 @@ export default function WalletDemo() {
                     </Button>
                     <Drawer
                       portalProps={{
+                        appendToParentPortal: true,
                         containerRef,
                       }}
                       size="xl"
@@ -239,6 +241,8 @@ export default function WalletDemo() {
                               _focusVisible={{
                                 outline: 'none',
                               }}
+                              min={0}
+                              required
                               {...register('sendAmount')}
                             />
                             <VStack
@@ -332,6 +336,20 @@ export default function WalletDemo() {
               <b>This is a demo</b>
               {' '}
               and has limited functionality
+            </Box>
+            <Box
+              opacity={0.5}
+              borderRadius=".5rem"
+              px={4}
+              py={4}
+              width="100%"
+              fontSize="xs"
+              pt={24}
+              textAlign="center"
+            >
+              Made with ❤️ by
+              {' '}
+              <ChakraLink target="_blank" href="https://aptoslabs.com/">Aptos Labs</ChakraLink>
             </Box>
           </VStack>
         </form>
