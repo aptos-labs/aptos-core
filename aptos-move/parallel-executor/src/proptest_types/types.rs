@@ -9,7 +9,7 @@ use crate::{
         TransactionOutput,
     },
 };
-use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_aggregator::{delta_change_set::DeltaOp, transaction::AggregatorValue};
 use aptos_types::{
     access_path::AccessPath, account_address::AccountAddress, write_set::TransactionWrite,
 };
@@ -76,22 +76,12 @@ pub struct ValueType<V: Into<Vec<u8>> + Debug + Clone + Eq + Arbitrary>(
 );
 
 impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> TransactionWrite
-for ValueType<V>
+    for ValueType<V>
 {
     fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
         let mut v = self.0.clone().into();
         v.resize(16, 1);
         Some(v)
-    }
-}
-
-impl<V: Into<Vec<u8>> + Debug + Clone + Eq + Send + Sync + Arbitrary> ValueType<V> {
-    // TODO: make this a trait.
-    fn extract_u128(&self) -> u128 {
-        // TODO: re-use this function with other prop-tests.
-        let v = self.extract_raw_bytes().unwrap();
-        assert_eq!(v.len(), 16);
-        bcs::from_bytes(&v).unwrap()
     }
 }
 
@@ -113,12 +103,12 @@ pub struct TransactionGenParams {
 pub struct TransactionGen<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + 'static> {
     /// Generate keys and values for possible write-sets based on above transaction gen parameters.
     #[proptest(
-    strategy = "vec(vec((any::<Index>(), any::<V>()), 1..params.write_size), 1..params.read_write_alternatives)"
+        strategy = "vec(vec((any::<Index>(), any::<V>()), 1..params.write_size), 1..params.read_write_alternatives)"
     )]
     keys_modified: Vec<Vec<(Index, V)>>,
     /// Generate keys for possible read-sets of the transaction based on the above parameters.
     #[proptest(
-    strategy = "vec(vec(any::<Index>(), 1..params.read_size), 1..params.read_write_alternatives)"
+        strategy = "vec(vec(any::<Index>(), 1..params.read_size), 1..params.read_write_alternatives)"
     )]
     keys_read: Vec<Vec<Index>>,
 }
@@ -270,9 +260,9 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq> TransactionGen<V> {
 }
 
 impl<K, V> TransactionType for Transaction<K, V>
-    where
-        K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-        V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+where
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type Key = K;
     type Value = V;
@@ -291,9 +281,9 @@ impl<K, V> Task<K, V> {
 }
 
 impl<K, V> ExecutorTask for Task<K, V>
-    where
-        K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-        V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+where
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type T = Transaction<K, V>;
     type Output = Output<K, V>;
@@ -359,9 +349,9 @@ pub struct Output<K, V>(
 );
 
 impl<K, V> TransactionOutput for Output<K, V>
-    where
-        K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
-        V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
+where
+    K: PartialOrd + Send + Sync + Clone + Hash + Eq + ModulePath + 'static,
+    V: Send + Sync + Debug + Clone + TransactionWrite + 'static,
 {
     type T = Transaction<K, V>;
 
@@ -436,7 +426,7 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                         let base = match delta_world.remove(k) {
                             None => match current_world.remove(k) {
                                 None => STORAGE_DELTA_VAL,
-                                Some(w_value) => w_value.extract_u128(),
+                                Some(w_value) => AggregatorValue::from_write(&w_value).into(),
                             },
                             Some(value) => value,
                         };
@@ -468,7 +458,9 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                         // u128 value of the aggregator is known, check it matches.
                         match result {
                             (_, Some(value)) => expected_value == value.clone(),
-                            (Some(v), None) => expected_value == v.extract_u128(),
+                            (Some(v), None) => {
+                                expected_value == AggregatorValue::from_write(v).into()
+                            }
                             _ => false,
                         }
                     }
@@ -493,9 +485,9 @@ impl<V: Debug + Clone + PartialEq + Eq + TransactionWrite> ExpectedOutput<V> {
                         Self::check_result(expected_results, result)
                     })
                     && results
-                    .iter()
-                    .skip(*skip_at)
-                    .all(|Output(_, _, result)| result.is_empty())
+                        .iter()
+                        .skip(*skip_at)
+                        .all(|Output(_, _, result)| result.is_empty())
             }
             (Self::Success(expected_results), Ok(results)) => expected_results
                 .iter()

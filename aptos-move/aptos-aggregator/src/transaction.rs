@@ -3,11 +3,31 @@
 
 use crate::delta_change_set::DeltaChangeSet;
 use aptos_state_view::StateView;
+use aptos_types::write_set::TransactionWrite;
 use aptos_types::{
     transaction::{ChangeSet, TransactionOutput},
     vm_status::VMStatus,
     write_set::WriteSet,
 };
+
+/// Helpful trait for e.g. extracting u128 value out of TransactionWrite that we know is
+/// for aggregator (i.e. if we have seen a DeltaOp for the same access path).
+pub struct AggregatorValue(u128);
+
+impl AggregatorValue {
+    /// Panics if the write doesn't contain a value, or the value raw bytes can't be
+    /// deserialized into an u128.
+    pub fn from_write(write: &dyn TransactionWrite) -> Self {
+        let v = write
+            .extract_raw_bytes()
+            .expect("Write must contain a value");
+        Self(bcs::from_bytes(&v).expect("Must be serialized aggregator value"))
+    }
+
+    pub fn into(self) -> u128 {
+        self.0
+    }
+}
 
 /// Extension of `ChangeSet` that also holds deltas.
 pub struct ChangeSetExt {

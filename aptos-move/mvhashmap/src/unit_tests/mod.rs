@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
+use aptos_aggregator::transaction::AggregatorValue;
 
 mod proptest_types;
 
@@ -10,18 +11,14 @@ struct Value(Vec<usize>);
 
 impl TransactionWrite for Value {
     fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
-        let mut v: Vec<u8> = self.0.clone().into_iter().flat_map(|element| element.to_be_bytes()).collect();
+        let mut v: Vec<u8> = self
+            .0
+            .clone()
+            .into_iter()
+            .flat_map(|element| element.to_be_bytes())
+            .collect();
         v.resize(16, 0);
         Some(v)
-    }
-}
-
-impl Value {
-    fn extract_u128(&self) -> u128 {
-        // TODO: re-use this function with other prop-tests.
-        let v = self.extract_raw_bytes().unwrap();
-        assert_eq!(v.len(), 16);
-        bcs::from_bytes(&v).unwrap()
     }
 }
 
@@ -38,7 +35,7 @@ fn arc_value_for(txn_idx: usize, incarnation: usize) -> Arc<Value> {
 
 // Convert value for txn_idx and incarnation into u128.
 fn u128_for(txn_idx: usize, incarnation: usize) -> u128 {
-    value_for(txn_idx, incarnation).extract_u128()
+    AggregatorValue::from_write(&value_for(txn_idx, incarnation)).into()
 }
 
 // Generate determinitc additions.
@@ -52,7 +49,7 @@ fn add_for(txn_idx: usize, limit: u128) -> DeltaOp {
 // Generate determinitc subtractions.
 fn sub_for(txn_idx: usize, base: u128) -> DeltaOp {
     DeltaOp::Subtraction {
-        value: base + (txn_idx as u128)
+        value: base + (txn_idx as u128),
     }
 }
 
@@ -141,7 +138,9 @@ fn create_write_read_placeholder_struct() {
     // Reads from ap1 and ap3 go to db.
     let r_db = mvtbl.read(&ap1, 30);
     assert_eq!(
-        Err(Unresolved(DeltaOp::Subtraction { value: (61 + 13) - 11 })),
+        Err(Unresolved(DeltaOp::Subtraction {
+            value: (61 + 13) - 11
+        })),
         r_db
     );
     let r_db = mvtbl.read(&ap3, 30);
@@ -162,7 +161,7 @@ fn create_write_read_placeholder_struct() {
 
     let val = value_for(10, 3);
     // sub base sub_for for which should underflow (with txn index)
-    let sub_base = val.extract_u128();
+    let sub_base = AggregatorValue::from_write(&val).into();
     mvtbl.add_write(&ap2, (10, 3), val);
     mvtbl.add_delta(&ap2, 30, sub_for(30, sub_base));
     let r_31 = mvtbl.read(&ap2, 31);

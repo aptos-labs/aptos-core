@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{MVHashMap, MVHashMapError, MVHashMapOutput};
-use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_aggregator::{delta_change_set::DeltaOp, transaction::AggregatorValue};
 use aptos_types::write_set::TransactionWrite;
 use proptest::{collection::vec, prelude::*, sample::Index, strategy::Strategy};
 use std::{
@@ -35,25 +35,14 @@ enum ExpectedOutput<V: Debug + Clone + PartialEq> {
 struct Value<V>(Option<V>);
 
 impl<V: Into<Vec<u8>> + Clone> TransactionWrite for Value<V> {
-    fn extract_raw_bytes(&self) -> Option<Vec<u8>>{
-        let mut bytes = match self.0.clone().map(|v| {
-            v.into()
-        }) {
+    fn extract_raw_bytes(&self) -> Option<Vec<u8>> {
+        let mut bytes = match self.0.clone().map(|v| v.into()) {
             Some(v) => v,
             None => vec![],
         };
 
         bytes.resize(16, 0);
         Some(bytes)
-    }
-}
-
-impl<V: Into<Vec<u8>> + Clone> Value<V> {
-    fn extract_u128(&self) -> u128 {
-        // TODO: re-use this function with other prop-tests.
-        let v = self.extract_raw_bytes().unwrap();
-        assert_eq!(v.len(), 16);
-        bcs::from_bytes(&v).unwrap()
     }
 }
 
@@ -95,7 +84,7 @@ where
                     match data {
                         Data::Write(v) => match acc {
                             Some(d) => {
-                                let int = v.extract_u128();
+                                let int = AggregatorValue::from_write(v).into();
                                 match d.apply_to(int) {
                                     Err(_) => return ExpectedOutput::Failure,
                                     Ok(i) => return ExpectedOutput::Resolved(i),

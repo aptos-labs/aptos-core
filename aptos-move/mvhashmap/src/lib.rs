@@ -1,7 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_aggregator::delta_change_set::DeltaOp;
+use aptos_aggregator::{delta_change_set::DeltaOp, transaction::AggregatorValue};
 use aptos_types::write_set::TransactionWrite;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
@@ -197,11 +197,10 @@ impl<K: Hash + Clone + Eq, V: TransactionWrite> MVHashMap<K, V> {
                                         // apply the aggregated delta. If Delta application
                                         // fails, we return a corresponding error, so that
                                         // the speculative execution can also fail.
-                                        let value :u128 = bcs::from_bytes(&data
-                                            .extract_raw_bytes().expect("could not extract bytes"))
-                                            .expect("cannot deserialize into u128");
                                         return delta
-                                            .apply_to(value)
+                                            .apply_to(
+                                                AggregatorValue::from_write(data.as_ref()).into(),
+                                            )
                                             .map_err(|_| DeltaApplicationFailure)
                                             .map(|result| Resolved(result));
                                     }

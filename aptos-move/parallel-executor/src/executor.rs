@@ -92,7 +92,6 @@ impl<
                         .push(ReadDescriptor::from_storage(key.clone()));
                     return ReadResult::None;
                 }
-                Err(DeltaApplicationFailure) => todo!(),
                 Err(Unresolved(delta)) => {
                     self.captured_reads
                         .lock()
