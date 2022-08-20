@@ -68,7 +68,7 @@ impl Context {
     ) -> Result<RemoteStorageOwned<DbStateView>, E> {
         self.move_resolver()
             .context("Failed to read latest state checkpoint from DB")
-            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))
+            .map_err(|e| E::internal_with_code(e, AptosErrorCode::ReadFromStorageError))
     }
 
     pub fn state_view_at_version(&self, version: Version) -> Result<DbStateView> {
@@ -170,7 +170,7 @@ impl Context {
     ) -> Result<Option<Vec<u8>>, E> {
         self.get_state_value(state_key, version)
             .context("Failed to retrieve state value")
-            .map_err(|e| E::internal(e).error_code(AptosErrorCode::ReadFromStorageError))
+            .map_err(|e| E::internal_with_code(e, AptosErrorCode::ReadFromStorageError))
     }
 
     pub fn get_state_values(
