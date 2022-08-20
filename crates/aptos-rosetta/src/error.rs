@@ -125,9 +125,28 @@ impl ApiError {
     }
 
     pub fn message(&self) -> String {
-        let full = format!("{:?}", self);
-        let parts: Vec<_> = full.split(':').collect();
-        parts[0].to_string()
+        match self {
+            ApiError::AptosError(_) => "Aptos API error",
+            ApiError::RetriableAptosError(_) => "Retriable API error",
+            ApiError::BlockParameterConflict => "Block input parameters conflict",
+            ApiError::TransactionIsPending => "Transaction is still pending",
+            ApiError::NetworkIdentifierMismatch => "Network identifier doesn't match",
+            ApiError::ChainIdMismatch => "Chain Id doesn't match",
+            ApiError::DeserializationFailed(_) => "Deserialization failed",
+            ApiError::InvalidTransferOperations(_) => "Invalid operations for a transfer",
+            ApiError::AccountNotFound(_) => "Account not found",
+            ApiError::InvalidSignatureType => "Invalid signature type",
+            ApiError::InvalidMaxGasFees => "Invalid max gas fee",
+            ApiError::InvalidGasMultiplier => "Invalid gas multiplier",
+            ApiError::InvalidOperations => "Invalid operations",
+            ApiError::MissingPayloadMetadata => "Payload metadata is missing",
+            ApiError::UnsupportedCurrency(_) => "Currency is unsupported",
+            ApiError::UnsupportedSignatureCount(_) => "Number of signatures is not supported",
+            ApiError::NodeIsOffline => "This API is unavailable for the node because he's offline",
+            ApiError::BlockIncomplete => "Block is missing events",
+            ApiError::TransactionParseError(_) => "Transaction failed to parse",
+        }
+        .to_string()
     }
 
     pub fn deserialization_failed(type_: &str) -> ApiError {
