@@ -11,9 +11,11 @@ export const $AptosError = {
         },
         error_code: {
             type: 'AptosErrorCode',
+            isRequired: true,
         },
-        aptos_ledger_version: {
-            type: 'U64',
+        vm_error_code: {
+            type: 'number',
+            format: 'uint64',
         },
     },
 } as const;

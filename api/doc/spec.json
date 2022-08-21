@@ -170,6 +170,16 @@
               }
             }
           },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "",
             "content": {
@@ -303,6 +313,16 @@
             }
           },
           "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "410": {
             "description": "",
             "content": {
               "application/json": {
@@ -454,6 +474,16 @@
               }
             }
           },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "",
             "content": {
@@ -587,7 +617,7 @@
               }
             }
           },
-          "400": {
+          "503": {
             "description": "",
             "content": {
               "application/json": {
@@ -737,6 +767,16 @@
               }
             }
           },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "",
             "content": {
@@ -868,6 +908,16 @@
             }
           },
           "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "410": {
             "description": "",
             "content": {
               "application/json": {
@@ -1020,6 +1070,16 @@
             }
           },
           "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "410": {
             "description": "",
             "content": {
               "application/json": {
@@ -1190,6 +1250,16 @@
             }
           },
           "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "410": {
             "description": "",
             "content": {
               "application/json": {
@@ -1456,6 +1526,16 @@
               }
             }
           },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "",
             "content": {
@@ -1595,6 +1675,16 @@
             }
           },
           "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "410": {
             "description": "",
             "content": {
               "application/json": {
@@ -1753,6 +1843,16 @@
               }
             }
           },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "",
             "content": {
@@ -1887,6 +1987,16 @@
             }
           },
           "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "410": {
             "description": "",
             "content": {
               "application/json": {
@@ -2172,6 +2282,16 @@
               }
             }
           },
+          "410": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "",
             "content": {
@@ -2293,6 +2413,16 @@
             }
           },
           "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "410": {
             "description": "",
             "content": {
               "application/json": {
@@ -2445,6 +2575,16 @@
             }
           },
           "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AptosError"
+                }
+              }
+            }
+          },
+          "410": {
             "description": "",
             "content": {
               "application/json": {
@@ -2822,7 +2962,8 @@
         "type": "object",
         "description": "This is the generic struct we use for all API errors, it contains a string\nmessage and an Aptos API specific error code.",
         "required": [
-          "message"
+          "message",
+          "error_code"
         ],
         "properties": {
           "message": {
@@ -2831,8 +2972,9 @@
           "error_code": {
             "$ref": "#/components/schemas/AptosErrorCode"
           },
-          "aptos_ledger_version": {
-            "$ref": "#/components/schemas/U64"
+          "vm_error_code": {
+            "type": "integer",
+            "format": "uint64"
           }
         }
       },
@@ -2844,7 +2986,30 @@
           "invalid_bcs_in_storage_error",
           "bcs_serialization_error",
           "invalid_start_param",
-          "invalid_limit_param"
+          "invalid_limit_param",
+          "health_check_failed",
+          "internal_error",
+          "account_not_found",
+          "resource_not_found",
+          "module_not_found",
+          "struct_field_not_found",
+          "version_not_found",
+          "version_pruned",
+          "invalid_event_key",
+          "block_not_found",
+          "table_item_not_found",
+          "block_pruned",
+          "invalid_input",
+          "transaction_not_found",
+          "transaction_submission_failed",
+          "mempool_is_full",
+          "vm_error",
+          "invalid_transaction_update",
+          "sequence_number_too_old",
+          "mempool_is_full_for_account",
+          "bcs_not_supported",
+          "web_framework_error",
+          "invalid_submitted_transaction"
         ]
       },
       "Block": {

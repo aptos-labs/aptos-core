@@ -3,7 +3,6 @@
 /* eslint-disable */
 
 import type { AptosErrorCode } from './AptosErrorCode';
-import type { U64 } from './U64';
 
 /**
  * This is the generic struct we use for all API errors, it contains a string
@@ -11,7 +10,7 @@ import type { U64 } from './U64';
  */
 export type AptosError = {
     message: string;
-    error_code?: AptosErrorCode;
-    aptos_ledger_version?: U64;
+    error_code: AptosErrorCode;
+    vm_error_code?: number;
 };
 
