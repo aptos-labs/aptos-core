@@ -18,7 +18,7 @@ use crate::response::{
 };
 use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
-use anyhow::{anyhow, Context as AnyhowContext};
+use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
     Address, AptosErrorCode, AsConverter, EncodeSubmissionRequest, HashValue, HexEncodedBytes,
     LedgerInfo, PendingTransaction, SubmitTransactionRequest, Transaction, TransactionData,
@@ -555,8 +555,9 @@ impl TransactionsApi {
         txn: SignedTransaction,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
         if txn.signature_is_valid() {
-            return Err(SubmitTransactionError::bad_request_str(
-                "Transaction simulation request has a valid signature, this is not allowed",
+            return Err(SubmitTransactionError::bad_request_with_code(
+                "Simulated transactions must have a non-valid signature",
+                AptosErrorCode::InvalidInput,
             ));
         }
         let ledger_info = self.context.get_latest_ledger_info()?;
@@ -610,9 +611,12 @@ impl TransactionsApi {
                 for transaction in transactions.into_iter() {
                     match transaction {
                         Transaction::UserTransaction(user_txn) => user_transactions.push(*user_txn),
-                        _ => return Err(SubmitTransactionError::internal_str(
-                            "Simulation unexpectedly resulted in something other than a UserTransaction",
-                        )),
+                        _ => {
+                            return Err(SubmitTransactionError::internal_with_code(
+                                "Simulation transaction resulted in a non-UserTransaction",
+                                AptosErrorCode::InternalError,
+                            ))
+                        }
                     }
                 }
                 BasicResponse::try_from_json((
@@ -632,9 +636,12 @@ impl TransactionsApi {
         accept_type: &AcceptType,
         request: EncodeSubmissionRequest,
     ) -> BasicResult<HexEncodedBytes> {
+        // We don't want to encourage people to use this API if they can sign the request directly
         if accept_type == &AcceptType::Bcs {
-            return Err(anyhow!("BCS is not supported for encode submission"))
-                .map_err(BasicError::bad_request);
+            return Err(BasicError::bad_request_with_code(
+                "BCS is not supported for encode submission",
+                AptosErrorCode::BcsNotSupported,
+            ));
         }
 
         let resolver = self.context.move_resolver_poem()?;
@@ -642,7 +649,7 @@ impl TransactionsApi {
             .as_converter(self.context.db.clone())
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")
-            .map_err(BasicError::bad_request)?;
+            .map_err(|err| BasicError::bad_request_with_code(err, AptosErrorCode::InvalidInput))?;
 
         let raw_message = match request.secondary_signers {
             Some(secondary_signer_addresses) => {
@@ -657,12 +664,11 @@ impl TransactionsApi {
             None => raw_txn.signing_message(),
         };
 
-        BasicResponse::try_from_rust_value((
+        BasicResponse::try_from_json((
             HexEncodedBytes::from(raw_message),
             // TODO: Make a variant that doesn't require ledger info.
             &self.context.get_latest_ledger_info()?,
             BasicResponseStatus::Ok,
-            accept_type,
         ))
     }
 }
