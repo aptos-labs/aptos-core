@@ -152,7 +152,7 @@ impl<T: AptosDataClient + Send + Clone + 'static> DataStreamingService<T> {
                         notification_id, notification_feedback,
                     )));
                 data_stream.handle_notification_feedback(notification_id, notification_feedback)?;
-                self.data_streams.remove(notification_id);
+                self.data_streams.remove(data_stream_id);
                 return Ok(());
             }
         }
