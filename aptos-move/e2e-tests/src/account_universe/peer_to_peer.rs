@@ -90,6 +90,7 @@ impl AUTransactionGen for P2PTransferGen {
                         ident_str!("coin").to_owned(),
                     )),
                     code: 65542,
+                    info: None,
                 });
             }
             (true, false, _) => {
@@ -105,6 +106,7 @@ impl AUTransactionGen for P2PTransferGen {
                         ident_str!("coin").to_owned(),
                     )),
                     code: 65542,
+                    info: None,
                 });
             }
             (false, _, _) => {

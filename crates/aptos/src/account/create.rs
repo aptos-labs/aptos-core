@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::common::types::{CliCommand, CliTypedResult, TransactionOptions, TransactionSummary};
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::account_address::AccountAddress;
 use async_trait::async_trait;
+use cached_packages::aptos_stdlib;
 use clap::Parser;
 
 // TODO(Gas): double check if this is correct

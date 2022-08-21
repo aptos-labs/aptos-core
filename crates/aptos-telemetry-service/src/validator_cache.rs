@@ -9,7 +9,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::time;
 use url::Url;
 
-use crate::{rest_client::RestClient, TelemetryServiceConfig};
+use crate::{clients::aptos_api::RestClient, TelemetryServiceConfig};
 
 pub type EpochNum = u64;
 pub type ValidatorSetCache = Arc<RwLock<HashMap<ChainId, (EpochNum, PeerSet)>>>;

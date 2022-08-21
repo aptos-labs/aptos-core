@@ -311,8 +311,8 @@ impl GasMeter for AptosGasMeter {
 
         let cost = instr_params.eq_base
             + per_unit
-                * (abs_val_params.abstract_value_size(lhs)
-                    + abs_val_params.abstract_value_size(rhs));
+                * (abs_val_params.abstract_value_size_dereferenced(lhs)
+                    + abs_val_params.abstract_value_size_dereferenced(rhs));
 
         self.charge(cost)
     }
@@ -325,8 +325,8 @@ impl GasMeter for AptosGasMeter {
 
         let cost = instr_params.neq_base
             + per_unit
-                * (abs_val_params.abstract_value_size(lhs)
-                    + abs_val_params.abstract_value_size(rhs));
+                * (abs_val_params.abstract_value_size_dereferenced(lhs)
+                    + abs_val_params.abstract_value_size_dereferenced(rhs));
 
         self.charge(cost)
     }

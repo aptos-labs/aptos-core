@@ -1,11 +1,11 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_transaction_builder::aptos_stdlib;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, on_chain_config::Version, transaction::TransactionStatus,
 };
 use aptos_vm::AptosVM;
+use cached_packages::aptos_stdlib;
 use language_e2e_tests::{
     common_transactions::peer_to_peer_txn, test_with_different_versions,
     versioning::CURRENT_RELEASE_VERSIONS,

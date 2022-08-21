@@ -11,9 +11,9 @@ from .account_address import AccountAddress
 from .authenticator import Authenticator, Ed25519Authenticator, MultiAgentAuthenticator
 from .bcs import Serializer
 from .transactions import (
+    EntryFunction,
     MultiAgentRawTransaction,
     RawTransaction,
-    EntryFunction,
     SignedTransaction,
     TransactionArgument,
     TransactionPayload,

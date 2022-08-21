@@ -13,6 +13,7 @@ We use [Poetry](https://python-poetry.org/docs/#installation) for packaging and 
 
 ```
 curl -sSL https://install.python-poetry.org | python3
+poetry update
 ```
 
 ## Unit testing

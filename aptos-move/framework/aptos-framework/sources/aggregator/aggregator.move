@@ -74,7 +74,7 @@ module aptos_framework::aggregator {
     const ENOT_SUPPORTED: u64 = 3;
 
     struct Aggregator has store {
-        handle: u128,
+        handle: address,
         key: u128,
         limit: u128,
     }
