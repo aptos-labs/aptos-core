@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    database::{execute_with_better_error, PgDbPool, PgPoolConnection},
+    database::{execute_with_better_error, get_chunks, PgDbPool, PgPoolConnection},
     indexer::{
         errors::TransactionProcessingError, processing_result::ProcessingResult,
         transaction_processor::TransactionProcessor,
@@ -17,6 +17,7 @@ use crate::{
 use aptos_rest_client::Transaction;
 use async_trait::async_trait;
 use diesel::Connection;
+use field_count::FieldCount;
 use futures::future::Either;
 use std::{fmt::Debug, sync::Arc};
 
@@ -42,23 +43,29 @@ impl Debug for DefaultTransactionProcessor {
 }
 
 fn insert_events(conn: &PgPoolConnection, events: &Vec<EventModel>) {
-    execute_with_better_error(
-        conn,
-        diesel::insert_into(schema::events::table)
-            .values(events)
-            .on_conflict_do_nothing(),
-    )
-    .expect("Error inserting row into database");
+    let chunks = get_chunks(events.len(), EventModel::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::events::table)
+                .values(&events[start_ind..end_ind])
+                .on_conflict_do_nothing(),
+        )
+        .expect("Error inserting row into database");
+    }
 }
 
 fn insert_write_set_changes(conn: &PgPoolConnection, write_set_changes: &Vec<WriteSetChangeModel>) {
-    execute_with_better_error(
-        conn,
-        diesel::insert_into(schema::write_set_changes::table)
-            .values(write_set_changes)
-            .on_conflict_do_nothing(),
-    )
-    .expect("Error inserting row into database");
+    let chunks = get_chunks(write_set_changes.len(), WriteSetChangeModel::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::write_set_changes::table)
+                .values(&write_set_changes[start_ind..end_ind])
+                .on_conflict_do_nothing(),
+        )
+        .expect("Error inserting row into database");
+    }
 }
 
 fn insert_transaction(conn: &PgPoolConnection, version: u64, transaction_model: &TransactionModel) {
