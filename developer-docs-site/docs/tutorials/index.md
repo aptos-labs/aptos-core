@@ -1,10 +1,10 @@
 ---
-title: "Aptos Quickstarts"
+title: "Developer Tutorials"
 slug: "aptos-quickstarts"
 hidden: false
 ---
 
-# Aptos Quickstarts
+# Developer Tutorials
 
 If you are new to the Aptos Blockchain, begin with these quickstarts before you get into in-depth development. These tutorials will help you familiarize yourself with how to develop for the Aptos Blockchain. 
 
