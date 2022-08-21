@@ -1,9 +1,9 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { Address } from '../models/Address';
 import type { MoveValue } from '../models/MoveValue';
 import type { TableItemRequest } from '../models/TableItemRequest';
-import type { U128 } from '../models/U128';
 import type { U64 } from '../models/U64';
 
 import type { CancelablePromise } from '../core/CancelablePromise';
@@ -29,7 +29,7 @@ export class TablesService {
      * @throws ApiError
      */
     public getTableItem(
-        tableHandle: U128,
+        tableHandle: Address,
         requestBody: TableItemRequest,
         ledgerVersion?: U64,
     ): CancelablePromise<MoveValue> {
