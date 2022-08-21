@@ -102,30 +102,24 @@ impl PrunerManager for StatePrunerManager {
 
 impl StatePrunerManager {
     /// Creates a worker thread that waits on a channel for pruning commands.
-    pub fn new(
-        state_merkle_rocksdb: Arc<DB>,
-        state_merkle_pruner_config: StateMerklePrunerConfig,
-    ) -> Self {
+    pub fn new(state_merkle_rocksdb: Arc<DB>, config: StateMerklePrunerConfig) -> Self {
         let state_db_clone = Arc::clone(&state_merkle_rocksdb);
-        let state_pruner = utils::create_state_pruner(state_db_clone);
+        let pruner = utils::create_state_pruner(state_db_clone);
 
-        if state_merkle_pruner_config.enable {
+        if config.enable {
             PRUNER_WINDOW
                 .with_label_values(&["state_pruner"])
-                .set(state_merkle_pruner_config.prune_window as i64);
+                .set(config.prune_window as i64);
 
             PRUNER_BATCH_SIZE
-                .with_label_values(&["state_store_pruner"])
-                .set(state_merkle_pruner_config.batch_size as i64);
+                .with_label_values(&["state_pruner"])
+                .set(config.batch_size as i64);
         }
 
-        let state_pruner_worker = Arc::new(StatePrunerWorker::new(
-            Arc::clone(&state_pruner),
-            state_merkle_pruner_config,
-        ));
-        let state_pruner_worker_clone = Arc::clone(&state_pruner_worker);
+        let pruner_worker = Arc::new(StatePrunerWorker::new(Arc::clone(&pruner), config));
+        let state_pruner_worker_clone = Arc::clone(&pruner_worker);
 
-        let state_pruner_worker_thread = if state_merkle_pruner_config.enable {
+        let worker_thread = if config.enable {
             Some(
                 std::thread::Builder::new()
                     .name("aptosdb_state_pruner".into())
@@ -136,16 +130,16 @@ impl StatePrunerManager {
             None
         };
 
-        let min_readable_version = state_pruner.as_ref().min_readable_version();
+        let min_readable_version = pruner.as_ref().min_readable_version();
         Self {
-            pruner_enabled: state_merkle_pruner_config.enable,
-            prune_window: state_merkle_pruner_config.prune_window,
-            pruner: state_pruner,
-            pruner_worker: state_pruner_worker,
-            worker_thread: state_pruner_worker_thread,
+            pruner_enabled: config.enable,
+            prune_window: config.prune_window,
+            pruner,
+            pruner_worker,
+            worker_thread,
             last_version_sent_to_pruner: Arc::new(Mutex::new(min_readable_version)),
             latest_version: Arc::new(Mutex::new(min_readable_version)),
-            user_pruning_window_offset: state_merkle_pruner_config.user_pruning_window_offset,
+            user_pruning_window_offset: config.user_pruning_window_offset,
         }
     }
 
