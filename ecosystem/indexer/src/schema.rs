@@ -1,6 +1,3 @@
-// Copyright (c) Aptos
-// SPDX-License-Identifier: Apache-2.0
-
 table! {
     block_metadata_transactions (hash) {
         hash -> Varchar,
@@ -166,6 +163,16 @@ table! {
 }
 
 table! {
+    v2_processor_statuses (name, block_height) {
+        name -> Varchar,
+        block_height -> Int8,
+        success -> Bool,
+        details -> Nullable<Text>,
+        last_updated -> Timestamp,
+    }
+}
+
+table! {
     write_set_changes (transaction_hash, hash) {
         transaction_hash -> Varchar,
         hash -> Varchar,
@@ -192,5 +199,6 @@ allow_tables_to_appear_in_same_query!(
     token_propertys,
     transactions,
     user_transactions,
+    v2_processor_statuses,
     write_set_changes,
 );

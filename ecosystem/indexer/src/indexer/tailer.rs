@@ -48,6 +48,16 @@ pub fn recurse_remove_null_bytes_from_json(sub_json: &mut Value) {
     }
 }
 
+pub fn remove_null_bytes_from_txns(txns: Vec<Transaction>) -> Vec<Transaction> {
+    txns.iter()
+        .map(|txn| {
+            let mut txn_json = serde_json::to_value(txn).unwrap();
+            recurse_remove_null_bytes_from_json(&mut txn_json);
+            serde_json::from_value::<Transaction>(txn_json).unwrap()
+        })
+        .collect::<Vec<Transaction>>()
+}
+
 pub fn remove_null_bytes_from_txn(txn: Arc<Transaction>) -> Arc<Transaction> {
     let mut txn_json = serde_json::to_value(txn).unwrap();
     recurse_remove_null_bytes_from_json(&mut txn_json);
@@ -132,115 +142,66 @@ impl Tailer {
         self.processors.push(processor);
     }
 
-    /// For all versions which have an `success=false` in the `processor_status` table, re-run them
-    /// TODO: also handle gaps in sequence numbers (pg query for this is super easy)
-    pub async fn handle_previous_errors(&self) {
-        info!("Checking for previously errored versions...");
-        let mut tasks = vec![];
-        for processor in &self.processors {
-            let processor2 = processor.clone();
-            let self2 = self.clone();
-            let task = tokio::task::spawn(async move {
-                let errored_versions = processor2.get_error_versions();
-                let err_count = errored_versions.len();
-                info!(
-                    "Found {} previously errored versions for {}",
-                    err_count,
-                    processor2.name(),
-                );
-                if err_count == 0 {
-                    return;
-                }
-                let mut fixed = 0;
-                for version in errored_versions {
-                    let txn = self2.get_txn(version).await;
-                    if processor2
-                        .process_transaction_with_status(txn)
-                        .await
-                        .is_ok()
-                    {
-                        fixed += 1;
-                    };
-                }
-                info!(
-                    "Fixed {}/{} previously errored versions for {}",
-                    fixed,
-                    err_count,
-                    processor2.name(),
-                );
-            });
-            tasks.push(task);
-        }
-        await_tasks(tasks).await;
-        info!("Fixing previously errored versions complete!");
+    /// Sets the block of the fetcher to the lowest block among all processors
+    pub async fn set_fetcher_to_block_from_input_version(&self, version: u64) -> u64 {
+        let starting_block = self
+            .transaction_fetcher
+            .lock()
+            .await
+            .fetch_block_height_from_version(version)
+            .await;
+        self.set_fetcher_block(starting_block).await
     }
 
-    /// Sets the version of the fetcher to the lowest version among all processors
-    pub async fn set_fetcher_to_lowest_processor_version(&self) -> u64 {
+    /// Sets the block of the fetcher to the lowest block among all processors
+    pub async fn set_fetcher_to_lowest_processor_block(&self) -> u64 {
         let mut lowest = u64::MAX;
         for processor in &self.processors {
-            let max_version = processor.get_max_version().unwrap_or_default();
+            let start_block_height = processor.get_start_block().unwrap_or_default() as u64;
             aptos_logger::debug!(
-                "Processor {} max version is {}",
+                "Processor {} start block is {}",
                 processor.name(),
-                max_version
+                start_block_height
             );
-            if max_version < lowest {
-                lowest = max_version;
+            if start_block_height < lowest {
+                lowest = start_block_height;
             }
         }
-        aptos_logger::info!("Lowest version amongst all processors is {}", lowest);
-        self.set_fetcher_version(lowest).await;
+        aptos_logger::info!("Lowest block amongst all processors is {}", lowest);
+        self.set_fetcher_block(lowest).await;
         lowest
     }
 
-    pub async fn set_fetcher_version(&self, version: u64) -> u64 {
-        self.transaction_fetcher.lock().await.set_version(version);
-        aptos_logger::info!("Will start fetching from version {}", version);
-        version
+    pub async fn set_fetcher_block(&self, block_height: u64) -> u64 {
+        self.transaction_fetcher
+            .lock()
+            .await
+            .set_block_height(block_height);
+        aptos_logger::info!("Will start fetching from block {}", block_height);
+        block_height
     }
 
-    pub async fn process_next(
-        &mut self,
-    ) -> anyhow::Result<Vec<Result<ProcessingResult, TransactionProcessingError>>> {
-        let txn = self.get_next_txn().await;
-        self.process_transaction(txn).await
-    }
-
-    pub async fn process_version(
-        &mut self,
-        version: u64,
-    ) -> anyhow::Result<Vec<Result<ProcessingResult, TransactionProcessingError>>> {
-        let txn = self.get_txn(version).await;
-        self.process_transaction(txn).await
-    }
-
-    pub async fn process_next_batch(
-        &mut self,
-        batch_size: u8,
-    ) -> Vec<anyhow::Result<Vec<Result<ProcessingResult, TransactionProcessingError>>>> {
-        let mut tasks = vec![];
-        for _ in 0..batch_size {
-            let mut self2 = self.clone();
-            let task = tokio::task::spawn(async move { self2.process_next().await });
-            tasks.push(task);
-        }
-        let results = await_tasks(tasks).await;
-        results
-    }
-
-    pub async fn process_transaction(
+    pub async fn process_next_block(
         &self,
-        txn: Arc<Transaction>,
+    ) -> anyhow::Result<Vec<Result<ProcessingResult, TransactionProcessingError>>> {
+        let txns = self.transaction_fetcher.lock().await.fetch_block().await;
+        self.process_transactions(txns).await
+    }
+
+    pub async fn process_transactions(
+        &self,
+        txns: Vec<Transaction>,
     ) -> anyhow::Result<Vec<Result<ProcessingResult, TransactionProcessingError>>> {
         let mut tasks = vec![];
-        let txn = remove_null_bytes_from_txn(txn.clone());
+        let txns = remove_null_bytes_from_txns(txns);
+        let block_height = self.get_block_height().await;
+
         for processor in &self.processors {
             let processor2 = processor.clone();
-            let txn2 = txn.clone();
+            let txns2 = txns.clone();
             let task = tokio::task::spawn(async move {
                 processor2
-                    .process_transaction_with_status(txn2.clone())
+                    .process_transactions_with_status(txns2.clone(), block_height)
                     .await
             });
             tasks.push(task);
@@ -249,18 +210,16 @@ impl Tailer {
         Ok(results)
     }
 
-    pub async fn get_next_txn(&mut self) -> Arc<Transaction> {
-        Arc::new(self.transaction_fetcher.lock().await.fetch_next().await)
+    async fn get_block_height(&self) -> u64 {
+        self.transaction_fetcher.lock().await.get_block_height()
     }
 
-    pub async fn get_txn(&self, version: u64) -> Arc<Transaction> {
-        Arc::new(
-            self.transaction_fetcher
-                .lock()
-                .await
-                .fetch_version(version)
-                .await,
-        )
+    pub async fn increment_block_height(&self) {
+        let curr_height = self.get_block_height().await;
+        self.transaction_fetcher
+            .lock()
+            .await
+            .set_block_height(curr_height + 1);
     }
 }
 
@@ -290,25 +249,33 @@ mod test {
     use serde_json::json;
 
     struct FakeFetcher {
-        version: u64,
         chain_id: u8,
+        block_height: u64,
     }
 
     impl FakeFetcher {
         fn new(_node_url: Url, _starting_version: Option<u64>) -> Self {
             Self {
-                version: 0,
                 chain_id: 0,
+                block_height: 0,
             }
         }
     }
 
     #[async_trait::async_trait]
     impl TransactionFetcherTrait for FakeFetcher {
-        fn set_version(&mut self, version: u64) {
-            self.version = version;
+        fn set_block_height(&mut self, block_height: u64) {
+            self.block_height = block_height;
             // Super hacky way of mocking chain_id
-            self.chain_id = version as u8;
+            self.chain_id = block_height as u8;
+        }
+
+        fn get_block_height(&mut self) -> u64 {
+            self.block_height
+        }
+
+        async fn fetch_block(&mut self) -> Vec<Transaction> {
+            unimplemented!();
         }
 
         async fn fetch_ledger_info(&mut self) -> State {
@@ -323,11 +290,7 @@ mod test {
             }
         }
 
-        async fn fetch_next(&mut self) -> Transaction {
-            unimplemented!();
-        }
-
-        async fn fetch_version(&self, _version: u64) -> Transaction {
+        async fn fetch_block_height_from_version(&self, _: u64) -> u64 {
             unimplemented!();
         }
     }
@@ -346,6 +309,7 @@ mod test {
             "block_metadata_transactions",
             "transactions",
             "processor_statuses",
+            "v2_processor_statuses",
             "ledger_infos",
             "__diesel_schema_migrations",
         ] {
@@ -574,7 +538,7 @@ mod test {
         )).unwrap();
 
         tailer
-            .process_transaction(Arc::new(genesis_txn.clone()))
+            .process_transactions(vec![genesis_txn])
             .await
             .unwrap();
 
@@ -652,7 +616,7 @@ mod test {
         )).unwrap();
 
         tailer
-            .process_transaction(Arc::new(block_metadata_transaction.clone()))
+            .process_transactions(vec![block_metadata_transaction.clone()])
             .await
             .unwrap();
 
@@ -765,11 +729,11 @@ mod test {
 
         // We run it twice to ensure we don't explode. Idempotency!
         tailer
-            .process_transaction(Arc::new(user_txn.clone()))
+            .process_transactions(vec![user_txn.clone()])
             .await
             .unwrap();
         tailer
-            .process_transaction(Arc::new(user_txn.clone()))
+            .process_transactions(vec![user_txn.clone()])
             .await
             .unwrap();
 
@@ -789,8 +753,8 @@ mod test {
         assert_eq!(wsc2.len(), 2);
 
         // Fetch the latest status
-        let latest_version = tailer.set_fetcher_to_lowest_processor_version().await;
-        assert_eq!(latest_version, 691595);
+        let latest_block = tailer.set_fetcher_to_lowest_processor_block().await;
+        assert_eq!(latest_block, 691595);
 
         // Message Transaction -> 0xb8bbd3936b05e3643f4b4f910bb00c9b6fa817c1935c74b9a16b5b7a2c8a69a3
         let message_txn: Transaction = serde_json::from_value(json!(
@@ -853,19 +817,19 @@ mod test {
         )).unwrap();
 
         tailer
-            .process_transaction(Arc::new(message_txn.clone()))
+            .process_transactions(vec![message_txn.clone()])
             .await
             .unwrap();
 
         let (_conn_pool, tailer) = setup_indexer().unwrap();
-        tailer.set_fetcher_version(4).await;
+        tailer.set_fetcher_block(4).await;
         assert!(tailer.check_or_update_chain_id().await.is_ok());
         assert!(tailer.check_or_update_chain_id().await.is_ok());
 
-        tailer.set_fetcher_version(10).await;
+        tailer.set_fetcher_block(10).await;
         assert!(tailer.check_or_update_chain_id().await.is_err());
 
-        tailer.set_fetcher_version(4).await;
+        tailer.set_fetcher_block(4).await;
         assert!(tailer.check_or_update_chain_id().await.is_ok());
     }
 }

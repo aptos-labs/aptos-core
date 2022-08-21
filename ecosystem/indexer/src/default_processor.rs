@@ -16,10 +16,10 @@ use crate::{
 };
 use aptos_rest_client::Transaction;
 use async_trait::async_trait;
-use diesel::Connection;
+use diesel::result::Error;
 use field_count::FieldCount;
-use futures::future::Either;
-use std::{fmt::Debug, sync::Arc};
+use field_count::FieldCount;
+use std::fmt::Debug;
 
 pub struct DefaultTransactionProcessor {
     connection_pool: PgDbPool,
@@ -42,7 +42,7 @@ impl Debug for DefaultTransactionProcessor {
     }
 }
 
-fn insert_events(conn: &PgPoolConnection, events: &Vec<EventModel>) {
+fn insert_events(conn: &PgPoolConnection, events: &[EventModel]) {
     let chunks = get_chunks(events.len(), EventModel::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
@@ -55,7 +55,7 @@ fn insert_events(conn: &PgPoolConnection, events: &Vec<EventModel>) {
     }
 }
 
-fn insert_write_set_changes(conn: &PgPoolConnection, write_set_changes: &Vec<WriteSetChangeModel>) {
+fn insert_write_set_changes(conn: &PgPoolConnection, write_set_changes: &[WriteSetChangeModel]) {
     let chunks = get_chunks(write_set_changes.len(), WriteSetChangeModel::field_count());
     for (start_ind, end_ind) in chunks {
         execute_with_better_error(
@@ -68,65 +68,70 @@ fn insert_write_set_changes(conn: &PgPoolConnection, write_set_changes: &Vec<Wri
     }
 }
 
-fn insert_transaction(conn: &PgPoolConnection, version: u64, transaction_model: &TransactionModel) {
-    aptos_logger::trace!(
-        "[default_processor] inserting 'transaction' version {} with hash {}",
-        version,
-        transaction_model.hash
-    );
-    execute_with_better_error(
-        conn,
-        diesel::insert_into(schema::transactions::table)
-            .values(transaction_model)
-            .on_conflict(schema::transactions::dsl::hash)
-            .do_update()
-            .set(transaction_model),
-    )
-    .expect("Error inserting row into database");
+fn insert_transactions(conn: &PgPoolConnection, txns: &[TransactionModel]) {
+    let chunks = get_chunks(txns.len(), TransactionModel::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::transactions::table)
+                .values(&txns[start_ind..end_ind])
+                .on_conflict_do_nothing(),
+        )
+        .expect("Error inserting row into database");
+    }
 }
 
-fn insert_user_transaction(
-    conn: &PgPoolConnection,
-    version: u64,
-    transaction_model: &TransactionModel,
-    user_transaction_model: &UserTransactionModel,
-) {
-    aptos_logger::trace!(
-        "[default_processor] inserting 'user_transaction' version {} with hash {}",
-        version,
-        &transaction_model.hash
-    );
-    execute_with_better_error(
-        conn,
-        diesel::insert_into(schema::user_transactions::table)
-            .values(user_transaction_model)
-            .on_conflict(schema::user_transactions::dsl::hash)
-            .do_update()
-            .set(user_transaction_model),
-    )
-    .expect("Error inserting row into database");
+fn insert_user_transactions(conn: &PgPoolConnection, user_txns: &[UserTransactionModel]) {
+    let chunks = get_chunks(user_txns.len(), UserTransactionModel::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::user_transactions::table)
+                .values(&user_txns[start_ind..end_ind])
+                .on_conflict_do_nothing(),
+        )
+        .expect("Error inserting row into database");
+    }
+}
 }
 
-fn insert_block_metadata_transaction(
+fn insert_block_metadata_transactions(
     conn: &PgPoolConnection,
-    version: u64,
-    transaction_model: &TransactionModel,
-    block_metadata_transaction_model: &BlockMetadataTransactionModel,
+    bm_txns: &[BlockMetadataTransactionModel],
 ) {
-    aptos_logger::trace!(
-        "[default_processor] inserting 'block_metadata_transaction' version {} with hash {}",
-        version,
-        &transaction_model.hash
-    );
-    execute_with_better_error(
-        conn,
-        diesel::insert_into(schema::block_metadata_transactions::table)
-            .values(block_metadata_transaction_model)
-            .on_conflict(schema::block_metadata_transactions::dsl::hash)
-            .do_update()
-            .set(block_metadata_transaction_model),
-    )
-    .expect("Error inserting row into database");
+    let chunks = get_chunks(bm_txns.len(), UserTransactionModel::field_count());
+    for (start_ind, end_ind) in chunks {
+        execute_with_better_error(
+            conn,
+            diesel::insert_into(schema::block_metadata_transactions::table)
+                .values(&bm_txns[start_ind..end_ind])
+                .on_conflict_do_nothing(),
+        )
+        .expect("Error inserting row into database");
+    }
+}
+
+fn insert_block(
+    conn: &PgPoolConnection,
+    name: &'static str,
+    block_height: u64,
+    txns: Vec<TransactionModel>,
+    user_txns: Vec<UserTransactionModel>,
+    bm_txns: Vec<BlockMetadataTransactionModel>,
+    events: Vec<EventModel>,
+    wscs: Vec<WriteSetChangeModel>,
+) -> Result<(), Error> {
+    aptos_logger::trace!("[{}] inserting block {}", name, block_height);
+    conn.build_transaction()
+        .read_write()
+        .run::<_, Error, _>(|| {
+            insert_transactions(conn, &txns);
+            insert_user_transactions(conn, &user_txns);
+            insert_block_metadata_transactions(conn, &bm_txns);
+            insert_events(conn, &events);
+            insert_write_set_changes(conn, &wscs);
+            Ok(())
+        })
 }
 
 #[async_trait]
@@ -135,54 +140,30 @@ impl TransactionProcessor for DefaultTransactionProcessor {
         "default_processor"
     }
 
-    async fn process_transaction(
+    async fn process_transactions(
         &self,
-        transaction: Arc<Transaction>,
+        transactions: Vec<Transaction>,
+        block_height: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
-        let version = transaction.version().unwrap_or(0);
-
-        let (transaction_model, maybe_details_model, maybe_events, maybe_write_set_changes) =
-            TransactionModel::from_transaction(&transaction);
+        let (txns, user_txns, bm_txns, events, write_set_changes) =
+            TransactionModel::from_transactions(&transactions);
 
         let conn = self.get_conn();
-
-        let tx_result = conn.transaction::<(), diesel::result::Error, _>(|| {
-            insert_transaction(&conn, version, &transaction_model);
-            if let Some(tx_details_model) = maybe_details_model {
-                match tx_details_model {
-                    Either::Left(user_transaction_model) => {
-                        insert_user_transaction(
-                            &conn,
-                            version,
-                            &transaction_model,
-                            &user_transaction_model,
-                        );
-                    }
-                    Either::Right(block_metadata_transaction_model) => {
-                        insert_block_metadata_transaction(
-                            &conn,
-                            version,
-                            &transaction_model,
-                            &block_metadata_transaction_model,
-                        );
-                    }
-                };
-            };
-
-            if let Some(events) = maybe_events {
-                insert_events(&conn, &events);
-            };
-            if let Some(write_set_changes) = maybe_write_set_changes {
-                insert_write_set_changes(&conn, &write_set_changes);
-            };
-            Ok(())
-        });
-
+        let tx_result = insert_block(
+            &conn,
+            self.name(),
+            block_height,
+            txns,
+            user_txns,
+            bm_txns,
+            events,
+            write_set_changes,
+        );
         match tx_result {
-            Ok(_) => Ok(ProcessingResult::new(self.name(), version)),
+            Ok(_) => Ok(ProcessingResult::new(self.name(), block_height)),
             Err(err) => Err(TransactionProcessingError::TransactionCommitError((
                 anyhow::Error::from(err),
-                version,
+                block_height,
                 self.name(),
             ))),
         }

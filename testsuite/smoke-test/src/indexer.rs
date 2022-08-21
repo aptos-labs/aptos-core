@@ -120,7 +120,7 @@ async fn test_indexer() {
     if aptos_indexer::should_skip_pg_tests() {
         return;
     }
-    let (conn_pool, mut tailer) = setup_indexer(&mut info).unwrap();
+    let (conn_pool, tailer) = setup_indexer(&mut info).unwrap();
 
     info.client().get_ledger_information().await.unwrap();
 
@@ -144,7 +144,12 @@ async fn test_indexer() {
             .unwrap()
             .into_inner()
             .version;
-        tailer.process_next_batch((version + 1) as u8).await;
+        tailer
+            .set_fetcher_to_block_from_input_version(version)
+            .await;
+        if tailer.process_next_block().await.is_ok() {
+            tailer.increment_block_height().await;
+        }
 
         // Get them into the array and sort by type in order to prevent ordering from breaking tests
         let mut transactions = vec![];
@@ -189,6 +194,6 @@ async fn test_indexer() {
         assert_eq!(events2.get(1).unwrap().type_, "0x1::coin::DepositEvent");
     }
 
-    let latest_version = tailer.set_fetcher_to_lowest_processor_version().await;
+    let latest_version = tailer.set_fetcher_to_lowest_processor_block().await;
     assert!(latest_version > version);
 }

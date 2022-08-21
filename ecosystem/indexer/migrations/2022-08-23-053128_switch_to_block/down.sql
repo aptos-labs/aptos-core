@@ -1,0 +1,1 @@
+DROP TABLE v2_processor_statuses;

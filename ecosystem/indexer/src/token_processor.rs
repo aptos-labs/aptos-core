@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::database::get_chunks;
 use crate::models::token::{
     CreateCollectionEventType, CreateTokenDataEventType, MintTokenEventType,
     MutateTokenPropertyMapEventType, TokenData, TokenEvent,
@@ -28,8 +29,8 @@ use crate::{
 use aptos_rest_client::Transaction;
 use async_trait::async_trait;
 use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
-use futures::future::Either;
-use std::{fmt::Debug, sync::Arc};
+use field_count::FieldCount;
+use std::fmt::Debug;
 
 pub struct TokenTransactionProcessor {
     connection_pool: PgDbPool,
@@ -196,7 +197,7 @@ fn insert_collection(
 fn process_token_on_chain_data(
     conn: &PgPoolConnection,
     events: &[EventModel],
-    txn: &UserTransaction,
+    txns: &[UserTransaction],
     uris: &mut Vec<(String, String)>,
 ) {
     // filter events to only keep token events
@@ -212,23 +213,33 @@ fn process_token_on_chain_data(
             TokenEvent::CreateTokenDataEvent(event_data) => {
                 let uri = event_data.uri.clone();
                 let t_data_id = event_data.id.to_string();
-                insert_token_data(conn, event_data, txn);
+                insert_token_data(conn, event_data, &txns[0]);
                 uris.push((t_data_id, uri));
             }
             TokenEvent::MintTokenEvent(event_data) => {
-                update_mint_token(conn, event_data, txn);
+                update_mint_token(conn, event_data, &txns[0]);
             }
             TokenEvent::CollectionCreationEvent(event_data) => {
-                insert_collection(conn, event_data, txn);
+                insert_collection(conn, event_data, &txns[0]);
             }
             TokenEvent::DepositEvent(event_data) => {
-                update_token_ownership(conn, event_data.id.to_string(), txn, event_data.amount);
+                update_token_ownership(
+                    conn,
+                    event_data.id.to_string(),
+                    &txns[0],
+                    event_data.amount,
+                );
             }
             TokenEvent::WithdrawEvent(event_data) => {
-                update_token_ownership(conn, event_data.id.to_string(), txn, -event_data.amount);
+                update_token_ownership(
+                    conn,
+                    event_data.id.to_string(),
+                    &txns[0],
+                    -event_data.amount,
+                );
             }
             TokenEvent::MutateTokenPropertyMapEvent(event_data) => {
-                insert_token_properties(conn, event_data, txn);
+                insert_token_properties(conn, event_data, &txns[0]);
             }
             _ => (),
         }
@@ -241,31 +252,25 @@ impl TransactionProcessor for TokenTransactionProcessor {
         "token_processor"
     }
 
-    async fn process_transaction(
+    async fn process_transactions(
         &self,
-        transaction: Arc<Transaction>,
+        transactions: Vec<Transaction>,
+        block_height: u64,
     ) -> Result<ProcessingResult, TransactionProcessingError> {
-        let version = transaction.version().unwrap_or(0);
-
-        let (_, maybe_details_model, maybe_events, _) =
-            TransactionModel::from_transaction(&transaction);
+        let (_, user_txns, _, events, _) = TransactionModel::from_transactions(&transactions);
 
         let conn = self.get_conn();
         let mut token_uris: Vec<(String, String)> = vec![];
 
         let mut tx_result = conn.transaction::<(), diesel::result::Error, _>(|| {
-            if let Some(Either::Left(user_txn)) = maybe_details_model {
-                if let Some(events) = maybe_events {
-                    process_token_on_chain_data(&conn, &events, &user_txn, &mut token_uris);
-                }
-            }
+            process_token_on_chain_data(&conn, &events, &user_txns, &mut token_uris);
             Ok(())
         });
 
         if let Err(err) = tx_result {
             return Err(TransactionProcessingError::TransactionCommitError((
                 anyhow::Error::from(err),
-                version,
+                block_height,
                 self.name(),
             )));
         };
@@ -273,11 +278,12 @@ impl TransactionProcessor for TokenTransactionProcessor {
             let mut res: Vec<Metadata> = vec![];
             get_all_metadata(&token_uris, &mut res).await;
             tx_result = conn.transaction::<(), diesel::result::Error, _>(|| {
-                for metadata in res {
+                let chunks = get_chunks(res.len(), Metadata::field_count());
+                for (start_ind, end_ind) in chunks {
                     execute_with_better_error(
                         &conn,
                         diesel::insert_into(schema::metadatas::table)
-                            .values(&metadata)
+                            .values(&res[start_ind..end_ind])
                             .on_conflict_do_nothing(),
                     )
                     .expect("Error inserting row into metadatas");
@@ -286,10 +292,10 @@ impl TransactionProcessor for TokenTransactionProcessor {
             });
         }
         match tx_result {
-            Ok(_) => Ok(ProcessingResult::new(self.name(), version)),
+            Ok(_) => Ok(ProcessingResult::new(self.name(), block_height)),
             Err(err) => Err(TransactionProcessingError::TransactionCommitError((
                 anyhow::Error::from(err),
-                version,
+                block_height,
                 self.name(),
             ))),
         }
