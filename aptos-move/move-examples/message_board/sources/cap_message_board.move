@@ -11,9 +11,9 @@
 /// The module also emits two types of events for subscribes
 ///     (1) message cap update event, this event contains the board address and participant offered capability
 ///     (2) message change event, this event contains the board, message and message author
-module MessageBoard::CapBasedMB {
+module message_board::cap_based_mb {
     use aptos_std::event::{Self, EventHandle};
-    use std::offer;
+    use message_board::offer;
     use std::signer;
     use std::vector;
 
@@ -136,11 +136,11 @@ module MessageBoard::CapBasedMB {
 }
 
 #[test_only]
-module MessageBoard::MessageBoardCapTests {
+module message_board::MessageBoardCapTests {
     use std::unit_test;
     use std::vector;
     use std::signer;
-    use MessageBoard::CapBasedMB;
+    use message_board::cap_based_mb;
 
 
     const HELLO_WORLD: vector<u8> = vector<u8>[150, 145, 154, 154, 157, 040, 167, 157, 162, 154, 144];
@@ -149,36 +149,36 @@ module MessageBoard::MessageBoardCapTests {
     #[test]
     public entry fun test_init_messageboard_v_cap() {
         let (alice, _) = create_two_signers();
-        CapBasedMB::message_board_init(&alice);
+        cap_based_mb::message_board_init(&alice);
         let board_addr = signer::address_of(&alice);
-        CapBasedMB::send_pinned_message(&alice, board_addr, HELLO_WORLD);
+        cap_based_mb::send_pinned_message(&alice, board_addr, HELLO_WORLD);
     }
 
     #[test]
     public entry fun test_send_pinned_message_v_cap() {
         let (alice, bob) = create_two_signers();
-        CapBasedMB::message_board_init(&alice);
-        CapBasedMB::add_participant(&alice, signer::address_of(&bob));
-        CapBasedMB::claim_notice_cap(&bob, signer::address_of(&alice));
-        CapBasedMB::send_pinned_message(&bob, signer::address_of(&alice), BOB_IS_HERE);
-        let message = CapBasedMB::view_message(signer::address_of(&alice));
+        cap_based_mb::message_board_init(&alice);
+        cap_based_mb::add_participant(&alice, signer::address_of(&bob));
+        cap_based_mb::claim_notice_cap(&bob, signer::address_of(&alice));
+        cap_based_mb::send_pinned_message(&bob, signer::address_of(&alice), BOB_IS_HERE);
+        let message = cap_based_mb::view_message(signer::address_of(&alice));
         assert!(message == BOB_IS_HERE, 1)
     }
 
     #[test]
     public entry fun test_send_message_v_cap() {
         let (alice, bob) = create_two_signers();
-        CapBasedMB::message_board_init(&alice);
-        CapBasedMB::send_message_to(bob, signer::address_of(&alice), BOB_IS_HERE);
+        cap_based_mb::message_board_init(&alice);
+        cap_based_mb::send_message_to(bob, signer::address_of(&alice), BOB_IS_HERE);
     }
 
     #[test]
     #[expected_failure]
     public entry fun test_add_new_participant_v_cap() {
         let (alice, bob) = create_two_signers();
-        CapBasedMB::message_board_init(&alice);
-        CapBasedMB::add_participant(&alice, signer::address_of(&bob));
-        CapBasedMB::send_pinned_message(&bob, signer::address_of(&alice), BOB_IS_HERE);
+        cap_based_mb::message_board_init(&alice);
+        cap_based_mb::add_participant(&alice, signer::address_of(&bob));
+        cap_based_mb::send_pinned_message(&bob, signer::address_of(&alice), BOB_IS_HERE);
     }
 
     #[test_only]
