@@ -33,6 +33,7 @@ pub trait DBPruner: Send + Sync {
             }
         }
     }
+
     fn name(&self) -> &'static str;
 
     /// Performs the actual pruning, a target version is passed, which is the target the pruner
