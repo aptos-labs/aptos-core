@@ -5,7 +5,7 @@ use first_transaction::{Account, FaucetClient, FAUCET_URL, TESTNET_URL};
 use hello_blockchain::HelloBlockchainClient;
 use std::env;
 
-fn main() -> () {
+fn main() {
     let args: Vec<String> = env::args().collect();
     println!("{:?}", args);
 
@@ -32,11 +32,14 @@ fn main() -> () {
     println!("\n=== Initial Balances ===");
     println!(
         "Alice: {:?}",
-        client.rest_client.account_balance(&alice.address())
+        client
+            .rest_client
+            .account_balance(&alice.address())
+            .unwrap()
     );
     println!(
         "Bob: {:?}",
-        client.rest_client.account_balance(&bob.address())
+        client.rest_client.account_balance(&bob.address()).unwrap()
     );
 
     println!("\nUpdate the module with Alice's address, build, copy to the provided path, and press enter.");
@@ -57,7 +60,7 @@ fn main() -> () {
         client.get_message(&alice.address(), &alice.address())
     );
     println!("Setting the message to \"Hello, Blockchain\"");
-    tx_hash = client.set_message(&alice.address(), &mut alice, &"Hello, Blockchain");
+    tx_hash = client.set_message(&alice.address(), &mut alice, "Hello, Blockchain");
     client.rest_client.wait_for_transaction(&tx_hash);
     println!(
         "New value: {:?}",
@@ -74,7 +77,7 @@ fn main() -> () {
         client.get_message(&alice.address(), &bob.address())
     );
     println!("Setting the message to \"Hello, Blockchain\"");
-    tx_hash = client.set_message(&alice.address(), &mut bob, &"Hello, Blockchain");
+    tx_hash = client.set_message(&alice.address(), &mut bob, "Hello, Blockchain");
     client.rest_client.wait_for_transaction(&tx_hash);
     println!(
         "New value: {:?}",
