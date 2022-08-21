@@ -11,6 +11,7 @@ use serde::Deserialize;
 pub struct AptosError {
     pub message: String,
     pub error_code: AptosErrorCode,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub vm_error_code: Option<u64>,
 }
 
