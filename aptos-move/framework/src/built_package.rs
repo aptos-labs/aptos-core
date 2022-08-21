@@ -27,11 +27,11 @@ pub const UPGRADE_POLICY_CUSTOM_FIELD: &str = "upgrade_policy";
 /// Represents a set of options for building artifacts from Move.
 #[derive(Debug, Clone, Parser, Serialize, Deserialize)]
 pub struct BuildOptions {
-    #[clap(long, default_value = "true")]
+    #[clap(long)]
     pub with_srcs: bool,
-    #[clap(long, default_value = "true")]
+    #[clap(long)]
     pub with_abis: bool,
-    #[clap(long, default_value = "true")]
+    #[clap(long)]
     pub with_source_maps: bool,
     #[clap(long, default_value = "true")]
     pub with_error_map: bool,
@@ -47,9 +47,9 @@ pub struct BuildOptions {
 impl Default for BuildOptions {
     fn default() -> Self {
         Self {
-            with_srcs: true,
-            with_abis: true,
-            with_source_maps: true,
+            with_srcs: false,
+            with_abis: false,
+            with_source_maps: false,
             with_error_map: true,
             install_dir: None,
             named_addresses: Default::default(),

@@ -170,11 +170,13 @@ fn code_publishing_upgrade_loader_cache_consistency() {
         h.create_publish_package(
             &acc,
             &common::test_dir_path("code_publishing.data/pack_initial"),
+            None,
         ),
         // Compatible with above package
         h.create_publish_package(
             &acc,
             &common::test_dir_path("code_publishing.data/pack_upgrade_compat"),
+            None,
         ),
         // Not compatible with above package, but with first one.
         // Correct behavior: should create backward_incompatible error
@@ -182,6 +184,7 @@ fn code_publishing_upgrade_loader_cache_consistency() {
         h.create_publish_package(
             &acc,
             &common::test_dir_path("code_publishing.data/pack_compat_first_not_second"),
+            None,
         ),
     ];
     let result = h.run_block(txns);
