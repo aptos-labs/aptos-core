@@ -6,7 +6,6 @@ pub mod error;
 pub mod faucet;
 
 pub use faucet::FaucetClient;
-use std::collections::BTreeMap;
 pub mod response;
 pub use response::Response;
 pub mod state;
@@ -19,7 +18,7 @@ pub use state::State;
 pub use types::{Account, Resource};
 
 use crate::aptos::{AptosVersion, Balance};
-use crate::response::RestError;
+use crate::error::RestError;
 use anyhow::{anyhow, Result};
 use aptos_api_types::mime_types::BCS;
 use aptos_api_types::{
@@ -41,6 +40,7 @@ use reqwest::header::ACCEPT;
 use reqwest::{header::CONTENT_TYPE, Client as ReqwestClient, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use std::time::Duration;
 use types::{deserialize_from_prefixed_hex_string, deserialize_from_string};
 use url::Url;

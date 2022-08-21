@@ -3,7 +3,7 @@
 
 use crate::{types, types::ErrorDetails};
 use aptos_rest_client::aptos_api_types::AptosErrorCode;
-use aptos_rest_client::response::RestError;
+use aptos_rest_client::error::RestError;
 use hex::FromHexError;
 use move_deps::move_core_types::account_address::AccountAddressParseError;
 use serde::{Deserialize, Serialize};
@@ -225,16 +225,6 @@ impl From<FromHexError> for ApiError {
 impl From<bcs::Error> for ApiError {
     fn from(err: bcs::Error) -> Self {
         ApiError::DeserializationFailed(Some(err.to_string()))
-    }
-}
-
-impl From<aptos_rest_client::error::Error> for ApiError {
-    fn from(err: aptos_rest_client::error::Error) -> Self {
-        if err.is_retriable() {
-            ApiError::RetriableAptosError(Some(err.to_string()))
-        } else {
-            ApiError::AptosError(Some(err.to_string()))
-        }
     }
 }
 
