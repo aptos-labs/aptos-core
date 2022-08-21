@@ -146,15 +146,17 @@ With your development environment ready, now you can start to setup your Validat
 12. Copy the `validator.yaml`, `fullnode.yaml` files into this directory.
     ```
     mkdir ~/$WORKSPACE/config
-    cp docker/compose/aptos-node/validator.yaml ~/$WORKSPACE/validator.yaml
-    cp docker/compose/aptos-node/fullnode.yaml ~/$WORKSPACE/fullnode.yaml
+    cp docker/compose/aptos-node/validator.yaml ~/$WORKSPACE/config/validator.yaml
+    cp docker/compose/aptos-node/fullnode.yaml ~/$WORKSPACE/config/fullnode.yaml
     ```
 
-    Modify the config file to update the key path, genesis file path, waypoint path.
+    Modify the config files to update the data directory, key path, genesis file path, waypoint path.
+    User must have write access to data directory.
 
 13. To recap, in your working directory (`~/$WORKSPACE`), you should have a list of files:
-    - `validator.yaml` validator config file
-    - `fullnode.yaml` fullnode config file
+    - `config` folder, which includes:
+      - `validator.yaml` validator config file
+      - `fullnode.yaml` fullnode config file
     - `keys` folder, which includes:
       - `public-keys.yaml`: Publick keys for the owner account, consensus, networking (from step 7).
       - `private-keys.yaml`: Private keys for the owner account, consensus, networking (from step 7).
@@ -171,13 +173,13 @@ With your development environment ready, now you can start to setup your Validat
 14. Start your local Validator by running the below command:
 
     ```
-    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/validator.yaml
+    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/validator.yaml
     ```
 
     Run fullnode in another machine:
 
     ```
-    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/fullnode.yaml
+    cargo run -p aptos-node --release -- -f ~/$WORKSPACE/config/fullnode.yaml
     ```
 
 Now you have completed setting up your node in test mode. You can continue to our [Aptos community platform](https://community.aptoslabs.com/) website for registration.
