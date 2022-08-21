@@ -100,7 +100,6 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: PrunerConfig = PrunerConfig {
         enable: false,
         prune_window: 0,
         batch_size: 0,
-        user_pruning_window_offset: 0,
     },
     epoch_ending_state_merkle_pruner_config: EpochEndingStateMerklePrunerConfig {
         enable: false,
@@ -138,8 +137,6 @@ pub struct StateMerklePrunerConfig {
     /// Similar to the variable above but for state store pruner. It means the number of stale
     /// nodes to prune a time.
     pub batch_size: usize,
-    /// The offset for user pruning window to adjust
-    pub user_pruning_window_offset: u64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -151,6 +148,19 @@ pub struct EpochEndingStateMerklePrunerConfig {
     pub prune_window: u64,
     /// Number of stale nodes to prune a time.
     pub batch_size: usize,
+}
+
+// Config for the epoch ending state pruner is actually in the same format as the state merkle
+// pruner, but it has it's own type hence separate default values. This converts it to the same
+// type, to use the same pruner implementation (but parameterized on the stale node index DB schema).
+impl From<EpochEndingStateMerklePrunerConfig> for StateMerklePrunerConfig {
+    fn from(config: EpochEndingStateMerklePrunerConfig) -> Self {
+        Self {
+            enable: config.enable,
+            prune_window: config.prune_window,
+            batch_size: config.batch_size,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, Default)]
@@ -185,7 +195,6 @@ impl Default for StateMerklePrunerConfig {
             // A 10k transaction block (touching 60k state values, in the case of the account
             // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
             batch_size: 1_000,
-            user_pruning_window_offset: 200_000,
         }
     }
 }
@@ -199,7 +208,7 @@ impl Default for EpochEndingStateMerklePrunerConfig {
             // The setting is in versions, not epochs, because this makes it behave more like other
             // pruners: a slower network will have longer history in db with the same pruner
             // settings, but the disk space take will be similar.
-            // FIXME(aldenhu): add metric to reflect current readable epoch
+            // settings.
             prune_window: 80_000_000,
             // A 10k transaction block (touching 60k state values, in the case of the account
             // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes

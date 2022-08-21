@@ -172,8 +172,10 @@ impl StateMerkleDb {
                     if previous_epoch_ending_version.is_some()
                         && row.node_key.version() <= previous_epoch_ending_version.unwrap()
                     {
+                        // These are processed by the epoch snapshot pruner.
                         batch.put::<StaleNodeIndexCrossEpochSchema>(row, &())
                     } else {
+                        // These are processed by the state merkle pruner.
                         batch.put::<StaleNodeIndexSchema>(row, &())
                     }
                 })
