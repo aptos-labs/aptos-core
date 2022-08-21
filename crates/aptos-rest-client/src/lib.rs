@@ -22,8 +22,8 @@ use crate::aptos::{AptosVersion, Balance};
 use anyhow::{anyhow, Result};
 use aptos_api_types::mime_types::BCS;
 use aptos_api_types::{
-    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, BcsBlock, Block,
-    HexEncodedBytes, MoveModuleId, TransactionData, TransactionOnChainData, UserTransaction,
+    mime_types::BCS_SIGNED_TRANSACTION as BCS_CONTENT_TYPE, AptosError, AptosErrorCode, BcsBlock,
+    Block, HexEncodedBytes, MoveModuleId, TransactionData, TransactionOnChainData, UserTransaction,
     VersionedEvent,
 };
 use aptos_crypto::HashValue;
@@ -47,6 +47,8 @@ use url::Url;
 
 pub const USER_AGENT: &str = concat!("aptos-client-sdk-rust / ", env!("CARGO_PKG_VERSION"));
 pub const DEFAULT_VERSION_PATH_BASE: &str = "v1/";
+
+type AptosResult<T> = Result<T, Error>;
 
 #[derive(Clone, Debug)]
 pub struct Client {
@@ -807,7 +809,7 @@ impl Client {
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
     }
 
-    pub async fn set_failpoint(&self, name: String, actions: String) -> Result<String> {
+    pub async fn set_failpoint(&self, name: String, actions: String) -> AptosResult<String> {
         let mut base = self.build_path("set_failpoint")?;
         let url = base
             .query_pairs_mut()
@@ -817,33 +819,32 @@ impl Client {
         let response = self.inner.get(url.clone()).send().await?;
 
         if !response.status().is_success() {
-            let error_response = AptosError::parse_from_json(Some(response.json().await?));
-            return Err(anyhow::anyhow!("Request failed: {:?}", error_response));
+            Err(parse_error(response))?
+        } else {
+            Ok(response
+                .text()
+                .await
+                .map_err(|e| anyhow::anyhow!("To text failed: {:?}", e))?)
         }
-
-        response
-            .text()
-            .await
-            .map_err(|e| anyhow::anyhow!("To text failed: {:?}", e))
     }
 
     async fn check_response(
         &self,
         response: reqwest::Response,
-    ) -> Result<(reqwest::Response, State)> {
+    ) -> AptosResult<(reqwest::Response, State)> {
         if !response.status().is_success() {
-            let error_response = AptosError::parse_from_json(Some(response.json().await?));
-            return Err(anyhow::anyhow!("Request failed: {:?}", error_response));
-        }
-        let state = State::from_headers(response.headers())?;
+            Err(parse_error(response).await)?
+        } else {
+            let state = State::from_headers(response.headers())?;
 
-        Ok((response, state))
+            Ok((response, state))
+        }
     }
 
     async fn json<T: serde::de::DeserializeOwned>(
         &self,
         response: reqwest::Response,
-    ) -> Result<Response<T>> {
+    ) -> AptosResult<Response<T>> {
         let (response, state) = self.check_response(response).await?;
         let json = response.json().await?;
         Ok(Response::new(json, state))
@@ -859,10 +860,10 @@ impl Client {
             .await?;
 
         if !response.status().is_success() {
-            return Err(anyhow::anyhow!("health check failed"));
+            Err(parse_error(response).await)?
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 
     async fn get<T: DeserializeOwned>(&self, url: Url) -> Result<Response<T>> {
@@ -920,4 +921,29 @@ pub struct VersionedNewBlockEvent {
     pub version: u64,
     /// sequence number
     pub sequence_number: u64,
+}
+
+// Convert errors to AptosError
+async fn parse_error(response: reqwest::Response) -> AptosError {
+    match response.json().await {
+        Ok(json) => AptosError::parse_from_json(Some(json)),
+        Err(err) => AptosError::new_with_error_code(err, AptosErrorCode::BcsSerializationError),
+    }
+}
+
+pub enum Error {
+    Api(AptosError),
+    Client(anyhow::Error),
+}
+
+impl From<AptosError> for Error {
+    fn from(err: AptosError) -> Self {
+        Self::Api(err)
+    }
+}
+
+impl From<anyhow::Error> for Error {
+    fn from(err: anyhow::Error) -> Self {
+        Self::Client(err)
+    }
 }
