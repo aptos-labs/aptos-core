@@ -1,7 +1,6 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_types::U64;
 use poem_openapi::{Enum, Object};
 use serde::Deserialize;
 
@@ -11,8 +10,6 @@ use serde::Deserialize;
 pub struct AptosError {
     pub message: String,
     pub error_code: AptosErrorCode,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub aptos_ledger_version: Option<U64>,
 }
 
 impl AptosError {
@@ -23,13 +20,7 @@ impl AptosError {
         Self {
             message: error.to_string(),
             error_code,
-            aptos_ledger_version: None,
         }
-    }
-
-    pub fn aptos_ledger_version(mut self, ledger_version: u64) -> Self {
-        self.aptos_ledger_version = Some(ledger_version.into());
-        self
     }
 }
 

@@ -58,14 +58,6 @@ pub enum AptosResponseContent<T: ToJSON + Send + Sync> {
 /// an error response to manipulate the AptosError inside it.
 pub trait AptosErrorResponse {
     fn inner_mut(&mut self) -> &mut AptosError;
-
-    fn aptos_ledger_version(mut self, aptos_ledger_version: u64) -> Self
-    where
-        Self: Sized,
-    {
-        self.inner_mut().aptos_ledger_version = Some(aptos_ledger_version.into());
-        self
-    }
 }
 
 /// This macro defines traits for all of the given status codes. In eahc trait
