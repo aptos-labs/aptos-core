@@ -9,8 +9,11 @@ use serde::Deserialize;
 /// message and an Aptos API specific error code.
 #[derive(Debug, Deserialize, Object)]
 pub struct AptosError {
+    /// A message describing the error
     pub message: String,
+    /// A code providing more granular error information beyond the HTTP status code
     pub error_code: AptosErrorCode,
+    /// A code providing VM error details when submitting transactions to the VM
     #[serde(skip_serializing_if = "Option::is_none")]
     pub vm_error_code: Option<u64>,
 }
@@ -42,7 +45,6 @@ impl AptosError {
 
 /// These codes provide more granular error information beyond just the HTTP
 /// status code of the response.
-// Make sure the integer codes increment one by one.
 #[derive(Debug, Deserialize, Enum)]
 #[oai(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
