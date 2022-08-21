@@ -143,9 +143,11 @@ impl Account {
             AccountResource::struct_tag(),
         )));
 
-        let state_value = self
-            .context
-            .get_state_value_poem(&state_key, self.ledger_version)?;
+        let state_value = self.context.get_state_value_poem(
+            &state_key,
+            self.ledger_version,
+            &self.latest_ledger_info,
+        )?;
 
         let state_value = match state_value {
             Some(state_value) => state_value,
@@ -154,6 +156,7 @@ impl Account {
                     self.address,
                     &AccountResource::struct_tag(),
                     self.ledger_version,
+                    &self.latest_ledger_info,
                 ))
             }
         };
@@ -161,7 +164,11 @@ impl Account {
         let account_resource: AccountResource = bcs::from_bytes(&state_value)
             .context("Internal error deserializing response from DB")
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(err, AptosErrorCode::InvalidBcsInStorageError)
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InvalidBcsInStorageError,
+                    &self.latest_ledger_info,
+                )
             })?;
         let account_data: AccountData = account_resource.into();
 
@@ -185,7 +192,7 @@ impl Account {
 
         match accept_type {
             AcceptType::Json => {
-                let move_resolver = self.context.move_resolver_poem()?;
+                let move_resolver = self.context.move_resolver_poem(&self.latest_ledger_info)?;
                 let converted_resources = move_resolver
                     .as_converter(self.context.db.clone())
                     .try_into_resources(resources)
@@ -194,6 +201,7 @@ impl Account {
                         BasicErrorWith404::internal_with_code(
                             err,
                             AptosErrorCode::InvalidBcsInStorageError,
+                            &self.latest_ledger_info,
                         )
                     })?;
 
@@ -230,6 +238,7 @@ impl Account {
                                 BasicErrorWith404::internal_with_code(
                                     err,
                                     AptosErrorCode::InvalidBcsInStorageError,
+                                    &self.latest_ledger_info,
                                 )
                             })?,
                     );
@@ -261,9 +270,15 @@ impl Account {
             .get_account_state(self.address.into(), self.ledger_version)
             .context("Failed to read account state at requested version")
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(err, AptosErrorCode::ReadFromStorageError)
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::ReadFromStorageError,
+                    &self.latest_ledger_info,
+                )
             })?
-            .ok_or_else(|| account_not_found(self.address, self.ledger_version))?;
+            .ok_or_else(|| {
+                account_not_found(self.address, self.ledger_version, &self.latest_ledger_info)
+            })?;
 
         Ok(state)
     }
@@ -279,7 +294,11 @@ impl Account {
             .try_into()
             .context("Given event handle was invalid")
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code(err, AptosErrorCode::InvalidEventKey)
+                BasicErrorWith404::bad_request_with_code(
+                    err,
+                    AptosErrorCode::InvalidEventKey,
+                    &self.latest_ledger_info,
+                )
             })?;
 
         let resource = self.find_resource(&struct_tag)?;
@@ -288,14 +307,24 @@ impl Account {
             .into_iter()
             .find(|(id, _)| id == &field_name)
             .ok_or_else(|| {
-                struct_field_not_found(self.address, &struct_tag, &field_name, self.ledger_version)
+                struct_field_not_found(
+                    self.address,
+                    &struct_tag,
+                    &field_name,
+                    self.ledger_version,
+                    &self.latest_ledger_info,
+                )
             })?;
 
         // Serialization should not fail, otherwise it's internal bug
         let event_handle_bytes = bcs::to_bytes(&value)
             .context("Failed to serialize event handle")
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(err, AptosErrorCode::BcsSerializationError)
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::BcsSerializationError,
+                    &self.latest_ledger_info,
+                )
             })?;
         // Deserialization may fail because the bytes are not EventHandle struct type.
         let event_handle: EventHandle = bcs::from_bytes(&event_handle_bytes)
@@ -304,7 +333,11 @@ impl Account {
                 field_name
             ))
             .map_err(|err| {
-                BasicErrorWith404::bad_request_with_code(err, AptosErrorCode::BcsSerializationError)
+                BasicErrorWith404::bad_request_with_code(
+                    err,
+                    AptosErrorCode::BcsSerializationError,
+                    &self.latest_ledger_info,
+                )
             })?;
         Ok(*event_handle.key())
     }
@@ -317,14 +350,25 @@ impl Account {
         let (typ, data) = account_state
             .get_resources()
             .find(|(tag, _data)| tag == struct_tag)
-            .ok_or_else(|| resource_not_found(self.address, struct_tag, self.ledger_version))?;
-        let move_resolver = self.context.move_resolver_poem()?;
+            .ok_or_else(|| {
+                resource_not_found(
+                    self.address,
+                    struct_tag,
+                    self.ledger_version,
+                    &self.latest_ledger_info,
+                )
+            })?;
+        let move_resolver = self.context.move_resolver_poem(&self.latest_ledger_info)?;
         move_resolver
             .as_converter(self.context.db.clone())
             .move_struct_fields(&typ, data)
             .context("Failed to convert move structs")
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(err, AptosErrorCode::BcsSerializationError)
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::BcsSerializationError,
+                    &self.latest_ledger_info,
+                )
             })
     }
 }

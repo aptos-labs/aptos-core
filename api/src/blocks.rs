@@ -106,10 +106,11 @@ impl BlocksApi {
         match accept_type {
             AcceptType::Json => {
                 let transactions = if let Some(inner) = bcs_block.transactions {
-                    Some(
-                        self.context
-                            .render_transactions_sequential(inner, bcs_block.block_timestamp)?,
-                    )
+                    Some(self.context.render_transactions_sequential(
+                        &latest_ledger_info,
+                        inner,
+                        bcs_block.block_timestamp,
+                    )?)
                 } else {
                     None
                 };

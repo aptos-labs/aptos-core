@@ -32,7 +32,7 @@
 use std::fmt::Display;
 
 use super::accept_type::AcceptType;
-use aptos_api_types::{Address, AptosError, AptosErrorCode, HashValue};
+use aptos_api_types::{Address, AptosError, AptosErrorCode, HashValue, LedgerInfo};
 use move_deps::move_core_types::identifier::{IdentStr, Identifier};
 use move_deps::move_core_types::language_storage::StructTag;
 use poem_openapi::{payload::Json, types::ToJSON, ResponseContent};
@@ -76,8 +76,25 @@ macro_rules! generate_error_traits {
         paste::paste! {
         $(
         pub trait [<$trait_name Error>]: AptosErrorResponse {
-            fn [<$trait_name:snake _with_code>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode) -> Self where Self: Sized;
-            fn [<$trait_name:snake _with_vm_status>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode, vm_status: aptos_types::vm_status::StatusCode) -> Self where Self: Sized;
+            // With ledger info and an error code
+            fn [<$trait_name:snake _with_code>]<Err: std::fmt::Display>(
+                err: Err,
+                error_code: aptos_api_types::AptosErrorCode,
+                ledger_info: &aptos_api_types::LedgerInfo
+            ) -> Self where Self: Sized;
+
+            // With an error code and no ledger info headers (special case)
+            fn [<$trait_name:snake _with_code_no_info>]<Err: std::fmt::Display>(
+                err: Err,
+                error_code: aptos_api_types::AptosErrorCode,
+            ) -> Self where Self: Sized;
+
+            fn [<$trait_name:snake _with_vm_status>]<Err: std::fmt::Display>(
+                err: Err,
+                error_code: aptos_api_types::AptosErrorCode,
+                vm_status: aptos_types::vm_status::StatusCode,
+                ledger_info: &aptos_api_types::LedgerInfo
+            ) -> Self where Self: Sized;
         }
         )*
         }
@@ -104,7 +121,17 @@ macro_rules! generate_error_response {
         pub enum $enum_name {
             $(
             #[oai(status = $status)]
-            $name(poem_openapi::payload::Json<aptos_api_types::AptosError>),
+            $name(poem_openapi::payload::Json<aptos_api_types::AptosError>,
+                #[oai(header = "X-Aptos-Chain-Id")] Option<u8>,
+                // We use just regular u64 here instead of U64 since all header
+                // values are implicitly strings anyway.
+                #[oai(header = "X-Aptos-Ledger-Version")] Option<u64>,
+                #[oai(header = "X-Aptos-Ledger-Oldest-Version")] Option<u64>,
+                #[oai(header = "X-Aptos-Ledger-TimestampUsec")] Option<u64>,
+                #[oai(header = "X-Aptos-Epoch")] Option<u64>,
+                #[oai(header = "X-Aptos-Block-Height")] Option<u64>,
+                #[oai(header = "X-Aptos-Oldest-Block-Height")] Option<u64>,
+            ),
             )*
         }
 
@@ -114,16 +141,63 @@ macro_rules! generate_error_response {
         // will be generated. There are also variants for taking in strs.
         $(
         impl $crate::response::[<$name Error>] for $enum_name {
-            fn [<$name:snake _with_code>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode) -> Self where Self: Sized {
+            fn [<$name:snake _with_code>]<Err: std::fmt::Display>(
+                err: Err,
+                error_code: aptos_api_types::AptosErrorCode,
+                ledger_info: &aptos_api_types::LedgerInfo
+            )-> Self where Self: Sized {
                 let error = aptos_api_types::AptosError::new_with_error_code(err, error_code);
                 let payload = poem_openapi::payload::Json(error);
-                Self::from($enum_name::$name(payload))
+
+                Self::from($enum_name::$name(
+                    payload,
+                    Some(ledger_info.chain_id),
+                    Some(ledger_info.ledger_version.into()),
+                    Some(ledger_info.oldest_ledger_version.into()),
+                    Some(ledger_info.ledger_timestamp.into()),
+                    Some(ledger_info.epoch.into()),
+                    Some(ledger_info.block_height.into()),
+                    Some(ledger_info.oldest_block_height.into()),
+                ))
             }
 
-            fn [<$name:snake _with_vm_status>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode, vm_status: aptos_types::vm_status::StatusCode) -> Self where Self: Sized {
+            fn [<$name:snake _with_code_no_info>]<Err: std::fmt::Display>(
+                err: Err,
+                error_code: aptos_api_types::AptosErrorCode,
+            )-> Self where Self: Sized {
+                let error = aptos_api_types::AptosError::new_with_error_code(err, error_code);
+                let payload = poem_openapi::payload::Json(error);
+
+                Self::from($enum_name::$name(
+                    payload,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ))
+            }
+
+            fn [<$name:snake _with_vm_status>]<Err: std::fmt::Display>(
+                err: Err,
+                error_code: aptos_api_types::AptosErrorCode,
+                vm_status: aptos_types::vm_status::StatusCode,
+                ledger_info: &aptos_api_types::LedgerInfo
+            ) -> Self where Self: Sized {
                 let error = aptos_api_types::AptosError::new_with_vm_status(err, error_code, vm_status);
                 let payload = poem_openapi::payload::Json(error);
-                Self::from($enum_name::$name(payload))
+                Self::from($enum_name::$name(
+                    payload,
+                    Some(ledger_info.chain_id),
+                    Some(ledger_info.ledger_version.into()),
+                    Some(ledger_info.oldest_ledger_version.into()),
+                    Some(ledger_info.ledger_timestamp.into()),
+                    Some(ledger_info.epoch.into()),
+                    Some(ledger_info.block_height.into()),
+                    Some(ledger_info.oldest_block_height.into()),
+                ))
             }
         }
         )*
@@ -134,7 +208,15 @@ macro_rules! generate_error_response {
             fn inner_mut(&mut self) -> &mut aptos_api_types::AptosError {
                 match self {
                     $(
-                    $enum_name::$name(poem_openapi::payload::Json(inner)) => inner,
+                    $enum_name::$name(poem_openapi::payload::Json(inner),
+                        _chain_id,
+                        _ledger_version,
+                        _oldest_ledger_version,
+                        _ledger_timestamp,
+                        _epoch,
+                        _block_height,
+                        _oldest_block_height,
+                    ) => inner,
                     )*
                 }
             }
@@ -170,7 +252,7 @@ macro_rules! generate_success_response {
             #[oai(status = $status)]
             $name(
                 $crate::response::AptosResponseContent<T>,
-                #[oai(header = "X-Aptos-Chain-Id")] u16,
+                #[oai(header = "X-Aptos-Chain-Id")] u8,
                 // We use just regular u64 here instead of U64 since all header
                 // values are implicitly strings anyway.
                 #[oai(header = "X-Aptos-Ledger-Version")] u64,
@@ -211,7 +293,7 @@ macro_rules! generate_success_response {
                     [<$enum_name Status>]::$name => {
                         $enum_name::$name(
                             value,
-                            ledger_info.chain_id as u16,
+                            ledger_info.chain_id,
                             ledger_info.ledger_version.into(),
                             ledger_info.oldest_ledger_version.into(),
                             ledger_info.ledger_timestamp.into(),
@@ -270,7 +352,7 @@ macro_rules! generate_success_response {
                     AcceptType::Bcs => Ok(Self::from((
                         $crate::bcs_payload::Bcs(
                             bcs::to_bytes(&value)
-                                .map_err(|e| E::internal_with_code(e, aptos_api_types::AptosErrorCode::BcsSerializationError))?
+                                .map_err(|e| E::internal_with_code(e, aptos_api_types::AptosErrorCode::BcsSerializationError, ledger_info))?
                         ),
                         ledger_info,
                         status
@@ -307,7 +389,7 @@ macro_rules! generate_success_response {
                Ok(Self::from((
                     $crate::bcs_payload::Bcs(
                         bcs::to_bytes(&value)
-                            .map_err(|e| E::internal_with_code(e, aptos_api_types::AptosErrorCode::BcsSerializationError))?
+                            .map_err(|e| E::internal_with_code(e, aptos_api_types::AptosErrorCode::BcsSerializationError, ledger_info))?
                     ),
                     ledger_info,
                     status
@@ -374,45 +456,61 @@ pub fn build_not_found<S: Display, E: NotFoundError>(
     resource: &str,
     identifier: S,
     error_code: AptosErrorCode,
+    ledger_info: &LedgerInfo,
 ) -> E {
     E::not_found_with_code(
         &format!("{} not found by {}", resource, identifier),
         error_code,
+        ledger_info,
     )
 }
 
-pub fn version_not_found<E: NotFoundError>(ledger_version: u64) -> E {
+pub fn version_not_found<E: NotFoundError>(ledger_version: u64, ledger_info: &LedgerInfo) -> E {
     build_not_found(
         "Ledger version",
         format!("Ledger version({})", ledger_version),
         AptosErrorCode::VersionNotFound,
+        ledger_info,
     )
 }
 
-pub fn transaction_not_found_by_version<E: NotFoundError>(ledger_version: u64) -> E {
+pub fn transaction_not_found_by_version<E: NotFoundError>(
+    ledger_version: u64,
+    ledger_info: &LedgerInfo,
+) -> E {
     build_not_found(
         "Transaction",
         format!("Ledger version({})", ledger_version),
         AptosErrorCode::TransactionNotFound,
+        ledger_info,
     )
 }
 
-pub fn transaction_not_found_by_hash<E: NotFoundError>(hash: HashValue) -> E {
+pub fn transaction_not_found_by_hash<E: NotFoundError>(
+    hash: HashValue,
+    ledger_info: &LedgerInfo,
+) -> E {
     build_not_found(
         "Transaction",
         format!("Transaction hash({})", hash),
         AptosErrorCode::TransactionNotFound,
+        ledger_info,
     )
 }
 
-pub fn version_pruned<E: GoneError>(ledger_version: u64) -> E {
+pub fn version_pruned<E: GoneError>(ledger_version: u64, ledger_info: &LedgerInfo) -> E {
     E::gone_with_code(
         &format!("Ledger version({}) has been pruned", ledger_version),
         AptosErrorCode::VersionPruned,
+        ledger_info,
     )
 }
 
-pub fn account_not_found<E: NotFoundError>(address: Address, ledger_version: u64) -> E {
+pub fn account_not_found<E: NotFoundError>(
+    address: Address,
+    ledger_version: u64,
+    ledger_info: &LedgerInfo,
+) -> E {
     build_not_found(
         "Account",
         format!(
@@ -420,6 +518,7 @@ pub fn account_not_found<E: NotFoundError>(address: Address, ledger_version: u64
             address, ledger_version
         ),
         AptosErrorCode::AccountNotFound,
+        ledger_info,
     )
 }
 
@@ -427,6 +526,7 @@ pub fn resource_not_found<E: NotFoundError>(
     address: Address,
     struct_tag: &StructTag,
     ledger_version: u64,
+    ledger_info: &LedgerInfo,
 ) -> E {
     build_not_found(
         "Resource",
@@ -435,6 +535,7 @@ pub fn resource_not_found<E: NotFoundError>(
             address, struct_tag, ledger_version
         ),
         AptosErrorCode::ResourceNotFound,
+        ledger_info,
     )
 }
 
@@ -442,6 +543,7 @@ pub fn module_not_found<E: NotFoundError>(
     address: Address,
     module_name: &IdentStr,
     ledger_version: u64,
+    ledger_info: &LedgerInfo,
 ) -> E {
     build_not_found(
         "Module",
@@ -450,6 +552,7 @@ pub fn module_not_found<E: NotFoundError>(
             address, module_name, ledger_version
         ),
         AptosErrorCode::ModuleNotFound,
+        ledger_info,
     )
 }
 
@@ -458,6 +561,7 @@ pub fn struct_field_not_found<E: NotFoundError>(
     struct_tag: &StructTag,
     field_name: &Identifier,
     ledger_version: u64,
+    ledger_info: &LedgerInfo,
 ) -> E {
     build_not_found(
         "Struct Field",
@@ -466,6 +570,7 @@ pub fn struct_field_not_found<E: NotFoundError>(
             address, struct_tag, field_name, ledger_version
         ),
         AptosErrorCode::StructFieldNotFound,
+        ledger_info,
     )
 }
 
@@ -473,6 +578,7 @@ pub fn table_item_not_found<E: NotFoundError>(
     table_handle: Address,
     table_key: &Value,
     ledger_version: u64,
+    ledger_info: &LedgerInfo,
 ) -> E {
     build_not_found(
         "Table Item",
@@ -481,28 +587,38 @@ pub fn table_item_not_found<E: NotFoundError>(
             table_handle, table_key, ledger_version
         ),
         AptosErrorCode::TableItemNotFound,
+        ledger_info,
     )
 }
 
-pub fn block_not_found_by_height<E: NotFoundError>(block_height: u64) -> E {
+pub fn block_not_found_by_height<E: NotFoundError>(
+    block_height: u64,
+    ledger_info: &LedgerInfo,
+) -> E {
     build_not_found(
         "Block",
         format!("Block height({})", block_height,),
         AptosErrorCode::BlockNotFound,
+        ledger_info,
     )
 }
 
-pub fn block_not_found_by_version<E: NotFoundError>(ledger_version: u64) -> E {
+pub fn block_not_found_by_version<E: NotFoundError>(
+    ledger_version: u64,
+    ledger_info: &LedgerInfo,
+) -> E {
     build_not_found(
         "Block",
         format!("Ledger version({})", ledger_version,),
         AptosErrorCode::BlockNotFound,
+        ledger_info,
     )
 }
 
-pub fn block_pruned_by_height<E: GoneError>(block_height: u64) -> E {
+pub fn block_pruned_by_height<E: GoneError>(block_height: u64, ledger_info: &LedgerInfo) -> E {
     E::gone_with_code(
         &format!("Block({}) has been pruned", block_height),
         AptosErrorCode::BlockPruned,
+        ledger_info,
     )
 }
