@@ -65,7 +65,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -108,24 +108,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_account
   /accounts/{address}/resources:
     get:
@@ -173,7 +317,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -216,24 +360,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_account_resources
   /accounts/{address}/modules:
     get:
@@ -281,7 +569,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -324,24 +612,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_account_modules
   /spec:
     get:
@@ -399,7 +831,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -442,12 +874,84 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: healthy
   /blocks/by_height/{block_height}:
     get:
@@ -490,7 +994,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -533,24 +1037,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_block_by_height
   /blocks/by_version/{version}:
     get:
@@ -593,7 +1241,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -636,24 +1284,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_block_by_version
   /events/{event_key}:
     get:
@@ -704,7 +1496,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -747,24 +1539,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_events_by_event_key
   /accounts/{address}/events/{event_handle}/{field_name}:
     get:
@@ -828,7 +1764,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -871,24 +1807,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_events_by_event_handle
   /:
     get:
@@ -917,7 +1997,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -960,12 +2040,84 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_ledger_info
   /accounts/{address}/resource/{resource_type}:
     get:
@@ -1018,7 +2170,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -1061,24 +2213,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_account_resource
   /accounts/{address}/module/{module_name}:
     get:
@@ -1131,7 +2427,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -1174,24 +2470,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_account_module
   /tables/{table_handle}/item:
     post:
@@ -1244,7 +2684,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -1287,24 +2727,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_table_item
   /transactions:
     get:
@@ -1349,7 +2933,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -1392,24 +2976,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_transactions
     post:
       tags:
@@ -1462,7 +3190,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -1505,24 +3233,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '413':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '507':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: submit_transaction
   /transactions/by_hash/{txn_hash}:
     get:
@@ -1567,7 +3439,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -1610,24 +3482,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_transaction_by_hash
   /transactions/by_version/{txn_version}:
     get:
@@ -1661,7 +3677,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -1704,24 +3720,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_transaction_by_version
   /accounts/{address}/transactions:
     get:
@@ -1770,7 +3930,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -1813,24 +3973,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '404':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '410':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: get_account_transactions
   /transactions/simulate:
     post:
@@ -1877,7 +4181,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -1920,24 +4224,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '413':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '507':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: simulate_transaction
   /transactions/encode_submission:
     post:
@@ -1986,7 +4434,7 @@ paths:
               deprecated: false
               schema:
                 type: integer
-                format: uint16
+                format: uint8
             X-APTOS-LEDGER-VERSION:
               required: true
               deprecated: false
@@ -2029,12 +4477,84 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
         '500':
           description: ''
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+          headers:
+            X-APTOS-CHAIN-ID:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint8
+            X-APTOS-LEDGER-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-OLDEST-VERSION:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-LEDGER-TIMESTAMPUSEC:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-EPOCH:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
+            X-APTOS-OLDEST-BLOCK-HEIGHT:
+              deprecated: false
+              schema:
+                type: integer
+                format: uint64
       operationId: encode_submission
 components:
   schemas:
