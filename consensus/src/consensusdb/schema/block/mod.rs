@@ -15,6 +15,7 @@ use aptos_crypto::HashValue;
 use consensus_types::block::Block;
 use schemadb::schema::{KeyCodec, Schema, ValueCodec};
 
+#[derive(Debug)]
 pub struct BlockSchema;
 
 impl Schema for BlockSchema {

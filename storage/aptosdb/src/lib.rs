@@ -109,6 +109,8 @@ use crate::pruner::{
     ledger_pruner_manager::LedgerPrunerManager, ledger_store::ledger_store_pruner::LedgerPruner,
     state_pruner_manager::StatePrunerManager, state_store::StateMerklePruner,
 };
+use crate::stale_node_index::StaleNodeIndexSchema;
+use crate::stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema;
 use storage_interface::{
     state_delta::StateDelta, state_view::DbStateView, DbReader, DbWriter, ExecutedTrees, Order,
     StateSnapshotReceiver,
@@ -261,7 +263,8 @@ pub struct AptosDB {
     ledger_store: Arc<LedgerStore>,
     state_store: Arc<StateStore>,
     transaction_store: Arc<TransactionStore>,
-    state_pruner: StatePrunerManager,
+    state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
+    epoch_ending_state_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
     ledger_pruner: LedgerPrunerManager,
     _rocksdb_property_reporter: RocksdbPropertyReporter,
     ledger_commit_lock: std::sync::Mutex<()>,
@@ -282,6 +285,10 @@ impl AptosDB {
         let state_pruner = StatePrunerManager::new(
             Arc::clone(&arc_state_merkle_rocksdb),
             pruner_config.state_merkle_pruner_config,
+        );
+        let epoch_ending_state_pruner = StatePrunerManager::new(
+            Arc::clone(&arc_state_merkle_rocksdb),
+            pruner_config.epoch_ending_state_merkle_pruner_config.into(),
         );
         let state_store = Arc::new(StateStore::new(
             Arc::clone(&arc_ledger_rocksdb),
@@ -304,6 +311,7 @@ impl AptosDB {
             state_store,
             transaction_store: Arc::new(TransactionStore::new(Arc::clone(&arc_ledger_rocksdb))),
             state_pruner,
+            epoch_ending_state_pruner,
             ledger_pruner,
             _rocksdb_property_reporter: RocksdbPropertyReporter::new(
                 Arc::clone(&arc_ledger_rocksdb),
@@ -813,6 +821,8 @@ impl AptosDB {
 
     fn set_pruner_target_version(&self, latest_version: Version) {
         self.state_pruner
+            .maybe_set_pruner_target_db_version(latest_version);
+        self.epoch_ending_state_pruner
             .maybe_set_pruner_target_db_version(latest_version);
         self.ledger_pruner
             .maybe_set_pruner_target_db_version(latest_version);
