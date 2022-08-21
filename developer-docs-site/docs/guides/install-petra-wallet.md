@@ -10,7 +10,7 @@ Petra is now available on the Chrome store.
 To install the Petra (Aptos Wallet) extension on your Chrome browser, you can chose either of the following options
 
 ## a) Install Petra from the Chrome Web Store:
-1. Visit the Petra Wallet extension page: https://chrome.google.com/webstore/detail/petra/ejjladinnckdgjemekebdpeokbikhfci
+1. Visit the [Petra Wallet extension page](https://chrome.google.com/webstore/detail/petra/ejjladinnckdgjemekebdpeokbikhfci)
 2. Click Add to Chrome
 
 - or - 
