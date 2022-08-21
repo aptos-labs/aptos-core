@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::state::State;
+use aptos_api_types::AptosError;
+use reqwest::StatusCode;
+use std::fmt::Formatter;
+use thiserror::Error;
 
 #[derive(Debug)]
 pub struct Response<T> {
@@ -47,5 +51,76 @@ impl<T> Response<T> {
     {
         let (inner, state) = self.into_parts();
         Response::new(f(inner), state)
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum RestError {
+    #[error("API error {0}")]
+    Api(AptosErrorResponse),
+    #[error("BCS ser/de error {0}")]
+    Bcs(bcs::Error),
+    #[error("JSON er/de error {0}")]
+    Json(serde_json::Error),
+    #[error("Web client error {0}")]
+    WebClient(reqwest::Error),
+    #[error("URL Parse error {0}")]
+    UrlParse(url::ParseError),
+    #[error("Timeout waiting for transaction {0}")]
+    Timeout(&'static str),
+    #[error("Unknown error {0}")]
+    Unknown(anyhow::Error),
+}
+
+impl From<(AptosError, Option<State>, StatusCode)> for RestError {
+    fn from((error, state, status_code): (AptosError, Option<State>, StatusCode)) -> Self {
+        Self::Api(AptosErrorResponse {
+            error,
+            state,
+            status_code,
+        })
+    }
+}
+
+impl From<bcs::Error> for RestError {
+    fn from(err: bcs::Error) -> Self {
+        Self::Bcs(err)
+    }
+}
+
+impl From<url::ParseError> for RestError {
+    fn from(err: url::ParseError) -> Self {
+        Self::UrlParse(err)
+    }
+}
+
+impl From<serde_json::Error> for RestError {
+    fn from(err: serde_json::Error) -> Self {
+        Self::Json(err)
+    }
+}
+
+impl From<reqwest::Error> for RestError {
+    fn from(err: reqwest::Error) -> Self {
+        Self::WebClient(err)
+    }
+}
+
+impl From<anyhow::Error> for RestError {
+    fn from(err: anyhow::Error) -> Self {
+        Self::Unknown(err)
+    }
+}
+
+#[derive(Debug)]
+pub struct AptosErrorResponse {
+    pub error: AptosError,
+    pub state: Option<State>,
+    pub status_code: StatusCode,
+}
+
+impl std::fmt::Display for AptosErrorResponse {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.error)
     }
 }

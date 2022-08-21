@@ -30,7 +30,7 @@ pub mod aptos_api {
             address: AccountAddress,
             resource_type: &str,
         ) -> Result<AptosResponse<T>> {
-            return self.inner.get_resource(address, resource_type).await;
+            Ok(self.inner.get_resource(address, resource_type).await?)
         }
 
         pub async fn validator_set(&self) -> Result<(Vec<ValidatorInfo>, State)> {

@@ -41,7 +41,7 @@ impl TransactionAvailabilityEvaluator {
             .map_err(|e| {
                 ApiEvaluatorError::EndpointError(
                     TRANSACTIONS_ENDPOINT.to_string(),
-                    e.context(format!(
+                    anyhow::Error::from(e).context(format!(
                         "The node API failed to return the requested transaction with version: {}",
                         version
                     )),

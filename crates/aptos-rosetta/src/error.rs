@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{types, types::ErrorDetails};
+use aptos_rest_client::aptos_api_types::AptosErrorCode;
+use aptos_rest_client::response::RestError;
 use hex::FromHexError;
 use move_deps::move_core_types::account_address::AccountAddressParseError;
 use serde::{Deserialize, Serialize};
@@ -50,6 +52,8 @@ pub enum ApiError {
     BlockNotFound,
     #[error("Transaction cannot be parsed")]
     TransactionParseError(Option<&'static str>),
+    #[error("Internal error")]
+    InternalError(Option<String>),
 }
 
 impl ApiError {
@@ -75,6 +79,7 @@ impl ApiError {
             UnsupportedCurrency(None),
             UnsupportedSignatureCount(None),
             TransactionParseError(None),
+            InternalError(None),
         ]
     }
 
@@ -100,6 +105,7 @@ impl ApiError {
             UnsupportedSignatureCount(_) => 17,
             TransactionParseError(_) => 18,
             RetriableAptosError(_) => 19,
+            InternalError(_) => 20,
         }
     }
 
@@ -147,6 +153,7 @@ impl ApiError {
             ApiError::NodeIsOffline => "This API is unavailable for the node because he's offline",
             ApiError::BlockNotFound => "Block is missing events",
             ApiError::TransactionParseError(_) => "Transaction failed to parse",
+            ApiError::InternalError(_) => "Internal error",
         }
         .to_string()
     }
@@ -180,6 +187,25 @@ impl From<&ApiError> for types::Error {
             retriable: error.retriable(),
             details,
             description: None,
+        }
+    }
+}
+
+impl From<RestError> for ApiError {
+    fn from(err: RestError) -> Self {
+        match err {
+            RestError::Api(err) => match err.error.error_code {
+                AptosErrorCode::AccountNotFound => {
+                    ApiError::AccountNotFound(Some(err.error.message))
+                }
+                _ => todo!(),
+            },
+            RestError::Bcs(_) => ApiError::DeserializationFailed(None),
+            RestError::Json(_) => ApiError::DeserializationFailed(None),
+            RestError::WebClient(err) => ApiError::InternalError(Some(err.to_string())),
+            RestError::UrlParse(err) => ApiError::InternalError(Some(err.to_string())),
+            RestError::Timeout(err) => ApiError::InternalError(Some(err.to_string())),
+            RestError::Unknown(err) => ApiError::InternalError(Some(err.to_string())),
         }
     }
 }

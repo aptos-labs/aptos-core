@@ -503,9 +503,10 @@ pub async fn nodes_healthcheck(nodes: Vec<&K8sNode>) -> Result<Vec<String>> {
                             node.name()
                         );
                     }
-                    Err(x) => {
-                        info!("Node {} unhealthy: {}", node.name(), &x);
-                        Err(x)
+                    Err(err) => {
+                        let err = anyhow::Error::from(err);
+                        info!("Node {} unhealthy: {}", node.name(), &err);
+                        Err(err)
                     }
                 }
             })

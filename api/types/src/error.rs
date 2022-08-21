@@ -21,7 +21,7 @@ pub struct AptosError {
 
 impl std::fmt::Display for AptosError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "Error({:?}): {}", self.error_code, self.message)
     }
 }
 
@@ -54,7 +54,7 @@ impl AptosError {
 
 /// These codes provide more granular error information beyond just the HTTP
 /// status code of the response.
-#[derive(Debug, Deserialize, Enum)]
+#[derive(Copy, Clone, Debug, Deserialize, Enum)]
 #[oai(rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum AptosErrorCode {
