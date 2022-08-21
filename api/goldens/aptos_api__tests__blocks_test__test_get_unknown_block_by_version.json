@@ -1,5 +1,0 @@
-{
-  "message": "Failed to retrieve block by version: NotFound(Json(AptosError { message: \"Failed to find block: Requested version 1000 > committed version 0\", error_code: None, aptos_ledger_version: None }))",
-  "error_code": null,
-  "aptos_ledger_version": null
-}
