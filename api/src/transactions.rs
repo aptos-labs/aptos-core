@@ -554,7 +554,7 @@ impl TransactionsApi {
         accept_type: &AcceptType,
         txn: SignedTransaction,
     ) -> SimulateTransactionResult<Vec<UserTransaction>> {
-        if txn.clone().check_signature().is_ok() {
+        if txn.signature_is_valid() {
             return Err(SubmitTransactionError::bad_request_str(
                 "Transaction simulation request has a valid signature, this is not allowed",
             ));
