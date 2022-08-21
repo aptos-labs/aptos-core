@@ -11,7 +11,8 @@ use crate::{
     state_merkle_db::StateMerkleDb,
     state_store::buffered_state::BufferedState,
     version_data::{VersionData, VersionDataSchema},
-    AptosDbError, LedgerStore, StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
+    AptosDbError, LedgerStore, StaleNodeIndexCrossEpochSchema, StaleNodeIndexSchema,
+    StatePrunerManager, TransactionStore, OTHER_TIMERS_SECONDS,
 };
 use anyhow::{anyhow, ensure, format_err, Result};
 use aptos_crypto::{
@@ -57,10 +58,11 @@ const MAX_WRITE_SETS_AFTER_SNAPSHOT: LeafCount = buffered_state::TARGET_SNAPSHOT
     * 2;
 
 #[derive(Debug)]
-pub struct StateDb {
+pub(crate) struct StateDb {
     pub ledger_db: Arc<DB>,
     pub state_merkle_db: Arc<StateMerkleDb>,
-    pub state_pruner: StatePrunerManager,
+    pub state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
+    pub epoch_ending_state_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
 }
 
 #[derive(Debug)]
@@ -251,7 +253,8 @@ impl StateStore {
     pub fn new(
         ledger_db: Arc<DB>,
         state_merkle_db: Arc<DB>,
-        state_pruner: StatePrunerManager,
+        state_pruner: StatePrunerManager<StaleNodeIndexSchema>,
+        epoch_ending_state_pruner: StatePrunerManager<StaleNodeIndexCrossEpochSchema>,
         target_snapshot_size: usize,
         max_nodes_per_lru_cache_shard: usize,
         hack_for_tests: bool,
@@ -264,6 +267,7 @@ impl StateStore {
             ledger_db,
             state_merkle_db,
             state_pruner,
+            epoch_ending_state_pruner,
         });
         let buffered_state = Mutex::new(
             Self::create_buffered_state_from_latest_snapshot(

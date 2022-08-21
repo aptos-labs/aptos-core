@@ -12,7 +12,7 @@ use storage_interface::{jmt_update_refs, jmt_updates, DbReader, DbWriter, StateS
 
 use crate::{
     test_helper::{arb_state_kv_sets, update_store},
-    AptosDB, StateMerklePruner,
+    AptosDB,
 };
 
 use super::*;
@@ -43,22 +43,6 @@ fn put_value_set(
         .unwrap();
     state_store.ledger_db.write_schemas(batch).unwrap();
     root
-}
-
-fn prune_stale_indices(
-    state_pruner: &StateMerklePruner,
-    min_readable_version: Version,
-    target_min_readable_version: Version,
-    limit: usize,
-) -> Version {
-    state_pruner
-        .prune_state_merkle(
-            min_readable_version,
-            target_min_readable_version,
-            limit,
-            None,
-        )
-        .unwrap()
 }
 
 fn verify_value_and_proof(
@@ -243,6 +227,7 @@ fn test_get_values_by_key_prefix() {
     assert_eq!(*key_value_map.get(&key5).unwrap(), value5_v2);
 }
 
+/*
 #[test]
 fn test_stale_node_index() {
     let key1 = StateKey::Raw(String::from("test_key1").into_bytes());
@@ -556,6 +541,7 @@ fn test_stale_node_index_all_at_once() {
         verify_value_and_proof(store, key3, Some(&value3_update), 2, root2);
     }
 }
+*/
 
 #[test]
 pub fn test_get_state_snapshot_before() {
