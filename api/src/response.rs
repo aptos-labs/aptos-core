@@ -77,6 +77,7 @@ macro_rules! generate_error_traits {
         $(
         pub trait [<$trait_name Error>]: AptosErrorResponse {
             fn [<$trait_name:snake _with_code>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode) -> Self where Self: Sized;
+            fn [<$trait_name:snake _with_vm_status>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode, vm_status: aptos_types::vm_status::StatusCode) -> Self where Self: Sized;
         }
         )*
         }
@@ -115,6 +116,12 @@ macro_rules! generate_error_response {
         impl $crate::response::[<$name Error>] for $enum_name {
             fn [<$name:snake _with_code>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode) -> Self where Self: Sized {
                 let error = aptos_api_types::AptosError::new_with_error_code(err, error_code);
+                let payload = poem_openapi::payload::Json(error);
+                Self::from($enum_name::$name(payload))
+            }
+
+            fn [<$name:snake _with_vm_status>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode, vm_status: aptos_types::vm_status::StatusCode) -> Self where Self: Sized {
+                let error = aptos_api_types::AptosError::new_with_vm_status(err, error_code, vm_status);
                 let payload = poem_openapi::payload::Json(error);
                 Self::from($enum_name::$name(payload))
             }
