@@ -25,6 +25,9 @@ pub struct MetricsPusher {
     quit_sender: mpsc::Sender<()>,
 }
 
+#[deprecated(
+    note = "The aptos-push-metrics crate is deprecrated. In future prefer to use aptos-metrics-core directly (pull) or use aptos-telemetry (push)."
+)]
 impl MetricsPusher {
     fn push(push_metrics_endpoint: &str) {
         let mut buffer = Vec::new();
@@ -119,6 +122,7 @@ impl MetricsPusher {
 }
 
 impl Drop for MetricsPusher {
+    #[allow(deprecated)]
     fn drop(&mut self) {
         self.join()
     }

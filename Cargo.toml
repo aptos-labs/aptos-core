@@ -86,7 +86,6 @@ members = [
     "network/peer-monitoring-service/types",
     "sdk",
     "secure/net",
-    "secure/push-metrics",
     "secure/storage",
     "secure/storage/github",
     "secure/storage/vault",
