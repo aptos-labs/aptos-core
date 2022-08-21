@@ -42,11 +42,11 @@ In AIT3 we will have UI support to allow owner managing the staking pool, see de
 
 ## Bootstrapping validator node
 
-Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode. AIT3 network Chain ID is 43.
+Before joining the testnet, you need to bootstrap your node with the genesis blob and waypoint provided by Aptos Labs team. This will convert your node from test mode to prod mode.
 
 ### Using source code
 
-- Stop your node and remove the data directory.
+- Stop your node and remove the data directory. Make sure you remove the secure-data file too, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/aptos-node/validator.yaml#L13). 
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address, don't change anything else, keep the keys as is.
 - Pull the latest changes on `testnet` branch
@@ -55,7 +55,7 @@ Before joining the testnet, you need to bootstrap your node with the genesis blo
 
 ### Using Docker
 
-- Stop your node and remove the data volumes, `docker compose down --volumes`
+- Stop your node and remove the data volumes, `docker compose down --volumes`. Make sure you remove the secure-data file too, path is defined [here](https://github.com/aptos-labs/aptos-core/blob/main/docker/compose/aptos-node/validator.yaml#L13). 
 - Download the `genesis.blob` and `waypoint.txt` file published by Aptos Labs team.
 - - Update your `account_address` in `validator-identity.yaml` to your **owner** wallet address.
 - Update your docker image to use tag `testnet`
