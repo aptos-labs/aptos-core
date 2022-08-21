@@ -75,7 +75,7 @@ The example file leverages helper functions to interact with the [REST API][rest
 
 ### Step 4.1: Initializing the Clients
 
-In the first step, the example initializes both the REST and Faucet clients. The REST client interacts with the REST API, whereas the Faucet client is a devnet service for creating and funding accounts.
+In the first step, the example initializes both the REST and Faucet clients. The REST client interacts with the REST API, whereas the Faucet client interacts with the devnet Faucet service for creating and funding accounts.
 
 <Tabs>
   <TabItem value="python" label="Python">
@@ -101,13 +101,12 @@ In progress.
 
 :::tip
 
-The URLs for both services, by default, point to our devnet services, however, they can be configured via setting following environmental variables: `APTOS_NODE_URL` and `APTOS_FAUCET_URL`.
-
+The URLs for both services by default, point to our devnet services. However, they can be configured with the following environment variables: `APTOS_NODE_URL` and `APTOS_FAUCET_URL`.
 :::
 
 ### Step 4.2: Creating local accounts
 
-The next step is to create two accounts from the locally. [Accounts][account_basics] represent both on and off-chain state. The off-chain state consists of an address and the public, private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
+The next step is to create two accounts from the locally. [Accounts][account_basics] represent both on and off-chain state. Off-chain state consists of an address and the public, private key pair used to authenticate ownership. This step demonstrates how to generate that off-chain state.
 
 <Tabs>
   <TabItem value="python" label="Python">
@@ -128,7 +127,7 @@ In progress.
 
 ### Step 4.3: Creating blockchain accounts
 
-In Aptos, each account must have an on-chain representation in order to support receive tokens, coins, and interacting in other DApps. In Aptos, an account represents a medium for storing assets, hence it must be explicitly created. This example leverages the Faucet to create and fund Alice's account and to just create Bob's:
+In Aptos, each account must have an on-chain representation in order to support receive tokens and coins as well as interacting in other dApps. An account represents a medium for storing assets, hence it must be explicitly created. This example leverages the Faucet to create and fund Alice's account and to only create Bob's:
 
 <Tabs>
   <TabItem value="python" label="Python">
