@@ -114,6 +114,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+        '410':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
         '500':
           description: ''
           content:
@@ -211,6 +217,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/AptosError'
         '404':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+        '410':
           description: ''
           content:
             application/json:
@@ -318,6 +330,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+        '410':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
         '500':
           description: ''
           content:
@@ -418,7 +436,7 @@ paths:
               schema:
                 type: integer
                 format: uint64
-        '400':
+        '503':
           description: ''
           content:
             application/json:
@@ -521,6 +539,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+        '410':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
         '500':
           description: ''
           content:
@@ -613,6 +637,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/AptosError'
         '404':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+        '410':
           description: ''
           content:
             application/json:
@@ -718,6 +748,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/AptosError'
         '404':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+        '410':
           description: ''
           content:
             application/json:
@@ -836,6 +872,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/AptosError'
         '404':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+        '410':
           description: ''
           content:
             application/json:
@@ -1025,6 +1067,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+        '410':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
         '500':
           description: ''
           content:
@@ -1127,6 +1175,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/AptosError'
         '404':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+        '410':
           description: ''
           content:
             application/json:
@@ -1239,6 +1293,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+        '410':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
         '500':
           description: ''
           content:
@@ -1333,6 +1393,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/AptosError'
         '404':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+        '410':
           description: ''
           content:
             application/json:
@@ -1550,6 +1616,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AptosError'
+        '410':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
         '500':
           description: ''
           content:
@@ -1633,6 +1705,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/AptosError'
         '404':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+        '410':
           description: ''
           content:
             application/json:
@@ -1736,6 +1814,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/AptosError'
         '404':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AptosError'
+        '410':
           description: ''
           content:
             application/json:
@@ -2006,24 +2090,55 @@ components:
         message and an Aptos API specific error code.
       required:
       - message
+      - error_code
       properties:
         message:
           type: string
+          description: A message describing the error
         error_code:
-          $ref: '#/components/schemas/AptosErrorCode'
-        aptos_ledger_version:
-          $ref: '#/components/schemas/U64'
+          allOf:
+          - $ref: '#/components/schemas/AptosErrorCode'
+          - description: A code providing more granular error information beyond the
+              HTTP status code
+        vm_error_code:
+          type: integer
+          format: uint64
+          description: A code providing VM error details when submitting transactions
+            to the VM
     AptosErrorCode:
       type: string
       description: |-
         These codes provide more granular error information beyond just the HTTP
         status code of the response.
       enum:
+      - account_not_found
+      - resource_not_found
+      - module_not_found
+      - struct_field_not_found
+      - version_not_found
+      - transaction_not_found
+      - table_item_not_found
+      - block_not_found
+      - version_pruned
+      - block_pruned
+      - invalid_input
+      - invalid_start_param
+      - invalid_limit_param
+      - invalid_event_key
+      - invalid_submitted_transaction
+      - invalid_transaction_update
+      - sequence_number_too_old
+      - vm_error
+      - transaction_submission_failed
+      - health_check_failed
+      - mempool_is_full
+      - mempool_is_full_for_account
+      - internal_error
       - read_from_storage_error
       - invalid_bcs_in_storage_error
       - bcs_serialization_error
-      - invalid_start_param
-      - invalid_limit_param
+      - web_framework_error
+      - bcs_not_supported
     Block:
       type: object
       required:
