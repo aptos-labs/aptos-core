@@ -143,9 +143,22 @@ module aptos_framework::code {
 
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
-    public entry fun publish_package_txn(owner: &signer, pack_serialized: vector<u8>, code: vector<vector<u8>>)
+    public entry fun publish_package_txn(owner: &signer, metadata_serialized: vector<u8>, code: vector<vector<u8>>)
     acquires PackageRegistry {
-        publish_package(owner, util::from_bytes<PackageMetadata>(pack_serialized), code)
+        publish_package(owner, util::from_bytes<PackageMetadata>(metadata_serialized), code)
+    }
+
+    /// Same as `publish_package_txn` but allows to split the metadata into multiple parts for working around
+    /// size constraints.
+    public entry fun publish_package_chunk3_txn(owner: &signer,
+                                                metadata_chunk1: vector<u8>,
+                                                metadata_chunk2: vector<u8>,
+                                                metadata_chunk3: vector<u8>,
+                                                code: vector<vector<u8>>)
+    acquires PackageRegistry {
+        vector::append(&mut metadata_chunk1, metadata_chunk2);
+        vector::append(&mut metadata_chunk1, metadata_chunk3);
+        publish_package(owner, util::from_bytes<PackageMetadata>(metadata_chunk1), code)
     }
 
     // Helpers

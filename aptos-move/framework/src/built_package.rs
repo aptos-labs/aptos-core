@@ -60,6 +60,7 @@ impl Default for BuildOptions {
 /// Represents a built package.  It allows to extract `PackageMetadata`. Can also be used to
 /// just build Move code.
 pub struct BuiltPackage {
+    options: BuildOptions,
     package_path: PathBuf,
     package: CompiledPackage,
 }
@@ -94,6 +95,7 @@ impl BuiltPackage {
             inject_module_metadata(package_path.clone(), &mut package, map)?
         }
         Ok(Self {
+            options,
             package_path,
             package,
         })
@@ -150,21 +152,32 @@ impl BuiltPackage {
         let mut modules = vec![];
         for u in self.package.root_modules() {
             let name = u.unit.name().to_string();
-            let source = std::fs::read_to_string(&u.source_path)?;
-            let source = zip_metadata(source.as_bytes())?;
-            let source_map = zip_metadata(&u.unit.serialize_source_map())?;
+            let source = if self.options.with_srcs {
+                zip_metadata(std::fs::read_to_string(&u.source_path)?.as_bytes())?
+            } else {
+                String::new()
+            };
+            let source_map = if self.options.with_source_maps {
+                zip_metadata(&u.unit.serialize_source_map())?
+            } else {
+                String::new()
+            };
             modules.push(ModuleMetadata {
                 name,
                 source,
                 source_map,
             })
         }
-        let abis = if let Some(abis) = &self.package.compiled_abis {
-            let mut r = vec![];
-            for (_, a) in abis {
-                r.push(zip_metadata(a)?)
+        let abis = if self.options.with_abis {
+            if let Some(abis) = &self.package.compiled_abis {
+                let mut r = vec![];
+                for (_, a) in abis {
+                    r.push(zip_metadata(a)?)
+                }
+                r
+            } else {
+                vec![]
             }
-            r
         } else {
             vec![]
         };

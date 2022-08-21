@@ -94,10 +94,19 @@ pub enum EntryFunctionCall {
         should_pass: bool,
     },
 
+    /// Same as `publish_package_txn` but allows to split the metadata into multiple parts for working around
+    /// size constraints.
+    CodePublishPackageChunk3Txn {
+        metadata_chunk1: Vec<u8>,
+        metadata_chunk2: Vec<u8>,
+        metadata_chunk3: Vec<u8>,
+        code: Vec<Vec<u8>>,
+    },
+
     /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
     /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
     CodePublishPackageTxn {
-        pack_serialized: Vec<u8>,
+        metadata_serialized: Vec<u8>,
         code: Vec<Vec<u8>>,
     },
 
@@ -290,10 +299,21 @@ impl EntryFunctionCall {
                 proposal_id,
                 should_pass,
             } => aptos_governance_vote(stake_pool, proposal_id, should_pass),
-            CodePublishPackageTxn {
-                pack_serialized,
+            CodePublishPackageChunk3Txn {
+                metadata_chunk1,
+                metadata_chunk2,
+                metadata_chunk3,
                 code,
-            } => code_publish_package_txn(pack_serialized, code),
+            } => code_publish_package_chunk3_txn(
+                metadata_chunk1,
+                metadata_chunk2,
+                metadata_chunk3,
+                code,
+            ),
+            CodePublishPackageTxn {
+                metadata_serialized,
+                code,
+            } => code_publish_package_txn(metadata_serialized, code),
             CoinTransfer {
                 coin_type,
                 to,
@@ -568,10 +588,37 @@ pub fn aptos_governance_vote(
     ))
 }
 
+/// Same as `publish_package_txn` but allows to split the metadata into multiple parts for working around
+/// size constraints.
+pub fn code_publish_package_chunk3_txn(
+    metadata_chunk1: Vec<u8>,
+    metadata_chunk2: Vec<u8>,
+    metadata_chunk3: Vec<u8>,
+    code: Vec<Vec<u8>>,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("code").to_owned(),
+        ),
+        ident_str!("publish_package_chunk3_txn").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&metadata_chunk1).unwrap(),
+            bcs::to_bytes(&metadata_chunk2).unwrap(),
+            bcs::to_bytes(&metadata_chunk3).unwrap(),
+            bcs::to_bytes(&code).unwrap(),
+        ],
+    ))
+}
+
 /// Same as `publish_package` but as an entry function which can be called as a transaction. Because
 /// of current restrictions for txn parameters, the metadata needs to be passed in serialized form.
 pub fn code_publish_package_txn(
-    pack_serialized: Vec<u8>,
+    metadata_serialized: Vec<u8>,
     code: Vec<Vec<u8>>,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -585,7 +632,7 @@ pub fn code_publish_package_txn(
         ident_str!("publish_package_txn").to_owned(),
         vec![],
         vec![
-            bcs::to_bytes(&pack_serialized).unwrap(),
+            bcs::to_bytes(&metadata_serialized).unwrap(),
             bcs::to_bytes(&code).unwrap(),
         ],
     ))
@@ -1142,10 +1189,25 @@ mod decoder {
         }
     }
 
+    pub fn code_publish_package_chunk3_txn(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CodePublishPackageChunk3Txn {
+                metadata_chunk1: bcs::from_bytes(script.args().get(0)?).ok()?,
+                metadata_chunk2: bcs::from_bytes(script.args().get(1)?).ok()?,
+                metadata_chunk3: bcs::from_bytes(script.args().get(2)?).ok()?,
+                code: bcs::from_bytes(script.args().get(3)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn code_publish_package_txn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::CodePublishPackageTxn {
-                pack_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
+                metadata_serialized: bcs::from_bytes(script.args().get(0)?).ok()?,
                 code: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
         } else {
@@ -1454,6 +1516,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "aptos_governance_vote".to_string(),
             Box::new(decoder::aptos_governance_vote),
+        );
+        map.insert(
+            "code_publish_package_chunk3_txn".to_string(),
+            Box::new(decoder::code_publish_package_chunk3_txn),
         );
         map.insert(
             "code_publish_package_txn".to_string(),
