@@ -1,6 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_types::vm_status::StatusCode;
 use poem_openapi::{Enum, Object};
 use serde::Deserialize;
 
@@ -10,6 +11,7 @@ use serde::Deserialize;
 pub struct AptosError {
     pub message: String,
     pub error_code: AptosErrorCode,
+    pub vm_error_code: Option<u64>,
 }
 
 impl AptosError {
@@ -20,6 +22,19 @@ impl AptosError {
         Self {
             message: error.to_string(),
             error_code,
+            vm_error_code: None,
+        }
+    }
+
+    pub fn new_with_vm_status<ErrorType: std::fmt::Display>(
+        error: ErrorType,
+        error_code: AptosErrorCode,
+        vm_error_code: StatusCode,
+    ) -> AptosError {
+        Self {
+            message: error.to_string(),
+            error_code,
+            vm_error_code: Some(vm_error_code as u64),
         }
     }
 }
@@ -72,4 +87,5 @@ pub enum AptosErrorCode {
     MempoolIsFullForAccount = 25,
     BcsNotSupported = 26,
     WebFrameworkError = 27,
+    InvalidSubmittedTransaction = 28,
 }

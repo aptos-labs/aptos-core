@@ -29,6 +29,7 @@ use aptos_types::mempool_status::MempoolStatusCode;
 use aptos_types::transaction::{
     ExecutionStatus, RawTransaction, RawTransactionWithData, SignedTransaction, TransactionStatus,
 };
+use aptos_types::vm_status::StatusCode;
 use aptos_vm::AptosVM;
 use poem_openapi::param::{Path, Query};
 use poem_openapi::payload::Json;
@@ -514,16 +515,25 @@ impl TransactionsApi {
                     AptosErrorCode::MempoolIsFull,
                 ))
             }
-            MempoolStatusCode::VmError => Err(SubmitTransactionError::bad_request_with_code(
-                &format!(
-                    // FIXME: Add VM error code to errors
-                    "invalid transaction: {}",
-                    vm_status_opt
-                        .map(|s| format!("{:?}", s))
-                        .unwrap_or_else(|| "UNKNOWN".to_owned())
-                ),
-                AptosErrorCode::InvalidInput,
-            )),
+            MempoolStatusCode::VmError => {
+                if let Some(status) = vm_status_opt {
+                    Err(SubmitTransactionError::bad_request_with_vm_status(
+                        format!(
+                            "Invalid transaction: Type: {:?} Code: {:?}",
+                            status.status_type(),
+                            status
+                        ),
+                        AptosErrorCode::InvalidSubmittedTransaction,
+                        status,
+                    ))
+                } else {
+                    Err(SubmitTransactionError::bad_request_with_vm_status(
+                        "Invalid transaction: unknown",
+                        AptosErrorCode::InvalidSubmittedTransaction,
+                        StatusCode::UNKNOWN_STATUS,
+                    ))
+                }
+            }
             MempoolStatusCode::InvalidSeqNumber => {
                 Err(SubmitTransactionError::bad_request_with_code(
                     mempool_status.message,
