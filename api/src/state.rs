@@ -257,13 +257,6 @@ impl StateApi {
         table_item_request: TableItemRequest,
         ledger_version: Option<U64>,
     ) -> BasicResultWith404<MoveValue> {
-        // FIXME: Determine what is needed to deserialize the storage type
-        if accept_type == &AcceptType::Bcs {
-            return Err(BasicErrorWith404::bad_request_with_code_no_info(
-                "BCS is not supported for get table item",
-                AptosErrorCode::InvalidInput,
-            ));
-        }
         let key_type = table_item_request
             .key_type
             .try_into()
@@ -321,22 +314,24 @@ impl StateApi {
                 table_item_not_found(table_handle, &key, ledger_version, &ledger_info)
             })?;
 
-        let move_value = converter
-            .try_into_move_value(&value_type, &bytes)
-            .context("Failed to deserialize table item retrieved from DB")
-            .map_err(|err| {
-                BasicErrorWith404::internal_with_code(
-                    err,
-                    AptosErrorCode::InvalidBcsInStorageError,
-                    &ledger_info,
-                )
-            })?;
+        match accept_type {
+            AcceptType::Json => {
+                let move_value = converter
+                    .try_into_move_value(&value_type, &bytes)
+                    .context("Failed to deserialize table item retrieved from DB")
+                    .map_err(|err| {
+                        BasicErrorWith404::internal_with_code(
+                            err,
+                            AptosErrorCode::InvalidBcsInStorageError,
+                            &ledger_info,
+                        )
+                    })?;
 
-        BasicResponse::try_from_rust_value((
-            move_value,
-            &ledger_info,
-            BasicResponseStatus::Ok,
-            accept_type,
-        ))
+                BasicResponse::try_from_json((move_value, &ledger_info, BasicResponseStatus::Ok))
+            }
+            AcceptType::Bcs => {
+                BasicResponse::try_from_encoded((bytes, &ledger_info, BasicResponseStatus::Ok))
+            }
+        }
     }
 }
