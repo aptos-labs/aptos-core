@@ -6,5 +6,5 @@ version = "0.0.1"
 AptosFramework = { local = "../../framework/aptos-framework" }
 
 [addresses]
-Std = "0x1"
-MessageBoard = "_"
+std = "0x1"
+message_board = "_"

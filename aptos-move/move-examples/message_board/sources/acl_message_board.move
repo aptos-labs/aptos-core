@@ -9,7 +9,7 @@
 ///
 /// The module also emits events for subscribers
 ///     (1) message change event, this event contains the board, message and message author
-module MessageBoard::ACLBasedMB{
+module message_board::acl_based_mb {
     use std::acl::Self;
     use aptos_std::event::{Self, EventHandle};
     use std::signer;
@@ -102,12 +102,12 @@ module MessageBoard::ACLBasedMB{
 }
 
 #[test_only]
-module MessageBoard::MessageBoardTests {
+module message_board::MessageBoardTests {
     use std::unit_test;
     use std::vector;
     use std::signer;
 
-    use MessageBoard::ACLBasedMB;
+    use message_board::acl_based_mb;
 
     const  HELLO_WORLD: vector<u8> = vector<u8>[150, 145, 154, 154, 157, 040, 167, 157, 162, 154, 144];
     const  BOB_IS_HERE: vector<u8> = vector<u8>[142, 157, 142, 040, 151, 163, 040, 150, 145, 162, 145];
@@ -115,38 +115,38 @@ module MessageBoard::MessageBoardTests {
     #[test]
     public entry fun test_init_messageboard() {
         let (alice, _) = create_two_signers();
-        ACLBasedMB::message_board_init(&alice);
-        ACLBasedMB::send_pinned_message(&alice, signer::address_of(&alice), HELLO_WORLD);
+        acl_based_mb::message_board_init(&alice);
+        acl_based_mb::send_pinned_message(&alice, signer::address_of(&alice), HELLO_WORLD);
     }
 
     #[test]
     public entry fun test_send_pinned_message() {
         let (alice, bob) = create_two_signers();
-        ACLBasedMB::message_board_init(&alice);
-        ACLBasedMB::add_participant(&alice, signer::address_of(&bob));
-        ACLBasedMB::send_pinned_message(&bob, signer::address_of(&alice), BOB_IS_HERE);
-        let message = ACLBasedMB::view_message(signer::address_of(&alice));
+        acl_based_mb::message_board_init(&alice);
+        acl_based_mb::add_participant(&alice, signer::address_of(&bob));
+        acl_based_mb::send_pinned_message(&bob, signer::address_of(&alice), BOB_IS_HERE);
+        let message = acl_based_mb::view_message(signer::address_of(&alice));
         assert!( message == BOB_IS_HERE, 1);
-        let message = ACLBasedMB::view_message(signer::address_of(&alice));
+        let message = acl_based_mb::view_message(signer::address_of(&alice));
         assert!( message == BOB_IS_HERE, 1);
     }
 
     #[test]
     public entry fun test_send_message_v_cap() {
         let (alice, bob) = create_two_signers();
-        ACLBasedMB::message_board_init(&alice);
-        ACLBasedMB::send_message_to(bob, signer::address_of(&alice), BOB_IS_HERE);
+        acl_based_mb::message_board_init(&alice);
+        acl_based_mb::send_message_to(bob, signer::address_of(&alice), BOB_IS_HERE);
     }
 
     #[test]
     public entry fun read_message_multiple_times() {
         let (alice, bob) = create_two_signers();
-        ACLBasedMB::message_board_init(&alice);
-        ACLBasedMB::add_participant(&alice, signer::address_of(&bob));
-        ACLBasedMB::send_pinned_message(&bob, signer::address_of(&alice), BOB_IS_HERE);
-        let message = ACLBasedMB::view_message(signer::address_of(&alice));
+        acl_based_mb::message_board_init(&alice);
+        acl_based_mb::add_participant(&alice, signer::address_of(&bob));
+        acl_based_mb::send_pinned_message(&bob, signer::address_of(&alice), BOB_IS_HERE);
+        let message = acl_based_mb::view_message(signer::address_of(&alice));
         assert!( message == BOB_IS_HERE, 1);
-        let message = ACLBasedMB::view_message(signer::address_of(&alice));
+        let message = acl_based_mb::view_message(signer::address_of(&alice));
         assert!( message == BOB_IS_HERE, 1);
     }
 
@@ -154,8 +154,8 @@ module MessageBoard::MessageBoardTests {
     #[expected_failure(abort_code = 1)]
     public entry fun test_add_new_participant() {
         let (alice, bob) = create_two_signers();
-        ACLBasedMB::message_board_init(&alice);
-        ACLBasedMB::send_pinned_message(&bob, signer::address_of(&alice), BOB_IS_HERE);
+        acl_based_mb::message_board_init(&alice);
+        acl_based_mb::send_pinned_message(&bob, signer::address_of(&alice), BOB_IS_HERE);
     }
 
     #[test_only]
