@@ -93,7 +93,6 @@ macro_rules! generate_error_traits {
         $(
         pub trait [<$trait_name Error>]: AptosErrorResponse {
             fn [<$trait_name:snake>](error: anyhow::Error) -> Self where Self: Sized;
-            fn [<$trait_name:snake _str>](error_str: &str) -> Self where Self: Sized;
             fn [<$trait_name:snake _with_code>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode) -> Self where Self: Sized;
         }
         )*
@@ -133,12 +132,6 @@ macro_rules! generate_error_response {
         impl $crate::response::[<$name Error>] for $enum_name {
             fn [<$name:snake>](error: anyhow::Error) -> Self where Self: Sized {
                 let error = aptos_api_types::AptosError::from(error);
-                let payload = poem_openapi::payload::Json(error);
-                Self::from($enum_name::$name(payload))
-            }
-
-            fn [<$name:snake _str>](error_str: &str) -> Self where Self: Sized {
-                let error = aptos_api_types::AptosError::new(error_str.to_string());
                 let payload = poem_openapi::payload::Json(error);
                 Self::from($enum_name::$name(payload))
             }
