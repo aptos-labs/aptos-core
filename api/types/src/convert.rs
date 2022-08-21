@@ -15,13 +15,11 @@ use crate::{
 };
 use anyhow::{bail, ensure, format_err, Context as AnyhowContext, Result};
 use aptos_crypto::{hash::CryptoHash, HashValue};
-use aptos_transaction_builder::error_explain;
-use aptos_types::state_store::table::TableHandle;
 use aptos_types::{
     access_path::{AccessPath, Path},
     chain_id::ChainId,
     contract_event::{ContractEvent, EventWithVersion},
-    state_store::state_key::StateKey,
+    state_store::{state_key::StateKey, table::TableHandle},
     transaction::{
         EntryFunction, ExecutionStatus, ModuleBundle, RawTransaction, Script, SignedTransaction,
     },
@@ -40,11 +38,11 @@ use move_deps::{
     move_resource_viewer::MoveValueAnnotator,
 };
 use serde_json::Value;
-use std::sync::Arc;
 use std::{
     convert::{TryFrom, TryInto},
     iter::IntoIterator,
     rc::Rc,
+    sync::Arc,
 };
 use storage_interface::DbReader;
 
@@ -285,7 +283,7 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
         key: Vec<u8>,
         op: WriteOp,
     ) -> Result<WriteSetChange> {
-        let hex_handle = handle.0.to_be_bytes().to_vec().into();
+        let hex_handle = handle.0.to_vec().into();
         let key: HexEncodedBytes = key.into();
         let ret = match op {
             WriteOp::Deletion => {
@@ -678,23 +676,13 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
 
     fn explain_vm_status(&self, status: &ExecutionStatus) -> String {
         match status {
-            ExecutionStatus::MoveAbort { location, code} => match &location {
-                AbortLocation::Module(module_id) => {
-                    let explanation = error_explain::get_explanation(module_id, *code);
-                    explanation
-                        .map(|ec| {
-                            // TODO(wrwg): category and reason where removed from Move apis,
-                            //   instead we have only single code_name/description. Need to
-                            //   verify whether error reporting in the api is still reasonable.
-                            format!(
-                                "Move abort by {}\n{}",
-                                ec.code_name,
-                                ec.code_description,
-                            )
-                        })
-                        .unwrap_or_else(|| {
-                            format!("Move abort: code {:#x} at {}", code, location)
-                        })
+            ExecutionStatus::MoveAbort { location, code, info } => match &location {
+                AbortLocation::Module(_) => {
+                    info.as_ref().map(|i| {
+                        format!("Move abort by {}\n{}", i.reason_name, i.description)
+                    }).unwrap_or_else(|| {
+                        format!("Move abort: code {:#x} at {}", code, location)
+                    })
                 }
                 AbortLocation::Script => format!("Move abort: code {:#x}", code),
             },
@@ -717,12 +705,12 @@ impl<'a, R: MoveResolverExt + ?Sized> MoveConverter<'a, R> {
                     func_name, code_offset
                 )
             }
-            ExecutionStatus::MiscellaneousError( code ) => {
+            ExecutionStatus::MiscellaneousError(code) => {
                 code.map_or(
                     "Move bytecode deserialization / verification failed, including entry function not found or invalid arguments".to_owned(),
                     |e| format!(
                         "Transaction Executed and Committed with Error {:#?}", e
-                    )
+                    ),
                 )
             }
         }

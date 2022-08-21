@@ -41,8 +41,10 @@ pub const MAX_CONCURRENT_NETWORK_REQS: usize = 100;
 pub const MAX_CONNECTION_DELAY_MS: u64 = 60_000; /* 1 minute */
 pub const MAX_FULLNODE_OUTBOUND_CONNECTIONS: usize = 4;
 pub const MAX_INBOUND_CONNECTIONS: usize = 100;
-pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KB: a buffer for metadata that might be added to messages by networking */
-pub const MAX_APPLICATION_MESSAGE_SIZE: usize = MAX_MESSAGE_SIZE - MAX_MESSAGE_METADATA_SIZE; /* The message size that applications should check against */
+pub const MAX_MESSAGE_METADATA_SIZE: usize = 128 * 1024; /* 128 KiB: a buffer for metadata that might be added to messages by networking */
+pub const MESSAGE_PADDING_SIZE: usize = 2 * 1024 * 1024; /* 2 MiB: a safety buffer to allow messages to get larger during serialization */
+pub const MAX_APPLICATION_MESSAGE_SIZE: usize =
+    (MAX_MESSAGE_SIZE - MAX_MESSAGE_METADATA_SIZE) - MESSAGE_PADDING_SIZE; /* The message size that applications should check against */
 pub const MAX_FRAME_SIZE: usize = 4 * 1024 * 1024; /* 4 MiB large messages will be chunked into multiple frames and streamed */
 pub const MAX_MESSAGE_SIZE: usize = 64 * 1024 * 1024; /* 64 MiB */
 pub const CONNECTION_BACKOFF_BASE: u64 = 2;

@@ -16,7 +16,7 @@
 //! where a block is a length prefixed array of bytes.
 
 use aptos_logger::{info, trace, warn, Schema};
-use aptos_secure_push_metrics::{register_int_counter_vec, IntCounterVec};
+use aptos_metrics_core::{register_int_counter_vec, IntCounterVec};
 use once_cell::sync::Lazy;
 use serde::Serialize;
 use std::{

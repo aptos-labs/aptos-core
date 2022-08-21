@@ -290,7 +290,11 @@ where
     println!("\tAptos root key path: {:?}", aptos_root_key_path);
     println!("\tWaypoint: {}", config.base.waypoint.genesis_waypoint());
     println!("\tChainId: {}", ChainId::test());
-    println!("\tREST API endpoint: {}", &config.api.address);
+    println!("\tREST API endpoint: http://{}", &config.api.address);
+    println!(
+        "\tMetrics endpoint: http://{}:{}/metrics",
+        &config.inspection_service.address, &config.inspection_service.port
+    );
     println!(
         "\tFullNode network: {}",
         &config.full_node_networks[0].listen_address

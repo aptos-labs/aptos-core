@@ -70,7 +70,7 @@ fn native_new_aggregator(
     Ok(NativeResult::ok(
         gas_params.base,
         smallvec![Value::struct_(Struct::pack(vec![
-            Value::u128(handle),
+            Value::address(handle.0),
             Value::u128(key),
             Value::u128(limit),
         ]))],

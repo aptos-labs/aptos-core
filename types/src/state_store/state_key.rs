@@ -1,8 +1,7 @@
 // Copyright (c) Aptos
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::access_path::AccessPath;
-use crate::state_store::table::TableHandle;
+use crate::{access_path::AccessPath, state_store::table::TableHandle};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -48,7 +47,7 @@ impl StateKey {
                 (StateKeyTag::AccessPath, bcs::to_bytes(access_path)?)
             }
             StateKey::TableItem { handle, key } => {
-                let mut bytes = handle.0.to_be_bytes().to_vec();
+                let mut bytes = bcs::to_bytes(&handle)?;
                 bytes.extend(key);
                 (StateKeyTag::TableItem, bytes)
             }
@@ -70,20 +69,20 @@ impl StateKey {
         match state_key_tag {
             StateKeyTag::AccessPath => Ok(StateKey::AccessPath(bcs::from_bytes(&val[1..])?)),
             StateKeyTag::TableItem => {
-                const HANDLE_SIZE: usize = std::mem::size_of::<u128>();
+                const HANDLE_SIZE: usize = std::mem::size_of::<TableHandle>();
                 if val.len() < 1 + HANDLE_SIZE {
                     return Err(StateKeyDecodeErr::NotEnoughBytes {
                         tag,
                         num_bytes: val.len(),
                     });
                 }
-                let handle = u128::from_be_bytes(
+                let handle = bcs::from_bytes(
                     val[1..1 + HANDLE_SIZE]
                         .try_into()
                         .expect("Bytes too short."),
-                );
+                )?;
                 let key = val[1 + HANDLE_SIZE..].to_vec();
-                Ok(StateKey::table_item(TableHandle(handle), key))
+                Ok(StateKey::table_item(handle, key))
             }
             StateKeyTag::Raw => Ok(StateKey::Raw(val[1..].to_vec())),
         }

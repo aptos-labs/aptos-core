@@ -25,7 +25,10 @@ pub fn aptos_natives(gas_params: NativeGasParameters) -> NativeFunctionTable {
             CORE_CODE_ADDRESS,
             gas_params.aptos_framework,
         ))
-        .chain(move_table_extension::table_natives(CORE_CODE_ADDRESS))
+        .chain(move_table_extension::table_natives(
+            CORE_CODE_ADDRESS,
+            gas_params.table,
+        ))
         // TODO(Gas): this isn't quite right yet...
         .chain(
             move_stdlib::natives::nursery_natives(

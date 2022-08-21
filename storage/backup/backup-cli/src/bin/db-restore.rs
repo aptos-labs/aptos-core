@@ -3,7 +3,7 @@
 
 use anyhow::Result;
 use aptos_logger::{prelude::*, Level, Logger};
-use aptos_secure_push_metrics::MetricsPusher;
+use aptos_push_metrics::MetricsPusher;
 use backup_cli::{
     backup_types::{
         epoch_ending::restore::{EpochEndingRestoreController, EpochEndingRestoreOpt},
@@ -64,6 +64,7 @@ async fn main() -> Result<()> {
 
 async fn main_impl() -> Result<()> {
     Logger::new().level(Level::Info).read_env().init();
+    #[allow(deprecated)]
     let _mp = MetricsPusher::start();
 
     let opt = Opt::from_args();

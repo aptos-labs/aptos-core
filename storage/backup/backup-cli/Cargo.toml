@@ -34,7 +34,7 @@ aptos-crypto = { path = "../../../crates/aptos-crypto" }
 aptos-infallible = { path = "../../../crates/aptos-infallible" }
 aptos-jellyfish-merkle = { path = "../../jellyfish-merkle" }
 aptos-logger = { path = "../../../crates/aptos-logger" }
-aptos-secure-push-metrics = { path = "../../../secure/push-metrics" }
+aptos-push-metrics = { path = "../../../crates/aptos-push-metrics" }
 aptos-temppath = { path = "../../../crates/aptos-temppath" }
 aptos-types = { path = "../../../types" }
 aptos-vm = { path = "../../../aptos-move/aptos-vm" }

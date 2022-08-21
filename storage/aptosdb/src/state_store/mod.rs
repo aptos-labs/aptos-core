@@ -32,7 +32,6 @@ use storage_interface::{
 };
 
 use crate::{
-    change_set::ChangeSet,
     metrics::{STATE_ITEMS, TOTAL_STATE_BYTES},
     schema::state_value::StateValueSchema,
     stale_state_value_index::StaleStateValueIndexSchema,
@@ -454,9 +453,9 @@ impl StateStore {
         value_state_sets: Vec<&HashMap<StateKey, Option<StateValue>>>,
         first_version: Version,
         expected_usage: StateStorageUsage,
-        cs: &mut ChangeSet,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
-        self.put_stats_and_indices(&value_state_sets, first_version, expected_usage, cs)?;
+        self.put_stats_and_indices(&value_state_sets, first_version, expected_usage, batch)?;
 
         let kv_batch = value_state_sets
             .iter()
@@ -466,7 +465,7 @@ impl StateStore {
                     .map(move |(k, v)| ((k.clone(), first_version + i as Version), v.clone()))
             })
             .collect::<HashMap<_, _>>();
-        add_kv_batch(&mut cs.batch, &kv_batch)
+        add_kv_batch(batch, &kv_batch)
     }
 
     pub fn get_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
@@ -487,7 +486,7 @@ impl StateStore {
         value_state_sets: &[&HashMap<StateKey, Option<StateValue>>],
         first_version: Version,
         expected_usage: StateStorageUsage,
-        cs: &mut ChangeSet,
+        batch: &mut SchemaBatch,
     ) -> Result<()> {
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["put_stats_and_indices"])
@@ -506,7 +505,7 @@ impl StateStore {
                     usage.add_item(key.size() + value.size());
                 } else {
                     // stale index of the tombstone at current version.
-                    cs.batch.put::<StaleStateValueIndexSchema>(
+                    batch.put::<StaleStateValueIndexSchema>(
                         &StaleStateValueIndex {
                             stale_since_version: version,
                             version,
@@ -530,7 +529,7 @@ impl StateStore {
                 if let Some((old_version, old_value)) = old_version_and_value_opt {
                     usage.remove_item(key.size() + old_value.size());
                     // stale index of the old value at its version.
-                    cs.batch.put::<StaleStateValueIndexSchema>(
+                    batch.put::<StaleStateValueIndexSchema>(
                         &StaleStateValueIndex {
                             stale_since_version: version,
                             version: old_version,
@@ -543,7 +542,7 @@ impl StateStore {
 
             STATE_ITEMS.set(usage.items() as i64);
             TOTAL_STATE_BYTES.set(usage.bytes() as i64);
-            cs.batch.put::<VersionDataSchema>(&version, &usage.into())?;
+            batch.put::<VersionDataSchema>(&version, &usage.into())?;
         }
 
         if !expected_usage.is_untracked() {

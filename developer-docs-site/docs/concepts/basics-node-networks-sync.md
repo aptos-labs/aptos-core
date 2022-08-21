@@ -22,6 +22,3 @@ For example, a validator node will invoke state synchronization when it comes on
 
 ## State synchronizer
 Each Aptos node contains a [State Synchronizer](https://github.com/aptos-labs/aptos-core/tree/main/state-sync) component which is used to synchronize the state of the node with its peers. This component has the same functionality for all types of Aptos nodes: it utilizes the dedicated peer-to-peer network to continuously request and disseminate blockchain data. Validator nodes distribute blockchain data within the validator node network, while FullNodes rely on other FullNodes (i.e., Validator or Public FullNodes).
-
-## Synchronization API
-The Aptos node's state synchronizer communicates with other nodes' state synchronizers to get and send chunks of transactions. Learn more about how this works in the specifications [here](https://github.com/aptos-labs/aptos-core/tree/main/documentation/specifications/state_sync).

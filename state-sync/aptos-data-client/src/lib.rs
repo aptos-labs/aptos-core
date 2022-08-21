@@ -11,10 +11,8 @@ use aptos_types::{
 use async_trait::async_trait;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::fmt::Display;
-use storage_service_types::responses::CompleteDataRange;
-use storage_service_types::Epoch;
+use std::{fmt, fmt::Display};
+use storage_service_types::{responses::CompleteDataRange, Epoch};
 use thiserror::Error;
 
 pub type ResponseId = u64;
@@ -212,7 +210,7 @@ impl<T> Response<T> {
 }
 
 /// The different data client response payloads as an enum.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ResponsePayload {
     EpochEndingLedgerInfos(Vec<LedgerInfoWithSignatures>),
     NewTransactionOutputsWithProof((TransactionOutputListWithProof, LedgerInfoWithSignatures)),

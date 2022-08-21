@@ -1155,7 +1155,7 @@ paths:
       parameters:
       - name: table_handle
         schema:
-          $ref: '#/components/schemas/U128'
+          $ref: '#/components/schemas/Address'
         in: path
         required: true
         deprecated: false

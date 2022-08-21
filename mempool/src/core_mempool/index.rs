@@ -204,6 +204,7 @@ impl TimelineIndex {
     }
 
     /// Read all transactions from the timeline since <timeline_id>.
+    /// At most `count` transactions will be returned.
     pub(crate) fn read_timeline(
         &self,
         timeline_id: u64,

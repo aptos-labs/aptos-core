@@ -30,4 +30,3 @@ aptos-crypto = { path = "../aptos-crypto" }
 aptos-logger = { path = "../../crates/aptos-logger" }
 aptos-rest-client = { path = "../aptos-rest-client" }
 aptos-sdk = { path = "../../sdk" }
-aptos-transaction-builder = { path = "../../sdk/transaction-builder" }
