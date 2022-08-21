@@ -113,7 +113,7 @@ impl Context {
             .map_err(|e| E::internal_with_code(e, AptosErrorCode::ReadFromStorageError))?;
         let ledger_info = self
             .get_latest_ledger_info_with_signatures()
-            .map_err(E::internal)?;
+            .map_err(|e| E::internal_with_code(e, AptosErrorCode::ReadFromStorageError))?;
         let (oldest_version, oldest_block_event) = self
             .db
             .get_next_block_event(maybe_oldest_version)

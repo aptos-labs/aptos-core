@@ -59,14 +59,6 @@ pub enum AptosResponseContent<T: ToJSON + Send + Sync> {
 pub trait AptosErrorResponse {
     fn inner_mut(&mut self) -> &mut AptosError;
 
-    fn error_code(mut self, error_code: AptosErrorCode) -> Self
-    where
-        Self: Sized,
-    {
-        self.inner_mut().error_code = Some(error_code);
-        self
-    }
-
     fn aptos_ledger_version(mut self, aptos_ledger_version: u64) -> Self
     where
         Self: Sized,
@@ -92,7 +84,6 @@ macro_rules! generate_error_traits {
         paste::paste! {
         $(
         pub trait [<$trait_name Error>]: AptosErrorResponse {
-            fn [<$trait_name:snake>](error: anyhow::Error) -> Self where Self: Sized;
             fn [<$trait_name:snake _with_code>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode) -> Self where Self: Sized;
         }
         )*
@@ -130,12 +121,6 @@ macro_rules! generate_error_response {
         // will be generated. There are also variants for taking in strs.
         $(
         impl $crate::response::[<$name Error>] for $enum_name {
-            fn [<$name:snake>](error: anyhow::Error) -> Self where Self: Sized {
-                let error = aptos_api_types::AptosError::from(error);
-                let payload = poem_openapi::payload::Json(error);
-                Self::from($enum_name::$name(payload))
-            }
-
             fn [<$name:snake _with_code>]<Err: std::fmt::Display>(err: Err, error_code: aptos_api_types::AptosErrorCode) -> Self where Self: Sized {
                 let error = aptos_api_types::AptosError::new_with_error_code(err, error_code);
                 let payload = poem_openapi::payload::Json(error);
