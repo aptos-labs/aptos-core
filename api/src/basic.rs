@@ -86,13 +86,18 @@ impl BasicApi {
                 .duration_since(UNIX_EPOCH)
                 .context("Failed to determine absolute unix time based on given duration")
                 .map_err(|err| {
-                    HealthCheckError::internal_with_code(err, AptosErrorCode::InternalError)
+                    HealthCheckError::internal_with_code(
+                        err,
+                        AptosErrorCode::InternalError,
+                        &ledger_info,
+                    )
                 })?;
 
             if timestamp < expectation {
                 return Err(HealthCheckError::service_unavailable_with_code(
                     "The latest ledger info timestamp is less than the expected timestamp",
                     AptosErrorCode::HealthCheckFailed,
+                    &ledger_info,
                 ));
             }
         }

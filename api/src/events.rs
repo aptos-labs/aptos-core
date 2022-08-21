@@ -93,17 +93,21 @@ impl EventsApi {
             .get_events(
                 &event_key.into(),
                 page.start_option(),
-                page.limit()?,
+                page.limit(&latest_ledger_info)?,
                 ledger_version,
             )
             .context(format!("Failed to find events by key {}", event_key))
             .map_err(|err| {
-                BasicErrorWith404::internal_with_code(err, AptosErrorCode::ReadFromStorageError)
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::ReadFromStorageError,
+                    &latest_ledger_info,
+                )
             })?;
 
         match accept_type {
             AcceptType::Json => {
-                let resolver = self.context.move_resolver_poem()?;
+                let resolver = self.context.move_resolver_poem(&latest_ledger_info)?;
                 let events = resolver
                     .as_converter(self.context.db.clone())
                     .try_into_versioned_events(&events)
@@ -112,6 +116,7 @@ impl EventsApi {
                         BasicErrorWith404::internal_with_code(
                             err,
                             AptosErrorCode::InvalidBcsInStorageError,
+                            &latest_ledger_info,
                         )
                     })?;
 
