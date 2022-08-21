@@ -4,7 +4,7 @@
 use first_transaction::{Account, FaucetClient, RestClient, FAUCET_URL, TESTNET_URL};
 
 //:!:>section_7
-fn main() -> () {
+fn main() {
     let rest_client = RestClient::new(TESTNET_URL.to_string());
     let faucet_client = FaucetClient::new(FAUCET_URL.to_string(), rest_client.clone());
 
@@ -16,19 +16,31 @@ fn main() -> () {
     println!("Alice: 0x{}", alice.address());
     println!("Bob: 0x{}", bob.address());
 
-    faucet_client.fund_account(&alice.auth_key().as_str(), 5_000);
-    faucet_client.fund_account(&bob.auth_key().as_str(), 0);
+    faucet_client.fund_account(alice.auth_key().as_str(), 5_000);
+    faucet_client.fund_account(bob.auth_key().as_str(), 0);
 
     println!("\n=== Initial Balances ===");
-    println!("Alice: {:?}", rest_client.account_balance(&alice.address()));
-    println!("Bob: {:?}", rest_client.account_balance(&bob.address()));
+    println!(
+        "Alice: {:?}",
+        rest_client.account_balance(&alice.address()).unwrap()
+    );
+    println!(
+        "Bob: {:?}",
+        rest_client.account_balance(&bob.address()).unwrap()
+    );
 
     // Have Alice give Bob 10 coins
     let tx_hash = rest_client.transfer(&mut alice, &bob.address(), 1_000);
     rest_client.wait_for_transaction(&tx_hash);
 
     println!("\n=== Final Balances ===");
-    println!("Alice: {:?}", rest_client.account_balance(&alice.address()));
-    println!("Bob: {:?}", rest_client.account_balance(&bob.address()));
+    println!(
+        "Alice: {:?}",
+        rest_client.account_balance(&alice.address()).unwrap()
+    );
+    println!(
+        "Bob: {:?}",
+        rest_client.account_balance(&bob.address()).unwrap()
+    );
 }
 //<:!:section_7
