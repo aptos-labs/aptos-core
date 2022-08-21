@@ -6,7 +6,6 @@ use crate::{counters::CRITICAL_ERRORS, create_access_path, logging::AdapterLogSc
 #[allow(unused_imports)]
 use anyhow::format_err;
 use anyhow::Error;
-use aptos_gas::InternalGas;
 use aptos_logger::prelude::*;
 use aptos_state_view::state_storage_usage::StateStorageUsage;
 use aptos_state_view::{StateView, StateViewId};
@@ -26,7 +25,7 @@ use move_deps::{
         language_storage::{ModuleId, StructTag},
         resolver::{ModuleResolver, ResourceResolver},
     },
-    move_table_extension::{TableHandle, TableOperation, TableResolver},
+    move_table_extension::{TableHandle, TableResolver},
 };
 use std::{
     collections::btree_map::BTreeMap,
@@ -168,15 +167,6 @@ impl<'a, S: StateView> TableResolver for RemoteStorage<'a, S> {
     ) -> Result<Option<Vec<u8>>, Error> {
         self.get_state_value(&StateKey::table_item((*handle).into(), key.to_vec()))
     }
-
-    fn operation_cost(
-        &self,
-        _op: TableOperation,
-        _key_size: usize,
-        _val_size: usize,
-    ) -> InternalGas {
-        1.into()
-    }
 }
 
 impl<'a, S: StateView> ConfigStorage for RemoteStorage<'a, S> {
@@ -254,11 +244,6 @@ impl<S: StateView> TableResolver for RemoteStorageOwned<S> {
         key: &[u8],
     ) -> Result<Option<Vec<u8>>, Error> {
         self.as_move_resolver().resolve_table_entry(handle, key)
-    }
-
-    fn operation_cost(&self, op: TableOperation, key_size: usize, val_size: usize) -> InternalGas {
-        self.as_move_resolver()
-            .operation_cost(op, key_size, val_size)
     }
 }
 

@@ -359,9 +359,6 @@ mod test {
         state_store::{state_key::StateKey, table::TableHandle as AptosTableHandle},
     };
     use claim::{assert_err, assert_ok};
-    use move_deps::{
-        move_core_types::gas_algebra::InternalGas, move_table_extension::TableOperation,
-    };
     use once_cell::sync::Lazy;
     use std::collections::HashMap;
 
@@ -402,15 +399,6 @@ mod test {
         ) -> Result<Option<Vec<u8>>, anyhow::Error> {
             let state_key = StateKey::table_item(AptosTableHandle::from(*handle), key.to_vec());
             self.get_state_value(&state_key)
-        }
-
-        fn operation_cost(
-            &self,
-            _op: TableOperation,
-            _key_size: usize,
-            _val_size: usize,
-        ) -> InternalGas {
-            1.into()
         }
     }
 
