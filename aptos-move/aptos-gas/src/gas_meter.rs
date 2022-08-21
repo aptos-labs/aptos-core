@@ -47,6 +47,7 @@ pub trait InitialGasSchedule: Sized {
 pub struct NativeGasParameters {
     pub move_stdlib: move_stdlib::natives::GasParameters,
     pub aptos_framework: framework::natives::GasParameters,
+    pub table: move_table_extension::GasParameters,
 }
 
 impl FromOnChainGasSchedule for NativeGasParameters {
@@ -54,6 +55,7 @@ impl FromOnChainGasSchedule for NativeGasParameters {
         Some(Self {
             move_stdlib: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
             aptos_framework: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
+            table: FromOnChainGasSchedule::from_on_chain_gas_schedule(gas_schedule)?,
         })
     }
 }
@@ -62,6 +64,7 @@ impl ToOnChainGasSchedule for NativeGasParameters {
     fn to_on_chain_gas_schedule(&self) -> Vec<(String, u64)> {
         let mut entries = self.move_stdlib.to_on_chain_gas_schedule();
         entries.extend(self.aptos_framework.to_on_chain_gas_schedule());
+        entries.extend(self.table.to_on_chain_gas_schedule());
         entries
     }
 }
@@ -71,6 +74,7 @@ impl NativeGasParameters {
         Self {
             move_stdlib: move_stdlib::natives::GasParameters::zeros(),
             aptos_framework: framework::natives::GasParameters::zeros(),
+            table: move_table_extension::GasParameters::zeros(),
         }
     }
 }
@@ -80,6 +84,7 @@ impl InitialGasSchedule for NativeGasParameters {
         Self {
             move_stdlib: InitialGasSchedule::initial(),
             aptos_framework: InitialGasSchedule::initial(),
+            table: InitialGasSchedule::initial(),
         }
     }
 }

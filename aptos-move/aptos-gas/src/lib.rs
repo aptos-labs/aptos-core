@@ -30,6 +30,7 @@ mod gas_meter;
 mod instr;
 mod misc;
 mod move_stdlib;
+mod table;
 mod transaction;
 
 pub use algebra::*;

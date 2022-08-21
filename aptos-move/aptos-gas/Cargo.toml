@@ -10,10 +10,11 @@ publish = false
 edition = "2021"
 
 [dependencies]
-move-binary-format = { git = "https://github.com/move-language/move", rev = "525c314014bba15a2aa0d65386bc9b53458718eb" }
-move-core-types = { git = "https://github.com/move-language/move", rev = "525c314014bba15a2aa0d65386bc9b53458718eb" }
-move-stdlib = { git = "https://github.com/move-language/move", rev = "525c314014bba15a2aa0d65386bc9b53458718eb" }
-move-vm-types = { git = "https://github.com/move-language/move", rev = "525c314014bba15a2aa0d65386bc9b53458718eb" }
+move-binary-format = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
+move-core-types = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
+move-stdlib = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
+move-table-extension = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
+move-vm-types = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
 
 framework = { path = "../framework" }
 
