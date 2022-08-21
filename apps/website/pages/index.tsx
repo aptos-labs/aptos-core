@@ -23,7 +23,7 @@ const Home: NextPage = () => (
             height: 600,
             type: 'image/jpeg',
             url: imageUrl,
-            width: 800,
+            width: 900,
           },
         ],
         site_name: COMPANY_NAME,
