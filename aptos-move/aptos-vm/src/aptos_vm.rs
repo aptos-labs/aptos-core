@@ -967,7 +967,7 @@ impl AptosSimulationVM {
     ) -> (VMStatus, TransactionOutputExt) {
         // simulation transactions should not carry valid signatures, otherwise malicious fullnodes
         // may execute them without user's explicit permission.
-        if txn.clone().check_signature().is_ok() {
+        if txn.signature_is_valid() {
             return discard_error_vm_status(VMStatus::Error(StatusCode::INVALID_SIGNATURE));
         }
 
