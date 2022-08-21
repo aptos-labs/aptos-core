@@ -9,7 +9,7 @@ use move_core_types::{account_address::AccountAddress, gas_algebra::NumArgs};
 use move_vm_types::views::{ValueView, ValueVisitor};
 
 crate::params::define_gas_parameters!(
-    AbstractMemorySizeGasParameters,
+    AbstractValueSizeGasParameters,
     "misc.abs_val",
     [
         // abstract value size
@@ -109,12 +109,12 @@ where
 }
 
 struct AbstractValueSizeVisitor<'a> {
-    params: &'a AbstractMemorySizeGasParameters,
+    params: &'a AbstractValueSizeGasParameters,
     size: AbstractValueSize,
 }
 
 impl<'a> AbstractValueSizeVisitor<'a> {
-    fn new(params: &'a AbstractMemorySizeGasParameters) -> Self {
+    fn new(params: &'a AbstractValueSizeGasParameters) -> Self {
         Self {
             params,
             size: 0.into(),
@@ -196,7 +196,7 @@ impl<'a> ValueVisitor for AbstractValueSizeVisitor<'a> {
     }
 }
 
-impl AbstractMemorySizeGasParameters {
+impl AbstractValueSizeGasParameters {
     /// Calculates the abstract size of the given value.
     pub fn abstract_value_size(&self, val: impl ValueView) -> AbstractValueSize {
         let mut visitor = AbstractValueSizeVisitor::new(self);
@@ -216,7 +216,7 @@ impl AbstractMemorySizeGasParameters {
 /// Miscellaneous gas parameters.
 #[derive(Debug, Clone)]
 pub struct MiscGasParameters {
-    pub abs_val: AbstractMemorySizeGasParameters,
+    pub abs_val: AbstractValueSizeGasParameters,
 }
 
 impl FromOnChainGasSchedule for MiscGasParameters {
@@ -236,7 +236,7 @@ impl ToOnChainGasSchedule for MiscGasParameters {
 impl MiscGasParameters {
     pub fn zeros() -> Self {
         Self {
-            abs_val: AbstractMemorySizeGasParameters::zeros(),
+            abs_val: AbstractValueSizeGasParameters::zeros(),
         }
     }
 }

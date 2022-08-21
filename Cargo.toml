@@ -19,6 +19,7 @@ members = [
     "aptos-move/e2e-testsuite",
     "aptos-move/framework",
     "aptos-move/framework/cached-packages",
+    "aptos-move/gas-algebra-ext",
     "aptos-move/move-deps",
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",

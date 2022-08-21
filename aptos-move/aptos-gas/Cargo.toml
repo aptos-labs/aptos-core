@@ -17,6 +17,7 @@ move-table-extension = { git = "https://github.com/move-language/move", rev = "5
 move-vm-types = { git = "https://github.com/move-language/move", rev = "5ecf4df61fb2d8afd4881cae14132b4006996476" }
 
 framework = { path = "../framework" }
+gas-algebra-ext = { path = "../gas-algebra-ext" }
 
 [features]
 testing = ["move-stdlib/testing"]
