@@ -12,9 +12,9 @@ use crate::context::Context;
 use crate::failpoint::fail_point_poem;
 use crate::page::Page;
 use crate::response::{
-    AptosErrorResponse, BadRequestError, BasicError, BasicErrorWith404, BasicResponse,
-    BasicResponseStatus, BasicResult, BasicResultWith404, InsufficientStorageError, InternalError,
-    NotFoundError,
+    transaction_not_found_by_hash, transaction_not_found_by_version, BadRequestError, BasicError,
+    BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
+    InsufficientStorageError, InternalError,
 };
 use crate::ApiTags;
 use crate::{generate_error_response, generate_success_response};
@@ -272,44 +272,24 @@ impl TransactionsApi {
             .context
             .get_transactions(start_version, limit, ledger_version)
             .context("Failed to read raw transactions from storage")
-            .map_err(BasicErrorWith404::internal)
-            .map_err(|e| e.error_code(AptosErrorCode::InvalidBcsInStorageError))?;
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(err, AptosErrorCode::InvalidBcsInStorageError)
+            })?;
 
         match accept_type {
-            AcceptType::Json => BasicResponse::try_from_json((
-                self.render_transactions(data)?,
-                &latest_ledger_info,
-                BasicResponseStatus::Ok,
-            )),
+            AcceptType::Json => {
+                let timestamp = self.context.get_block_timestamp(start_version)?;
+                BasicResponse::try_from_json((
+                    self.context
+                        .render_transactions_sequential(data, timestamp)?,
+                    &latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            }
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
             }
         }
-    }
-
-    fn render_transactions<E: InternalError>(
-        &self,
-        data: Vec<TransactionOnChainData>,
-    ) -> Result<Vec<Transaction>, E> {
-        if data.is_empty() {
-            return Ok(vec![]);
-        }
-
-        let resolver = self.context.move_resolver_poem()?;
-        let converter = resolver.as_converter(self.context.db.clone());
-        let txns: Vec<Transaction> = data
-            .into_iter()
-            .map(|t| {
-                let version = t.version;
-                let timestamp = self.context.get_block_timestamp(version)?;
-                let txn = converter.try_into_onchain_transaction(timestamp, t)?;
-                Ok(txn)
-            })
-            .collect::<Result<_, anyhow::Error>>()
-            .context("Failed to convert transaction data from storage")
-            .map_err(E::internal)?;
-
-        Ok(txns)
     }
 
     async fn get_transaction_by_hash_inner(
@@ -322,9 +302,11 @@ impl TransactionsApi {
             .get_by_hash(hash.into(), &ledger_info)
             .await
             .context(format!("Failed to get transaction by hash {}", hash))
-            .map_err(BasicErrorWith404::not_found)?
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(err, AptosErrorCode::ReadFromStorageError)
+            })?
             .context(format!("Failed to find transaction with hash: {}", hash))
-            .map_err(BasicErrorWith404::not_found)?;
+            .map_err(|_| transaction_not_found_by_hash(hash))?;
 
         self.get_transaction_inner(accept_type, txn_data, &ledger_info)
             .await
@@ -339,12 +321,14 @@ impl TransactionsApi {
         let txn_data = self
             .get_by_version(version.0, &ledger_info)
             .context(format!("Failed to get transaction by version {}", version))
-            .map_err(BasicErrorWith404::not_found)?
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(err, AptosErrorCode::ReadFromStorageError)
+            })?
             .context(format!(
                 "Failed to find transaction at version: {}",
                 version
             ))
-            .map_err(BasicErrorWith404::not_found)?;
+            .map_err(|_| transaction_not_found_by_version(version.0))?;
 
         self.get_transaction_inner(accept_type, txn_data, &ledger_info)
             .await
@@ -361,22 +345,28 @@ impl TransactionsApi {
                 let resolver = self.context.move_resolver_poem()?;
                 let transaction = match transaction_data {
                     TransactionData::OnChain(txn) => {
-                        let timestamp = self
-                            .context
-                            .get_block_timestamp(txn.version)
-                            .context("Failed to get block timestamp from DB")
-                            .map_err(BasicErrorWith404::internal)?;
+                        let timestamp = self.context.get_block_timestamp(txn.version)?;
                         resolver
                             .as_converter(self.context.db.clone())
                             .try_into_onchain_transaction(timestamp, txn)
                             .context("Failed to convert on chain transaction to Transaction")
-                            .map_err(BasicErrorWith404::internal)?
+                            .map_err(|err| {
+                                BasicErrorWith404::internal_with_code(
+                                    err,
+                                    AptosErrorCode::InvalidBcsInStorageError,
+                                )
+                            })?
                     }
                     TransactionData::Pending(txn) => resolver
                         .as_converter(self.context.db.clone())
                         .try_into_pending_transaction(*txn)
                         .context("Failed to convert on pending transaction to Transaction")
-                        .map_err(BasicErrorWith404::internal)?,
+                        .map_err(|err| {
+                            BasicErrorWith404::internal_with_code(
+                                err,
+                                AptosErrorCode::InvalidBcsInStorageError,
+                            )
+                        })?,
                 };
 
                 BasicResponse::try_from_json((transaction, ledger_info, BasicResponseStatus::Ok))
@@ -434,19 +424,15 @@ impl TransactionsApi {
     ) -> BasicResultWith404<Vec<Transaction>> {
         let latest_ledger_info = self.context.get_latest_ledger_info()?;
         // TODO: Return more specific errors from within this function.
-        let data = self
-            .context
-            .get_account_transactions(
-                address.into(),
-                page.start(0, u64::MAX)?,
-                page.limit()?,
-                latest_ledger_info.version(),
-            )
-            .context("Failed to get account transactions for the given account")
-            .map_err(BasicErrorWith404::internal)?;
+        let data = self.context.get_account_transactions(
+            address.into(),
+            page.start(0, u64::MAX)?,
+            page.limit()?,
+            latest_ledger_info.version(),
+        )?;
         match accept_type {
             AcceptType::Json => BasicResponse::try_from_json((
-                self.render_transactions(data)?,
+                self.context.render_transactions_non_sequential(data)?,
                 &latest_ledger_info,
                 BasicResponseStatus::Ok,
             )),
@@ -464,7 +450,12 @@ impl TransactionsApi {
             SubmitTransactionPost::Bcs(data) => {
                 let signed_transaction = bcs::from_bytes(&data.0)
                     .context("Failed to deserialize input into SignedTransaction")
-                    .map_err(SubmitTransactionError::bad_request)?;
+                    .map_err(|err| {
+                        SubmitTransactionError::bad_request_with_code(
+                            err,
+                            AptosErrorCode::InvalidInput,
+                        )
+                    })?;
                 Ok(signed_transaction)
             }
             SubmitTransactionPost::Json(data) => self
@@ -473,7 +464,9 @@ impl TransactionsApi {
                 .as_converter(self.context.db.clone())
                 .try_into_signed_transaction_poem(data.0, self.context.chain_id())
                 .context("Failed to create SignedTransaction from SubmitTransactionRequest")
-                .map_err(SubmitTransactionError::bad_request),
+                .map_err(|err| {
+                    SubmitTransactionError::bad_request_with_code(err, AptosErrorCode::InvalidInput)
+                }),
         }
     }
 
@@ -488,7 +481,12 @@ impl TransactionsApi {
             .submit_transaction(txn.clone())
             .await
             .context("Mempool failed to initially evaluate submitted transaction")
-            .map_err(SubmitTransactionError::internal)?;
+            .map_err(|err| {
+                SubmitTransactionError::internal_with_code(
+                    err,
+                    AptosErrorCode::TransactionSubmissionFailed,
+                )
+            })?;
         match mempool_status.code {
             MempoolStatusCode::Accepted => match accept_type {
                 AcceptType::Json => {
@@ -497,7 +495,7 @@ impl TransactionsApi {
                             .as_converter(self.context.db.clone())
                             .try_into_pending_transaction_poem(txn)
                             .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
-                            .map_err(SubmitTransactionError::internal)?;
+                            .map_err(|err| SubmitTransactionError::internal_with_code(err, AptosErrorCode::InternalError))?;
                     SubmitTransactionResponse::try_from_json((
                         pending_txn,
                         &ledger_info,
@@ -510,19 +508,39 @@ impl TransactionsApi {
                     SubmitTransactionResponseStatus::Accepted,
                 )),
             },
-            MempoolStatusCode::MempoolIsFull => Err(
-                SubmitTransactionError::insufficient_storage_str(&mempool_status.message),
-            ),
+            MempoolStatusCode::MempoolIsFull => {
+                Err(SubmitTransactionError::insufficient_storage_with_code(
+                    &mempool_status.message,
+                    AptosErrorCode::MempoolIsFull,
+                ))
+            }
             MempoolStatusCode::VmError => Err(SubmitTransactionError::bad_request_str(&format!(
+                // FIXME: Add VM error code to errors
                 "invalid transaction: {}",
                 vm_status_opt
                     .map(|s| format!("{:?}", s))
                     .unwrap_or_else(|| "UNKNOWN".to_owned())
             ))),
-            _ => Err(SubmitTransactionError::bad_request_str(&format!(
-                "transaction is rejected: {}",
-                mempool_status,
-            ))),
+            MempoolStatusCode::InvalidSeqNumber => {
+                Err(SubmitTransactionError::bad_request_with_code(
+                    mempool_status.message,
+                    AptosErrorCode::SequenceNumberTooOld,
+                ))
+            }
+            MempoolStatusCode::InvalidUpdate => Err(SubmitTransactionError::bad_request_with_code(
+                mempool_status.message,
+                AptosErrorCode::InvalidTransactionUpdate,
+            )),
+            MempoolStatusCode::TooManyTransactions => {
+                Err(SubmitTransactionError::insufficient_storage_with_code(
+                    &mempool_status.message,
+                    AptosErrorCode::MempoolIsFullForAccount,
+                ))
+            }
+            MempoolStatusCode::UnknownStatus => Err(SubmitTransactionError::internal_with_code(
+                format!("Transaction was rejected with status {}", mempool_status,),
+                AptosErrorCode::InternalError,
+            )),
         }
     }
 
@@ -582,7 +600,9 @@ impl TransactionsApi {
 
         match accept_type {
             AcceptType::Json => {
-                let transactions = self.render_transactions(vec![simulated_txn])?;
+                let transactions = self
+                    .context
+                    .render_transactions_non_sequential(vec![simulated_txn])?;
 
                 // Users can only make requests to simulate UserTransactions, so unpack
                 // the Vec<Transaction> into Vec<UserTransaction>.

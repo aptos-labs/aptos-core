@@ -32,7 +32,7 @@
 use std::fmt::Display;
 
 use super::accept_type::AcceptType;
-use aptos_api_types::{Address, AptosError, AptosErrorCode};
+use aptos_api_types::{Address, AptosError, AptosErrorCode, HashValue};
 use move_deps::move_core_types::identifier::{IdentStr, Identifier};
 use move_deps::move_core_types::language_storage::StructTag;
 use poem_openapi::{payload::Json, types::ToJSON, ResponseContent};
@@ -409,6 +409,22 @@ pub fn version_not_found<E: NotFoundError>(ledger_version: u64) -> E {
         "Ledger version",
         format!("Ledger version({})", ledger_version),
         AptosErrorCode::VersionNotFound,
+    )
+}
+
+pub fn transaction_not_found_by_version<E: NotFoundError>(ledger_version: u64) -> E {
+    build_not_found(
+        "Transaction",
+        format!("Ledger version({})", ledger_version),
+        AptosErrorCode::TransactionNotFound,
+    )
+}
+
+pub fn transaction_not_found_by_hash<E: NotFoundError>(hash: HashValue) -> E {
+    build_not_found(
+        "Transaction",
+        format!("Transaction hash({})", hash),
+        AptosErrorCode::TransactionNotFound,
     )
 }
 

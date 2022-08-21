@@ -94,4 +94,11 @@ pub enum AptosErrorCode {
     TableItemNotFound = 16,
     BlockPruned = 17,
     InvalidInput = 18,
+    TransactionNotFound = 19,
+    TransactionSubmissionFailed = 20,
+    MempoolIsFull = 21,
+    VmError = 22,
+    InvalidTransactionUpdate = 23,
+    SequenceNumberTooOld = 24,
+    MempoolIsFullForAccount = 25,
 }

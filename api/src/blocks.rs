@@ -108,7 +108,7 @@ impl BlocksApi {
                 let transactions = if let Some(inner) = bcs_block.transactions {
                     Some(
                         self.context
-                            .render_transactions(inner, bcs_block.block_timestamp)?,
+                            .render_transactions_sequential(inner, bcs_block.block_timestamp)?,
                     )
                 } else {
                     None
