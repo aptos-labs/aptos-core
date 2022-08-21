@@ -102,6 +102,11 @@ pub const NO_OP_STORAGE_PRUNER_CONFIG: PrunerConfig = PrunerConfig {
         batch_size: 0,
         user_pruning_window_offset: 0,
     },
+    epoch_ending_state_merkle_pruner_config: EpochEndingStateMerklePrunerConfig {
+        enable: false,
+        prune_window: 0,
+        batch_size: 0,
+    },
 };
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -137,11 +142,23 @@ pub struct StateMerklePrunerConfig {
     pub user_pruning_window_offset: u64,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct EpochEndingStateMerklePrunerConfig {
+    pub enable: bool,
+    /// Window size in versions, but only the snapshots at epoch ending versions are kept, because
+    /// other snapshots are pruned by the state merkle pruner.
+    pub prune_window: u64,
+    /// Number of stale nodes to prune a time.
+    pub batch_size: usize,
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct PrunerConfig {
     pub ledger_pruner_config: LedgerPrunerConfig,
     pub state_merkle_pruner_config: StateMerklePrunerConfig,
+    pub epoch_ending_state_merkle_pruner_config: EpochEndingStateMerklePrunerConfig,
 }
 
 impl Default for LedgerPrunerConfig {
@@ -161,12 +178,32 @@ impl Default for StateMerklePrunerConfig {
     fn default() -> Self {
         StateMerklePrunerConfig {
             enable: true,
-            // This is based on ~5K TPS * 2h/epoch * 2 epochs.
-            prune_window: 80_000_000,
+            // This allows a block / chunk being executed to have access to a non-latest state tree.
+            // It needs to be greater than the number of versions the state committing thread is
+            // able to commit during the execution of the block / chunk.
+            prune_window: 100_000,
             // A 10k transaction block (touching 60k state values, in the case of the account
             // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
             batch_size: 1_000,
             user_pruning_window_offset: 200_000,
+        }
+    }
+}
+
+impl Default for EpochEndingStateMerklePrunerConfig {
+    fn default() -> Self {
+        Self {
+            enable: true,
+            // This is based on ~5K TPS * 2h/epoch * 2 epochs. -- epoch ending snapshots are used
+            // by state sync in fast sync mode.
+            // The setting is in versions, not epochs, because this makes it behave more like other
+            // pruners: a slower network will have longer history in db with the same pruner
+            // settings, but the disk space take will be similar.
+            // FIXME(aldenhu): add metric to reflect current readable epoch
+            prune_window: 80_000_000,
+            // A 10k transaction block (touching 60k state values, in the case of the account
+            // creation benchmark) on a 4B items DB (or 1.33B accounts) yields 300k JMT nodes
+            batch_size: 1_000,
         }
     }
 }
