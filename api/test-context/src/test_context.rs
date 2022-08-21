@@ -217,20 +217,47 @@ impl TestContext {
     /// TODO: we can't dump all resources of an account as golden output. As functionality
     /// grows this becomes too much. Need a way to filter only the resources which folks want.
     fn prune_golden(val: Value) -> Value {
-        if let Some(elems) = val.as_array() {
-            let filtered = elems
-                .iter()
-                .map(|e| match e.get("type") {
-                    Some(s) if s == "0x1::code::PackageRegistry" => {
-                        Value::String("package registry omitted".to_string())
-                    }
-                    _ => e.clone(),
-                })
-                .collect::<Vec<_>>();
-            Value::Array(filtered)
-        } else {
-            val
+        if !val.is_array() {
+            return val;
         }
+
+        val.as_array()
+            .unwrap()
+            .iter()
+            .map(|field| {
+                if let Some(changes) = field.as_object().unwrap().get("changes") {
+                    let mut nfield = field.clone();
+                    nfield["changes"] = changes
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|change| {
+                            let mut nchange = change.clone();
+                            nchange["data"] = Self::resource_replacer(&change["data"]);
+                            nchange
+                        })
+                        .collect();
+                    nfield
+                } else {
+                    field.clone()
+                }
+            })
+            .collect()
+    }
+
+    // Resource may appear in many different places, so make a convenient stripper
+    fn resource_replacer(val: &Value) -> Value {
+        let mut nval = val.clone();
+        nval["data"] = match val["type"].as_str().unwrap() {
+            "0x1::code::PackageRegistry" => Value::String("package registry omitted".to_string()),
+            // Ideally this wouldn't be stripped, but it changes by minor changes to the
+            // Move modules, which leads to a bad devx.
+            "0x1::state_storage::StateStorageUsage" => {
+                Value::String("state storage omitted".to_string())
+            }
+            _ => val["data"].clone(),
+        };
+        nval
     }
 
     pub fn rng(&mut self) -> &mut rand::rngs::StdRng {
