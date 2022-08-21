@@ -22,7 +22,7 @@ class FirstCoin(RestClient):
             "arguments": [
                 "Moon Coin".encode("utf-8").hex(),
                 "MOON".encode("utf-8").hex(),
-                "6",
+                6,
                 False,
             ],
         }

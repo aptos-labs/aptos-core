@@ -25,7 +25,7 @@ impl FirstCoinClient {
             "arguments": [
                 hex::encode("Moon Coin".as_bytes()),
                 hex::encode("MOON".as_bytes()),
-                "6",
+                6,
                 false,
             ]
         });
