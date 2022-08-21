@@ -246,6 +246,7 @@ class RestClient:
         }
         return self.submit_transaction(sender, payload)
 
+#:!:>bcs_transfer
     def bcs_transfer(
         self, sender: Account, recipient: AccountAddress, amount: int
     ) -> str:
@@ -265,6 +266,7 @@ class RestClient:
             sender, TransactionPayload(payload)
         )
         return self.submit_bcs_transaction(signed_transaction)
+#<:!:bcs_transfer
 
     #
     # Token transaction wrappers
