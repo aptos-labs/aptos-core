@@ -7,6 +7,7 @@
 use std::sync::Arc;
 
 use crate::accept_type::AcceptType;
+use crate::accounts::Account;
 use crate::bcs_payload::Bcs;
 use crate::context::Context;
 use crate::failpoint::fail_point_poem;
@@ -153,7 +154,6 @@ impl TransactionsApi {
         operation_id = "get_account_transactions",
         tag = "ApiTags::Transactions"
     )]
-    // TODO: https://github.com/aptos-labs/aptos-core/issues/2285
     async fn get_accounts_transactions(
         &self,
         accept_type: AcceptType,
@@ -447,7 +447,11 @@ impl TransactionsApi {
         page: Page,
         address: Address,
     ) -> BasicResultWith404<Vec<Transaction>> {
-        let latest_ledger_info = self.context.get_latest_ledger_info()?;
+        // Verify the account exists
+        let account = Account::new(self.context.clone(), address, None)?;
+        account.account_state()?;
+
+        let latest_ledger_info = account.latest_ledger_info;
         // TODO: Return more specific errors from within this function.
         let data = self.context.get_account_transactions(
             address.into(),
