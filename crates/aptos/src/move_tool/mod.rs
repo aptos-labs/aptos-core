@@ -408,7 +408,8 @@ impl IncludedArtifacts {
                 with_srcs: false,
                 with_abis: false,
                 with_source_maps: false,
-                with_error_map: false,
+                // Always enable error map bytecode injection
+                with_error_map: true,
                 named_addresses,
                 install_dir: Option::None,
             },
@@ -416,7 +417,7 @@ impl IncludedArtifacts {
                 with_srcs: true,
                 with_abis: false,
                 with_source_maps: false,
-                with_error_map: false,
+                with_error_map: true,
                 named_addresses,
                 install_dir: Option::None,
             },
