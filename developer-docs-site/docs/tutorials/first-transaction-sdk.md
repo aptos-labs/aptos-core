@@ -14,6 +14,8 @@ This tutorial introduces the Aptos SDKs and how to generate, submit, and verify 
 ## Step 1: Pick an SDK
 
 * [Official Aptos Python SDK][python-sdk]
+* Official Aptos Typescript SDK -- TBA
+* Official Aptos Rust SDK -- TBA
 
 ## Step 2: Run the Example
 
@@ -22,9 +24,15 @@ Each SDK provides an examples directory. This tutorial covers the `transfer-coin
 <Tabs>
   <TabItem value="python" label="Python">
 
-      In the SDK directory run: `python -m examples.transfer-coin`
+In the SDK directory run: `python -m examples.transfer-coin`
+  </TabItem>
+  <TabItem value="rust" label="Rust">
+
+In progress.
   </TabItem>
   <TabItem value="typescript" label="Typescript">
+
+In progress.
   </TabItem>
 </Tabs>
 
@@ -72,12 +80,22 @@ In the first step, the example initializes both the REST and Faucet clients. The
 <Tabs>
   <TabItem value="python" label="Python">
 
+```python
+:!: static/sdks/python/examples/transfer-coin.py section_1
 ```
-rest_client = RestClient(NODE_URL)
-faucet_client = FaucetClient(FAUCET_URL, rest_client)
+
+`common.py` initializes these values as such:
+```python
+:!: static/sdks/python/examples/common.py section_1
 ```
   </TabItem>
+  <TabItem value="rust" label="Rust">
+
+In progress.
+  </TabItem>
   <TabItem value="typescript" label="Typescript">
+
+In progress.
   </TabItem>
 </Tabs>
 
@@ -94,12 +112,17 @@ The next step is to create two accounts from the locally. [Accounts][account_bas
 <Tabs>
   <TabItem value="python" label="Python">
 
-```
-alice = Account.generate()
-bob = Account.generate()
+```python
+:!: static/sdks/python/examples/transfer-coin.py section_2
 ```
   </TabItem>
+  <TabItem value="rust" label="Rust">
+
+In progress.
+  </TabItem>
   <TabItem value="typescript" label="Typescript">
+
+In progress.
   </TabItem>
 </Tabs>
 
@@ -110,12 +133,17 @@ In Aptos, each account must have an on-chain representation in order to support 
 <Tabs>
   <TabItem value="python" label="Python">
 
-```
-faucet_client.fund_account(alice.address(), 20_000)
-faucet_client.fund_account(bob.address(), 0)
+```python
+:!: static/sdks/python/examples/transfer-coin.py section_3
 ```
   </TabItem>
+  <TabItem value="rust" label="Rust">
+
+In progress.
+  </TabItem>
   <TabItem value="typescript" label="Typescript">
+
+In progress.
   </TabItem>
 </Tabs>
 
@@ -126,13 +154,12 @@ In this step, the SDK translates a single call into the process of querying a re
 <Tabs>
   <TabItem value="python" label="Python">
 
-```
-print(f"Alice: {rest_client.account_balance(alice.address())}")
-print(f"Bob: {rest_client.account_balance(bob.address())}")
+```python
+:!: static/sdks/python/examples/transfer-coin.py section_4
 ```
 
 Behind the scenes, the SDK queries the CoinStore resource for the AptosCoin and reads the current stored value:
-```
+```python
 def account_balance(self, account_address: str) -> int:
     """Returns the test coin balance associated with the account"""
     return self.account_resource(
@@ -140,7 +167,13 @@ def account_balance(self, account_address: str) -> int:
     )["data"]["coin"]["value"]
 ```
   </TabItem>
+  <TabItem value="rust" label="Rust">
+
+In progress.
+  </TabItem>
   <TabItem value="typescript" label="Typescript">
+
+In progress.
   </TabItem>
 </Tabs>
 
@@ -151,41 +184,29 @@ Like the previous step, this is another helper step that constructs a transactio
 <Tabs>
   <TabItem value="python" label="Python">
 
-```
-txn_hash = rest_client.bcs_transfer(alice, bob.address(), 1_000)
+```python
+:!: static/sdks/python/examples/transfer-coin.py section_5
 ```
 
 Behind the scenes, the SDK generates, signs, and submits a transaction:
-```
-def bcs_transfer(
-    self, sender: Account, recipient: AccountAddress, amount: int
-) -> str:
-    transaction_arguments = [
-        TransactionArgument(recipient, Serializer.struct),
-        TransactionArgument(amount, Serializer.u64),
-    ]
-
-    payload = ScriptFunction.natural(
-        "0x1::coin",
-        "transfer",
-        [TypeTag(StructTag.from_str("0x1::aptos_coin::AptosCoin"))],
-        transaction_arguments,
-    )
-
-    signed_transaction = self.create_single_signer_bcs_transaction(
-        sender, TransactionPayload(payload)
-    )
-    return self.submit_bcs_transaction(signed_transaction)
+```python
+:!: static/sdks/python/aptos_sdk/client.py bcs_transfer
 ```
 
 Breaking the above down into pieces:<br/>
-(1) `transfer` internally is a `ScriptFunction` or an entry function in Move that is directly callable.<br/>
+(1) `transfer` internally is a `EntryFunction` or an entry function in Move that is directly callable.<br/>
 (2) The Move function is stored on the coin module: `0x1::coin`.<br/>
 (3) Because the Coin module can be used by other coins, the transfer must explicitly use a `TypeTag` to define which coin to transfer.<br/>
 (4) The transaction arguments must be placed into `TransactionArgument`s with type specifiers (`Serializer.{type}`), that will serialize the value into the appropriate type at transaction generation time.
 
   </TabItem>
+  <TabItem value="rust" label="Rust">
+
+In progress.
+  </TabItem>
   <TabItem value="typescript" label="Typescript">
+
+In progress.
   </TabItem>
 </Tabs>
 
@@ -196,11 +217,17 @@ The transaction hash can be used to query the status of a transaction:
 <Tabs>
   <TabItem value="python" label="Python">
 
-```
-rest_client.wait_for_transaction(txn_hash)
+```python
+:!: static/sdks/python/examples/transfer-coin.py section_6
 ```
   </TabItem>
+  <TabItem value="rust" label="Rust">
+
+In progress.
+  </TabItem>
   <TabItem value="typescript" label="Typescript">
+
+In progress.
   </TabItem>
 </Tabs>
 
