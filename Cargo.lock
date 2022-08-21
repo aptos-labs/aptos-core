@@ -1047,6 +1047,7 @@ dependencies = [
  "reqwest",
  "serde 1.0.143",
  "serde_json",
+ "thiserror",
  "tokio",
  "url",
 ]

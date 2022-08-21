@@ -20,6 +20,7 @@ use aptos_crypto::{
 };
 use aptos_keygen::KeyGen;
 use aptos_rest_client::aptos_api_types::HashValue;
+use aptos_rest_client::response::RestError;
 use aptos_rest_client::{Client, Transaction};
 use aptos_sdk::{
     move_types::{
@@ -103,6 +104,12 @@ impl CliError {
             CliError::UnableToReadFile(_, _) => "UnableToReadFile",
             CliError::UnexpectedError(_) => "UnexpectedError",
         }
+    }
+}
+
+impl From<RestError> for CliError {
+    fn from(e: RestError) -> Self {
+        CliError::ApiError(e.to_string())
     }
 }
 
