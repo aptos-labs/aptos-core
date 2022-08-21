@@ -22,7 +22,7 @@ const sidebars = {
 
     {
       type: "category",
-      label: "Aptos Quickstarts",
+      label: "Developer Tutorials",
       link: { type: "doc", id: "tutorials/index" },
       collapsible: true,
       collapsed: true,
