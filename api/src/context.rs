@@ -12,6 +12,7 @@ use aptos_crypto::HashValue;
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_state_view::StateView;
 use aptos_types::account_config::NewBlockEvent;
+use aptos_types::transaction::Transaction;
 use aptos_types::{
     account_address::AccountAddress,
     account_state::AccountState,
@@ -190,8 +191,11 @@ impl Context {
         )
     }
 
-    pub fn get_block_timestamp(&self, version: u64) -> Result<u64> {
-        self.db.get_block_timestamp(version)
+    pub fn get_block_timestamp<E: InternalError>(&self, version: u64) -> Result<u64, E> {
+        self.db
+            .get_block_timestamp(version)
+            .context("Failed to retrieve timestamp")
+            .map_err(|err| E::internal_with_code(err, AptosErrorCode::ReadFromStorageError))
     }
 
     pub fn get_block_by_height<E: StdApiError>(
@@ -292,10 +296,10 @@ impl Context {
         })
     }
 
-    pub fn render_transactions<E: InternalError>(
+    pub fn render_transactions_sequential<E: InternalError>(
         &self,
         data: Vec<TransactionOnChainData>,
-        timestamp: u64,
+        mut timestamp: u64,
     ) -> Result<Vec<aptos_api_types::Transaction>, E> {
         if data.is_empty() {
             return Ok(vec![]);
@@ -306,6 +310,34 @@ impl Context {
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
+                // Update the timestamp if the next block occurs
+                if let Transaction::BlockMetadata(ref txn) = t.transaction {
+                    timestamp = txn.timestamp_usecs();
+                }
+                let txn = converter.try_into_onchain_transaction(timestamp, t)?;
+                Ok(txn)
+            })
+            .collect::<Result<_, anyhow::Error>>()
+            .context("Failed to convert transaction data from storage")
+            .map_err(|err| E::internal_with_code(err, AptosErrorCode::InvalidBcsInStorageError))?;
+
+        Ok(txns)
+    }
+
+    pub fn render_transactions_non_sequential<E: InternalError>(
+        &self,
+        data: Vec<TransactionOnChainData>,
+    ) -> Result<Vec<aptos_api_types::Transaction>, E> {
+        if data.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let resolver = self.move_resolver_poem()?;
+        let converter = resolver.as_converter(self.db.clone());
+        let txns: Vec<aptos_api_types::Transaction> = data
+            .into_iter()
+            .map(|t| {
+                let timestamp = self.db.get_block_timestamp(t.version)?;
                 let txn = converter.try_into_onchain_transaction(timestamp, t)?;
                 Ok(txn)
             })
@@ -359,24 +391,28 @@ impl Context {
             .collect()
     }
 
-    pub fn get_account_transactions(
+    pub fn get_account_transactions<E: InternalError>(
         &self,
         address: AccountAddress,
         start_seq_number: u64,
         limit: u16,
         ledger_version: u64,
-    ) -> Result<Vec<TransactionOnChainData>> {
-        let txns = self.db.get_account_transactions(
-            address,
-            start_seq_number,
-            limit as u64,
-            true,
-            ledger_version,
-        )?;
+    ) -> Result<Vec<TransactionOnChainData>, E> {
+        let txns = self
+            .db
+            .get_account_transactions(
+                address,
+                start_seq_number,
+                limit as u64,
+                true,
+                ledger_version,
+            )
+            .map_err(|err| E::internal_with_code(err, AptosErrorCode::ReadFromStorageError))?;
         txns.into_inner()
             .into_iter()
             .map(|t| self.convert_into_transaction_on_chain_data(t))
             .collect::<Result<Vec<_>>>()
+            .map_err(|err| E::internal_with_code(err, AptosErrorCode::InvalidBcsInStorageError))
     }
 
     pub fn get_transaction_by_hash(
