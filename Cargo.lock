@@ -3688,8 +3688,8 @@ version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1320970ff3b1c1cacc6a38e8cdb1aced955f29627697cd992c5ded82eb646a8"
 dependencies = [
- "quote 1.0.21",
- "syn 1.0.99",
+ "quote 1.0.20",
+ "syn 1.0.98",
 ]
 
 [[package]]
