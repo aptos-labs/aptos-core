@@ -1,5 +1,5 @@
 {
-  "message": "resource not found by address(0x1), struct tag(0x1::reconfiguration::NotFound) and ledger version(0)",
-  "error_code": null,
-  "aptos_ledger_version": "0"
+  "message": "Resource not found by Address(0x1), Struct tag(0x1::reconfiguration::NotFound) and Ledger version(0)",
+  "error_code": "resource_not_found",
+  "vm_error_code": null
 }
