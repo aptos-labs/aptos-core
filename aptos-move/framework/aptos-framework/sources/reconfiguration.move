@@ -150,4 +150,23 @@ module aptos_framework::reconfiguration {
             },
         );
     }
+
+    // For tests, skips the guid validation.
+    #[test_only]
+    public fun initialize_for_test(account: &signer) {
+        system_addresses::assert_aptos_framework(account);
+        move_to<Configuration>(
+            account,
+            Configuration {
+                epoch: 0,
+                last_reconfiguration_time: 0,
+                events: event::new_event_handle<NewEpochEvent>(account),
+            }
+        );
+    }
+
+    #[test_only]
+    public fun reconfigure_for_test() acquires Configuration {
+        reconfigure();
+    }
 }
