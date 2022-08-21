@@ -514,13 +514,16 @@ impl TransactionsApi {
                     AptosErrorCode::MempoolIsFull,
                 ))
             }
-            MempoolStatusCode::VmError => Err(SubmitTransactionError::bad_request_str(&format!(
-                // FIXME: Add VM error code to errors
-                "invalid transaction: {}",
-                vm_status_opt
-                    .map(|s| format!("{:?}", s))
-                    .unwrap_or_else(|| "UNKNOWN".to_owned())
-            ))),
+            MempoolStatusCode::VmError => Err(SubmitTransactionError::bad_request_with_code(
+                &format!(
+                    // FIXME: Add VM error code to errors
+                    "invalid transaction: {}",
+                    vm_status_opt
+                        .map(|s| format!("{:?}", s))
+                        .unwrap_or_else(|| "UNKNOWN".to_owned())
+                ),
+                AptosErrorCode::InvalidInput,
+            )),
             MempoolStatusCode::InvalidSeqNumber => {
                 Err(SubmitTransactionError::bad_request_with_code(
                     mempool_status.message,
