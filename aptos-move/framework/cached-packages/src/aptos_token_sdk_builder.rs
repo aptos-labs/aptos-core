@@ -34,6 +34,31 @@ type Bytes = Vec<u8>;
 #[cfg_attr(feature = "fuzzing", derive(proptest_derive::Arbitrary))]
 #[cfg_attr(feature = "fuzzing", proptest(no_params))]
 pub enum EntryFunctionCall {
+    /// bidder should be able to cancel a bid and get fund back
+    BidCancelBid {
+        coin_type: TypeTag,
+        bid_id_creation_number: u64,
+    },
+
+    /// remove an listing for the direct listing records
+    ListingCancelDirectList {
+        coin_type: TypeTag,
+        listing_id_creation_number: u64,
+    },
+
+    /// creator use this function to direct list token for sale under their own account
+    ListingDirectListing {
+        coin_type: TypeTag,
+        creator: AccountAddress,
+        collection_name: Vec<u8>,
+        token_name: Vec<u8>,
+        property_version: u64,
+        amount: u64,
+        min_price: u64,
+        instant_sale: bool,
+        expiration_sec: u64,
+    },
+
     TokenBurn {
         creators_address: AccountAddress,
         collection: Vec<u8>,
@@ -148,6 +173,35 @@ impl EntryFunctionCall {
     pub fn encode(self) -> TransactionPayload {
         use EntryFunctionCall::*;
         match self {
+            BidCancelBid {
+                coin_type,
+                bid_id_creation_number,
+            } => bid_cancel_bid(coin_type, bid_id_creation_number),
+            ListingCancelDirectList {
+                coin_type,
+                listing_id_creation_number,
+            } => listing_cancel_direct_list(coin_type, listing_id_creation_number),
+            ListingDirectListing {
+                coin_type,
+                creator,
+                collection_name,
+                token_name,
+                property_version,
+                amount,
+                min_price,
+                instant_sale,
+                expiration_sec,
+            } => listing_direct_listing(
+                coin_type,
+                creator,
+                collection_name,
+                token_name,
+                property_version,
+                amount,
+                min_price,
+                instant_sale,
+                expiration_sec,
+            ),
             TokenBurn {
                 creators_address,
                 collection,
@@ -305,6 +359,76 @@ impl EntryFunctionCall {
             None
         }
     }
+}
+
+/// bidder should be able to cancel a bid and get fund back
+pub fn bid_cancel_bid(coin_type: TypeTag, bid_id_creation_number: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("bid").to_owned(),
+        ),
+        ident_str!("cancel_bid").to_owned(),
+        vec![coin_type],
+        vec![bcs::to_bytes(&bid_id_creation_number).unwrap()],
+    ))
+}
+
+/// remove an listing for the direct listing records
+pub fn listing_cancel_direct_list(
+    coin_type: TypeTag,
+    listing_id_creation_number: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("listing").to_owned(),
+        ),
+        ident_str!("cancel_direct_list").to_owned(),
+        vec![coin_type],
+        vec![bcs::to_bytes(&listing_id_creation_number).unwrap()],
+    ))
+}
+
+/// creator use this function to direct list token for sale under their own account
+pub fn listing_direct_listing(
+    coin_type: TypeTag,
+    creator: AccountAddress,
+    collection_name: Vec<u8>,
+    token_name: Vec<u8>,
+    property_version: u64,
+    amount: u64,
+    min_price: u64,
+    instant_sale: bool,
+    expiration_sec: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 3,
+            ]),
+            ident_str!("listing").to_owned(),
+        ),
+        ident_str!("direct_listing").to_owned(),
+        vec![coin_type],
+        vec![
+            bcs::to_bytes(&creator).unwrap(),
+            bcs::to_bytes(&collection_name).unwrap(),
+            bcs::to_bytes(&token_name).unwrap(),
+            bcs::to_bytes(&property_version).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
+            bcs::to_bytes(&min_price).unwrap(),
+            bcs::to_bytes(&instant_sale).unwrap(),
+            bcs::to_bytes(&expiration_sec).unwrap(),
+        ],
+    ))
 }
 
 pub fn token_burn(
@@ -644,6 +768,46 @@ pub fn token_transfers_offer_script(
 }
 mod decoder {
     use super::*;
+    pub fn bid_cancel_bid(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::BidCancelBid {
+                coin_type: script.ty_args().get(0)?.clone(),
+                bid_id_creation_number: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn listing_cancel_direct_list(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ListingCancelDirectList {
+                coin_type: script.ty_args().get(0)?.clone(),
+                listing_id_creation_number: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn listing_direct_listing(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::ListingDirectListing {
+                coin_type: script.ty_args().get(0)?.clone(),
+                creator: bcs::from_bytes(script.args().get(0)?).ok()?,
+                collection_name: bcs::from_bytes(script.args().get(1)?).ok()?,
+                token_name: bcs::from_bytes(script.args().get(2)?).ok()?,
+                property_version: bcs::from_bytes(script.args().get(3)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(4)?).ok()?,
+                min_price: bcs::from_bytes(script.args().get(5)?).ok()?,
+                instant_sale: bcs::from_bytes(script.args().get(6)?).ok()?,
+                expiration_sec: bcs::from_bytes(script.args().get(7)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn token_burn(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::TokenBurn {
@@ -840,6 +1004,18 @@ type EntryFunctionDecoderMap = std::collections::HashMap<
 static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMap> =
     once_cell::sync::Lazy::new(|| {
         let mut map: EntryFunctionDecoderMap = std::collections::HashMap::new();
+        map.insert(
+            "bid_cancel_bid".to_string(),
+            Box::new(decoder::bid_cancel_bid),
+        );
+        map.insert(
+            "listing_cancel_direct_list".to_string(),
+            Box::new(decoder::listing_cancel_direct_list),
+        );
+        map.insert(
+            "listing_direct_listing".to_string(),
+            Box::new(decoder::listing_direct_listing),
+        );
         map.insert("token_burn".to_string(), Box::new(decoder::token_burn));
         map.insert(
             "token_create_collection_script".to_string(),
